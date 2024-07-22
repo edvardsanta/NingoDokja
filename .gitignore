@@ -1,0 +1,39 @@
+# Ignore os binários compilados
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore diretórios específicos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Ignore dependências baixadas pelo Go Modules
+/pkg/mod/
+/pkg/sumdb/
+
+# Ignore arquivos gerados pelo Go
+*.out
+*.test
+*.log
+
+# Ignore pastas específicas de IDEs e editores
+.idea/
+.vscode/
+*.swp
+
+# Ignore arquivos de configuração específicos do usuário
+.env
+
+# Ignorar crawlers
+**/sites
+
+#
+.venv
+
+# torch
+libtorch
