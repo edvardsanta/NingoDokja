@@ -3,8 +3,10 @@ package fetcher
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/antchfx/htmlquery"
+	"github.com/go-resty/resty/v2"
 	"golang.org/x/net/html"
 )
 
@@ -26,4 +28,23 @@ func FetchHTML(url string) (*html.Node, error) {
 	}
 
 	return doc, nil
+}
+
+func FetchJson(url string, target interface{}) error {
+	client := resty.New()
+	client.SetTimeout(10 * time.Second)
+
+	resp, err := client.R().
+		SetHeader("Accept", "application/json").
+		SetHeader("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36").
+		SetResult(target).
+		Get(url)
+	if err != nil {
+		return fmt.Errorf("erro ao fazer o GET da URL: %v", err)
+	}
+
+	if resp.IsError() {
+		return fmt.Errorf("received non-200 response: %d", resp.StatusCode())
+	}
+	return nil
 }
