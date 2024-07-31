@@ -18,10 +18,18 @@ var commands = []Command{
 		Name:    "!news",
 		Execute: cnnNews,
 	},
+	{
+		Name:    "!olympic",
+		Execute: olympicDay,
+	},
 }
 
 func ping(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "Pong!")
+}
+
+func olympicDay(s *discordgo.Session, m *discordgo.MessageCreate) {
+	sendOlympicUpdates(s, m.ChannelID, "")
 }
 
 func cnnNews(s *discordgo.Session, m *discordgo.MessageCreate) {
