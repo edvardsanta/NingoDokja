@@ -8,19 +8,22 @@ import (
 )
 
 type Bot struct {
-	Session       *discordgo.Session
-	NewsChannelID string
-	GuildID       string
+	Session                  *discordgo.Session
+	NewsChannelID            string
+	GuildID                  string
+	OlympicChannelID         string
+	OlympicChannelFinishedID string
+	OlympicChannelRunningID  string
 }
 
-func NewBot(token, newsChannelID, guildID string) *Bot {
+func NewBot(token, newsChannelID, guildID, olympicChannelID, olympicChannelFinishedID, olympicChannelRunningID string) *Bot {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		logger.Error("Erro ao criar a sessão do Discord", err)
 		return nil
 	}
 
-	return &Bot{Session: dg, NewsChannelID: newsChannelID, GuildID: guildID}
+	return &Bot{Session: dg, NewsChannelID: newsChannelID, GuildID: guildID, OlympicChannelID: olympicChannelID, OlympicChannelFinishedID: olympicChannelFinishedID, OlympicChannelRunningID: olympicChannelRunningID}
 }
 
 func (b *Bot) Open() error {
