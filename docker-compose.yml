@@ -8,20 +8,27 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - 3000:3000
+    env_file:
+      - ./cmd/bot/.env.production
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - NEWS_CHANNEL_ID=${NEWS_CHANNEL_ID}
-      - OLYMPIC_CHANNEL_ID=${OLYMPIC_CHANNEL_ID}
-      - OLYMPIC_CHANNEL_FINISHED_ID=${OLYMPIC_CHANNEL_FINISHED_ID}
-      - OLYMPIC_CHANNEL_RUNNING_ID=${OLYMPIC_CHANNEL_RUNNING_ID}
-      - GUILD_ID=${GUILD_ID}
-      - ENVIRONMENT=development
-      - REDIS_ADDR=redis:6379
+      - APP_ENVIRONMENT=production
+      - APP_REDIS_ADDR=redis:6379
+      - APP_POSTGRES_HOST=postgres
+      - APP_POSTGRES_PORT=5432
     depends_on:
       - redis
-      
-  redis:
-    image: redis:latest
-    container_name: redis
+
+  postgres:
+    image: postgres:13.15
+    container_name: ningo_postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
-      - "6379:6379"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

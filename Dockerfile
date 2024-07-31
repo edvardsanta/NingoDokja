@@ -12,7 +12,7 @@ RUN go mod download
 COPY . ./
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o bot ./cmd/bot/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o ningodokja ./cmd/bot/main.go
 
 # # Optional:
 # # To bind to a TCP port, runtime parameters must be supplied to the docker command.
@@ -22,4 +22,4 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o bot ./cmd/bot/main.go
 # EXPOSE 8080
 
 # Run
-CMD ["./bot"]
+CMD ["./ningodokja"]
