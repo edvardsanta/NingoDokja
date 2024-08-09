@@ -1,6 +1,11 @@
 package bot
 
 import (
+	"log"
+	"read_books/internal/logger"
+	"read_books/internal/usecase/audio"
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -19,9 +24,52 @@ var commands = []Command{
 		Execute: cnnNews,
 	},
 	{
-		Name:    "!olympic",
+		Name:    "!olympic_medals",
 		Execute: olympicDay,
 	},
+	{
+		Name:    "!join",
+		Execute: joinVoiceChannel,
+	},
+	{
+		Name:    "!playradio",
+		Execute: playRadio,
+	},
+}
+
+func joinVoiceChannel(s *discordgo.Session, m *discordgo.MessageCreate) {
+	guild, err := s.State.Guild(m.GuildID)
+	if err != nil {
+		log.Printf("Erro encontrar servidor: %v", err)
+		return
+	}
+
+	if _, err := joinChannel(s, guild, m.Author.ID, true); err != nil {
+		logger.Error("Erro ao entrar no canal: %v", err)
+		return
+	}
+}
+func playRadio(s *discordgo.Session, m *discordgo.MessageCreate) {
+	url := getArgument(m.Content, 1)
+	if url == "" {
+		s.ChannelMessageSend(m.ChannelID, "Please provide a radio URL.")
+		return
+	}
+	guild, err := s.State.Guild(m.GuildID)
+	if err != nil {
+		log.Printf("Erro encontrar servidor: %v", err)
+		return
+	}
+	vc, err := joinChannel(s, guild, m.Author.ID, false)
+	if err != nil {
+		logger.Error("Erro ao entrar no canal: %v", err)
+		return
+	}
+
+	if err := audio.PlayRadioStream(vc, url); err != nil {
+		log.Printf("Error playing radio: %v", err)
+		s.ChannelMessageSend(m.ChannelID, "Failed to play radio.")
+	}
 }
 
 func ping(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -29,6 +77,7 @@ func ping(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func olympicDay(s *discordgo.Session, m *discordgo.MessageCreate) {
+	logger.Info("Enviando atualizações das olimpiadas")
 	sendOlympicUpdates(s, m.ChannelID, "")
 }
 
@@ -42,9 +91,17 @@ func HandleCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	for _, cmd := range commands {
-		if m.Content == cmd.Name {
+		if m.Content == cmd.Name || strings.HasPrefix(m.Content, cmd.Name+" ") {
 			cmd.Execute(s, m)
 			return
 		}
 	}
+}
+
+func getArgument(input string, index int) string {
+	parts := strings.Fields(input)
+	if index < len(parts) {
+		return parts[index]
+	}
+	return ""
 }
