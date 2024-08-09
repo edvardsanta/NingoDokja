@@ -102,6 +102,10 @@ func SendOlympicUpdates(session *discordgo.Session, runningChannelID string, fin
 	return nil
 }
 
+func SendOlympicMedals(session *discordgo.Session, channelId string) {
+
+}
+
 func getOlympicInfo() ([]olympyc_model.Unit, error) {
 	scraper := scraper.NewScraper("olympic")
 	var response olympyc_model.Response
