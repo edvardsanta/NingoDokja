@@ -65,7 +65,7 @@ func PlayAllSounds(vc *discordgo.VoiceConnection) error {
 						}
 
 						log.Printf("Tocando: %s", filePath)
-						if err := playStream(vc, "/home/vard/git_repos/my_repos/ningo_dokja/cmd/scripts/Gregorian Lauds to the Virgin Mary (LIVE from Mount Zion) – OFFICIUM PARVUM B.M.V..webm", false); err != nil {
+						if err := playStream(vc, "", false); err != nil {
 							log.Printf("Erro ao tocar som %v", err)
 						}
 					}
