@@ -65,7 +65,7 @@ func PlayAllSounds(vc *discordgo.VoiceConnection) error {
 						}
 
 						log.Printf("Tocando: %s", filePath)
-						if err := playStream(vc, "", false); err != nil {
+						if err := playStream(vc, filePath, false); err != nil {
 							log.Printf("Erro ao tocar som %v", err)
 						}
 					}
