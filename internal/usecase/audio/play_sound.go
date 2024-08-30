@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/iawia002/lux/downloader"
+	"github.com/iawia002/lux/extractors"
 	"gopkg.in/hraban/opus.v2"
 )
 
@@ -45,14 +47,14 @@ func PlayAllSounds(vc *discordgo.VoiceConnection) error {
 			}
 			files, err := os.ReadDir(pwd)
 			if err != nil {
-				log.Printf("Erro ao ler diretorio: %v", err)
+				logger.Error("Erro ao ler diretorio: %v", err)
 				return err
 			}
 
 			for _, file := range files {
 				select {
 				case <-stopChan:
-					log.Println("Playback stopped")
+					logger.Info("Playback parado")
 					return nil
 				default:
 					if file.Type().IsRegular() {
@@ -63,7 +65,7 @@ func PlayAllSounds(vc *discordgo.VoiceConnection) error {
 						}
 
 						log.Printf("Tocando: %s", filePath)
-						if err := playStream(vc, filePath, false); err != nil {
+						if err := playStream(vc, "/home/vard/git_repos/my_repos/ningo_dokja/cmd/scripts/Gregorian Lauds to the Virgin Mary (LIVE from Mount Zion) – OFFICIUM PARVUM B.M.V..webm", false); err != nil {
 							log.Printf("Erro ao tocar som %v", err)
 						}
 					}
@@ -112,6 +114,56 @@ func PlayRadioStream(vc *discordgo.VoiceConnection, radioURL string) error {
 
 	log.Printf("Playing radio stream: %s", radioURL)
 	return playStream(vc, radioURL, true)
+}
+
+func PlayVideoMp3(vc *discordgo.VoiceConnection, videoUrl string) error {
+	resetStopChan()
+
+	stopMutex.Lock()
+	stopChan = make(chan struct{})
+	stopMutex.Unlock()
+	err := StreamAudio(vc, videoUrl)
+	if err != nil {
+		log.Printf("Error during audio streaming: %v", err)
+		return err
+	}
+	return nil
+}
+
+func StreamAudio(vc *discordgo.VoiceConnection, url string) error {
+	data, err := extractors.Extract(url, extractors.Options{
+		Playlist: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	defaultDownloader := downloader.New(downloader.Options{
+		AudioOnly:    true,
+		MultiThread:  true,
+		ThreadNumber: 4,
+		RetryTimes:   3,
+	})
+
+	for _, item := range data {
+		if item.Err != nil {
+			return item.Err
+		}
+
+		err := defaultDownloader.Download(item)
+		if err != nil {
+			log.Printf("Error getting stream data: %v", err)
+			return err
+		}
+
+		err = playStream(vc, "streamData", false)
+		if err != nil {
+			log.Printf("Error playing stream: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func playStream(vc *discordgo.VoiceConnection, source string, isURL bool) error {

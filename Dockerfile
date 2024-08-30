@@ -1,5 +1,12 @@
 FROM golang:1.22.2
 
+# Instalar dependências necessárias para Opus e Opusfile
+RUN apt-get update && apt-get install -y \
+    libopus-dev \
+    libopusfile-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set destination for COPY
 WORKDIR /app
 
@@ -12,14 +19,11 @@ RUN go mod download
 COPY . ./
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o ningodokja ./cmd/bot/main.go
+RUN GOOS=linux go build -o ningodokja ./cmd/bot/main.go
 
-# # Optional:
-# # To bind to a TCP port, runtime parameters must be supplied to the docker command.
-# # But we can document in the Dockerfile what ports
-# # the application is going to listen on by default.
-# # https://docs.docker.com/reference/dockerfile/#expose
+
+# Expose the application port (uncomment if necessary)
 # EXPOSE 8080
 
-# Run
+# Run the application
 CMD ["./ningodokja"]

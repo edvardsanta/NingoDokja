@@ -35,6 +35,10 @@ var commands = []Command{
 		Name:    "!playradio",
 		Execute: playRadio,
 	},
+	{
+		Name:    "!playplaylist",
+		Execute: playPlaylist,
+	},
 }
 
 func joinVoiceChannel(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -67,6 +71,24 @@ func playRadio(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if err := audio.PlayRadioStream(vc, url); err != nil {
+		log.Printf("Error playing radio: %v", err)
+		s.ChannelMessageSend(m.ChannelID, "Failed to play radio.")
+	}
+}
+
+func playPlaylist(s *discordgo.Session, m *discordgo.MessageCreate) {
+	guild, err := s.State.Guild(m.GuildID)
+	if err != nil {
+		log.Printf("Erro encontrar servidor: %v", err)
+		return
+	}
+	vc, err := joinChannel(s, guild, m.Author.ID, false)
+	if err != nil {
+		logger.Error("Erro ao entrar no canal: %v", err)
+		return
+	}
+
+	if err := audio.PlayAllSounds(vc); err != nil {
 		log.Printf("Error playing radio: %v", err)
 		s.ChannelMessageSend(m.ChannelID, "Failed to play radio.")
 	}
