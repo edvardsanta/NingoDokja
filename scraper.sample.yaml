@@ -1,0 +1,4 @@
+scrapers:
+  - name: ExampleScraper
+    key: example
+    usecase: example
