@@ -1,69 +1,64 @@
 package audio
 
 import (
-	"bytes"
 	"encoding/binary"
-	"github.com/bwmarrin/discordgo"
-	"gopkg.in/hraban/opus.v2"
 	"log"
 	"os"
+	"read_books/internal/infrastructure/audio/decoder"
 )
 
 type AudioListener struct {
-	stopChan chan struct{}
-	doneChan chan struct{}
-	buffer   bytes.Buffer
-	filename string
-	pcmData  []int16
+	stopChan       chan struct{}
+	doneChan       chan struct{}
+	filename       string
+	pcmData        []int16
+	encodedPackets <-chan []byte
 }
 
-func NewAudioListener() *AudioListener {
+func NewAudioListener(encodedPackets <-chan []byte) *AudioListener {
 	return &AudioListener{
-		stopChan: make(chan struct{}),
-		doneChan: make(chan struct{}),
+		stopChan:       make(chan struct{}),
+		doneChan:       make(chan struct{}),
+		encodedPackets: encodedPackets,
 	}
 }
 
-func (l *AudioListener) Start(vc *discordgo.VoiceConnection, filename string) {
+func (l *AudioListener) Start(filename string) {
 	l.filename = filename
 	go func() {
-		decoder, err := opus.NewDecoder(48000, 2)
+		opusDecoder, err := decoder.NewOpusDecoder(48000, 2) // 48kHz, 2 canais (estéreo)
 		if err != nil {
 			log.Printf("Erro ao criar decoder Opus: %v", err)
 			close(l.doneChan)
 			return
 		}
 		log.Println("Gravando áudio em PCM... (Ctrl+C para parar)")
-		if vc == nil || vc.OpusRecv == nil {
-			log.Println("Conexão de voz inválida.")
-			close(l.doneChan)
-			return
-		}
 	loop:
 		for {
 			select {
 			case <-l.stopChan:
 				break loop
-			case pkt, ok := <-vc.OpusRecv:
+			case opusData, ok := <-l.encodedPackets:
 				if !ok {
-					log.Println("Canal de áudio fechado ou conexão de voz inválida.")
 					break loop
 				}
-				if pkt == nil || len(pkt.Opus) == 0 {
+				if err != nil {
+					log.Printf("Erro ao ler pacote Opus: %v", err)
+					break loop
+				}
+
+				if opusData == nil || len(opusData) == 0 {
 					silence := make([]int16, 960*2)
 					l.pcmData = append(l.pcmData, silence...)
 					continue
 				}
-				pcm := make([]int16, 960*2)
-				for i := range pcm {
-					pcm[i] = 0
-				}
-				n, err := decoder.Decode(pkt.Opus, pcm)
+
+				pcm, err := opusDecoder.Decode(opusData, 5760)
 				if err != nil {
 					log.Printf("Erro ao decodificar Opus: %v", err)
 					continue
 				}
-				l.pcmData = append(l.pcmData, pcm[:n*2]...)
+				l.pcmData = append(l.pcmData, pcm...)
 			}
 		}
 		close(l.doneChan)
