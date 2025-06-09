@@ -1,9 +1,7 @@
 package domain
 
-import "github.com/bwmarrin/discordgo"
-
 type PlayStrategy interface {
-	Play(vc *discordgo.VoiceConnection) error
+	Play() error
 	Stop() error
-	SetVolume(vc *discordgo.VoiceConnection, volume int) error
+	SetVolume(volume int) error
 }
