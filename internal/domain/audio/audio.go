@@ -14,6 +14,6 @@ type AudioEncoder interface {
 }
 
 type AudioDecoder interface {
-	Decode(data []byte, frames int, channels int) ([]int16, error)
+	Decode(data []byte, frames int) ([]int16, error)
 	Close() error
 }

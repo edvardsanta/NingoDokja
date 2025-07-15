@@ -3,10 +3,12 @@ package test
 import (
 	"gopkg.in/hraban/opus.v2"
 	"log"
+	"read_books/internal/infrastructure/audio/decoder"
 	"read_books/internal/infrastructure/audio/encoder"
 	domain "read_books/internal/infrastructure/audio/mic"
 	"read_books/internal/usecase/audio"
 	"read_books/internal/usecase/audio/strategy"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -36,9 +38,10 @@ func TestAudioListenerUseCase(t *testing.T) {
 			encodedPackets <- encoded
 		}
 	}()
-	audioListener := audio.NewAudioListener(encodedPackets)
+	decoderAudio, err := decoder.NewOpusDecoder(48000, 2)
+	audioListener := audio.NewAudioListener(encodedPackets, decoderAudio)
 	time.Sleep(1 * time.Second)
-	audioListener.Start("gravacao")
+	audioListener.Start()
 	time.Sleep(5 * time.Second)
 }
 
@@ -64,4 +67,17 @@ func TestPortAudioStream_Play_Stop(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
+}
+
+func TestRoundTripPCM(t *testing.T) {
+	original := []int16{100, -100, 200, -200}
+	encoder := encoder.NewPCMEncoderSource()
+	encoded, _ := encoder.Encode(original)
+
+	decoder := decoder.NewPcmDecoder(2) // supondo 2 canais
+	decoded, _ := decoder.Decode(encoded, 2)
+
+	if !reflect.DeepEqual(original, decoded) {
+		log.Fatal("Erro: dados não coincidem após encode/decode")
+	}
 }
