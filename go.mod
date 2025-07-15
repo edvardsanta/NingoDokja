@@ -15,6 +15,7 @@ require (
 	github.com/MercuryEngineering/CookieMonster v0.0.0-20180304172713-1584578b3403 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
+	github.com/alphacep/vosk-api/go v0.3.50 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/xmlquery v1.3.1 // indirect
 	github.com/bitly/go-simplejson v0.5.1 // indirect
