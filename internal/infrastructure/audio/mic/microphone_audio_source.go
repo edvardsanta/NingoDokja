@@ -2,13 +2,11 @@ package mic
 
 import (
 	"github.com/gordonklaus/portaudio"
-	"gopkg.in/hraban/opus.v2"
 )
 
 type MicrophoneSource struct {
-	stream  *portaudio.Stream
-	buffer  []int16
-	encoder *opus.Encoder
+	stream *portaudio.Stream
+	buffer []int16
 }
 
 func NewMicrophoneSource() (*MicrophoneSource, error) {
@@ -26,7 +24,7 @@ func NewMicrophoneSource() (*MicrophoneSource, error) {
 	}
 
 	buffer := make([]int16, 960) // 960 samples per channel, 2 channels
-	inputDevice := devices[0]
+	inputDevice := devices[16]
 
 	params := portaudio.StreamParameters{
 		Input: portaudio.StreamDeviceParameters{
@@ -53,17 +51,9 @@ func NewMicrophoneSource() (*MicrophoneSource, error) {
 		return nil, err
 	}
 
-	encoder, err := opus.NewEncoder(48000, 2, opus.AppAudio)
-	if err != nil {
-		stream.Close()
-		portaudio.Terminate()
-		return nil, err
-	}
-
 	return &MicrophoneSource{
-		stream:  stream,
-		buffer:  buffer,
-		encoder: encoder,
+		stream: stream,
+		buffer: buffer,
 	}, nil
 }
 
