@@ -35,9 +35,6 @@ func runBot(stop chan os.Signal) {
 				config.AppConfig.Bot.Token,
 				config.AppConfig.Bot.NewsChannelID,
 				config.AppConfig.Bot.GuildID,
-				config.AppConfig.Bot.OlympicChannelID,
-				config.AppConfig.Bot.OlympicChannelFinishedID,
-				config.AppConfig.Bot.OlympicChannelRunningID,
 			)
 			b.AddHandlers()
 
