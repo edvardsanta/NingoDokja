@@ -106,13 +106,9 @@ func loadFromFileAndEnv(configName, configType, configPath string) {
 
 func validateConfig() {
 	requiredFields := map[string]string{
-		"bot_token":                   AppConfig.Bot.Token,
-		"news_channel_id":             AppConfig.Bot.NewsChannelID,
-		"olympic_channel_id":          AppConfig.Bot.OlympicChannelID,
-		"olympic_channel_finished_id": AppConfig.Bot.OlympicChannelFinishedID,
-		"olympic_channel_running_id":  AppConfig.Bot.OlympicChannelRunningID,
-		"guild_id":                    AppConfig.Bot.GuildID,
-		"redis_addr":                  AppConfig.Redis.Addr,
+		"bot_token":       AppConfig.Bot.Token,
+		"news_channel_id": AppConfig.Bot.NewsChannelID,
+		"guild_id":        AppConfig.Bot.GuildID,
 		// "postgres_host":               AppConfig.Postgres.Host,
 		// "postgres_port":               AppConfig.Postgres.Port,
 		// "postgres_user":               AppConfig.Postgres.User,
