@@ -2,10 +2,8 @@ package bot
 
 import (
 	"fmt"
-	"read_books/internal/logger"
-	"read_books/internal/usecase/audio"
-
 	"github.com/bwmarrin/discordgo"
+	"read_books/internal/logger"
 )
 
 var slashCommands = []*discordgo.ApplicationCommand{
@@ -69,7 +67,7 @@ func handlePlayCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	// Processar o comando (por exemplo, entrar no canal de voz)
-	if _, err := joinChannel(s, guild, i.Member.User.ID, true); err != nil {
+	if _, err := joinChannel(s, guild, i.Member.User.ID); err != nil {
 		logger.Error("Erro ao entrar no canal: %v", err)
 		return
 	}
@@ -85,8 +83,6 @@ func editResponse(s *discordgo.Session, i *discordgo.InteractionCreate, content 
 	}
 }
 func handleStopCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	audio.StopPlaying()
-
 	response := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -114,54 +110,5 @@ func handleHelpCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 }
 
 func handlePlayRadioCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	url := i.ApplicationCommandData().Options[0].StringValue()
-	userID := i.Member.User.ID
-	guildID := i.GuildID
 
-	guild, err := s.State.Guild(guildID)
-	if err != nil {
-		logger.Error("Erro ao encontrar servidor: %v", err)
-		response := &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Erro ao encontrar servidor.",
-			},
-		}
-		s.InteractionRespond(i.Interaction, response)
-		return
-	}
-
-	vc, err := joinChannel(s, guild, userID, false)
-	if err != nil {
-		logger.Error("Erro ao entrar no canal: %v", err)
-		response := &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Erro ao entrar no canal.",
-			},
-		}
-		s.InteractionRespond(i.Interaction, response)
-		return
-	}
-
-	if err := audio.PlayRadioStream(vc, url); err != nil {
-		logger.Error("Erro ao tocar radio: %v", err)
-		response := &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Erro ao tocar radio.",
-			},
-		}
-		s.InteractionRespond(i.Interaction, response)
-		return
-	}
-
-	response := &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: fmt.Sprintf("Tocando radio: %s", url),
-		},
-	}
-
-	s.InteractionRespond(i.Interaction, response)
 }
