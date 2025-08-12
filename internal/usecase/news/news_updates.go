@@ -2,21 +2,29 @@ package news
 
 import (
 	"read_books/internal/logger"
-	scraper "read_books/internal/scraper/sites"
+	"read_books/internal/scraper/sites"
+	"read_books/internal/utils"
 
 	"github.com/bwmarrin/discordgo"
 )
 
-func SendNews(s *discordgo.Session, channelID string) error {
-	scraper := scraper.NewScraper("c_news")
+var (
+	scraperNews scraper.Scraper
+)
 
-	results, err := scraper.GetResultsByXpath()
+func init() {
+	useCase := utils.GetUsecaseFromPath()
+	scraperNews = scraper.NewScraper(useCase)
+}
+
+func SendNews(s *discordgo.Session, channelID string) error {
+	results, err := scraperNews.Fetch()
 	if err != nil {
 		logger.Error("Erro ao buscar por XPath", err)
 		return err
 	}
 
-	for _, newsUrl := range results {
+	for _, newsUrl := range results.([]string) {
 		_, err = s.ChannelMessageSend(channelID, newsUrl)
 		if err != nil {
 			logger.Error("Erro ao enviar a notícia", err)
