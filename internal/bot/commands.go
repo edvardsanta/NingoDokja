@@ -2,7 +2,7 @@ package bot
 
 import (
 	"log"
-	"read_books/internal/usecase/audio"
+	"read_books/internal/usecase/memes"
 	"read_books/internal/usecase/news"
 	"read_books/internal/usecase/olympics"
 
@@ -21,7 +21,11 @@ func sendOlympicMedals(session *discordgo.Session, channelID string) {
 	olympics.SendOlympicMedals(session, channelID)
 }
 
-func joinChannel(s *discordgo.Session, guild *discordgo.Guild, userId string, playSounds bool) (*discordgo.VoiceConnection, error) {
+func sendMemes(s *discordgo.Session, channelID string) {
+	memes.SendMemes(s, channelID)
+}
+
+func joinChannel(s *discordgo.Session, guild *discordgo.Guild, userId string) (*discordgo.VoiceConnection, error) {
 	var vc *discordgo.VoiceConnection
 	var err error
 	for _, vs := range guild.VoiceStates {
