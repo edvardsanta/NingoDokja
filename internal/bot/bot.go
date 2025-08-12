@@ -8,22 +8,19 @@ import (
 )
 
 type Bot struct {
-	Session                  *discordgo.Session
-	NewsChannelID            string
-	GuildID                  string
-	OlympicChannelID         string
-	OlympicChannelFinishedID string
-	OlympicChannelRunningID  string
+	Session       *discordgo.Session
+	NewsChannelID string
+	GuildID       string
 }
 
-func NewBot(token, newsChannelID, guildID, olympicChannelID, olympicChannelFinishedID, olympicChannelRunningID string) *Bot {
+func NewBot(token, newsChannelID, guildID string) *Bot {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		logger.Error("Erro ao criar a sessão do Discord", err)
 		return nil
 	}
 
-	return &Bot{Session: dg, NewsChannelID: newsChannelID, GuildID: guildID, OlympicChannelID: olympicChannelID, OlympicChannelFinishedID: olympicChannelFinishedID, OlympicChannelRunningID: olympicChannelRunningID}
+	return &Bot{Session: dg, NewsChannelID: newsChannelID, GuildID: guildID}
 }
 
 func (b *Bot) Open() error {
@@ -50,7 +47,6 @@ func (b *Bot) Close() {
 
 func (b *Bot) AddHandlers() {
 	b.Session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		// Verificar se a mensagem foi enviada no canal especificado
 		if m.ChannelID == b.NewsChannelID {
 			MessageCreateForSpecificChannel(s, m)
 		} else {
