@@ -30,8 +30,9 @@ Thumbs.db
 .env
 .env.production
 
-# Ignorar crawlers
-**/sites
+# Ignore crawlers
+**/*_scraper.go
+**/scraper/**/abstract_factory.go
 
 #
 .venv
@@ -41,3 +42,6 @@ libtorch
 
 # songs
 song
+
+# scraper
+scraper.yaml
