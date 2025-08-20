@@ -19,19 +19,10 @@ type RedisConfig struct {
 	Addr string `mapstructure:"redis_addr"`
 }
 
-type PostgresConfig struct {
-	Host     string `mapstructure:"postgres_host"`
-	Port     string `mapstructure:"postgres_port"`
-	User     string `mapstructure:"postgres_user"`
-	Password string `mapstructure:"postgres_password"`
-	DBName   string `mapstructure:"postgres_db_name"`
-}
-
 type Config struct {
-	Bot         BotConfig      `mapstructure:"bot"`
-	Redis       RedisConfig    `mapstructure:"redis"`
-	Postgres    PostgresConfig `mapstructure:"postgres"`
-	Environment string         `mapstructure:"environment"`
+	Bot         BotConfig   `mapstructure:"bot"`
+	Redis       RedisConfig `mapstructure:"redis"`
+	Environment string      `mapstructure:"environment"`
 }
 
 var AppConfig Config
@@ -51,7 +42,6 @@ func LoadConfig() {
 
 	var botConfig BotConfig
 	var redisConfig RedisConfig
-	var postgresConfig PostgresConfig
 
 	err := viper.Unmarshal(&botConfig)
 	if err != nil {
@@ -63,15 +53,9 @@ func LoadConfig() {
 		log.Fatalf("Não foi possível carregar a configuração do Redis: %v", err)
 	}
 
-	err = viper.Unmarshal(&postgresConfig)
-	if err != nil {
-		log.Fatalf("Não foi possível carregar a configuração do PostgreSQL: %v", err)
-	}
-	// Atribuir valores para a configuração global
 	AppConfig = Config{
-		Bot:      botConfig,
-		Redis:    redisConfig,
-		Postgres: postgresConfig,
+		Bot:   botConfig,
+		Redis: redisConfig,
 	}
 	validateConfig()
 }
