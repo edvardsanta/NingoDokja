@@ -3,11 +3,14 @@ package redis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"read_books/internal/infrastructure/pubsub"
 )
 
 type Subscriber struct {
 	client *redis.Client
 }
+
+var _ pubsub.Subscriber = (*Subscriber)(nil)
 
 func NewSubscriber(addr, password string, db int) *Subscriber {
 	rdb := redis.NewClient(&redis.Options{
@@ -25,4 +28,8 @@ func (s *Subscriber) Subscribe(ctx context.Context, channel string, handler func
 		handler(msg.Payload)
 	}
 	return nil
+}
+
+func (s *Subscriber) Close() error {
+	return s.client.Close()
 }
