@@ -12,7 +12,7 @@ stop_event = threading.Event()
 def event_dispatcher(subscriber: BaseSubscriber):
     try:
         while not stop_event.is_set():
-            message = subscriber.receive_item() # Simulated message for testing
+            message = subscriber.receive_item()
             if not message:
                 continue
 
@@ -39,7 +39,6 @@ def event_dispatcher(subscriber: BaseSubscriber):
 
 
 def main():
-
     event_thread = threading.Thread(
         target=event_dispatcher, args=(None,), daemon=True
     )
