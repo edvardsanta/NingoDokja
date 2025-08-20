@@ -1,9 +1,11 @@
 import threading
 import random
-from typing import List, Dict
+from typing import Dict
 
 from infra.storage import BaseStorage
 from logging_config import get_logger
+from models.Meme import Meme
+from utils.mapper import from_dict
 
 logger = get_logger(__name__)
 
@@ -17,10 +19,11 @@ class MemePool:
     def _scrape_and_store(self, scraper, max_items):
         memes : list[dict] = scraper.scrape(max_items=max_items)
         logger.debug(f"Scraped {len(memes)} memes")
-        for meme in memes:
-            url = meme.get("url")
-            if url and not self.storage.exists_meme(url):
-                self.storage.add_meme(meme)
+        for meme_dict in memes:
+            meme = from_dict(Meme, meme_dict)
+            url = meme.url
+            if url and not self.storage.exists(url):
+                self.storage.add(meme)
                 logger.debug(f"Stored meme: {url}")
 
     def refresh_pool(self, max_items_per_scraper=20):
@@ -37,8 +40,8 @@ class MemePool:
 
     def get_next_meme(self) -> Dict|None:
         logger.debug("Getting next meme")
-        all_memes = self.storage.get_all_memes()
+        all_memes: list[Meme] = self.storage.get_all()
         if not all_memes:
             return None
         meme_bytes = random.choice(all_memes)
-        return meme_bytes
+        return meme_bytes.to_dict() if meme_bytes else None
