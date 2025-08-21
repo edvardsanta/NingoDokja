@@ -9,13 +9,22 @@ T = TypeVar('T')
 logger = get_logger(__name__)
 
 class BaseHandler(ABC):
-    def __init__(self, storage : BaseStorage[T], publisher):
+    def __init__(self, storage: BaseStorage=None, publisher=None):
         self.storage = storage
-
-    def __call__(self, event_data):
-        logger.info(f"Handling {self.__class__.__name__} event: {event_data}")
-        self.persist(event_data)
+        self.publisher = publisher
 
     @abstractmethod
-    def persist(self, event_data):
-        pass
+    def validate_payload(self, payload: dict) -> bool:
+        """
+        Return True if payload is valid, False otherwise.
+        Must be overridden in subclasses.
+        """
+        return True
+
+    @abstractmethod
+    def handle(self, payload: dict):
+        """
+        Handle the request and return a result.
+        Must be overridden in subclasses.
+        """
+        raise NotImplementedError
