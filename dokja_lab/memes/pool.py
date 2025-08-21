@@ -1,7 +1,4 @@
 import threading
-import random
-from typing import Dict
-
 from infra.storage import BaseStorage
 from logging_config import get_logger
 from models.Meme import Meme
@@ -36,12 +33,3 @@ class MemePool:
 
         for t in threads:
             t.join()
-
-
-    def get_next_meme(self) -> Dict|None:
-        logger.debug("Getting next meme")
-        all_memes: list[Meme] = self.storage.get_all()
-        if not all_memes:
-            return None
-        meme_bytes = random.choice(all_memes)
-        return meme_bytes.to_dict() if meme_bytes else None
