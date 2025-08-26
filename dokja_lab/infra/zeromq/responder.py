@@ -1,10 +1,12 @@
 import json
+
 import zmq
 
 from infra.transport import BaseTransport
 from logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 class Responder(BaseTransport):
     def __init__(self, endpoint: str = "tcp://*:5556", handlers=None):
@@ -35,7 +37,10 @@ class Responder(BaseTransport):
 
                     handler = self.handlers.get(event_type)
                     if not handler:
-                        response = {"status": "error", "message": f"Unknown event_type '{event_type}'"}
+                        response = {
+                            "status": "error",
+                            "message": f"Unknown event_type '{event_type}'",
+                        }
                     else:
                         # Validate payload inside handler before doing anything
                         if not handler.validate_payload(payload):

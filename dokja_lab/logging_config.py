@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 def get_logger(name=None, level=logging.INFO, log_file=None):
     """
     Returns a centralized logger instance.
@@ -14,9 +15,7 @@ def get_logger(name=None, level=logging.INFO, log_file=None):
         return logger
 
     logger.setLevel(level)
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s")
 
     # Console handler
     ch = logging.StreamHandler(sys.stdout)

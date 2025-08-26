@@ -1,5 +1,5 @@
-from dataclasses import fields, asdict
-from typing import Type, TypeVar, Any, Dict
+from dataclasses import asdict, fields
+from typing import Any, Dict, Type, TypeVar
 
 T = TypeVar("T")
 

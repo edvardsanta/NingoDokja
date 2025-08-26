@@ -1,0 +1,95 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'dokja_lab/**'
+      - '.github/workflows/python.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'dokja_lab/**'
+      - '.github/workflows/python.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('dokja_lab/requirements.txt', 'dokja_lab/requirements-dev.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      working-directory: ./dokja_lab
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Lint with flake8
+      working-directory: ./dokja_lab
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Format check with black
+      working-directory: ./dokja_lab
+      run: |
+        black --check --diff .
+
+    - name: Import sorting check with isort
+      working-directory: ./dokja_lab
+      run: |
+        isort --check-only --diff .
+
+    - name: Type checking with mypy
+      working-directory: ./dokja_lab
+      run: |
+        mypy . --ignore-missing-imports --exclude migrations/
+
+    - name: Test with pytest
+      working-directory: ./dokja_lab
+      run: |
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./dokja_lab/coverage.xml
+        flags: python
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Docker image
+      working-directory: ./dokja_lab
+      run: |
+        docker build -t dokja-lab:latest .
+
+    - name: Test Docker image
+      run: |
+        docker run --rm dokja-lab:latest python -c "import main; print('Docker image working')"

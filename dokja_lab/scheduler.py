@@ -1,4 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
+
 from logging_config import get_logger
 
 logger = get_logger(__name__)

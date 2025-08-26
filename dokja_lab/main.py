@@ -1,13 +1,15 @@
 import signal
 import sys
+import threading
 
 from config import HANDLER_FACTORY
-from logging_config import get_logger
-import threading
+
 from infra.subscriber import BaseSubscriber
+from logging_config import get_logger
 
 logger = get_logger(__name__)
 stop_event = threading.Event()
+
 
 def event_dispatcher(subscriber: BaseSubscriber):
     try:
@@ -39,9 +41,7 @@ def event_dispatcher(subscriber: BaseSubscriber):
 
 
 def main():
-    event_thread = threading.Thread(
-        target=event_dispatcher, args=(None,), daemon=True
-    )
+    event_thread = threading.Thread(target=event_dispatcher, args=(None,), daemon=True)
 
     def shutdown(signum, frame):
         logger.info("Shutting down dispatcher...")

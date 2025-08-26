@@ -1,12 +1,16 @@
 import json
+
 from openai import OpenAI
+
 
 class ChatAgent:
     def __init__(self, api_key: str, base_url: str, model: str = "n/a"):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
 
-    def send_message(self, message: str, temperature: float = 0) -> dict[str, list[str|None]]:
+    def send_message(
+        self, message: str, temperature: float = 0
+    ) -> dict[str, list[str | None]]:
         """
         Send a message to the AI and return the response.
         """
@@ -14,7 +18,7 @@ class ChatAgent:
             model=self.model,
             messages=[{"role": "user", "content": message}],
             temperature=temperature,
-            extra_body={"include_retrieval_info": True}
+            extra_body={"include_retrieval_info": True},
         )
 
         # Extract message content
@@ -24,10 +28,7 @@ class ChatAgent:
         response_dict = response.to_dict()
         retrieval_info = response_dict.get("retrieval", {})
 
-        return {
-            "contents": contents,
-            "retrieval": retrieval_info
-        }
+        return {"contents": contents, "retrieval": retrieval_info}
 
     def print_response(self, message: str, temperature: float = 0):
         """

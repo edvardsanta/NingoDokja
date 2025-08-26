@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache
+.coverage
+htmlcov/
+.tox
+.mypy_cache
+*.egg-info/
+dist/
+build/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+tests/
+.pytest_cache/
+coverage.xml
+
+# Documentation
+docs/
+*.md
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Development dependencies
+requirements-dev.txt
+
+# Pre-commit
+.pre-commit-config.yaml

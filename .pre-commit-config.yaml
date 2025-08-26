@@ -1,0 +1,52 @@
+# Pre-commit configuration for dokja_lab
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-docstring-first
+
+  - repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+      - id: black
+        files: ^dokja_lab/
+        exclude: ^dokja_lab/migrations/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        files: ^dokja_lab/
+        exclude: ^dokja_lab/migrations/
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        files: ^dokja_lab/
+        exclude: ^dokja_lab/migrations/
+        args: [--max-line-length=88, --max-complexity=10]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.5.1
+    hooks:
+      - id: mypy
+        files: ^dokja_lab/
+        exclude: ^dokja_lab/(migrations|tests)/
+        additional_dependencies: [types-requests, types-redis]
+        args: [--ignore-missing-imports]
+
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest-check
+        entry: bash -c 'cd dokja_lab && python -m pytest tests/ --tb=short'
+        language: system
+        pass_filenames: false
+        always_run: true

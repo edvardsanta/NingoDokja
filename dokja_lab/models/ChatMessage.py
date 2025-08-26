@@ -1,7 +1,8 @@
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
+
 
 @dataclass
 class ChatMessage:
@@ -19,6 +20,4 @@ class ChatMessage:
     language: str = ""
 
     def __post_init__(self):
-        self.id_hash = hashlib.sha256(
-            self.request_message.encode("utf-8")
-        ).hexdigest()
+        self.id_hash = hashlib.sha256(self.request_message.encode("utf-8")).hexdigest()
