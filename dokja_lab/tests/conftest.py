@@ -1,6 +1,6 @@
 """Shared test fixtures and utilities for dokja_lab tests."""
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Type
 
 from handlers.base_handler import BaseHandler
 from logging_config import get_logger
