@@ -18,6 +18,5 @@ def main():
     signal.signal(signal.SIGTERM, shutdown)
 
 
-
 if __name__ == "__main__":
     main()
