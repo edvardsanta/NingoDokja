@@ -1,5 +1,6 @@
 import zmq
 
+
 class BaseSubscriber:
     def __init__(self, endpoint: str = "tcp://*:5555"):
         self.context = zmq.Context()

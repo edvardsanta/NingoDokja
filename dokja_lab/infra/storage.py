@@ -1,12 +1,20 @@
 import json
-import sqlite3
-from dataclasses import is_dataclass, fields
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Generic, TypeVar, Type, get_origin, Union, get_args, Optional
+from dataclasses import fields, is_dataclass
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+)
+
 import redis
 
 T = TypeVar("T")
+
 
 class BaseStorage(ABC, Generic[T]):
     def __init__(self, entity_cls: Type[T]):
@@ -87,5 +95,3 @@ class RedisStorage(BaseStorage[T]):
             data = json.loads(entity_data)
             data.update(updates)
             self.r.hset(self.data_key, entity_id, json.dumps(data))
-
-

@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import datetime
+
 from ai.chat_agent import ChatAgent
 from handlers.base_handler import BaseHandler
 from models.ChatMessage import ChatMessage
@@ -13,7 +14,7 @@ class MessageHandler(BaseHandler):
         self.chat_client = ChatAgent(api_key=api_key, base_url=base_url, model=model)
 
     from datetime import datetime
-    from typing import Optional, Dict, List
+    from typing import Dict, List, Optional
 
     def _dict_to_chatmessage(self, data: dict) -> ChatMessage:
         """
@@ -31,7 +32,7 @@ class MessageHandler(BaseHandler):
             cached=data.get("cached", False),
             emojis=ningo.get("emojis", []),
             tone=ningo.get("tone", ""),
-            language=ningo.get("language", "")
+            language=ningo.get("language", ""),
         )
 
     def persist(self, event_data):

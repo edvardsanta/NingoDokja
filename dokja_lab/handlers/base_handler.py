@@ -4,12 +4,13 @@ from typing import TypeVar
 from infra.storage import BaseStorage
 from logging_config import get_logger
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
+
 class BaseHandler(ABC):
-    def __init__(self, storage: BaseStorage=None, publisher=None):
+    def __init__(self, storage: BaseStorage = None, publisher=None):
         self.storage = storage
         self.publisher = publisher
 

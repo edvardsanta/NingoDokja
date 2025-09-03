@@ -2,11 +2,12 @@ import json
 import sqlite3
 from dataclasses import fields
 from datetime import datetime
-from typing import TypeVar, Type, get_origin, Union, get_args, Optional, Any, Dict
+from typing import Any, Dict, Optional, Type, TypeVar, Union, get_args, get_origin
 
 from infra.storage import BaseStorage
 
 T = TypeVar("T")
+
 
 class SQLiteStorage(BaseStorage[T]):
     def __init__(self, db_file: str, entity_cls: Type[T]):
@@ -64,7 +65,10 @@ class SQLiteStorage(BaseStorage[T]):
         values = tuple(entity_dict.values())
 
         try:
-            cursor.execute(f"INSERT INTO {self.table_name} ({columns}) VALUES ({placeholders})", values)
+            cursor.execute(
+                f"INSERT INTO {self.table_name} ({columns}) VALUES ({placeholders})",
+                values,
+            )
             self.conn.commit()
             return True
         except sqlite3.IntegrityError:  # duplicate primary key
@@ -86,7 +90,9 @@ class SQLiteStorage(BaseStorage[T]):
 
         init_field_names = {f.name for f in fields(self.entity_cls) if f.init}
         init_kwargs = {k: v for k, v in row_dict.items() if k in init_field_names}
-        non_init_fields = {k: v for k, v in row_dict.items() if k not in init_field_names}
+        non_init_fields = {
+            k: v for k, v in row_dict.items() if k not in init_field_names
+        }
 
         entity = self.entity_cls(**init_kwargs)
         for k, v in non_init_fields.items():
@@ -98,29 +104,29 @@ class SQLiteStorage(BaseStorage[T]):
 
     def get_filtered(self, **filters) -> List[T]:
         """
-           Retrieve a list of entities from the database filtered by the given keyword arguments.
+        Retrieve a list of entities from the database filtered by the given keyword arguments.
 
-           This method dynamically constructs a SQL SELECT query based on the provided filters.
-           Only columns that match the fields of the entity class are selected. The results
-           are returned as instances of `self.entity_cls`, with all fields properly initialized.
+        This method dynamically constructs a SQL SELECT query based on the provided filters.
+        Only columns that match the fields of the entity class are selected. The results
+        are returned as instances of `self.entity_cls`, with all fields properly initialized.
 
-           Parameters:
-               **filters: Arbitrary keyword arguments where the key is the column/field name
-                          and the value is the value to filter by. Multiple filters are combined
-                          using AND in the SQL WHERE clause.
-                          Example: get_filtered(name="Alice", age=30)
+        Parameters:
+            **filters: Arbitrary keyword arguments where the key is the column/field name
+                       and the value is the value to filter by. Multiple filters are combined
+                       using AND in the SQL WHERE clause.
+                       Example: get_filtered(name="Alice", age=30)
 
-           Returns:
-               List[T]: A list of entities of type `self.entity_cls` matching the filter criteria.
+        Returns:
+            List[T]: A list of entities of type `self.entity_cls` matching the filter criteria.
 
-           Behavior:
-               - Constructs a SELECT query for all columns of the entity.
-               - Applies WHERE conditions based on filters if provided.
-               - Executes the query and fetches all matching rows.
-               - Converts each row to an instance of `self.entity_cls`.
-                 - Fields that are declared in `__init__` are passed as constructor arguments.
-                 - Fields not in `__init__` are set using `setattr`.
-           """
+        Behavior:
+            - Constructs a SELECT query for all columns of the entity.
+            - Applies WHERE conditions based on filters if provided.
+            - Executes the query and fetches all matching rows.
+            - Converts each row to an instance of `self.entity_cls`.
+              - Fields that are declared in `__init__` are passed as constructor arguments.
+              - Fields not in `__init__` are set using `setattr`.
+        """
         col_names = [f.name for f in fields(self.entity_cls)]
         conditions = [f"{k} = ?" for k in filters.keys()]
         query = f"SELECT {', '.join(col_names)} FROM {self.table_name}"
@@ -137,7 +143,9 @@ class SQLiteStorage(BaseStorage[T]):
             row_dict = dict(zip(col_names, row))
             init_field_names = {f.name for f in fields(self.entity_cls) if f.init}
             init_kwargs = {k: v for k, v in row_dict.items() if k in init_field_names}
-            non_init_fields = {k: v for k, v in row_dict.items() if k not in init_field_names}
+            non_init_fields = {
+                k: v for k, v in row_dict.items() if k not in init_field_names
+            }
 
             entity = self.entity_cls(**init_kwargs)
             for k, v in non_init_fields.items():
@@ -150,8 +158,7 @@ class SQLiteStorage(BaseStorage[T]):
     def get_by_id_hash(self, entity_hash: str) -> Optional[T]:
         cursor = self.conn.cursor()
         cursor.execute(
-            f"SELECT * FROM {self.table_name} WHERE id_hash = ?",
-            (entity_hash,)
+            f"SELECT * FROM {self.table_name} WHERE id_hash = ?", (entity_hash,)
         )
         row = cursor.fetchone()
         if not row:
@@ -162,7 +169,9 @@ class SQLiteStorage(BaseStorage[T]):
 
         init_field_names = {f.name for f in fields(self.entity_cls) if f.init}
         init_kwargs = {k: v for k, v in row_dict.items() if k in init_field_names}
-        non_init_fields = {k: v for k, v in row_dict.items() if k not in init_field_names}
+        non_init_fields = {
+            k: v for k, v in row_dict.items() if k not in init_field_names
+        }
 
         entity = self.entity_cls(**init_kwargs)
 
@@ -195,5 +204,7 @@ class SQLiteStorage(BaseStorage[T]):
         set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
         values = tuple(updates.values()) + (entity_id,)
         cursor = self.conn.cursor()
-        cursor.execute(f"UPDATE {self.table_name} SET {set_clause} WHERE {pk} = ?", values)
+        cursor.execute(
+            f"UPDATE {self.table_name} SET {set_clause} WHERE {pk} = ?", values
+        )
         self.conn.commit()

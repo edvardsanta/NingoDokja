@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Type, Any, Tuple
+from typing import Any, Dict, Optional, Type
 
 from handlers.base_handler import BaseHandler
 from logging_config import get_logger
@@ -11,22 +11,24 @@ class HandlerFactory:
         self._registry = {}
 
     def register_handler(
-            self,
-            handler_name: str,
-            event_type: str,
-            handler_cls: Type[BaseHandler],
-            storage: Optional[Any] = None,
-            publisher: Optional[Any] = None,
-            args: Optional[Dict[str, Any]] = None
+        self,
+        handler_name: str,
+        event_type: str,
+        handler_cls: Type[BaseHandler],
+        storage: Optional[Any] = None,
+        publisher: Optional[Any] = None,
+        args: Optional[Dict[str, Any]] = None,
     ):
         """Register a handler class along with its dependencies."""
-        self._registry.setdefault(event_type, []).append({
-            "name": handler_name,
-            "cls": handler_cls,
-            "storage": storage,
-            "publisher": publisher,
-            "args": args or {}
-        })
+        self._registry.setdefault(event_type, []).append(
+            {
+                "name": handler_name,
+                "cls": handler_cls,
+                "storage": storage,
+                "publisher": publisher,
+                "args": args or {},
+            }
+        )
 
     def get_handlers(self, event_type: str) -> Dict[str, BaseHandler]:
         """
@@ -36,9 +38,7 @@ class HandlerFactory:
         handlers_info = self._registry.get(event_type, [])
         return {
             info["name"]: info["cls"](
-                storage=info["storage"],
-                publisher=info["publisher"],
-                **info["args"]
+                storage=info["storage"], publisher=info["publisher"], **info["args"]
             )
             for info in handlers_info
         }
