@@ -102,19 +102,18 @@ class SQLiteStorage(BaseStorage[T]):
 
     from typing import Callable, List
 
-    def get_filtered(self, **filters) -> List[T]:
+    def get_filtered(
+        self, order_by=None, order_dir="DESC", limit=None, **filters
+    ) -> List[T]:
         """
         Retrieve a list of entities from the database filtered by the given keyword arguments.
-
-        This method dynamically constructs a SQL SELECT query based on the provided filters.
-        Only columns that match the fields of the entity class are selected. The results
-        are returned as instances of `self.entity_cls`, with all fields properly initialized.
+        Supports optional ordering and limiting.
 
         Parameters:
-            **filters: Arbitrary keyword arguments where the key is the column/field name
-                       and the value is the value to filter by. Multiple filters are combined
-                       using AND in the SQL WHERE clause.
-                       Example: get_filtered(name="Alice", age=30)
+            order_by: column name to order by
+            order_dir: 'ASC' or 'DESC' (default 'DESC')
+            limit: max number of results
+            **filters: column=value filters
 
         Returns:
             List[T]: A list of entities of type `self.entity_cls` matching the filter criteria.
@@ -132,6 +131,10 @@ class SQLiteStorage(BaseStorage[T]):
         query = f"SELECT {', '.join(col_names)} FROM {self.table_name}"
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
+        if order_by:
+            query += f" ORDER BY {order_by} {order_dir}"
+        if limit:
+            query += f" LIMIT {limit}"
 
         with self.conn as conn:
             cursor = conn.cursor()
@@ -205,6 +208,25 @@ class SQLiteStorage(BaseStorage[T]):
         values = tuple(updates.values()) + (entity_id,)
         cursor = self.conn.cursor()
         cursor.execute(
+            f"UPDATE {self.table_name} SET {set_clause} WHERE {pk} = ?", values
+        )
+        self.conn.commit()
+
+    def update_many(self, entity_ids: list[Any], updates: Dict[str, Any]) -> None:
+        pk = fields(self.entity_cls)[0].name
+        # Identifica campos datetime no model
+        datetime_fields = {
+            f.name for f in fields(self.entity_cls) if f.type == datetime
+        }
+        # Converte valores datetime para string ISO
+        safe_updates = updates.copy()
+        for k in updates:
+            if k in datetime_fields and isinstance(updates[k], datetime):
+                safe_updates[k] = updates[k].isoformat()
+        set_clause = ", ".join(f"{k} = ?" for k in safe_updates.keys())
+        values = [tuple(safe_updates.values()) + (id_,) for id_ in entity_ids]
+        cursor = self.conn.cursor()
+        cursor.executemany(
             f"UPDATE {self.table_name} SET {set_clause} WHERE {pk} = ?", values
         )
         self.conn.commit()

@@ -43,7 +43,9 @@ class BaseStorage(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def get_filtered(self, **filters) -> List[T]:
+    def get_filtered(
+        self, order_by=None, order_dir="DESC", limit=None, **filters
+    ) -> List[T]:
         """Get entities filtered by SQL conditions."""
         pass
 
@@ -53,6 +55,10 @@ class BaseStorage(ABC, Generic[T]):
 
     @abstractmethod
     def update(self, entity_id: Any, updates: Dict[str, Any]) -> None:
+        pass
+
+    @abstractmethod
+    def update_many(self, entity_ids: List[Any], updates: Dict[str, Any]) -> None:
         pass
 
 
