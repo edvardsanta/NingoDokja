@@ -11,20 +11,40 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type Bot struct {
-	Session       *discordgo.Session
-	NewsChannelID string
-	GuildID       string
+type ChannelType int
+
+const (
+	ChannelTypeUnknown ChannelType = iota
+	ChannelTypeNews
+	ChannelTypeMemes
+	ChannelTypeSports
+	ChannelTypeChat
+)
+
+type Channel struct {
+	ID   string
+	Name string
+	Type ChannelType
+	// Add more metadata if needed
 }
 
-func NewBot(token, newsChannelID, guildID string) *Bot {
+type Bot struct {
+	Session  *discordgo.Session
+	Channels map[string]*Channel // key: channel ID
+	GuildID  string
+}
+
+func NewBot(token string, channels []*Channel, guildID string) *Bot {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		logger.Error("Erro ao criar a sessão do Discord", err)
 		return nil
 	}
-
-	return &Bot{Session: dg, NewsChannelID: newsChannelID, GuildID: guildID}
+	chMap := make(map[string]*Channel)
+	for _, ch := range channels {
+		chMap[ch.ID] = ch
+	}
+	return &Bot{Session: dg, Channels: chMap, GuildID: guildID}
 }
 
 func (b *Bot) Open() error {
@@ -54,9 +74,15 @@ func (b *Bot) Close() {
 
 func (b *Bot) AddHandlers() {
 	b.Session.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
-		if m.ChannelID == b.NewsChannelID {
+		channel, ok := b.Channels[m.ChannelID]
+		if !ok {
+			channel = &Channel{ID: m.ChannelID, Type: ChannelTypeUnknown}
+		}
+
+		switch channel.Type {
+		case ChannelTypeNews:
 			MessageCreateForSpecificChannel(s, m)
-		} else {
+		default:
 			MessageCreate(s, m)
 		}
 	})
@@ -70,11 +96,31 @@ func (b *Bot) AddHandlers() {
 }
 
 func StartBotComponent(stop chan os.Signal) {
+	channels := []*Channel{}
+	for _, chCfg := range config.AppConfig.Bot.Channels {
+		var chType ChannelType
+		switch chCfg.Type {
+		case "news":
+			chType = ChannelTypeNews
+		case "memes":
+			chType = ChannelTypeMemes
+		case "chat":
+			chType = ChannelTypeChat
+		default:
+			chType = ChannelTypeUnknown
+		}
+		channels = append(channels, &Channel{
+			ID:   chCfg.ID,
+			Name: chCfg.Name,
+			Type: chType,
+		})
+	}
+
 	err := retry.Do(
 		func() error {
 			b := NewBot(
 				config.AppConfig.Bot.Token,
-				config.AppConfig.Bot.NewsChannelID,
+				channels,
 				config.AppConfig.Bot.GuildID,
 			)
 			if b == nil {
