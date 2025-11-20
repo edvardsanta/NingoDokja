@@ -2,8 +2,12 @@ package bot
 
 import (
 	"fmt"
+	"os"
+	"read_books/internal/config"
 	"read_books/internal/logger"
+	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -33,7 +37,7 @@ func (b *Bot) Open() error {
 	for _, v := range slashCommands {
 		_, err := b.Session.ApplicationCommandCreate(b.Session.State.User.ID, b.GuildID, v)
 		if err != nil {
-			fmt.Printf("Não foi poossivel criar o comando '%v': %v", v.Name, err)
+			logger.ErrorPrintf("Não foi poossivel criar o comando '%v': %v", v.Name, err)
 		}
 	}
 	b.StartScheduler()
@@ -42,7 +46,10 @@ func (b *Bot) Open() error {
 }
 
 func (b *Bot) Close() {
-	b.Session.Close()
+	err := b.Session.Close()
+	if err != nil {
+		return
+	}
 }
 
 func (b *Bot) AddHandlers() {
@@ -60,4 +67,38 @@ func (b *Bot) AddHandlers() {
 			HandleSlashCommands(s, i)
 		}
 	})
+}
+
+func StartBotComponent(stop chan os.Signal) {
+	err := retry.Do(
+		func() error {
+			b := NewBot(
+				config.AppConfig.Bot.Token,
+				config.AppConfig.Bot.NewsChannelID,
+				config.AppConfig.Bot.GuildID,
+			)
+			if b == nil {
+				return fmt.Errorf("failed to create bot instance")
+			}
+			b.AddHandlers()
+
+			err := b.Open()
+			if err != nil {
+				logger.Error("Erro ao abrir a conexão com o Discord", err)
+				return err
+			}
+
+			logger.Info("Ningo Dokja está rodando. Pressione CTRL+C para sair.")
+			<-stop
+			b.Close()
+			return nil
+		},
+		retry.Attempts(3),
+		retry.Delay(5*time.Second),
+		retry.DelayType(retry.FixedDelay),
+	)
+
+	if err != nil {
+		logger.Error("Erro ao executar o bot", err)
+	}
 }
