@@ -1,0 +1,6 @@
+FROM docker.io/python:3.13-slim
+
+WORKDIR /workspace
+
+COPY dokja_lab/requirements.txt /tmp/dokja_lab_requirements.txt
+RUN pip install --no-cache-dir -r /tmp/dokja_lab_requirements.txt
