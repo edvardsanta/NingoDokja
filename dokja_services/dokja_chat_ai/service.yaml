@@ -1,0 +1,27 @@
+name: dokja-chat-ai
+description: Standalone AI service responsible for chat completion requests and retrieval metadata
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - http
+
+consumes:
+  - http
+
+depends_on: []
+
+tags:
+  - domain:chat
+  - criticality:medium
+
+paths:
+  source: ./
+  tests: ./tests
+  docs: ./docs
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev
