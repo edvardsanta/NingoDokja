@@ -1,0 +1,32 @@
+name: dokja-orchestrator
+description: Central orchestration service that receives interface traffic, plans workflows, dispatches domains, and coordinates downstream services
+
+type: orchestration
+language: go
+entrypoint: ./cmd/va/main.go
+
+exposes:
+  - http
+  - zmq-pubsub
+  - zmq-reqrep
+
+consumes:
+  - http
+  - zmq-pubsub
+  - zmq-reqrep
+
+depends_on:
+  - dokja-services
+
+tags:
+  - domain:orchestration
+  - criticality:high
+
+paths:
+  source: ./internal
+  tests: ./internal
+  docs: ./README.md
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile
