@@ -1,0 +1,114 @@
+services:
+  dokja-orchestrator:
+    build:
+      context: .
+      dockerfile: dokja_orch/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      VA_ZMQ_ENDPOINT: ${VA_ZMQ_ENDPOINT}
+      VA_ZMQ_TOPIC: ${VA_ZMQ_TOPIC}
+      VA_ZMQ_REQUEST_ENDPOINT: ${VA_ZMQ_REQUEST_ENDPOINT}
+      VA_HTTP_ENDPOINT: ${VA_HTTP_ENDPOINT}
+      VA_RESPONSE_MODE: ${VA_RESPONSE_MODE}
+      MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT}
+      CHAT_AI_SERVICE_ENDPOINT: ${CHAT_AI_SERVICE_ENDPOINT}
+      DISCORD_INTERFACE_ENDPOINT: ${DISCORD_INTERFACE_ENDPOINT}
+      DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
+    ports:
+      - "5555:5555"
+      - "5558:5558"
+      - "8091:8091"
+    depends_on:
+      - dokja-meme
+      - dokja-chat-ai
+    networks:
+      - dokja-net
+
+  dokja-meme:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_meme/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT_BIND}
+      MEME_SERVICE_DB_FILE: ${MEME_SERVICE_DB_FILE}
+      MEME_SERVICE_SCRAPERS: ${MEME_SERVICE_SCRAPERS}
+    ports:
+      - "5557:5557"
+    volumes:
+      - dokja-data:/data
+    networks:
+      - dokja-net
+
+  dokja-chat-ai:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_chat_ai/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      CHAT_AI_SERVICE_HOST: ${CHAT_AI_SERVICE_HOST}
+      CHAT_AI_SERVICE_PORT: ${CHAT_AI_SERVICE_PORT}
+      CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
+      CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
+      CHAT_AI_MODEL: ${CHAT_AI_MODEL}
+    ports:
+      - "8080:8080"
+    networks:
+      - dokja-net
+
+  dokja-discord:
+    build:
+      context: .
+      dockerfile: dokja_interfaces/discord/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
+      DOKJA_ORCH_HTTP_ENDPOINT: ${DOKJA_ORCH_HTTP_ENDPOINT}
+      DOKJA_DISCORD_DELIVERY_PORT: ${DOKJA_DISCORD_DELIVERY_PORT}
+      DOKJA_DISCORD_API_BASE_URL: ${DOKJA_DISCORD_API_BASE_URL}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS}
+      DISCORD_DM_POLICY: ${DISCORD_DM_POLICY}
+      OPENCLAW_ORCHESTRATOR_TIMEOUT_MS: ${OPENCLAW_ORCHESTRATOR_TIMEOUT_MS}
+    ports:
+      - "8092:8092"
+    depends_on:
+      - dokja-orchestrator
+    networks:
+      - dokja-net
+
+  dokja-scheduler:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_scheduler/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      DOKJA_SCHEDULER_EVENT_ENDPOINT: ${DOKJA_SCHEDULER_EVENT_ENDPOINT}
+      DOKJA_SCHEDULER_TOPIC: ${DOKJA_SCHEDULER_TOPIC}
+      DOKJA_SCHEDULER_MEME_REFRESH_INTERVAL: ${DOKJA_SCHEDULER_MEME_REFRESH_INTERVAL}
+      DOKJA_SCHEDULER_MEME_DISPATCH_INTERVAL: ${DOKJA_SCHEDULER_MEME_DISPATCH_INTERVAL}
+      DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD: ${DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD}
+      DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS: ${DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS}
+      DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT: ${DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT}
+    depends_on:
+      - dokja-orchestrator
+    networks:
+      - dokja-net
+
+networks:
+  dokja-net:
+    driver: bridge
+
+volumes:
+  dokja-data:

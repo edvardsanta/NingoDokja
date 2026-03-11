@@ -11,7 +11,10 @@ from typing import (
     TypeVar,
 )
 
-import redis
+try:
+    import redis
+except ImportError:  # pragma: no cover
+    redis = None
 
 T = TypeVar("T")
 
@@ -67,6 +70,8 @@ class RedisStorage(BaseStorage[T]):
     # TODO: Implement BaseStorage correctly for RedisStorage
     def __init__(self, entity_cls: Type[T], host="localhost", port=6379, db=0):
         super().__init__(entity_cls)
+        if redis is None:
+            raise RuntimeError("redis package is required for RedisStorage")
         self.r = redis.Redis(host=host, port=port, db=db)
         self.set_key = f"{self.entity_cls.__name__.lower()}:set"
         self.data_key = f"{self.entity_cls.__name__.lower()}:data"

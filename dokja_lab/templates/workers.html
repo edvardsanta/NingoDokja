@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Workers Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Workers Status</h1>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Worker</th>
+                <th>Status</th>
+                <th>Última execução</th>
+                <th>Próxima execução</th>
+                <th>Exception</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for worker, info in workers.items() %}
+            <tr>
+                <td>{{ worker }}</td>
+                <td>
+                    {% if info['status'] == 'success' %}
+                        <span class="badge bg-success">Success</span>
+                    {% elif info['status'] == 'error' %}
+                        <span class="badge bg-danger">Error</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ info['status'] }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if info['timestamp'] %}
+                        {{ info['timestamp'] }}
+                    {% else %}
+                        Ainda não iniciado
+                    {% endif %}
+                </td>
+                <td>
+                    {% if info['next_run'] %}
+                        {{ info['next_run'] }}
+                    {% else %}
+                        Ainda não iniciado
+                    {% endif %}
+                </td>
+                <td>
+                    {% if info['status'] == 'error' %}
+                        {{ info['exception'] }}
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-warning btn-sm" onclick="controlWorker('{{ worker }}', 'pause')">Pause</button>
+                    <button class="btn btn-success btn-sm" onclick="controlWorker('{{ worker }}', 'resume')">Resume</button>
+                    <button class="btn btn-primary btn-sm" onclick="controlWorker('{{ worker }}', 'restart')">Restart</button>
+                    <button class="btn btn-secondary btn-sm" onclick="controlWorker('{{ worker }}', 'execute_now')">Execute Now</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div id="feedback" class="mt-3"></div>
+</div>
+<script>
+function controlWorker(workerId, action) {
+    fetch(`/worker/${workerId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json().then(data => ({status: response.status, body: data})))
+    .then(result => {
+        const feedback = document.getElementById('feedback');
+        if (result.status === 200 && result.body.success) {
+            feedback.innerHTML = `<div class='alert alert-success'>${result.body.message}</div>`;
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            feedback.innerHTML = `<div class='alert alert-danger'>${result.body.message}</div>`;
+        }
+    })
+    .catch(error => {
+        document.getElementById('feedback').innerHTML = `<div class='alert alert-danger'>${error}</div>`;
+    });
+}
+</script>
+{% endblock %}

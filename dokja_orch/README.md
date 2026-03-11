@@ -1,0 +1,6 @@
+- internal/core: event model, router, workflow engine, dispatcher, service
+- internal/handlers: domain handlers, including meme and logging
+- internal/clients: service integrations like the meme client
+- internal/ingress: ZeroMQ event/request ingress
+- internal/app: component lifecycle
+- internal/chat: chat-specific orchestration/use case

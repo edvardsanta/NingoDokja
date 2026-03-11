@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Histórico de Mensagens{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header bg-secondary text-white">
+            <h2 class="mb-0">Últimas 20 Mensagens</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Role</th>
+                            <th>Request</th>
+                            <th>Response</th>
+                            <th>Emojis</th>
+                            <th>Tone</th>
+                            <th>Language</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for msg in messages %}
+                        <tr>
+                            <td>{{ msg.type }}</td>
+                            <td>{{ msg.role }}</td>
+                            <td>
+                                {% if msg.request_message %}
+                                    <span data-bs-toggle="tooltip" title="{{ msg.request_message }}">
+                                        {{ msg.request_message[:30] ~ ('...' if msg.request_message|length > 30 else '') }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if msg.response_message %}
+                                    <span data-bs-toggle="tooltip" title="{{ msg.response_message }}">
+                                        {{ msg.response_message[:30] ~ ('...' if msg.response_message|length > 30 else '') }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if msg.emojis %}
+                                    {% for emoji in msg.emojis %}
+                                        <span class="badge bg-light text-dark me-1">{{ emoji }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ msg.tone or '-' }}</td>
+                            <td>{{ msg.language or '-' }}</td>
+                            <td>
+                                {% if msg.timestamp %}
+                                    {{ msg.timestamp.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Inicializa tooltips do Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
+{% endblock %}

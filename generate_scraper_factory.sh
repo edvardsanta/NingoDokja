@@ -1,5 +1,15 @@
 #!/bin/bash
 
+set -e  # Para sair imediatamente se algum comando falhar
+
+# Verificar se yq está instalado
+if ! command -v yq &> /dev/null
+then
+    echo "❌ yq não encontrado. Instale yq para continuar."
+    exit 1
+fi
+
+
 CONFIG_FILE="./scraper.yaml"
 DIR="./internal/scraper/sites"
 FACTORY_FILE="$DIR/abstract_factory.go"

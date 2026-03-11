@@ -33,7 +33,14 @@ This project consists of two main components:
 ## Development
 
 ### Go Component
-See the existing CI/CD workflow for Go development.
+The Go orchestrator code now lives under `dokja_orch/`.
+
+Quick setup:
+```bash
+cd dokja_orch
+go test ./...
+go run ./cmd/va
+```
 
 ### Python Component (dokja_lab)
 For Python development, see the dedicated [dokja_lab README](dokja_lab/README.md).

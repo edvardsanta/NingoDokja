@@ -34,7 +34,7 @@ Thumbs.db
 **/*_scraper.go
 **/scraper/**/abstract_factory.go
 
-#
+# Ignore  ython ambientes virtuais
 .venv
 
 # torch
@@ -45,3 +45,5 @@ song
 
 # scraper
 scraper.yaml
+/vendor/
+/.env.prod
