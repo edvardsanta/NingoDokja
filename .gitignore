@@ -36,6 +36,8 @@ Thumbs.db
 
 # Ignore  ython ambientes virtuais
 .venv
+__pycache__/
+*.py[cod]
 
 # torch
 libtorch
@@ -47,3 +49,12 @@ song
 scraper.yaml
 /vendor/
 /.env.prod
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+
+# Local runtime artifacts
+*.db
+*.sqlite
+*.sqlite3
