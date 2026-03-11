@@ -1,0 +1,28 @@
+name: dokja-scheduler
+description: Scheduled job runner that emits orchestrator events for recurring platform workflows
+
+type: service
+language: go
+entrypoint: ./cmd/dokja-scheduler/main.go
+
+exposes:
+  - events
+
+consumes:
+  - events
+
+depends_on:
+  - dokja-orchestrator
+
+tags:
+  - domain:automation
+  - criticality:medium
+
+paths:
+  source: ./
+  tests: ./
+  docs: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev
