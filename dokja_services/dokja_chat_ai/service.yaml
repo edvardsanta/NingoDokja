@@ -24,4 +24,4 @@ paths:
 
 runtime:
   containerized: true
-  dockerfile: ./Dockerfile.dev
+  dockerfile: ./Dockerfile
