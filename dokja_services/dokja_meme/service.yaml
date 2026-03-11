@@ -1,0 +1,26 @@
+name: dokja-meme
+description: ZeroMQ meme service for meme retrieval, pool refresh, and meme status operations
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - zmq-reqrep
+
+consumes:
+  - zmq-reqrep
+
+depends_on:
+  - dokja_lab (legacy)
+
+tags:
+  - domain:meme
+  - criticality:medium
+
+paths:
+  source: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile
