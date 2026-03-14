@@ -37,6 +37,7 @@ test("chat command forwards prompt and replies with orchestrator response", asyn
     assert.ok(command);
 
     let replyText = "";
+    let ephemeral: boolean | undefined;
     await command.handle({
       userId: "u1",
       channelId: "c1",
@@ -44,13 +45,16 @@ test("chat command forwards prompt and replies with orchestrator response", asyn
       guildId: "g1",
       getString: () => "hello dokja",
       getNumber: () => undefined,
-      reply: async (message: string) => {
+      reply: async (message: string, opts?: { ephemeral?: boolean }) => {
         replyText = message;
+        ephemeral = opts?.ephemeral;
       },
       updateReply: async () => {},
+      showModal: async () => {},
     });
 
     assert.equal(replyText, "hello user");
+    assert.equal(ephemeral, true);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -58,6 +62,7 @@ test("chat command forwards prompt and replies with orchestrator response", asyn
 
 test("play_radio command forwards the url to the voice controller", async () => {
   let replyText = "";
+  let replyEphemeral: boolean | undefined;
   let updatedReplyText = "";
   let receivedArgs: { guildId: string; userId: string; streamUrl: string } | undefined;
   let releasePlayRadio: (() => void) | undefined;
@@ -84,15 +89,18 @@ test("play_radio command forwards the url to the voice controller", async () => 
     guildId: "g1",
     getString: () => "https://24493.live.streamtheworld.com/RADIO_89FM_SC",
     getNumber: () => undefined,
-    reply: async (message: string) => {
+    reply: async (message: string, opts?: { ephemeral?: boolean }) => {
       replyText = message;
+      replyEphemeral = opts?.ephemeral;
     },
     updateReply: async (message) => {
       updatedReplyText = typeof message === "string" ? message : message.content;
     },
+    showModal: async () => {},
   });
 
   assert.equal(replyText, "Starting radio playback...");
+  assert.equal(replyEphemeral, true);
   releasePlayRadio?.();
   await new Promise((resolve) => setTimeout(resolve, 0));
 

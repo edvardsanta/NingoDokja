@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "node --import tsx ./main.ts",
     "dev": "node --import tsx ./main.ts",
     "dev:watch": "tsx watch --clear-screen=false ./main.ts",
     "test": "node --import tsx --test ./tests/*.test.ts"

@@ -14,4 +14,4 @@ COPY dokja_interfaces/discord /app
 
 EXPOSE 8092
 
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "start"]

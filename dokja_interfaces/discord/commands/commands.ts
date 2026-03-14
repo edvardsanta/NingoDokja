@@ -12,11 +12,21 @@ type DokjaCommandParams = {
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
   eventType: string;
+  ephemeralResponse?: boolean;
   buildPayload?: (context: DiscordCommandContext) => Partial<Parameters<typeof buildBridgePayload>[0]>;
 };
 
 function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
-  const { name, description, options, orchestratorEndpoint, orchestratorTimeoutMs, eventType, buildPayload } =
+  const {
+    name,
+    description,
+    options,
+    orchestratorEndpoint,
+    orchestratorTimeoutMs,
+    eventType,
+    ephemeralResponse = true,
+    buildPayload,
+  } =
     params;
 
   return {
@@ -39,7 +49,7 @@ function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
             }),
           )
         ).trim() || "No response.";
-        await context.reply(reply);
+        await context.reply(reply, { ephemeral: ephemeralResponse });
       } catch (error) {
         console.error(`[dokja-discord] command ${name} failed`, error);
         await context.reply("Command failed.", { ephemeral: true });
@@ -183,7 +193,7 @@ export function createCommands(
       description: "Open the Ningo interaction panel.",
       defer: false,
       async handle(context: DiscordCommandContext) {
-        await context.reply(buildNingoPanelReply());
+        await context.reply(buildNingoPanelReply(), { ephemeral: true });
       },
     },
     {
