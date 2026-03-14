@@ -1,0 +1,27 @@
+name: dokja-lab
+description: Legacy Python runtime with Flask routes, background workers, and a ZeroMQ responder for bot-era workflows
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - http
+  - zmq-reqrep
+
+consumes: []
+
+depends_on: []
+
+tags:
+  - domain:legacy
+  - criticality:medium
+
+paths:
+  source: ./
+  tests: ./tests
+  docs: ./README.md
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile
