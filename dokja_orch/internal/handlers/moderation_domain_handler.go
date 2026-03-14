@@ -25,6 +25,9 @@ func (h *ModerationDomainHandler) Handle(ctx context.Context, event core.Event, 
 		return nil, fmt.Errorf("moderation domain is not configured")
 	}
 
+	// TODO: Once moderation decisions are richer, the orchestrator should use
+	// this result to short-circuit or reshape downstream workflows instead of
+	// treating moderation as a mostly observational step.
 	logger.Info(fmt.Sprintf(
 		"moderation handler received event_id=%s type=%s action=%s source=%s",
 		event.EventID,
