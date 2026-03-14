@@ -89,8 +89,6 @@ Known rough edges:
 
 - [AGENTS.md](./AGENTS.md)
   - architectural rules for coding agents
-- [AGENTS.INFO.md](./AGENTS.INFO.md)
-  - current project state summary
 - [dokja_docs/README.md](./dokja_docs/README.md)
   - architecture and behavior docs
 
