@@ -1,0 +1,128 @@
+services:
+  dokja-orchestrator:
+    build:
+      context: .
+      dockerfile: dokja_orch/Dockerfile.dev
+    command: /go/bin/air -c .air.toml
+    security_opt:
+      - apparmor:unconfined
+    cap_add:
+      - SYS_PTRACE
+    environment:
+      VA_ZMQ_ENDPOINT: tcp://*:5555
+      VA_ZMQ_REQUEST_ENDPOINT: tcp://*:5558
+      VA_HTTP_ENDPOINT: :8091
+      VA_RESPONSE_MODE: debug
+      MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT:-tcp://dokja-meme:5557}
+      CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
+      DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
+      DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
+      GOCACHE: /tmp/go-build
+    volumes:
+      - ./:/workspace
+    ports:
+      - "5555:5555"
+      - "5558:5558"
+      - "8091:8091"
+      - "40000:40000"
+    depends_on:
+      - dokja-chat-ai
+    networks:
+      - dokja-net
+
+  dokja-meme:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_meme/Dockerfile.dev
+    working_dir: /workspace
+    command: python dokja_services/dokja_meme/main.py
+    environment:
+      MEME_SERVICE_ENDPOINT: tcp://*:5557
+      MEME_SERVICE_DB_FILE: /workspace/ningo_memory.db
+      MEME_SERVICE_SCRAPERS: memedroid
+    ports:
+      - "5557:5557"
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
+
+  dokja-chat-ai:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_chat_ai/Dockerfile.dev
+    working_dir: /workspace
+    command: python dokja_services/dokja_chat_ai/main.py
+    environment:
+      CHAT_AI_SERVICE_HOST: 0.0.0.0
+      CHAT_AI_SERVICE_PORT: 8080
+      CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
+      CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
+      CHAT_AI_MODEL: ${CHAT_AI_MODEL}
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8080:8080"
+    networks:
+      - dokja-net
+
+  dokja-cli:
+    build:
+      context: .
+      dockerfile: dokja_interfaces/cli/Dockerfile.dev
+    entrypoint: ["/usr/local/go/bin/go", "run", "./cmd/dokja-cli"]
+    environment:
+      DOKJA_ORCH_ENDPOINT: tcp://dokja-orchestrator:5555
+      DOKJA_ORCH_REQUEST_ENDPOINT: tcp://dokja-orchestrator:5558
+      GOCACHE: /tmp/go-build
+    volumes:
+      - ./:/workspace
+    networks:
+      - dokja-net
+
+  dokja-discord:
+    build:
+      context: .
+      dockerfile: dokja_interfaces/discord/Dockerfile.dev
+    working_dir: /workspace/dokja_interfaces/discord
+    command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
+    environment:
+      DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
+      DOKJA_DISCORD_DELIVERY_PORT: 8092
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}
+      DISCORD_DM_POLICY: ${DISCORD_DM_POLICY:-open}
+    volumes:
+      - ./:/workspace
+    depends_on:
+      - dokja-orchestrator
+    networks:
+      - dokja-net
+
+  dokja-scheduler:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_scheduler/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_scheduler
+    command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-scheduler"]
+    environment:
+      DOKJA_SCHEDULER_EVENT_ENDPOINT: tcp://dokja-orchestrator:5555
+      DOKJA_SCHEDULER_TOPIC: events
+      DOKJA_SCHEDULER_MEME_REFRESH_INTERVAL: ${DOKJA_SCHEDULER_MEME_REFRESH_INTERVAL:-45m}
+      DOKJA_SCHEDULER_MEME_DISPATCH_INTERVAL: ${DOKJA_SCHEDULER_MEME_DISPATCH_INTERVAL:-6h}
+      DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD: ${DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD:-15s}
+      DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS: ${DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS:-20}
+      DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT: ${DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT:-1}
+      GOCACHE: /tmp/go-build
+    volumes:
+      - ./:/workspace
+    depends_on:
+      - dokja-orchestrator
+    networks:
+      - dokja-net
+
+networks:
+  dokja-net:
+    driver: bridge
