@@ -1,0 +1,28 @@
+name: dokja-discord
+description: Discord interface that converts Discord messages and interactions into orchestrator events
+
+type: interface
+language: typescript
+entrypoint: ./main.ts
+
+exposes:
+  - events
+
+consumes:
+  - events
+
+depends_on:
+  - dokja-orchestrator
+
+tags:
+  - domain:discord
+  - criticality:high
+
+paths:
+  source: ./
+  tests: ./
+  docs: ./docs
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev
