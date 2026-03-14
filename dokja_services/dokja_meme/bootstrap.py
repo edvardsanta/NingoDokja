@@ -19,9 +19,8 @@ def _configure_legacy_imports() -> Path:
 
 REPO_ROOT = _configure_legacy_imports()
 
+from config import SCRAPERS as LEGACY_SCRAPERS
 from infra.sqlite.storage import SQLiteStorage
-from memes.ifunny_scraper import IfunnyScraper
-from memes.memedroid_scraper import MemedroidScraper
 from models.Meme import Meme
 from workers.meme_worker import MemeWorker
 
@@ -33,19 +32,23 @@ def resolve_db_file() -> str:
 
 
 def build_scrapers() -> list:
-    requested = os.getenv("MEME_SERVICE_SCRAPERS", "memedroid").split(",")
-    enabled = {item.strip().lower() for item in requested if item.strip()}
+    available = {
+        scraper.source_name.strip().lower(): scraper.__class__
+        for scraper in LEGACY_SCRAPERS
+        if getattr(scraper, "source_name", "").strip()
+    }
 
-    scrapers = []
-    if "memedroid" in enabled:
-        scrapers.append(MemedroidScraper())
-    if "ifunny" in enabled:
-        scrapers.append(IfunnyScraper())
+    requested_env = os.getenv("MEME_SERVICE_SCRAPERS", "")
+    requested = [item.strip().lower() for item in requested_env.split(",") if item.strip()]
 
-    if not scrapers:
-        scrapers.append(MemedroidScraper())
+    if not requested:
+        return [scraper_cls() for scraper_cls in available.values()]
 
-    return scrapers
+    scrapers = [available[name]() for name in requested if name in available]
+    if scrapers:
+        return scrapers
+
+    return [scraper_cls() for scraper_cls in available.values()]
 
 
 def build_service() -> MemeService:

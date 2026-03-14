@@ -2,7 +2,7 @@
 
 This service is the extraction boundary for the legacy Dokja Lab meme system.
 
-It does not rewrite the meme stack. It wraps the existing legacy components so the orchestrator can talk to memes through ZeroMQ events instead of direct Flask or in-process calls.
+It does not rewrite the meme stack. It wraps the existing legacy components so the orchestrator can talk to memes through ZeroMQ request/reply instead of direct Flask or in-process calls.
 
 ## Legacy Components Reused
 
@@ -90,4 +90,6 @@ Environment variables:
 - `MEME_SERVICE_DB_FILE`
   Default: `<repo>/ningo_memory.db`
 - `MEME_SERVICE_SCRAPERS`
-  Comma-separated list. Supported: `memedroid`, `ifunny`
+  Optional comma-separated list of scraper keys.
+  When omitted, the service uses the scraper set defined in `dokja_lab/config.py`.
+  When provided, the keys are resolved against that same legacy scraper registry.
