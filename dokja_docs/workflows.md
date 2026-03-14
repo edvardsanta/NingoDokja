@@ -33,10 +33,10 @@ Purpose:
 
 Current files:
 
-- [router.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/core/router.go)
-- [workflow_engine.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/core/workflow_engine.go)
-- [moderation_domain_handler.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/handlers/moderation_domain_handler.go)
-- [chat_domain_handler.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/handlers/chat_domain_handler.go)
+- [router.go](../dokja_orch/internal/core/router.go)
+- [workflow_engine.go](../dokja_orch/internal/core/workflow_engine.go)
+- [moderation_domain_handler.go](../dokja_orch/internal/handlers/moderation_domain_handler.go)
+- [chat_domain_handler.go](../dokja_orch/internal/handlers/chat_domain_handler.go)
 
 ## Meme Workflow
 
@@ -66,8 +66,8 @@ Purpose:
 
 Current files:
 
-- [meme_domain_handler.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/handlers/meme_domain_handler.go)
-- [domain.go](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_meme/domain.go)
+- [meme_domain_handler.go](../dokja_orch/internal/handlers/meme_domain_handler.go)
+- [domain.go](../dokja_domain/dokja_meme/domain.go)
 
 ## Scheduled Meme Dispatch Workflow
 
@@ -98,9 +98,9 @@ Important rule:
 
 Current files:
 
-- [service.go](/home/vard/repos/my_repos/read_books/dokja_services/dokja_scheduler/scheduler/service.go)
-- [system_domain_handler.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/handlers/system_domain_handler.go)
-- [discord_interface_client.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/clients/discord_interface_client.go)
+- [service.go](../dokja_services/dokja_scheduler/scheduler/service.go)
+- [system_domain_handler.go](../dokja_orch/internal/handlers/system_domain_handler.go)
+- [discord_interface_client.go](../dokja_orch/internal/clients/discord_interface_client.go)
 
 ## System Status Workflow
 
@@ -125,8 +125,8 @@ Purpose:
 
 Current files:
 
-- [system_domain_handler.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/handlers/system_domain_handler.go)
-- [http_bridge_ingress.go](/home/vard/repos/my_repos/read_books/dokja_orch/internal/ingress/http_bridge_ingress.go)
+- [system_domain_handler.go](../dokja_orch/internal/handlers/system_domain_handler.go)
+- [http_bridge_ingress.go](../dokja_orch/internal/ingress/http_bridge_ingress.go)
 
 ## Response Shape
 

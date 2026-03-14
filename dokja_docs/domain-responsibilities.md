@@ -76,15 +76,15 @@ Services should not:
 
 Current domain modules:
 
-- [dokja_chat](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_chat)
-- [dokja_meme](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_meme)
-- [dokja_moderation](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_moderation)
+- [dokja_chat](../dokja_domain/dokja_chat)
+- [dokja_meme](../dokja_domain/dokja_meme)
+- [dokja_moderation](../dokja_domain/dokja_moderation)
 
 ## Chat Domain
 
 Location:
 
-- [domain.py](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_chat/domain.py)
+- [domain.py](../dokja_domain/dokja_chat/domain.py)
 
 Owns:
 
@@ -109,7 +109,7 @@ Does not own:
 
 Location:
 
-- [domain.go](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_meme/domain.go)
+- [domain.go](../dokja_domain/dokja_meme/domain.go)
 
 Owns:
 
@@ -131,7 +131,7 @@ Does not own:
 
 Location:
 
-- [domain.go](/home/vard/repos/my_repos/read_books/dokja_domain/dokja_moderation/domain.go)
+- [domain.go](../dokja_domain/dokja_moderation/domain.go)
 
 Owns:
 

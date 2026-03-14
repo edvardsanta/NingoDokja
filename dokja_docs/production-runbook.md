@@ -4,8 +4,8 @@ This document is the practical production checklist for Dokja.
 
 Main files:
 
-- [docker-compose.prod.yml](/home/vard/repos/my_repos/read_books/docker-compose.prod.yml)
-- [.env.prod](/home/vard/repos/my_repos/read_books/.env.prod)
+- [docker-compose.prod.yml](../docker-compose.prod.yml)
+- [.env.prod](../.env.prod)
 
 ## Services
 
@@ -19,7 +19,7 @@ Production stack:
 
 ## Required Secrets
 
-Before starting production, replace placeholder values in [.env.prod](/home/vard/repos/my_repos/read_books/.env.prod):
+Before starting production, replace placeholder values in [.env.prod](../.env.prod):
 
 - `CHAT_AI_API_KEY`
 - `CHAT_AI_BASE_URL`
