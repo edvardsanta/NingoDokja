@@ -28,7 +28,7 @@ Interfaces must be decoupled from business logic.
 
 ```
 Interfaces
-├─ Discord (OpenClaw)
+├─ Discord
 ├─ WhatsApp
 ├─ CLI
 ├─ Web
@@ -103,8 +103,6 @@ Interfaces are responsible only for:
 - converting them into events
 - sending events to the orchestrator
 
-We will use OpenClaw for the Discord interface, and build similar interfaces for WhatsApp, CLI, Web, and API.
-
 # Orchestrator
 
 The orchestrator is the central brain of the system.
@@ -146,6 +144,6 @@ ningo-dokja/
 │
 ├── scripts/
 │
-├── docs/
+├── dokja_docs/
 ```
 

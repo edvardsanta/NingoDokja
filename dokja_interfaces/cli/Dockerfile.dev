@@ -1,0 +1,8 @@
+FROM docker.io/golang:1.25-bookworm
+
+RUN apt-get update && apt-get install -y \
+    libzmq3-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/dokja_interfaces/cli
