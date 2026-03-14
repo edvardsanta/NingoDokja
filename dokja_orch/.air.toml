@@ -2,7 +2,8 @@ root = "."
 tmp_dir = "/tmp/air"
 
 [build]
-cmd = "go build -o /tmp/air/dokja-va ./cmd/va"
+# TODO: Resolve hot reload issue with dlv. Currently, we have to restart the server manually after code changes.
+cmd = "dlv debug ./cmd/va --headless --listen=:40000 --api-version=2 --accept-multiclient"
 bin = "/tmp/air/dokja-va"
 include_ext = ["go", "tpl", "tmpl", "html", "yaml", "yml", "json"]
 exclude_dir = ["vendor", "tmp", ".git"]
