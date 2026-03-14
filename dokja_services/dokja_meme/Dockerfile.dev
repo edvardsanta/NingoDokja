@@ -1,5 +1,16 @@
 FROM docker.io/python:3.13-slim
 
+ENV TZ=America/Sao_Paulo
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      tzdata \
+      locales \
+   && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace
 
 COPY dokja_lab/requirements.txt /tmp/dokja_lab_requirements.txt
