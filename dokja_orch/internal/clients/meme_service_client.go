@@ -10,6 +10,7 @@ import (
 	"read_books/internal/infrastructure/repreq"
 	"read_books/internal/infrastructure/zeromq"
 	"read_books/internal/logger"
+	"strings"
 )
 
 const defaultMemeServiceEndpoint = "tcp://127.0.0.1:5557"
@@ -27,16 +28,13 @@ type MemeServiceResponse struct {
 }
 
 func NewMemeServiceClient(endpoint string) *MemeServiceClient {
-	resolvedEndpoint := endpoint
-	if resolvedEndpoint == "" {
-		resolvedEndpoint = os.Getenv("MEME_SERVICE_ENDPOINT")
-	}
-	if resolvedEndpoint == "" {
-		resolvedEndpoint = defaultMemeServiceEndpoint
-	}
+	resolvedEndpoint := resolveMemeServiceEndpoint(endpoint)
 
 	return &MemeServiceClient{
 		requesterFactory: func() (repreq.RequesterReply, error) {
+			if err := validateMemeServiceEndpoint(resolvedEndpoint); err != nil {
+				return nil, err
+			}
 			return zeromq.NewRequester(resolvedEndpoint)
 		},
 	}
@@ -151,4 +149,29 @@ func (c *MemeServiceClient) dispatch(ctx context.Context, event core.Event) (Mem
 	case response := <-responseCh:
 		return response, nil
 	}
+}
+
+func resolveMemeServiceEndpoint(endpoint string) string {
+	if endpoint != "" {
+		return endpoint
+	}
+	if envEndpoint := os.Getenv("MEME_SERVICE_ENDPOINT"); envEndpoint != "" {
+		return envEndpoint
+	}
+	return defaultMemeServiceEndpoint
+}
+
+func validateMemeServiceEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return fmt.Errorf("meme service endpoint is empty")
+	}
+
+	if strings.HasPrefix(endpoint, "tcp://*:") || strings.HasPrefix(endpoint, "tcp://0.0.0.0:") {
+		return fmt.Errorf(
+			"meme service endpoint %q is a bind address; configure a connect address such as tcp://dokja-meme:5557",
+			endpoint,
+		)
+	}
+
+	return nil
 }

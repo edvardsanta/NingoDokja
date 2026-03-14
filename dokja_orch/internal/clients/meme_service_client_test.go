@@ -84,6 +84,22 @@ func TestMemeServiceClientDispatchErrors(t *testing.T) {
 	}
 }
 
+func TestValidateMemeServiceEndpoint(t *testing.T) {
+	if err := validateMemeServiceEndpoint("tcp://dokja-meme:5557"); err != nil {
+		t.Fatalf("expected routable endpoint to be valid, got %v", err)
+	}
+
+	for _, endpoint := range []string{"tcp://*:5557", "tcp://0.0.0.0:5557"} {
+		err := validateMemeServiceEndpoint(endpoint)
+		if err == nil {
+			t.Fatalf("expected %q to be rejected", endpoint)
+		}
+		if !strings.Contains(err.Error(), "bind address") {
+			t.Fatalf("expected bind address guidance for %q, got %v", endpoint, err)
+		}
+	}
+}
+
 func intPtr(value int) *int {
 	return &value
 }
