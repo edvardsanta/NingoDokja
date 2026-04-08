@@ -1,4 +1,5 @@
 import { ApplicationCommandOptionType } from "discord-api-types/v10";
+import { randomUUID } from "node:crypto";
 
 import { buildBridgePayload, dispatchToOrchestrator } from "../transport/bridge.js";
 import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
@@ -62,6 +63,9 @@ export function createCommands(
   orchestratorEndpoint: string,
   orchestratorTimeoutMs: number,
   voice?: DiscordVoiceController,
+  options?: {
+    logVoiceConversation?: boolean;
+  },
 ): DiscordSlashCommand[] {
   return [
     createDokjaCommand({
@@ -126,6 +130,206 @@ export function createCommands(
         maxItemsPerScraper: context.getNumber("max_items"),
       }),
     }),
+    {
+      name: "speak",
+      description: "Speak a text in your current voice channel.",
+      defer: false,
+      options: [
+        {
+          name: "prompt",
+          description: "Text to be spoken",
+          type: ApplicationCommandOptionType.String,
+          required: true,
+        },
+      ],
+      async handle(context: DiscordCommandContext) {
+        if (!voice) {
+          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          return;
+        }
+
+        const prompt = context.getString("prompt");
+        await context.reply("Starting speech playback...", { ephemeral: true });
+
+        void voice
+          .speakText({
+            guildId: context.guildId,
+            userId: context.userId,
+            text: prompt,
+          })
+          .then((reply) => context.updateReply(reply))
+          .catch((error) => {
+            console.error("[dokja-discord] command speak failed", error);
+            return context.updateReply(
+              error instanceof Error ? error.message : "Could not start speech playback.",
+            );
+          });
+      },
+    },
+    {
+      name: "voice_chat_start",
+      description: "Start listening to your speech in the current voice channel.",
+      defer: false,
+      async handle(context: DiscordCommandContext) {
+        if (!voice) {
+          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          return;
+        }
+
+        await context.reply("Starting voice conversation...", { ephemeral: true });
+        let firstTurn = true;
+
+        void voice
+          .startConversation({
+            guildId: context.guildId,
+            userId: context.userId,
+            activationMode: "always",
+            onTurn: async (transcript) => {
+              if (options?.logVoiceConversation) {
+                console.log(
+                  "[dokja-discord] voice transcript dispatch",
+                  JSON.stringify({
+                    guildId: context.guildId,
+                    userId: context.userId,
+                    channelId: context.channelId,
+                    transcript,
+                  }),
+                );
+              }
+              const reply = await dispatchToOrchestrator(
+                orchestratorEndpoint,
+                orchestratorTimeoutMs,
+                buildBridgePayload({
+                  eventType: "message.created",
+                  content: transcript,
+                  userId: context.userId,
+                  channelId: context.channelId,
+                  messageId: randomUUID(),
+                  guildId: context.guildId,
+                  sessionKey: `discord-voice:${context.guildId ?? "dm"}:${context.userId}`,
+                  startSession: firstTurn,
+                }),
+              );
+              firstTurn = false;
+              if (options?.logVoiceConversation) {
+                console.log(
+                  "[dokja-discord] voice reply received",
+                  JSON.stringify({
+                    guildId: context.guildId,
+                    userId: context.userId,
+                    channelId: context.channelId,
+                    reply,
+                  }),
+                );
+              }
+              if (reply.trim()) {
+                await voice.speakText({
+                  guildId: context.guildId,
+                  userId: context.userId,
+                  text: reply,
+                });
+              }
+            },
+          })
+          .then((reply) => context.updateReply(reply))
+          .catch((error) => {
+            console.error("[dokja-discord] command voice_chat_start failed", error);
+            return context.updateReply(
+              error instanceof Error ? error.message : "Could not start voice conversation.",
+            );
+          });
+      },
+    },
+    {
+      name: "wake_chat",
+      description: "Listen in the current voice channel and only answer after the wake word.",
+      defer: false,
+      async handle(context: DiscordCommandContext) {
+        if (!voice) {
+          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          return;
+        }
+
+        await context.reply("Starting wake-word voice conversation...", { ephemeral: true });
+        let firstTurn = true;
+
+        void voice
+          .startConversation({
+            guildId: context.guildId,
+            userId: context.userId,
+            activationMode: "wakeword",
+            onTurn: async (transcript) => {
+              if (options?.logVoiceConversation) {
+                console.log(
+                  "[dokja-discord] wake voice transcript dispatch",
+                  JSON.stringify({
+                    guildId: context.guildId,
+                    userId: context.userId,
+                    channelId: context.channelId,
+                    transcript,
+                  }),
+                );
+              }
+              const reply = await dispatchToOrchestrator(
+                orchestratorEndpoint,
+                orchestratorTimeoutMs,
+                buildBridgePayload({
+                  eventType: "message.created",
+                  content: transcript,
+                  userId: context.userId,
+                  channelId: context.channelId,
+                  messageId: randomUUID(),
+                  guildId: context.guildId,
+                  sessionKey: `discord-wake-voice:${context.guildId ?? "dm"}:${context.userId}`,
+                  startSession: firstTurn,
+                }),
+              );
+              firstTurn = false;
+              if (options?.logVoiceConversation) {
+                console.log(
+                  "[dokja-discord] wake voice reply received",
+                  JSON.stringify({
+                    guildId: context.guildId,
+                    userId: context.userId,
+                    channelId: context.channelId,
+                    reply,
+                  }),
+                );
+              }
+              if (reply.trim()) {
+                await voice.speakText({
+                  guildId: context.guildId,
+                  userId: context.userId,
+                  text: reply,
+                });
+              }
+            },
+          })
+          .then((reply) => context.updateReply(reply))
+          .catch((error) => {
+            console.error("[dokja-discord] command wake_chat failed", error);
+            return context.updateReply(
+              error instanceof Error ? error.message : "Could not start wake-word voice conversation.",
+            );
+          });
+      },
+    },
+    {
+      name: "voice_chat_stop",
+      description: "Stop listening to your speech in this server.",
+      async handle(context: DiscordCommandContext) {
+        try {
+          if (!voice) {
+            throw new Error("Voice controller is not configured");
+          }
+          const reply = await voice.stopConversation({ guildId: context.guildId });
+          await context.reply(reply, { ephemeral: true });
+        } catch (error) {
+          console.error("[dokja-discord] command voice_chat_stop failed", error);
+          await context.reply("Could not stop voice conversation.", { ephemeral: true });
+        }
+      },
+    },
     {
       name: "play_radio",
       description: "Play a radio stream in your current voice channel.",

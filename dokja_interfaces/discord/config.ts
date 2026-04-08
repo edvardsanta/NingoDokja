@@ -6,6 +6,7 @@ export type DiscordInterfaceConfig = {
   mode: "full" | "voice";
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
+  voiceServiceEndpoint: string;
   deliveryPort: number;
 };
 
@@ -28,7 +29,8 @@ export function buildConfig(): DiscordInterfaceConfig {
       "DOKJA_ORCH_HTTP_ENDPOINT",
       "http://dokja-orchestrator:8091/orchestrator",
     ),
-    orchestratorTimeoutMs: Number(env("OPENCLAW_ORCHESTRATOR_TIMEOUT_MS", "180000")),
+    orchestratorTimeoutMs: Number(env("DOKJA_ORCHESTRATOR_TIMEOUT_MS", "180000")),
+    voiceServiceEndpoint: env("DOKJA_VOICE_HTTP_ENDPOINT", "http://dokja-voice:8081"),
     deliveryPort: Number(env("DOKJA_DISCORD_DELIVERY_PORT", "8092")),
   };
 }

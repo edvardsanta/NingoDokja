@@ -109,6 +109,7 @@ export function buildBridgePayload(params: {
   messageId: string;
   guildId?: string;
   accountId?: string;
+  sessionKey?: string;
 }): BridgeRequest {
   const accountId = params.accountId?.trim() || "default";
   return {
@@ -121,7 +122,7 @@ export function buildBridgePayload(params: {
       channelId: params.channelId,
       messageId: params.messageId,
       guildId: params.guildId,
-      sessionKey: `discord:${params.channelId}:${params.userId}`,
+      sessionKey: params.sessionKey?.trim() || `discord:${params.channelId}:${params.userId}`,
       startSession: params.startSession,
       accountId,
     },

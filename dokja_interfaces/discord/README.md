@@ -7,6 +7,7 @@ Environment variables:
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID` optional override if automatic app-id probe fails
 - `DOKJA_ORCH_HTTP_ENDPOINT`
+- `DOKJA_ORCHESTRATOR_TIMEOUT_MS`
 - `DISCORD_GUILD_ID`
 - `DISCORD_ALLOWED_CHANNELS`
 - `DISCORD_DM_POLICY`
@@ -17,7 +18,12 @@ Environment variables:
 Voice-only mode:
 
 - set `DOKJA_DISCORD_MODE=voice`
-- only `/play_radio` and `/stop_radio` are deployed
+- only voice-oriented commands are deployed:
+  - `/speak`
+  - `/voice_chat_start`
+  - `/voice_chat_stop`
+  - `/play_radio`
+  - `/stop_radio`
 - orchestrator chat/message forwarding and outbound delivery server are skipped
 
 Run:

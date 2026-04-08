@@ -14,19 +14,32 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
 
   const voice = createDiscordVoiceController({
     token,
+    voiceServiceEndpoint: cfg.voiceServiceEndpoint,
+    logTranscripts: cfg.mode === "full",
     log: runtime.log,
     error: runtime.error,
   });
-  const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice);
+  const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
+    logVoiceConversation: cfg.mode === "full",
+  });
   const commands =
     cfg.mode === "voice"
-      ? allCommands.filter((entry) => entry.name === "play_radio" || entry.name === "stop_radio")
+      ? allCommands.filter(
+          (entry) =>
+            entry.name === "speak" ||
+            entry.name === "voice_chat_start" ||
+            entry.name === "wake_chat" ||
+            entry.name === "voice_chat_stop" ||
+            entry.name === "play_radio" ||
+            entry.name === "stop_radio",
+        )
       : allCommands;
 
   runtime.log?.(
     JSON.stringify({
       mode: cfg.mode,
       orchestratorUrl: cfg.orchestratorEndpoint,
+      voiceServiceUrl: cfg.voiceServiceEndpoint,
       guildId: cfg.allowedGuildId,
       allowedChannels: cfg.allowedChannelIds.join(","),
       dmPolicy: cfg.dmPolicy,
