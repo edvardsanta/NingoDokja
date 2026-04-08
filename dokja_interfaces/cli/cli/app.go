@@ -3,9 +3,11 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,6 +68,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.PersistentFlags().StringVar(&a.emitOpts.channelID, "channel-id", a.emitOpts.channelID, "Event channel id")
 
 	root.AddCommand(a.newMemeCommand(ctx))
+	root.AddCommand(a.newBookCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
 	root.AddCommand(a.newEmitCommand(ctx))
 
@@ -140,6 +143,70 @@ func (a *App) newMemeCommand(ctx context.Context) *cobra.Command {
 
 	memeCommand.AddCommand(fetch, refresh, status)
 	return memeCommand
+}
+
+func (a *App) newBookCommand(ctx context.Context) *cobra.Command {
+	bookCommand := &cobra.Command{
+		Use:   "book",
+		Short: "Request book classification and summary actions from the orchestrator",
+	}
+
+	var classifyTitle string
+	var classifyGoal string
+	var classifyLanguage string
+	classify := &cobra.Command{
+		Use:   "classify <file>",
+		Short: "Emit book.resource.classify with an uploaded file payload",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			payload, err := buildBookFilePayload(args[0], classifyTitle, classifyGoal, classifyLanguage, false)
+			if err != nil {
+				return err
+			}
+			return a.request(ctx, EmitOptions{
+				Type:      "book.resource.classify",
+				UserID:    a.emitOpts.userID,
+				UserName:  a.emitOpts.userName,
+				ChannelID: a.emitOpts.channelID,
+				Payload:   payload,
+				Context:   map[string]any{"interface": "cli"},
+				Source:    "cli",
+			})
+		},
+	}
+	classify.Flags().StringVar(&classifyTitle, "title", "", "Book title override")
+	classify.Flags().StringVar(&classifyGoal, "goal", "study", "Reading goal")
+	classify.Flags().StringVar(&classifyLanguage, "language", "pt-BR", "Content language hint")
+
+	var summarizeTitle string
+	var summarizeGoal string
+	var summarizeLanguage string
+	summarize := &cobra.Command{
+		Use:   "summarize <file>",
+		Short: "Emit book.summary.requested with an uploaded file payload",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			payload, err := buildBookFilePayload(args[0], summarizeTitle, summarizeGoal, summarizeLanguage, true)
+			if err != nil {
+				return err
+			}
+			return a.request(ctx, EmitOptions{
+				Type:      "book.summary.requested",
+				UserID:    a.emitOpts.userID,
+				UserName:  a.emitOpts.userName,
+				ChannelID: a.emitOpts.channelID,
+				Payload:   payload,
+				Context:   map[string]any{"interface": "cli"},
+				Source:    "cli",
+			})
+		},
+	}
+	summarize.Flags().StringVar(&summarizeTitle, "title", "", "Book title override")
+	summarize.Flags().StringVar(&summarizeGoal, "goal", "study", "Reading goal")
+	summarize.Flags().StringVar(&summarizeLanguage, "language", "pt-BR", "Content language hint")
+
+	bookCommand.AddCommand(classify, summarize)
+	return bookCommand
 }
 
 func (a *App) newChatCommand(ctx context.Context) *cobra.Command {
@@ -353,4 +420,36 @@ func currentUserName() string {
 		return value
 	}
 	return "cli"
+}
+
+func buildBookFilePayload(path, title, goal, language string, includeBytes bool) (map[string]any, error) {
+	fileBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read book file: %w", err)
+	}
+
+	base := filepath.Base(path)
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(base)), ".")
+	if ext == "" {
+		return nil, fmt.Errorf("book file extension is required to infer format")
+	}
+
+	payload := map[string]any{
+		"filename":    base,
+		"format":      ext,
+		"goal":        strings.TrimSpace(goal),
+		"language":    strings.TrimSpace(language),
+		"metadata":    map[string]any{"uploaded_via": "cli"},
+		"source_path": path,
+	}
+	if strings.TrimSpace(title) != "" {
+		payload["title"] = strings.TrimSpace(title)
+	}
+	if includeBytes || ext == "pdf" || ext == "epub" || ext == "mobi" || ext == "md" || ext == "txt" {
+		payload["resource_bytes_b64"] = base64.StdEncoding.EncodeToString(fileBytes)
+	}
+	if ext == "txt" || ext == "md" {
+		payload["content"] = string(fileBytes)
+	}
+	return payload, nil
 }

@@ -14,6 +14,7 @@ It uses two orchestrator channels:
 Behavior:
 
 - `meme ...` commands use synchronous request/reply with the orchestrator and print the returned JSON
+- `book ...` commands upload a file payload to the orchestrator and print the returned JSON
 - `emit ...` uses asynchronous event publishing
 
 Examples:
@@ -23,5 +24,7 @@ cd dokja_interfaces/cli
 go run ./cmd/dokja-cli meme status
 go run ./cmd/dokja-cli meme fetch --limit 3
 go run ./cmd/dokja-cli meme refresh --max-items 10
+go run ./cmd/dokja-cli book classify ./test/sample.pdf
+go run ./cmd/dokja-cli book summarize ./test/sample.epub --title "Clean Architecture"
 go run ./cmd/dokja-cli emit message.created --payload content=hello --payload channel=general
 ```

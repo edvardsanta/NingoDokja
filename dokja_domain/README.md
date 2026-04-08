@@ -23,6 +23,8 @@ What does not belong here:
 
 Current domains:
 
+- `dokja_book`
+  - book classification and summary routing decisions
 - `dokja_chat`
   - conversation/session logic
   - chat history coordination for AI requests
