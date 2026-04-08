@@ -14,6 +14,7 @@ services:
       VA_HTTP_ENDPOINT: :8091
       VA_RESPONSE_MODE: debug
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT:-tcp://dokja-meme:5557}
+      BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
@@ -27,6 +28,32 @@ services:
       - "40000:40000"
     depends_on:
       - dokja-chat-ai
+      - dokja-book
+    networks:
+      - dokja-net
+
+  dokja-book:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_book/Dockerfile.dev
+    working_dir: /workspace
+    command: python dokja_services/dokja_book/main.py
+    environment:
+      DOKJA_BOOK_HOST: 0.0.0.0
+      DOKJA_BOOK_PORT: 8083
+      DOKJA_BOOK_DEFAULT_LANGUAGE: ${DOKJA_BOOK_DEFAULT_LANGUAGE:-pt-BR}
+      DOKJA_BOOK_DEFAULT_GOAL: ${DOKJA_BOOK_DEFAULT_GOAL:-study}
+      DOKJA_BOOK_CLASSIFIER_PROVIDER: ${DOKJA_BOOK_CLASSIFIER_PROVIDER:-local}
+      DOKJA_BOOK_CLASSIFIER_MODEL: ${DOKJA_BOOK_CLASSIFIER_MODEL:-typeform/distilbert-base-uncased-mnli}
+      DOKJA_BOOK_CLASSIFIER_ENDPOINT: ${DOKJA_BOOK_CLASSIFIER_ENDPOINT:-}
+      DOKJA_BOOK_OVERVIEW_PROVIDER: ${DOKJA_BOOK_OVERVIEW_PROVIDER:-transformers}
+      DOKJA_BOOK_OVERVIEW_MODEL: ${DOKJA_BOOK_OVERVIEW_MODEL:-sshleifer/distilbart-cnn-12-6}
+      DOKJA_BOOK_OVERVIEW_ENDPOINT: ${DOKJA_BOOK_OVERVIEW_ENDPOINT:-}
+      DOKJA_BOOK_MODEL_CACHE_DIR: /workspace/dokja_services/dokja_book/models
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8083:8083"
     networks:
       - dokja-net
 
@@ -66,6 +93,33 @@ services:
     networks:
       - dokja-net
 
+  dokja-voice:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_voice/Dockerfile.dev
+    working_dir: /workspace
+    command: python dokja_services/dokja_voice/main.py
+    environment:
+      DOKJA_VOICE_HOST: 0.0.0.0
+      DOKJA_VOICE_PORT: 8081
+      DOKJA_VOICE_PROVIDER: ${DOKJA_VOICE_PROVIDER:-stub}
+      DOKJA_VOICE_STT_PROVIDER: ${DOKJA_VOICE_STT_PROVIDER:-stub}
+      DOKJA_VOICE_DEFAULT_VOICE: ${DOKJA_VOICE_DEFAULT_VOICE:-default}
+      DOKJA_VOICE_DEFAULT_LANGUAGE: ${DOKJA_VOICE_DEFAULT_LANGUAGE:-pt-BR}
+      DOKJA_VOICE_PIPER_MODEL: ${DOKJA_VOICE_PIPER_MODEL:-}
+      DOKJA_VOICE_STT_MODEL: ${DOKJA_VOICE_STT_MODEL:-openai/whisper-tiny}
+      DOKJA_VOICE_MODEL_CACHE_DIR: ${DOKJA_VOICE_MODEL_CACHE_DIR:-/workspace/dokja_services/dokja_voice/models}
+      DOKJA_VOICE_WAKEWORD_PROVIDER: ${DOKJA_VOICE_WAKEWORD_PROVIDER:-stub}
+      DOKJA_VOICE_WAKEWORD_MODEL: ${DOKJA_VOICE_WAKEWORD_MODEL:-}
+      DOKJA_VOICE_WAKEWORD_HOTWORD: ${DOKJA_VOICE_WAKEWORD_HOTWORD:-Ningo}
+      DOKJA_VOICE_WAKEWORD_THRESHOLD: ${DOKJA_VOICE_WAKEWORD_THRESHOLD:-0.5}
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8081:8081"
+    networks:
+      - dokja-net
+
   dokja-cli:
     build:
       context: .
@@ -90,6 +144,7 @@ services:
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
+      DOKJA_VOICE_HTTP_ENDPOINT: http://dokja-voice:8081
       DOKJA_DISCORD_DELIVERY_PORT: 8092
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}
@@ -98,6 +153,7 @@ services:
       - ./:/workspace
     depends_on:
       - dokja-orchestrator
+      - dokja-voice
     networks:
       - dokja-net
 
