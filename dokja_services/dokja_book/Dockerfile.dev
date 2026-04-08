@@ -1,0 +1,15 @@
+FROM docker.io/python:3.13-slim
+
+WORKDIR /workspace/dokja_services/dokja_book
+
+RUN pip install --no-cache-dir \
+fastapi \
+uvicorn \
+transformers \
+torch \
+--extra-index-url https://download.pytorch.org/whl/cpu \
+PyMuPDF \
+mobi \
+markdown-it-py
+
+CMD ["python", "main.py"]

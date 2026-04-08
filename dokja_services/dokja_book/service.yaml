@@ -1,0 +1,25 @@
+name: dokja-book
+description: Specialized HTTP service for book classification, context compaction strategy, and structured summary preparation
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - http
+
+consumes:
+  - http
+
+depends_on: []
+
+tags:
+  - domain:book
+  - criticality:high
+
+paths:
+  source: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile
