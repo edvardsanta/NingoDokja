@@ -76,9 +76,33 @@ Services should not:
 
 Current domain modules:
 
+- [dokja_book](../dokja_domain/dokja_book)
 - [dokja_chat](../dokja_domain/dokja_chat)
 - [dokja_meme](../dokja_domain/dokja_meme)
 - [dokja_moderation](../dokja_domain/dokja_moderation)
+
+## Book Domain
+
+Location:
+
+- [domain.go](../dokja_domain/dokja_book/domain.go)
+
+Owns:
+
+- interpreting book workflow actions
+- deciding whether a request is classification-only or summarization
+- merging workflow payload/context into a domain input contract
+- keeping book summarization concerns out of generic chat flows
+
+Depends on ports:
+
+- book service integration port
+
+Does not own:
+
+- raw PDF / EPUB / MOBI parser implementation details
+- HTTP serving
+- interface-specific upload behavior
 
 ## Chat Domain
 

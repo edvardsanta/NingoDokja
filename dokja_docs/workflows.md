@@ -69,6 +69,36 @@ Current files:
 - [meme_domain_handler.go](../dokja_orch/internal/handlers/meme_domain_handler.go)
 - [domain.go](../dokja_domain/dokja_meme/domain.go)
 
+## Book Workflow
+
+Used for:
+
+- `book.summary.requested`
+- `book.resource.classify`
+
+Route:
+
+- workflow: `book`
+- domains:
+  - `book`
+
+Actions:
+
+- `book.summary.requested` -> `summarize-book`
+- `book.resource.classify` -> `classify-book-resource`
+
+Purpose:
+
+- classify book resource format and book type
+- select extraction and context compaction strategy
+- generate an initial structured summary when extracted text is already available
+
+Current files:
+
+- [book_domain_handler.go](../dokja_orch/internal/handlers/book_domain_handler.go)
+- [domain.go](../dokja_domain/dokja_book/domain.go)
+- [book_service_client.go](../dokja_orch/internal/clients/book_service_client.go)
+
 ## Scheduled Meme Dispatch Workflow
 
 Used for:

@@ -26,12 +26,15 @@ The active architecture is:
 
 ### Domains
 
+- [dokja_domain/dokja_book](./dokja_domain/dokja_book)
 - [dokja_domain/dokja_chat](./dokja_domain/dokja_chat)
 - [dokja_domain/dokja_meme](./dokja_domain/dokja_meme)
 - [dokja_domain/dokja_moderation](./dokja_domain/dokja_moderation)
 
 ### Services
 
+- [dokja_services/dokja_book](./dokja_services/dokja_book)
+  - HTTP service for book classification, context compaction strategy, and structured summary preparation
 - [dokja_services/dokja_chat_ai](./dokja_services/dokja_chat_ai)
   - FastAPI chat AI service
 - [dokja_services/dokja_meme](./dokja_services/dokja_meme)
@@ -43,6 +46,8 @@ The active architecture is:
 
 Implemented workflows include:
 
+- book
+  - classify book resources and plan/produce structured summaries
 - conversation
   - moderation -> chat -> chat AI
 - meme
@@ -74,6 +79,7 @@ What is already working:
 - CLI request/reply and REPL chat
 - compact orchestrator responses with optional debug mode
 - scheduled meme refresh and scheduled dispatch workflow
+- book workflow routed through orchestrator and dedicated book domain
 - chat sessions with timeout-based revocation
 - long Discord replies split safely across multiple messages
 - voice/radio commands in the Discord interface

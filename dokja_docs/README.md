@@ -9,3 +9,5 @@ Available docs:
 - [discord-interface.md](./discord-interface.md)
 - [production-runbook.md](./production-runbook.md)
 - [domain-responsibilities.md](./domain-responsibilities.md)
+- [voice-planning.md](./voice-planning.md)
+- [voice-service-proposal.md](./voice-service-proposal.md)
