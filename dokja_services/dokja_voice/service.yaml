@@ -1,0 +1,26 @@
+name: dokja-voice
+description: Standalone voice synthesis service for generating playable audio from text
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - http
+  - websocket
+
+consumes:
+  - http
+
+depends_on: []
+
+tags:
+  - domain:voice
+  - criticality:medium
+
+paths:
+  source: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile

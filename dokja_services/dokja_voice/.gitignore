@@ -1,0 +1,9 @@
+# Voice models and audio files
+*.onnx
+*.onnx.json
+*.wav
+models/
+
+# Python cache
+__pycache__/
+*.pyc
