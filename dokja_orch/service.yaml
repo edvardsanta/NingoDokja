@@ -16,7 +16,10 @@ consumes:
   - zmq-reqrep
 
 depends_on:
-  - dokja-services
+  - dokja-chat-ai
+  - dokja-meme
+  - dokja-book
+  - dokja-discord
 
 tags:
   - domain:orchestration

@@ -28,6 +28,11 @@ func (r *RuleBasedEventRouter) Route(_ context.Context, event Event) (Route, err
 			Workflow: "meme-dispatch",
 			Domains:  []Domain{DomainSystem},
 		}, nil
+	case strings.HasPrefix(eventType, "book."):
+		return Route{
+			Workflow: "book",
+			Domains:  []Domain{DomainBook},
+		}, nil
 	case strings.HasPrefix(eventType, "ningo."):
 		return Route{
 			Workflow: "ningo",

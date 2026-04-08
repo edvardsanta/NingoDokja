@@ -50,6 +50,15 @@ func actionFor(domain Domain, eventType string) string {
 		}
 	case DomainModeration:
 		return "screen-event"
+	case DomainBook:
+		switch eventType {
+		case "book.summary.requested":
+			return "summarize-book"
+		case "book.resource.classify":
+			return "classify-book-resource"
+		default:
+			return "handle-book-event"
+		}
 	case DomainChat:
 		if eventType == "message.created" {
 			return "generate-response"

@@ -28,6 +28,7 @@ func main() {
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
 		),
 		handlers.NewModerationDomainHandler(nil),
+		handlers.NewBookDomainHandler(clients.NewBookServiceClient("")),
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")),
 		handlers.NewMemeDomainHandler(clients.NewMemeServiceClient("")),
 		handlers.NewLoggingDomainHandler(core.DomainMemory),

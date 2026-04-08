@@ -102,6 +102,31 @@ func TestServiceProcessRoutesMemeEvents(t *testing.T) {
 	}
 }
 
+func TestServiceProcessRoutesBookEvents(t *testing.T) {
+	book := &captureHandler{domain: DomainBook}
+	service := DefaultService(book)
+
+	err := service.Process(context.Background(), Event{
+		Source:  SourceCLI,
+		Type:    "book.summary.requested",
+		Channel: EventChannel{ID: "c1"},
+		Payload: map[string]any{"title": "Clean Code", "content": "Meaningful names matter."},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(book.events) != 1 {
+		t.Fatalf("expected book handler to receive 1 event, got %d", len(book.events))
+	}
+	if book.steps[0].Action != "summarize-book" {
+		t.Fatalf("expected book action summarize-book, got %q", book.steps[0].Action)
+	}
+	if book.events[0].Context["workflow"] != "book" {
+		t.Fatalf("expected workflow context book, got %#v", book.events[0].Context["workflow"])
+	}
+}
+
 func TestServiceProcessValidation(t *testing.T) {
 	service := DefaultService(&captureHandler{domain: DomainChat})
 

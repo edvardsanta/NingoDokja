@@ -12,6 +12,7 @@ The intended flow is:
 
 In practice, this project currently handles:
 
+- book classification and summary planning flows
 - real-time chat requests
 - meme request/reply flows
 - scheduled meme dispatch workflows
@@ -53,6 +54,26 @@ Behavior:
 - chat builds/continues the conversation session
 - chat forwards full message history to `dokja-chat-ai`
 - reply is normalized before returning to the interface
+
+### Book
+
+Triggered by:
+
+- `book.summary.requested`
+- `book.resource.classify`
+
+Route:
+
+- workflow: `book`
+- domains: `book`
+
+Behavior:
+
+- delegates to the book domain
+- book domain calls the specialized HTTP book service
+- service classifies resource format and book type
+- service selects context compaction and summarization route
+- when extracted text is already available, service returns a structured initial summary
 
 ### Meme
 
@@ -141,6 +162,8 @@ Behavior:
   - downstream chat AI service base URL
 - `MEME_SERVICE_ENDPOINT`
   - downstream ZeroMQ meme service endpoint
+- `BOOK_SERVICE_ENDPOINT`
+  - downstream HTTP book service base URL
 - `DISCORD_INTERFACE_ENDPOINT`
   - downstream Discord delivery endpoint
 - `DISCORD_SCHEDULED_MEME_CHANNEL_ID`
@@ -178,5 +201,6 @@ The request ingress and HTTP bridge support:
 
 - chat session history is still held in-process inside the orchestrator
 - `memory` and `automation` domains are still placeholder/logging paths
+- book extraction by PDF / EPUB / MOBI is still a staged service concern; the first version focuses on classification and summary planning
 - the HTTP bridge contains some Discord-specific command mapping that should stay narrow
 - scheduled delivery currently targets Discord specifically through the interface delivery endpoint

@@ -4,7 +4,9 @@ go 1.25.0
 
 require read_books/dokja_domain/dokja_meme v0.0.0
 require read_books/dokja_domain/dokja_moderation v0.0.0
+require read_books/dokja_domain/dokja_book v0.0.0
 
+replace read_books/dokja_domain/dokja_book => ../dokja_domain/dokja_book
 replace read_books/dokja_domain/dokja_meme => ../dokja_domain/dokja_meme
 replace read_books/dokja_domain/dokja_moderation => ../dokja_domain/dokja_moderation
 
