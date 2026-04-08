@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
@@ -29,6 +30,18 @@ class ChatMessage(BaseModel):
     content: str = Field(..., min_length=1)
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    logger.info(
+        "starting chat ai server host=%s port=%s model=%s base_url=%s",
+        os.getenv("CHAT_AI_SERVICE_HOST", "0.0.0.0"),
+        os.getenv("CHAT_AI_SERVICE_PORT", "8080"),
+        os.getenv("CHAT_AI_MODEL", "n/a"),
+        os.getenv("CHAT_AI_BASE_URL", ""),
+    )
+    yield
+
+
 def create_app() -> FastAPI:
     service = OpenAIChatService(
         api_key=os.getenv("CHAT_AI_API_KEY", ""),
@@ -36,17 +49,7 @@ def create_app() -> FastAPI:
         model=os.getenv("CHAT_AI_MODEL", "n/a"),
     )
 
-    app = FastAPI()
-
-    @app.on_event("startup")
-    async def log_startup() -> None:
-        logger.info(
-            "starting chat ai server host=%s port=%s model=%s base_url=%s",
-            os.getenv("CHAT_AI_SERVICE_HOST", "0.0.0.0"),
-            os.getenv("CHAT_AI_SERVICE_PORT", "8080"),
-            os.getenv("CHAT_AI_MODEL", "n/a"),
-            os.getenv("CHAT_AI_BASE_URL", ""),
-        )
+    app = FastAPI(lifespan=lifespan)
 
     @app.post("/chat")
     async def chat(payload: ChatRequest, request: Request) -> dict:
