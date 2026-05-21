@@ -1,146 +1,71 @@
-# Ningo Dokja
+# Ningo Dokja (The Arrogant Philosopher)
 
-Ningo Dokja is being refactored from a monolithic Discord bot into a modular multi-interface AI platform.
+> "A virtual assistant that doesn't just summarize your books, but judges them with the weight of an 'arrogant philosopher'."
 
-The active architecture is:
+Welcome to **Ningo Dokja**, a modular AI virtual assistant born from the intersection of Data Science and the mythos of *Omniscient Reader*. Originally conceived as a simple tool for book summarization, Dokja has evolved into a multi-interface presence—an opinionated, high-functioning digital entity designed to assist with research, generate creative content, and dominate social interactions with intellectual flair.
 
-`Interfaces -> Orchestrator -> Domains -> Services`
+## The Vision
 
-## Current Architecture
+Dokja is more than a chatbot; it is an experiment in digital personality and utility. Built as part of a Data Science exploration, it bridges the gap between raw information processing and social engagement. Whether it's analyzing a complex dataset, summarizing a novel, or generating the perfect meme for your Discord server, Dokja does so with a distinct persona—talkative, well-read, and charmingly arrogant.
 
-### Interfaces
+> **💡 Fun Fact: The Meaning of "Dokja"**
+>
+> In Korean, the name **Dokja (독자)** carries a triple meaning that perfectly mirrors this project's evolution:
+> 1. **Reader (讀者):** Reflecting its origins as a book-summarization tool.
+> 2. **Only Child (獨子):** Representing its status as a unique, custom-built assistant.
+> 3. **Alone/Independent (獨自):** Marking its transformation into an autonomous, "arrogant philosopher" persona that stands on its own.
+>
+> **The Real Irony:** Despite the name fitting perfectly, its choice was entirely serendipitous—i have never actually read *Omniscient Reader*. Much like the protagonist of that story, Dokja seems to have manifested its own destiny, evolving from a mere observer of stories into the independent architect of its own digital world.
 
-- [dokja_interfaces/discord](./dokja_interfaces/discord)
-  - Discord messages, slash commands, richer interactions, outbound delivery, and voice/radio
-- [dokja_interfaces/cli](./dokja_interfaces/cli)
-  - request/reply CLI and chat REPL
+## Core Pillars
 
-### Orchestrator
+Dokja's existence is sustained by three foundational capabilities:
 
-- [dokja_orch](./dokja_orch)
-  - central routing, workflow planning, and domain dispatch
-  - ingress paths:
-    - `zmq-pubsub`
-    - `zmq-reqrep`
-    - `http`
+### 🧠 Intellectual Superiority (Knowledge & Intelligence)
+Dokja excels at transforming raw data into actionable knowledge. It classifies resources, produces structured summaries, and analyzes software releases, all while maintaining a critical, philosophical perspective.
 
-### Domains
+### 🎨 Social Dominance (Connection & Engagement)
+AI is best when it's social. Dokja powers natural, context-aware conversations and manages creative content like memes. It doesn't just "interact"—it commands the conversation, making group chats more informative and significantly more entertaining.
 
-- [dokja_domain/dokja_book](./dokja_domain/dokja_book)
-- [dokja_domain/dokja_chat](./dokja_domain/dokja_chat)
-- [dokja_domain/dokja_meme](./dokja_domain/dokja_meme)
-- [dokja_domain/dokja_moderation](./dokja_domain/dokja_moderation)
+### 🔌 Ubiquitous Presence (Integration)
+A true philosopher is always accessible. Through its modular architecture, Dokja provides a consistent experience across **Discord** (voice and chat), the **CLI** (for those who prefer the terminal's purity), and **Mobile** platforms.
 
-### Services
+---
 
-- [dokja_services/dokja_book](./dokja_services/dokja_book)
-  - HTTP service for book classification, context compaction strategy, and structured summary preparation
-- [dokja_services/dokja_chat_ai](./dokja_services/dokja_chat_ai)
-  - FastAPI chat AI service
-- [dokja_services/dokja_meme](./dokja_services/dokja_meme)
-  - ZeroMQ meme service wrapping legacy meme logic
-- [dokja_services/dokja_scheduler](./dokja_services/dokja_scheduler)
-  - scheduled event emitter for meme refresh and scheduled dispatch
+## Architectural Philosophy
 
-## Current Workflows
+At its heart, Dokja follows a **Modular Orchestrator** philosophy. 
 
-Implemented workflows include:
+Instead of a monolithic bot, it is a distributed system where **Interfaces** emit events to a central **Orchestrator**, which then coordinates with specialized **Domains** and **Services**. This architecture ensures that Dokja is resilient, extensible, and capable of supporting any interface or AI model.
 
-- book
-  - classify book resources and plan/produce structured summaries
-- conversation
-  - moderation -> chat -> chat AI
-- meme
-  - fetch, refresh, status
-- scheduled meme dispatch
-  - scheduler -> orchestrator -> Discord delivery
-- system status
-  - aggregate chat AI + meme health/status
+For a deep dive into the technical details, see the [Architecture Documentation](./dokja_docs/README.md).
 
-## Communication
+---
 
-The repo currently uses a pragmatic mix of:
+## Quick Start
 
-- `zmq-pubsub`
-- `zmq-reqrep`
-- `http`
-
-When writing `service.yaml`, prefer accurate protocol names such as:
-
-- `http`
-- `zmq-pubsub`
-- `zmq-reqrep`
-
-## Current State
-
-What is already working:
-
-- Discord interface through the orchestrator
-- CLI request/reply and REPL chat
-- compact orchestrator responses with optional debug mode
-- scheduled meme refresh and scheduled dispatch workflow
-- book workflow routed through orchestrator and dedicated book domain
-- chat sessions with timeout-based revocation
-- long Discord replies split safely across multiple messages
-- voice/radio commands in the Discord interface
-
-Known rough edges:
-
-- chat history is still in-process, not yet behind a dedicated memory domain/store
-- moderation exists but is still a thin domain
-- some legacy logic is still reused behind new service boundaries
-- `dokja_legacy` remains as reference only
-
-## Important Docs
-
-- [AGENTS.md](./AGENTS.md)
-  - architectural rules for coding agents
-- [dokja_docs/README.md](./dokja_docs/README.md)
-  - architecture and behavior docs
-
-Key project docs:
-
-- [events-vs-requests.md](./dokja_docs/events-vs-requests.md)
-- [workflows.md](./dokja_docs/workflows.md)
-- [discord-interface.md](./dokja_docs/discord-interface.md)
-- [production-runbook.md](./dokja_docs/production-runbook.md)
-- [domain-responsibilities.md](./dokja_docs/domain-responsibilities.md)
-
-## Development
-
-### Run Tests
-
-Central test runner:
+The fastest way to deploy the Dokja stack is using Docker:
 
 ```bash
-./scripts/test_all.sh
-```
+# Clone the repository and move into the directory
+git clone https://github.com/your-repo/read_books.git
+cd read_books
 
-Reports are written to:
-
-- [test_reports/latest/summary.md](./test_reports/latest/summary.md)
-- [test_reports/latest/summary.json](./test_reports/latest/summary.json)
-
-### Dev Stack
-
-Use:
-
-```bash
+# Start the development stack
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-Main stack files:
+---
 
-- [docker-compose.dev.yml](./docker-compose.dev.yml)
-- [docker-compose.prod.yml](./docker-compose.prod.yml)
-- [.env](./.env)
-- [.env.prod](./.env.prod)
+## Navigation Hub
 
-## Legacy Areas
+Explore the technical foundations of the project:
 
-- [dokja_lab](./dokja_lab)
-  - still exists as a legacy runtime/reference area
-- [dokja_legacy](./dokja_legacy)
-  - reference only unless explicitly needed
+- **[Architecture Guide](./dokja_docs/README.md)**: Deep dive into the system design.
+- **[Coding Conventions (AGENTS.md)](./AGENTS.md)**: Guidelines for contributing and AI-assisted coding.
+- **[Domain Responsibilities](./dokja_docs/domain-responsibilities.md)**: Understanding the business logic boundaries.
+- **[Workflows](./dokja_docs/workflows.md)**: Step-by-step breakdowns of system operations.
 
-New work should prefer the modular architecture instead of extending those legacy paths directly.
+---
+
+*Built with ❤️ for a more intelligent and fun digital life.*
