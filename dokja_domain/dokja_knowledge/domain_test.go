@@ -26,6 +26,8 @@ func TestHandleForwardsEachActionAsItsServiceEvent(t *testing.T) {
 		payload   map[string]any
 	}{
 		{ActionIngestKnowledge, "knowledge.ingest", map[string]any{"title": "T", "body": "B"}},
+		{ActionIngestKnowledge, "knowledge.ingest", map[string]any{"content_b64": "eA==", "filename": "a.pdf"}},
+		{ActionIngestKnowledge, "knowledge.ingest", map[string]any{"source": "https://docs.example/a"}},
 		{ActionSearchKnowledge, "knowledge.search", map[string]any{"query": "q"}},
 		{ActionListKnowledge, "knowledge.list", nil},
 		{ActionDeleteKnowledge, "knowledge.delete", map[string]any{"source_id": "note:t"}},
@@ -50,8 +52,12 @@ func TestHandleRejectsMissingFieldsBeforeCallingTheService(t *testing.T) {
 		payload map[string]any
 		field   string
 	}{
-		{ActionIngestKnowledge, map[string]any{"title": "T"}, "body"},
+		{ActionIngestKnowledge, map[string]any{"title": "T"}, "exactly one"},
+		{ActionIngestKnowledge, nil, "exactly one"},
+		{ActionIngestKnowledge, map[string]any{"body": "B", "source": "inbox:x"}, "exactly one"},
+		{ActionIngestKnowledge, map[string]any{"content_b64": "eA==", "source": "inbox:x"}, "exactly one"},
 		{ActionIngestKnowledge, map[string]any{"title": "  ", "body": "B"}, "title"},
+		{ActionIngestKnowledge, map[string]any{"content_b64": "eA=="}, "filename"},
 		{ActionSearchKnowledge, map[string]any{"query": " "}, "query"},
 		{ActionSearchKnowledge, nil, "query"},
 		{ActionDeleteKnowledge, map[string]any{"source_id": 3}, "source_id"},

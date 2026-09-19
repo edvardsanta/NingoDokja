@@ -2,20 +2,48 @@ package cli
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 )
 
-// maxKnowledgeFileBytes keeps a file well under the service's own limit (2M characters).
+// maxKnowledgeFileBytes keeps a text file well under the service's own limit (2M characters).
 const maxKnowledgeFileBytes = 4 << 20
 
-var knowledgeTextExtensions = map[string]bool{".txt": true, ".md": true, ".markdown": true}
+// maxKnowledgeUploadBytes matches the service's limit for files it unpacks itself.
+const maxKnowledgeUploadBytes = 20 << 20
+
+// Text files are read here; the formats below are sent as they are and the service extracts
+// their text, so the same code serves the CLI, the TUI and any other interface.
+var knowledgeTextExtensions = map[string]bool{".txt": true, ".md": true, ".markdown": true, ".rst": true}
+var knowledgeUploadExtensions = map[string]bool{
+	".docx": true, ".epub": true, ".pdf": true, ".html": true, ".htm": true, ".xhtml": true,
+	".xml": true, ".rss": true, ".atom": true,
+}
+
+var schemePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]{0,31}:\S`)
+
+// IsKnowledgeSource says whether an argument names a source to fetch (an address or a
+// scheme handled by a user plugin) rather than a file on this machine. An existing file
+// always wins, so a file name that happens to contain a colon still works.
+func IsKnowledgeSource(arg string) bool {
+	lower := strings.ToLower(arg)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		return true
+	}
+	if _, err := os.Stat(arg); err == nil {
+		return false
+	}
+	return schemePattern.MatchString(arg)
+}
 
 // KnowledgeDocument is one document ready to be sent to the knowledge base.
 type KnowledgeDocument struct {
@@ -25,10 +53,27 @@ type KnowledgeDocument struct {
 	Kind      string
 	SourceRef string
 	Tags      []string
+	// Filename and ContentB64 carry a file the service extracts; Source names something
+	// for the service to fetch. Exactly one of Body, ContentB64 and Source is set.
+	Filename   string
+	ContentB64 string
+	Source     string
 }
 
 func (d KnowledgeDocument) Payload() map[string]any {
-	payload := map[string]any{"title": d.Title, "body": d.Body, "kind": d.Kind}
+	payload := map[string]any{"kind": d.Kind}
+	switch {
+	case d.Source != "":
+		payload["source"] = d.Source
+	case d.ContentB64 != "":
+		payload["content_b64"] = d.ContentB64
+		payload["filename"] = d.Filename
+	default:
+		payload["body"] = d.Body
+	}
+	if d.Title != "" {
+		payload["title"] = d.Title
+	}
 	if d.SourceID != "" {
 		payload["source_id"] = d.SourceID
 	}
@@ -41,12 +86,21 @@ func (d KnowledgeDocument) Payload() map[string]any {
 	return payload
 }
 
-// ReadKnowledgeFile loads a text or markdown file. Its source id comes from the file
-// name, so adding the same file again updates the document instead of duplicating it.
+// NewKnowledgeSource builds a document for the service to fetch.
+func NewKnowledgeSource(source, title, kind string, tags []string) KnowledgeDocument {
+	return KnowledgeDocument{Source: strings.TrimSpace(source), Title: strings.TrimSpace(title), Kind: kind, Tags: tags}
+}
+
+// ReadKnowledgeFile loads a file. Its source id comes from the file name, so adding the
+// same file again updates the document instead of duplicating it.
 func ReadKnowledgeFile(path, title, kind string, tags []string) (KnowledgeDocument, error) {
 	extension := strings.ToLower(filepath.Ext(path))
+	if knowledgeUploadExtensions[extension] {
+		return readKnowledgeUpload(path, title, kind, tags)
+	}
 	if !knowledgeTextExtensions[extension] {
-		return KnowledgeDocument{}, fmt.Errorf("%s: only .txt and .md files are supported for now", path)
+		return KnowledgeDocument{}, fmt.Errorf("%s: unsupported file type %q (text: .txt .md .rst; other: %s; or pass an address or plugin source)",
+			path, extension, strings.Join(sortedKeys(knowledgeUploadExtensions), " "))
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -78,6 +132,40 @@ func ReadKnowledgeFile(path, title, kind string, tags []string) (KnowledgeDocume
 		Kind:     kind,
 		Tags:     tags,
 	}, nil
+}
+
+func readKnowledgeUpload(path, title, kind string, tags []string) (KnowledgeDocument, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return KnowledgeDocument{}, fmt.Errorf("read %s: %w", path, err)
+	}
+	if info.Size() == 0 {
+		return KnowledgeDocument{}, fmt.Errorf("%s is empty", path)
+	}
+	if info.Size() > maxKnowledgeUploadBytes {
+		return KnowledgeDocument{}, fmt.Errorf("%s: %d bytes is over the %d byte limit; split it first", path, info.Size(), maxKnowledgeUploadBytes)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return KnowledgeDocument{}, fmt.Errorf("read %s: %w", path, err)
+	}
+	base := filepath.Base(path)
+	return KnowledgeDocument{
+		SourceID:   "file:" + sanitizeSourceID(base),
+		Title:      strings.TrimSpace(title),
+		Kind:       kind,
+		Filename:   base,
+		ContentB64: base64.StdEncoding.EncodeToString(raw),
+	}, nil
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // ReadKnowledgeStdin reads a note piped in. It needs a title, since there is no file name.
@@ -215,8 +303,8 @@ func (a *App) newKnowledgeCommand(ctx context.Context) *cobra.Command {
 	var addTitle, addKind, addRef string
 	var addTags []string
 	add := &cobra.Command{
-		Use:   "add <file.md|file.txt|->...",
-		Short: "Add documents (use - to read one note from standard input)",
+		Use:   "add <file|address|scheme:ref|->...",
+		Short: "Add documents: files (text, .docx, .epub, .pdf, .html, feeds), addresses, plugin sources, or - for a note on standard input",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 1 && addTitle != "" {
@@ -226,9 +314,12 @@ func (a *App) newKnowledgeCommand(ctx context.Context) *cobra.Command {
 			for _, arg := range args {
 				var document KnowledgeDocument
 				var err error
-				if arg == "-" {
+				switch {
+				case arg == "-":
 					document, err = ReadKnowledgeStdin(os.Stdin, addTitle, addKind, addTags)
-				} else {
+				case IsKnowledgeSource(arg):
+					document = NewKnowledgeSource(arg, addTitle, addKind, addTags)
+				default:
 					document, err = ReadKnowledgeFile(arg, addTitle, addKind, addTags)
 				}
 				if err == nil {
@@ -248,7 +339,7 @@ func (a *App) newKnowledgeCommand(ctx context.Context) *cobra.Command {
 			return nil
 		},
 	}
-	add.Flags().StringVar(&addTitle, "title", "", "Title (default: the first # heading, then the file name)")
+	add.Flags().StringVar(&addTitle, "title", "", "Title (default: the document's own title, then the file name)")
 	add.Flags().StringVar(&addKind, "kind", "note", "Kind of document: note, article, book, paper...")
 	add.Flags().StringVar(&addRef, "ref", "", "Where it came from, such as a URL")
 	add.Flags().StringSliceVar(&addTags, "tag", nil, "Tag (repeatable)")

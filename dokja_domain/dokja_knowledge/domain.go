@@ -44,9 +44,36 @@ func New(service Service) *Domain {
 // requiredFields are what each action cannot do without. Checking them here keeps a
 // malformed request from ever reaching the service.
 var requiredFields = map[string][]string{
-	ActionIngestKnowledge: {"title", "body"},
 	ActionSearchKnowledge: {"query"},
 	ActionDeleteKnowledge: {"source_id"},
+}
+
+// ingestInputs are the ways to hand the service a document: its text, an uploaded file or
+// a source it should read. Exactly one is needed; a title is only required with a body,
+// since files and sources carry their own.
+var ingestInputs = []string{"body", "content_b64", "source"}
+
+func validateIngest(payload map[string]any) error {
+	given := 0
+	for _, field := range ingestInputs {
+		if value, _ := payload[field].(string); strings.TrimSpace(value) != "" {
+			given++
+		}
+	}
+	if given != 1 {
+		return fmt.Errorf("send exactly one of %s", strings.Join(ingestInputs, ", "))
+	}
+	if body, _ := payload["body"].(string); strings.TrimSpace(body) != "" {
+		if title, _ := payload["title"].(string); strings.TrimSpace(title) == "" {
+			return fmt.Errorf("title is required with body")
+		}
+	}
+	if upload, _ := payload["content_b64"].(string); strings.TrimSpace(upload) != "" {
+		if name, _ := payload["filename"].(string); strings.TrimSpace(name) == "" {
+			return fmt.Errorf("filename is required with content_b64")
+		}
+	}
+	return nil
 }
 
 var eventTypes = map[string]string{
@@ -71,6 +98,11 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return nil, fmt.Errorf("unsupported knowledge action %q for event type %q", request.Action, request.Event.Type)
 	}
 	payload := request.Event.Payload
+	if request.Action == ActionIngestKnowledge {
+		if err := validateIngest(payload); err != nil {
+			return nil, err
+		}
+	}
 	for _, field := range requiredFields[request.Action] {
 		if value, _ := payload[field].(string); strings.TrimSpace(value) == "" {
 			return nil, fmt.Errorf("%s is required", field)
