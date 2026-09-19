@@ -30,8 +30,8 @@ MAX_TITLE_CHARS = 300
 MAX_QUERY_CHARS = 2_000
 CANDIDATES = 30
 RRF_K = 60
-# Calibrated with bge-m3 (see README): paraphrases score 0.46-0.61, unrelated 0.27-0.41.
-DEFAULT_MIN_SCORE = 0.44
+# Provisional: measured with bge-m3 on a three-document corpus (see README).
+DEFAULT_MIN_SCORE = 0.45
 DEFAULT_LEXICAL_COVERAGE = 0.75
 
 STOPWORDS = frozenset(
@@ -232,6 +232,10 @@ class KnowledgeService:
             return {}, True, f"{err}; keyword search only"
         ids, matrix = self._embeddings()
         if len(ids) == 0 or matrix.shape[1] != vector.shape[1]:
+            if self.store.stats(self.model)["chunks"] > 0:
+                # Stored text exists but none of it has a vector from this model, for
+                # example right after a model change: say so instead of looking healthy.
+                return {}, True, "embeddings are missing for this model (reindex pending); keyword search only"
             return {}, False, ""
         scores = matrix @ vector[0]
         top = np.argsort(-scores)[:CANDIDATES]

@@ -24,7 +24,13 @@ PARAPHRASES = {
     "bolo": "receita de sobremesa doce feita com raiz alaranjada",
     "juros": "por que aumentar o custo do dinheiro emprestado segura o aumento dos preços?",
 }
-UNRELATED = ["quem ganhou o campeonato de futebol ontem?", "como configurar um servidor nginx com https?"]
+UNRELATED = [
+    "quem ganhou o campeonato de futebol ontem?",
+    "como configurar um servidor nginx com https?",
+    # Neighbouring topics: the hard cases that actually pin the threshold.
+    "receita de lasanha",
+    "explica o que é um imposto",
+]
 
 
 @pytest.fixture(scope="module")

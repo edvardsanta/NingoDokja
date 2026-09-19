@@ -209,11 +209,14 @@ def test_embeddings_from_another_model_are_not_used(embedder):
 
     assert old.status()["embedded"] == added["chunks"]
     assert new.status()["embedded"] == 0 and new.status()["pending_embeddings"] == added["chunks"]
-    assert all(hit["score"] is None or hit["score"] == 0 for hit in new.search({"query": "kant"})["hits"])
+    before = new.search({"query": "kant"})
+    assert before["degraded"] is True and "reindex pending" in before["reason"]
+    assert all(hit["score"] is None for hit in before["hits"])
 
     assert new.reindex({})["remaining"] == 0
     assert new.status()["embedded"] == added["chunks"]
-    assert new.search({"query": "Kant razao pura"})["hits"][0]["score"] > 0.3
+    after = new.search({"query": "Kant razao pura"})
+    assert after["degraded"] is False and after["hits"][0]["score"] > 0.3
 
 
 # ---- misc -----------------------------------------------------------------------------

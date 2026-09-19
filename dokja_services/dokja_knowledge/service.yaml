@@ -1,10 +1,13 @@
 name: dokja_knowledge
 image: dokja_knowledge:latest
 ports:
-  - "5561:5561"
+  - "127.0.0.1:5561:5561"
 env:
   KNOWLEDGE_SERVICE_ENDPOINT: tcp://*:5561
   KNOWLEDGE_DB_FILE: /data/dokja_knowledge.db
   DOKJA_EMBED_ENDPOINT: http://ollama:11434
   DOKJA_EMBED_MODEL: bge-m3
+  DOKJA_EMBED: "on"
+  DOKJA_EMBED_TIMEOUT: "60"
+  KNOWLEDGE_MIN_SCORE: "0.45"
 healthcheck: {}
