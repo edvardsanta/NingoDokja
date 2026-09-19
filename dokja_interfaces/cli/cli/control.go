@@ -23,7 +23,7 @@ var JobNames = []string{
 
 // ServiceNames are the services that can be switched off.
 // "scheduler" pauses every scheduled run at once (the container itself is not touched).
-var ServiceNames = []string{"meme", "chat_ai", "book", "scheduler"}
+var ServiceNames = []string{"meme", "chat_ai", "book", "knowledge", "scheduler"}
 
 // JobEvent is the event that runs a job right now. Manual runs carry no schedule
 // stamp, so a paused job does not block them; a disabled service still does.
