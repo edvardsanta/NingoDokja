@@ -8,6 +8,10 @@ description: Open a pull request for the current task branch in the Ningo Dokja 
 Language rules, no exceptions:
 
 - The PR title and body are written in **English**.
+- Everything the PR adds to the repository is in **English** too: documentation, code
+  comments, commit messages and error text. User-facing interface text is written in English
+  and translated through a catalog (as the TUI does); Portuguese lives only in catalogs and
+  in test data where the language is the point (say so in a comment).
 - Talk to the user in **Portuguese** (see `CLAUDE.md`).
 
 Read [AGENTS.md](../../../AGENTS.md) first; it is the source of truth for git, tests
