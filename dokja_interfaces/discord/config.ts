@@ -8,6 +8,7 @@ export type DiscordInterfaceConfig = {
   orchestratorTimeoutMs: number;
   voiceServiceEndpoint: string;
   deliveryPort: number;
+  deliveryWebhooks: Record<string, string>;
 };
 
 export function env(name: string, fallback = ""): string {
@@ -32,5 +33,24 @@ export function buildConfig(): DiscordInterfaceConfig {
     orchestratorTimeoutMs: Number(env("DOKJA_ORCHESTRATOR_TIMEOUT_MS", "180000")),
     voiceServiceEndpoint: env("DOKJA_VOICE_HTTP_ENDPOINT", "http://dokja-voice:8081"),
     deliveryPort: Number(env("DOKJA_DISCORD_DELIVERY_PORT", "8092")),
+    deliveryWebhooks: parseWebhookMap(env("DOKJA_DISCORD_WEBHOOKS")),
   };
+}
+
+// Parses `channelId=webhookUrl,channelId2=webhookUrl2`. Splits on the first "="
+// only, since webhook URLs may carry query strings.
+export function parseWebhookMap(raw: string): Record<string, string> {
+  const webhooks: Record<string, string> = {};
+  for (const entry of raw.split(",")) {
+    const separator = entry.indexOf("=");
+    if (separator < 0) {
+      continue;
+    }
+    const channelId = entry.slice(0, separator).trim();
+    const url = entry.slice(separator + 1).trim();
+    if (channelId && url) {
+      webhooks[channelId] = url;
+    }
+  }
+  return webhooks;
 }

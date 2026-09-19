@@ -46,6 +46,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
       commandDeploy: cfg.allowedGuildId ? "guild" : "global",
       commands: commands.map((entry) => entry.name),
       deliveryPort: cfg.deliveryPort,
+      deliveryWebhookChannels: Object.keys(cfg.deliveryWebhooks),
     }),
   );
 
@@ -53,6 +54,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     startDiscordDeliveryServer({
       token,
       port: cfg.deliveryPort,
+      webhooks: cfg.deliveryWebhooks,
       log: runtime.log,
       error: runtime.error,
     });
