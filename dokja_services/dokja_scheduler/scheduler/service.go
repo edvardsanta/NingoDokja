@@ -55,6 +55,12 @@ type Service struct {
 	refreshMaxItems   int
 	dispatchMemeLimit int
 	publisherFactory  func() (*zmq4.Socket, error)
+
+	// stateFile is the orchestrator-owned file that may carry per-job interval overrides.
+	stateFile string
+	statePoll time.Duration
+	now       func() time.Time
+	emit      func(ctx context.Context, event Event) error
 }
 
 func NewFromEnv(logger *log.Logger) (*Service, error) {
@@ -87,7 +93,7 @@ func NewFromEnv(logger *log.Logger) (*Service, error) {
 	eventEndpoint := firstNonEmpty(os.Getenv("DOKJA_SCHEDULER_EVENT_ENDPOINT"), defaultEventEndpoint)
 	topic := firstNonEmpty(os.Getenv("DOKJA_SCHEDULER_TOPIC"), defaultTopic)
 
-	return &Service{
+	service := &Service{
 		logger:            logger,
 		eventEndpoint:     eventEndpoint,
 		topic:             topic,
@@ -96,6 +102,9 @@ func NewFromEnv(logger *log.Logger) (*Service, error) {
 		bootstrapGrace:    bootstrapGrace,
 		refreshMaxItems:   refreshMaxItems,
 		dispatchMemeLimit: dispatchMemeLimit,
+		stateFile:         strings.TrimSpace(os.Getenv("DOKJA_STATE_FILE")),
+		statePoll:         defaultStatePoll,
+		now:               time.Now,
 		publisherFactory: func() (*zmq4.Socket, error) {
 			socket, err := zmq4.NewSocket(zmq4.PUB)
 			if err != nil {
@@ -107,65 +116,9 @@ func NewFromEnv(logger *log.Logger) (*Service, error) {
 			}
 			return socket, nil
 		},
-	}, nil
-}
-
-func (s *Service) JobNames() func(func(string) bool) {
-	return func(yield func(string) bool) {
-		for _, name := range []string{"meme.refresh", "meme.dispatch"} {
-			if !yield(name) {
-				return
-			}
-		}
 	}
-}
-
-func (s *Service) Run(ctx context.Context) error {
-	if s == nil {
-		return fmt.Errorf("scheduler service is nil")
-	}
-
-	s.logger.Printf(
-		"config refresh_interval=%s dispatch_interval=%s bootstrap_grace=%s refresh_max_items=%d dispatch_limit=%d event_endpoint=%s topic=%s",
-		s.refreshInterval,
-		s.dispatchInterval,
-		s.bootstrapGrace,
-		s.refreshMaxItems,
-		s.dispatchMemeLimit,
-		s.eventEndpoint,
-		s.topic,
-	)
-
-	if err := s.runMemeRefresh(ctx); err != nil {
-		s.logger.Printf("initial meme refresh failed: %v", err)
-	}
-	if err := s.waitBootstrapGrace(ctx); err != nil {
-		return err
-	}
-	if err := s.runMemeDispatch(ctx); err != nil {
-		s.logger.Printf("bootstrap meme dispatch failed: %v", err)
-	}
-
-	refreshTicker := time.NewTicker(s.refreshInterval)
-	defer refreshTicker.Stop()
-
-	dispatchTicker := time.NewTicker(s.dispatchInterval)
-	defer dispatchTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-refreshTicker.C:
-			if err := s.runMemeRefresh(ctx); err != nil {
-				s.logger.Printf("scheduled meme refresh failed: %v", err)
-			}
-		case <-dispatchTicker.C:
-			if err := s.runMemeDispatch(ctx); err != nil {
-				s.logger.Printf("scheduled meme dispatch failed: %v", err)
-			}
-		}
-	}
+	service.emit = service.publish
+	return service, nil
 }
 
 func (s *Service) waitBootstrapGrace(ctx context.Context) error {
@@ -194,7 +147,7 @@ func (s *Service) runMemeRefresh(ctx context.Context) error {
 	})
 
 	s.logger.Printf("emit type=%s max_items_per_scraper=%d", event.Type, s.refreshMaxItems)
-	return s.publish(ctx, event)
+	return s.emit(ctx, event)
 }
 
 func (s *Service) runMemeDispatch(ctx context.Context) error {
@@ -206,7 +159,7 @@ func (s *Service) runMemeDispatch(ctx context.Context) error {
 	})
 
 	s.logger.Printf("emit type=%s limit=%d", event.Type, s.dispatchMemeLimit)
-	return s.publish(ctx, event)
+	return s.emit(ctx, event)
 }
 
 func (s *Service) publish(ctx context.Context, event Event) error {
