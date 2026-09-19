@@ -67,6 +67,11 @@ Notes that save time:
 
 - Go: use `GOTOOLCHAIN=local ASDF_GOLANG_VERSION=1.25.0` and keep the `go`
   directive at `1.25.0`. Also run `go vet ./...` and `gofmt -l` on touched files.
+- Python under `dokja_lab`: CI also runs `black --check .`, `isort --check-only .` and
+  `mypy . --ignore-missing-imports` from that directory (versions pinned in
+  `dokja_lab/requirements.txt`). Run them on the files you touched, and compare with
+  `origin/main` before blaming the change: if `main` already fails a check, say so in the
+  PR instead of reformatting files you did not write.
 - CI only runs the orchestrator tests (`go.yml`) and `dokja_lab` (`python.yml`),
   so the local results are the real evidence for the other modules.
 - Record every command and its result. A suite that failed, was blocked or was
