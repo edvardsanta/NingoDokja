@@ -66,6 +66,7 @@ services:
       DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
       DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
       KNOWLEDGE_MIN_SCORE: ${KNOWLEDGE_MIN_SCORE:-0.45}
+      KNOWLEDGE_FETCH: ${KNOWLEDGE_FETCH:-on}
     volumes:
       - dokja-data:/data
     # Private research notes and no authentication: reachable from this host only.

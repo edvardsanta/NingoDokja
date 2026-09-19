@@ -138,6 +138,26 @@ reports `degraded`; `knowledge.reindex` embeds what was missed. Changing `DOKJA_
 reindex. `KNOWLEDGE_MIN_SCORE` (default `0.45`) decides which hits count as relevant; it was measured on a
 tiny corpus, so retune it once the base has real content.
 
+Documents can be added from `.txt`, `.md`, `.html`, `.docx`, `.epub`, `.pdf` and feed files, and from an
+address (`dokja-cli knowledge add <address>`). A feed is only read once; following one over time is not built
+in. Scanned PDFs are refused because OCR is not included. Because the orchestrator port has no
+authentication, the address fetcher only reaches public hosts (see the service README for the exact rules);
+set `KNOWLEDGE_FETCH=off` to disable it.
+
+Anything specific to one site or system is a **plugin you own**: Python files in a directory outside the
+repository, mounted read-only and named by `KNOWLEDGE_PLUGINS_DIR`, for example with a compose override:
+
+```yaml
+services:
+  dokja-knowledge:
+    environment:
+      KNOWLEDGE_PLUGINS_DIR: /plugins
+    volumes:
+      - /path/to/your/plugins:/plugins:ro
+```
+
+Plugins run with the service's permissions, so only mount a directory you control.
+
 Port `5561` is published on `127.0.0.1` only: the notes are private and the service has no authentication.
 On every Discord message the orchestrator looks the question up and gives the chat model only the relevant
 hits, then ends the reply with the sources it consulted. Switching `knowledge` off (`dokja-cli services`)
