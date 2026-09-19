@@ -64,3 +64,5 @@ test_reports/
 # ML Models cache
 models/
 **/models/models--*/
+# Operator switches written by the orchestrator
+.dokja/
