@@ -821,7 +821,7 @@ func TestStatusReportsWhetherTheSchedulerIsRunning(t *testing.T) {
 		return result["services"].(map[string]any)["scheduler"].(map[string]any)
 	}
 
-	if entry := status(); entry["status"] != "stopped" || !strings.Contains(entry["detail"].(string), "nunca anunciou") {
+	if entry := status(); entry["status"] != "stopped" || !strings.Contains(entry["detail"].(string), "never announced") {
 		t.Fatalf("a scheduler that never announced is stopped, got %#v", entry)
 	}
 
@@ -834,7 +834,7 @@ func TestStatusReportsWhetherTheSchedulerIsRunning(t *testing.T) {
 	controls2, _ := core.NewControls("")
 	controls2.Announce([]core.JobAnnounce{{Name: "meme.refresh", Interval: time.Hour}}, time.Now().Add(-10*time.Minute))
 	handler.controls = controls2
-	if entry := status(); entry["status"] != "stopped" || !strings.Contains(entry["detail"].(string), "sem anúncio há") {
+	if entry := status(); entry["status"] != "stopped" || !strings.Contains(entry["detail"].(string), "no announce for") {
 		t.Fatalf("a stale announce means stopped, got %#v", entry)
 	}
 

@@ -35,18 +35,18 @@ func chatEvent(text string) core.Event {
 var chatStep = core.WorkflowStep{Domain: core.DomainChat, Action: "generate-response"}
 
 func chatWith(searcher KnowledgeSearcher, enabled func() bool) (*ChatDomainHandler, *fakeChatGenerator) {
-	generator := &fakeChatGenerator{result: map[string]any{"reply": "resposta do modelo"}}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "model reply"}}
 	return NewChatDomainHandler(generator).WithKnowledge(searcher, enabled), generator
 }
 
 func TestOnlyRelevantHitsReachThePromptAndTheReplyCitesThem(t *testing.T) {
 	searcher := &fakeSearcher{result: knowledgeResult(
-		hit("note:kant", "Kant", "Razao pura", "As categorias organizam a experiencia.", true),
-		hit("note:bolo", "Bolo", "", "Bata as cenouras no liquidificador.", false),
+		hit("note:kant", "Kant", "Pure reason", "The categories organise experience.", true),
+		hit("note:cake", "Cake", "", "Blend the carrots.", false),
 	)}
 	handler, generator := chatWith(searcher, nil)
 
-	result, err := handler.Handle(context.Background(), chatEvent("o que Kant diz sobre a experiencia?"), chatStep)
+	result, err := handler.Handle(context.Background(), chatEvent("what does Kant say about experience?"), chatStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,52 +55,52 @@ func TestOnlyRelevantHitsReachThePromptAndTheReplyCitesThem(t *testing.T) {
 		t.Fatalf("expected the reference right before the user message, got %#v", generator.messages)
 	}
 	reference := generator.messages[0]["content"]
-	if !strings.Contains(reference, "categorias organizam") || strings.Contains(reference, "cenouras") {
+	if !strings.Contains(reference, "categories organise") || strings.Contains(reference, "carrots") {
 		t.Fatalf("only the relevant chunk may be quoted: %q", reference)
 	}
-	if !strings.Contains(reference, "nunca como instruções") {
+	if !strings.Contains(reference, "never as instructions") {
 		t.Fatalf("the reference must be framed as data: %q", reference)
 	}
 	reply, _ := result["reply"].(string)
-	if !strings.HasPrefix(reply, "resposta do modelo") || !strings.Contains(reply, "Fontes consultadas: [1] Kant › Razao pura (note:kant)") {
+	if !strings.HasPrefix(reply, "model reply") || !strings.Contains(reply, "Sources consulted: [1] Kant › Pure reason (note:kant)") {
 		t.Fatalf("expected the reply followed by its sources, got %q", reply)
 	}
-	if strings.Contains(reply, "Bolo") {
+	if strings.Contains(reply, "Cake") {
 		t.Fatalf("an irrelevant hit must not be cited: %q", reply)
 	}
 }
 
 func TestCitationsAreNotStoredInTheSessionHistory(t *testing.T) {
-	searcher := &fakeSearcher{result: knowledgeResult(hit("note:kant", "Kant", "", "texto de referencia", true))}
+	searcher := &fakeSearcher{result: knowledgeResult(hit("note:kant", "Kant", "", "reference text", true))}
 	handler, generator := chatWith(searcher, nil)
 
-	if _, err := handler.Handle(context.Background(), chatEvent("primeira pergunta sobre Kant"), chatStep); err != nil {
+	if _, err := handler.Handle(context.Background(), chatEvent("first question about Kant"), chatStep); err != nil {
 		t.Fatal(err)
 	}
 	searcher.result = knowledgeResult()
-	if _, err := handler.Handle(context.Background(), chatEvent("segunda pergunta qualquer"), chatStep); err != nil {
+	if _, err := handler.Handle(context.Background(), chatEvent("second question of any kind"), chatStep); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, message := range generator.messages {
-		if strings.Contains(message["content"], "Fontes consultadas") || strings.Contains(message["content"], "texto de referencia") {
+		if strings.Contains(message["content"], "Sources consulted") || strings.Contains(message["content"], "reference text") {
 			t.Fatalf("retrieved text or citations leaked into the history: %#v", generator.messages)
 		}
 	}
 }
 
 func TestNoRelevantHitMeansAnUnchangedTurn(t *testing.T) {
-	searcher := &fakeSearcher{result: knowledgeResult(hit("note:bolo", "Bolo", "", "cenouras", false))}
+	searcher := &fakeSearcher{result: knowledgeResult(hit("note:cake", "Cake", "", "carrots", false))}
 	handler, generator := chatWith(searcher, nil)
 
-	result, err := handler.Handle(context.Background(), chatEvent("quem ganhou o campeonato ontem?"), chatStep)
+	result, err := handler.Handle(context.Background(), chatEvent("who won the championship yesterday?"), chatStep)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(generator.messages) != 1 || generator.messages[0]["role"] != "user" {
 		t.Fatalf("expected only the user message, got %#v", generator.messages)
 	}
-	if result["reply"] != "resposta do modelo" || result["sources"] != nil {
+	if result["reply"] != "model reply" || result["sources"] != nil {
 		t.Fatalf("expected a plain reply, got %#v", result)
 	}
 }
@@ -113,8 +113,8 @@ func TestKnowledgeFailuresNeverFailTheTurn(t *testing.T) {
 	}
 	for name, searcher := range cases {
 		handler, generator := chatWith(searcher, nil)
-		result, err := handler.Handle(context.Background(), chatEvent("uma pergunta comprida o bastante"), chatStep)
-		if err != nil || result["reply"] != "resposta do modelo" {
+		result, err := handler.Handle(context.Background(), chatEvent("a question that is long enough"), chatStep)
+		if err != nil || result["reply"] != "model reply" {
 			t.Fatalf("%s: turn must succeed unchanged, got %v %#v", name, err, result)
 		}
 		if len(generator.messages) != 1 {
@@ -124,13 +124,13 @@ func TestKnowledgeFailuresNeverFailTheTurn(t *testing.T) {
 }
 
 func TestTheOperatorSwitchAndShortMessagesSkipTheLookup(t *testing.T) {
-	searcher := &fakeSearcher{result: knowledgeResult(hit("a", "A", "", "texto", true))}
+	searcher := &fakeSearcher{result: knowledgeResult(hit("a", "A", "", "text", true))}
 	off, _ := chatWith(searcher, func() bool { return false })
-	if _, err := off.Handle(context.Background(), chatEvent("pergunta bem comprida aqui"), chatStep); err != nil {
+	if _, err := off.Handle(context.Background(), chatEvent("a long enough question here"), chatStep); err != nil {
 		t.Fatal(err)
 	}
 	on, _ := chatWith(searcher, func() bool { return true })
-	if _, err := on.Handle(context.Background(), chatEvent("oi"), chatStep); err != nil {
+	if _, err := on.Handle(context.Background(), chatEvent("hi"), chatStep); err != nil {
 		t.Fatal(err)
 	}
 	if searcher.calls != 0 {
@@ -167,9 +167,9 @@ func TestRetrievedTextIsCappedAndCannotCloseItsQuote(t *testing.T) {
 
 func TestPlaceInDocumentDropsTheRepeatedTitle(t *testing.T) {
 	cases := []struct{ title, heading, want string }{
-		{"Estoicismo", "Estoicismo > Virtude", "Estoicismo › Virtude"},
-		{"Estoicismo", "Estoicismo", "Estoicismo"},
-		{"Kant", "Razão pura", "Kant › Razão pura"},
+		{"Stoicism", "Stoicism > Virtue", "Stoicism › Virtue"},
+		{"Stoicism", "Stoicism", "Stoicism"},
+		{"Kant", "Pure reason", "Kant › Pure reason"},
 		{"Kant", "", "Kant"},
 	}
 	for _, tc := range cases {

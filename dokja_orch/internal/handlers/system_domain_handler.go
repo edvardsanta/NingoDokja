@@ -581,9 +581,9 @@ func (h *SystemDomainHandler) describeScheduler(entry map[string]any) {
 	last := h.controls.LastAnnounce()
 	switch {
 	case last.IsZero():
-		entry["status"], entry["detail"] = "stopped", "nunca anunciou (parado?)"
+		entry["status"], entry["detail"] = "stopped", "never announced (stopped?)"
 	case time.Since(last) > schedulerFresh:
-		entry["status"], entry["detail"] = "stopped", fmt.Sprintf("sem anúncio há %dm (parado?)", int(time.Since(last).Minutes()))
+		entry["status"], entry["detail"] = "stopped", fmt.Sprintf("no announce for %dm (stopped?)", int(time.Since(last).Minutes()))
 	default:
 		entry["status"], entry["detail"] = "ok", "rodando"
 	}

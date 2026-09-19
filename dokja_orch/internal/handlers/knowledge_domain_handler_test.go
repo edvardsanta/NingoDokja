@@ -23,12 +23,12 @@ func TestKnowledgeEventsFlowThroughTheOrchestrator(t *testing.T) {
 	result, err := orchestrator.ProcessWithResult(context.Background(), core.Event{
 		Source:  core.SourceCLI,
 		Type:    "knowledge.search",
-		Payload: map[string]any{"query": "virtude"},
+		Payload: map[string]any{"query": "virtue"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if service.eventType != "knowledge.search" || service.payload["query"] != "virtude" {
+	if service.eventType != "knowledge.search" || service.payload["query"] != "virtue" {
 		t.Fatalf("service got %q %v", service.eventType, service.payload)
 	}
 	if result.Workflow != "knowledge" || result.Result["knowledge"] == nil {

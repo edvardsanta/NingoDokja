@@ -129,7 +129,7 @@ func extractBridgeReply(result core.ProcessResult) string {
 	// The operator switched this off: say so instead of answering with silence.
 	if skipped, _ := result.Result["skipped"].(bool); skipped {
 		reason, _ := result.Result["reason"].(string)
-		return fmt.Sprintf("Isso está desligado no momento (%s).", strings.TrimSpace(reason))
+		return fmt.Sprintf("That is switched off right now (%s).", strings.TrimSpace(reason))
 	}
 
 	chatResult, ok := result.Result[string(core.DomainChat)].(map[string]any)
