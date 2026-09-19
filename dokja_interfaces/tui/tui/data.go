@@ -254,28 +254,28 @@ func parseScreen(res map[string]any) screenData {
 }
 
 func summarizeDispatch(res map[string]any) string {
-	summary := fmt.Sprintf("%d meme(s) entregue(s)", num(res, "delivered_count"))
+	summary := tr("%d meme(s) delivered", num(res, "delivered_count"))
 	if skipped, ok := res["skipped_unsafe"].(map[string]any); ok && len(skipped) > 0 {
 		parts := []string{}
 		for channel, count := range skipped {
 			parts = append(parts, fmt.Sprintf("%s: %v", channel, count))
 		}
 		sort.Strings(parts)
-		summary += "; pulados por NSFW em " + strings.Join(parts, ", ")
+		summary += tr("; skipped by NSFW in ") + strings.Join(parts, ", ")
 	}
 	return summary
 }
 
 func summarizeSend(res map[string]any) string {
-	summary := "enviado para " + strings.Join(strList(res, "sent_to"), ", ")
+	summary := tr("sent to ") + strings.Join(strList(res, "sent_to"), ", ")
 	if skipped := strList(res, "skipped_unsafe"); len(skipped) > 0 {
-		summary += fmt.Sprintf("; PULADO em %s (%s)", strings.Join(skipped, ", "), str(res, "unsafe_reason"))
+		summary += tr("; SKIPPED in %s (%s)", strings.Join(skipped, ", "), str(res, "unsafe_reason"))
 	}
 	if marked, ok := res["marked_sent"].(bool); ok {
 		if marked {
-			summary += "; marcado como enviado"
+			summary += tr("; marked as sent")
 		} else {
-			summary += "; NAO foi possivel marcar como enviado"
+			summary += tr("; could NOT be marked as sent")
 		}
 	}
 	return summary

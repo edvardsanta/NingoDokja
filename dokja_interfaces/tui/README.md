@@ -18,6 +18,20 @@ cd dokja_interfaces/tui && go run ./cmd/dokja-tui
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--refresh` (panel poll, default `5s`), `--timeout` (one orchestrator answer, default `2m`).
 
+## Language
+
+The interface is available in English (the default) and Portuguese. It is chosen with
+`--lang en|pt`, else `DOKJA_LANG`, else the system locale (`LC_ALL`, `LC_MESSAGES`, `LANG`;
+any `pt*` value selects Portuguese), else English. `--tab` accepts `panel`, `memes`, `discord`
+and `history` (the Portuguese names `painel` and `historico` also work).
+
+The text in the code is English; `tui/i18n_pt.go` maps each message to Portuguese and a message
+without an entry is shown in English. To add a language, add a catalog and a case in
+`SetLanguage`. The tests fail when a message has no Portuguese entry, when an entry is stale,
+when a translation changes the format verbs, and when any screen shows Portuguese words in
+English mode. Text that comes from the orchestrator (for example a service's `detail`) is
+English in both modes.
+
 ## Screens
 
 - **Painel** (`1`): services, scheduler jobs, pool counts and the delivery channels. The channel that only
