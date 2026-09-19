@@ -91,6 +91,23 @@ func actionFor(domain Domain, eventType string) string {
 		default:
 			return "handle-meme-event"
 		}
+	case DomainKnowledge:
+		switch eventType {
+		case "knowledge.ingest":
+			return "ingest-knowledge"
+		case "knowledge.search":
+			return "search-knowledge"
+		case "knowledge.list":
+			return "list-knowledge"
+		case "knowledge.delete":
+			return "delete-knowledge"
+		case "knowledge.status":
+			return "inspect-knowledge"
+		case "knowledge.reindex":
+			return "reindex-knowledge"
+		default:
+			return "handle-knowledge-event"
+		}
 	case DomainMemory:
 		return "sync-memory"
 	case DomainAutomation:

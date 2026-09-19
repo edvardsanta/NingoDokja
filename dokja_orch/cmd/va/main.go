@@ -55,6 +55,7 @@ func main() {
 		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithControls(controls).WithProfiles(profiles),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(clients.NewBookServiceClient("")),
+		handlers.NewKnowledgeDomainHandler(clients.NewKnowledgeServiceClient("")),
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")),
 		handlers.NewMemeDomainHandler(clients.NewMemeServiceClient("")),
 		handlers.NewLoggingDomainHandler(core.DomainMemory),
