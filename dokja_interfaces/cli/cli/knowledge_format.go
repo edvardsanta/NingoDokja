@@ -50,10 +50,9 @@ func FormatSearch(answer map[string]any) string {
 		if value, ok := hit["score"].(float64); ok {
 			score = fmt.Sprintf("%.2f", value)
 		}
-		place, _ := hit["title"].(string)
-		if heading, _ := hit["heading"].(string); heading != "" {
-			place += " › " + heading
-		}
+		title, _ := hit["title"].(string)
+		heading, _ := hit["heading"].(string)
+		place := placeInDocument(title, heading)
 		fmt.Fprintf(&out, "%s%v. [%s] %s (%v)\n", mark, hit["rank"], score, place, hit["source_id"])
 		text, _ := hit["text"].(string)
 		fmt.Fprintf(&out, "      %s\n", snippet(text, 240))
@@ -87,4 +86,15 @@ func snippet(text string, limit int) string {
 		return text
 	}
 	return string([]rune(text)[:limit]) + "…"
+}
+
+// placeInDocument names where a passage sits. The service's heading path starts at the
+// document's own top heading, which is usually its title, so drop that repetition.
+func placeInDocument(title, heading string) string {
+	heading = strings.TrimPrefix(heading, title)
+	heading = strings.TrimPrefix(heading, " > ")
+	if heading == "" {
+		return title
+	}
+	return title + " › " + heading
 }

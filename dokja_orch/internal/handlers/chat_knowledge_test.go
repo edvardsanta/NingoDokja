@@ -164,3 +164,17 @@ func TestRetrievedTextIsCappedAndCannotCloseItsQuote(t *testing.T) {
 		t.Fatalf("the document must not be able to forge the fence: %q", reference)
 	}
 }
+
+func TestPlaceInDocumentDropsTheRepeatedTitle(t *testing.T) {
+	cases := []struct{ title, heading, want string }{
+		{"Estoicismo", "Estoicismo > Virtude", "Estoicismo › Virtude"},
+		{"Estoicismo", "Estoicismo", "Estoicismo"},
+		{"Kant", "Razão pura", "Kant › Razão pura"},
+		{"Kant", "", "Kant"},
+	}
+	for _, tc := range cases {
+		if got := placeInDocument(tc.title, tc.heading); got != tc.want {
+			t.Fatalf("placeInDocument(%q, %q) = %q, want %q", tc.title, tc.heading, got, tc.want)
+		}
+	}
+}

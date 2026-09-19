@@ -149,25 +149,26 @@ func buildKnowledgeSearchPayload(query string, k int) (map[string]any, error) {
 }
 
 // knowledgeResult digs the knowledge domain's answer out of an orchestrator response.
-// A switched-off service answers with a skip reason instead, returned as skipped.
+// The envelope depends on the orchestrator's VA_RESPONSE_MODE: compact (the default)
+// puts the domain's answer straight in "result", debug/verbose nests it under the domain
+// name. A switched-off service answers with a skip reason instead, returned as skipped.
 func knowledgeResult(result any) (answer map[string]any, skipped string, err error) {
 	envelope, ok := result.(map[string]any)
 	if !ok {
 		return nil, "", fmt.Errorf("unexpected orchestrator response shape")
 	}
-	domains, _ := envelope["result"].(map[string]any)
-	if domains == nil {
+	body, _ := envelope["result"].(map[string]any)
+	if body == nil {
 		return nil, "", fmt.Errorf("orchestrator response is missing result")
 	}
-	if isSkipped, _ := domains["skipped"].(bool); isSkipped {
-		reason, _ := domains["reason"].(string)
+	if isSkipped, _ := body["skipped"].(bool); isSkipped {
+		reason, _ := body["reason"].(string)
 		return nil, reason, nil
 	}
-	answer, _ = domains["knowledge"].(map[string]any)
-	if answer == nil {
-		return nil, "", fmt.Errorf("orchestrator response is missing the knowledge result")
+	if nested, ok := body["knowledge"].(map[string]any); ok {
+		return nested, "", nil
 	}
-	return answer, "", nil
+	return body, "", nil
 }
 
 func (a *App) knowledgeCall(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {

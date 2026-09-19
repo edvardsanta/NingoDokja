@@ -108,12 +108,22 @@ func TestBuildKnowledgeSearchPayload(t *testing.T) {
 	}
 }
 
-func TestKnowledgeResultUnwrapsTheOrchestratorEnvelope(t *testing.T) {
+func TestKnowledgeResultUnwrapsBothResponseModes(t *testing.T) {
+	// VA_RESPONSE_MODE=debug nests the answer under the domain name.
 	answer, skipped, err := knowledgeResult(map[string]any{
 		"result": map[string]any{"knowledge": map[string]any{"total": 2.0}},
 	})
 	if err != nil || skipped != "" || answer["total"] != 2.0 {
-		t.Fatalf("unexpected %#v %q %v", answer, skipped, err)
+		t.Fatalf("verbose: unexpected %#v %q %v", answer, skipped, err)
+	}
+
+	// The default compact mode puts the answer directly in "result".
+	answer, skipped, err = knowledgeResult(map[string]any{
+		"event_id": "e1", "workflow": "knowledge", "domain": "knowledge",
+		"result": map[string]any{"total": 2.0},
+	})
+	if err != nil || skipped != "" || answer["total"] != 2.0 {
+		t.Fatalf("compact: unexpected %#v %q %v", answer, skipped, err)
 	}
 
 	_, skipped, err = knowledgeResult(map[string]any{
@@ -123,7 +133,7 @@ func TestKnowledgeResultUnwrapsTheOrchestratorEnvelope(t *testing.T) {
 		t.Fatalf("expected the skip reason, got %q (%v)", skipped, err)
 	}
 
-	for _, bad := range []any{"x", map[string]any{}, map[string]any{"result": map[string]any{}}} {
+	for _, bad := range []any{"x", map[string]any{}, map[string]any{"result": "text"}} {
 		if _, _, err := knowledgeResult(bad); err == nil {
 			t.Fatalf("expected an error for %#v", bad)
 		}
@@ -191,5 +201,15 @@ func TestFormatListShowsPartialEmbeddings(t *testing.T) {
 func TestKnowledgeIsASwitchableService(t *testing.T) {
 	if _, err := buildServicePayload("knowledge", false); err != nil {
 		t.Fatalf("knowledge must be a known service: %v", err)
+	}
+}
+
+func TestFormatSearchDoesNotRepeatTheTitleInTheHeadingPath(t *testing.T) {
+	out := FormatSearch(map[string]any{"relevant_count": 1.0, "hits": []any{map[string]any{
+		"rank": 1.0, "relevant": true, "score": 0.5, "title": "Estoicismo", "heading": "Estoicismo > Virtude",
+		"source_id": "file:e.md", "text": "x",
+	}}})
+	if !strings.Contains(out, "Estoicismo › Virtude (file:e.md)") || strings.Contains(out, "Estoicismo › Estoicismo") {
+		t.Fatalf("unexpected rendering:\n%s", out)
 	}
 }

@@ -34,11 +34,18 @@ type knowledgeSource struct {
 }
 
 func (s knowledgeSource) label() string {
-	label := s.Title
-	if s.Heading != "" {
-		label += " › " + s.Heading
+	return fmt.Sprintf("[%d] %s (%s)", s.Number, placeInDocument(s.Title, s.Heading), s.SourceID)
+}
+
+// placeInDocument names where a passage sits. The service's heading path starts at the
+// document's own top heading, which is usually its title, so drop that repetition.
+func placeInDocument(title, heading string) string {
+	heading = strings.TrimPrefix(heading, title)
+	heading = strings.TrimPrefix(heading, " > ")
+	if heading == "" {
+		return title
 	}
-	return fmt.Sprintf("[%d] %s (%s)", s.Number, label, s.SourceID)
+	return title + " › " + heading
 }
 
 // WithKnowledge lets replies draw on the knowledge base. enabled is asked on every
