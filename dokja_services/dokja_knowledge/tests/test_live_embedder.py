@@ -1,4 +1,9 @@
-"""Retrieval quality against a real bge-m3. Skipped when no Ollama server is reachable."""
+"""Retrieval quality against a real bge-m3. Skipped when no Ollama server is reachable.
+
+The corpus and the questions are in Portuguese on purpose: the threshold in DEFAULT_MIN_SCORE was
+measured on them, and they check that retrieval works across languages. Do not translate them
+without measuring the scores again.
+"""
 
 import pytest
 

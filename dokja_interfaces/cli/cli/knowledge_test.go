@@ -22,24 +22,24 @@ func writeFile(t *testing.T, name string, content []byte) string {
 }
 
 func TestReadKnowledgeFileTakesTheTitleFromTheFirstHeading(t *testing.T) {
-	path := writeFile(t, "Notas do Estoicismo.md", []byte(bomMark+"# Estoicismo prático\n\nA virtude basta."))
+	path := writeFile(t, "Rate notes.md", []byte(bomMark+"# Résumé of rates\n\nRates were held."))
 
-	document, err := ReadKnowledgeFile(path, "", "note", []string{"filosofia"})
+	document, err := ReadKnowledgeFile(path, "", "note", []string{"macro"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if document.Title != "Estoicismo prático" {
+	if document.Title != "Résumé of rates" {
 		t.Fatalf("expected the heading as title, got %q", document.Title)
 	}
-	if document.SourceID != "file:Notas-do-Estoicismo.md" {
+	if document.SourceID != "file:Rate-notes.md" {
 		t.Fatalf("source id must come from the file name with only accepted characters, got %q", document.SourceID)
 	}
 	if strings.HasPrefix(document.Body, bomMark) {
 		t.Fatal("the byte order mark must be dropped")
 	}
 	want := map[string]any{
-		"title": "Estoicismo prático", "body": document.Body, "kind": "note",
-		"source_id": "file:Notas-do-Estoicismo.md", "tags": []string{"filosofia"},
+		"title": "Résumé of rates", "body": document.Body, "kind": "note",
+		"source_id": "file:Rate-notes.md", "tags": []string{"macro"},
 	}
 	if got := document.Payload(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected payload %#v", got)
@@ -47,13 +47,13 @@ func TestReadKnowledgeFileTakesTheTitleFromTheFirstHeading(t *testing.T) {
 }
 
 func TestReadKnowledgeFileTitleFallbacks(t *testing.T) {
-	plain := writeFile(t, "ideias.txt", []byte("sem cabeçalho aqui"))
+	plain := writeFile(t, "ideas.txt", []byte("no heading here"))
 	document, err := ReadKnowledgeFile(plain, "", "note", nil)
-	if err != nil || document.Title != "ideias" {
+	if err != nil || document.Title != "ideas" {
 		t.Fatalf("expected the file name as title, got %q (%v)", document.Title, err)
 	}
-	document, err = ReadKnowledgeFile(plain, "  Meu título ", "note", nil)
-	if err != nil || document.Title != "Meu título" {
+	document, err = ReadKnowledgeFile(plain, "  My title ", "note", nil)
+	if err != nil || document.Title != "My title" {
 		t.Fatalf("expected the explicit title, got %q (%v)", document.Title, err)
 	}
 	// A heading buried after prose is not the document's title.
@@ -144,7 +144,7 @@ func TestASourceIsSentForTheServiceToFetch(t *testing.T) {
 }
 
 func TestReadKnowledgeStdinNeedsATitle(t *testing.T) {
-	if _, err := ReadKnowledgeStdin(strings.NewReader("texto"), " ", "note", nil); err == nil {
+	if _, err := ReadKnowledgeStdin(strings.NewReader("text"), " ", "note", nil); err == nil {
 		t.Fatal("expected a title error")
 	}
 	document, err := ReadKnowledgeStdin(strings.NewReader("uma ideia solta"), "Ideia", "note", nil)
@@ -157,8 +157,8 @@ func TestReadKnowledgeStdinNeedsATitle(t *testing.T) {
 }
 
 func TestBuildKnowledgeSearchPayload(t *testing.T) {
-	payload, err := buildKnowledgeSearchPayload("  o que é virtude? ", 3)
-	if err != nil || payload["query"] != "o que é virtude?" || payload["k"] != 3 {
+	payload, err := buildKnowledgeSearchPayload("  what is virtue? ", 3)
+	if err != nil || payload["query"] != "what is virtue?" || payload["k"] != 3 {
 		t.Fatalf("unexpected payload %#v (%v)", payload, err)
 	}
 	for _, k := range []int{0, 21} {
@@ -223,15 +223,15 @@ func TestFormatIngestSaysWhatHappened(t *testing.T) {
 
 func TestFormatSearchMarksRelevanceAndWarnsWhenNothingIs(t *testing.T) {
 	hit := func(rank float64, relevant bool, score any) any {
-		return map[string]any{"rank": rank, "relevant": relevant, "score": score, "title": "Kant", "heading": "Razão",
-			"source_id": "note:kant", "text": "  muito   texto\nem várias linhas "}
+		return map[string]any{"rank": rank, "relevant": relevant, "score": score, "title": "Kant", "heading": "Reason",
+			"source_id": "note:kant", "text": "  much   text\nover several lines "}
 	}
 	out := FormatSearch(map[string]any{"relevant_count": 1.0, "hits": []any{hit(1, true, 0.61), hit(2, false, 0.31)}})
 	lines := strings.Split(out, "\n")
-	if !strings.HasPrefix(lines[0], "* 1. [0.61] Kant › Razão (note:kant)") || !strings.HasPrefix(lines[2], "  2. [0.31]") {
+	if !strings.HasPrefix(lines[0], "* 1. [0.61] Kant › Reason (note:kant)") || !strings.HasPrefix(lines[2], "  2. [0.31]") {
 		t.Fatalf("unexpected rendering:\n%s", out)
 	}
-	if !strings.Contains(out, "muito texto em várias linhas") {
+	if !strings.Contains(out, "much text over several lines") {
 		t.Fatalf("whitespace must be collapsed:\n%s", out)
 	}
 
@@ -270,10 +270,10 @@ func TestKnowledgeIsASwitchableService(t *testing.T) {
 
 func TestFormatSearchDoesNotRepeatTheTitleInTheHeadingPath(t *testing.T) {
 	out := FormatSearch(map[string]any{"relevant_count": 1.0, "hits": []any{map[string]any{
-		"rank": 1.0, "relevant": true, "score": 0.5, "title": "Estoicismo", "heading": "Estoicismo > Virtude",
+		"rank": 1.0, "relevant": true, "score": 0.5, "title": "Stoicism", "heading": "Stoicism > Virtue",
 		"source_id": "file:e.md", "text": "x",
 	}}})
-	if !strings.Contains(out, "Estoicismo › Virtude (file:e.md)") || strings.Contains(out, "Estoicismo › Estoicismo") {
+	if !strings.Contains(out, "Stoicism › Virtue (file:e.md)") || strings.Contains(out, "Stoicism › Stoicism") {
 		t.Fatalf("unexpected rendering:\n%s", out)
 	}
 }

@@ -1,107 +1,109 @@
 # dokja_knowledge
 
-Base de conhecimento de pesquisa: guarda documentos que o usuário alimenta e
-os recupera por significado e por palavra-chave, com fonte citável.
+A research knowledge base: it stores the documents a user feeds it and finds them again by
+meaning and by keyword, with a citable source.
 
-- Armazenamento: SQLite próprio (`KNOWLEDGE_DB_FILE`), separado do `dokja.db`.
-- Recuperação híbrida: cosseno sobre embeddings (bge-m3 via Ollama) + FTS5,
-  fundidos por reciprocal rank fusion.
-- Sem Ollama (ou logo após trocar o modelo, antes do reindex) o serviço
-  continua de pé: ingere e busca só por palavra-chave (`degraded: true` +
-  `reason`). `knowledge.reindex` embute o que faltou.
-- Reenviar o mesmo conteúdo não faz nada (hash); editar substitui os chunks.
+- Storage: its own SQLite file (`KNOWLEDGE_DB_FILE`), separate from `dokja.db`.
+- Hybrid retrieval: cosine similarity over embeddings (bge-m3 through Ollama) plus an FTS5
+  keyword index, merged by reciprocal rank fusion.
+- Without Ollama (or right after changing the model, before a reindex) the service stays up:
+  it still ingests and searches by keyword only (`degraded: true` plus `reason`).
+  `knowledge.reindex` embeds whatever was missed.
+- Sending the same content again does nothing (content hash); editing replaces the chunks.
 
-## Eventos (ZeroMQ REQ/REP, porta 5561)
+## Events (ZeroMQ REQ/REP, port 5561)
 
-| evento | payload | resultado |
+| event | payload | result |
 | --- | --- | --- |
-| `knowledge.ingest` | um de `body` (com `title`), `content_b64` (com `filename`) ou `source`; mais `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (várias entradas: `documents[]`, `count`) |
-| `knowledge.search` | `query`, `k?` (1–20), `min_score?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
+| `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
+| `knowledge.search` | `query`, `k?` (1-20), `min_score?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?` | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
-| `knowledge.status` | — | contagens, `embed_model`, `embedder_reachable` |
+| `knowledge.status` | none | counts, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |
 
-## Formatos e fontes
+## Formats and sources
 
-O repositório traz só **mecanismos genéricos**, nenhum site ou marca:
+The repository ships **generic mechanisms only**, with no site or brand built in:
 
-| entrada | como |
+| input | how it is read |
 | --- | --- |
-| `.txt`, `.md`, `.rst` | texto UTF-8; o primeiro `# título` vira o título |
-| `.html` | texto com títulos (`#`) e listas; ignora menus, rodapés e scripts |
-| `.docx` | parágrafos, títulos por estilo, tabelas e o título das propriedades |
-| `.epub` | capítulos na ordem da lista de leitura |
-| `.pdf` | texto de cada página; PDF escaneado (sem camada de texto) é recusado, OCR não vem embutido |
-| `.xml`/`.rss`/`.atom` | um feed que você entrega: **cada entrada vira um documento** |
-| `source` = `http(s)://…` | busca a página que você informou e escolhe o extrator pelo tipo |
+| `.txt`, `.md`, `.rst` | UTF-8 text; a leading `# title` becomes the title |
+| `.html` | text with headings (`#`) and lists; menus, footers and scripts are dropped |
+| `.docx` | paragraphs, headings by style, tables and the title from the document properties |
+| `.epub` | chapters in reading order |
+| `.pdf` | the text of each page; a scanned PDF (no text layer) is refused, OCR is not built in |
+| `.xml`, `.rss`, `.atom` | a feed you hand over: **each entry becomes a document** |
+| `source` = `http(s)://...` | fetches the page you named and picks the extractor from its type |
 
-Ler um feed é só ler o que você entregou uma vez. **Seguir** um feed no tempo (endereço
-guardado, consultado por agenda) não existe aqui: é integração sua.
+Reading a feed only reads what you handed over, once. **Following** a feed over time (a
+stored address polled on a schedule) is deliberately not built in: that is your own
+integration.
 
-Reenviar o mesmo arquivo ou endereço não faz nada; cada entrada de um feed tem id estável.
+Sending the same file or address again does nothing, and every feed entry has a stable id.
 
-### Busca de endereços (`KNOWLEDGE_FETCH`, padrão `on`)
+### Address fetching (`KNOWLEDGE_FETCH`, default `on`)
 
-Como a porta do orquestrador não tem autenticação, o buscador recusa tudo que possa
-alcançar sua rede: só `http`/`https` nas portas padrão, sem credenciais na URL; **todos**
-os IPs que o nome resolve precisam ser públicos (loopback, privados, link-local, CGNAT,
-multicast e reservados são recusados); a conexão usa o IP já validado (sem DNS rebinding);
-redirecionamentos são seguidos à mão (máx. 3) e revalidados; resposta limitada a 20 MB e
-30 s, sem descompressão, só tipos conhecidos. `KNOWLEDGE_FETCH=off` desliga tudo.
+The orchestrator port has no authentication, so the fetcher refuses anything that could
+reach your network: only `http`/`https` on their default ports, no credentials in the URL;
+**every** address the host resolves to must be public (loopback, private, link-local,
+shared-address, multicast and reserved ranges are refused); the connection uses the address
+that was validated (no DNS rebinding); redirects are followed by hand (at most 3) and each
+one is checked again; the response is capped at 20 MB and 30 s, is never decompressed and
+must be a known type. `KNOWLEDGE_FETCH=off` disables it entirely.
 
-### Plugins do usuário (`KNOWLEDGE_PLUGINS_DIR`)
+### User plugins (`KNOWLEDGE_PLUGINS_DIR`)
 
-Para um site, sistema interno ou formato específico, escreva um plugin **fora do
-repositório**: um `*.py` numa pasta sua (montada somente leitura, fora do git) com
-`register(registry)`:
+For a specific site, internal system or format, write a plugin **outside the repository**:
+a `*.py` file in a directory of your own (mounted read-only and kept out of git) that
+defines `register(registry)`:
 
 ```python
 def register(registry):
     registry.add_extractor(".ext", lambda data, name: [...])   # -> list[Extracted]
-    registry.add_fetcher("meuesquema", lambda ref: (bytes, "arquivo.md"))
+    registry.add_fetcher("myscheme", lambda ref: (bytes, "file.md"))
 ```
 
-Depois `knowledge add meuesquema:qualquer-coisa`. Um exemplo sem rede está em
-`plugins.example/`. Plugins são Python comum rodando com as permissões do serviço:
-carregue só pastas que você controla. Um plugin que falha é registrado e ignorado.
+Then `knowledge add myscheme:anything`. An example that uses no network is in
+`plugins.example/`. Plugins are ordinary Python running with the service's permissions, so
+only load directories you control. A plugin that fails to load is logged and skipped.
 
-## Relevância
+## Relevance
 
-`search` sempre devolve os melhores candidatos; **quem injeta contexto em um
-prompt deve usar só os hits com `relevant: true`**. `relevant` é um sinal
-absoluto: cosseno >= limiar, ou o trecho contém >= 2 termos da pergunta e
->= 75% deles. Ordem no ranking não prova relevância.
+`search` always returns the best candidates; **whoever injects context into a prompt must
+use only the hits with `relevant: true`**. `relevant` is an absolute signal: the cosine
+score is at or above the threshold, or the passage contains at least 2 of the query's terms
+and at least 75% of them. A high rank alone does not prove relevance.
 
-### Limiar (`KNOWLEDGE_MIN_SCORE`, padrão 0.45) — provisório
+### Threshold (`KNOWLEDGE_MIN_SCORE`, default 0.45), provisional
 
-Medido com bge-m3 em apenas 3 documentos (Kant, bolo, juros):
+Measured with bge-m3 on only 3 documents (Kant, a cake recipe, interest rates):
 
-| tipo de pergunta | maior cosseno |
+| kind of question | highest cosine |
 | --- | --- |
-| paráfrase sem palavras em comum | 0.46 – 0.61 |
-| pergunta com as palavras do texto | 0.63 – 0.73 |
-| assunto vizinho ("receita de lasanha", "o que é um imposto") | 0.43 – 0.45 |
-| sem relação (futebol, nginx, piada, capital da França) | 0.27 – 0.41 |
+| paraphrase sharing no words with the text | 0.46 - 0.61 |
+| question using the text's own words | 0.63 - 0.73 |
+| neighbouring topic ("a lasagna recipe", "what is a tax") | 0.43 - 0.45 |
+| unrelated (football, nginx, a joke, the capital of France) | 0.27 - 0.41 |
 
-Esses grupos quase se encostam (a paráfrase mais fraca fez 0.456; o vizinho
-mais forte, 0.446). Trate 0.45 como ponto de partida, não como calibração:
-uma base maior muda a distribuição. Por isso o consumidor deve sempre citar a
-fonte de cada trecho usado, para que uma recuperação errada seja visível. O
-teste vivo (`tests/test_live_embedder.py`, pulado sem Ollama) inclui os casos
-vizinhos e imprime a distribuição.
+The groups almost touch (the weakest paraphrase scored 0.456, the strongest neighbour
+0.446). Treat 0.45 as a starting point, not a calibration: a larger base changes the
+distribution. That is why a consumer should always cite the source of each passage it uses,
+so a wrong retrieval is visible. The live test (`tests/test_live_embedder.py`, skipped
+without Ollama) includes the neighbouring cases and prints the distribution. It uses a
+Portuguese corpus on purpose, to check that retrieval works across languages.
 
-## Variáveis
+## Variables
 
 `KNOWLEDGE_SERVICE_ENDPOINT`, `KNOWLEDGE_DB_FILE`, `DOKJA_EMBED_ENDPOINT`
-(padrão `http://127.0.0.1:11434`), `DOKJA_EMBED_MODEL` (padrão `bge-m3`),
-`DOKJA_EMBED=off` (só palavra-chave), `DOKJA_EMBED_TIMEOUT`,
-`KNOWLEDGE_MIN_SCORE`, `KNOWLEDGE_FETCH`, `KNOWLEDGE_PLUGINS_DIR`.
+(default `http://127.0.0.1:11434`), `DOKJA_EMBED_MODEL` (default `bge-m3`),
+`DOKJA_EMBED=off` (keyword search only), `DOKJA_EMBED_TIMEOUT`, `KNOWLEDGE_MIN_SCORE`,
+`KNOWLEDGE_FETCH`, `KNOWLEDGE_PLUGINS_DIR`.
 
-Trocar `DOKJA_EMBED_MODEL` invalida os vetores antigos (marcados por modelo);
-rode `knowledge.reindex`.
+Changing `DOKJA_EMBED_MODEL` invalidates the old vectors (they are tagged by model); run
+`knowledge.reindex`.
 
-## Testes
+## Tests
 
 ```sh
 pip install numpy pyzmq pypdf pytest
