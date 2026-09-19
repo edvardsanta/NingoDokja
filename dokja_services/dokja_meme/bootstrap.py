@@ -21,6 +21,7 @@ REPO_ROOT = _configure_legacy_imports()
 
 from config import SCRAPERS as LEGACY_SCRAPERS
 from infra.sqlite.storage import SQLiteStorage
+from memes.safety import build_screen_from_env
 from models.Meme import Meme
 from workers.meme_worker import MemeWorker
 
@@ -55,4 +56,9 @@ def build_service() -> MemeService:
     storage = SQLiteStorage(resolve_db_file(), Meme)
     scrapers = build_scrapers()
     worker = MemeWorker(scrapers=scrapers, storage=storage)
-    return MemeService(storage=storage, scrapers=scrapers, worker=worker)
+    return MemeService(
+        storage=storage,
+        scrapers=scrapers,
+        worker=worker,
+        screen=build_screen_from_env(),
+    )
