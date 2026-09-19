@@ -91,6 +91,24 @@ not a secret. Stop and tell the user if the range contains a credential (webhook
 API tokens), a `.env*` file, or a database file (`*.db`, `*.sqlite*`). Never print
 the secret itself; give the file and line only.
 
+This repository is **public**, so also list everything the diff adds that points outside
+it, and treat each hit as a defect unless it is a placeholder:
+
+```sh
+git diff origin/main...HEAD -U0 | grep -E '^\+' | grep -oE 'https?://[^ "'"'"'`)>,]+' | sort -u
+git diff origin/main...HEAD -U0 | grep -E '^\+' | grep -nE '[0-9]{17,20}|/home/[a-z]+|/Users/[A-Za-z]+'
+```
+
+- Allowed: reserved placeholders (`example.com`, `*.example`, `localhost`, compose service
+  names) and neutral fixture names.
+- Not allowed: real third-party sites, feeds or APIs, real Discord/channel/webhook IDs,
+  provider or brand names used as examples, personal absolute paths, or default URLs in
+  compose files. Replace them; a URL is an input the user supplies at run time, never a
+  built-in default. Scrapers and site-specific integrations stay in the user's own
+  git-ignored plugins or config, not in a PR.
+- Force-pushing a fix does not make GitHub forget the old commits (they stay reachable by
+  SHA), so catch these before the first push.
+
 ## 5. Write the PR text (English)
 
 Title: Conventional Commits style, imperative, about 70 characters at most, for
