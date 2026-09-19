@@ -14,6 +14,7 @@ Production stack:
 - `dokja-orchestrator`
 - `dokja-meme`
 - `dokja-chat-ai`
+- `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-discord`
 - `dokja-scheduler`
 
@@ -120,6 +121,27 @@ Chat profiles are created and removed on the machine that holds the database (`d
 with `DOKJA_DB_FILE` pointing at it, or `p` in the TUI panel), never through the orchestrator. The
 orchestrator can only list them (masked) and select one, and the chat service picks the selection up on its
 next request.
+
+## Research Knowledge Base
+
+`dokja-knowledge` stores the documents the operator feeds in and finds them by meaning and by keyword. Its
+SQLite file is `/data/dokja_knowledge.db` on the `dokja-data` volume (separate from `dokja.db`). Embeddings
+come from `bge-m3` on `dokja-ollama`, which keeps its models in the `dokja-ollama` volume. After the first
+deploy, pull the model once:
+
+```sh
+docker compose -f docker-compose.prod.yml exec dokja-ollama ollama pull bge-m3
+```
+
+Without it, or while `dokja-ollama` is down, the service still ingests and searches by keyword only and
+reports `degraded`; `knowledge.reindex` embeds what was missed. Changing `DOKJA_EMBED_MODEL` also needs a
+reindex. `KNOWLEDGE_MIN_SCORE` (default `0.45`) decides which hits count as relevant; it was measured on a
+tiny corpus, so retune it once the base has real content.
+
+Port `5561` is published on `127.0.0.1` only: the notes are private and the service has no authentication.
+On every Discord message the orchestrator looks the question up and gives the chat model only the relevant
+hits, then ends the reply with the sources it consulted. Switching `knowledge` off (`dokja-cli services`)
+stops both that lookup and the `knowledge.*` events; chat keeps working either way.
 
 ## NSFW Screening for Memes
 

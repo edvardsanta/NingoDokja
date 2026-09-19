@@ -16,6 +16,7 @@ services:
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT:-tcp://dokja-meme:5557}
       BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
       DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
@@ -83,6 +84,34 @@ services:
       - ./:/workspace
       - ${DOKJA_MODELS_DIR:-./.dokja/models}:/models:ro
 
+  dokja-knowledge:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_knowledge/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_knowledge
+    command: python main.py
+    environment:
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://*:5561
+      KNOWLEDGE_DB_FILE: /workspace/.dokja/dokja_knowledge.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      KNOWLEDGE_MIN_SCORE: ${KNOWLEDGE_MIN_SCORE:-0.45}
+    ports:
+      - "127.0.0.1:5561:5561"
+    depends_on:
+      - dokja-ollama
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
+
+  dokja-ollama:
+    image: docker.io/ollama/ollama:latest
+    volumes:
+      # Reuses the models already pulled on this machine (bge-m3 is ~1.2 GB).
+      - ${OLLAMA_MODELS_DIR:-${HOME}/.ollama}:/root/.ollama
+    networks:
+      - dokja-net
 
   dokja-chat-ai:
     build:
