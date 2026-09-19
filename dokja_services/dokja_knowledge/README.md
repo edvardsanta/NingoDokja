@@ -15,12 +15,56 @@ os recupera por significado e por palavra-chave, com fonte citável.
 
 | evento | payload | resultado |
 | --- | --- | --- |
-| `knowledge.ingest` | `title`, `body`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` |
+| `knowledge.ingest` | um de `body` (com `title`), `content_b64` (com `filename`) ou `source`; mais `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (várias entradas: `documents[]`, `count`) |
 | `knowledge.search` | `query`, `k?` (1–20), `min_score?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?` | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
 | `knowledge.status` | — | contagens, `embed_model`, `embedder_reachable` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |
+
+## Formatos e fontes
+
+O repositório traz só **mecanismos genéricos**, nenhum site ou marca:
+
+| entrada | como |
+| --- | --- |
+| `.txt`, `.md`, `.rst` | texto UTF-8; o primeiro `# título` vira o título |
+| `.html` | texto com títulos (`#`) e listas; ignora menus, rodapés e scripts |
+| `.docx` | parágrafos, títulos por estilo, tabelas e o título das propriedades |
+| `.epub` | capítulos na ordem da lista de leitura |
+| `.pdf` | texto de cada página; PDF escaneado (sem camada de texto) é recusado, OCR não vem embutido |
+| `.xml`/`.rss`/`.atom` | um feed que você entrega: **cada entrada vira um documento** |
+| `source` = `http(s)://…` | busca a página que você informou e escolhe o extrator pelo tipo |
+
+Ler um feed é só ler o que você entregou uma vez. **Seguir** um feed no tempo (endereço
+guardado, consultado por agenda) não existe aqui: é integração sua.
+
+Reenviar o mesmo arquivo ou endereço não faz nada; cada entrada de um feed tem id estável.
+
+### Busca de endereços (`KNOWLEDGE_FETCH`, padrão `on`)
+
+Como a porta do orquestrador não tem autenticação, o buscador recusa tudo que possa
+alcançar sua rede: só `http`/`https` nas portas padrão, sem credenciais na URL; **todos**
+os IPs que o nome resolve precisam ser públicos (loopback, privados, link-local, CGNAT,
+multicast e reservados são recusados); a conexão usa o IP já validado (sem DNS rebinding);
+redirecionamentos são seguidos à mão (máx. 3) e revalidados; resposta limitada a 20 MB e
+30 s, sem descompressão, só tipos conhecidos. `KNOWLEDGE_FETCH=off` desliga tudo.
+
+### Plugins do usuário (`KNOWLEDGE_PLUGINS_DIR`)
+
+Para um site, sistema interno ou formato específico, escreva um plugin **fora do
+repositório**: um `*.py` numa pasta sua (montada somente leitura, fora do git) com
+`register(registry)`:
+
+```python
+def register(registry):
+    registry.add_extractor(".ext", lambda data, name: [...])   # -> list[Extracted]
+    registry.add_fetcher("meuesquema", lambda ref: (bytes, "arquivo.md"))
+```
+
+Depois `knowledge add meuesquema:qualquer-coisa`. Um exemplo sem rede está em
+`plugins.example/`. Plugins são Python comum rodando com as permissões do serviço:
+carregue só pastas que você controla. Um plugin que falha é registrado e ignorado.
 
 ## Relevância
 
@@ -52,7 +96,7 @@ vizinhos e imprime a distribuição.
 `KNOWLEDGE_SERVICE_ENDPOINT`, `KNOWLEDGE_DB_FILE`, `DOKJA_EMBED_ENDPOINT`
 (padrão `http://127.0.0.1:11434`), `DOKJA_EMBED_MODEL` (padrão `bge-m3`),
 `DOKJA_EMBED=off` (só palavra-chave), `DOKJA_EMBED_TIMEOUT`,
-`KNOWLEDGE_MIN_SCORE`.
+`KNOWLEDGE_MIN_SCORE`, `KNOWLEDGE_FETCH`, `KNOWLEDGE_PLUGINS_DIR`.
 
 Trocar `DOKJA_EMBED_MODEL` invalida os vetores antigos (marcados por modelo);
 rode `knowledge.reindex`.
@@ -60,6 +104,6 @@ rode `knowledge.reindex`.
 ## Testes
 
 ```sh
-pip install numpy pyzmq pytest
+pip install numpy pyzmq pypdf pytest
 python -m pytest dokja_services/dokja_knowledge/tests
 ```

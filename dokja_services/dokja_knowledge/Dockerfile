@@ -2,7 +2,7 @@ FROM docker.io/python:3.13-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir numpy pyzmq
+RUN pip install --no-cache-dir numpy pyzmq pypdf
 
 COPY dokja_services/dokja_knowledge /app
 
