@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from handlers.base_handler import BaseHandler
 from logging_config import get_logger
@@ -7,8 +7,8 @@ logger = get_logger(__name__)
 
 
 class HandlerFactory:
-    def __init__(self):
-        self._registry = {}
+    def __init__(self) -> None:
+        self._registry: Dict[str, List[Dict[str, Any]]] = {}
 
     def register_handler(
         self,
@@ -18,7 +18,7 @@ class HandlerFactory:
         storage: Optional[Any] = None,
         publisher: Optional[Any] = None,
         args: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         """Register a handler class along with its dependencies."""
         self._registry.setdefault(event_type, []).append(
             {

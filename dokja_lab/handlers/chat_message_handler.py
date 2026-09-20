@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 try:
     from bootstrap import ensure_repo_root
@@ -23,7 +24,14 @@ logger = get_logger(__name__, level=logging.DEBUG)
 
 class MessageHandler(BaseHandler):
 
-    def __init__(self, storage, publisher, ningo_token, ningo_agent, model="n/a"):
+    def __init__(
+        self,
+        storage: Any,
+        publisher: Any,
+        ningo_token: str,
+        ningo_agent: str,
+        model: str = "n/a",
+    ) -> None:
         """
         Initialize the MessageHandler with storage, publisher, and Ningo API details.
         """
@@ -37,7 +45,7 @@ class MessageHandler(BaseHandler):
             ),
         )
 
-    def handle(self, payload: dict):
+    def handle(self, payload: dict) -> Any:
         logger.info("Sending message to AI...")
         response = self.domain.handle_message(payload["content"])
         logger.info("AI response received.")

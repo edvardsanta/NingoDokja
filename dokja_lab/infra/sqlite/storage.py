@@ -43,7 +43,7 @@ class SQLiteStorage(BaseStorage[T]):
         self.table_name = entity_cls.__name__.lower()
         self._ensure_table()
 
-    def _ensure_table(self):
+    def _ensure_table(self) -> None:
         cols = []
         for f in fields(self.entity_cls):
             typ = _unwrap_optional(f.type)
@@ -125,7 +125,11 @@ class SQLiteStorage(BaseStorage[T]):
     from typing import Callable, List
 
     def get_filtered(
-        self, order_by=None, order_dir="DESC", limit=None, **filters
+        self,
+        order_by: Optional[str] = None,
+        order_dir: str = "DESC",
+        limit: Optional[int] = None,
+        **filters: Any,
     ) -> List[T]:
         """
         Retrieve a list of entities from the database filtered by the given keyword arguments.
