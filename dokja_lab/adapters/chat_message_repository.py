@@ -6,6 +6,7 @@ except ImportError:  # pragma: no cover
 ensure_repo_root()
 
 from dokja_domain.dokja_chat import ChatResponse
+
 try:
     from models.ChatMessage import ChatMessage
 except ImportError:  # pragma: no cover
@@ -24,7 +25,9 @@ class SQLiteChatMessageRepository:
 
     def mark_cached(self, record: ChatResponse) -> None:
         if not hasattr(record, "id") or record.id is None:
-            stored = self.storage.get_by_id_hash(self._request_hash(record.request_message))
+            stored = self.storage.get_by_id_hash(
+                self._request_hash(record.request_message)
+            )
             if stored is None:
                 return
             record.id = stored.id

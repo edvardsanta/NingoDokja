@@ -1,15 +1,17 @@
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
+import importlib
+import re
+import threading
+
+from config import WORKERS
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+
+from infra.sqlite.storage import SQLiteStorage
+from models.WorkerStatus import WorkerStatus
 from scheduler import (
     get_scheduler,
     worker_configs,
 )
-from infra.sqlite.storage import SQLiteStorage
-from models.WorkerStatus import WorkerStatus
 from utils.mapper import to_dict
-from config import WORKERS
-import threading
-import importlib
-import re
 
 workers_bp = Blueprint("workers", __name__)
 worker_status_storage = SQLiteStorage("ningo_memory.db", WorkerStatus)

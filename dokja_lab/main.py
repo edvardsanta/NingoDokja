@@ -1,16 +1,17 @@
 import os
 import signal
 import sys
+import threading
+
+from config import RESPONDER_HANDLERS, WORKERS
 from flask import Flask, redirect, url_for
 
-from config import WORKERS, RESPONDER_HANDLERS
+from chat_message_routes import chat_messages_bp
 from infra.zeromq.responder import Responder
 from logging_config import get_logger
-import threading
+from memes_routes import memes_bp
 from scheduler import start_workers
 from worker_routes import workers_bp
-from memes_routes import memes_bp
-from chat_message_routes import chat_messages_bp
 
 logger = get_logger(__name__)
 stop_event = threading.Event()

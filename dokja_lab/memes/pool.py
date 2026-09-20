@@ -26,7 +26,10 @@ class MemePool:
                     self.storage.add(meme)
                     logger.debug(f"Stored meme: {url}")
         except Exception as err:
-            logger.exception("Scraper failed for %s", getattr(scraper, "source_name", type(scraper).__name__))
+            logger.exception(
+                "Scraper failed for %s",
+                getattr(scraper, "source_name", type(scraper).__name__),
+            )
             errors.append(
                 f"{getattr(scraper, 'source_name', type(scraper).__name__)}: {err}"
             )

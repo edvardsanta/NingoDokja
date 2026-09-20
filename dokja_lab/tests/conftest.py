@@ -1,8 +1,8 @@
 """Shared test fixtures and utilities for dokja_lab tests."""
 
-from unittest.mock import Mock
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 

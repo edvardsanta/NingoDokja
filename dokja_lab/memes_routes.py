@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from flask import Blueprint, render_template
+
 from infra.sqlite.storage import SQLiteStorage
 from models.Meme import Meme
-from datetime import datetime
 
 memes_bp = Blueprint("memes", __name__)
 

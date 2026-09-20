@@ -1,7 +1,9 @@
+from datetime import datetime
+
 from flask import Blueprint, render_template
+
 from infra.sqlite.storage import SQLiteStorage
 from models.ChatMessage import ChatMessage
-from datetime import datetime
 
 chat_messages_bp = Blueprint("chat_messages", __name__)
 

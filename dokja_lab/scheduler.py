@@ -1,10 +1,11 @@
 import time
 from datetime import datetime
 
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.background import BackgroundScheduler
-from logging_config import get_logger
+
 from infra.sqlite.storage import SQLiteStorage
+from logging_config import get_logger
 from models.WorkerStatus import WorkerStatus
 from utils.mapper import to_dict
 
