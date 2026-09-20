@@ -10,12 +10,13 @@ class MemeHandler(BaseHandler):
         return True
 
     def handle(self, payload):
-        memes: list[Meme] = (
-            self.storage.get_filtered(sent_count=0) if self.storage else []
+        if not self.storage:
+            return []
+        memes: list[Meme] = self.storage.get_filtered(sent_count=0)
+        if not memes:
+            return []
+        self.storage.update_many(
+            [meme.url for meme in memes],
+            {"sent_count": 1, "date_sent": datetime.now()},
         )
-        if memes:
-            self.storage.update_many(
-                [meme.url for meme in memes],
-                {"sent_count": 1, "date_sent": datetime.now()},
-            )
-        return [to_dict(meme) for meme in memes] if memes else []
+        return [to_dict(meme) for meme in memes]
