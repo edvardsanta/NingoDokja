@@ -2,6 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import fields, is_dataclass
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     Generic,
@@ -16,7 +17,11 @@ try:
 except ImportError:  # pragma: no cover
     redis = None
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+# Bound to dataclasses: these modules call dataclasses.fields() and asdict() on T.
+T = TypeVar("T", bound="DataclassInstance")
 
 
 class BaseStorage(ABC, Generic[T]):

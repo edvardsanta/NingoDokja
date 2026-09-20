@@ -2,11 +2,25 @@ import json
 import sqlite3
 from dataclasses import fields
 from datetime import datetime
-from typing import Any, Dict, Optional, Type, TypeVar, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from infra.storage import BaseStorage
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+# Bound to dataclasses: these modules call dataclasses.fields() and asdict() on T.
+T = TypeVar("T", bound="DataclassInstance")
 
 
 class SQLiteStorage(BaseStorage[T]):
