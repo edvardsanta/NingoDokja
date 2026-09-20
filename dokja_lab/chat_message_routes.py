@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Any, List, Optional
 
 from flask import Blueprint, render_template
+from flask.typing import ResponseReturnValue
 
 from infra.sqlite.storage import SQLiteStorage
 from models.ChatMessage import ChatMessage
@@ -10,7 +12,7 @@ chat_messages_bp = Blueprint("chat_messages", __name__)
 storage = SQLiteStorage("ningo_memory.db", ChatMessage)
 
 
-def safe_parse_datetime(val):
+def safe_parse_datetime(val: Any) -> Optional[datetime]:
     if isinstance(val, datetime):
         return val
     if isinstance(val, str) and val:
@@ -21,7 +23,7 @@ def safe_parse_datetime(val):
     return None
 
 
-def safe_parse_list(val):
+def safe_parse_list(val: Any) -> Any:
     if isinstance(val, list):
         return val
     if isinstance(val, str) and val:
@@ -35,7 +37,7 @@ def safe_parse_list(val):
 
 
 @chat_messages_bp.route("/chat/message", methods=["GET"])
-def show_chat_messages():
+def show_chat_messages() -> ResponseReturnValue:
     messages = storage.get_filtered(order_by="timestamp", order_dir="DESC", limit=20)
     for msg in messages:
         msg.timestamp = safe_parse_datetime(getattr(msg, "timestamp", None))
