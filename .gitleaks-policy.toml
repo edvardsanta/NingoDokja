@@ -1,0 +1,110 @@
+# Project policy rules for gitleaks (https://github.com/gitleaks/gitleaks).
+#
+# The repository is public. Besides credentials, it must not carry addresses of real
+# third-party sites, real chat ids, personal paths or the terms the project decided to avoid.
+# Placeholders are fine: reserved hosts (example.com, *.example, localhost), compose service
+# names and neutral fixture names.
+#
+# Why this is a separate file from .gitleaks.toml: the default gitleaks configuration carries a
+# long list of global stopwords (home, config, app-, admin, author...) that silently drops any
+# finding whose text contains one of them. That is fine for guessing at random secrets and wrong
+# for a policy rule, where https://some-site.example/config must still be reported. This file
+# does not extend the defaults, so nothing here is filtered that way.
+#
+# It runs with the credential scan in three places (see dokja_docs/secret-scanning.md):
+#   - pre-commit, on the staged changes (.pre-commit-config.yaml)
+#   - CI, on the commits of a pull request (.github/workflows/gitleaks.yml)
+#   - by hand: scripts/scan-secrets.sh [git-range]
+#
+# To let a specific value through, add a narrow entry to the rule's allowlist below with a
+# comment saying why. Do not disable a rule.
+
+title = "Ningo Dokja policy"
+
+[allowlist]
+description = "Files that are not source or that describe the rules themselves"
+paths = [
+  '''(^|/)go\.sum$''',
+  '''(^|/)go\.work\.sum$''',
+  '''(^|/)package-lock\.json$''',
+  '''\.lock$''',
+  '''^\.gitleaks(-policy)?\.toml$''',
+  '''^dokja_docs/secret-scanning\.md$''',
+  '''^dokja_legacy/''',
+]
+
+# ---- credentials the default rules do not know -------------------------------------------
+
+[[rules]]
+id = "dokja-discord-webhook"
+description = "Discord webhook URL (it is a credential: anyone holding it can post as the webhook)"
+regex = '''https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{40,}'''
+keywords = ["discord"]
+
+[[rules]]
+id = "dokja-discord-bot-token"
+description = "Discord bot token"
+regex = '''\b[MNO][A-Za-z0-9_-]{23,27}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,40}\b'''
+entropy = 3.5
+
+# ---- project policy: nothing that ties the public repository to a real place --------------
+
+[[rules]]
+id = "dokja-external-url"
+description = "URL that is not a reserved placeholder. A URL is an input the user supplies at run time, never a built-in default."
+regex = '''https?://[^\s"'`)>,\]\\<]+'''
+keywords = ["http"]
+
+  [[rules.allowlists]]
+  description = "Reserved placeholders, loopback, compose service names, hosts that are a single label (they cannot be a public site) and this repository. An address may carry user info (user:pass@host)."
+  regexTarget = "match"
+  regexes = [
+    '''(?i)^https?://(?:[^/@\s]+@)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*(example|test|invalid|localhost)(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*example\.(com|org|net)(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://(?:[^/@\s]+@)?(dokja-[a-z-]+|ollama|orchestrator)(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://(?:[^/@\s]+@)?[a-z0-9_-]+(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://github\.com/edvardsanta/NingoDokja([/?#].*)?$''',
+    '''^https?:///''',
+    '''^https?://\.\.\.$''',
+  ]
+
+  [[rules.allowlists]]
+  description = "Tool configuration that has to name where a hook or action comes from"
+  paths = [
+    '''^\.pre-commit-config\.yaml$''',
+    '''^\.github/workflows/''',
+  ]
+
+[[rules]]
+id = "dokja-discord-id"
+description = "Discord channel, guild or webhook id: it identifies a real server"
+regex = '''(?i)(?:channel|guild|webhook|server)[a-z_]{0,12}[\s=:"'\-]{1,6}[0-9]{17,20}\b'''
+keywords = ["channel", "guild", "webhook", "server"]
+
+  [[rules.allowlists]]
+  description = "Obvious placeholders: counting digits or one repeated digit"
+  regexTarget = "match"
+  regexes = [
+    '''(?:0?123456789012345678(?:9|0)?|(?:1234567890)+)\b''',
+    '''(?:0{17,}|1{17,}|2{17,}|3{17,}|4{17,}|5{17,}|6{17,}|7{17,}|8{17,}|9{17,})\b''',
+  ]
+
+[[rules]]
+id = "dokja-personal-path"
+description = "Absolute path from a person's machine"
+regex = '''(?:/home|/Users)/([A-Za-z][A-Za-z0-9._-]{1,31})/'''
+secretGroup = 1
+keywords = ["/home/", "/users/"]
+
+  [[rules.allowlists]]
+  description = "Generic accounts used by CI and containers"
+  regexes = [
+    '''^(runner|user|app|node|nonroot|vscode)$''',
+  ]
+
+[[rules]]
+id = "dokja-avoided-term"
+description = "Name of a real site, provider or event the project decided not to tie itself to"
+regex = '''(?i)\b(world ?cup|copa do mundo|fifa|folha|memedroid|openrouter)\b'''
+keywords = ["cup", "copa", "fifa", "folha", "memedroid", "openrouter"]

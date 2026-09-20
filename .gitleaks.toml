@@ -1,0 +1,17 @@
+# Credential scan for gitleaks (https://github.com/gitleaks/gitleaks): the default rules.
+# The project's own rules (real hosts, chat ids, personal paths, avoided terms and the
+# credential formats gitleaks does not know) are in .gitleaks-policy.toml, which does not
+# extend these defaults on purpose; see the comment there.
+#
+# Both run in pre-commit, in CI and from scripts/scan-secrets.sh; see dokja_docs/secret-scanning.md.
+
+title = "Ningo Dokja credentials"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Code from before these rules existed"
+paths = [
+  '''^dokja_legacy/''',
+]

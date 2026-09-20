@@ -42,6 +42,20 @@ repos:
         additional_dependencies: [types-requests, types-redis]
         args: [--ignore-missing-imports]
 
+  # Credentials and things a public repository must not carry (real hosts, chat ids, personal
+  # paths). Two configurations, see dokja_docs/secret-scanning.md. These hooks look at every
+  # staged file, not only dokja_lab.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        name: gitleaks (credentials)
+        args: [--config=.gitleaks.toml]
+      - id: gitleaks
+        alias: gitleaks-policy
+        name: gitleaks (project policy)
+        args: [--config=.gitleaks-policy.toml]
+
   - repo: local
     hooks:
       - id: pytest-check
