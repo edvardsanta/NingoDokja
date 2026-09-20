@@ -197,6 +197,9 @@ def update_worker_config(worker_id):
     # Remove e recria o job com novos parâmetros
     try:
         # Parse params (ex: seconds=60, minutes=5, etc)
+        if params is None:
+            # A missing field used to fail here with an AttributeError; say what is wrong.
+            raise ValueError("params is required")
         param_dict = {}
         for part in params.split(","):
             if "=" in part:
