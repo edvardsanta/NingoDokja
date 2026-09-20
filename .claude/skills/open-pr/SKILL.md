@@ -85,6 +85,31 @@ Notes that save time:
 
 ## 4. Scan for things that must not be published
 
+Use the project's scanner instead of reading the diff yourself. It is gitleaks with two
+configurations (default credential rules, and the project's own rules for a public
+repository: Discord webhooks and bot tokens, real hosts, chat ids, personal paths, avoided
+terms), so it is fast, exhaustive and costs no tokens. See `dokja_docs/secret-scanning.md`.
+
+```sh
+scripts/scan-secrets.sh                  # the commits not on origin/main
+scripts/scan-secrets.sh <parent>..HEAD   # a stacked branch: only what this branch adds
+```
+
+It scans commit by commit, because history is public: a value added and later removed was
+still published. Read the result:
+
+- **A real credential**: stop and tell the user. It must be revoked, not just removed.
+- **A real host, id, path or avoided term**: replace it with a placeholder, in the commit
+  that introduced it. If it is a default, make it an input instead.
+- **A legitimate placeholder**: add a narrow entry, with a comment saying why, to the rule's
+  allowlist in `.gitleaks-policy.toml`. Never disable a rule.
+- Never print a secret; the scanner redacts values, so quote the rule and the file only.
+
+If the branch has no `scripts/scan-secrets.sh` or gitleaks is not installed, say so to the
+user and fall back to the manual checks below. They are a weaker version of the same thing.
+
+### Manual fallback
+
 ```sh
 git diff --name-only origin/main...HEAD
 git diff origin/main...HEAD | grep -nEi 'discord(app)?\.com/api/webhooks|Bot [A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9]{20,}|CHANGE_ME|(api|secret|token)[_-]?key.{0,3}[:=][[:space:]]*.?[A-Za-z0-9._-]{16,}'
