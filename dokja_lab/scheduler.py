@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from typing import Any
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -11,9 +12,9 @@ from utils.mapper import to_dict
 
 logger = get_logger(__name__)
 
-worker_status = {}
+worker_status: dict[str, Any] = {}
 scheduler_instance: BackgroundScheduler = None
-worker_configs = {}
+worker_configs: dict[str, Any] = {}
 worker_status_storage = SQLiteStorage("ningo_memory.db", WorkerStatus)
 
 

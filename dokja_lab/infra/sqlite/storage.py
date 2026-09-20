@@ -216,7 +216,8 @@ class SQLiteStorage(BaseStorage[T]):
         return results
 
     def get_by_id(self, entity_id: Any) -> T:
-        pass
+        # This used to be an empty body that silently returned None. Nothing calls it.
+        raise NotImplementedError("get_by_id is not implemented for SQLite storage")
 
     def exists(self, entity_id: Any) -> bool:
         pk = fields(self.entity_cls)[0].name

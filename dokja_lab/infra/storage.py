@@ -15,7 +15,7 @@ from typing import (
 try:
     import redis
 except ImportError:  # pragma: no cover
-    redis = None
+    redis = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance

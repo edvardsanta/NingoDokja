@@ -36,7 +36,7 @@ class MemePool:
 
     def refresh_pool(self, max_items_per_scraper=20):
         threads = []
-        errors = []
+        errors: list[str] = []
         for scraper in self.scrapers:
             logger.debug(f"Starting scraping {scraper.source_name}")
             t = threading.Thread(
