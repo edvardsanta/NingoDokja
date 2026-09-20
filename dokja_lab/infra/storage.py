@@ -52,7 +52,11 @@ class BaseStorage(ABC, Generic[T]):
 
     @abstractmethod
     def get_filtered(
-        self, order_by=None, order_dir="DESC", limit=None, **filters
+        self,
+        order_by: Optional[str] = None,
+        order_dir: str = "DESC",
+        limit: Optional[int] = None,
+        **filters: Any,
     ) -> List[T]:
         """Get entities filtered by SQL conditions."""
         pass
@@ -73,7 +77,13 @@ class BaseStorage(ABC, Generic[T]):
 class RedisStorage(BaseStorage[T]):
 
     # TODO: Implement BaseStorage correctly for RedisStorage
-    def __init__(self, entity_cls: Type[T], host="localhost", port=6379, db=0):
+    def __init__(
+        self,
+        entity_cls: Type[T],
+        host: str = "localhost",
+        port: int = 6379,
+        db: int = 0,
+    ) -> None:
         super().__init__(entity_cls)
         if redis is None:
             raise RuntimeError("redis package is required for RedisStorage")

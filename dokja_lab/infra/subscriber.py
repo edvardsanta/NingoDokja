@@ -8,11 +8,11 @@ class BaseSubscriber:
         self.socket.connect(endpoint)
         self.socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
-    def receive_item(self):
+    def receive_item(self) -> str:
         """Receive an item from the publisher."""
         message = self.socket.recv_string()
         return message
 
-    def close(self):
+    def close(self) -> None:
         self.socket.close()
         self.context.term()

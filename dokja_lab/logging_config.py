@@ -1,8 +1,13 @@
 import logging
 import sys
+from typing import Optional
 
 
-def get_logger(name=None, level=logging.INFO, log_file=None):
+def get_logger(
+    name: Optional[str] = None,
+    level: int = logging.INFO,
+    log_file: Optional[str] = None,
+) -> logging.Logger:
     """
     Returns a centralized logger instance.
     - name: module name (usually __name__)

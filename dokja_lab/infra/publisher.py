@@ -6,7 +6,7 @@ import zmq
 
 class BasePublisher(ABC):
     @abstractmethod
-    def publish_item(self, item: Dict):
+    def publish_item(self, item: Dict) -> None:
         """Publish a new item to subscribers."""
         pass
 
@@ -17,9 +17,9 @@ class MemePublisher(BasePublisher):
         self.socket = self.context.socket(zmq.PUB)
         self.socket.bind(endpoint)
 
-    def publish_item(self, item: Dict):
+    def publish_item(self, item: Dict) -> None:
         self.socket.send_string(str(item))
 
-    def close(self):
+    def close(self) -> None:
         self.socket.close()
         self.context.term()

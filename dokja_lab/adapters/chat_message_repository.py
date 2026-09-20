@@ -1,3 +1,5 @@
+from typing import Any
+
 try:
     from bootstrap import ensure_repo_root
 except ImportError:  # pragma: no cover
@@ -14,7 +16,7 @@ except ImportError:  # pragma: no cover
 
 
 class SQLiteChatMessageRepository:
-    def __init__(self, storage):
+    def __init__(self, storage: Any) -> None:
         self.storage = storage
 
     def get_by_request_hash(self, request_hash: str) -> ChatResponse | None:
