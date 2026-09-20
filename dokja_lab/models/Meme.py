@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 
 
 @dataclass
@@ -10,4 +11,4 @@ class Meme:
     tags: str = ""
     sent_count: int = 0
     date_created: datetime = field(default_factory=datetime.now)
-    date_sent: datetime = None
+    date_sent: Optional[datetime] = None

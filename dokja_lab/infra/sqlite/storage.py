@@ -23,6 +23,19 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="DataclassInstance")
 
 
+def _unwrap_optional(typ: Any) -> Any:
+    """Return X for Optional[X]; any other annotation is returned unchanged.
+
+    The storage reflects on dataclass annotations to choose column types and to find datetime
+    fields, and a nullable field has to be seen as its underlying type.
+    """
+    if get_origin(typ) is Union:
+        args = [a for a in get_args(typ) if a is not type(None)]
+        if args:
+            return args[0]
+    return typ
+
+
 class SQLiteStorage(BaseStorage[T]):
     def __init__(self, db_file: str, entity_cls: Type[T]):
         super().__init__(entity_cls)
@@ -33,12 +46,7 @@ class SQLiteStorage(BaseStorage[T]):
     def _ensure_table(self):
         cols = []
         for f in fields(self.entity_cls):
-            typ = f.type
-            # Handle Optional types
-            if get_origin(typ) is Union:
-                args = [a for a in get_args(typ) if a is not type(None)]
-                if args:
-                    typ = args[0]
+            typ = _unwrap_optional(f.type)
 
             if typ in (int, bool):
                 col_type = "INTEGER"
@@ -230,7 +238,9 @@ class SQLiteStorage(BaseStorage[T]):
         pk = fields(self.entity_cls)[0].name
         # Identifica campos datetime no model
         datetime_fields = {
-            f.name for f in fields(self.entity_cls) if f.type == datetime
+            f.name
+            for f in fields(self.entity_cls)
+            if _unwrap_optional(f.type) == datetime
         }
         # Converte valores datetime para string ISO
         safe_updates = updates.copy()
