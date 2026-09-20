@@ -1,7 +1,7 @@
 try:
     from bootstrap import ensure_repo_root
 except ImportError:  # pragma: no cover
-    from dokja_lab.bootstrap import ensure_repo_root
+    from dokja_lab.bootstrap import ensure_repo_root  # type: ignore[no-redef]
 
 ensure_repo_root()
 
@@ -10,7 +10,7 @@ from dokja_domain.dokja_chat import ChatResponse
 try:
     from models.ChatMessage import ChatMessage
 except ImportError:  # pragma: no cover
-    from dokja_lab.models.ChatMessage import ChatMessage
+    from dokja_lab.models.ChatMessage import ChatMessage  # type: ignore[no-redef]
 
 
 class SQLiteChatMessageRepository:
