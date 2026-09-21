@@ -1,7 +1,9 @@
+from typing import Any
+
 try:
     from bootstrap import ensure_repo_root
 except ImportError:  # pragma: no cover
-    from dokja_lab.bootstrap import ensure_repo_root
+    from dokja_lab.bootstrap import ensure_repo_root  # type: ignore[no-redef]
 
 ensure_repo_root()
 
@@ -10,11 +12,11 @@ from dokja_domain.dokja_chat import ChatResponse
 try:
     from models.ChatMessage import ChatMessage
 except ImportError:  # pragma: no cover
-    from dokja_lab.models.ChatMessage import ChatMessage
+    from dokja_lab.models.ChatMessage import ChatMessage  # type: ignore[no-redef]
 
 
 class SQLiteChatMessageRepository:
-    def __init__(self, storage):
+    def __init__(self, storage: Any) -> None:
         self.storage = storage
 
     def get_by_request_hash(self, request_hash: str) -> ChatResponse | None:

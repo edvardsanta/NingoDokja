@@ -1,4 +1,5 @@
 import json
+from typing import Any, Dict, Optional
 
 import zmq
 
@@ -9,20 +10,25 @@ logger = get_logger(__name__)
 
 
 class Responder(BaseTransport):
-    def __init__(self, endpoint: str = "tcp://*:5556", handlers=None):
+    def __init__(
+        self,
+        endpoint: str = "tcp://*:5556",
+        handlers: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REP)
         self.socket.bind(endpoint)
         self.running = False
-        self.handlers = handlers
+        # No handlers means every event type is unknown, answered with an error.
+        self.handlers: Dict[str, Any] = handlers if handlers is not None else {}
 
     def receive(self) -> str:
         return self.socket.recv_string()
 
-    def send(self, msg: str):
+    def send(self, msg: str) -> None:
         self.socket.send_string(msg)
 
-    def start(self):
+    def start(self) -> None:
         self.running = True
         logger.info("Responder running...")
         try:
@@ -61,7 +67,7 @@ class Responder(BaseTransport):
         finally:
             self.close()
 
-    def close(self):
+    def close(self) -> None:
         if not self.running:
             return
         self.running = False

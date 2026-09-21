@@ -2,9 +2,12 @@ import os
 import signal
 import sys
 import threading
+from types import FrameType
+from typing import NoReturn, Optional
 
 from config import RESPONDER_HANDLERS, WORKERS
 from flask import Flask, redirect, url_for
+from flask.typing import ResponseReturnValue
 
 from chat_message_routes import chat_messages_bp
 from infra.zeromq.responder import Responder
@@ -22,18 +25,18 @@ app.register_blueprint(chat_messages_bp)
 
 
 @app.route("/")
-def index():
+def index() -> ResponseReturnValue:
     return redirect(url_for("workers.index"))
 
 
-def main():
+def main() -> None:
     scheduler = start_workers(WORKERS)
 
     responder_thread = threading.Thread(
         target=Responder(handlers=RESPONDER_HANDLERS).start
     )
 
-    def shutdown(signum, frame):
+    def shutdown(signum: int, frame: Optional[FrameType]) -> NoReturn:
         logger.info("Shutting down dispatcher...")
         stop_event.set()
         responder_thread.join()
