@@ -32,9 +32,6 @@ services:
       - "5558:5558"
       - "8091:8091"
       - "40000:40000"
-    depends_on:
-      - dokja-chat-ai
-      - dokja-book
     networks:
       - dokja-net
 
