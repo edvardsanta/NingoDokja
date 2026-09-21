@@ -20,6 +20,9 @@ type ChatConversationGenerator interface {
 type ChatDomainHandler struct {
 	generator ChatGenerator
 	sessions  *chatSessionManager
+
+	knowledge        KnowledgeSearcher
+	knowledgeEnabled func() bool
 }
 
 func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
@@ -51,13 +54,15 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	))
 
 	lifecycle, history := h.sessions.BeginTurn(event, content)
-	result, err := h.generateReply(ctx, content, history)
+	sources := h.lookupKnowledge(ctx, content)
+	result, err := h.generateReply(ctx, content, history, sources)
 	if err != nil {
 		return nil, err
 	}
 	rawReply := chatReplyFromResult(result)
 	h.sessions.CompleteTurn(event, rawReply)
-	reply := sessionAwareReply(rawReply, lifecycle, event)
+	// The session keeps the model's own words; citations are added only to what is sent.
+	reply := sessionAwareReply(citeSources(rawReply, sources), lifecycle, event)
 	logger.Info(fmt.Sprintf(
 		"chat handler completed event_id=%s action=%s reply_chars=%d",
 		event.EventID,
@@ -65,17 +70,21 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		len(reply),
 	))
 
-	return map[string]any{
+	response := map[string]any{
 		"action":  workflow.Action,
 		"reply":   reply,
 		"raw":     result,
 		"session": map[string]any{"id": lifecycle.SessionID, "created": lifecycle.Created, "revoked": lifecycle.Revoked, "reason": lifecycle.Reason},
-	}, nil
+	}
+	if len(sources) > 0 {
+		response["sources"] = sourcesForResult(sources)
+	}
+	return response, nil
 }
 
-func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, history []chatMessage) (map[string]any, error) {
+func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, history []chatMessage, sources []knowledgeSource) (map[string]any, error) {
 	if generator, ok := h.generator.(ChatConversationGenerator); ok {
-		return generator.GenerateMessages(ctx, chatMessagesForGenerator(history))
+		return generator.GenerateMessages(ctx, withKnowledgeReference(chatMessagesForGenerator(history), sources))
 	}
 	return h.generator.Generate(ctx, content)
 }

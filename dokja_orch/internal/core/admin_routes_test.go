@@ -13,6 +13,12 @@ func TestAdminEventsAreRoutedAndPlanned(t *testing.T) {
 		action    string
 	}{
 		{"discord.send", "discord-send", DomainSystem, "send-discord-message"},
+		{"knowledge.ingest", "knowledge", DomainKnowledge, "ingest-knowledge"},
+		{"knowledge.search", "knowledge", DomainKnowledge, "search-knowledge"},
+		{"knowledge.list", "knowledge", DomainKnowledge, "list-knowledge"},
+		{"knowledge.delete", "knowledge", DomainKnowledge, "delete-knowledge"},
+		{"knowledge.status", "knowledge", DomainKnowledge, "inspect-knowledge"},
+		{"knowledge.reindex", "knowledge", DomainKnowledge, "reindex-knowledge"},
 		{"meme.screen", "meme", DomainMeme, "screen-meme"},
 		{"services.set", "admin", DomainSystem, "set-service"},
 		{"scheduler.jobs.set", "admin", DomainSystem, "set-job"},
