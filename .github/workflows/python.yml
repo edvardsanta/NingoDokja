@@ -92,4 +92,7 @@ jobs:
 
     - name: Test Docker image
       run: |
-        docker run --rm dokja-lab:latest python -c "import main; print('Docker image working')"
+        # dokja_lab/config.py is local to each machine and git-ignored (it lists the scrapers
+        # the user chose), so the image built from a clean checkout has none. Give the smoke test
+        # a minimal one in memory, so it still fails when a module cannot be imported.
+        docker run --rm dokja-lab:latest python -c "import sys, types; sys.modules['config'] = types.SimpleNamespace(WORKERS=[], RESPONDER_HANDLERS={}, SCRAPERS=[], DB_FILE='ningo_memory.db'); import main; print('Docker image working')"

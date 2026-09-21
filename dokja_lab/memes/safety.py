@@ -6,6 +6,7 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass
+from typing import Any, Iterable
 
 import requests
 
@@ -129,7 +130,7 @@ def _fold(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
-def _compile_words(words) -> re.Pattern | None:
+def _compile_words(words: Iterable[str]) -> re.Pattern | None:
     folded = sorted({_fold(word).strip() for word in words if _fold(word).strip()})
     if not folded:
         return None
@@ -177,13 +178,13 @@ class NsfwScreen:
         threshold: float = DEFAULT_THRESHOLD,
         strict: bool = True,
         strict_threshold: float = DEFAULT_STRICT_THRESHOLD,
-        blocked_words=BLOCKED_WORDS,
-        text_reader=None,
+        blocked_words: Iterable[str] = BLOCKED_WORDS,
+        text_reader: Any = None,
         max_bytes: int = DEFAULT_MAX_BYTES,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
-        session=None,
-        detector=None,
-    ):
+        session: Any = None,
+        detector: Any = None,
+    ) -> None:
         self.model_path = model_path or None
         self.threshold = threshold
         self.strict = strict
@@ -200,10 +201,10 @@ class NsfwScreen:
         self._session = session or requests.Session()
         self._detector = detector
 
-    def check(self, meme) -> Verdict:
+    def check(self, meme: Any) -> Verdict:
         return self.inspect(meme).verdict
 
-    def inspect(self, meme) -> Screening:
+    def inspect(self, meme: Any) -> Screening:
         caption = " ".join(str(part or "") for part in (meme.title, meme.tags))
         word = self._find_blocked_word(caption)
         if word:
@@ -252,7 +253,7 @@ class NsfwScreen:
                     return word
         return None
 
-    def _judge(self, detections) -> Verdict:
+    def _judge(self, detections: Iterable[dict[str, Any]]) -> Verdict:
         for detection in detections:
             label = detection.get("class")
             score = float(detection.get("score", 0))
@@ -280,13 +281,13 @@ class NsfwScreen:
         return bytes(data)
 
     @staticmethod
-    def _decode(raw: bytes):
+    def _decode(raw: bytes) -> Any:
         import cv2
         import numpy as np
 
         return cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
 
-    def _get_detector(self):
+    def _get_detector(self) -> Any:
         if self._detector is not None:
             return self._detector
         if self.model_path and not os.path.isfile(self.model_path):
@@ -301,7 +302,7 @@ class NsfwScreen:
         return self._detector
 
 
-def build_text_reader_from_env():
+def build_text_reader_from_env() -> Any:
     if os.getenv("MEME_NSFW_OCR", "on").strip().lower() in {"off", "0", "false"}:
         logger.warning("meme ocr is disabled; text inside images is not checked")
         return None

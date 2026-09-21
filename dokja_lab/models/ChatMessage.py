@@ -12,12 +12,12 @@ class ChatMessage:
     role: str
     request_message: str
     response_message: str
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: Optional[datetime] = field(default_factory=datetime.now)
     retrieval_info: Optional[Dict] = None
     cached: bool = False
     emojis: List[str] = field(default_factory=list)
     tone: str = ""
     language: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.id_hash = hashlib.sha256(self.request_message.encode("utf-8")).hexdigest()

@@ -2,11 +2,38 @@ import json
 import sqlite3
 from dataclasses import fields
 from datetime import datetime
-from typing import Any, Dict, Optional, Type, TypeVar, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from infra.storage import BaseStorage
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+# Bound to dataclasses: these modules call dataclasses.fields() and asdict() on T.
+T = TypeVar("T", bound="DataclassInstance")
+
+
+def _unwrap_optional(typ: Any) -> Any:
+    """Return X for Optional[X]; any other annotation is returned unchanged.
+
+    The storage reflects on dataclass annotations to choose column types and to find datetime
+    fields, and a nullable field has to be seen as its underlying type.
+    """
+    if get_origin(typ) is Union:
+        args = [a for a in get_args(typ) if a is not type(None)]
+        if args:
+            return args[0]
+    return typ
 
 
 class SQLiteStorage(BaseStorage[T]):
@@ -16,15 +43,10 @@ class SQLiteStorage(BaseStorage[T]):
         self.table_name = entity_cls.__name__.lower()
         self._ensure_table()
 
-    def _ensure_table(self):
+    def _ensure_table(self) -> None:
         cols = []
         for f in fields(self.entity_cls):
-            typ = f.type
-            # Handle Optional types
-            if get_origin(typ) is Union:
-                args = [a for a in get_args(typ) if a is not type(None)]
-                if args:
-                    typ = args[0]
+            typ = _unwrap_optional(f.type)
 
             if typ in (int, bool):
                 col_type = "INTEGER"
@@ -103,7 +125,11 @@ class SQLiteStorage(BaseStorage[T]):
     from typing import Callable, List
 
     def get_filtered(
-        self, order_by=None, order_dir="DESC", limit=None, **filters
+        self,
+        order_by: Optional[str] = None,
+        order_dir: str = "DESC",
+        limit: Optional[int] = None,
+        **filters: Any,
     ) -> List[T]:
         """
         Retrieve a list of entities from the database filtered by the given keyword arguments.
@@ -194,7 +220,8 @@ class SQLiteStorage(BaseStorage[T]):
         return results
 
     def get_by_id(self, entity_id: Any) -> T:
-        pass
+        # This used to be an empty body that silently returned None. Nothing calls it.
+        raise NotImplementedError("get_by_id is not implemented for SQLite storage")
 
     def exists(self, entity_id: Any) -> bool:
         pk = fields(self.entity_cls)[0].name
@@ -216,7 +243,9 @@ class SQLiteStorage(BaseStorage[T]):
         pk = fields(self.entity_cls)[0].name
         # Identifica campos datetime no model
         datetime_fields = {
-            f.name for f in fields(self.entity_cls) if f.type == datetime
+            f.name
+            for f in fields(self.entity_cls)
+            if _unwrap_optional(f.type) == datetime
         }
         # Converte valores datetime para string ISO
         safe_updates = updates.copy()

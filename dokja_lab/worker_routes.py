@@ -1,32 +1,37 @@
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, flash
+import importlib
+import re
+import threading
+from typing import Any, Dict, Optional
+
+from config import WORKERS
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask.typing import ResponseReturnValue
+
+from infra.sqlite.storage import SQLiteStorage
+from models.WorkerStatus import WorkerStatus
 from scheduler import (
     get_scheduler,
     worker_configs,
 )
-from infra.sqlite.storage import SQLiteStorage
-from models.WorkerStatus import WorkerStatus
 from utils.mapper import to_dict
-from config import WORKERS
-import threading
-import importlib
-import re
 
 workers_bp = Blueprint("workers", __name__)
 worker_status_storage = SQLiteStorage("ningo_memory.db", WorkerStatus)
 
 
-def get_worker_status_dict():
+def get_worker_status_dict() -> Dict[str, Dict[str, Any]]:
     # Retorna dict {job_name: status_dict} para uso nas rotas
     statuses = worker_status_storage.get_filtered()
     return {s.job_name: to_dict(s) for s in statuses}
 
 
-def camel_to_snake(name):
+def camel_to_snake(name: str) -> str:
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
-def get_worker_config_by_id(worker_id):
+def get_worker_config_by_id(worker_id: str) -> Optional[Dict[str, Any]]:
+    config: Dict[str, Any]
     for config in WORKERS:
         sched_params = config.get("scheduler_params", {})
         if sched_params.get("id") == worker_id:
@@ -34,7 +39,8 @@ def get_worker_config_by_id(worker_id):
     return None
 
 
-def get_worker_config_by_class(class_name):
+def get_worker_config_by_class(class_name: str) -> Optional[Dict[str, Any]]:
+    config: Dict[str, Any]
     for config in WORKERS:
         worker_cls = config.get("worker_class")
         if worker_cls and worker_cls.__name__ == class_name:
@@ -43,7 +49,7 @@ def get_worker_config_by_class(class_name):
 
 
 @workers_bp.route("/health")
-def health():
+def health() -> ResponseReturnValue:
     """Retorna status em JSON para APIs"""
     worker_status = get_worker_status_dict()
     all_statuses = [info["status"] for info in worker_status.values()]
@@ -52,14 +58,14 @@ def health():
 
 
 @workers_bp.route("/workers")
-def index():
+def index() -> ResponseReturnValue:
     """Página web mostrando status de todos os workers"""
     worker_status = get_worker_status_dict()
     return render_template("workers.html", workers=worker_status)
 
 
 @workers_bp.route("/worker/<worker_id>/pause", methods=["POST"])
-def pause_worker(worker_id):
+def pause_worker(worker_id: str) -> ResponseReturnValue:
     scheduler = get_scheduler()
     try:
         scheduler.pause_job(worker_id)
@@ -69,7 +75,7 @@ def pause_worker(worker_id):
 
 
 @workers_bp.route("/worker/<worker_id>/resume", methods=["POST"])
-def resume_worker(worker_id):
+def resume_worker(worker_id: str) -> ResponseReturnValue:
     scheduler = get_scheduler()
     try:
         scheduler.resume_job(worker_id)
@@ -79,7 +85,7 @@ def resume_worker(worker_id):
 
 
 @workers_bp.route("/worker/<worker_id>/restart", methods=["POST"])
-def restart_worker(worker_id):
+def restart_worker(worker_id: str) -> ResponseReturnValue:
     scheduler = get_scheduler()
     job = scheduler.get_job(worker_id)
     if not job:
@@ -111,7 +117,7 @@ def restart_worker(worker_id):
 
 
 @workers_bp.route("/worker/<worker_id>/execute_now", methods=["POST"])
-def execute_now_worker(worker_id):
+def execute_now_worker(worker_id: str) -> ResponseReturnValue:
     config = worker_configs.get(worker_id)
     if not config:
         # Tenta buscar config pelo id no WORKERS
@@ -135,7 +141,7 @@ def execute_now_worker(worker_id):
                 worker_instance = worker_cls()
             func = getattr(worker_instance, func_name)
 
-            def run_in_background():
+            def run_in_background() -> None:
                 try:
                     func()
                 except Exception as e:
@@ -159,7 +165,7 @@ def execute_now_worker(worker_id):
         init_kwargs = config.get("init_kwargs", {})
         worker_instance = worker_class(*init_args, **init_kwargs)
 
-        def run_in_background():
+        def run_in_background() -> None:
             try:
                 worker_instance.run()
             except Exception as e:
@@ -174,7 +180,7 @@ def execute_now_worker(worker_id):
 
 
 @workers_bp.route("/workers/config", methods=["GET"])
-def config_workers():
+def config_workers() -> ResponseReturnValue:
     worker_status = get_worker_status_dict()
     # Adiciona scheduler_params vindos do WORKERS
     for ws in worker_status.values():
@@ -184,7 +190,7 @@ def config_workers():
 
 
 @workers_bp.route("/workers/config/<worker_id>", methods=["POST"])
-def update_worker_config(worker_id):
+def update_worker_config(worker_id: str) -> ResponseReturnValue:
     trigger = request.form.get("trigger")
     params = request.form.get("params")
     scheduler = get_scheduler()
@@ -195,6 +201,9 @@ def update_worker_config(worker_id):
     # Remove e recria o job com novos parâmetros
     try:
         # Parse params (ex: seconds=60, minutes=5, etc)
+        if params is None:
+            # A missing field used to fail here with an AttributeError; say what is wrong.
+            raise ValueError("params is required")
         param_dict = {}
         for part in params.split(","):
             if "=" in part:

@@ -1,4 +1,5 @@
 import threading
+from typing import Any, List
 
 from infra.storage import BaseStorage
 from logging_config import get_logger
@@ -15,7 +16,9 @@ class MemePool:
         self.scrapers = scrapers
         self.storage = storage
 
-    def _scrape_and_store(self, scraper, max_items, errors):
+    def _scrape_and_store(
+        self, scraper: Any, max_items: int, errors: List[str]
+    ) -> None:
         try:
             memes: list[dict] = scraper.scrape(max_items=max_items)
             logger.debug(f"Scraped {len(memes)} memes from {scraper.source_name}")
@@ -26,14 +29,17 @@ class MemePool:
                     self.storage.add(meme)
                     logger.debug(f"Stored meme: {url}")
         except Exception as err:
-            logger.exception("Scraper failed for %s", getattr(scraper, "source_name", type(scraper).__name__))
+            logger.exception(
+                "Scraper failed for %s",
+                getattr(scraper, "source_name", type(scraper).__name__),
+            )
             errors.append(
                 f"{getattr(scraper, 'source_name', type(scraper).__name__)}: {err}"
             )
 
-    def refresh_pool(self, max_items_per_scraper=20):
+    def refresh_pool(self, max_items_per_scraper: int = 20) -> None:
         threads = []
-        errors = []
+        errors: list[str] = []
         for scraper in self.scrapers:
             logger.debug(f"Starting scraping {scraper.source_name}")
             t = threading.Thread(

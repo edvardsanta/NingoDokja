@@ -1,22 +1,31 @@
 import time
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.background import BackgroundScheduler
-from logging_config import get_logger
+
 from infra.sqlite.storage import SQLiteStorage
+from logging_config import get_logger
 from models.WorkerStatus import WorkerStatus
 from utils.mapper import to_dict
 
 logger = get_logger(__name__)
 
-worker_status = {}
+worker_status: dict[str, Any] = {}
 scheduler_instance: BackgroundScheduler = None
-worker_configs = {}
+worker_configs: dict[str, Any] = {}
 worker_status_storage = SQLiteStorage("ningo_memory.db", WorkerStatus)
 
 
-def save_worker_status(job_name, status, timestamp, exception, next_run, trigger):
+def save_worker_status(
+    job_name: str,
+    status: str,
+    timestamp: Optional[str],
+    exception: Optional[str],
+    next_run: Optional[str],
+    trigger: Optional[str],
+) -> None:
     ws = WorkerStatus(
         job_name=job_name,
         status=status,
@@ -33,7 +42,7 @@ def save_worker_status(job_name, status, timestamp, exception, next_run, trigger
         worker_status_storage.add(ws)
 
 
-def start_workers(workers_config):
+def start_workers(workers_config: List[Dict[str, Any]]) -> BackgroundScheduler:
     global scheduler_instance
     scheduler = BackgroundScheduler()
     scheduler_instance = scheduler
@@ -71,7 +80,7 @@ def start_workers(workers_config):
             scheduler_params.get("trigger", "interval"),
         )
 
-    def listener(event):
+    def listener(event: Any) -> None:
         job_listener = scheduler.get_job(event.job_id)
         worker_name = job_listener.name
         now = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -128,5 +137,5 @@ def start_workers(workers_config):
     return scheduler
 
 
-def get_scheduler():
+def get_scheduler() -> BackgroundScheduler:
     return scheduler_instance

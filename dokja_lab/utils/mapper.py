@@ -1,7 +1,11 @@
 from dataclasses import asdict, fields
-from typing import Any, Dict, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
+# Bound to dataclasses: these modules call dataclasses.fields() and asdict() on T.
+T = TypeVar("T", bound="DataclassInstance")
 
 
 def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
