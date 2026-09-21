@@ -139,6 +139,34 @@ def test_blocked_word_short_circuits_before_download():
     assert session.calls == 0
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://x/clip.mp4",
+        "https://x/clip.MP4?token=1",
+        "https://x/a/b.webm#t=3",
+        "https://x/movie.mov",
+    ],
+)
+def test_videos_are_never_approved_and_are_not_downloaded(url):
+    session = FakeSession(_png_bytes())
+
+    verdict = screen(session=session).check(meme(url=url))
+
+    assert not verdict.safe
+    assert "video" in verdict.reason
+    assert session.calls == 0
+
+
+def test_an_image_whose_path_mentions_a_video_format_is_still_screened():
+    session = FakeSession(_png_bytes())
+
+    verdict = screen(session=session).check(meme(url="https://x/mp4/a.png"))
+
+    assert verdict.safe
+    assert session.calls == 1
+
+
 def test_blocked_word_needs_whole_word_match():
     assert screen().check(meme(title="Xxxtentacion, nudesc")).safe is True
 
