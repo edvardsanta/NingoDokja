@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"read_books/internal/logger"
+	"time"
 )
 
 type ProcessResult struct {
@@ -18,6 +20,58 @@ type Service struct {
 	contextBuilder ContextBuilder
 	workflowEngine WorkflowEngine
 	dispatcher     DomainDispatcher
+	controls       *Controls
+}
+
+// WithControls makes the service honour the operator's service and job switches.
+func (s *Service) WithControls(controls *Controls) *Service {
+	s.controls = controls
+	return s
+}
+
+func scheduleOf(event Event) string {
+	schedule, _ := event.Context["schedule"].(string)
+	return schedule
+}
+
+// skipped answers an event the operator switched off. It is a normal result, not an
+// error: a paused job would otherwise log a failure on every tick.
+func (s *Service) skipped(event Event, route Route) (ProcessResult, bool) {
+	if s.controls == nil {
+		return ProcessResult{}, false
+	}
+	schedule := scheduleOf(event)
+	reason := ""
+	if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) {
+		reason = fmt.Sprintf("service %s is disabled", service)
+	} else if schedule != "" && !s.controls.ServiceEnabled("scheduler") {
+		reason = "scheduler is paused"
+	} else if schedule != "" && !s.controls.JobEnabled(schedule) {
+		reason = fmt.Sprintf("job %s is paused", schedule)
+	}
+	if reason == "" {
+		return ProcessResult{}, false
+	}
+
+	logger.Info(fmt.Sprintf("orchestrator skipped event_id=%s type=%s reason=%q", event.EventID, event.Type, reason))
+	s.controls.RecordRun(schedule, "skipped", errors.New(reason), time.Now().UTC())
+	return ProcessResult{
+		Event:    event,
+		Workflow: route.Workflow,
+		Domains:  domainsToStrings(route.Domains),
+		Result:   map[string]any{"skipped": true, "reason": reason},
+	}, true
+}
+
+func (s *Service) recordRun(event Event, cause error) {
+	if s.controls == nil || scheduleOf(event) == "" {
+		return
+	}
+	outcome := "ran"
+	if cause != nil {
+		outcome = "error"
+	}
+	s.controls.RecordRun(scheduleOf(event), outcome, cause, time.Now().UTC())
 }
 
 func NewService(
@@ -81,6 +135,10 @@ func (s *Service) ProcessWithResult(ctx context.Context, event Event) (ProcessRe
 		domainsToStrings(route.Domains),
 	))
 
+	if result, skip := s.skipped(event, route); skip {
+		return result, nil
+	}
+
 	event.Context, err = s.contextBuilder.Build(ctx, event, route)
 	if err != nil {
 		return ProcessResult{}, fmt.Errorf("build context: %w", err)
@@ -98,6 +156,7 @@ func (s *Service) ProcessWithResult(ctx context.Context, event Event) (ProcessRe
 	))
 
 	dispatchResult, err := s.dispatcher.Dispatch(ctx, event, workflow)
+	s.recordRun(event, err)
 	if err != nil {
 		return ProcessResult{}, fmt.Errorf("dispatch workflow: %w", err)
 	}

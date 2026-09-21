@@ -20,6 +20,7 @@ export type DiscordDeliveryResponse = {
 type DeliveryHandlerDependencies = {
   apiBaseUrl: string;
   token: string;
+  webhooks?: Record<string, string>;
   fetchImpl: typeof fetch;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
@@ -28,6 +29,7 @@ type DeliveryHandlerDependencies = {
 type DeliveryServerOptions = {
   token: string;
   port: number;
+  webhooks?: Record<string, string>;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
   fetchImpl?: typeof fetch;
@@ -50,6 +52,7 @@ export function startDiscordDeliveryServer(options: DeliveryServerOptions) {
         {
           apiBaseUrl,
           token: options.token,
+          webhooks: options.webhooks,
           fetchImpl,
           log: options.log,
           error: options.error,
@@ -93,21 +96,24 @@ export async function handleDiscordDeliveryRequest(
     };
   }
 
+  const webhookUrl = deps.webhooks?.[channelId];
+  const target = webhookUrl
+    ? { url: `${webhookUrl}${webhookUrl.includes("?") ? "&" : "?"}wait=true`, headers: {} as Record<string, string> }
+    : { url: `${deps.apiBaseUrl}/channels/${channelId}/messages`, headers: { Authorization: `Bot ${deps.token}` } };
+
   deps.log?.(JSON.stringify({
     delivery: "request",
     channelId,
+    via: webhookUrl ? "webhook" : "bot",
     contentLength: content.length,
     hasAttachment: attachmentUrl.length > 0,
   }));
 
   const response = attachmentUrl
-    ? await sendMessageWithAttachment(deps.fetchImpl, deps.apiBaseUrl, deps.token, channelId, content, attachmentUrl)
-    : await deps.fetchImpl(`${deps.apiBaseUrl}/channels/${channelId}/messages`, {
+    ? await sendMessageWithAttachment(deps.fetchImpl, target, content, attachmentUrl)
+    : await deps.fetchImpl(target.url, {
         method: "POST",
-        headers: {
-          Authorization: `Bot ${deps.token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { ...target.headers, "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
 
@@ -147,9 +153,7 @@ export async function handleDiscordDeliveryRequest(
 
 async function sendMessageWithAttachment(
   fetchImpl: typeof fetch,
-  apiBaseUrl: string,
-  token: string,
-  channelId: string,
+  target: { url: string; headers: Record<string, string> },
   content: string,
   attachmentUrl: string,
 ) {
@@ -175,11 +179,9 @@ async function sendMessageWithAttachment(
     filename,
   );
 
-  return fetchImpl(`${apiBaseUrl}/channels/${channelId}/messages`, {
+  return fetchImpl(target.url, {
     method: "POST",
-    headers: {
-      Authorization: `Bot ${token}`,
-    },
+    headers: target.headers,
     body: form,
   });
 }

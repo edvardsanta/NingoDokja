@@ -126,6 +126,12 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 }
 
 func extractBridgeReply(result core.ProcessResult) string {
+	// The operator switched this off: say so instead of answering with silence.
+	if skipped, _ := result.Result["skipped"].(bool); skipped {
+		reason, _ := result.Result["reason"].(string)
+		return fmt.Sprintf("Isso está desligado no momento (%s).", strings.TrimSpace(reason))
+	}
+
 	chatResult, ok := result.Result[string(core.DomainChat)].(map[string]any)
 	if ok {
 		reply, _ := chatResult["reply"].(string)
@@ -149,13 +155,13 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 	content := strings.TrimSpace(request.Payload.Content)
 	eventType, payload := mapBridgeRequestToEvent(request, content)
 	context := map[string]any{
-		"interface":   "discord",
-		"message_id":  strings.TrimSpace(request.Payload.MessageID),
-		"guild_id":    strings.TrimSpace(request.Payload.GuildID),
-		"session_key": strings.TrimSpace(request.Payload.SessionKey),
+		"interface":         "discord",
+		"message_id":        strings.TrimSpace(request.Payload.MessageID),
+		"guild_id":          strings.TrimSpace(request.Payload.GuildID),
+		"session_key":       strings.TrimSpace(request.Payload.SessionKey),
 		"force_new_session": request.Payload.StartChat,
-		"account_id":  strings.TrimSpace(request.Payload.AccountID),
-		"event_type":  strings.TrimSpace(request.EventType),
+		"account_id":        strings.TrimSpace(request.Payload.AccountID),
+		"event_type":        strings.TrimSpace(request.EventType),
 	}
 	if eventType == "message.created" {
 		context["content"] = content
@@ -278,6 +284,10 @@ func formatMemeReply(result map[string]any) string {
 }
 
 func formatSystemReply(result map[string]any) string {
+	if reply := strings.TrimSpace(stringValue(result["reply"])); reply != "" {
+		return reply
+	}
+
 	status := strings.TrimSpace(stringValue(result["status"]))
 	if status == "" {
 		status = "unknown"

@@ -45,6 +45,18 @@ func actionFor(domain Domain, eventType string) string {
 			return "inspect-ningo-platform"
 		case "meme.dispatch.scheduled":
 			return "deliver-scheduled-memes"
+		case "discord.send":
+			return "send-discord-message"
+		case "services.set":
+			return "set-service"
+		case "scheduler.jobs.set":
+			return "set-job"
+		case "scheduler.jobs.announce":
+			return "record-job-announce"
+		case "chat.profiles.list":
+			return "list-chat-profiles"
+		case "chat.profile.use":
+			return "use-chat-profile"
 		default:
 			return "inspect-system"
 		}
@@ -72,6 +84,10 @@ func actionFor(domain Domain, eventType string) string {
 			return "refresh-meme-pool"
 		case "meme.status":
 			return "inspect-meme-service"
+		case "meme.screen":
+			return "screen-meme"
+		case "meme.list":
+			return "list-memes"
 		default:
 			return "handle-meme-event"
 		}

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { parseWebhookMap } from "../config.js";
 import { handleDiscordDeliveryRequest } from "../delivery/delivery_server.js";
 
 test("delivery contract accepts content-only payload", async () => {
@@ -84,4 +85,78 @@ test("delivery contract rejects invalid payload", async () => {
   assert.equal(result.statusCode, 400);
   assert.equal(result.payload.status, "error");
   assert.match(String(result.payload.message), /content or attachment_url/);
+});
+
+test("delivery routes mapped channels through the webhook without bot auth", async () => {
+  const calls: { url: string; headers: HeadersInit | undefined }[] = [];
+  const result = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", content: "meme kkk" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      webhooks: { "channel-9": "https://discord.test/api/webhooks/1/abc" },
+      fetchImpl: async (input, init) => {
+        calls.push({ url: String(input), headers: init?.headers });
+        return new Response(JSON.stringify({ id: "webhook-message-1" }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.url, "https://discord.test/api/webhooks/1/abc?wait=true");
+  assert.equal(JSON.stringify(calls[0]?.headers).includes("Bot"), false);
+  assert.equal(result.payload.message_id, "webhook-message-1");
+});
+
+test("delivery sends attachments through the webhook", async () => {
+  const urls: string[] = [];
+  const result = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", attachment_url: "https://example.com/meme.png" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      webhooks: { "channel-9": "https://discord.test/api/webhooks/1/abc" },
+      fetchImpl: async (input) => {
+        const url = String(input);
+        urls.push(url);
+        if (url === "https://example.com/meme.png") {
+          return new Response(new Uint8Array([1]), { status: 200, headers: { "Content-Type": "image/png" } });
+        }
+        return new Response(JSON.stringify({ id: "webhook-message-2" }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(urls[1], "https://discord.test/api/webhooks/1/abc?wait=true");
+  assert.equal(result.payload.has_attachment, true);
+});
+
+test("parseWebhookMap splits on first equals and skips malformed entries", () => {
+  assert.deepEqual(
+    parseWebhookMap(" 1=https://d.test/api/webhooks/1/a?thread_id=5 , bad, 2=https://d.test/api/webhooks/2/b ,=x"),
+    {
+      "1": "https://d.test/api/webhooks/1/a?thread_id=5",
+      "2": "https://d.test/api/webhooks/2/b",
+    },
+  );
+  assert.deepEqual(parseWebhookMap(""), {});
+});
+
+test("delivery logs which route was used without leaking the webhook url", async () => {
+  const logs: string[] = [];
+  await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", content: "meme kkk" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      webhooks: { "channel-9": "https://discord.test/api/webhooks/1/secret-token" },
+      log: (...args) => logs.push(args.join(" ")),
+      fetchImpl: async () => new Response(JSON.stringify({ id: "m1" }), { status: 200 }),
+    },
+  );
+
+  assert.match(logs.join("\n"), /"via":"webhook"/);
+  assert.equal(logs.join("\n").includes("secret-token"), false);
 });

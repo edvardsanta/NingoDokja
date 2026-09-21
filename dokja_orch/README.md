@@ -109,6 +109,8 @@ Behavior:
 - fetches memes from `dokja-meme`
 - formats outbound content
 - delivers to the Discord interface delivery endpoint
+- `DISCORD_SCHEDULED_MEME_CHANNEL_ID` accepts a comma-separated list; every meme goes to every channel, and a failing channel is skipped for the rest of the run without blocking the others (the error is still returned)
+- `DISCORD_SAFE_ONLY_CHANNEL_IDS` (comma-separated, subset of the meme channels) marks channels that only receive memes the NSFW screen approved; every other channel receives everything. A meme with no NSFW label counts as unsafe there. Skipped memes are reported as `skipped_unsafe`.
 
 ### System / Ningo Status
 
@@ -204,3 +206,44 @@ The request ingress and HTTP bridge support:
 - book extraction by PDF / EPUB / MOBI is still a staged service concern; the first version focuses on classification and summary planning
 - the HTTP bridge contains some Discord-specific command mapping that should stay narrow
 - scheduled delivery currently targets Discord specifically through the interface delivery endpoint
+
+### Admin events
+
+- `meme.list` browses the pool without consuming it (`scope`, `limit`, `offset`).
+- `meme.screen` runs the NSFW screen on an image (`url`, optional `caption`).
+- `discord.send` posts to configured channels only. An image bound for a channel in
+  `DISCORD_SAFE_ONLY_CHANNEL_IDS` is screened first and skipped if flagged or if the screen fails.
+  `mark_sent: true` also flags the meme as sent so the scheduler does not repeat it.
+- `ningo.status` also reports the delivery channels (`meme`, `safe_only`).
+
+### Switches (services and jobs)
+
+Operator switches live in `VA_STATE_FILE` (a JSON file; `/data/dokja_state.json` in prod, where the
+orchestrator and scheduler share the `dokja-data` volume). They are read by all three ingresses, so access is
+guarded, and they survive restarts. A corrupt file starts every job paused rather than resuming posting.
+
+- `services.set` (`name`, `enabled`): `meme`, `chat_ai`, `book` or `scheduler` only. A disabled service makes the
+  orchestrator answer its events with `{"skipped": true, "reason": ...}` (not an error), never runs a
+  handler for them, and does not probe them in `ningo.status`. `discord.send` also stops using the meme
+  screen, so images bound for a safe-only channel are refused.
+- `scheduler.jobs.set` (`name`, `enabled` and/or `interval`): pauses a job by name, matched on the
+  `schedule` stamp the scheduler puts in `Context`. Manual runs carry no stamp and are not blocked by a
+  pause. Intervals are bounded to 1m..720h and picked up by the scheduler from the same state file.
+- `scheduler.jobs.announce`: sent by the scheduler about once a minute with each job's interval and next run.
+- `ningo.status` now returns `services` (with `enabled`), `jobs` (state, interval, last/next run) and `channels`.
+
+The request port (`5558`) has no authentication and is published on every interface, so anything that can
+reach it can flip these switches. Bind it to localhost (`127.0.0.1:5558:5558`) if the host is shared.
+
+### Chat profiles
+
+`DOKJA_DB_FILE` points at the shared SQLite database (`dokja_store`). The orchestrator opens it to list and
+select chat provider profiles and can do nothing else with them:
+
+- `chat.profiles.list`: profiles with base URL, model and a masked key hint (`…abcd`), plus the active one.
+  `ningo.status` carries the same summary as `chat_profiles`.
+- `chat.profile.use` (`name`): selects an existing profile.
+
+There is no event that creates or edits a profile, and no query in this process selects the `api_key` column, so
+a token cannot come out of the orchestrator (a test marshals every response and looks for it). Without
+`DOKJA_DB_FILE` these events answer with a configuration error and the chat service keeps its environment settings.

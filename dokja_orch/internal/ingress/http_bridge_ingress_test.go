@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"strings"
 	"testing"
 
 	"read_books/internal/core"
@@ -85,5 +86,33 @@ func TestExtractBridgeReplyFormatsMemeResult(t *testing.T) {
 	expected := "one\nhttps://example.com/1\n\ntwo\nhttps://example.com/2"
 	if reply != expected {
 		t.Fatalf("expected %q, got %q", expected, reply)
+	}
+}
+
+func TestExtractBridgeReplyReturnsSystemReply(t *testing.T) {
+	reply := extractBridgeReply(core.ProcessResult{
+		Result: map[string]any{
+			"system": map[string]any{
+				"reply": "Resumo de ontem:\n- item um",
+			},
+		},
+	})
+
+	expected := "Resumo de ontem:\n- item um"
+	if reply != expected {
+		t.Fatalf("expected %q, got %q", expected, reply)
+	}
+}
+
+func TestExtractBridgeReplyExplainsAnEventTheOperatorSwitchedOff(t *testing.T) {
+	reply := extractBridgeReply(core.ProcessResult{
+		Result: map[string]any{"skipped": true, "reason": "service chat_ai is disabled"},
+	})
+
+	if !strings.Contains(reply, "desligado") || !strings.Contains(reply, "service chat_ai is disabled") {
+		t.Fatalf("expected an explanation, got %q", reply)
+	}
+	if extractBridgeReply(core.ProcessResult{Result: map[string]any{}}) != "" {
+		t.Fatal("an ordinary empty result keeps its empty reply")
 	}
 }
