@@ -2,8 +2,8 @@ from chunker import chunk_text
 
 
 def test_a_short_document_is_one_chunk():
-    chunks = chunk_text("Uma ideia curta sobre estoicismo.")
-    assert [(c.position, c.heading, c.text) for c in chunks] == [(0, "", "Uma ideia curta sobre estoicismo.")]
+    chunks = chunk_text("A short idea about stoicism.")
+    assert [(c.position, c.heading, c.text) for c in chunks] == [(0, "", "A short idea about stoicism.")]
 
 
 def test_empty_or_blank_bodies_have_no_chunks():
@@ -13,17 +13,17 @@ def test_empty_or_blank_bodies_have_no_chunks():
 
 
 def test_chunks_carry_their_heading_path_and_never_cross_a_heading():
-    body = "# Etica\nAbertura da etica.\n\n## Virtude\nA virtude e um habito.\n\n# Logica\nRegras de inferencia."
+    body = "# Ethics\nOpening of ethics.\n\n## Virtue\nVirtue is a habit.\n\n# Logic\nRules of inference."
     chunks = chunk_text(body)
     assert [(c.heading, c.text) for c in chunks] == [
-        ("Etica", "Abertura da etica."),
-        ("Etica > Virtude", "A virtude e um habito."),
-        ("Logica", "Regras de inferencia."),
+        ("Ethics", "Opening of ethics."),
+        ("Ethics > Virtue", "Virtue is a habit."),
+        ("Logic", "Rules of inference."),
     ]
 
 
 def test_a_long_document_is_split_under_the_limit_with_a_shared_tail():
-    sentence = "Esta e uma frase de teste com varias palavras para encher espaco."
+    sentence = "This is a test sentence with several words to fill some space."
     body = "\n\n".join(f"{sentence} Numero {i}." for i in range(40))
     chunks = chunk_text(body, max_chars=400, overlap=80)
 
@@ -36,8 +36,8 @@ def test_a_long_document_is_split_under_the_limit_with_a_shared_tail():
 
 
 def test_a_single_huge_paragraph_is_split_by_sentence_and_then_by_word():
-    long_sentence = "palavra " * 500
-    chunks = chunk_text(f"Primeira frase curta. {long_sentence}", max_chars=300, overlap=0)
+    long_sentence = "word " * 500
+    chunks = chunk_text(f"First short sentence. {long_sentence}", max_chars=300, overlap=0)
     assert len(chunks) >= 3
     assert all(len(c.text) <= 300 for c in chunks)
 

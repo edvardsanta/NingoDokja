@@ -18,9 +18,16 @@ func main() {
 	refresh := flag.Duration("refresh", 5*time.Second, "How often the panel refreshes")
 	timeout := flag.Duration("timeout", 2*time.Minute, "How long to wait for one orchestrator answer")
 	images := flag.String("images", envOrDefault("DOKJA_TUI_IMAGES", "auto"), "Meme previews: auto, kitty, blocks or off")
-	startTab := flag.String("tab", "painel", "Tab to open: painel, memes, discord or historico")
+	startTab := flag.String("tab", "panel", "Tab to open: panel, memes, discord or history (the Portuguese names painel and historico also work)")
+	lang := flag.String("lang", "", "Interface language: en or pt (default: DOKJA_LANG, then the system locale, then en)")
 	dbPath := flag.String("db", "", "Shared database (default: DOKJA_DB_FILE or the repo .dokja/dokja.db); enables creating profiles here")
 	flag.Parse()
+
+	if *lang != "" {
+		tui.SetLanguage(*lang)
+	} else {
+		tui.SetLanguage(tui.DetectLanguage(os.Getenv))
+	}
 
 	output := tui.NewSafeOutput(os.Stdout)
 	model := tui.NewModel(tui.NewOrchestratorClient(*endpoint), *refresh, *timeout)

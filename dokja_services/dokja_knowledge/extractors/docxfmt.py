@@ -7,6 +7,8 @@ import re
 
 from . import ExtractError, Extracted, ZipBudget, local, open_zip, parse_xml
 
+# Word names its built-in heading styles in the language of the user interface, so the
+# common Portuguese names are recognised next to the English one.
 HEADING_STYLE = re.compile(r"^(?:heading|título|titulo)\s*([1-9])$", re.IGNORECASE)
 
 

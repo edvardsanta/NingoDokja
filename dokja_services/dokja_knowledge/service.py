@@ -42,6 +42,8 @@ RRF_K = 60
 DEFAULT_MIN_SCORE = 0.45
 DEFAULT_LEXICAL_COVERAGE = 0.75
 
+# Portuguese and English function words: they carry no meaning for keyword matching, and the
+# knowledge base is used with documents in both languages.
 STOPWORDS = frozenset(
     "a o as os um uma uns umas de do da dos das em no na nos nas por para com sem sobre entre "
     "e ou mas que se como qual quais quem onde quando porque pois ao aos ha ser sao foi era "

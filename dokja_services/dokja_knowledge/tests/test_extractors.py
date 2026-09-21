@@ -17,9 +17,9 @@ def registry():
 
 
 def test_text_takes_its_title_from_a_leading_heading_or_the_file_name(registry):
-    [doc] = registry.extract("notes.md", "﻿# Estoicismo\n\nA virtude basta.".encode())
-    assert (doc.title, doc.text.startswith("# Estoicismo")) == ("Estoicismo", True)
-    [doc] = registry.extract("ideas.txt", "sem cabeçalho".encode())
+    [doc] = registry.extract("notes.md", "﻿# Stoicism\n\nVirtue is enough.".encode())
+    assert (doc.title, doc.text.startswith("# Stoicism")) == ("Stoicism", True)
+    [doc] = registry.extract("ideas.txt", "no heading".encode())
     assert doc.title == "ideas"
     [doc] = registry.extract("late.md", b"prose first\n\n# Later")
     assert doc.title == "late"
@@ -47,9 +47,9 @@ def test_html_keeps_headings_and_lists_and_drops_chrome():
 
 
 def test_html_declared_charset_is_honoured(registry):
-    data = '<html><head><meta charset="latin-1"></head><body><p>ação</p></body></html>'.encode("latin-1")
+    data = '<html><head><meta charset="latin-1"></head><body><p>café</p></body></html>'.encode("latin-1")
     [doc] = registry.extract("page.html", data)
-    assert "ação" in doc.text
+    assert "café" in doc.text
 
 
 # ---- docx -------------------------------------------------------------------------------

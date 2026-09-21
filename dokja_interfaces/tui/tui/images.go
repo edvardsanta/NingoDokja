@@ -341,7 +341,7 @@ type VideoFramer func(ctx context.Context, data []byte) ([][]byte, error)
 func FFmpegFrames(ctx context.Context, data []byte) ([][]byte, error) {
 	binary, err := exec.LookPath("ffmpeg")
 	if err != nil {
-		return nil, errors.New("ffmpeg não encontrado: sem prévia de vídeo")
+		return nil, errors.New(tr("ffmpeg not found: no video preview"))
 	}
 	// mp4 files often keep their index at the end, so ffmpeg needs a seekable file.
 	file, err := os.CreateTemp("", "dokja-video-*")
@@ -369,7 +369,7 @@ func FFmpegFrames(ctx context.Context, data []byte) ([][]byte, error) {
 	}
 	frames := splitPNGs(output)
 	if len(frames) == 0 {
-		return nil, errors.New("ffmpeg não produziu frames")
+		return nil, errors.New(tr("ffmpeg produced no frames"))
 	}
 	return frames, nil
 }

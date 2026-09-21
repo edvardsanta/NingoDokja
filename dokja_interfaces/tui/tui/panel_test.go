@@ -286,11 +286,11 @@ func TestSchedulerRowSwitchesEverythingAndShowsWhetherItIsRunning(t *testing.T) 
 	}
 
 	fake.responses["ningo.status"]["services"].(map[string]any)["scheduler"] = map[string]any{
-		"status": "stopped", "enabled": true, "detail": "nunca anunciou (parado?)",
+		"status": "stopped", "enabled": true, "detail": "never announced (stopped?)",
 	}
 	press(m, "r")
 	view := m.View()
-	if !strings.Contains(view, "scheduler") || !strings.Contains(view, "parado") || !strings.Contains(view, "nunca anunciou") {
+	if !strings.Contains(view, "scheduler") || !strings.Contains(view, "parado") || !strings.Contains(view, "never announced") {
 		t.Fatalf("a scheduler that is not announcing must read as stopped:\n%s", view)
 	}
 

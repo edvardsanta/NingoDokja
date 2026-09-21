@@ -25,10 +25,10 @@ def test_the_server_answers_over_zeromq_and_reports_errors(tmp_path):
         return json.loads(client.recv_string())
 
     ingested = call({"type": "knowledge.ingest",
-                     "payload": {"title": "Nota", "body": "texto sobre estoicismo e virtude"}})
+                     "payload": {"title": "Note", "body": "text about stoicism and virtue"}})
     assert ingested["status"] == "ok" and ingested["result"]["created"] is True
-    found = call({"type": "knowledge.search", "payload": {"query": "estoicismo virtude"}})
-    assert found["result"]["hits"][0]["source_id"] == "note:nota"
+    found = call({"type": "knowledge.search", "payload": {"query": "stoicism virtue"}})
+    assert found["result"]["hits"][0]["source_id"] == "note:note"
     bad = call({"type": "knowledge.ingest", "payload": {"title": "", "body": "x"}})
     assert bad["status"] == "error" and "title" in bad["message"]
     assert call({"type": "nope"})["status"] == "error"

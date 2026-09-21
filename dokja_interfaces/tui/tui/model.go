@@ -24,7 +24,8 @@ const (
 	tabHistory
 )
 
-var tabNames = []string{"Painel", "Memes", "Discord", "Histórico"}
+// tabTitles is a function, not a variable, so it follows the language chosen at start-up.
+func tabTitles() []string { return []string{tr("Panel"), "Memes", "Discord", tr("History")} }
 
 type overlayKind int
 
@@ -153,7 +154,7 @@ type Model struct {
 
 func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	text := textinput.New()
-	text.Placeholder = "mensagem (opcional se houver imagem)"
+	text.Placeholder = tr("message (optional when there is an image)")
 	text.CharLimit = 1900
 	text.Width = 60
 	text.Focus()
@@ -164,7 +165,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	image.Width = 60
 
 	interval := textinput.New()
-	interval.Placeholder = "45m, 6h ou default"
+	interval.Placeholder = tr("45m, 6h or default")
 	interval.CharLimit = 16
 	interval.Width = 20
 
@@ -174,7 +175,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	dispatch.Width = 4
 
 	var form [4]textinput.Model
-	for i, placeholder := range []string{"nome (ex.: hosted)", "https://api.example.com/v1", "modelo", "token (não aparece na tela)"} {
+	for i, placeholder := range []string{tr("name (e.g. hosted)"), "https://api.example.com/v1", tr("model"), tr("token (not shown on screen)")} {
 		form[i] = textinput.New()
 		form[i].Placeholder = placeholder
 		form[i].Width = 46
@@ -206,14 +207,15 @@ func (m *Model) EnableImages(mode ImageMode, sink TerminalSink, fetch ImageFetch
 	m.images.mode, m.images.sink, m.images.fetch = mode, sink, fetch
 }
 
-// OpenTab makes the TUI start on the named tab (painel, memes, discord, historico).
+// OpenTab makes the TUI start on the named tab (panel, memes, discord, history; the
+// Portuguese names painel and historico are accepted too).
 func (m *Model) OpenTab(name string) {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "memes":
 		m.tab, m.startOnMemes = tabMemes, true
 	case "discord":
 		m.tab = tabDiscord
-	case "historico", "histórico":
+	case "history", "historico", "histórico":
 		m.tab = tabHistory
 	}
 }
@@ -232,7 +234,7 @@ func (m *Model) tickCmd() tea.Cmd {
 // begin claims the single in-flight slot.
 func (m *Model) begin(label string) bool {
 	if m.busy {
-		m.setNotice("aguarde: "+m.busyLabel+" em andamento", true)
+		m.setNotice("aguarde: "+m.busyLabel+tr(" in progress"), true)
 		return false
 	}
 	m.busy, m.busyLabel = true, label
@@ -246,7 +248,7 @@ func (m *Model) setNotice(text string, isErr bool) {
 // skippedError means the orchestrator understood the request but a switch is off.
 type skippedError struct{ reason string }
 
-func (e *skippedError) Error() string { return "recusado pelo orquestrador: " + e.reason }
+func (e *skippedError) Error() string { return tr("refused by the orchestrator: ") + e.reason }
 
 func (m *Model) request(eventType string, payload map[string]any) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
@@ -262,7 +264,7 @@ func (m *Model) request(eventType string, payload map[string]any) (map[string]an
 }
 
 func (m *Model) cmdStatus() tea.Cmd {
-	if !m.begin("atualizando painel") {
+	if !m.begin(tr("refreshing panel")) {
 		return nil
 	}
 	return func() tea.Msg {
@@ -286,7 +288,7 @@ func (m *Model) cmdStatus() tea.Cmd {
 }
 
 func (m *Model) cmdMemes() tea.Cmd {
-	if !m.begin("carregando memes") {
+	if !m.begin(tr("loading memes")) {
 		return nil
 	}
 	scope, offset := m.memes.scope, m.memes.page.Offset
@@ -300,7 +302,7 @@ func (m *Model) cmdMemes() tea.Cmd {
 }
 
 func (m *Model) cmdScreen(item memeItem) tea.Cmd {
-	if !m.begin("checando no filtro NSFW") {
+	if !m.begin(tr("checking the NSFW filter")) {
 		return nil
 	}
 	return func() tea.Msg {
@@ -394,7 +396,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.setNotice("filtro NSFW falhou: "+msg.err.Error(), true)
+			m.setNotice(tr("NSFW filter failed: ")+msg.err.Error(), true)
 			return m, nil
 		}
 		m.screen = &msg.data
@@ -404,7 +406,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.busy = false
 		if msg.err != nil {
 			m.addHistory(msg.action.label, msg.err.Error(), false)
-			m.setNotice(msg.action.label+" falhou: "+msg.err.Error(), true)
+			m.setNotice(msg.action.label+tr(" failed: ")+msg.err.Error(), true)
 			return m, nil
 		}
 		summary := "ok"
@@ -459,9 +461,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch key {
 	case "tab":
-		return m, m.gotoTab(tab((int(m.tab) + 1) % len(tabNames)))
+		return m, m.gotoTab(tab((int(m.tab) + 1) % len(tabTitles())))
 	case "shift+tab":
-		return m, m.gotoTab(tab((int(m.tab) + len(tabNames) - 1) % len(tabNames)))
+		return m, m.gotoTab(tab((int(m.tab) + len(tabTitles()) - 1) % len(tabTitles())))
 	}
 
 	switch m.tab {
@@ -573,10 +575,10 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 		m.dispatchInput.Focus()
 	case "R":
 		return m, m.exec(&pendingAction{
-			label:     "atualizar pool",
+			label:     tr("refresh pool"),
 			eventType: "meme.pool.refresh",
 			payload:   map[string]any{"max_items_per_scraper": 20},
-			summarize: func(map[string]any) string { return "pool atualizado" },
+			summarize: func(map[string]any) string { return tr("pool refreshed") },
 			reload:    true,
 		})
 	}
@@ -585,12 +587,12 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 
 func (m *Model) channelsOrNotice() []string {
 	if m.status == nil {
-		m.setNotice("canais ainda não carregados; abra o Painel e aguarde", true)
+		m.setNotice(tr("channels not loaded yet; open the Panel and wait"), true)
 		return nil
 	}
 	channels := m.status.Channels.destinations()
 	if len(channels) == 0 {
-		m.setNotice("nenhum canal configurado no orquestrador", true)
+		m.setNotice(tr("no channel configured in the orchestrator"), true)
 	}
 	return channels
 }
@@ -626,7 +628,7 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 	case "enter":
 		chosen := chosenChannels(channels, m.picker.selected)
 		if len(chosen) == 0 {
-			m.setNotice("marque ao menos um canal com espaço", true)
+			m.setNotice(tr("select at least one channel with space"), true)
 			return m, nil
 		}
 		item := m.picker.item
@@ -635,7 +637,7 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 			payload["mark_sent"] = true
 		}
 		m.askConfirm(&pendingAction{
-			label:     "enviar meme",
+			label:     tr("send meme"),
 			eventType: "discord.send",
 			payload:   payload,
 			lines:     append([]string{"Meme: " + trunc(item.Title, 60), "URL:  " + trunc(item.URL, 70), ""}, m.destinationLines(chosen)...),
@@ -657,18 +659,18 @@ func chosenChannels(all []string, selected map[string]bool) []string {
 }
 
 func (m *Model) destinationLines(chosen []string) []string {
-	lines := []string{"Enviar para:"}
+	lines := []string{tr("Send to:")}
 	restricted := false
 	for _, id := range chosen {
 		label := id
 		if m.status != nil && m.status.Channels.isSafeOnly(id) {
-			label += "  (só seguro: a imagem passa pelo filtro NSFW antes)"
+			label += tr("  (safe-only: the image goes through the NSFW filter first)")
 			restricted = true
 		}
 		lines = append(lines, "  • "+label)
 	}
 	if restricted {
-		lines = append(lines, "", "Se o filtro barrar, esse canal é pulado e o resto recebe.")
+		lines = append(lines, "", tr("If the filter blocks it, this channel is skipped and the rest receive it."))
 	}
 	return lines
 }
@@ -683,7 +685,7 @@ func (m *Model) keyConfirm(key string) (tea.Model, tea.Cmd) {
 	case "y", "Y", "enter":
 		if m.busy {
 			// Keep the confirmation open instead of silently dropping the action.
-			m.setNotice("aguarde: "+m.busyLabel+" em andamento", true)
+			m.setNotice("aguarde: "+m.busyLabel+tr(" in progress"), true)
 			return m, nil
 		}
 		action := m.pending
@@ -704,7 +706,7 @@ func (m *Model) keyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		count, err := strconv.Atoi(strings.TrimSpace(m.dispatchInput.Value()))
 		if err != nil || count < 1 || count > maxDispatchBatch {
-			m.setNotice(fmt.Sprintf("informe um número entre 1 e %d", maxDispatchBatch), true)
+			m.setNotice(tr("enter a number between 1 and %d", maxDispatchBatch), true)
 			return m, nil
 		}
 		channels := []string{}
@@ -713,10 +715,10 @@ func (m *Model) keyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.overlay = overlayNone
 		m.askConfirm(&pendingAction{
-			label:     fmt.Sprintf("disparar %d meme(s)", count),
+			label:     tr("dispatch %d meme(s)", count),
 			eventType: "meme.dispatch.scheduled",
 			payload:   map[string]any{"limit": count},
-			lines: append([]string{fmt.Sprintf("Sortear %d meme(s) do topo da fila e enviar para:", count)},
+			lines: append([]string{tr("Pick %d meme(s) from the top of the queue and send to:", count)},
 				m.destinationLines(channels)[1:]...),
 			summarize: summarizeDispatch,
 			reload:    true,
@@ -801,24 +803,24 @@ func (m *Model) confirmDiscordSend(channels []string) tea.Cmd {
 	chosen := chosenChannels(channels, m.form.selected)
 	switch {
 	case text == "" && image == "":
-		m.setNotice("escreva uma mensagem e/ou informe uma imagem", true)
+		m.setNotice(tr("write a message and/or provide an image"), true)
 		return nil
 	case len(chosen) == 0:
-		m.setNotice("marque ao menos um canal (espaço)", true)
+		m.setNotice(tr("select at least one channel (space)"), true)
 		return nil
 	}
 	payload := map[string]any{"channel_ids": chosen}
 	lines := []string{}
 	if text != "" {
 		payload["content"] = text
-		lines = append(lines, "Texto:  "+trunc(text, 70))
+		lines = append(lines, tr("Text:  ")+trunc(text, 70))
 	}
 	if image != "" {
 		payload["attachment_url"] = image
-		lines = append(lines, "Imagem: "+trunc(image, 70))
+		lines = append(lines, tr("Image: ")+trunc(image, 70))
 	}
 	m.askConfirm(&pendingAction{
-		label:     "enviar mensagem",
+		label:     tr("send message"),
 		eventType: "discord.send",
 		payload:   payload,
 		lines:     append(append(lines, ""), m.destinationLines(chosen)...),
@@ -866,7 +868,7 @@ func (m *Model) cmdSelectedImage() tea.Cmd {
 	video := isVideo(url)
 	if video && framer == nil {
 		delete(m.images.inflight, url)
-		m.images.remember(&preview{url: url, err: "vídeo: sem prévia (ffmpeg indisponível)"})
+		m.images.remember(&preview{url: url, err: tr("video: no preview (ffmpeg unavailable)")})
 		return nil
 	}
 	firstID, span := uint32(0), uint32(1)
@@ -937,7 +939,7 @@ func (m *Model) upload(p *preview) {
 		return
 	}
 	if err := m.images.sink.WriteRaw(p.transmit); err != nil {
-		p.err = "terminal recusou a imagem: " + err.Error()
+		p.err = tr("terminal refused the image: ") + err.Error()
 	}
 	p.uploaded, p.transmit = true, nil
 }
@@ -994,7 +996,7 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.askRunJob(row)
 		} else if ok {
-			m.setNotice("só jobs podem ser executados; selecione um job", true)
+			m.setNotice(tr("only jobs can be run; select a job"), true)
 		}
 	case "p":
 		m.openProfiles()
@@ -1002,7 +1004,7 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.openInterval(row.name)
 		} else if ok {
-			m.setNotice("só jobs têm intervalo; selecione um job", true)
+			m.setNotice(tr("only jobs have an interval; select a job"), true)
 		}
 	}
 	return m, nil
@@ -1011,7 +1013,7 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 // togglePending flips a service or job. It needs no confirmation: it posts nothing and
 // is undone by pressing the same key.
 func (m *Model) togglePending(row panelRow) *pendingAction {
-	eventType, kind := "services.set", "serviço"
+	eventType, kind := "services.set", tr("service")
 	if row.isJob {
 		eventType, kind = "scheduler.jobs.set", "job"
 	}
@@ -1043,22 +1045,22 @@ func (m *Model) askRunJob(row panelRow) {
 		m.setNotice(err.Error(), true)
 		return
 	}
-	lines := []string{"Rodar agora: " + row.name, ""}
+	lines := []string{tr("Run now: ") + row.name, ""}
 	if !row.enabled {
-		lines = append(lines, "O job está pausado; a execução manual ignora a pausa.", "")
+		lines = append(lines, tr("The job is paused; a manual run ignores the pause."), "")
 	}
 	if service, ok := m.status.service(jobService(row.name)); ok && !service.Enabled {
-		lines = append(lines, fmt.Sprintf("Atenção: o serviço %s está desligado e o orquestrador vai recusar.", service.Name), "")
+		lines = append(lines, tr("Warning: service %s is switched off and the orchestrator will refuse it.", service.Name), "")
 	}
 	summarize := func(map[string]any) string { return "executado" }
 	switch row.name {
 	case "meme.dispatch":
-		lines = append(lines, "Envia 1 meme (passa pelo filtro NSFW nos canais só-seguro) para:")
+		lines = append(lines, tr("Sends 1 meme (goes through the NSFW filter on safe-only channels) to:"))
 		lines = append(lines, m.destinationLines(m.status.Channels.Meme)[1:]...)
 		summarize = summarizeDispatch
 	}
 	m.askConfirm(&pendingAction{
-		label:     "rodar job " + row.name,
+		label:     tr("run job ") + row.name,
 		eventType: eventType,
 		payload:   payload,
 		lines:     lines,
@@ -1088,14 +1090,14 @@ func (m *Model) keyInterval(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.overlay = overlayNone
 		return m, m.exec(&pendingAction{
-			label:     "intervalo de " + m.intervalJob,
+			label:     tr("interval of ") + m.intervalJob,
 			eventType: "scheduler.jobs.set",
 			payload:   payload,
 			summarize: func(res map[string]any) string {
 				if interval := str(res, "interval"); interval != "" {
-					return "a cada " + interval
+					return tr("every ") + interval
 				}
-				return "voltou ao padrão"
+				return tr("back to the default")
 			},
 			reload: true,
 		})
@@ -1115,7 +1117,7 @@ func (m *Model) SetProfileStore(profiles ProfileStore) { m.profiles = profiles }
 
 func (m *Model) openProfiles() {
 	if m.status == nil {
-		m.setNotice("aguarde o painel carregar", true)
+		m.setNotice(tr("wait for the panel to load"), true)
 		return
 	}
 	m.profileCursor = 0
@@ -1145,16 +1147,16 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 			row := rows[m.profileCursor]
 			m.overlay = overlayNone
 			return m, m.exec(&pendingAction{
-				label:     "usar perfil de chat " + row.Name,
+				label:     tr("use chat profile ") + row.Name,
 				eventType: "chat.profile.use",
 				payload:   map[string]any{"name": row.Name},
-				summarize: func(map[string]any) string { return "ativo (vale na próxima mensagem)" },
+				summarize: func(map[string]any) string { return tr("active (applies from the next message)") },
 				reload:    true,
 			})
 		}
 	case "n":
 		if m.profiles == nil {
-			m.setNotice("sem acesso local ao banco: defina DOKJA_DB_FILE para criar perfis", true)
+			m.setNotice(tr("no local access to the database: set DOKJA_DB_FILE to create profiles"), true)
 			return m, nil
 		}
 		for i := range m.profileForm {
@@ -1166,7 +1168,7 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayProfileForm
 	case "d":
 		if m.profiles == nil {
-			m.setNotice("sem acesso local ao banco: defina DOKJA_DB_FILE para apagar perfis", true)
+			m.setNotice(tr("no local access to the database: set DOKJA_DB_FILE to delete profiles"), true)
 			return m, nil
 		}
 		if m.profileCursor < len(rows) {
@@ -1177,20 +1179,20 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) askDeleteProfile(row profileRow) {
-	lines := []string{"Apagar o perfil " + row.Name + " (" + row.Model + ")?", ""}
+	lines := []string{tr("Delete profile ") + row.Name + " (" + row.Model + ")?", ""}
 	if row.Active {
-		lines = append(lines, "É o perfil ATIVO: o chat volta a usar as variáveis CHAT_AI_* do ambiente.", "")
+		lines = append(lines, tr("This is the ACTIVE profile: chat goes back to the CHAT_AI_* environment variables."), "")
 	}
-	lines = append(lines, "Isso remove o token do banco local. Não dá pra desfazer.")
+	lines = append(lines, tr("This removes the token from the local database. It cannot be undone."))
 	m.overlay = overlayConfirm
 	m.pending = &pendingAction{
-		label: "apagar perfil " + row.Name,
+		label: tr("delete profile ") + row.Name,
 		lines: lines,
 		local: func() (string, error) {
 			if err := m.profiles.DeleteProfile(row.Name, row.Active); err != nil {
 				return "", err
 			}
-			return "apagado", nil
+			return tr("deleted"), nil
 		},
 		reload: true,
 	}
@@ -1239,7 +1241,7 @@ func (m *Model) saveProfileForm() tea.Cmd {
 	}
 	m.profileForm[3].SetValue("")
 	m.overlay = overlayProfiles
-	m.addHistory("criar perfil "+profile.Name, "salvo no banco local", true)
-	m.setNotice("perfil "+profile.Name+" salvo; enter no perfil para ativá-lo", false)
+	m.addHistory(tr("create profile ")+profile.Name, tr("saved in the local database"), true)
+	m.setNotice(tr("profile ")+profile.Name+tr(" saved; press enter on the profile to activate it"), false)
 	return m.cmdStatus()
 }
