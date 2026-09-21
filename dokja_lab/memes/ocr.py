@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from logging_config import get_logger
 
@@ -16,16 +17,16 @@ MODEL_FILES = {
 
 
 class TextReader:
-    def __init__(self, model_dir: str | None = None, engine=None):
+    def __init__(self, model_dir: str | None = None, engine: Any = None) -> None:
         self.model_dir = model_dir or None
         self._engine = engine
 
-    def read(self, image) -> str:
+    def read(self, image: Any) -> str:
         """Return the text found in a BGR image array, one detected line per row."""
         result, _ = self._get_engine()(image)
         return "\n".join(line[1] for line in (result or []))
 
-    def _get_engine(self):
+    def _get_engine(self) -> Any:
         if self._engine is not None:
             return self._engine
 
