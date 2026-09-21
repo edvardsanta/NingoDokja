@@ -69,7 +69,8 @@ services:
     environment:
       MEME_SERVICE_ENDPOINT: tcp://*:5557
       MEME_SERVICE_DB_FILE: /workspace/ningo_memory.db
-      MEME_SERVICE_SCRAPERS: memedroid
+      # Empty means every scraper your own dokja_lab/config.py defines; set it to pick some.
+      MEME_SERVICE_SCRAPERS: ${MEME_SERVICE_SCRAPERS:-}
       DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
       DOKJA_OCR_MODEL_DIR: /models/rapidocr
       MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
