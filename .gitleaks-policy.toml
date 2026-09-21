@@ -106,5 +106,5 @@ keywords = ["/home/", "/users/"]
 [[rules]]
 id = "dokja-avoided-term"
 description = "Name of a real site, provider or event the project decided not to tie itself to"
-regex = '''(?i)\b(world ?cup|copa do mundo|fifa|folha|memedroid|openrouter)\b'''
-keywords = ["cup", "copa", "fifa", "folha", "memedroid", "openrouter"]
+regex = '''(?i)(?:\b(world ?cup|copa do mundo|fifa|folha|memedroid|openrouter)\b|br[_-]match)'''
+keywords = ["cup", "copa", "fifa", "folha", "memedroid", "openrouter", "br_match", "br-match"]
