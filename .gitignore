@@ -66,3 +66,6 @@ models/
 **/models/models--*/
 # Operator switches written by the orchestrator
 .dokja/
+
+# Knowledge base plugins are user-owned and kept out of the repository
+dokja_services/dokja_knowledge/plugins.local/

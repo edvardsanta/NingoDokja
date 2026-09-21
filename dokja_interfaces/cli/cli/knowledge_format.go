@@ -8,6 +8,15 @@ import (
 
 // FormatIngest is the one-line report for an added file.
 func FormatIngest(name string, answer map[string]any) string {
+	if _, ok := answer["documents"].([]any); ok {
+		line := fmt.Sprintf("added  %s: %v entries (%v new, %v unchanged), %v chunks",
+			name, answer["count"], answer["created"], answer["unchanged"], answer["chunks"])
+		if answer["degraded"] == true {
+			reason, _ := answer["reason"].(string)
+			line += fmt.Sprintf("; keyword search only (%s), run 'knowledge reindex' later", reason)
+		}
+		return line
+	}
 	sourceID, _ := answer["source_id"].(string)
 	switch {
 	case answer["changed"] == false:

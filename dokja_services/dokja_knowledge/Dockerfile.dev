@@ -2,6 +2,6 @@ FROM docker.io/python:3.13-slim
 
 WORKDIR /workspace
 
-RUN pip install --no-cache-dir numpy pyzmq pytest
+RUN pip install --no-cache-dir numpy pyzmq pypdf pytest
 
 CMD ["python", "dokja_services/dokja_knowledge/main.py"]

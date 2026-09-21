@@ -9,16 +9,23 @@ caller that injects context into a prompt must only use hits marked relevant.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import logging
+import posixpath
 import re
 import unicodedata
+from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import numpy as np
 
+import fetch as fetcher_module
 from chunker import chunk_text
 from embedder import EmbedUnavailable
+from extractors import ExtractError, Registry, default_registry
 from store import Store
 
 logger = logging.getLogger("dokja_knowledge.service")
@@ -28,6 +35,7 @@ KIND = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 MAX_BODY_CHARS = 2_000_000
 MAX_TITLE_CHARS = 300
 MAX_QUERY_CHARS = 2_000
+MAX_UPLOAD_BYTES = 20_000_000
 CANDIDATES = 30
 RRF_K = 60
 # Provisional: measured with bge-m3 on a three-document corpus (see README).
@@ -61,10 +69,28 @@ def slug(title: str) -> str:
     return text[:120] or "untitled"
 
 
+def _safe(text: str) -> str:
+    """Keep to the characters a source id accepts, and to a length that leaves room for a suffix."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-")[:120] or "item"
+
+
+@dataclass(frozen=True)
+class _Document:
+    title: str
+    body: str
+    source_ref: str = ""
+    default_id: str = ""
+    key: str = ""
+
+
 class KnowledgeService:
     def __init__(self, store: Store, embedder=None, model: str = "bge-m3",
                  min_score: float = DEFAULT_MIN_SCORE,
-                 lexical_coverage: float = DEFAULT_LEXICAL_COVERAGE):
+                 lexical_coverage: float = DEFAULT_LEXICAL_COVERAGE,
+                 registry: Registry | None = None, fetch_enabled: bool = True, fetcher=None):
+        self.registry = registry if registry is not None else default_registry()
+        self.fetch_enabled = fetch_enabled
+        self._fetch = fetcher if fetcher is not None else fetcher_module.fetch
         self.store = store
         self.embedder = embedder
         self.model = model
@@ -93,24 +119,63 @@ class KnowledgeService:
     # ---- ingest ---------------------------------------------------------------------
 
     def ingest(self, payload: dict) -> dict:
+        """Store one document, or every entry of a multi-document source such as a feed.
+
+        The text comes from `body`, from an uploaded file (`content_b64` and `filename`) or
+        from a `source`: an http(s) address, or a scheme handled by a user plugin.
+        """
+        kind = str(payload.get("kind") or "note").strip().lower()
+        if not KIND.match(kind):
+            raise ValueError("kind must be a short lowercase word such as note, article or book")
+        tags = self._tags(payload.get("tags"))
+        explicit_id = str(payload.get("source_id") or "").strip()
+        if explicit_id and not SOURCE_ID.match(explicit_id):
+            raise ValueError("source_id may only use letters, digits and . _ : / # @ -")
+        override_ref = str(payload.get("source_ref") or "").strip()[:2000]
         title = str(payload.get("title") or "").strip()
-        body = str(payload.get("body") or "")
-        if not title or len(title) > MAX_TITLE_CHARS:
+
+        documents = self._documents(payload, title, override_ref)
+        results = []
+        for index, document in enumerate(documents):
+            if len(documents) == 1:
+                source_id = explicit_id or document.default_id or f"{kind}:{slug(document.title)}"
+            else:
+                base = explicit_id or document.default_id
+                source_id = f"{base}#{hashlib.sha1(document.key.encode()).hexdigest()[:10]}"
+            if not SOURCE_ID.match(source_id):
+                raise ValueError("source_id may only use letters, digits and . _ : / # @ -")
+            results.append(self._store(document, kind, override_ref or document.source_ref, source_id, tags))
+
+        embedded, degraded, reason = 0, False, ""
+        if any(result["changed"] for result in results):
+            embedded, degraded, reason = self._embed_pending()
+        for result in results:
+            if result["changed"]:
+                result.update(embedded=embedded, degraded=degraded)
+                if reason:
+                    result["reason"] = reason
+        if len(results) == 1:
+            return results[0]
+        summary = {
+            "documents": results, "count": len(results),
+            "created": sum(1 for r in results if r["created"]),
+            "unchanged": sum(1 for r in results if not r["changed"]),
+            "chunks": sum(r.get("chunks", 0) for r in results),
+            "embedded": embedded, "degraded": degraded,
+        }
+        if reason:
+            summary["reason"] = reason
+        return summary
+
+    def _store(self, document: "_Document", kind: str, source_ref: str, source_id: str, tags: list[str]) -> dict:
+        title = document.title.strip()[:MAX_TITLE_CHARS]
+        body = document.body
+        if not title:
             raise ValueError(f"title is required (up to {MAX_TITLE_CHARS} characters)")
         if not body.strip():
             raise ValueError("body is required")
         if len(body) > MAX_BODY_CHARS:
             raise ValueError(f"body is larger than {MAX_BODY_CHARS} characters")
-
-        kind = str(payload.get("kind") or "note").strip().lower()
-        if not KIND.match(kind):
-            raise ValueError("kind must be a short lowercase word such as note, article or book")
-        source_ref = str(payload.get("source_ref") or "").strip()[:2000]
-        source_id = str(payload.get("source_id") or "").strip() or f"{kind}:{slug(title)}"
-        if not SOURCE_ID.match(source_id):
-            raise ValueError("source_id may only use letters, digits and . _ : / # @ -")
-        tags = self._tags(payload.get("tags"))
-
         digest = hashlib.sha256(
             json.dumps([title, kind, source_ref, tags, body], ensure_ascii=False).encode()
         ).hexdigest()
@@ -118,19 +183,82 @@ class KnowledgeService:
         if existing is not None and existing["content_hash"] == digest:
             return {"source_id": source_id, "created": False, "changed": False,
                     "pending_embeddings": len(self.store.chunks_needing_embedding(self.model))}
-
         chunks = chunk_text(body)
         if not chunks:
             raise ValueError("the document has no text to store")
         document_id, created = self.store.replace_document(
             source_id, title, kind, source_ref, ",".join(tags), digest, chunks
         )
-        embedded, degraded, reason = self._embed_pending()
-        result = {"source_id": source_id, "document_id": document_id, "created": created,
-                  "changed": True, "chunks": len(chunks), "embedded": embedded, "degraded": degraded}
-        if reason:
-            result["reason"] = reason
-        return result
+        return {"source_id": source_id, "document_id": document_id, "created": created,
+                "changed": True, "chunks": len(chunks)}
+
+    # ---- where the text comes from --------------------------------------------------
+
+    def _documents(self, payload: dict, title: str, override_ref: str) -> "list[_Document]":
+        body = str(payload.get("body") or "")
+        upload = payload.get("content_b64")
+        source = str(payload.get("source") or "").strip()
+        given = [name for name, value in (("body", body.strip()), ("content_b64", upload), ("source", source)) if value]
+        if len(given) != 1:
+            raise ValueError("send exactly one of body, content_b64 (with filename) or source")
+        if body.strip():
+            if not title or len(title) > MAX_TITLE_CHARS:
+                raise ValueError(f"title is required (up to {MAX_TITLE_CHARS} characters)")
+            return [_Document(title, body)]
+        if upload:
+            return self._from_upload(str(upload), str(payload.get("filename") or ""), title)
+        return self._from_source(source, title)
+
+    def _from_upload(self, encoded: str, filename: str, title: str) -> "list[_Document]":
+        name = posixpath.basename(filename.replace("\\", "/")).strip()
+        if not name:
+            raise ValueError("filename is required with content_b64")
+        if len(encoded) > MAX_UPLOAD_BYTES * 4 // 3 + 16:
+            raise ValueError(f"the file is larger than {MAX_UPLOAD_BYTES} bytes")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as err:
+            raise ValueError("content_b64 is not valid base64") from err
+        extracted = self.registry.extract(name, data)
+        base = "file:" + _safe(name)
+        return self._wrap(extracted, title, base, "")
+
+    def _from_source(self, source: str, title: str) -> "list[_Document]":
+        scheme = urlsplit(source).scheme.lower()
+        if scheme in ("http", "https"):
+            if not self.fetch_enabled:
+                raise ValueError("fetching addresses is switched off (KNOWLEDGE_FETCH=off)")
+            fetched = self._fetch(source)
+            name = posixpath.basename(urlsplit(fetched.url).path) or "page"
+            extracted = self.registry.extract(name, fetched.data, fetched.content_type)
+            parts = urlsplit(fetched.url)
+            base = "url:" + _safe(parts.netloc + parts.path) + "-" + hashlib.sha1(fetched.url.encode()).hexdigest()[:8]
+            return self._wrap(extracted, title, base, fetched.url)
+        handler = self.registry.fetcher(scheme) if scheme else None
+        if handler is None:
+            raise ValueError(
+                f"no fetcher is registered for {scheme + ':' if scheme else 'this kind of source'}; "
+                "add one as a plugin (see KNOWLEDGE_PLUGINS_DIR)"
+            )
+        try:
+            data, name = handler(source)
+        except ValueError:
+            raise
+        except Exception as err:  # a user plugin failing must not take the request handler down
+            raise ValueError(f"the {scheme}: fetcher failed: {type(err).__name__}") from err
+        extracted = self.registry.extract(str(name), data)
+        base = "src:" + _safe(source) + "-" + hashlib.sha1(source.encode()).hexdigest()[:8]
+        return self._wrap(extracted, title, base, source)
+
+    @staticmethod
+    def _wrap(extracted, title: str, base: str, ref: str) -> "list[_Document]":
+        if len(extracted) == 1:
+            entry = extracted[0]
+            return [_Document(title or entry.title, entry.text, entry.source_ref or ref, base, entry.key)]
+        return [
+            _Document(entry.title, entry.text, entry.source_ref or ref, base, entry.key or entry.title)
+            for entry in extracted
+        ]
 
     @staticmethod
     def _tags(raw) -> list[str]:
@@ -274,4 +402,5 @@ class KnowledgeService:
             reachable = self.embedder.reachable()
         return {**stats, "pending_embeddings": stats["chunks"] - stats["embedded"],
                 "embed_model": self.model, "embedder_reachable": reachable,
-                "threshold": self.min_score}
+                "threshold": self.min_score, "formats": self.registry.extensions,
+                "fetchers": self.registry.schemes, "fetch_enabled": self.fetch_enabled}

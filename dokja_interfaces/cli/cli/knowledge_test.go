@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -64,11 +65,13 @@ func TestReadKnowledgeFileTitleFallbacks(t *testing.T) {
 
 func TestReadKnowledgeFileRejectsWhatItCannotStore(t *testing.T) {
 	cases := map[string][]byte{
-		"a.pdf":   []byte("%PDF-1.4"),
+		"a.zip":   []byte("PK"),
+		"run.exe": []byte("MZ"),
 		"b.md":    {0xff, 0xfe, 0x00, 0x41},
 		"c.txt":   []byte("   \n\n"),
 		"d.txt":   []byte("tem\x00nulo"),
 		"big.txt": []byte(strings.Repeat("a", maxKnowledgeFileBytes+1)),
+		"e.pdf":   {},
 	}
 	for name, content := range cases {
 		if _, err := ReadKnowledgeFile(writeFile(t, name, content), "", "note", nil); err == nil {
@@ -77,6 +80,66 @@ func TestReadKnowledgeFileRejectsWhatItCannotStore(t *testing.T) {
 	}
 	if _, err := ReadKnowledgeFile(filepath.Join(t.TempDir(), "missing.md"), "", "note", nil); err == nil {
 		t.Fatal("expected a missing file error")
+	}
+}
+
+func TestBinaryFormatsAreSentAsUploadsForTheServiceToExtract(t *testing.T) {
+	raw := []byte("%PDF-1.4 not really parsed here")
+	document, err := ReadKnowledgeFile(writeFile(t, "Rate paper.PDF", raw), "", "paper", []string{"macro"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	payload := document.Payload()
+	decoded, _ := base64.StdEncoding.DecodeString(payload["content_b64"].(string))
+	if string(decoded) != string(raw) || payload["filename"] != "Rate paper.PDF" {
+		t.Fatalf("the file must travel as it is, got %#v", payload)
+	}
+	if _, has := payload["body"]; has {
+		t.Fatal("an upload must not also carry a body")
+	}
+	if _, has := payload["title"]; has {
+		t.Fatal("without --title the service uses the document's own title")
+	}
+	if payload["source_id"] != "file:Rate-paper.PDF" || payload["kind"] != "paper" {
+		t.Fatalf("unexpected payload %#v", payload)
+	}
+
+	titled, _ := ReadKnowledgeFile(writeFile(t, "a.docx", []byte("zip")), " Memo ", "note", nil)
+	if titled.Payload()["title"] != "Memo" {
+		t.Fatalf("an explicit title must be sent, got %#v", titled.Payload())
+	}
+	for _, extension := range []string{".epub", ".html", ".htm", ".xml", ".rss", ".atom"} {
+		if _, err := ReadKnowledgeFile(writeFile(t, "x"+extension, []byte("data")), "", "note", nil); err != nil {
+			t.Fatalf("%s should be accepted: %v", extension, err)
+		}
+	}
+}
+
+func TestIsKnowledgeSourceTellsAddressesAndSchemesFromFiles(t *testing.T) {
+	existing := writeFile(t, "odd:name.md", []byte("x"))
+	cases := map[string]bool{
+		"https://docs.example/a": true,
+		"HTTP://docs.example/a":  true,
+		"inbox:2024/note":        true,
+		"notes.md":               false,
+		"./notes.md":             false,
+		"dir/notes.md":           false,
+		"C":                      false,
+		"-":                      false,
+		existing:                 false, // an existing file wins over the scheme shape
+	}
+	for arg, want := range cases {
+		if got := IsKnowledgeSource(arg); got != want {
+			t.Errorf("IsKnowledgeSource(%q) = %v, want %v", arg, got, want)
+		}
+	}
+}
+
+func TestASourceIsSentForTheServiceToFetch(t *testing.T) {
+	payload := NewKnowledgeSource("  https://docs.example/a ", " Note ", "article", []string{"macro"}).Payload()
+	want := map[string]any{"source": "https://docs.example/a", "title": "Note", "kind": "article", "tags": []string{"macro"}}
+	if !reflect.DeepEqual(payload, want) {
+		t.Fatalf("unexpected payload %#v", payload)
 	}
 }
 
@@ -149,6 +212,7 @@ func TestFormatIngestSaysWhatHappened(t *testing.T) {
 		{map[string]any{"source_id": "file:a.md", "created": false, "changed": true, "chunks": 4.0, "degraded": false}, "updated"},
 		{map[string]any{"source_id": "file:a.md", "created": false, "changed": false}, "unchanged"},
 		{map[string]any{"source_id": "file:a.md", "created": true, "changed": true, "chunks": 4.0, "degraded": true, "reason": "unreachable"}, "knowledge reindex"},
+		{map[string]any{"documents": []any{map[string]any{}, map[string]any{}}, "count": 2.0, "created": 1.0, "unchanged": 1.0, "chunks": 5.0, "degraded": false}, "2 entries (1 new, 1 unchanged)"},
 	}
 	for _, tc := range cases {
 		if got := FormatIngest("a.md", tc.answer); !strings.Contains(got, tc.want) {
