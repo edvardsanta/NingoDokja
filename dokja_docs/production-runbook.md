@@ -51,6 +51,14 @@ Start the full stack:
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
+The orchestrator is the hub: the interfaces and the scheduler connect to it, and it does not depend on
+the services it calls. It opens a connection per request and reports a service that is down as
+unavailable, so it can run alone or with only the services you want, for example:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d dokja-orchestrator dokja-meme
+```
+
 Check status:
 
 ```bash

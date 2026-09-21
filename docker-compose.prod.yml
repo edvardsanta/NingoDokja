@@ -26,9 +26,6 @@ services:
       - "5555:5555"
       - "5558:5558"
       - "8091:8091"
-    depends_on:
-      - dokja-meme
-      - dokja-chat-ai
     networks:
       - dokja-net
 
