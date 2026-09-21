@@ -28,10 +28,26 @@ func (r *RuleBasedEventRouter) Route(_ context.Context, event Event) (Route, err
 			Workflow: "meme-dispatch",
 			Domains:  []Domain{DomainSystem},
 		}, nil
+	case eventType == "services.set", eventType == "scheduler.jobs.set", eventType == "scheduler.jobs.announce",
+		eventType == "chat.profiles.list", eventType == "chat.profile.use":
+		return Route{
+			Workflow: "admin",
+			Domains:  []Domain{DomainSystem},
+		}, nil
+	case eventType == "discord.send":
+		return Route{
+			Workflow: "discord-send",
+			Domains:  []Domain{DomainSystem},
+		}, nil
 	case strings.HasPrefix(eventType, "book."):
 		return Route{
 			Workflow: "book",
 			Domains:  []Domain{DomainBook},
+		}, nil
+	case strings.HasPrefix(eventType, "knowledge."):
+		return Route{
+			Workflow: "knowledge",
+			Domains:  []Domain{DomainKnowledge},
 		}, nil
 	case strings.HasPrefix(eventType, "ningo."):
 		return Route{

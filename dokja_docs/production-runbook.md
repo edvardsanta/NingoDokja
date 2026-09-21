@@ -14,6 +14,7 @@ Production stack:
 - `dokja-orchestrator`
 - `dokja-meme`
 - `dokja-chat-ai`
+- `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-discord`
 - `dokja-scheduler`
 
@@ -100,6 +101,65 @@ The scheduler must not talk to Discord directly.
 
 The orchestrator owns the delivery workflow.
 
+## Operator State and Shared Database
+
+The orchestrator, scheduler and chat service share the `dokja-data` volume, mounted at `/data`:
+
+- `/data/dokja_state.json` (`VA_STATE_FILE` in the orchestrator, `DOKJA_STATE_FILE` in the scheduler):
+  which services and scheduler jobs an operator switched off and any job interval overrides. The
+  orchestrator writes it; the scheduler only reads the intervals. A corrupt file starts every job paused.
+- `/data/dokja.db` (`DOKJA_DB_FILE`): SQLite database with the chat provider profiles (base URL, model
+  and token). Keep the volume private: the token is stored in plain text.
+
+Without a writable volume both files would be lost on every deploy.
+
+Startup still emits every scheduled job once, but the orchestrator skips the ones an operator paused, so a
+restart never posts something that was switched off. `dokja-cli services list` and `dokja-cli jobs list` show
+the current state.
+
+Chat profiles are created and removed on the machine that holds the database (`dokja-cli chat profile add`
+with `DOKJA_DB_FILE` pointing at it, or `p` in the TUI panel), never through the orchestrator. The
+orchestrator can only list them (masked) and select one, and the chat service picks the selection up on its
+next request.
+
+## Research Knowledge Base
+
+`dokja-knowledge` stores the documents the operator feeds in and finds them by meaning and by keyword. Its
+SQLite file is `/data/dokja_knowledge.db` on the `dokja-data` volume (separate from `dokja.db`). Embeddings
+come from `bge-m3` on `dokja-ollama`, which keeps its models in the `dokja-ollama` volume. After the first
+deploy, pull the model once:
+
+```sh
+docker compose -f docker-compose.prod.yml exec dokja-ollama ollama pull bge-m3
+```
+
+Without it, or while `dokja-ollama` is down, the service still ingests and searches by keyword only and
+reports `degraded`; `knowledge.reindex` embeds what was missed. Changing `DOKJA_EMBED_MODEL` also needs a
+reindex. `KNOWLEDGE_MIN_SCORE` (default `0.45`) decides which hits count as relevant; it was measured on a
+tiny corpus, so retune it once the base has real content.
+
+Port `5561` is published on `127.0.0.1` only: the notes are private and the service has no authentication.
+On every Discord message the orchestrator looks the question up and gives the chat model only the relevant
+hits, then ends the reply with the sources it consulted. Switching `knowledge` off (`dokja-cli services`)
+stops both that lookup and the `knowledge.*` events; chat keeps working either way.
+
+## NSFW Screening for Memes
+
+The meme service labels each meme with an NSFW verdict, and channels in `DISCORD_SAFE_ONLY_CHANNEL_IDS`
+only receive memes that passed. It needs two read-only model folders, mounted from `DOKJA_MODELS_DIR`
+(`nudenet/320n.onnx` and `rapidocr/*.onnx`). The compose default is a path on the development machine, so
+set `DOKJA_MODELS_DIR` in [.env.prod](../.env.prod). If the models are missing the screen fails closed:
+safe-only channels receive nothing, other channels are unaffected. `MEME_NSFW_EXTRA_WORDS` adds words to the
+blacklist. `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) makes the delivery server
+post to those channels through a webhook instead of the bot; the URLs are credentials, keep them in the
+env file only.
+
+## Security Notes
+
+The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone
+who can reach it can flip the switches above and run manual deliveries. Bind it to localhost
+(`127.0.0.1:5558:5558`) on shared hosts.
+
 ## Common Failure Checks
 
 ### Discord issues
@@ -120,6 +180,8 @@ Check:
 - `CHAT_AI_API_KEY`
 - `CHAT_AI_BASE_URL`
 - `CHAT_AI_MODEL`
+- the selected chat provider profile (see "Operator state and shared database"); it wins over the
+  `CHAT_AI_*` variables, and `GET /health` on the chat service reports which one is in use
 
 ### Scheduled delivery issues
 

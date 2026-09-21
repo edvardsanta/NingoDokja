@@ -16,8 +16,14 @@ services:
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT:-tcp://dokja-meme:5557}
       BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
+      DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
+      # Operator switches (services on/off, job pause, intervals); shared with the scheduler.
+      VA_STATE_FILE: /workspace/.dokja/state.json
+      # Shared SQLite: chat provider profiles (the token never crosses the orchestrator).
+      DOKJA_DB_FILE: /workspace/.dokja/dokja.db
       GOCACHE: /tmp/go-build
     volumes:
       - ./:/workspace
@@ -67,12 +73,45 @@ services:
       MEME_SERVICE_ENDPOINT: tcp://*:5557
       MEME_SERVICE_DB_FILE: /workspace/ningo_memory.db
       MEME_SERVICE_SCRAPERS: memedroid
+      DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
+      DOKJA_OCR_MODEL_DIR: /models/rapidocr
+      MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
     ports:
       - "5557:5557"
     networks:
       - dokja-net
     volumes:
       - ./:/workspace
+      - ${DOKJA_MODELS_DIR:-./.dokja/models}:/models:ro
+
+  dokja-knowledge:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_knowledge/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_knowledge
+    command: python main.py
+    environment:
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://*:5561
+      KNOWLEDGE_DB_FILE: /workspace/.dokja/dokja_knowledge.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      KNOWLEDGE_MIN_SCORE: ${KNOWLEDGE_MIN_SCORE:-0.45}
+    ports:
+      - "127.0.0.1:5561:5561"
+    depends_on:
+      - dokja-ollama
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
+
+  dokja-ollama:
+    image: docker.io/ollama/ollama:latest
+    volumes:
+      # Reuses the models already pulled on this machine (bge-m3 is ~1.2 GB).
+      - ${OLLAMA_MODELS_DIR:-${HOME}/.ollama}:/root/.ollama
+    networks:
+      - dokja-net
 
   dokja-chat-ai:
     build:
@@ -86,6 +125,7 @@ services:
       CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
       CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
       CHAT_AI_MODEL: ${CHAT_AI_MODEL}
+      DOKJA_DB_FILE: /workspace/.dokja/dokja.db
     volumes:
       - ./:/workspace
     ports:
@@ -129,8 +169,32 @@ services:
       DOKJA_ORCH_ENDPOINT: tcp://dokja-orchestrator:5555
       DOKJA_ORCH_REQUEST_ENDPOINT: tcp://dokja-orchestrator:5558
       GOCACHE: /tmp/go-build
+      DOKJA_DB_FILE: /workspace/.dokja/dokja.db
     volumes:
       - ./:/workspace
+    networks:
+      - dokja-net
+
+
+  dokja-tui:
+    build:
+      context: .
+      dockerfile: dokja_interfaces/cli/Dockerfile.dev
+    working_dir: /workspace/dokja_interfaces/tui
+    entrypoint: ["/usr/local/go/bin/go", "run", "./cmd/dokja-tui"]
+    environment:
+      DOKJA_ORCH_REQUEST_ENDPOINT: tcp://dokja-orchestrator:5558
+      # The container gets a plain TERM; these let the TUI recognise a kitty-protocol terminal.
+      TERM: xterm-256color
+      COLORTERM: ${COLORTERM:-truecolor}
+      KITTY_WINDOW_ID: ${KITTY_WINDOW_ID:-}
+      TERM_PROGRAM: ${TERM_PROGRAM:-}
+      GOCACHE: /tmp/go-build
+      DOKJA_DB_FILE: /workspace/.dokja/dokja.db
+    volumes:
+      - ./:/workspace
+    stdin_open: true
+    tty: true
     networks:
       - dokja-net
 
@@ -141,6 +205,7 @@ services:
     working_dir: /workspace/dokja_interfaces/discord
     command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
     environment:
+      CI: "true"
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
@@ -148,6 +213,7 @@ services:
       DOKJA_DISCORD_DELIVERY_PORT: 8092
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}
+      DOKJA_DISCORD_WEBHOOKS: ${DOKJA_DISCORD_WEBHOOKS:-}
       DISCORD_DM_POLICY: ${DISCORD_DM_POLICY:-open}
     volumes:
       - ./:/workspace
@@ -171,6 +237,8 @@ services:
       DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD: ${DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD:-15s}
       DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS: ${DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS:-20}
       DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT: ${DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT:-1}
+      DOKJA_SCHEDULER_BR_MATCH_CHECK_INTERVAL: ${DOKJA_SCHEDULER_BR_MATCH_CHECK_INTERVAL:-30m}
+      DOKJA_STATE_FILE: /workspace/.dokja/state.json
       GOCACHE: /tmp/go-build
     volumes:
       - ./:/workspace

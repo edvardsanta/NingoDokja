@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from openai_chat_service import OpenAIChatService
+from profiles import ChatServiceProvider, CredentialSource, NotConfigured
 
 logger = logging.getLogger("dokja_chat_ai.http")
 
@@ -33,21 +33,16 @@ class ChatMessage(BaseModel):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info(
-        "starting chat ai server host=%s port=%s model=%s base_url=%s",
+        "starting chat ai server host=%s port=%s db=%s",
         os.getenv("CHAT_AI_SERVICE_HOST", "0.0.0.0"),
         os.getenv("CHAT_AI_SERVICE_PORT", "8080"),
-        os.getenv("CHAT_AI_MODEL", "n/a"),
-        os.getenv("CHAT_AI_BASE_URL", ""),
+        os.getenv("DOKJA_DB_FILE", "(none, environment settings only)"),
     )
     yield
 
 
-def create_app() -> FastAPI:
-    service = OpenAIChatService(
-        api_key=os.getenv("CHAT_AI_API_KEY", ""),
-        base_url=os.getenv("CHAT_AI_BASE_URL", ""),
-        model=os.getenv("CHAT_AI_MODEL", "n/a"),
-    )
+def create_app(provider: ChatServiceProvider | None = None) -> FastAPI:
+    provider = provider or ChatServiceProvider(CredentialSource(db_path=os.getenv("DOKJA_DB_FILE")))
 
     app = FastAPI(lifespan=lifespan)
 
@@ -74,7 +69,10 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="messages must include at least one non-empty message")
 
         try:
+            service = provider.get()
             result = service.send_messages(messages, temperature=payload.temperature)
+        except NotConfigured as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
             logger.exception("chat request failed path=%s", request.url.path)
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -85,6 +83,9 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health(request: Request) -> dict:
         logger.info("received health request remote=%s", request.client.host if request.client else "")
-        return {"status": "ok"}
+        try:
+            return provider.health()
+        except NotConfigured as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return app

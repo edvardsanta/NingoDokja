@@ -14,6 +14,7 @@ Environment variables:
 - `DOKJA_DISCORD_MODE` (`full` or `voice`)
 - `DOKJA_DISCORD_DELIVERY_PORT`
 - `DOKJA_DISCORD_API_BASE_URL`
+- `DOKJA_DISCORD_WEBHOOKS` optional `channel_id=webhook_url` pairs, comma-separated. Deliveries to a listed `channel_id` go through that webhook instead of the bot (useful for servers the bot is not in). Webhook URLs are secrets, keep them out of git.
 
 Voice-only mode:
 

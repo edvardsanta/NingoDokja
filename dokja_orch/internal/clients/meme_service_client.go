@@ -86,6 +86,54 @@ func (c *MemeServiceClient) Status(ctx context.Context) (map[string]any, error) 
 	return response.Result, nil
 }
 
+func (c *MemeServiceClient) Screen(ctx context.Context, url, caption string) (map[string]any, error) {
+	payload := map[string]any{"url": url}
+	if caption != "" {
+		payload["caption"] = caption
+	}
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.screen",
+		Payload: payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
+func (c *MemeServiceClient) List(ctx context.Context, scope string, limit, offset int) (map[string]any, error) {
+	payload := map[string]any{"limit": limit, "offset": offset}
+	if scope != "" {
+		payload["scope"] = scope
+	}
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.list",
+		Payload: payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
+// MarkSent flags a meme as delivered so the scheduler does not send it again.
+func (c *MemeServiceClient) MarkSent(ctx context.Context, url string) error {
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.mark_sent",
+		Payload: map[string]any{"url": url},
+	})
+	if err != nil {
+		return err
+	}
+	if marked, _ := response.Result["marked"].(bool); !marked {
+		return fmt.Errorf("meme was not marked as sent: %v", response.Result["reason"])
+	}
+	return nil
+}
+
 func (c *MemeServiceClient) dispatch(ctx context.Context, event core.Event) (MemeServiceResponse, error) {
 	if c == nil || c.requesterFactory == nil {
 		return MemeServiceResponse{}, fmt.Errorf("meme service requester factory is not configured")

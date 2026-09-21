@@ -14,8 +14,14 @@ services:
       VA_RESPONSE_MODE: ${VA_RESPONSE_MODE}
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT}
       CHAT_AI_SERVICE_ENDPOINT: ${CHAT_AI_SERVICE_ENDPOINT}
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       DISCORD_INTERFACE_ENDPOINT: ${DISCORD_INTERFACE_ENDPOINT}
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
+      DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
+      VA_STATE_FILE: /data/dokja_state.json
+      DOKJA_DB_FILE: /data/dokja.db
+    volumes:
+      - dokja-data:/data
     ports:
       - "5555:5555"
       - "5558:5558"
@@ -37,10 +43,44 @@ services:
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT_BIND}
       MEME_SERVICE_DB_FILE: ${MEME_SERVICE_DB_FILE}
       MEME_SERVICE_SCRAPERS: ${MEME_SERVICE_SCRAPERS}
+      DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
+      DOKJA_OCR_MODEL_DIR: /models/rapidocr
+      MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
     ports:
       - "5557:5557"
     volumes:
       - dokja-data:/data
+      - ${DOKJA_MODELS_DIR:?set DOKJA_MODELS_DIR to the folder with the NudeNet and OCR models}:/models:ro
+    networks:
+      - dokja-net
+
+
+  dokja-knowledge:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_knowledge/Dockerfile
+    restart: unless-stopped
+    environment:
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://*:5561
+      KNOWLEDGE_DB_FILE: /data/dokja_knowledge.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      KNOWLEDGE_MIN_SCORE: ${KNOWLEDGE_MIN_SCORE:-0.45}
+    volumes:
+      - dokja-data:/data
+    # Private research notes and no authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:5561:5561"
+    depends_on:
+      - dokja-ollama
+    networks:
+      - dokja-net
+
+  dokja-ollama:
+    image: docker.io/ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - dokja-ollama:/root/.ollama
     networks:
       - dokja-net
 
@@ -57,6 +97,9 @@ services:
       CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
       CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
       CHAT_AI_MODEL: ${CHAT_AI_MODEL}
+      DOKJA_DB_FILE: /data/dokja.db
+    volumes:
+      - dokja-data:/data
     ports:
       - "8080:8080"
     networks:
@@ -78,6 +121,7 @@ services:
       DOKJA_DISCORD_MODE: ${DOKJA_DISCORD_MODE}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS}
+      DOKJA_DISCORD_WEBHOOKS: ${DOKJA_DISCORD_WEBHOOKS:-}
       DISCORD_DM_POLICY: ${DISCORD_DM_POLICY}
       DOKJA_ORCHESTRATOR_TIMEOUT_MS: ${DOKJA_ORCHESTRATOR_TIMEOUT_MS}
     ports:
@@ -102,6 +146,10 @@ services:
       DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD: ${DOKJA_SCHEDULER_MEME_BOOTSTRAP_GRACE_PERIOD}
       DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS: ${DOKJA_SCHEDULER_MEME_REFRESH_MAX_ITEMS}
       DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT: ${DOKJA_SCHEDULER_MEME_DISPATCH_LIMIT}
+      DOKJA_SCHEDULER_BR_MATCH_CHECK_INTERVAL: ${DOKJA_SCHEDULER_BR_MATCH_CHECK_INTERVAL}
+      DOKJA_STATE_FILE: /data/dokja_state.json
+    volumes:
+      - dokja-data:/data
     depends_on:
       - dokja-orchestrator
     networks:
@@ -113,3 +161,4 @@ networks:
 
 volumes:
   dokja-data:
+  dokja-ollama:

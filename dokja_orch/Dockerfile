@@ -9,6 +9,7 @@ WORKDIR /src
 
 COPY dokja_orch /src/dokja_orch
 COPY dokja_domain /src/dokja_domain
+COPY dokja_store /src/dokja_store
 
 WORKDIR /src/dokja_orch
 

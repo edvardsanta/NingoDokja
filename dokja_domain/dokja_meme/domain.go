@@ -3,12 +3,15 @@ package meme
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 const (
 	ActionFetchMemes        = "fetch-memes"
 	ActionRefreshMemePool   = "refresh-meme-pool"
 	ActionInspectMemeStatus = "inspect-meme-service"
+	ActionScreenMeme        = "screen-meme"
+	ActionListMemes         = "list-memes"
 )
 
 type Event struct {
@@ -28,6 +31,8 @@ type Service interface {
 	Fetch(ctx context.Context, limit *int) (map[string]any, error)
 	RefreshPool(ctx context.Context, maxItemsPerScraper int) (map[string]any, error)
 	Status(ctx context.Context) (map[string]any, error)
+	Screen(ctx context.Context, url, caption string) (map[string]any, error)
+	List(ctx context.Context, scope string, limit, offset int) (map[string]any, error)
 }
 
 type Domain struct {
@@ -54,6 +59,21 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return d.service.RefreshPool(ctx, maxItems)
 	case ActionInspectMemeStatus:
 		return d.service.Status(ctx)
+	case ActionScreenMeme:
+		url, _ := request.Event.Payload["url"].(string)
+		if strings.TrimSpace(url) == "" {
+			return nil, fmt.Errorf("meme screen requires a url")
+		}
+		caption, _ := request.Event.Payload["caption"].(string)
+		return d.service.Screen(ctx, strings.TrimSpace(url), strings.TrimSpace(caption))
+	case ActionListMemes:
+		scope, _ := request.Event.Payload["scope"].(string)
+		return d.service.List(
+			ctx,
+			strings.TrimSpace(scope),
+			intValue(request.Event.Payload["limit"], 20),
+			intValue(request.Event.Payload["offset"], 0),
+		)
 	default:
 		return nil, fmt.Errorf("unsupported meme action %q for event type %q", request.Action, request.Event.Type)
 	}
