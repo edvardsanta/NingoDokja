@@ -29,6 +29,10 @@ go run ./cmd/dokja-cli meme refresh --max-items 10
 go run ./cmd/dokja-cli meme pool
 go run ./cmd/dokja-cli meme dispatch --limit 2
 go run ./cmd/dokja-cli meme screen https://example.com/meme.jpg
+go run ./cmd/dokja-cli meme hashtag tag https://example.com/pave.jpg TioDoPave
+go run ./cmd/dokja-cli meme hashtag suggest https://example.com/new.jpg
+go run ./cmd/dokja-cli meme hashtag list
+go run ./cmd/dokja-cli meme hashtag untag https://example.com/pave.jpg
 go run ./cmd/dokja-cli services disable book
 go run ./cmd/dokja-cli jobs list
 go run ./cmd/dokja-cli jobs disable meme.dispatch
@@ -52,6 +56,12 @@ Administrative commands:
   because an absent limit means "the whole pool" to the orchestrator.
 - `meme screen <url>` downloads an image and prints the NSFW verdict, every detection
   with its score, and the active thresholds. Nothing is sent or marked.
+- `meme hashtag tag <url> <hashtag> [--text]` trains the hashtag classifier: this meme's
+  text (read from the image itself, or `--text` to give it directly) means this hashtag.
+  `meme hashtag suggest [url] [--text] [--min-score]` finds the closest tagged example
+  and reports its hashtag; check the `relevant` field, a hit below the threshold is
+  still shown but is not a match. `meme hashtag list` and `meme hashtag untag <url>`
+  browse and remove tagged examples. See `dokja_services/dokja_meme/README.md`.
 - `discord send` posts text and/or an image (`--text`, `--image`) to `--channel <id>`
   (repeatable) or `--all`. The channel picked decides the transport: a channel with a
   webhook in `DOKJA_DISCORD_WEBHOOKS` goes through the webhook, any other through the
