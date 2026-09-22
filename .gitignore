@@ -56,6 +56,9 @@ node_modules/
 
 # Local runtime artifacts
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
 
