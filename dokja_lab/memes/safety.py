@@ -285,6 +285,23 @@ class NsfwScreen:
                 return Verdict(False, f"{label} score={score:.2f} (strict)")
         return Verdict(True)
 
+    def read_text(self, url: str) -> str:
+        """The text printed on an image, for callers other than NSFW screening (such as
+        hashtag suggestion). Downloads and decodes the image but never runs the NSFW
+        detector, so it works even when the detector model is unavailable. Returns "" if
+        there is no text reader configured. Refuses videos for the same reason `inspect`
+        does: this only decodes a still image.
+        """
+        if self._text_reader is None:
+            return ""
+        if _is_video(url):
+            raise ValueError("video is not screened, so its text cannot be read")
+        raw = self._download(url)
+        image = self._decode(raw)
+        if image is None:
+            raise ValueError("unsupported or unreadable media")
+        return str(self._text_reader.read(image))
+
     def _download(self, url: str) -> bytes:
         with self._session.get(url, timeout=self.timeout, stream=True) as response:
             response.raise_for_status()
