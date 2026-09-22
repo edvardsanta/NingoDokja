@@ -13,11 +13,14 @@ MAX_LIST_LIMIT = 100
 
 
 class MemeService:
-    def __init__(self, storage, scrapers: list, worker, screen=None):
+    def __init__(self, storage, scrapers: list, worker, screen=None, hashtags=None):
         self.storage = storage
         self.scrapers = scrapers
         self.worker = worker
         self.screen = screen
+        # Optional: without it, meme.hashtag.* events are refused rather than crashing
+        # the service (the same posture as `screen` being disabled).
+        self.hashtags = hashtags
 
     def dispatch(self, event: dict) -> dict:
         event_type = (event.get("type") or event.get("event_type") or "").strip()
@@ -44,6 +47,14 @@ class MemeService:
             )
         if event_type == "meme.mark_sent":
             return self.mark_sent(payload.get("url"))
+        if event_type == "meme.hashtag.tag":
+            return self.tag_hashtag(payload.get("url"), payload.get("hashtag"), payload.get("text"))
+        if event_type == "meme.hashtag.suggest":
+            return self.suggest_hashtag(payload.get("url"), payload.get("text"), payload.get("min_score"))
+        if event_type == "meme.hashtag.list":
+            return self._require_hashtags().list_examples(payload.get("limit"), payload.get("offset"))
+        if event_type == "meme.hashtag.untag":
+            return self.untag_hashtag(payload.get("url"))
 
         raise ValueError(f"unsupported meme event type: {event_type}")
 
@@ -163,6 +174,58 @@ class MemeService:
             "sent_count": len(sent),
             "scrapers": [getattr(scraper, "source_name", type(scraper).__name__) for scraper in self.scrapers],
         }
+
+    def _require_hashtags(self):
+        if self.hashtags is None:
+            raise ValueError("hashtag suggestion is disabled (no embedding server configured)")
+        return self.hashtags
+
+    def _read_text(self, url: str) -> str:
+        """The OCR text of an image, the signal hashtag training and suggestion learn
+        from. Reuses the NSFW screen's reader, since that is where OCR already lives;
+        it never runs the NSFW detector for this.
+        """
+        if self.screen is None:
+            raise ValueError("cannot read image text: the nsfw filter (which also runs OCR) is disabled")
+        text = self.screen.read_text(url)
+        if not text.strip():
+            raise ValueError(f"no text was found on the image at {url}")
+        return text
+
+    def tag_hashtag(self, url, hashtag, text=None) -> dict:
+        url = str(url or "").strip()
+        if not url:
+            raise ValueError("meme.hashtag.tag requires a url")
+        classifier = self._require_hashtags()
+        text = str(text or "").strip() or self._read_text(url)
+        result = classifier.tag(url, hashtag, text)
+        logger.info("meme hashtag tagged url=%s hashtag=%s", url, result["hashtag"])
+        return result
+
+    def suggest_hashtag(self, url=None, text=None, min_score=None) -> dict:
+        text = str(text or "").strip()
+        url = str(url or "").strip()
+        if not text:
+            if not url:
+                raise ValueError("meme.hashtag.suggest requires a url or a text")
+            text = self._read_text(url)
+        result = self._require_hashtags().suggest(
+            text, float(min_score) if min_score is not None else None
+        )
+        logger.info(
+            "meme hashtag suggest url=%s hashtag=%s relevant=%s",
+            url or "(text)",
+            result["hashtag"],
+            result["relevant"],
+        )
+        return result
+
+    def untag_hashtag(self, url) -> dict:
+        url = str(url or "").strip()
+        if not url:
+            raise ValueError("meme.hashtag.untag requires a url")
+        deleted = self._require_hashtags().delete(url)
+        return {"source_url": url, "deleted": deleted}
 
     def _to_dict(self, meme, nsfw: dict | None = None) -> dict:
         entry = {
