@@ -182,6 +182,19 @@ blacklist. `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) 
 post to those channels through a webhook instead of the bot; the URLs are credentials, keep them in the
 env file only.
 
+## Hashtag Suggestion for Memes
+
+The operator tags a meme's own text (read by OCR, not the scraper's title or tags) with a hashtag; a new
+meme's text is compared to every tagged example and, if the closest one is similar enough, its hashtag is
+suggested. `dokja-cli meme hashtag tag|suggest|list|untag`; see `dokja_services/dokja_meme/README.md`.
+
+Embeddings come from `bge-m3` on `dokja-ollama`, the same server and model `dokja-knowledge` uses. If it is
+missing, pull it once (see "Research Knowledge Base" above): the meme service works without it too, it just
+stores tagged text without a vector and `meme.hashtag.suggest` reports `degraded` instead of guessing.
+`MEME_HASHTAG_MIN_SCORE` (default `0.6`) decides which suggestion counts as relevant; like the knowledge
+base's threshold, it was measured on a handful of examples, so retune it once there is a real set of tagged
+memes. Its SQLite file is `MEME_HASHTAG_DB_FILE`, separate from `MEME_SERVICE_DB_FILE`.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone
