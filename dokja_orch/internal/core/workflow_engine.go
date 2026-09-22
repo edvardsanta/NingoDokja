@@ -88,6 +88,14 @@ func actionFor(domain Domain, eventType string) string {
 			return "screen-meme"
 		case "meme.list":
 			return "list-memes"
+		case "meme.hashtag.tag":
+			return "tag-meme-hashtag"
+		case "meme.hashtag.suggest":
+			return "suggest-meme-hashtag"
+		case "meme.hashtag.list":
+			return "list-meme-hashtags"
+		case "meme.hashtag.untag":
+			return "untag-meme-hashtag"
 		default:
 			return "handle-meme-event"
 		}
