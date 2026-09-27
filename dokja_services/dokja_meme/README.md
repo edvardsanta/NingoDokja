@@ -134,7 +134,13 @@ Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still st
 the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
 of guessing.
 
-`MEME_HASHTAG_MIN_SCORE` (default `0.6`) is provisional, checked against only four
-examples in `dokja_lab/tests/test_hashtags_live.py` (skipped without Ollama): related
-captions scored 0.68-0.83, unrelated ones 0.27-0.48. Retune it once there is a real set
-of tagged memes.
+`MEME_HASHTAG_MIN_SCORE` (default `0.6`) is provisional. The small evaluation corpus
+in `dokja_lab/tests/test_hashtags_live.py` is skipped without a reachable embedding
+server; validate the threshold against representative tagged memes before relying on it.
+
+Re-tag examples saved without embeddings, or under a different model, after the
+configured model becomes available. Automatic reindexing is not implemented.
+
+Manual and scheduled delivery append only relevant suggestions. Suggestion failures
+leave the original message unchanged. Automatic OCR requires the text reader used
+by the screening component; explicit `--text` input works without that reader.
