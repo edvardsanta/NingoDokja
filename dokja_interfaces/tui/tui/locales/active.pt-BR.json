@@ -30,7 +30,7 @@
   "enter_continue_esc_cancel": "enter continua · esc cancela",
   "enter_save_esc_cancel": "enter salva · esc cancela",
   "embedding_missing": "sem embedding",
-  "embedding_missing_help": "Este exemplo ainda não pode ser sugerido; marque-o novamente quando o serviço de embeddings estiver disponível.",
+  "embedding_missing_help": "Aprendizado pendente: as próximas sugestões processarão este exemplo quando o serviço de embeddings estiver disponível.",
   "embedding_ready": "pronto",
   "error": "erro",
   "every": "a cada ",

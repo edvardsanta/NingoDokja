@@ -30,7 +30,7 @@
   "enter_continue_esc_cancel": "enter continue · esc cancel",
   "enter_save_esc_cancel": "enter save · esc cancel",
   "embedding_missing": "no embedding",
-  "embedding_missing_help": "This example cannot be suggested yet; re-tag it after the embedding service is available.",
+  "embedding_missing_help": "Learning pending: upcoming suggestions will process this example when the embedding service is available.",
   "embedding_ready": "ready",
   "error": "error",
   "every": "every ",

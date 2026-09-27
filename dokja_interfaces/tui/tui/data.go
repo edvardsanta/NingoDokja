@@ -282,6 +282,9 @@ func summarizeDispatch(res map[string]any) string {
 }
 
 func summarizeHashtagTag(res map[string]any) string {
+	if embedded, ok := res["embedded"].(bool); ok && !embedded {
+		return tr("hashtag_example_saved") + ": " + str(res, "hashtag") + ". " + tr("embedding_missing_help")
+	}
 	if hashtag := str(res, "hashtag"); hashtag != "" {
 		return tr("learned") + hashtag
 	}
