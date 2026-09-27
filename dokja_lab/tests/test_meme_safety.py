@@ -437,6 +437,35 @@ def test_ocr_runs_after_the_cheap_checks_and_is_skipped_without_a_reader():
     assert screen().check(meme()).safe
 
 
+def test_read_text_downloads_decodes_and_reads_without_touching_the_detector():
+    detector = FakeDetector()
+    result = ocr_screen(
+        "o tio pegou o pave", session=FakeSession(_png_bytes()), detector=detector
+    ).read_text("https://x/a.png")
+    assert result == "o tio pegou o pave"
+    assert detector.detect(None) == [], "the detector must never be asked to run"
+
+
+def test_read_text_without_a_reader_configured_is_empty():
+    assert screen(session=FakeSession(_png_bytes())).read_text("https://x/a.png") == ""
+
+
+def test_read_text_refuses_a_video_without_downloading_it():
+    session = FakeSession(_png_bytes())
+    with pytest.raises(ValueError, match="video"):
+        ocr_screen("text", session=session).read_text("https://x/clip.mp4")
+    assert session.calls == 0
+
+
+def test_read_text_propagates_download_and_decode_failures():
+    with pytest.raises(OSError):
+        ocr_screen("text", session=FakeSession(error=OSError("404"))).read_text(
+            "https://x/a.png"
+        )
+    with pytest.raises(ValueError, match="unsupported or unreadable"):
+        ocr_screen("text", body=b"not an image").read_text("https://x/a.png")
+
+
 def test_text_reader_reports_missing_model_files(tmp_path):
     from memes.ocr import TextReader
 
@@ -548,3 +577,157 @@ def test_screen_url_applies_the_caption_to_the_blacklist():
     blocked = service.screen_url("https://example.com/a.png", caption="que tesão")
     assert blocked["safe"] is False
     assert "blocked word" in blocked["reason"]
+
+
+# ---- meme.hashtag.* -----------------------------------------------------------------
+
+
+class FakeHashtagEmbedder:
+    """Deterministic, offline, fixed-dimension: shared words make similar vectors
+    however many texts a call embeds (a real model's dimension never depends on its
+    input). Enough to prove the service wires suggest() end to end; the classifier's
+    own nearest-neighbour logic is exercised in tests/test_hashtags.py.
+    """
+
+    def embed(self, texts):
+        import zlib
+
+        import numpy as np
+
+        from memes.embedder import normalize
+
+        dimensions = 64
+        matrix = np.zeros((len(texts), dimensions), dtype=np.float32)
+        for row, text in enumerate(texts):
+            for word in text.lower().split():
+                matrix[row, zlib.crc32(word.encode()) % dimensions] += 1.0
+        return normalize(matrix)
+
+
+def _hashtag_service(text_reader_text="", hashtags="build"):
+    from memes.hashtags import HashtagClassifier
+
+    module = _load_meme_service()
+    if hashtags == "build":
+        hashtags = HashtagClassifier(
+            ":memory:", embedder=FakeHashtagEmbedder(), model="fake"
+        )
+    meme_screen = ocr_screen(text_reader_text, session=FakeSession(_png_bytes()))
+    service = module.MemeService(
+        FakeStorage([]), [], None, screen=meme_screen, hashtags=hashtags
+    )
+    return service, hashtags
+
+
+def test_tag_hashtag_reads_the_image_text_when_none_is_given():
+    service, hashtags = _hashtag_service(text_reader_text="o tio pegou o pave")
+
+    result = service.tag_hashtag("https://x/a.png", "TioDoPave")
+
+    assert result == {
+        "source_url": "https://x/a.png",
+        "hashtag": "#TioDoPave",
+        "text": "o tio pegou o pave",
+        "embedded": True,
+    }
+
+
+def test_tag_hashtag_accepts_an_explicit_text_without_reading_the_image():
+    service, hashtags = _hashtag_service(
+        text_reader_text="ocr text that would be wrong here"
+    )
+
+    result = service.tag_hashtag(
+        "https://x/a.png", "TioDoPave", text="texto escolhido a mao"
+    )
+
+    assert result["text"] == "texto escolhido a mao"
+
+
+def test_tag_hashtag_fails_clearly_when_the_image_has_no_text():
+    service, _ = _hashtag_service(text_reader_text="")
+    with pytest.raises(ValueError, match="no text was found"):
+        service.tag_hashtag("https://x/a.png", "TioDoPave")
+
+
+def test_tag_hashtag_requires_a_url():
+    service, _ = _hashtag_service()
+    with pytest.raises(ValueError, match="requires a url"):
+        service.tag_hashtag("", "TioDoPave", text="algo")
+
+
+def test_hashtag_events_are_refused_when_the_classifier_is_disabled():
+    service, _ = _hashtag_service(hashtags=None)
+    for event_type, payload in (
+        ("meme.hashtag.tag", {"url": "https://x/a.png", "hashtag": "T", "text": "x"}),
+        ("meme.hashtag.suggest", {"text": "x"}),
+        ("meme.hashtag.list", {}),
+        ("meme.hashtag.untag", {"url": "https://x/a.png"}),
+    ):
+        with pytest.raises(ValueError, match="disabled"):
+            service.dispatch({"type": event_type, "payload": payload})
+
+
+def test_suggest_hashtag_prefers_explicit_text_over_reading_the_image():
+    service, hashtags = _hashtag_service(text_reader_text="wrong text")
+    hashtags.tag("https://x/known.png", "TioDoPave", "o tio pegou o pave da geladeira")
+
+    result = service.suggest_hashtag(text="o tio comeu o pave escondido")
+
+    assert result["hashtag"] == "#TioDoPave" and result["relevant"] is True
+
+
+def test_suggest_hashtag_reads_the_image_when_no_text_is_given():
+    service, hashtags = _hashtag_service(
+        text_reader_text="o tio pegou o pave da geladeira"
+    )
+    hashtags.tag("https://x/known.png", "TioDoPave", "o tio pegou o pave da geladeira")
+
+    result = service.suggest_hashtag(url="https://x/new.png")
+
+    assert result["hashtag"] == "#TioDoPave"
+
+
+def test_suggest_hashtag_requires_a_url_or_a_text():
+    service, _ = _hashtag_service()
+    with pytest.raises(ValueError, match="requires a url or a text"):
+        service.suggest_hashtag()
+
+
+def test_untag_hashtag_removes_a_stored_example():
+    service, hashtags = _hashtag_service()
+    hashtags.tag("https://x/a.png", "TioDoPave", "texto")
+
+    assert service.untag_hashtag("https://x/a.png") == {
+        "source_url": "https://x/a.png",
+        "deleted": True,
+    }
+    assert service.untag_hashtag("https://x/a.png")["deleted"] is False
+
+
+def test_dispatch_routes_every_hashtag_event():
+    service, hashtags = _hashtag_service(text_reader_text="o tio pegou o pave")
+
+    tagged = service.dispatch(
+        {
+            "type": "meme.hashtag.tag",
+            "payload": {"url": "https://x/a.png", "hashtag": "TioDoPave"},
+        }
+    )
+    assert tagged["hashtag"] == "#TioDoPave"
+
+    listed = service.dispatch({"type": "meme.hashtag.list", "payload": {}})
+    assert listed["total"] == 1
+
+    suggested = service.dispatch(
+        {
+            "type": "meme.hashtag.suggest",
+            "payload": {"text": "o tio comeu o pave"},
+        }
+    )
+    assert suggested["hashtag"] == "#TioDoPave"
+
+    untagged = service.dispatch(
+        {"type": "meme.hashtag.untag", "payload": {"url": "https://x/a.png"}}
+    )
+    assert untagged["deleted"] is True

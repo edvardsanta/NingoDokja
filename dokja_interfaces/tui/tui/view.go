@@ -35,6 +35,8 @@ func (m *Model) View() string {
 		body = m.viewProfiles()
 	case overlayProfileForm:
 		body = m.viewProfileForm()
+	case overlayHashtag:
+		body = m.viewHashtag()
 	default:
 		switch m.tab {
 		case tabPanel:
@@ -71,7 +73,7 @@ func (m *Model) viewHeader() string {
 func (m *Model) viewFooter() string {
 	hints := map[tab]string{
 		tabPanel:   tr("↑↓ move · space toggle · x run job · i interval · p chat profiles · r refresh · tab/1-4 tabs · q quit"),
-		tabMemes:   tr("↑↓ move · s NSFW filter · enter send this one · d dispatch · t queue/sent · n/p page · R refresh pool · q quit"),
+		tabMemes:   tr("↑↓ move · s NSFW · h learn tag · g suggest · u remove tag · enter send · d dispatch · t queue/sent · n/p page · R refresh · q quit"),
 		tabDiscord: tr("↑↓ field · space toggle channel · ctrl+s send · F1-F4 tabs · ctrl+c quit"),
 		tabHistory: tr("tab/1-4 tabs · q quit"),
 	}
@@ -89,6 +91,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("↑↓ move · enter activate · n new (local) · d delete (local) · esc close")
 	case overlayProfileForm:
 		hint = tr("tab/↑↓ field · ctrl+s save · esc back")
+	case overlayHashtag:
+		hint = tr("enter save · esc cancel")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
@@ -421,7 +425,7 @@ func (m *Model) viewConfirm() string {
 		return ""
 	}
 	body := styleTitle.Render(tr("Confirm: ")+m.pending.label) + "\n\n" + strings.Join(m.pending.lines, "\n")
-	if m.pending.local == nil {
+	if m.pending.local == nil && strings.HasPrefix(m.pending.eventType, "discord.") {
 		body += "\n\n" + styleWarn.Render(tr("This really posts to Discord."))
 	}
 	return styleBox.Render(body)
@@ -449,6 +453,15 @@ func (m *Model) viewDispatch() string {
 	return styleBox.Render(
 		styleTitle.Render(tr("Dispatch memes from the queue")) + "\n\n" +
 			"Quantos? (1–" + fmt.Sprint(maxDispatchBatch) + ")  " + m.dispatchInput.View())
+}
+
+func (m *Model) viewHashtag() string {
+	item, _ := m.selectedMeme()
+	return styleBox.Render(
+		styleTitle.Render(tr("Learn hashtag from selected meme")) + "\n\n" +
+			"Meme: " + trunc(item.Title, 70) + "\n" +
+			tr("The image text is read by OCR automatically.") + "\n\n" +
+			"Hashtag: " + m.hashtagInput.View())
 }
 
 func (m *Model) viewInterval() string {

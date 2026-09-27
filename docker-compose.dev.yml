@@ -73,6 +73,11 @@ services:
       DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
       DOKJA_OCR_MODEL_DIR: /models/rapidocr
       MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
+      # Optional hashtag suggestion; stores examples without vectors if unavailable.
+      MEME_HASHTAG_DB_FILE: /workspace/ningo_hashtags.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
     ports:
       - "5557:5557"
     networks:

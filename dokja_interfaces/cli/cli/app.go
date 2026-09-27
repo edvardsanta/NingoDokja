@@ -233,7 +233,7 @@ func (a *App) newMemeCommand(ctx context.Context) *cobra.Command {
 	list.Flags().IntVar(&listLimit, "limit", 20, "Page size (1-100)")
 	list.Flags().IntVar(&listOffset, "offset", 0, "Rows to skip")
 
-	memeCommand.AddCommand(fetch, refresh, status, dispatch, screen, list)
+	memeCommand.AddCommand(fetch, refresh, status, dispatch, screen, list, a.newMemeHashtagCommand(ctx))
 	return memeCommand
 }
 

@@ -118,6 +118,76 @@ func (c *MemeServiceClient) List(ctx context.Context, scope string, limit, offse
 	return response.Result, nil
 }
 
+// TagHashtag trains the hashtag classifier: this meme's text means that hashtag. An
+// empty text tells the service to read it from the image itself.
+func (c *MemeServiceClient) TagHashtag(ctx context.Context, url, hashtag, text string) (map[string]any, error) {
+	payload := map[string]any{"url": url, "hashtag": hashtag}
+	if text != "" {
+		payload["text"] = text
+	}
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.hashtag.tag",
+		Payload: payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
+// SuggestHashtag finds the closest tagged example for a meme's text (or, with an empty
+// text, for the meme at url) and reports its hashtag. Check the result's "relevant"
+// field: a hit below the threshold is returned for visibility but must not be presented
+// as a match. minScore overrides the service's default threshold for this call only.
+func (c *MemeServiceClient) SuggestHashtag(ctx context.Context, url, text string, minScore *float64) (map[string]any, error) {
+	payload := map[string]any{}
+	if url != "" {
+		payload["url"] = url
+	}
+	if text != "" {
+		payload["text"] = text
+	}
+	if minScore != nil {
+		payload["min_score"] = *minScore
+	}
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.hashtag.suggest",
+		Payload: payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
+// ListHashtags lists tagged examples, newest first.
+func (c *MemeServiceClient) ListHashtags(ctx context.Context, limit, offset int) (map[string]any, error) {
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.hashtag.list",
+		Payload: map[string]any{"limit": limit, "offset": offset},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
+// UntagHashtag removes a tagged example.
+func (c *MemeServiceClient) UntagHashtag(ctx context.Context, url string) (map[string]any, error) {
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.hashtag.untag",
+		Payload: map[string]any{"url": url},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Result, nil
+}
+
 // MarkSent flags a meme as delivered so the scheduler does not send it again.
 func (c *MemeServiceClient) MarkSent(ctx context.Context, url string) error {
 	response, err := c.dispatch(ctx, core.Event{

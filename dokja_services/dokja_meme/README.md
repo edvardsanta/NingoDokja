@@ -57,6 +57,15 @@ Supported event types:
   Scrapes sources and stores new memes.
 - `meme.status`
   Returns service health and current unsent count.
+- `meme.screen`
+  Runs the NSFW filter on one image URL and returns the verdict, the OCR text and the
+  detections. See `dokja_lab/memes/safety.py`.
+- `meme.list`
+  Browses the pool (`unsent` or `sent`) without consuming it.
+- `meme.mark_sent`
+  Flags one meme as delivered without going through `meme.fetch`.
+- `meme.hashtag.tag`, `meme.hashtag.suggest`, `meme.hashtag.list`, `meme.hashtag.untag`
+  See "Hashtag suggestion" below.
 
 Response format:
 
@@ -93,3 +102,45 @@ Environment variables:
   Optional comma-separated list of scraper keys.
   When omitted, the service uses the scraper set defined in `dokja_lab/config.py`.
   When provided, the keys are resolved against that same legacy scraper registry.
+- `MEME_HASHTAG_DB_FILE`
+  Default: `<repo>/ningo_hashtags.db`. Its own file, separate from the meme pool.
+- `DOKJA_EMBED_ENDPOINT` (default `http://127.0.0.1:11434`), `DOKJA_EMBED_MODEL`
+  (default `bge-m3`), `DOKJA_EMBED_TIMEOUT`, `DOKJA_EMBED=off` (no embedder; tagging
+  still stores text, suggestion is `degraded`). Same names `dokja_knowledge` uses, both
+  services talk to the same Ollama server; see its README for why the client is not
+  shared code.
+- `MEME_HASHTAG_MIN_SCORE`
+  Default `0.6`, provisional. See "Hashtag suggestion" below.
+
+## Hashtag suggestion
+
+The operator tags a meme's OCR text with a hashtag (`meme.hashtag.tag`); a new meme's
+OCR text is compared to every tagged example by cosine similarity over `bge-m3`
+embeddings, and the closest one's hashtag is suggested (`meme.hashtag.suggest`) only if
+the score is at or above `MEME_HASHTAG_MIN_SCORE` (`relevant: true`). Below that, the
+closest hashtag is still reported for visibility, but `relevant` is `false` and callers
+must not present it as a match — the same absolute-relevance posture `dokja_knowledge`
+uses for its search results.
+
+The signal is the image's own printed text (read by the same OCR reader the NSFW filter
+uses), not the scraper's title or tags: those are often meaningless (random keymashes,
+or the scraper's own boilerplate), while the caption baked into the meme is what a
+hashtag is actually about. `meme.hashtag.tag` and `.suggest` read it automatically from
+`url`, or accept an explicit `text` to skip that (useful for testing, or when the
+caller already has it from a prior `meme.screen` call). A meme with no legible text, or
+a video, cannot be tagged or matched by this signal.
+
+Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still stores
+the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
+of guessing.
+
+`MEME_HASHTAG_MIN_SCORE` (default `0.6`) is provisional. The small evaluation corpus
+in `dokja_lab/tests/test_hashtags_live.py` is skipped without a reachable embedding
+server; validate the threshold against representative tagged memes before relying on it.
+
+Re-tag examples saved without embeddings, or under a different model, after the
+configured model becomes available. Automatic reindexing is not implemented.
+
+Manual and scheduled delivery append only relevant suggestions. Suggestion failures
+leave the original message unchanged. Automatic OCR requires the text reader used
+by the screening component; explicit `--text` input works without that reader.

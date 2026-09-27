@@ -41,6 +41,11 @@ type MemeFetcher interface {
 	Fetch(ctx context.Context, limit *int) (map[string]any, error)
 }
 
+// MemeHashtagSuggester finds a learned hashtag for a meme's OCR text.
+type MemeHashtagSuggester interface {
+	SuggestHashtag(ctx context.Context, url, text string, minScore *float64) (map[string]any, error)
+}
+
 type DiscordMessageDeliverer interface {
 	Deliver(ctx context.Context, channelID, content, attachmentURL string) error
 }
@@ -49,6 +54,7 @@ type SystemDomainHandler struct {
 	chatAI           ChatAIHealthChecker
 	memeStatus       MemeStatusReader
 	memeFetch        MemeFetcher
+	memeHashtags     MemeHashtagSuggester
 	discord          DiscordMessageDeliverer
 	deliveryChannels []string
 	safeOnlyChannels map[string]struct{}
@@ -89,6 +95,13 @@ func (h *SystemDomainHandler) WithSafeOnlyChannels(channels string) *SystemDomai
 func (h *SystemDomainHandler) WithMemeTools(screener MemeScreener, marker MemeMarker) *SystemDomainHandler {
 	h.memeScreen = screener
 	h.memeMarker = marker
+	return h
+}
+
+// WithHashtagSuggestions enables appending a learned hashtag to scheduled meme text.
+// A missing/low-confidence suggestion never blocks delivery.
+func (h *SystemDomainHandler) WithHashtagSuggestions(suggester MemeHashtagSuggester) *SystemDomainHandler {
+	h.memeHashtags = suggester
 	return h
 }
 
@@ -235,6 +248,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 		if content == "" {
 			continue
 		}
+		content = h.appendLearnedHashtag(ctx, content, attachmentURL)
 		safe, reason := memeSafety(meme)
 		sent := false
 		for _, channelID := range h.deliveryChannels {
@@ -298,6 +312,26 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 	return response, nil
 }
 
+func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content, url string) string {
+	if h.memeHashtags == nil || url == "" || !h.serviceEnabled("meme") {
+		return content
+	}
+	result, err := h.memeHashtags.SuggestHashtag(ctx, url, "", nil)
+	if err != nil {
+		logger.Info(fmt.Sprintf("system handler hashtag suggestion unavailable url=%s error=%v", url, err))
+		return content
+	}
+	relevant, _ := result["relevant"].(bool)
+	hashtag := strings.TrimSpace(resultString(result, "hashtag"))
+	if !relevant || hashtag == "" {
+		return content
+	}
+	if content == "" {
+		return hashtag
+	}
+	return content + "\n" + hashtag
+}
+
 // handleDiscordSend posts an admin-supplied message to configured channels. It only
 // accepts channels the orchestrator already delivers to, so the request port cannot
 // be used to post anywhere the bot can reach.
@@ -331,6 +365,7 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 			return nil, fmt.Errorf("channel %s is not a configured delivery channel", channelID)
 		}
 	}
+	content = h.appendLearnedHashtag(ctx, content, attachmentURL)
 
 	// The safe-only rule applies here too: an image bound for a restricted channel is
 	// screened server-side, so no client can vouch for it. A failed screen counts as unsafe.

@@ -7,11 +7,15 @@ import (
 )
 
 const (
-	ActionFetchMemes        = "fetch-memes"
-	ActionRefreshMemePool   = "refresh-meme-pool"
-	ActionInspectMemeStatus = "inspect-meme-service"
-	ActionScreenMeme        = "screen-meme"
-	ActionListMemes         = "list-memes"
+	ActionFetchMemes         = "fetch-memes"
+	ActionRefreshMemePool    = "refresh-meme-pool"
+	ActionInspectMemeStatus  = "inspect-meme-service"
+	ActionScreenMeme         = "screen-meme"
+	ActionListMemes          = "list-memes"
+	ActionTagMemeHashtag     = "tag-meme-hashtag"
+	ActionSuggestMemeHashtag = "suggest-meme-hashtag"
+	ActionListMemeHashtags   = "list-meme-hashtags"
+	ActionUntagMemeHashtag   = "untag-meme-hashtag"
 )
 
 type Event struct {
@@ -33,6 +37,10 @@ type Service interface {
 	Status(ctx context.Context) (map[string]any, error)
 	Screen(ctx context.Context, url, caption string) (map[string]any, error)
 	List(ctx context.Context, scope string, limit, offset int) (map[string]any, error)
+	TagHashtag(ctx context.Context, url, hashtag, text string) (map[string]any, error)
+	SuggestHashtag(ctx context.Context, url, text string, minScore *float64) (map[string]any, error)
+	ListHashtags(ctx context.Context, limit, offset int) (map[string]any, error)
+	UntagHashtag(ctx context.Context, url string) (map[string]any, error)
 }
 
 type Domain struct {
@@ -74,6 +82,35 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 			intValue(request.Event.Payload["limit"], 20),
 			intValue(request.Event.Payload["offset"], 0),
 		)
+	case ActionTagMemeHashtag:
+		url, _ := request.Event.Payload["url"].(string)
+		if strings.TrimSpace(url) == "" {
+			return nil, fmt.Errorf("meme hashtag tag requires a url")
+		}
+		hashtag, _ := request.Event.Payload["hashtag"].(string)
+		text, _ := request.Event.Payload["text"].(string)
+		return d.service.TagHashtag(ctx, strings.TrimSpace(url), strings.TrimSpace(hashtag), strings.TrimSpace(text))
+	case ActionSuggestMemeHashtag:
+		url, _ := request.Event.Payload["url"].(string)
+		text, _ := request.Event.Payload["text"].(string)
+		return d.service.SuggestHashtag(
+			ctx,
+			strings.TrimSpace(url),
+			strings.TrimSpace(text),
+			floatPointer(request.Event.Payload["min_score"]),
+		)
+	case ActionListMemeHashtags:
+		return d.service.ListHashtags(
+			ctx,
+			intValue(request.Event.Payload["limit"], 50),
+			intValue(request.Event.Payload["offset"], 0),
+		)
+	case ActionUntagMemeHashtag:
+		url, _ := request.Event.Payload["url"].(string)
+		if strings.TrimSpace(url) == "" {
+			return nil, fmt.Errorf("meme hashtag untag requires a url")
+		}
+		return d.service.UntagHashtag(ctx, strings.TrimSpace(url))
 	default:
 		return nil, fmt.Errorf("unsupported meme action %q for event type %q", request.Action, request.Event.Type)
 	}
@@ -84,6 +121,21 @@ func intPointer(value any) *int {
 		return &parsed
 	}
 	return nil
+}
+
+func floatPointer(value any) *float64 {
+	switch typed := value.(type) {
+	case float64:
+		return &typed
+	case float32:
+		parsed := float64(typed)
+		return &parsed
+	case int:
+		parsed := float64(typed)
+		return &parsed
+	default:
+		return nil
+	}
 }
 
 func intValue(value any, fallback int) int {

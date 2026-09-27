@@ -42,6 +42,10 @@ English in both modes.
   (verdict, text read by OCR, detections). `enter` sends *that* meme to the channels you tick.
   `d` dispatches N memes from the top of the queue. `t` switches queue/already-sent, `n`/`p` page,
   `R` refreshes the pool.
+  `h` teaches a hashtag from the selected image's OCR text, `g` suggests one, `l` shows
+  the number of saved examples, and `u` removes the selected example after confirmation.
+  Relevant suggestions are appended during manual and scheduled delivery. Images without
+  readable text and videos are sent without a suggestion when classification fails.
 - **Discord** (`3`): send text and/or an image to chosen channels (`ctrl+s`).
 - **Histórico** (`4`): what you triggered in this session and how each action ended.
 

@@ -182,6 +182,30 @@ blacklist. `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) 
 post to those channels through a webhook instead of the bot; the URLs are credentials, keep them in the
 env file only.
 
+## Hashtag Suggestion for Memes
+
+The operator tags a meme's own text (read by OCR, not the scraper's title or tags) with a hashtag; a new
+meme's text is compared to every tagged example and, if the closest one is similar enough, its hashtag is
+suggested. `dokja-cli meme hashtag tag|suggest|list|untag`; see `dokja_services/dokja_meme/README.md`.
+
+Embeddings use the same configured server and model as the knowledge service. If the model is
+missing, provision it once (see "Research Knowledge Base" above): the meme service works without it too, it just
+stores tagged text without a vector and `meme.hashtag.suggest` reports `degraded` instead of guessing.
+`MEME_HASHTAG_MIN_SCORE` (default `0.6`) decides which suggestion counts as relevant; like the knowledge
+base's threshold, it needs validation on representative examples, so retune it once there is a real set of tagged
+memes. Its SQLite file is `MEME_HASHTAG_DB_FILE`, separate from `MEME_SERVICE_DB_FILE`.
+
+The orchestrator appends relevant suggestions to manual and scheduled deliveries.
+Missing OCR text, unsupported video input, low similarity or a classifier error leaves
+the original message intact. Disabling the meme service also disables automatic suggestions
+for manual delivery. Channel validation and safe-only screening remain in effect.
+
+The TUI supports learning (`h`), suggestion (`g`), example count (`l`) and removal (`u`).
+Examples stored without embeddings, or under a different model, must be tagged again
+after the configured embedding model is available. This release has no automatic reindex.
+Back up the hashtag database alongside the meme pool. Rebuild the meme service and
+orchestrator and update the operator interfaces to enable the feature; no new ports.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone
