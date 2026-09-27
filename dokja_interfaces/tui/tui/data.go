@@ -254,54 +254,54 @@ func parseScreen(res map[string]any) screenData {
 }
 
 func summarizeDispatch(res map[string]any) string {
-	summary := tr("%d meme(s) delivered", num(res, "delivered_count"))
+	summary := tr("d_meme_s_delivered", num(res, "delivered_count"))
 	if skipped, ok := res["skipped_unsafe"].(map[string]any); ok && len(skipped) > 0 {
 		parts := []string{}
 		for channel, count := range skipped {
 			parts = append(parts, fmt.Sprintf("%s: %v", channel, count))
 		}
 		sort.Strings(parts)
-		summary += tr("; skipped by NSFW in ") + strings.Join(parts, ", ")
+		summary += tr("skipped_by_nsfw_in") + strings.Join(parts, ", ")
 	}
 	return summary
 }
 
 func summarizeHashtagTag(res map[string]any) string {
 	if hashtag := str(res, "hashtag"); hashtag != "" {
-		return tr("learned ") + hashtag
+		return tr("learned") + hashtag
 	}
-	return tr("hashtag example saved")
+	return tr("hashtag_example_saved")
 }
 
 func summarizeHashtagSuggestion(res map[string]any) string {
 	hashtag := str(res, "hashtag")
 	if hashtag == "" {
-		return tr("no hashtag suggestion")
+		return tr("no_hashtag_suggestion")
 	}
 	relevant, _ := res["relevant"].(bool)
 	if !relevant {
-		return tr("closest is ") + hashtag + tr(" (below relevance threshold)")
+		return tr("closest_is") + hashtag + tr("below_relevance_threshold")
 	}
-	return tr("suggested ") + hashtag
+	return tr("suggested") + hashtag
 }
 
 func summarizeHashtagList(res map[string]any) string {
-	return tr("%d hashtag examples", num(res, "total"))
+	return tr("d_hashtag_examples", num(res, "total"))
 }
 
 func summarizeSend(res map[string]any) string {
-	summary := tr("sent to ") + strings.Join(strList(res, "sent_to"), ", ")
+	summary := tr("sent_to") + strings.Join(strList(res, "sent_to"), ", ")
 	if bypassed, _ := res["nsfw_bypassed"].(bool); bypassed {
-		summary += tr("; NSFW blocking bypassed")
+		summary += tr("nsfw_bypass_summary")
 	}
 	if skipped := strList(res, "skipped_unsafe"); len(skipped) > 0 {
-		summary += tr("; SKIPPED in %s (%s)", strings.Join(skipped, ", "), str(res, "unsafe_reason"))
+		summary += tr("skipped_in_s_s", strings.Join(skipped, ", "), str(res, "unsafe_reason"))
 	}
 	if marked, ok := res["marked_sent"].(bool); ok {
 		if marked {
-			summary += tr("; marked as sent")
+			summary += tr("marked_as_sent")
 		} else {
-			summary += tr("; could NOT be marked as sent")
+			summary += tr("could_not_be_marked_as_sent")
 		}
 	}
 	return summary

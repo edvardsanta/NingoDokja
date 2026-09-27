@@ -25,12 +25,16 @@ The interface is available in English (the default) and Portuguese. It is chosen
 any `pt*` value selects Portuguese), else English. `--tab` accepts `panel`, `memes`, `discord`
 and `history` (the Portuguese names `painel` and `historico` also work).
 
-The text in the code is English; `tui/i18n_pt.go` maps each message to Portuguese and a message
-without an entry is shown in English. To add a language, add a catalog and a case in
-`SetLanguage`. The tests fail when a message has no Portuguese entry, when an entry is stale,
-when a translation changes the format verbs, and when any screen shows Portuguese words in
-English mode. Text that comes from the orchestrator (for example a service's `detail`) is
-English in both modes.
+Interface text uses stable message IDs resolved by `go-i18n`. English and Portuguese live in
+the embedded JSON catalogs under `tui/locales/`, so the TUI remains a single binary. Add or
+change a message in both catalogs and reference its ID with `tr("message_id")`; changing the
+displayed text does not require touching Go call sites. To add a language, add another active
+catalog and load it in `newTranslationBundle`.
+
+The tests fail when code references a missing ID, a catalog contains a stale or unmatched
+entry, translations change the `fmt` verbs or trailing newline, or a screen leaks Portuguese
+text while running in English. Text that comes from the orchestrator (for example a service's
+`detail`) is English in both modes.
 
 ## Screens
 
