@@ -72,27 +72,27 @@ func (m *Model) viewHeader() string {
 
 func (m *Model) viewFooter() string {
 	hints := map[tab]string{
-		tabPanel:   tr("↑↓ move · space toggle · x run job · i interval · p chat profiles · r refresh · tab/1-4 tabs · q quit"),
-		tabMemes:   tr("↑↓ move · s NSFW · h learn tag · g suggest · u remove tag · enter send · d dispatch · t queue/sent · n/p page · R refresh · q quit"),
-		tabDiscord: tr("↑↓ field · space toggle channel · ctrl+s send · F1-F4 tabs · ctrl+c quit"),
-		tabHistory: tr("tab/1-4 tabs · q quit"),
+		tabPanel:   tr("panel_tab_help"),
+		tabMemes:   tr("meme_tab_help"),
+		tabDiscord: tr("field_space_toggle_channel_ctrl_s_send_f1_f4_tabs_ctrl_c_quit"),
+		tabHistory: tr("tab_1_4_tabs_q_quit"),
 	}
 	hint := hints[m.tab]
 	switch m.overlay {
 	case overlayConfirm:
-		hint = tr("y/enter confirm · n/esc cancel")
+		hint = tr("y_enter_confirm_n_esc_cancel")
 	case overlayPicker:
-		hint = tr("↑↓ move · space toggle · a all · f --force · enter continue · esc cancel")
+		hint = tr("channel_picker_help")
 	case overlayDispatch:
-		hint = tr("enter continue · esc cancel")
+		hint = tr("enter_continue_esc_cancel")
 	case overlayInterval:
-		hint = tr("enter apply · esc cancel")
+		hint = tr("enter_apply_esc_cancel")
 	case overlayProfiles:
-		hint = tr("↑↓ move · enter activate · n new (local) · d delete (local) · esc close")
+		hint = tr("move_enter_activate_n_new_local_d_delete_local_esc_close")
 	case overlayProfileForm:
-		hint = tr("tab/↑↓ field · ctrl+s save · esc back")
+		hint = tr("tab_field_ctrl_s_save_esc_back")
 	case overlayHashtag:
-		hint = tr("enter save · esc cancel")
+		hint = tr("enter_save_esc_cancel")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
@@ -107,27 +107,27 @@ func (m *Model) viewFooter() string {
 
 func (m *Model) channelLabel(id string) string {
 	if m.status != nil && m.status.Channels.isSafeOnly(id) {
-		return id + styleWarn.Render(tr("  safe-only (NSFW filter)"))
+		return id + styleWarn.Render(tr("safe_only_nsfw_filter"))
 	}
-	return id + styleDim.Render(tr("  no filter"))
+	return id + styleDim.Render(tr("no_filter"))
 }
 
 func (m *Model) viewPanel() string {
 	if m.status == nil {
 		if m.statusErr != "" {
-			return styleBad.Render(tr("No answer from the orchestrator: ") + m.statusErr)
+			return styleBad.Render(tr("no_answer_from_the_orchestrator") + m.statusErr)
 		}
-		return styleDim.Render(tr("Loading…"))
+		return styleDim.Render(tr("loading"))
 	}
 	s := m.status
 	var b strings.Builder
 
-	b.WriteString(styleTitle.Render(tr("Services")) + styleDim.Render(tr("   space toggles (the container keeps running; switching the scheduler off pauses every job)")) + "\n")
+	b.WriteString(styleTitle.Render(tr("services")) + styleDim.Render(tr("service_toggle_help")) + "\n")
 	for i, service := range s.Services {
 		b.WriteString(m.panelLine(i, checkbox(service.Enabled), fmt.Sprintf("%-9s %s", service.Name, m.serviceState(service))))
 	}
 
-	b.WriteString("\n" + styleTitle.Render("Jobs") + styleDim.Render(tr("   space pauses/resumes · x runs now · i interval")) + "\n")
+	b.WriteString("\n" + styleTitle.Render("Jobs") + styleDim.Render(tr("space_pauses_resumes_x_runs_now_i_interval")) + "\n")
 	for i, job := range s.Jobs {
 		b.WriteString(m.panelLine(len(s.Services)+i, checkbox(job.Enabled), fmt.Sprintf("%-25s %s", job.Name, m.jobState(job))))
 	}
@@ -135,19 +135,19 @@ func (m *Model) viewPanel() string {
 		b.WriteString(styleWarn.Render("  "+hint) + "\n")
 	}
 
-	b.WriteString("\n" + styleTitle.Render(tr("Meme pool")) + "\n")
+	b.WriteString("\n" + styleTitle.Render(tr("meme_pool")) + "\n")
 	if s.MemeOff {
-		b.WriteString("  " + styleWarn.Render(tr("meme service switched off: counts unavailable")) + "\n")
+		b.WriteString("  " + styleWarn.Render(tr("meme_service_switched_off_counts_unavailable")) + "\n")
 	} else {
-		b.WriteString(tr("  %d queued · %d already sent\n", s.Unsent, s.Sent))
+		b.WriteString(tr("d_queued_d_already_sent", s.Unsent, s.Sent))
 	}
-	b.WriteString("\n" + styleTitle.Render(tr("Meme channels")) + "\n")
+	b.WriteString("\n" + styleTitle.Render(tr("meme_channels")) + "\n")
 	for _, id := range s.Channels.Meme {
 		b.WriteString("  " + m.channelLabel(id) + "\n")
 	}
-	b.WriteString("\n" + styleDim.Render(tr("updated at ")+s.UpdatedAt.Format("15:04:05")))
+	b.WriteString("\n" + styleDim.Render(tr("updated_at")+s.UpdatedAt.Format("15:04:05")))
 	if m.statusErr != "" {
-		b.WriteString("\n" + styleBad.Render(tr("last refresh failed: ")+m.statusErr))
+		b.WriteString("\n" + styleBad.Render(tr("last_refresh_failed")+m.statusErr))
 	}
 	return b.String()
 }
@@ -171,16 +171,16 @@ func (m *Model) serviceState(service serviceRow) string {
 	switch {
 	case service.Status == "disabled":
 		if service.Detail != "" {
-			return styleWarn.Render(tr("switched off")) + styleDim.Render("  ("+trunc(service.Detail, 50)+")")
+			return styleWarn.Render(tr("switched_off")) + styleDim.Render("  ("+trunc(service.Detail, 50)+")")
 		}
-		return styleWarn.Render(tr("switched off"))
+		return styleWarn.Render(tr("switched_off"))
 	case service.Status == "error":
 		return styleBad.Render("error") + styleDim.Render("  "+trunc(service.Detail, 60))
 	case service.Status == "stopped":
 		return styleWarn.Render(tr("stopped")) + styleDim.Render("  "+trunc(service.Detail, 60))
 	case service.Status == "ok" && service.Name == "chat_ai" && m.status != nil:
 		if profile, ok := m.status.activeProfile(); ok {
-			return styleOK.Render("ok") + styleDim.Render(tr("  profile ")+profile.Name+" "+profile.KeyHint)
+			return styleOK.Render("ok") + styleDim.Render(tr("profile_status_prefix")+profile.Name+" "+profile.KeyHint)
 		}
 		return styleOK.Render("ok")
 	case service.Status == "ok":
@@ -189,15 +189,15 @@ func (m *Model) serviceState(service serviceRow) string {
 		}
 		return styleOK.Render("ok")
 	}
-	return styleDim.Render(tr("no health probe"))
+	return styleDim.Render(tr("no_health_probe"))
 }
 
 func (m *Model) jobState(job jobRow) string {
-	every := tr("unknown interval")
+	every := tr("unknown_interval")
 	if job.Interval != "" {
-		every = tr("every ") + job.Interval
+		every = tr("every") + job.Interval
 		if job.Override {
-			every += tr(" (changed)")
+			every += tr("changed")
 		}
 	}
 	parts := []string{styleDim.Render(fmt.Sprintf("%-24s", every))}
@@ -206,7 +206,7 @@ func (m *Model) jobState(job jobRow) string {
 	}
 	if !job.LastAt.IsZero() {
 		outcome := map[string]string{"ran": tr("ran"), "skipped": tr("skipped"), "error": tr("error")}[job.LastOutcome]
-		text := tr("last ") + clock(job.LastAt, m.status.UpdatedAt)
+		text := tr("last") + clock(job.LastAt, m.status.UpdatedAt)
 		if outcome != "" {
 			text += " " + outcome
 		}
@@ -217,7 +217,7 @@ func (m *Model) jobState(job jobRow) string {
 		parts = append(parts, style.Render(text))
 	}
 	if job.Enabled && !job.NextAt.IsZero() {
-		parts = append(parts, styleDim.Render(tr("next ")+clock(job.NextAt, m.status.UpdatedAt)+" ("+until(job.NextAt.Sub(m.status.UpdatedAt))+")"))
+		parts = append(parts, styleDim.Render(tr("next")+clock(job.NextAt, m.status.UpdatedAt)+" ("+until(job.NextAt.Sub(m.status.UpdatedAt))+")"))
 	}
 	return strings.Join(parts, "  ")
 }
@@ -234,11 +234,11 @@ func clock(t, now time.Time) string {
 func until(d time.Duration) string {
 	switch {
 	case d < time.Minute:
-		return tr("in <1m")
+		return tr("in_1m")
 	case d < time.Hour:
-		return tr("in %dm", int(d.Minutes()))
+		return tr("in_dm", int(d.Minutes()))
 	}
-	return tr("in %dh%02dm", int(d.Hours()), int(d.Minutes())%60)
+	return tr("in_dh_02dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 // schedulerHint warns when the scheduler has stopped announcing itself; it does so about
@@ -254,9 +254,9 @@ func schedulerHint(s *statusData) string {
 	case len(s.Jobs) == 0:
 		return ""
 	case newest.IsZero():
-		return tr("the scheduler has not announced anything yet (stopped?): intervals and next runs appear once it runs")
+		return tr("scheduler_missing_announcement")
 	case s.UpdatedAt.Sub(newest) > 3*time.Minute:
-		return tr("last scheduler announce %dm ago (stopped?): the times below may be stale", int(s.UpdatedAt.Sub(newest).Minutes()))
+		return tr("last_scheduler_announce_dm_ago_stopped_the_times_below_may_be_stale", int(s.UpdatedAt.Sub(newest).Minutes()))
 	}
 	return ""
 }
@@ -267,7 +267,7 @@ func (m *Model) viewMemes() string {
 	var list strings.Builder
 	scope := tr("queued")
 	if m.memes.scope == "sent" {
-		scope = tr("already sent")
+		scope = tr("already_sent")
 	}
 	page := m.memes.page
 	from := 0
@@ -279,17 +279,17 @@ func (m *Model) viewMemes() string {
 
 	switch {
 	case m.memes.err != "":
-		return list.String() + styleBad.Render(tr("Failed to list: ")+m.memes.err)
+		return list.String() + styleBad.Render(tr("failed_to_list")+m.memes.err)
 	case !m.memes.loaded:
-		return list.String() + styleDim.Render(tr("Loading…"))
+		return list.String() + styleDim.Render(tr("loading"))
 	case len(page.Items) == 0:
-		return list.String() + styleDim.Render(tr("Nothing here."))
+		return list.String() + styleDim.Render(tr("nothing_here"))
 	}
 
 	for i, item := range page.Items {
 		title := strings.TrimSpace(item.Title)
 		if title == "" {
-			title = tr("(untitled)")
+			title = tr("untitled")
 		}
 		line := fmt.Sprintf("%-52s %s", trunc(title, 50), styleDim.Render(fileName(item.URL)))
 		if i == m.memes.cursor {
@@ -301,12 +301,12 @@ func (m *Model) viewMemes() string {
 
 	var detail strings.Builder
 	if item, ok := m.selectedMeme(); ok {
-		detail.WriteString("\n" + styleTitle.Render(tr("Selected")) + "\n")
-		detail.WriteString(tr("  title: ") + trunc(item.Title, 80) + "\n")
+		detail.WriteString("\n" + styleTitle.Render(tr("selected")) + "\n")
+		detail.WriteString(tr("title") + trunc(item.Title, 80) + "\n")
 		detail.WriteString("  tags:   " + trunc(item.Tags, 80) + "\n")
 		detail.WriteString("  url:    " + trunc(item.URL, 90) + "\n")
 		if item.DateSent != "" {
-			detail.WriteString(tr("  sent at: ") + item.DateSent + "\n")
+			detail.WriteString(tr("sent_at") + item.DateSent + "\n")
 		}
 		if m.screen != nil && m.screen.URL == item.URL {
 			detail.WriteString("\n" + m.viewScreen(*m.screen))
@@ -338,11 +338,11 @@ func (m *Model) viewPreview() string {
 	p := m.images.cache[item.URL]
 	switch {
 	case p == nil && m.images.inflight[item.URL]:
-		return styleDim.Render(tr("loading image…"))
+		return styleDim.Render(tr("loading_image"))
 	case p == nil:
 		return ""
 	case p.err != "":
-		return styleDim.Render(tr("(no preview: ") + trunc(p.err, 60) + ")")
+		return styleDim.Render(tr("no_preview") + trunc(p.err, 60) + ")")
 	}
 	return p.textAt(m.images.frame)
 }
@@ -350,15 +350,15 @@ func (m *Model) viewPreview() string {
 func (m *Model) viewScreen(s screenData) string {
 	var b strings.Builder
 	if s.Safe {
-		b.WriteString(styleOK.Render(tr("NSFW filter: safe")) + "\n")
+		b.WriteString(styleOK.Render(tr("nsfw_filter_safe")) + "\n")
 	} else {
-		b.WriteString(styleBad.Render(tr("NSFW filter: BLOCKED — ")+s.Reason) + "\n")
+		b.WriteString(styleBad.Render(tr("nsfw_filter_blocked")+s.Reason) + "\n")
 	}
 	if s.Text != "" {
-		b.WriteString(tr("  text read: ") + trunc(s.Text, 90) + "\n")
+		b.WriteString(tr("text_read") + trunc(s.Text, 90) + "\n")
 	}
 	if len(s.Detections) > 0 {
-		b.WriteString(tr("  detections:  ") + strings.Join(s.Detections, ", ") + "\n")
+		b.WriteString(tr("detections") + strings.Join(s.Detections, ", ") + "\n")
 	}
 	return b.String()
 }
@@ -372,17 +372,17 @@ func fileName(url string) string {
 
 func (m *Model) viewDiscord() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(tr("Send message")) + "\n\n")
-	b.WriteString(m.formRow(0, tr("Text "), m.form.text.View()))
-	b.WriteString(m.formRow(1, tr("Image"), m.form.image.View()))
-	b.WriteString("\n" + styleTitle.Render(tr("Channels")) + "\n")
+	b.WriteString(styleTitle.Render(tr("send_message_heading")) + "\n\n")
+	b.WriteString(m.formRow(0, tr("text_field"), m.form.text.View()))
+	b.WriteString(m.formRow(1, tr("image_field"), m.form.image.View()))
+	b.WriteString("\n" + styleTitle.Render(tr("channels")) + "\n")
 
 	channels := []string{}
 	if m.status != nil {
 		channels = m.status.Channels.destinations()
 	}
 	if len(channels) == 0 {
-		b.WriteString(styleDim.Render(tr("  (channels not loaded yet)")) + "\n")
+		b.WriteString(styleDim.Render(tr("channels_not_loaded_yet")) + "\n")
 	}
 	for i, id := range channels {
 		box := "[ ]"
@@ -392,7 +392,7 @@ func (m *Model) viewDiscord() string {
 		b.WriteString(m.formRow(2+i, box, m.channelLabel(id)))
 	}
 	sendRow := 2 + len(channels)
-	b.WriteString("\n" + m.formRow(sendRow, "", styleTitle.Render(tr("[ Send ]"))))
+	b.WriteString("\n" + m.formRow(sendRow, "", styleTitle.Render(tr("send"))))
 	return b.String()
 }
 
@@ -406,10 +406,10 @@ func (m *Model) formRow(index int, label, content string) string {
 
 func (m *Model) viewHistory() string {
 	if len(m.history) == 0 {
-		return styleDim.Render(tr("Nothing has been triggered in this session yet."))
+		return styleDim.Render(tr("nothing_has_been_triggered_in_this_session_yet"))
 	}
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(tr("Session history")) + "\n\n")
+	b.WriteString(styleTitle.Render(tr("session_history")) + "\n\n")
 	for _, entry := range m.history {
 		mark := styleOK.Render("✔")
 		if !entry.OK {
@@ -424,16 +424,16 @@ func (m *Model) viewConfirm() string {
 	if m.pending == nil {
 		return ""
 	}
-	body := styleTitle.Render(tr("Confirm: ")+m.pending.label) + "\n\n" + strings.Join(m.pending.lines, "\n")
+	body := styleTitle.Render(tr("confirm")+m.pending.label) + "\n\n" + strings.Join(m.pending.lines, "\n")
 	if m.pending.local == nil && strings.HasPrefix(m.pending.eventType, "discord.") {
-		body += "\n\n" + styleWarn.Render(tr("This really posts to Discord."))
+		body += "\n\n" + styleWarn.Render(tr("this_really_posts_to_discord"))
 	}
 	return styleBox.Render(body)
 }
 
 func (m *Model) viewPicker() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(tr("Send to which channels?")) + "\n")
+	b.WriteString(styleTitle.Render(tr("send_to_which_channels")) + "\n")
 	b.WriteString(styleDim.Render(trunc(m.picker.item.Title, 60)) + "\n\n")
 	for i, id := range m.status.Channels.destinations() {
 		box := "[ ]"
@@ -446,42 +446,42 @@ func (m *Model) viewPicker() string {
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s\n", marker, box, m.channelLabel(id)))
 	}
-	force := tr("off")
+	force := tr("force_nsfw_off")
 	if m.picker.forceNSFW {
-		force = styleBad.Render(tr("ON — bypass safe-only blocking"))
+		force = styleBad.Render(tr("force_nsfw_on"))
 	}
-	b.WriteString("\n" + tr("--force NSFW: ") + force + "\n")
+	b.WriteString("\n" + tr("force_nsfw_label") + force + "\n")
 	return styleBox.Render(b.String())
 }
 
 func (m *Model) viewDispatch() string {
 	return styleBox.Render(
-		styleTitle.Render(tr("Dispatch memes from the queue")) + "\n\n" +
+		styleTitle.Render(tr("dispatch_memes_from_the_queue")) + "\n\n" +
 			"Quantos? (1–" + fmt.Sprint(maxDispatchBatch) + ")  " + m.dispatchInput.View())
 }
 
 func (m *Model) viewHashtag() string {
 	item, _ := m.selectedMeme()
 	return styleBox.Render(
-		styleTitle.Render(tr("Learn hashtag from selected meme")) + "\n\n" +
+		styleTitle.Render(tr("learn_hashtag_from_selected_meme")) + "\n\n" +
 			"Meme: " + trunc(item.Title, 70) + "\n" +
-			tr("The image text is read by OCR automatically.") + "\n\n" +
+			tr("the_image_text_is_read_by_ocr_automatically") + "\n\n" +
 			"Hashtag: " + m.hashtagInput.View())
 }
 
 func (m *Model) viewInterval() string {
 	return styleBox.Render(
-		styleTitle.Render(tr("Interval of ")+m.intervalJob) + "\n\n" +
-			tr("New interval (e.g. 45m, 6h; min 1m, max 720h)\n") +
-			tr("or \"default\" to go back to the default:  ") + m.intervalInput.View())
+		styleTitle.Render(tr("interval_heading_prefix")+m.intervalJob) + "\n\n" +
+			tr("new_interval_e_g_45m_6h_min_1m_max_720h") +
+			tr("or_default_to_go_back_to_the_default") + m.intervalInput.View())
 }
 
 func (m *Model) viewProfiles() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(tr("Chat profiles (provider + model + token)")) + "\n")
-	b.WriteString(styleDim.Render(tr("the token is never shown; only its last 4 characters")) + "\n\n")
+	b.WriteString(styleTitle.Render(tr("chat_profiles_provider_model_token")) + "\n")
+	b.WriteString(styleDim.Render(tr("the_token_is_never_shown_only_its_last_4_characters")) + "\n\n")
 	if len(m.status.Profiles) == 0 {
-		b.WriteString(styleDim.Render(tr("no profiles yet: chat uses the CHAT_AI_* environment variables.\n")) + tr("n creates the first one.\n"))
+		b.WriteString(styleDim.Render(tr("no_profiles_yet_chat_uses_the_chat_ai_environment_variables")) + tr("n_creates_the_first_one"))
 	}
 	for i, row := range m.status.Profiles {
 		marker, active := "  ", "   "
@@ -501,10 +501,10 @@ func (m *Model) viewProfiles() string {
 }
 
 func (m *Model) viewProfileForm() string {
-	labels := []string{tr("Name  "), "URL   ", tr("Model"), "Token "}
+	labels := []string{tr("name"), "URL   ", tr("model_field"), "Token "}
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(tr("New chat profile")) + "\n")
-	b.WriteString(styleDim.Render(tr("stored on this computer only; it never goes through the orchestrator")) + "\n\n")
+	b.WriteString(styleTitle.Render(tr("new_chat_profile")) + "\n")
+	b.WriteString(styleDim.Render(tr("stored_on_this_computer_only_it_never_goes_through_the_orchestrator")) + "\n\n")
 	for i, label := range labels {
 		marker := "  "
 		if i == m.profileFocus {

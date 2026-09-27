@@ -25,7 +25,7 @@ const (
 )
 
 // tabTitles is a function, not a variable, so it follows the language chosen at start-up.
-func tabTitles() []string { return []string{tr("Panel"), "Memes", "Discord", tr("History")} }
+func tabTitles() []string { return []string{tr("panel"), "Memes", "Discord", tr("history")} }
 
 type overlayKind int
 
@@ -157,7 +157,7 @@ type Model struct {
 
 func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	text := textinput.New()
-	text.Placeholder = tr("message (optional when there is an image)")
+	text.Placeholder = tr("message_optional_when_there_is_an_image")
 	text.CharLimit = 1900
 	text.Width = 60
 	text.Focus()
@@ -168,7 +168,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	image.Width = 60
 
 	interval := textinput.New()
-	interval.Placeholder = tr("45m, 6h or default")
+	interval.Placeholder = tr("45m_6h_or_default")
 	interval.CharLimit = 16
 	interval.Width = 20
 
@@ -183,7 +183,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	hashtag.Width = 40
 
 	var form [4]textinput.Model
-	for i, placeholder := range []string{tr("name (e.g. hosted)"), "https://api.example.com/v1", tr("model"), tr("token (not shown on screen)")} {
+	for i, placeholder := range []string{tr("name_e_g_hosted"), "https://api.example.com/v1", tr("model_placeholder"), tr("token_not_shown_on_screen")} {
 		form[i] = textinput.New()
 		form[i].Placeholder = placeholder
 		form[i].Width = 46
@@ -243,7 +243,7 @@ func (m *Model) tickCmd() tea.Cmd {
 // begin claims the single in-flight slot.
 func (m *Model) begin(label string) bool {
 	if m.busy {
-		m.setNotice("aguarde: "+m.busyLabel+tr(" in progress"), true)
+		m.setNotice("aguarde: "+m.busyLabel+tr("in_progress"), true)
 		return false
 	}
 	m.busy, m.busyLabel = true, label
@@ -257,7 +257,7 @@ func (m *Model) setNotice(text string, isErr bool) {
 // skippedError means the orchestrator understood the request but a switch is off.
 type skippedError struct{ reason string }
 
-func (e *skippedError) Error() string { return tr("refused by the orchestrator: ") + e.reason }
+func (e *skippedError) Error() string { return tr("refused_by_the_orchestrator") + e.reason }
 
 func (m *Model) request(eventType string, payload map[string]any) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
@@ -273,7 +273,7 @@ func (m *Model) request(eventType string, payload map[string]any) (map[string]an
 }
 
 func (m *Model) cmdStatus() tea.Cmd {
-	if !m.begin(tr("refreshing panel")) {
+	if !m.begin(tr("refreshing_panel")) {
 		return nil
 	}
 	return func() tea.Msg {
@@ -297,7 +297,7 @@ func (m *Model) cmdStatus() tea.Cmd {
 }
 
 func (m *Model) cmdMemes() tea.Cmd {
-	if !m.begin(tr("loading memes")) {
+	if !m.begin(tr("loading_memes")) {
 		return nil
 	}
 	scope, offset := m.memes.scope, m.memes.page.Offset
@@ -311,7 +311,7 @@ func (m *Model) cmdMemes() tea.Cmd {
 }
 
 func (m *Model) cmdScreen(item memeItem) tea.Cmd {
-	if !m.begin(tr("checking the NSFW filter")) {
+	if !m.begin(tr("checking_the_nsfw_filter")) {
 		return nil
 	}
 	return func() tea.Msg {
@@ -405,7 +405,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenMsg:
 		m.busy = false
 		if msg.err != nil {
-			m.setNotice(tr("NSFW filter failed: ")+msg.err.Error(), true)
+			m.setNotice(tr("nsfw_filter_failed")+msg.err.Error(), true)
 			return m, nil
 		}
 		m.screen = &msg.data
@@ -415,7 +415,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.busy = false
 		if msg.err != nil {
 			m.addHistory(msg.action.label, msg.err.Error(), false)
-			m.setNotice(msg.action.label+tr(" failed: ")+msg.err.Error(), true)
+			m.setNotice(msg.action.label+tr("failed")+msg.err.Error(), true)
 			return m, nil
 		}
 		summary := "ok"
@@ -586,10 +586,10 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 		m.dispatchInput.Focus()
 	case "R":
 		return m, m.exec(&pendingAction{
-			label:     tr("refresh pool"),
+			label:     tr("refresh_pool"),
 			eventType: "meme.pool.refresh",
 			payload:   map[string]any{"max_items_per_scraper": 20},
-			summarize: func(map[string]any) string { return tr("pool refreshed") },
+			summarize: func(map[string]any) string { return tr("pool_refreshed") },
 			reload:    true,
 		})
 	case "h":
@@ -601,7 +601,7 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 	case "g":
 		if item, ok := m.selectedMeme(); ok {
 			return m, m.exec(&pendingAction{
-				label:     tr("suggest hashtag"),
+				label:     tr("suggest_hashtag"),
 				eventType: "meme.hashtag.suggest",
 				payload:   map[string]any{"url": item.URL},
 				summarize: summarizeHashtagSuggestion,
@@ -609,7 +609,7 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 		}
 	case "l":
 		return m, m.exec(&pendingAction{
-			label:     tr("list hashtag examples"),
+			label:     tr("list_hashtag_examples"),
 			eventType: "meme.hashtag.list",
 			payload:   map[string]any{"limit": 20, "offset": 0},
 			summarize: summarizeHashtagList,
@@ -617,10 +617,10 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 	case "u":
 		if item, ok := m.selectedMeme(); ok {
 			m.askConfirm(&pendingAction{
-				label:     tr("remove hashtag example"),
+				label:     tr("remove_hashtag_example"),
 				eventType: "meme.hashtag.untag",
 				payload:   map[string]any{"url": item.URL},
-				summarize: func(map[string]any) string { return tr("hashtag example removed") },
+				summarize: func(map[string]any) string { return tr("hashtag_example_removed") },
 			})
 		}
 	}
@@ -636,14 +636,14 @@ func (m *Model) keyHashtag(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		item, ok := m.selectedMeme()
 		if !ok || strings.TrimSpace(m.hashtagInput.Value()) == "" {
-			m.setNotice(tr("enter a hashtag"), true)
+			m.setNotice(tr("enter_a_hashtag"), true)
 			return m, nil
 		}
 		hashtag := strings.TrimSpace(m.hashtagInput.Value())
 		m.overlay = overlayNone
 		m.hashtagInput.Blur()
 		return m, m.exec(&pendingAction{
-			label:     tr("tag meme hashtag"),
+			label:     tr("tag_meme_hashtag"),
 			eventType: "meme.hashtag.tag",
 			payload:   map[string]any{"url": item.URL, "hashtag": hashtag},
 			summarize: summarizeHashtagTag,
@@ -656,12 +656,12 @@ func (m *Model) keyHashtag(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) channelsOrNotice() []string {
 	if m.status == nil {
-		m.setNotice(tr("channels not loaded yet; open the Panel and wait"), true)
+		m.setNotice(tr("channels_not_loaded_yet_open_the_panel_and_wait"), true)
 		return nil
 	}
 	channels := m.status.Channels.destinations()
 	if len(channels) == 0 {
-		m.setNotice(tr("no channel configured in the orchestrator"), true)
+		m.setNotice(tr("no_channel_configured_in_the_orchestrator"), true)
 	}
 	return channels
 }
@@ -699,7 +699,7 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 	case "enter":
 		chosen := chosenChannels(channels, m.picker.selected)
 		if len(chosen) == 0 {
-			m.setNotice(tr("select at least one channel with space"), true)
+			m.setNotice(tr("select_at_least_one_channel_with_space"), true)
 			return m, nil
 		}
 		item := m.picker.item
@@ -710,10 +710,10 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 		lines := append([]string{"Meme: " + trunc(item.Title, 60), "URL:  " + trunc(item.URL, 70), ""}, m.destinationLines(chosen)...)
 		if m.picker.forceNSFW && m.includesSafeOnly(chosen) {
 			payload["force_nsfw"] = true
-			lines = append(lines, "", tr("WARNING: --force bypasses NSFW blocking for selected safe-only channels."))
+			lines = append(lines, "", tr("force_nsfw_warning"))
 		}
 		m.askConfirm(&pendingAction{
-			label:     tr("send meme"),
+			label:     tr("send_meme"),
 			eventType: "discord.send",
 			payload:   payload,
 			lines:     lines,
@@ -747,18 +747,18 @@ func chosenChannels(all []string, selected map[string]bool) []string {
 }
 
 func (m *Model) destinationLines(chosen []string) []string {
-	lines := []string{tr("Send to:")}
+	lines := []string{tr("send_to")}
 	restricted := false
 	for _, id := range chosen {
 		label := id
 		if m.status != nil && m.status.Channels.isSafeOnly(id) {
-			label += tr("  (safe-only: the image goes through the NSFW filter first)")
+			label += tr("safe_only_the_image_goes_through_the_nsfw_filter_first")
 			restricted = true
 		}
 		lines = append(lines, "  • "+label)
 	}
 	if restricted {
-		lines = append(lines, "", tr("If the filter blocks it, this channel is skipped and the rest receive it."))
+		lines = append(lines, "", tr("if_the_filter_blocks_it_this_channel_is_skipped_and_the_rest_receive_it"))
 	}
 	return lines
 }
@@ -773,7 +773,7 @@ func (m *Model) keyConfirm(key string) (tea.Model, tea.Cmd) {
 	case "y", "Y", "enter":
 		if m.busy {
 			// Keep the confirmation open instead of silently dropping the action.
-			m.setNotice("aguarde: "+m.busyLabel+tr(" in progress"), true)
+			m.setNotice("aguarde: "+m.busyLabel+tr("in_progress"), true)
 			return m, nil
 		}
 		action := m.pending
@@ -794,7 +794,7 @@ func (m *Model) keyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		count, err := strconv.Atoi(strings.TrimSpace(m.dispatchInput.Value()))
 		if err != nil || count < 1 || count > maxDispatchBatch {
-			m.setNotice(tr("enter a number between 1 and %d", maxDispatchBatch), true)
+			m.setNotice(tr("enter_a_number_between_1_and_d", maxDispatchBatch), true)
 			return m, nil
 		}
 		channels := []string{}
@@ -803,10 +803,10 @@ func (m *Model) keyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.overlay = overlayNone
 		m.askConfirm(&pendingAction{
-			label:     tr("dispatch %d meme(s)", count),
+			label:     tr("dispatch_d_meme_s", count),
 			eventType: "meme.dispatch.scheduled",
 			payload:   map[string]any{"limit": count},
-			lines: append([]string{tr("Pick %d meme(s) from the top of the queue and send to:", count)},
+			lines: append([]string{tr("pick_d_meme_s_from_the_top_of_the_queue_and_send_to", count)},
 				m.destinationLines(channels)[1:]...),
 			summarize: summarizeDispatch,
 			reload:    true,
@@ -891,24 +891,24 @@ func (m *Model) confirmDiscordSend(channels []string) tea.Cmd {
 	chosen := chosenChannels(channels, m.form.selected)
 	switch {
 	case text == "" && image == "":
-		m.setNotice(tr("write a message and/or provide an image"), true)
+		m.setNotice(tr("write_a_message_and_or_provide_an_image"), true)
 		return nil
 	case len(chosen) == 0:
-		m.setNotice(tr("select at least one channel (space)"), true)
+		m.setNotice(tr("select_at_least_one_channel_space"), true)
 		return nil
 	}
 	payload := map[string]any{"channel_ids": chosen}
 	lines := []string{}
 	if text != "" {
 		payload["content"] = text
-		lines = append(lines, tr("Text:  ")+trunc(text, 70))
+		lines = append(lines, tr("text_summary_prefix")+trunc(text, 70))
 	}
 	if image != "" {
 		payload["attachment_url"] = image
-		lines = append(lines, tr("Image: ")+trunc(image, 70))
+		lines = append(lines, tr("image_summary_prefix")+trunc(image, 70))
 	}
 	m.askConfirm(&pendingAction{
-		label:     tr("send message"),
+		label:     tr("send_message_action"),
 		eventType: "discord.send",
 		payload:   payload,
 		lines:     append(append(lines, ""), m.destinationLines(chosen)...),
@@ -956,7 +956,7 @@ func (m *Model) cmdSelectedImage() tea.Cmd {
 	video := isVideo(url)
 	if video && framer == nil {
 		delete(m.images.inflight, url)
-		m.images.remember(&preview{url: url, err: tr("video: no preview (ffmpeg unavailable)")})
+		m.images.remember(&preview{url: url, err: tr("video_no_preview_ffmpeg_unavailable")})
 		return nil
 	}
 	firstID, span := uint32(0), uint32(1)
@@ -1027,7 +1027,7 @@ func (m *Model) upload(p *preview) {
 		return
 	}
 	if err := m.images.sink.WriteRaw(p.transmit); err != nil {
-		p.err = tr("terminal refused the image: ") + err.Error()
+		p.err = tr("terminal_refused_the_image") + err.Error()
 	}
 	p.uploaded, p.transmit = true, nil
 }
@@ -1084,7 +1084,7 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.askRunJob(row)
 		} else if ok {
-			m.setNotice(tr("only jobs can be run; select a job"), true)
+			m.setNotice(tr("only_jobs_can_be_run_select_a_job"), true)
 		}
 	case "p":
 		m.openProfiles()
@@ -1092,7 +1092,7 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.openInterval(row.name)
 		} else if ok {
-			m.setNotice(tr("only jobs have an interval; select a job"), true)
+			m.setNotice(tr("only_jobs_have_an_interval_select_a_job"), true)
 		}
 	}
 	return m, nil
@@ -1133,22 +1133,22 @@ func (m *Model) askRunJob(row panelRow) {
 		m.setNotice(err.Error(), true)
 		return
 	}
-	lines := []string{tr("Run now: ") + row.name, ""}
+	lines := []string{tr("run_now") + row.name, ""}
 	if !row.enabled {
-		lines = append(lines, tr("The job is paused; a manual run ignores the pause."), "")
+		lines = append(lines, tr("the_job_is_paused_a_manual_run_ignores_the_pause"), "")
 	}
 	if service, ok := m.status.service(jobService(row.name)); ok && !service.Enabled {
-		lines = append(lines, tr("Warning: service %s is switched off and the orchestrator will refuse it.", service.Name), "")
+		lines = append(lines, tr("warning_service_s_is_switched_off_and_the_orchestrator_will_refuse_it", service.Name), "")
 	}
 	summarize := func(map[string]any) string { return "executado" }
 	switch row.name {
 	case "meme.dispatch":
-		lines = append(lines, tr("Sends 1 meme (goes through the NSFW filter on safe-only channels) to:"))
+		lines = append(lines, tr("sends_1_meme_goes_through_the_nsfw_filter_on_safe_only_channels_to"))
 		lines = append(lines, m.destinationLines(m.status.Channels.Meme)[1:]...)
 		summarize = summarizeDispatch
 	}
 	m.askConfirm(&pendingAction{
-		label:     tr("run job ") + row.name,
+		label:     tr("run_job") + row.name,
 		eventType: eventType,
 		payload:   payload,
 		lines:     lines,
@@ -1178,14 +1178,14 @@ func (m *Model) keyInterval(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.overlay = overlayNone
 		return m, m.exec(&pendingAction{
-			label:     tr("interval of ") + m.intervalJob,
+			label:     tr("interval_action_prefix") + m.intervalJob,
 			eventType: "scheduler.jobs.set",
 			payload:   payload,
 			summarize: func(res map[string]any) string {
 				if interval := str(res, "interval"); interval != "" {
-					return tr("every ") + interval
+					return tr("every") + interval
 				}
-				return tr("back to the default")
+				return tr("back_to_the_default")
 			},
 			reload: true,
 		})
@@ -1205,7 +1205,7 @@ func (m *Model) SetProfileStore(profiles ProfileStore) { m.profiles = profiles }
 
 func (m *Model) openProfiles() {
 	if m.status == nil {
-		m.setNotice(tr("wait for the panel to load"), true)
+		m.setNotice(tr("wait_for_the_panel_to_load"), true)
 		return
 	}
 	m.profileCursor = 0
@@ -1235,16 +1235,16 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 			row := rows[m.profileCursor]
 			m.overlay = overlayNone
 			return m, m.exec(&pendingAction{
-				label:     tr("use chat profile ") + row.Name,
+				label:     tr("use_chat_profile") + row.Name,
 				eventType: "chat.profile.use",
 				payload:   map[string]any{"name": row.Name},
-				summarize: func(map[string]any) string { return tr("active (applies from the next message)") },
+				summarize: func(map[string]any) string { return tr("active_applies_from_the_next_message") },
 				reload:    true,
 			})
 		}
 	case "n":
 		if m.profiles == nil {
-			m.setNotice(tr("no local access to the database: set DOKJA_DB_FILE to create profiles"), true)
+			m.setNotice(tr("no_local_access_to_the_database_set_dokja_db_file_to_create_profiles"), true)
 			return m, nil
 		}
 		for i := range m.profileForm {
@@ -1256,7 +1256,7 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayProfileForm
 	case "d":
 		if m.profiles == nil {
-			m.setNotice(tr("no local access to the database: set DOKJA_DB_FILE to delete profiles"), true)
+			m.setNotice(tr("no_local_access_to_the_database_set_dokja_db_file_to_delete_profiles"), true)
 			return m, nil
 		}
 		if m.profileCursor < len(rows) {
@@ -1267,14 +1267,14 @@ func (m *Model) keyProfiles(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) askDeleteProfile(row profileRow) {
-	lines := []string{tr("Delete profile ") + row.Name + " (" + row.Model + ")?", ""}
+	lines := []string{tr("delete_profile_confirmation") + row.Name + " (" + row.Model + ")?", ""}
 	if row.Active {
-		lines = append(lines, tr("This is the ACTIVE profile: chat goes back to the CHAT_AI_* environment variables."), "")
+		lines = append(lines, tr("default_profile_warning"), "")
 	}
-	lines = append(lines, tr("This removes the token from the local database. It cannot be undone."))
+	lines = append(lines, tr("this_removes_the_token_from_the_local_database_it_cannot_be_undone"))
 	m.overlay = overlayConfirm
 	m.pending = &pendingAction{
-		label: tr("delete profile ") + row.Name,
+		label: tr("delete_profile_action") + row.Name,
 		lines: lines,
 		local: func() (string, error) {
 			if err := m.profiles.DeleteProfile(row.Name, row.Active); err != nil {
@@ -1329,7 +1329,7 @@ func (m *Model) saveProfileForm() tea.Cmd {
 	}
 	m.profileForm[3].SetValue("")
 	m.overlay = overlayProfiles
-	m.addHistory(tr("create profile ")+profile.Name, tr("saved in the local database"), true)
-	m.setNotice(tr("profile ")+profile.Name+tr(" saved; press enter on the profile to activate it"), false)
+	m.addHistory(tr("create_profile")+profile.Name, tr("saved_in_the_local_database"), true)
+	m.setNotice(tr("profile_notice_prefix")+profile.Name+tr("saved_press_enter_on_the_profile_to_activate_it"), false)
 	return m.cmdStatus()
 }

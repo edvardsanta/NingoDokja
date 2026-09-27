@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -28,9 +29,9 @@ func withLanguage(t *testing.T, tag string) {
 	t.Cleanup(func() { SetLanguage(previous) })
 }
 
-// usedMessages returns every literal passed as the first argument of tr(...) in the
+// usedMessageIDs returns every literal passed as the first argument of tr(...) in the
 // package sources.
-func usedMessages(t *testing.T) map[string]bool {
+func usedMessageIDs(t *testing.T) map[string]bool {
 	t.Helper()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -66,27 +67,52 @@ func usedMessages(t *testing.T) map[string]bool {
 	return used
 }
 
-func TestEveryMessageUsedInTheCodeHasAPortugueseTranslation(t *testing.T) {
-	var missing []string
-	for message := range usedMessages(t) {
-		if _, ok := ptMessages[message]; !ok {
-			missing = append(missing, message)
-		}
+func decodeCatalog(t *testing.T, content []byte) map[string]string {
+	t.Helper()
+	var catalog map[string]string
+	if err := json.Unmarshal(content, &catalog); err != nil {
+		t.Fatal(err)
 	}
-	sort.Strings(missing)
-	if len(missing) > 0 {
-		t.Fatalf("messages without a Portuguese translation:\n  %s", strings.Join(missing, "\n  "))
+	return catalog
+}
+
+func TestEveryMessageIDUsedInTheCodeExistsInBothCatalogs(t *testing.T) {
+	english := decodeCatalog(t, englishCatalog)
+	portuguese := decodeCatalog(t, portugueseCatalog)
+	for catalogLanguage, catalog := range map[string]map[string]string{"English": english, "Portuguese": portuguese} {
+		var missing []string
+		for id := range usedMessageIDs(t) {
+			if _, ok := catalog[id]; !ok {
+				missing = append(missing, id)
+			}
+		}
+		sort.Strings(missing)
+		if len(missing) > 0 {
+			t.Errorf("IDs without an %s translation:\n  %s", catalogLanguage, strings.Join(missing, "\n  "))
+		}
 	}
 }
 
 func TestTheCatalogHoldsNoStaleOrIdenticalEntries(t *testing.T) {
-	used := usedMessages(t)
-	for message, translated := range ptMessages {
-		if !used[message] {
-			t.Errorf("stale catalog entry, not used in the code: %q", message)
+	used := usedMessageIDs(t)
+	english := decodeCatalog(t, englishCatalog)
+	portuguese := decodeCatalog(t, portugueseCatalog)
+	for id, original := range english {
+		if !used[id] {
+			t.Errorf("stale catalog entry, not used in the code: %q", id)
 		}
-		if message == translated {
-			t.Errorf("entry %q is identical in both languages; drop it", message)
+		translated, ok := portuguese[id]
+		if !ok {
+			t.Errorf("Portuguese catalog does not contain %q", id)
+			continue
+		}
+		if original == translated {
+			t.Errorf("entry %q is identical in both languages; use the literal directly", id)
+		}
+	}
+	for id := range portuguese {
+		if _, ok := english[id]; !ok {
+			t.Errorf("Portuguese catalog contains unknown ID %q", id)
 		}
 	}
 }
@@ -94,12 +120,15 @@ func TestTheCatalogHoldsNoStaleOrIdenticalEntries(t *testing.T) {
 var verbs = regexp.MustCompile(`%[-+# 0-9.]*[a-zA-Z]`)
 
 func TestTranslationsKeepTheSameFormatVerbsInTheSameOrder(t *testing.T) {
-	for message, translated := range ptMessages {
-		if got, want := verbs.FindAllString(translated, -1), verbs.FindAllString(message, -1); strings.Join(got, "") != strings.Join(want, "") {
-			t.Errorf("format verbs differ between %q (%v) and %q (%v)", message, want, translated, got)
+	english := decodeCatalog(t, englishCatalog)
+	portuguese := decodeCatalog(t, portugueseCatalog)
+	for id, original := range english {
+		translated := portuguese[id]
+		if got, want := verbs.FindAllString(translated, -1), verbs.FindAllString(original, -1); strings.Join(got, "") != strings.Join(want, "") {
+			t.Errorf("format verbs differ for %q: English %v, Portuguese %v", id, want, got)
 		}
-		if strings.HasSuffix(message, "\n") != strings.HasSuffix(translated, "\n") {
-			t.Errorf("trailing newline differs for %q", message)
+		if strings.HasSuffix(original, "\n") != strings.HasSuffix(translated, "\n") {
+			t.Errorf("trailing newline differs for %q", id)
 		}
 	}
 }
@@ -140,18 +169,15 @@ func TestLanguageSelection(t *testing.T) {
 
 func TestMessagesFallBackToEnglishAndFormatArguments(t *testing.T) {
 	withLanguage(t, "pt")
-	if got := tr("no such message %d", 3); got != "no such message 3" {
-		t.Fatalf("expected the English text with its arguments, got %q", got)
+	if got := tr("no_such_message"); got != "no_such_message" {
+		t.Fatalf("expected a missing ID to remain visible, got %q", got)
 	}
-	if got := tr("Services"); got != "Serviços" {
+	if got := tr("services"); got != "Serviços" {
 		t.Fatalf("expected the Portuguese text, got %q", got)
 	}
 	SetLanguage("en")
-	if got := tr("Services"); got != "Services" || tr("%d queued · %d already sent\n", 1, 2) != "1 queued · 2 already sent\n" {
+	if got := tr("services"); got != "Services" || tr("d_queued_d_already_sent", 1, 2) != "  1 queued · 2 already sent\n" {
 		t.Fatalf("unexpected English text %q", got)
-	}
-	if tr("100% sure") != "100% sure" {
-		t.Fatal("a message without arguments must not be treated as a format string")
 	}
 }
 

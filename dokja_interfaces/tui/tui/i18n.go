@@ -1,27 +1,59 @@
 package tui
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
+	"sync"
+
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"golang.org/x/text/language"
 )
 
-// The interface text is written in English in the code. Each message is looked up in the
-// catalog of the active language and shown as written when there is no entry, so English is
-// both the default and the fallback. Add a language by adding a catalog and a case in
-// SetLanguage.
+// Translation catalogs are embedded so the TUI remains a single binary.
 //
-// The language is process-wide and must be set before the program starts.
+//go:embed locales/active.en.json
+var englishCatalog []byte
 
-var language = "en"
+//go:embed locales/active.pt-BR.json
+var portugueseCatalog []byte
+
+var (
+	translations = newTranslationBundle()
+	languageMu   sync.RWMutex
+	activeLang   = "en"
+	localizer    = i18n.NewLocalizer(translations, "en")
+)
+
+func newTranslationBundle() *i18n.Bundle {
+	bundle := i18n.NewBundle(language.English)
+	bundle.MustParseMessageFileBytes(englishCatalog, "active.en.json")
+	bundle.MustParseMessageFileBytes(portugueseCatalog, "active.pt-BR.json")
+	return bundle
+}
 
 // SetLanguage selects the interface language from a tag such as "pt", "pt-BR" or
-// "pt_BR.UTF-8". Anything it does not know falls back to English.
+// "pt_BR.UTF-8". Anything it does not know falls back to English. The language is
+// selected at startup; the lock also keeps tests that switch it race-safe.
 func SetLanguage(tag string) {
-	language = normalizeLanguage(tag)
+	selected := normalizeLanguage(tag)
+	tags := []string{selected}
+	if selected == "pt" {
+		tags = []string{"pt-BR", "en"}
+	}
+
+	languageMu.Lock()
+	activeLang = selected
+	localizer = i18n.NewLocalizer(translations, tags...)
+	languageMu.Unlock()
 }
 
 // Language reports the active language code.
-func Language() string { return language }
+func Language() string {
+	languageMu.RLock()
+	defer languageMu.RUnlock()
+	return activeLang
+}
 
 func normalizeLanguage(tag string) string {
 	tag = strings.ToLower(strings.TrimSpace(tag))
@@ -41,14 +73,17 @@ func DetectLanguage(env func(string) string) string {
 	return "en"
 }
 
-// tr returns the message in the active language. With arguments it formats them, so a
-// translation must keep the same verbs in the same order as the English text.
-func tr(message string, args ...any) string {
-	text := message
-	if language == "pt" {
-		if translated, ok := ptMessages[message]; ok {
-			text = translated
-		}
+// tr resolves a stable message ID from the active catalog. Formatting remains compatible
+// with fmt.Printf so existing callers can pass positional values after the ID.
+func tr(messageID string, args ...any) string {
+	languageMu.RLock()
+	current := localizer
+	languageMu.RUnlock()
+
+	text, err := current.Localize(&i18n.LocalizeConfig{MessageID: messageID})
+	if err != nil {
+		// Missing IDs are intentionally visible and are also rejected by catalog tests.
+		text = messageID
 	}
 	if len(args) == 0 {
 		return text
