@@ -4,6 +4,7 @@ Project-level architecture and behavior notes.
 
 Available docs:
 
+- [experience-memory-plan.md](./experience-memory-plan.md)
 - [events-vs-requests.md](./events-vs-requests.md)
 - [workflows.md](./workflows.md)
 - [discord-interface.md](./discord-interface.md)
