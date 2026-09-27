@@ -206,6 +206,12 @@ after the configured embedding model is available. This release has no automatic
 Back up the hashtag database alongside the meme pool. Rebuild the meme service and
 orchestrator and update the operator interfaces to enable the feature; no new ports.
 
+For manual TUI sends only, the channel picker exposes `--force`. It bypasses screening
+for selected safe-only channels and requires a highlighted confirmation. The orchestrator
+rejects the field from CLI, API and scheduled events, records the bypass in its log and
+returns `nsfw_bypassed: true`. The request bridge is an operator interface rather than an
+authentication boundary, so keep its existing network-access restrictions in place.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone

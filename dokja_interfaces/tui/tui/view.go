@@ -82,7 +82,7 @@ func (m *Model) viewFooter() string {
 	case overlayConfirm:
 		hint = tr("y/enter confirm · n/esc cancel")
 	case overlayPicker:
-		hint = tr("↑↓ move · space toggle · a all · enter continue · esc cancel")
+		hint = tr("↑↓ move · space toggle · a all · f --force · enter continue · esc cancel")
 	case overlayDispatch:
 		hint = tr("enter continue · esc cancel")
 	case overlayInterval:
@@ -446,6 +446,11 @@ func (m *Model) viewPicker() string {
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s\n", marker, box, m.channelLabel(id)))
 	}
+	force := tr("off")
+	if m.picker.forceNSFW {
+		force = styleBad.Render(tr("ON — bypass safe-only blocking"))
+	}
+	b.WriteString("\n" + tr("--force NSFW: ") + force + "\n")
 	return styleBox.Render(b.String())
 }
 

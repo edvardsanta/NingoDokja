@@ -282,6 +282,35 @@ func TestSendingAPickedMemeNeedsConfirmationAndMarksItSent(t *testing.T) {
 	}
 }
 
+func TestPickedMemeCanForceSafeOnlyDeliveryFromTUI(t *testing.T) {
+	m, fake := started(t)
+	press(m, "2", "enter", "down", "space", "f", "enter")
+
+	if m.overlay != overlayConfirm || !strings.Contains(m.View(), "--force ignora o bloqueio NSFW") {
+		t.Fatalf("forced send needs an explicit warning:\n%s", m.View())
+	}
+	if fake.count("discord.send") != 0 {
+		t.Fatal("forced send must still wait for confirmation")
+	}
+	press(m, "y")
+	if fake.last("discord.send").payload["force_nsfw"] != true {
+		t.Fatalf("expected force_nsfw in TUI request, got %#v", fake.last("discord.send").payload)
+	}
+
+	press(m, "enter")
+	if m.picker.forceNSFW {
+		t.Fatal("--force must reset whenever the picker opens")
+	}
+}
+
+func TestForceIsNotSentForOpenOnlyDestination(t *testing.T) {
+	m, fake := started(t)
+	press(m, "2", "enter", "space", "f", "enter", "y")
+	if _, present := fake.last("discord.send").payload["force_nsfw"]; present {
+		t.Fatalf("open-only send must not carry force_nsfw: %#v", fake.last("discord.send").payload)
+	}
+}
+
 func TestResendingFromTheSentListDoesNotMarkAgain(t *testing.T) {
 	m, fake := started(t)
 	press(m, "2", "t", "enter", "space", "enter", "y")

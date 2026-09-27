@@ -3,6 +3,12 @@ package tui
 // ptMessages translates the interface into Portuguese. Keys are the English text used
 // in the code; a message with no entry is shown in English.
 var ptMessages = map[string]string{
+	"; NSFW blocking bypassed":       "; bloqueio NSFW ignorado",
+	"--force NSFW: ":                 "NSFW com --force: ",
+	"off":                            "desligado",
+	"ON — bypass safe-only blocking": "LIGADO — ignora o bloqueio só-seguro",
+	"WARNING: --force bypasses NSFW blocking for selected safe-only channels.":                                                           "AVISO: --force ignora o bloqueio NSFW nos canais só-seguro selecionados.",
+	"↑↓ move · space toggle · a all · f --force · enter continue · esc cancel":                                                           "↑↓ mover · espaço marca · a todos · f --force · enter continua · esc cancela",
 	"↑↓ move · s NSFW · h learn tag · g suggest · u remove tag · enter send · d dispatch · t queue/sent · n/p page · R refresh · q quit": "↑↓ mover · s NSFW · h aprender tag · g sugerir · u remover tag · enter enviar · d disparar · t fila/enviados · n/p página · R atualizar · q sair",
 	"enter save · esc cancel":                      "enter salva · esc cancela",
 	"Learn hashtag from selected meme":             "Aprender hashtag do meme selecionado",
@@ -160,6 +166,5 @@ var ptMessages = map[string]string{
 	"y/enter confirm · n/esc cancel":          "y/enter confirma · n/esc cancela",
 	"↑↓ field · space toggle channel · ctrl+s send · F1-F4 tabs · ctrl+c quit":                              "↑↓ campo · espaço marca canal · ctrl+s enviar · F1-F4 abas · ctrl+c sair",
 	"↑↓ move · enter activate · n new (local) · d delete (local) · esc close":                               "↑↓ mover · enter ativa · n novo (local) · d apagar (local) · esc fecha",
-	"↑↓ move · space toggle · a all · enter continue · esc cancel":                                          "↑↓ mover · espaço marca · a todos · enter continua · esc cancela",
 	"↑↓ move · space toggle · x run job · i interval · p chat profiles · r refresh · tab/1-4 tabs · q quit": "↑↓ mover · espaço liga/desliga · x rodar job · i intervalo · p perfis do chat · r atualizar · tab/1-4 abas · q sair",
 }

@@ -91,9 +91,10 @@ type memeList struct {
 }
 
 type picker struct {
-	cursor   int
-	selected map[string]bool
-	item     memeItem
+	cursor    int
+	selected  map[string]bool
+	item      memeItem
+	forceNSFW bool
 }
 
 type discordForm struct {
@@ -693,6 +694,8 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 		for _, id := range channels {
 			m.picker.selected[id] = true
 		}
+	case "f":
+		m.picker.forceNSFW = !m.picker.forceNSFW
 	case "enter":
 		chosen := chosenChannels(channels, m.picker.selected)
 		if len(chosen) == 0 {
@@ -704,16 +707,33 @@ func (m *Model) keyPicker(key string) (tea.Model, tea.Cmd) {
 		if m.memes.scope == "unsent" {
 			payload["mark_sent"] = true
 		}
+		lines := append([]string{"Meme: " + trunc(item.Title, 60), "URL:  " + trunc(item.URL, 70), ""}, m.destinationLines(chosen)...)
+		if m.picker.forceNSFW && m.includesSafeOnly(chosen) {
+			payload["force_nsfw"] = true
+			lines = append(lines, "", tr("WARNING: --force bypasses NSFW blocking for selected safe-only channels."))
+		}
 		m.askConfirm(&pendingAction{
 			label:     tr("send meme"),
 			eventType: "discord.send",
 			payload:   payload,
-			lines:     append([]string{"Meme: " + trunc(item.Title, 60), "URL:  " + trunc(item.URL, 70), ""}, m.destinationLines(chosen)...),
+			lines:     lines,
 			summarize: summarizeSend,
 			reload:    true,
 		})
 	}
 	return m, nil
+}
+
+func (m *Model) includesSafeOnly(channels []string) bool {
+	if m.status == nil {
+		return false
+	}
+	for _, id := range channels {
+		if m.status.Channels.isSafeOnly(id) {
+			return true
+		}
+	}
+	return false
 }
 
 func chosenChannels(all []string, selected map[string]bool) []string {

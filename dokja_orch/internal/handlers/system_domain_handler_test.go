@@ -607,6 +607,83 @@ func TestDiscordSendSkipsSafeOnlyChannelsWhenImageIsFlagged(t *testing.T) {
 	}
 }
 
+func TestDiscordSendAllowsNSFWBypassFromTUIOnly(t *testing.T) {
+	screener := &fakeScreener{result: map[string]any{"safe": false, "reason": "blocked"}}
+	handler, deliverer := sendHandler(screener, nil)
+	event := core.Event{
+		Type:   "discord.send",
+		Source: core.SourceCLI,
+		Context: map[string]any{
+			"interface": "tui",
+		},
+		Payload: map[string]any{
+			"channel_ids":    []any{"hook-chan"},
+			"content":        "x",
+			"attachment_url": "https://media.example/a.png",
+			"force_nsfw":     true,
+		},
+	}
+	result, err := handler.Handle(context.Background(), event,
+		core.WorkflowStep{Domain: core.DomainSystem, Action: "send-discord-message"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deliveredChannels(deliverer) != "hook-chan" || result["nsfw_bypassed"] != true {
+		t.Fatalf("expected forced restricted delivery, got deliveries=%q result=%#v", deliveredChannels(deliverer), result)
+	}
+	if len(screener.urls) != 0 {
+		t.Fatalf("forced TUI delivery must bypass screening, got %v", screener.urls)
+	}
+}
+
+func TestDiscordSendRejectsNSFWBypassOutsideTUI(t *testing.T) {
+	for name, event := range map[string]core.Event{
+		"cli": {
+			Type: "discord.send", Source: core.SourceCLI,
+			Context: map[string]any{"interface": "cli"},
+		},
+		"api spoof": {
+			Type: "discord.send", Source: core.SourceAPI,
+			Context: map[string]any{"interface": "tui"},
+		},
+		"missing interface": {Type: "discord.send", Source: core.SourceCLI},
+	} {
+		t.Run(name, func(t *testing.T) {
+			handler, deliverer := sendHandler(nil, nil)
+			event.Payload = map[string]any{
+				"channel_ids":    []any{"hook-chan"},
+				"attachment_url": "https://media.example/a.png",
+				"force_nsfw":     true,
+			}
+			_, err := handler.Handle(context.Background(), event,
+				core.WorkflowStep{Domain: core.DomainSystem, Action: "send-discord-message"})
+			if err == nil || !strings.Contains(err.Error(), "only allowed for TUI") {
+				t.Fatalf("expected TUI-only refusal, got %v", err)
+			}
+			if len(deliverer.deliveries) != 0 {
+				t.Fatalf("unauthorized bypass delivered %#v", deliverer.deliveries)
+			}
+		})
+	}
+}
+
+func TestDiscordSendForceRequiresAnAttachment(t *testing.T) {
+	handler, deliverer := sendHandler(nil, nil)
+	event := core.Event{
+		Type: "discord.send", Source: core.SourceCLI,
+		Context: map[string]any{"interface": "tui"},
+		Payload: map[string]any{"channel_ids": []any{"hook-chan"}, "content": "x", "force_nsfw": true},
+	}
+	_, err := handler.Handle(context.Background(), event,
+		core.WorkflowStep{Domain: core.DomainSystem, Action: "send-discord-message"})
+	if err == nil || !strings.Contains(err.Error(), "requires attachment_url") {
+		t.Fatalf("expected attachment validation, got %v", err)
+	}
+	if len(deliverer.deliveries) != 0 {
+		t.Fatalf("invalid forced send delivered %#v", deliverer.deliveries)
+	}
+}
+
 func TestDiscordSendErrorsWhenEveryTargetIsRestrictedAndFlagged(t *testing.T) {
 	screener := &fakeScreener{result: map[string]any{"safe": false, "reason": "BUTTOCKS_COVERED score=0.57 (strict)"}}
 	marker := &fakeMarker{}
