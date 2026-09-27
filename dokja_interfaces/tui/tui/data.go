@@ -291,6 +291,9 @@ func summarizeHashtagList(res map[string]any) string {
 
 func summarizeSend(res map[string]any) string {
 	summary := tr("sent to ") + strings.Join(strList(res, "sent_to"), ", ")
+	if bypassed, _ := res["nsfw_bypassed"].(bool); bypassed {
+		summary += tr("; NSFW blocking bypassed")
+	}
 	if skipped := strList(res, "skipped_unsafe"); len(skipped) > 0 {
 		summary += tr("; SKIPPED in %s (%s)", strings.Join(skipped, ", "), str(res, "unsafe_reason"))
 	}

@@ -345,6 +345,13 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	if content == "" && attachmentURL == "" {
 		return nil, fmt.Errorf("discord send requires content or attachment_url")
 	}
+	forceNSFW, _ := event.Payload["force_nsfw"].(bool)
+	if forceNSFW && attachmentURL == "" {
+		return nil, fmt.Errorf("force_nsfw requires attachment_url")
+	}
+	if forceNSFW && !tuiNSFWBypassAllowed(event) {
+		return nil, fmt.Errorf("force_nsfw is only allowed for TUI discord.send requests")
+	}
 
 	var targets []string
 	if all, _ := event.Payload["all"].(bool); all {
@@ -367,18 +374,18 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	}
 	content = h.appendLearnedHashtag(ctx, content, attachmentURL)
 
-	// The safe-only rule applies here too: an image bound for a restricted channel is
-	// screened server-side, so no client can vouch for it. A failed screen counts as unsafe.
+	// The safe-only rule applies here too. Only an explicit TUI --force bypasses it;
+	// otherwise a failed server-side screen counts as unsafe.
 	blocked := map[string]struct{}{}
 	blockReason := ""
+	restricted := []string{}
 	if attachmentURL != "" {
-		restricted := []string{}
 		for _, channelID := range targets {
 			if _, ok := h.safeOnlyChannels[channelID]; ok {
 				restricted = append(restricted, channelID)
 			}
 		}
-		if len(restricted) > 0 {
+		if len(restricted) > 0 && !forceNSFW {
 			if safe, reason := h.screenAttachment(ctx, attachmentURL, content); !safe {
 				blockReason = reason
 				for _, channelID := range restricted {
@@ -403,12 +410,13 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		sent = append(sent, channelID)
 	}
 	logger.Info(fmt.Sprintf(
-		"system handler discord send event_id=%s sent=%s skipped_unsafe=%s failed=%d has_attachment=%t",
+		"system handler discord send event_id=%s sent=%s skipped_unsafe=%s failed=%d has_attachment=%t nsfw_bypassed=%t",
 		event.EventID,
 		strings.Join(sent, ","),
 		strings.Join(skipped, ","),
 		len(errs),
 		attachmentURL != "",
+		forceNSFW && len(restricted) > 0,
 	))
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("delivered to [%s]: %w", strings.Join(sent, ","), errors.Join(errs...))
@@ -422,6 +430,9 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		"sent_to":        sent,
 		"has_attachment": attachmentURL != "",
 	}
+	if forceNSFW && len(restricted) > 0 {
+		response["nsfw_bypassed"] = true
+	}
 	if len(skipped) > 0 {
 		response["skipped_unsafe"] = skipped
 		response["unsafe_reason"] = blockReason
@@ -434,6 +445,11 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		response["marked_sent"] = err == nil
 	}
 	return response, nil
+}
+
+func tuiNSFWBypassAllowed(event core.Event) bool {
+	return event.Type == "discord.send" && event.Source == core.SourceCLI &&
+		strings.TrimSpace(resultString(event.Context, "interface")) == "tui"
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {

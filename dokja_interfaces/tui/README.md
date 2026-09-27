@@ -46,6 +46,9 @@ English in both modes.
   the number of saved examples, and `u` removes the selected example after confirmation.
   Relevant suggestions are appended during manual and scheduled delivery. Images without
   readable text and videos are sent without a suggestion when classification fails.
+  In the channel picker, `f` toggles `--force` for a manual send. When a selected channel
+  is safe-only, this explicitly bypasses its NSFW block after a highlighted confirmation.
+  The option exists only in the TUI and resets whenever the picker is opened.
 - **Discord** (`3`): send text and/or an image to chosen channels (`ctrl+s`).
 - **Histórico** (`4`): what you triggered in this session and how each action ended.
 
