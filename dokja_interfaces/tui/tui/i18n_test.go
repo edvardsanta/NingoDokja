@@ -236,6 +236,7 @@ func TestNoScreenOrOverlayLeaksPortugueseIntoTheEnglishInterface(t *testing.T) {
 		"new profile":        func(t *testing.T) string { m, _, _ := profileTUI(t); press(m, "p", "n"); return m.View() },
 		"delete profile":     func(t *testing.T) string { m, _, _ := profileTUI(t); press(m, "p", "d"); return m.View() },
 		"memes":              func(t *testing.T) string { m, _ := started(t); press(m, "2"); return m.View() },
+		"tagged memes":       func(t *testing.T) string { m, _ := started(t); press(m, "2", "l"); return m.View() },
 		"meme send":          func(t *testing.T) string { m, _ := started(t); press(m, "2", "enter"); return m.View() },
 		"meme dispatch":      func(t *testing.T) string { m, _ := started(t); press(m, "2", "d"); return m.View() },
 		"discord":            func(t *testing.T) string { m, _ := started(t); press(m, "3"); return m.View() },

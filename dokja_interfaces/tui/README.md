@@ -46,8 +46,9 @@ text while running in English. Text that comes from the orchestrator (for exampl
   (verdict, text read by OCR, detections). `enter` sends *that* meme to the channels you tick.
   `d` dispatches N memes from the top of the queue. `t` switches queue/already-sent, `n`/`p` page,
   `R` refreshes the pool.
-  `h` teaches a hashtag from the selected image's OCR text, `g` suggests one, `l` shows
-  the number of saved examples, and `u` removes the selected example after confirmation.
+  `h` teaches a hashtag from the selected image's OCR text, `g` suggests one, and `l`
+  opens a navigable list of tagged memes with their OCR text, embedding state, URL and
+  image preview. `u` removes the selected pool meme's example after confirmation.
   Relevant suggestions are appended during manual and scheduled delivery. Images without
   readable text and videos are sent without a suggestion when classification fails.
   In the channel picker, `f` toggles `--force` for a manual send. When a selected channel

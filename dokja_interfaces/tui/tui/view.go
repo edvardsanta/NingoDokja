@@ -37,6 +37,8 @@ func (m *Model) View() string {
 		body = m.viewProfileForm()
 	case overlayHashtag:
 		body = m.viewHashtag()
+	case overlayHashtagList:
+		body = m.viewHashtagList()
 	default:
 		switch m.tab {
 		case tabPanel:
@@ -93,6 +95,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("tab_field_ctrl_s_save_esc_back")
 	case overlayHashtag:
 		hint = tr("enter_save_esc_cancel")
+	case overlayHashtagList:
+		hint = tr("hashtag_list_help")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
@@ -331,7 +335,7 @@ func (m *Model) viewPreview() string {
 	if !m.images.enabled() {
 		return ""
 	}
-	item, ok := m.selectedMeme()
+	item, ok := m.selectedPreviewItem()
 	if !ok {
 		return ""
 	}
@@ -467,6 +471,58 @@ func (m *Model) viewHashtag() string {
 			"Meme: " + trunc(item.Title, 70) + "\n" +
 			tr("the_image_text_is_read_by_ocr_automatically") + "\n\n" +
 			"Hashtag: " + m.hashtagInput.View())
+}
+
+func (m *Model) viewHashtagList() string {
+	var list strings.Builder
+	list.WriteString(styleTitle.Render(tr("tagged_memes")) +
+		styleDim.Render(fmt.Sprintf("  %d", m.hashtagList.Total)) + "\n\n")
+	if len(m.hashtagList.Items) == 0 {
+		return styleBox.Render(list.String() + styleDim.Render(tr("no_tagged_memes")))
+	}
+
+	visible := 8
+	if m.height > 0 {
+		visible = max(3, min(12, m.height-14))
+	}
+	start := max(0, m.hashtagList.Cursor-visible+1)
+	end := min(len(m.hashtagList.Items), start+visible)
+	for i := start; i < end; i++ {
+		example := m.hashtagList.Items[i]
+		state := styleOK.Render(fmt.Sprintf("%-16s", tr("embedding_ready")))
+		if !example.Embedded {
+			state = styleWarn.Render(fmt.Sprintf("%-16s", tr("embedding_missing")))
+		}
+		line := fmt.Sprintf("%-22s %s %s", trunc(example.Hashtag, 20), state, styleDim.Render(fileName(example.SourceURL)))
+		if i == m.hashtagList.Cursor {
+			list.WriteString(styleCursor.Render("▸ ") + line + "\n")
+		} else {
+			list.WriteString("  " + line + "\n")
+		}
+	}
+
+	var detail strings.Builder
+	if example, ok := m.selectedHashtagExample(); ok {
+		detail.WriteString("\n" + styleTitle.Render(example.Hashtag) + "\n")
+		detail.WriteString(tr("text_read") + trunc(example.Text, 100) + "\n")
+		detail.WriteString("  URL: " + trunc(example.SourceURL, 100) + "\n")
+		if example.UpdatedAt != "" {
+			detail.WriteString(tr("updated_at") + example.UpdatedAt + "\n")
+		}
+		if !example.Embedded {
+			detail.WriteString(styleWarn.Render(tr("embedding_missing_help")) + "\n")
+		}
+	}
+
+	top := strings.TrimRight(list.String(), "\n")
+	image := m.viewPreview()
+	if image != "" && m.width >= memeListWidth+4+previewMaxCols {
+		top = lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Width(memeListWidth).Render(top), "  ", image)
+		image = ""
+	} else if image != "" {
+		image = "\n" + image
+	}
+	return styleBox.Render(top + "\n" + detail.String() + image)
 }
 
 func (m *Model) viewInterval() string {
