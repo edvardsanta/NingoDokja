@@ -96,8 +96,14 @@ func newFake() *fakeClient {
 			"meme.pool.refresh":       {"status": "refreshed"},
 			"meme.hashtag.tag":        {"hashtag": "#TioDoPave"},
 			"meme.hashtag.suggest":    {"hashtag": "#TioDoPave", "relevant": true},
-			"meme.hashtag.list":       {"total": float64(2)},
-			"meme.hashtag.untag":      {"deleted": true},
+			"meme.hashtag.list": {
+				"total": float64(2), "offset": float64(0),
+				"examples": []any{
+					map[string]any{"source_url": "https://x/tagged-a.jpeg", "text": "first tagged meme text", "hashtag": "#Trabalho", "embedded": false, "updated_at": "2026-09-27T12:54:03Z"},
+					map[string]any{"source_url": "https://x/tagged-b.jpeg", "text": "second tagged meme text", "hashtag": "#Cafe", "embedded": true, "updated_at": "2026-09-27T12:55:03Z"},
+				},
+			},
+			"meme.hashtag.untag": {"deleted": true},
 		},
 	}
 }
@@ -221,11 +227,34 @@ func TestMemesTabCanLearnAndSuggestAHashtag(t *testing.T) {
 	}
 }
 
-func TestHashtagListShowsServiceTotal(t *testing.T) {
-	m, _ := started(t)
+func TestHashtagListShowsTaggedMemesAndEmbeddingState(t *testing.T) {
+	m, fake := started(t)
 	press(m, "2", "l")
-	if !strings.Contains(m.notice, "2 exemplos de hashtag") {
-		t.Fatalf("unexpected total: %q", m.notice)
+	if req := fake.last("meme.hashtag.list"); req.payload["limit"] != 200 || req.payload["offset"] != 0 {
+		t.Fatalf("unexpected hashtag list request: %#v", req.payload)
+	}
+	if m.overlay != overlayHashtagList {
+		t.Fatalf("expected hashtag list overlay, got %v", m.overlay)
+	}
+	view := m.View()
+	for _, want := range []string{"Memes marcados", "#Trabalho", "sem embedding", "first tagged meme text", "tagged-a.jpeg"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("tagged meme list is missing %q:\n%s", want, view)
+		}
+	}
+	if item, ok := m.selectedPreviewItem(); !ok || item.URL != "https://x/tagged-a.jpeg" {
+		t.Fatalf("wrong selected preview item: %#v, %v", item, ok)
+	}
+	press(m, "down")
+	if item, ok := m.selectedPreviewItem(); !ok || item.URL != "https://x/tagged-b.jpeg" {
+		t.Fatalf("cursor did not select the second tagged meme: %#v, %v", item, ok)
+	}
+	if !strings.Contains(m.View(), "pronto") || !strings.Contains(m.View(), "second tagged meme text") {
+		t.Fatalf("second tagged meme details were not rendered:\n%s", m.View())
+	}
+	press(m, "esc")
+	if m.overlay != overlayNone {
+		t.Fatal("escape must close the tagged meme list")
 	}
 }
 

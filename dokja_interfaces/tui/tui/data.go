@@ -99,6 +99,21 @@ type memePage struct {
 	Offset int
 }
 
+type hashtagExample struct {
+	SourceURL string
+	Text      string
+	Hashtag   string
+	Embedded  bool
+	UpdatedAt string
+}
+
+type hashtagExamples struct {
+	Items  []hashtagExample
+	Total  int
+	Offset int
+	Cursor int
+}
+
 type screenData struct {
 	URL, Reason, Text string
 	Safe              bool
@@ -287,6 +302,26 @@ func summarizeHashtagSuggestion(res map[string]any) string {
 
 func summarizeHashtagList(res map[string]any) string {
 	return tr("d_hashtag_examples", num(res, "total"))
+}
+
+func parseHashtagExamples(res map[string]any) hashtagExamples {
+	list := hashtagExamples{Total: num(res, "total"), Offset: num(res, "offset")}
+	items, _ := res["examples"].([]any)
+	for _, item := range items {
+		fields, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		embedded, _ := fields["embedded"].(bool)
+		list.Items = append(list.Items, hashtagExample{
+			SourceURL: str(fields, "source_url"),
+			Text:      str(fields, "text"),
+			Hashtag:   str(fields, "hashtag"),
+			Embedded:  embedded,
+			UpdatedAt: str(fields, "updated_at"),
+		})
+	}
+	return list
 }
 
 func summarizeSend(res map[string]any) string {

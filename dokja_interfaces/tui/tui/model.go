@@ -38,6 +38,7 @@ const (
 	overlayProfiles
 	overlayProfileForm
 	overlayHashtag
+	overlayHashtagList
 )
 
 const (
@@ -76,6 +77,7 @@ type pendingAction struct {
 	payload   map[string]any
 	lines     []string
 	summarize func(map[string]any) string
+	onSuccess func(*Model, map[string]any) tea.Cmd
 	reload    bool
 
 	// local runs instead of an orchestrator request, for actions that must stay on this machine.
@@ -144,6 +146,7 @@ type Model struct {
 	profileForm   [4]textinput.Model
 	profileFocus  int
 	hashtagInput  textinput.Model
+	hashtagList   hashtagExamples
 
 	// reloadMemes chains a pool reload after the status refresh that follows an action,
 	// because each request must claim the single in-flight slot when it actually starts.
@@ -389,13 +392,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case imageMsg:
 		m.applyImage(msg)
-		if item, ok := m.selectedMeme(); ok && item.URL == msg.url {
+		if item, ok := m.selectedPreviewItem(); ok && item.URL == msg.url {
 			return m, m.cmdAnimate()
 		}
 		return m, nil
 
 	case frameTickMsg:
-		item, ok := m.selectedMeme()
+		item, ok := m.selectedPreviewItem()
 		if !ok || msg.gen != m.images.animGen || item.URL != msg.url || m.tab != tabMemes {
 			return m, nil
 		}
@@ -426,11 +429,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addHistory(msg.action.label, summary, true)
 		m.setNotice(msg.action.label+": "+summary, false)
+		var follow tea.Cmd
+		if msg.action.onSuccess != nil {
+			follow = msg.action.onSuccess(m, msg.res)
+		}
 		if msg.action.reload {
 			m.reloadMemes = true
-			return m, m.cmdStatus()
+			return m, tea.Batch(follow, m.cmdStatus())
 		}
-		return m, nil
+		return m, follow
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -465,6 +472,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyProfileForm(msg)
 	case overlayHashtag:
 		return m.keyHashtag(msg)
+	case overlayHashtagList:
+		return m.keyHashtagList(key)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -534,6 +543,22 @@ func (m *Model) selectedMeme() (memeItem, bool) {
 		return memeItem{}, false
 	}
 	return items[m.memes.cursor], true
+}
+
+func (m *Model) selectedHashtagExample() (hashtagExample, bool) {
+	items := m.hashtagList.Items
+	if m.hashtagList.Cursor < 0 || m.hashtagList.Cursor >= len(items) {
+		return hashtagExample{}, false
+	}
+	return items[m.hashtagList.Cursor], true
+}
+
+func (m *Model) selectedPreviewItem() (memeItem, bool) {
+	if m.overlay == overlayHashtagList {
+		example, ok := m.selectedHashtagExample()
+		return memeItem{URL: example.SourceURL, Title: example.Hashtag}, ok
+	}
+	return m.selectedMeme()
 }
 
 func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
@@ -611,8 +636,13 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 		return m, m.exec(&pendingAction{
 			label:     tr("list_hashtag_examples"),
 			eventType: "meme.hashtag.list",
-			payload:   map[string]any{"limit": 20, "offset": 0},
+			payload:   map[string]any{"limit": 200, "offset": 0},
 			summarize: summarizeHashtagList,
+			onSuccess: func(m *Model, res map[string]any) tea.Cmd {
+				m.hashtagList = parseHashtagExamples(res)
+				m.overlay = overlayHashtagList
+				return tea.Batch(m.cmdSelectedImage(), m.cmdAnimate())
+			},
 		})
 	case "u":
 		if item, ok := m.selectedMeme(); ok {
@@ -652,6 +682,25 @@ func (m *Model) keyHashtag(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.hashtagInput, cmd = m.hashtagInput.Update(msg)
 	return m, cmd
+}
+
+func (m *Model) keyHashtagList(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q":
+		m.overlay = overlayNone
+		return m, m.cmdAnimate()
+	case "up", "k":
+		if m.hashtagList.Cursor > 0 {
+			m.hashtagList.Cursor--
+		}
+	case "down", "j":
+		if m.hashtagList.Cursor < len(m.hashtagList.Items)-1 {
+			m.hashtagList.Cursor++
+		}
+	default:
+		return m, nil
+	}
+	return m, tea.Batch(m.cmdSelectedImage(), m.cmdAnimate())
 }
 
 func (m *Model) channelsOrNotice() []string {
@@ -940,10 +989,11 @@ func isVideo(url string) bool {
 	return false
 }
 
-// cmdSelectedImage fetches the selected meme's preview. Downloads do not use the
-// orchestrator request slot: they are plain HTTP and independent of the REQ socket.
+// cmdSelectedImage fetches the selected pool meme or tagged example's preview.
+// Downloads do not use the orchestrator request slot: they are plain HTTP and
+// independent of the REQ socket.
 func (m *Model) cmdSelectedImage() tea.Cmd {
-	item, ok := m.selectedMeme()
+	item, ok := m.selectedPreviewItem()
 	if !ok || !m.images.enabled() || item.URL == "" {
 		return nil
 	}
@@ -992,7 +1042,7 @@ func (m *Model) cmdSelectedImage() tea.Cmd {
 func (m *Model) cmdAnimate() tea.Cmd {
 	m.images.animGen++
 	m.images.frame = 0
-	item, ok := m.selectedMeme()
+	item, ok := m.selectedPreviewItem()
 	if !ok || m.tab != tabMemes {
 		return nil
 	}

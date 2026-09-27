@@ -276,6 +276,21 @@ func TestBlocksPreviewNeedsNoTerminalCooperation(t *testing.T) {
 	}
 }
 
+func TestTaggedMemeListPreviewsTheSelectedExample(t *testing.T) {
+	m, _, _, fetcher := withImages(t, ImagesBlocks)
+	press(m, "2", "l")
+	if got := fetcher.calls[len(fetcher.calls)-1]; got != "https://x/tagged-a.jpeg" {
+		t.Fatalf("expected the first tagged meme preview, got %q", got)
+	}
+	if !strings.Contains(m.View(), "▀") {
+		t.Fatalf("tagged meme view should contain a preview:\n%s", m.View())
+	}
+	press(m, "down")
+	if got := fetcher.calls[len(fetcher.calls)-1]; got != "https://x/tagged-b.jpeg" {
+		t.Fatalf("expected the second tagged meme preview, got %q", got)
+	}
+}
+
 func TestPreviewFailuresAndVideosDegradeToAMessage(t *testing.T) {
 	m, _, _, fetcher := withImages(t, ImagesKitty)
 	fetcher.fail["https://x/a.jpeg"] = errors.New("download returned 403")
