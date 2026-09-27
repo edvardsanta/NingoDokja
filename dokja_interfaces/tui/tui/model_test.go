@@ -94,6 +94,10 @@ func newFake() *fakeClient {
 			"discord.send":            {"sent_to": []any{"bot-chan"}, "marked_sent": true},
 			"meme.dispatch.scheduled": {"delivered_count": float64(3)},
 			"meme.pool.refresh":       {"status": "refreshed"},
+			"meme.hashtag.tag":        {"hashtag": "#TioDoPave"},
+			"meme.hashtag.suggest":    {"hashtag": "#TioDoPave", "relevant": true},
+			"meme.hashtag.list":       {"total": float64(2)},
+			"meme.hashtag.untag":      {"deleted": true},
 		},
 	}
 }
@@ -195,6 +199,45 @@ func TestScreenShowsTheVerdictTextAndCaptionIsForwarded(t *testing.T) {
 	view := m.View()
 	if !strings.Contains(view, "BARRADO") || !strings.Contains(view, "que voce torava e") {
 		t.Fatalf("verdict not rendered:\n%s", view)
+	}
+}
+
+func TestMemesTabCanLearnAndSuggestAHashtag(t *testing.T) {
+	m, fake := started(t)
+	press(m, "2", "h")
+	if m.overlay != overlayHashtag {
+		t.Fatalf("expected hashtag overlay, got %v", m.overlay)
+	}
+	press(m, "TioDoPave", "enter")
+	if req := fake.last("meme.hashtag.tag"); req.payload["url"] != "https://x/a.jpeg" || req.payload["hashtag"] != "TioDoPave" {
+		t.Fatalf("unexpected tag request %#v", req.payload)
+	}
+	press(m, "g")
+	if req := fake.last("meme.hashtag.suggest"); req.payload["url"] != "https://x/a.jpeg" {
+		t.Fatalf("unexpected suggest request %#v", req.payload)
+	}
+	if !strings.Contains(m.notice, "#TioDoPave") {
+		t.Fatalf("suggestion was not shown: %q", m.notice)
+	}
+}
+
+func TestHashtagListShowsServiceTotal(t *testing.T) {
+	m, _ := started(t)
+	press(m, "2", "l")
+	if !strings.Contains(m.notice, "2 exemplos de hashtag") {
+		t.Fatalf("unexpected total: %q", m.notice)
+	}
+}
+
+func TestHashtagRemovalNeedsConfirmation(t *testing.T) {
+	m, fake := started(t)
+	press(m, "2", "u")
+	if m.overlay != overlayConfirm || fake.count("meme.hashtag.untag") != 0 {
+		t.Fatal("removal needs confirmation")
+	}
+	press(m, "y")
+	if fake.last("meme.hashtag.untag").payload["url"] != "https://x/a.jpeg" {
+		t.Fatal("wrong meme removed")
 	}
 }
 

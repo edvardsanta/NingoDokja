@@ -37,6 +37,7 @@ const (
 	overlayInterval
 	overlayProfiles
 	overlayProfileForm
+	overlayHashtag
 )
 
 const (
@@ -141,6 +142,7 @@ type Model struct {
 	profileCursor int
 	profileForm   [4]textinput.Model
 	profileFocus  int
+	hashtagInput  textinput.Model
 
 	// reloadMemes chains a pool reload after the status refresh that follows an action,
 	// because each request must claim the single in-flight slot when it actually starts.
@@ -174,6 +176,11 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	dispatch.CharLimit = 2
 	dispatch.Width = 4
 
+	hashtag := textinput.New()
+	hashtag.Placeholder = "TioDoPave"
+	hashtag.CharLimit = 100
+	hashtag.Width = 40
+
 	var form [4]textinput.Model
 	for i, placeholder := range []string{tr("name (e.g. hosted)"), "https://api.example.com/v1", tr("model"), tr("token (not shown on screen)")} {
 		form[i] = textinput.New()
@@ -194,6 +201,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 		form:          discordForm{text: text, image: image, selected: map[string]bool{}},
 		dispatchInput: dispatch,
 		intervalInput: interval,
+		hashtagInput:  hashtag,
 		images:        newImageState(),
 	}
 }
@@ -454,6 +462,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyProfiles(key)
 	case overlayProfileForm:
 		return m.keyProfileForm(msg)
+	case overlayHashtag:
+		return m.keyHashtag(msg)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -581,8 +591,66 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 			summarize: func(map[string]any) string { return tr("pool refreshed") },
 			reload:    true,
 		})
+	case "h":
+		if _, ok := m.selectedMeme(); ok {
+			m.hashtagInput.SetValue("")
+			m.hashtagInput.Focus()
+			m.overlay = overlayHashtag
+		}
+	case "g":
+		if item, ok := m.selectedMeme(); ok {
+			return m, m.exec(&pendingAction{
+				label:     tr("suggest hashtag"),
+				eventType: "meme.hashtag.suggest",
+				payload:   map[string]any{"url": item.URL},
+				summarize: summarizeHashtagSuggestion,
+			})
+		}
+	case "l":
+		return m, m.exec(&pendingAction{
+			label:     tr("list hashtag examples"),
+			eventType: "meme.hashtag.list",
+			payload:   map[string]any{"limit": 20, "offset": 0},
+			summarize: summarizeHashtagList,
+		})
+	case "u":
+		if item, ok := m.selectedMeme(); ok {
+			m.askConfirm(&pendingAction{
+				label:     tr("remove hashtag example"),
+				eventType: "meme.hashtag.untag",
+				payload:   map[string]any{"url": item.URL},
+				summarize: func(map[string]any) string { return tr("hashtag example removed") },
+			})
+		}
 	}
 	return m, nil
+}
+
+func (m *Model) keyHashtag(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.overlay = overlayNone
+		m.hashtagInput.Blur()
+		return m, nil
+	case "enter":
+		item, ok := m.selectedMeme()
+		if !ok || strings.TrimSpace(m.hashtagInput.Value()) == "" {
+			m.setNotice(tr("enter a hashtag"), true)
+			return m, nil
+		}
+		hashtag := strings.TrimSpace(m.hashtagInput.Value())
+		m.overlay = overlayNone
+		m.hashtagInput.Blur()
+		return m, m.exec(&pendingAction{
+			label:     tr("tag meme hashtag"),
+			eventType: "meme.hashtag.tag",
+			payload:   map[string]any{"url": item.URL, "hashtag": hashtag},
+			summarize: summarizeHashtagTag,
+		})
+	}
+	var cmd tea.Cmd
+	m.hashtagInput, cmd = m.hashtagInput.Update(msg)
+	return m, cmd
 }
 
 func (m *Model) channelsOrNotice() []string {

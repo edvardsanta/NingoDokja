@@ -266,6 +266,29 @@ func summarizeDispatch(res map[string]any) string {
 	return summary
 }
 
+func summarizeHashtagTag(res map[string]any) string {
+	if hashtag := str(res, "hashtag"); hashtag != "" {
+		return tr("learned ") + hashtag
+	}
+	return tr("hashtag example saved")
+}
+
+func summarizeHashtagSuggestion(res map[string]any) string {
+	hashtag := str(res, "hashtag")
+	if hashtag == "" {
+		return tr("no hashtag suggestion")
+	}
+	relevant, _ := res["relevant"].(bool)
+	if !relevant {
+		return tr("closest is ") + hashtag + tr(" (below relevance threshold)")
+	}
+	return tr("suggested ") + hashtag
+}
+
+func summarizeHashtagList(res map[string]any) string {
+	return tr("%d hashtag examples", num(res, "total"))
+}
+
 func summarizeSend(res map[string]any) string {
 	summary := tr("sent to ") + strings.Join(strList(res, "sent_to"), ", ")
 	if skipped := strList(res, "skipped_unsafe"); len(skipped) > 0 {
