@@ -96,6 +96,11 @@ Rules:
 - `channel_id` is required
 - at least one of `content` or `attachment_url` is required
 - when `attachment_url` exists, the interface downloads the file and uploads it to Discord
+- an optional `attachment_data_b64` (with `attachment_content_type`) skips that download:
+  the interface uploads those bytes instead, and only uses `attachment_url` to name the
+  file. The orchestrator sends this when the meme service already fetched the bytes
+  itself, for hosts this interface's own download cannot get past (Cloudflare and
+  similar bot checks).
 
 Response:
 

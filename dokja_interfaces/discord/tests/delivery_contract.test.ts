@@ -159,6 +159,37 @@ test("delivery downloads protected media with browser headers", async () => {
   assert.equal(downloadHeaders.get("Referer"), "https://media.example/");
 });
 
+test("delivery attaches bytes it was given instead of fetching the url again", async () => {
+  const fetchedUrls: string[] = [];
+  let uploadedFilename = "";
+  const bytes = Buffer.from("video-bytes");
+  const result = await handleDiscordDeliveryRequest(
+    {
+      channel_id: "channel-9",
+      attachment_url: "https://media.example/videos/clip.mp4",
+      attachment_data_b64: bytes.toString("base64"),
+      attachment_content_type: "video/mp4",
+    },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      fetchImpl: async (input, init) => {
+        fetchedUrls.push(String(input));
+        const form = init?.body as FormData;
+        const payload = JSON.parse(String(form.get("payload_json")));
+        uploadedFilename = payload.attachments[0].filename;
+        const file = form.get("files[0]") as Blob;
+        assert.equal(await file.text(), "video-bytes");
+        return new Response(JSON.stringify({ id: "discord-message-bytes" }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(fetchedUrls, ["https://discord.test/api/v10/channels/channel-9/messages"]);
+  assert.equal(uploadedFilename, "clip.mp4");
+});
+
 test("parseWebhookMap splits on first equals and skips malformed entries", () => {
   assert.deepEqual(
     parseWebhookMap(" 1=https://d.test/api/webhooks/1/a?thread_id=5 , bad, 2=https://d.test/api/webhooks/2/b ,=x"),

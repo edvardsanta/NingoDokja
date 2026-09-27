@@ -212,6 +212,19 @@ rejects the field from CLI, API and scheduled events, records the bypass in its 
 returns `nsfw_bypassed: true`. The request bridge is an operator interface rather than an
 authentication boundary, so keep its existing network-access restrictions in place.
 
+## Attachment Fetch for Memes
+
+Some hosts put media downloads behind a client-fingerprint check (Cloudflare and
+similar) that the Discord interface's own plain HTTP download fails, even with correct
+`Referer`/`User-Agent` headers. `meme.attachment.fetch` (`MEME_ATTACHMENT_FETCH`,
+default `on`) has the meme service download the bytes itself and hand them to the
+orchestrator, which then sends them to the Discord interface instead of a URL to fetch.
+Scoped to URLs already in the meme service's own pool.
+
+A failed or disabled fetch falls back to the previous behaviour (sending the plain
+URL), so this never blocks delivery for hosts that do not need it; no new ports, and
+rebuilding the meme service and orchestrator is enough to pick it up.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone

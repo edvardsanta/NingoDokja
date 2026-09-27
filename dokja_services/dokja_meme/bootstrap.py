@@ -19,15 +19,15 @@ def _configure_legacy_imports() -> Path:
 
 REPO_ROOT = _configure_legacy_imports()
 
+from attachment_fetcher import build_attachment_fetcher_from_env
 from config import SCRAPERS as LEGACY_SCRAPERS
 from infra.sqlite.storage import SQLiteStorage
 from memes.embedder import OllamaEmbedder
 from memes.hashtags import DEFAULT_MIN_SCORE, HashtagClassifier
 from memes.safety import build_screen_from_env
 from models.Meme import Meme
-from workers.meme_worker import MemeWorker
-
 from service import MemeService
+from workers.meme_worker import MemeWorker
 
 
 def resolve_db_file() -> str:
@@ -85,4 +85,5 @@ def build_service() -> MemeService:
         worker=worker,
         screen=build_screen_from_env(),
         hashtags=build_hashtag_classifier(),
+        attachments=build_attachment_fetcher_from_env(),
     )

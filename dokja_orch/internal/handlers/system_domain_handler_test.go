@@ -86,9 +86,11 @@ func (f *fakeMemeFetcher) Fetch(_ context.Context, limit *int) (map[string]any, 
 }
 
 type deliveredMessage struct {
-	channelID     string
-	content       string
-	attachmentURL string
+	channelID      string
+	content        string
+	attachmentURL  string
+	attachmentData []byte
+	contentType    string
 }
 
 type fakeDiscordDeliverer struct {
@@ -105,6 +107,21 @@ func (f *fakeDiscordDeliverer) Deliver(_ context.Context, channelID, content, at
 		channelID:     channelID,
 		content:       content,
 		attachmentURL: attachmentURL,
+	})
+	return nil
+}
+
+func (f *fakeDiscordDeliverer) DeliverAttachment(_ context.Context, channelID, content string, data []byte, contentType, attachmentURL string) error {
+	if f.err != nil {
+		return f.err
+	}
+
+	f.deliveries = append(f.deliveries, deliveredMessage{
+		channelID:      channelID,
+		content:        content,
+		attachmentURL:  attachmentURL,
+		attachmentData: data,
+		contentType:    contentType,
 	})
 	return nil
 }
@@ -391,6 +408,70 @@ func TestSystemDomainHandlerDiscordSendDeliversToChosenChannelOnly(t *testing.T)
 	}
 	if result["has_attachment"] != true {
 		t.Fatalf("expected has_attachment true, got %#v", result["has_attachment"])
+	}
+}
+
+type fakeMemeAttachmentFetcher struct {
+	data        []byte
+	contentType string
+	err         error
+	calls       []string
+}
+
+func (f *fakeMemeAttachmentFetcher) FetchAttachment(_ context.Context, url string) ([]byte, string, error) {
+	f.calls = append(f.calls, url)
+	if f.err != nil {
+		return nil, "", f.err
+	}
+	return f.data, f.contentType, nil
+}
+
+func TestSystemDomainHandlerDiscordSendUsesMemeServiceBytesWhenConfigured(t *testing.T) {
+	deliverer := &fakeDiscordDeliverer{}
+	fetcher := &fakeMemeAttachmentFetcher{data: []byte("video-bytes"), contentType: "video/mp4"}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "hook-chan").WithMemeAttachments(fetcher)
+
+	event, step := discordSendEvent(map[string]any{
+		"channel_ids":    []any{"hook-chan"},
+		"content":        "oi",
+		"attachment_url": "https://cdn.example/videos/clip.mp4",
+	})
+	if _, err := handler.Handle(context.Background(), event, step); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(fetcher.calls) != 1 || fetcher.calls[0] != "https://cdn.example/videos/clip.mp4" {
+		t.Fatalf("expected one attachment fetch, got %#v", fetcher.calls)
+	}
+	if len(deliverer.deliveries) != 1 {
+		t.Fatalf("expected one delivery, got %#v", deliverer.deliveries)
+	}
+	delivery := deliverer.deliveries[0]
+	if string(delivery.attachmentData) != "video-bytes" || delivery.contentType != "video/mp4" {
+		t.Fatalf("expected bytes to be delivered directly, got %#v", delivery)
+	}
+}
+
+func TestSystemDomainHandlerDiscordSendFallsBackToURLWhenMemeServiceFetchFails(t *testing.T) {
+	deliverer := &fakeDiscordDeliverer{}
+	fetcher := &fakeMemeAttachmentFetcher{err: errors.New("host returned 403")}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "hook-chan").WithMemeAttachments(fetcher)
+
+	event, step := discordSendEvent(map[string]any{
+		"channel_ids":    []any{"hook-chan"},
+		"content":        "oi",
+		"attachment_url": "https://cdn.example/videos/clip.mp4",
+	})
+	if _, err := handler.Handle(context.Background(), event, step); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(deliverer.deliveries) != 1 {
+		t.Fatalf("expected one delivery, got %#v", deliverer.deliveries)
+	}
+	delivery := deliverer.deliveries[0]
+	if delivery.attachmentData != nil || delivery.attachmentURL != "https://cdn.example/videos/clip.mp4" {
+		t.Fatalf("expected a plain URL delivery, got %#v", delivery)
 	}
 }
 

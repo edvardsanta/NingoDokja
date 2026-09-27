@@ -53,7 +53,7 @@ func main() {
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(memeClient).WithControls(controls).WithProfiles(profiles),
+		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(memeClient).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(clients.NewBookServiceClient("")),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),

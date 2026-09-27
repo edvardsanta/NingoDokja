@@ -48,6 +48,16 @@ type MemeHashtagSuggester interface {
 
 type DiscordMessageDeliverer interface {
 	Deliver(ctx context.Context, channelID, content, attachmentURL string) error
+	// DeliverAttachment posts content with attachment bytes already in hand, for hosts
+	// a plain HTTP client cannot fetch directly (Cloudflare and similar bot checks).
+	DeliverAttachment(ctx context.Context, channelID, content string, data []byte, contentType, attachmentURL string) error
+}
+
+// MemeAttachmentFetcher downloads a pooled meme's raw bytes when the origin host blocks
+// a plain HTTP client (Cloudflare and similar bot checks) but the meme service's own
+// client can get through.
+type MemeAttachmentFetcher interface {
+	FetchAttachment(ctx context.Context, url string) (data []byte, contentType string, err error)
 }
 
 type SystemDomainHandler struct {
@@ -60,6 +70,7 @@ type SystemDomainHandler struct {
 	safeOnlyChannels map[string]struct{}
 	memeScreen       MemeScreener
 	memeMarker       MemeMarker
+	memeAttachments  MemeAttachmentFetcher
 	controls         *core.Controls
 	profiles         ChatProfiles
 }
@@ -102,6 +113,14 @@ func (h *SystemDomainHandler) WithMemeTools(screener MemeScreener, marker MemeMa
 // A missing/low-confidence suggestion never blocks delivery.
 func (h *SystemDomainHandler) WithHashtagSuggestions(suggester MemeHashtagSuggester) *SystemDomainHandler {
 	h.memeHashtags = suggester
+	return h
+}
+
+// WithMemeAttachments routes attachment delivery through the meme service's own
+// download, for hosts (Cloudflare and similar) that block a plain HTTP client. Without
+// it, attachments are sent by URL and the delivery interface fetches them itself.
+func (h *SystemDomainHandler) WithMemeAttachments(fetcher MemeAttachmentFetcher) *SystemDomainHandler {
+	h.memeAttachments = fetcher
 	return h
 }
 
@@ -265,7 +284,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 				))
 				continue
 			}
-			if err := h.discord.Deliver(ctx, channelID, content, attachmentURL); err != nil {
+			if err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
 				logger.Info(fmt.Sprintf(
 					"system handler meme delivery failed event_id=%s channel_id=%s error=%v",
 					event.EventID,
@@ -330,6 +349,25 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content,
 		return hashtag
 	}
 	return content + "\n" + hashtag
+}
+
+// deliverAttachment posts content to a channel. When the meme service's own download is
+// configured (WithMemeAttachments), it fetches the attachment there first, since some
+// hosts (Cloudflare and similar) block a plain HTTP client; a failed fetch falls back to
+// sending the attachment by URL, same as when the feature is not enabled at all.
+func (h *SystemDomainHandler) deliverAttachment(ctx context.Context, channelID, content, attachmentURL string) error {
+	if attachmentURL == "" || h.memeAttachments == nil || !h.serviceEnabled("meme") {
+		return h.discord.Deliver(ctx, channelID, content, attachmentURL)
+	}
+	data, contentType, err := h.memeAttachments.FetchAttachment(ctx, attachmentURL)
+	if err != nil {
+		logger.Info(fmt.Sprintf(
+			"system handler attachment fetch fell back to url url=%s error=%v",
+			attachmentURL, err,
+		))
+		return h.discord.Deliver(ctx, channelID, content, attachmentURL)
+	}
+	return h.discord.DeliverAttachment(ctx, channelID, content, data, contentType, attachmentURL)
 }
 
 // handleDiscordSend posts an admin-supplied message to configured channels. It only
@@ -403,7 +441,7 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 			skipped = append(skipped, channelID)
 			continue
 		}
-		if err := h.discord.Deliver(ctx, channelID, content, attachmentURL); err != nil {
+		if err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
 			errs = append(errs, fmt.Errorf("send to channel %s: %w", channelID, err))
 			continue
 		}

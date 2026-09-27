@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from types import SimpleNamespace
+
+from attachment_fetcher import AttachmentFetchError
 from logging_config import get_logger
 from memes.safety import ScreenUnavailable
 
@@ -13,7 +16,7 @@ MAX_LIST_LIMIT = 100
 
 
 class MemeService:
-    def __init__(self, storage, scrapers: list, worker, screen=None, hashtags=None):
+    def __init__(self, storage, scrapers: list, worker, screen=None, hashtags=None, attachments=None):
         self.storage = storage
         self.scrapers = scrapers
         self.worker = worker
@@ -21,6 +24,8 @@ class MemeService:
         # Optional: without it, meme.hashtag.* events are refused rather than crashing
         # the service (the same posture as `screen` being disabled).
         self.hashtags = hashtags
+        # Optional: without it, meme.attachment.fetch is refused (MEME_ATTACHMENT_FETCH=off).
+        self.attachments = attachments
 
     def dispatch(self, event: dict) -> dict:
         event_type = (event.get("type") or event.get("event_type") or "").strip()
@@ -55,6 +60,8 @@ class MemeService:
             return self._require_hashtags().list_examples(payload.get("limit"), payload.get("offset"))
         if event_type == "meme.hashtag.untag":
             return self.untag_hashtag(payload.get("url"))
+        if event_type == "meme.attachment.fetch":
+            return self.fetch_attachment(payload.get("url"))
 
         raise ValueError(f"unsupported meme event type: {event_type}")
 
@@ -219,6 +226,32 @@ class MemeService:
             result["relevant"],
         )
         return result
+
+    def fetch_attachment(self, url) -> dict:
+        """Downloads a pooled meme's raw bytes, for a caller (the orchestrator) that
+        cannot reach the origin host itself (some hosts block plain HTTP clients).
+        Scoped to URLs already in this service's own pool, so this cannot be used as a
+        generic unauthenticated fetch-any-URL endpoint.
+        """
+        url = str(url or "").strip()
+        if not url:
+            raise ValueError("meme.attachment.fetch requires a url")
+        if self.attachments is None:
+            raise ValueError("attachment fetch is disabled (MEME_ATTACHMENT_FETCH=off)")
+        if not self.storage.exists(url):
+            raise ValueError("url is not in this service's meme pool")
+        try:
+            content, content_type = self.attachments.fetch(url)
+        except AttachmentFetchError as err:
+            logger.error("meme attachment fetch failed url=%s error=%s", url, err)
+            raise ValueError(str(err)) from err
+        logger.info("meme attachment fetch url=%s bytes=%d content_type=%s", url, len(content), content_type)
+        return {
+            "url": url,
+            "content_type": content_type,
+            "size": len(content),
+            "data_b64": base64.b64encode(content).decode("ascii"),
+        }
 
     def untag_hashtag(self, url) -> dict:
         url = str(url or "").strip()

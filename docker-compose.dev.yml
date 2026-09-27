@@ -78,6 +78,11 @@ services:
       DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
       DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
       MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
+      # meme.attachment.fetch: lets the meme service download attachments the Discord
+      # interface cannot reach directly (Cloudflare and similar bot checks).
+      MEME_ATTACHMENT_FETCH: ${MEME_ATTACHMENT_FETCH:-on}
+      MEME_ATTACHMENT_MAX_BYTES: ${MEME_ATTACHMENT_MAX_BYTES:-20000000}
+      MEME_ATTACHMENT_TIMEOUT: ${MEME_ATTACHMENT_TIMEOUT:-30}
     ports:
       - "5557:5557"
     networks:
