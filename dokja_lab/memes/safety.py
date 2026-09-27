@@ -7,6 +7,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from typing import Any, Iterable
+from urllib.parse import urlsplit
 
 import requests
 
@@ -152,6 +153,14 @@ MIN_GLUED_WORD_LENGTH = 6
 WHOLE_WORD_ONLY = frozenset({"sexual"})
 
 
+# The screen decodes still images only, so a video can never be approved.
+VIDEO_EXTENSIONS = (".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi")
+
+
+def _is_video(url: str) -> bool:
+    return urlsplit(str(url or "")).path.lower().endswith(VIDEO_EXTENSIONS)
+
+
 class ScreenUnavailable(RuntimeError):
     """The screening model could not run. Nothing should be delivered."""
 
@@ -209,6 +218,15 @@ class NsfwScreen:
         word = self._find_blocked_word(caption)
         if word:
             return Screening(Verdict(False, f"blocked word {word!r}"))
+
+        if _is_video(meme.url):
+            # Say so instead of downloading a whole video to fail on decoding it.
+            return Screening(
+                Verdict(
+                    False,
+                    "video is not screened, so it is not sent to restricted channels",
+                )
+            )
 
         try:
             raw = self._download(meme.url)
