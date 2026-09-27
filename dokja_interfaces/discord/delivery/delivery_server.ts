@@ -3,6 +3,10 @@ import { basename } from "node:path";
 
 import { env } from "../config.js";
 
+const browserUserAgent =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/133.0 Safari/537.36";
+
 export type DiscordDeliveryRequest = {
   channel_id: string;
   content?: string;
@@ -157,7 +161,9 @@ async function sendMessageWithAttachment(
   content: string,
   attachmentUrl: string,
 ) {
-  const attachmentResponse = await fetchImpl(attachmentUrl);
+  const attachmentResponse = await fetchImpl(attachmentUrl, {
+    headers: attachmentRequestHeaders(attachmentUrl),
+  });
   if (!attachmentResponse.ok) {
     throw new Error(`attachment fetch failed (${attachmentResponse.status})`);
   }
@@ -184,6 +190,16 @@ async function sendMessageWithAttachment(
     headers: target.headers,
     body: form,
   });
+}
+
+function attachmentRequestHeaders(attachmentUrl: string): Record<string, string> {
+  const headers: Record<string, string> = { "User-Agent": browserUserAgent };
+  try {
+    headers.Referer = `${new URL(attachmentUrl).origin}/`;
+  } catch {
+    // Validation and the fetch call will report malformed URLs to the caller.
+  }
+  return headers;
 }
 
 function parseDeliveryRequest(body: Record<string, unknown>): DiscordDeliveryRequest {

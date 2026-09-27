@@ -133,6 +133,32 @@ test("delivery sends attachments through the webhook", async () => {
   assert.equal(result.payload.has_attachment, true);
 });
 
+test("delivery downloads protected media with browser headers", async () => {
+  let downloadHeaders = new Headers();
+  const mediaUrl = "https://media.example/videos/clip.mp4";
+  const result = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", attachment_url: mediaUrl },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      fetchImpl: async (input, init) => {
+        if (String(input) === mediaUrl) {
+          downloadHeaders = new Headers(init?.headers);
+          return new Response(new Uint8Array([1]), {
+            status: 200,
+            headers: { "Content-Type": "video/mp4" },
+          });
+        }
+        return new Response(JSON.stringify({ id: "discord-message-video" }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.statusCode, 200);
+  assert.match(downloadHeaders.get("User-Agent") ?? "", /Mozilla/);
+  assert.equal(downloadHeaders.get("Referer"), "https://media.example/");
+});
+
 test("parseWebhookMap splits on first equals and skips malformed entries", () => {
   assert.deepEqual(
     parseWebhookMap(" 1=https://d.test/api/webhooks/1/a?thread_id=5 , bad, 2=https://d.test/api/webhooks/2/b ,=x"),
