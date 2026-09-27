@@ -200,9 +200,11 @@ Missing OCR text, unsupported video input, low similarity or a classifier error 
 the original message intact. Disabling the meme service also disables automatic suggestions
 for manual delivery. Channel validation and safe-only screening remain in effect.
 
-The TUI supports learning (`h`), suggestion (`g`), example count (`l`) and removal (`u`).
-Examples stored without embeddings, or under a different model, must be tagged again
-after the configured embedding model is available. This release has no automatic reindex.
+The TUI supports learning (`h`), suggestion (`g`), tagged examples (`l`) and removal (`u`).
+Each suggestion recovers up to 32 examples without embeddings or from another model.
+After the embedding model becomes available, subsequent suggestions progressively
+recover the backlog. Corrections replace the example for the same URL; automatic
+suggestions are not saved as training examples.
 Back up the hashtag database alongside the meme pool. Rebuild the meme service and
 orchestrator and update the operator interfaces to enable the feature; no new ports.
 
@@ -211,6 +213,29 @@ for selected safe-only channels and requires a highlighted confirmation. The orc
 rejects the field from CLI, API and scheduled events, records the bypass in its log and
 returns `nsfw_bypassed: true`. The request bridge is an operator interface rather than an
 authentication boundary, so keep its existing network-access restrictions in place.
+
+### Local lite stack
+
+`docker-compose.lite.yml` connects the meme service to the internal embedding server.
+Set `MEME_SERVICE_SCRAPERS` to select the locally configured scraper names; when
+empty, the meme service uses all scrapers from its local configuration.
+The `dokja-embedding-init` one-shot service downloads `${DOKJA_EMBED_MODEL:-bge-m3}`
+after the server is healthy; the meme service starts only if that download succeeds.
+The default uses CPU, requires no GPU passthrough and publishes no embedding port.
+Models persist in `${OLLAMA_MODELS_DIR:-${HOME}/.ollama}`. Set `OLLAMA_MODELS_DIR`
+to another writable directory before startup if needed; this changes the model cache,
+not the container engine's image storage. Both locations need sufficient free space.
+
+```bash
+docker compose -f docker-compose.lite.yml up -d dokja-meme
+docker compose -f docker-compose.lite.yml logs dokja-embedding-init
+docker compose -f docker-compose.lite.yml exec -T dokja-ollama ollama list
+```
+
+The first start requires network access to download the image and model. If the
+download fails, fix the reported storage/network issue and repeat the startup command.
+After changing `DOKJA_EMBED_MODEL`, repeat it to provision the new model. Later server
+outages preserve tags as pending examples; they do not erase the learning database.
 
 ## Security Notes
 
