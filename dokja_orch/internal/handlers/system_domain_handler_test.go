@@ -17,6 +17,69 @@ type fakeMemeFetcher struct {
 	err    error
 }
 
+type fakeMemeHashtagSuggester struct {
+	result map[string]any
+	err    error
+	calls  int
+}
+
+func (f *fakeMemeHashtagSuggester) SuggestHashtag(_ context.Context, _, _ string, _ *float64) (map[string]any, error) {
+	f.calls++
+	return f.result, f.err
+}
+
+func TestManualSendHashtagDelivery(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		relevant bool
+		err      error
+		disabled bool
+		want     string
+	}{
+		{"relevant", true, nil, false, "meme\n#Humor"},
+		{"irrelevant", false, nil, false, "meme"},
+		{"unavailable", false, errors.New("offline"), false, "meme"},
+		{"disabled", true, nil, true, "meme"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			controls, err := core.NewControls("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.disabled {
+				if err := controls.SetService("meme", false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			suggester := &fakeMemeHashtagSuggester{result: map[string]any{"hashtag": "#Humor", "relevant": tc.relevant}, err: tc.err}
+			deliverer := &fakeDiscordDeliverer{}
+			handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "channel").WithControls(controls).WithHashtagSuggestions(suggester)
+			event, step := discordSendEvent(map[string]any{"channel_ids": []any{"channel"}, "content": "meme", "attachment_url": "https://media.example/a.png"})
+			if _, err := handler.Handle(context.Background(), event, step); err != nil {
+				t.Fatal(err)
+			}
+			if len(deliverer.deliveries) != 1 || deliverer.deliveries[0].content != tc.want {
+				t.Fatalf("unexpected delivery: %+v", deliverer.deliveries)
+			}
+			if tc.disabled && suggester.calls != 0 {
+				t.Fatal("disabled service was called")
+			}
+		})
+	}
+}
+
+func TestInvalidManualDestinationDoesNotRequestHashtags(t *testing.T) {
+	suggester := &fakeMemeHashtagSuggester{}
+	handler := NewSystemDomainHandler(nil, nil, nil, &fakeDiscordDeliverer{}, "channel").WithHashtagSuggestions(suggester)
+	event, step := discordSendEvent(map[string]any{"channel_ids": []any{"unknown"}, "attachment_url": "https://media.example/a.png"})
+	if _, err := handler.Handle(context.Background(), event, step); err == nil {
+		t.Fatal("expected invalid destination")
+	}
+	if suggester.calls != 0 {
+		t.Fatal("invalid request triggered hashtag download")
+	}
+}
+
 func (f *fakeMemeFetcher) Fetch(_ context.Context, limit *int) (map[string]any, error) {
 	f.limit = limit
 	return f.result, f.err
@@ -92,6 +155,25 @@ func TestSystemDomainHandlerScheduledDispatchDeliversFetchedMemes(t *testing.T) 
 	}
 	if result["delivered_count"] != 2 {
 		t.Fatalf("expected delivered_count 2, got %#v", result["delivered_count"])
+	}
+}
+
+func TestScheduledDispatchAppendsRelevantLearnedHashtag(t *testing.T) {
+	deliverer := &fakeDiscordDeliverer{}
+	handler := NewSystemDomainHandler(nil, nil, &fakeMemeFetcher{result: map[string]any{
+		"memes": []any{map[string]any{"title": "First meme", "url": "https://example.com/first.jpg"}},
+	}}, deliverer, "discord-channel").WithHashtagSuggestions(&fakeMemeHashtagSuggester{
+		result: map[string]any{"hashtag": "#TioDoPave", "relevant": true},
+	})
+
+	_, err := handler.Handle(context.Background(), core.Event{Type: "meme.dispatch.scheduled", Payload: map[string]any{}}, core.WorkflowStep{
+		Domain: core.DomainSystem, Action: "deliver-scheduled-memes",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := deliverer.deliveries[0].content; got != "First meme\n#TioDoPave" {
+		t.Fatalf("expected learned hashtag in delivery, got %q", got)
 	}
 }
 
