@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
+import tempfile
 import unicodedata
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -155,6 +157,7 @@ WHOLE_WORD_ONLY = frozenset({"sexual"})
 
 # The screen decodes still images only, so a video can never be approved.
 VIDEO_EXTENSIONS = (".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi")
+VIDEO_OCR_MAX_FRAMES = 12
 
 
 def _is_video(url: str) -> bool:
@@ -286,21 +289,53 @@ class NsfwScreen:
         return Verdict(True)
 
     def read_text(self, url: str) -> str:
-        """The text printed on an image, for callers other than NSFW screening (such as
-        hashtag suggestion). Downloads and decodes the image but never runs the NSFW
-        detector, so it works even when the detector model is unavailable. Returns "" if
-        there is no text reader configured. Refuses videos for the same reason `inspect`
-        does: this only decodes a still image.
-        """
+        """Read image or sampled video text for hashtags, without NSFW detection."""
         if self._text_reader is None:
             return ""
-        if _is_video(url):
-            raise ValueError("video is not screened, so its text cannot be read")
         raw = self._download(url)
+        if _is_video(url):
+            return self._read_video_text(raw)
         image = self._decode(raw)
         if image is None:
-            raise ValueError("unsupported or unreadable media")
+            return self._read_video_text(raw)
         return str(self._text_reader.read(image))
+
+    def _read_video_text(self, raw: bytes) -> str:
+        import cv2
+
+        # Decode a local, size-limited download, never a remote URL via OpenCV.
+        with tempfile.NamedTemporaryFile(suffix=".video") as video:
+            video.write(raw)
+            video.flush()
+            capture = cv2.VideoCapture(video.name)
+            try:
+                if not capture.isOpened():
+                    raise ValueError("unsupported or unreadable media")
+                count = capture.get(cv2.CAP_PROP_FRAME_COUNT)
+                count = int(count) if math.isfinite(count) and count > 0 else 0
+                samples = (
+                    min(count, VIDEO_OCR_MAX_FRAMES) if count else VIDEO_OCR_MAX_FRAMES
+                )
+                lines: dict[str, None] = {}
+                decoded = False
+                for index in range(samples):
+                    if count > 1 and samples > 1:
+                        position = index * (count - 1) // (samples - 1)
+                        if not capture.set(cv2.CAP_PROP_POS_FRAMES, position):
+                            continue
+                    ok, frame = capture.read()
+                    if not ok:
+                        continue
+                    decoded = True
+                    for line in str(self._text_reader.read(frame)).splitlines():
+                        line = line.strip()
+                        if line:
+                            lines[line] = None
+                if not decoded:
+                    raise ValueError("unsupported or unreadable media")
+                return "\n".join(lines)
+            finally:
+                capture.release()
 
     def _download(self, url: str) -> bytes:
         with self._session.get(url, timeout=self.timeout, stream=True) as response:

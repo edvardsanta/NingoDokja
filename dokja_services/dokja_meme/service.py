@@ -188,15 +188,15 @@ class MemeService:
         return self.hashtags
 
     def _read_text(self, url: str) -> str:
-        """The OCR text of an image, the signal hashtag training and suggestion learn
+        """The OCR text of media, the signal hashtag training and suggestion learn
         from. Reuses the NSFW screen's reader, since that is where OCR already lives;
         it never runs the NSFW detector for this.
         """
         if self.screen is None:
-            raise ValueError("cannot read image text: the nsfw filter (which also runs OCR) is disabled")
+            raise ValueError("cannot read media text: the nsfw filter (which also runs OCR) is disabled")
         text = self.screen.read_text(url)
         if not text.strip():
-            raise ValueError(f"no text was found on the image at {url}")
+            raise ValueError(f"no text was found in the media at {url}; provide explicit text")
         return text
 
     def tag_hashtag(self, url, hashtag, text=None) -> dict:

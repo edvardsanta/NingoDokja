@@ -135,7 +135,10 @@ or the scraper's own boilerplate), while the caption baked into the meme is what
 hashtag is actually about. `meme.hashtag.tag` and `.suggest` read it automatically from
 `url`, or accept an explicit `text` to skip that (useful for testing, or when the
 caller already has it from a prior `meme.screen` call). A meme with no legible text, or
-a video, cannot be tagged or matched by this signal.
+a video without legible text, needs explicit `text` to be tagged or matched.
+Videos use OCR on up to 12 frames spread across the clip, deduplicating repeated
+lines. The same download size limit (8 MB) and timeout as image OCR apply. Audio
+is not transcribed, and sampled OCR does not change the NSFW screening policy.
 
 Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still stores
 the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
