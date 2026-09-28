@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,6 +187,29 @@ func (c *MemeServiceClient) UntagHashtag(ctx context.Context, url string) (map[s
 		return nil, err
 	}
 	return response.Result, nil
+}
+
+// FetchAttachment downloads a pooled meme's raw bytes through the meme service, for
+// hosts a plain HTTP client cannot reach directly (Cloudflare and similar bot checks).
+func (c *MemeServiceClient) FetchAttachment(ctx context.Context, url string) ([]byte, string, error) {
+	response, err := c.dispatch(ctx, core.Event{
+		Source:  core.SourceOrchestrator,
+		Type:    "meme.attachment.fetch",
+		Payload: map[string]any{"url": url},
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	encoded, _ := response.Result["data_b64"].(string)
+	if encoded == "" {
+		return nil, "", fmt.Errorf("meme service returned no attachment data")
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode attachment data: %w", err)
+	}
+	contentType, _ := response.Result["content_type"].(string)
+	return data, contentType, nil
 }
 
 // MarkSent flags a meme as delivered so the scheduler does not send it again.

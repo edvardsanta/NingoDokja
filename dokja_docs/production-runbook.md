@@ -237,6 +237,19 @@ download fails, fix the reported storage/network issue and repeat the startup co
 After changing `DOKJA_EMBED_MODEL`, repeat it to provision the new model. Later server
 outages preserve tags as pending examples; they do not erase the learning database.
 
+## Attachment Fetch for Memes
+
+Some hosts put media downloads behind a client-fingerprint check (Cloudflare and
+similar) that the Discord interface's own plain HTTP download fails, even with correct
+`Referer`/`User-Agent` headers. `meme.attachment.fetch` (`MEME_ATTACHMENT_FETCH`,
+default `on`) has the meme service download the bytes itself and hand them to the
+orchestrator, which then sends them to the Discord interface instead of a URL to fetch.
+Scoped to URLs already in the meme service's own pool.
+
+A failed or disabled fetch falls back to the previous behaviour (sending the plain
+URL), so this never blocks delivery for hosts that do not need it; no new ports, and
+rebuilding the meme service and orchestrator is enough to pick it up.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone
