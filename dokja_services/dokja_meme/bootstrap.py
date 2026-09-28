@@ -19,14 +19,19 @@ def _configure_legacy_imports() -> Path:
 
 REPO_ROOT = _configure_legacy_imports()
 
-from attachment_fetcher import build_attachment_fetcher_from_env
+from attachment_fetcher import AttachmentFetcher, build_attachment_fetcher_from_env
+from service import MemeService
+
 from config import SCRAPERS as LEGACY_SCRAPERS
 from infra.sqlite.storage import SQLiteStorage
 from memes.embedder import OllamaEmbedder
 from memes.hashtags import DEFAULT_MIN_SCORE, HashtagClassifier
-from memes.safety import build_screen_from_env
+from memes.safety import (
+    DEFAULT_MAX_BYTES,
+    DEFAULT_TIMEOUT_SECONDS,
+    build_screen_from_env,
+)
 from models.Meme import Meme
-from service import MemeService
 from workers.meme_worker import MemeWorker
 
 
@@ -42,7 +47,9 @@ def build_scrapers() -> list:
     }
 
     requested_env = os.getenv("MEME_SERVICE_SCRAPERS", "")
-    requested = [item.strip().lower() for item in requested_env.split(",") if item.strip()]
+    requested = [
+        item.strip().lower() for item in requested_env.split(",") if item.strip()
+    ]
 
     if not requested:
         return [scraper_cls() for scraper_cls in available.values()]
@@ -61,7 +68,12 @@ def resolve_hashtag_db_file() -> str:
 def build_hashtag_classifier() -> HashtagClassifier:
     model = os.getenv("DOKJA_EMBED_MODEL", "bge-m3")
     embedder = None
-    if os.getenv("DOKJA_EMBED", "on").strip().lower() not in {"off", "0", "false", "none"}:
+    if os.getenv("DOKJA_EMBED", "on").strip().lower() not in {
+        "off",
+        "0",
+        "false",
+        "none",
+    }:
         embedder = OllamaEmbedder(
             os.getenv("DOKJA_EMBED_ENDPOINT", "http://127.0.0.1:11434"),
             model,
@@ -79,11 +91,16 @@ def build_service() -> MemeService:
     storage = SQLiteStorage(resolve_db_file(), Meme)
     scrapers = build_scrapers()
     worker = MemeWorker(scrapers=scrapers, storage=storage)
+    # OCR needs the same browser-compatible transport as delivery, with its own
+    # existing limits. Disabling attachment delivery must not disable OCR.
+    ocr_fetcher = AttachmentFetcher(
+        max_bytes=DEFAULT_MAX_BYTES, timeout=DEFAULT_TIMEOUT_SECONDS
+    )
     return MemeService(
         storage=storage,
         scrapers=scrapers,
         worker=worker,
-        screen=build_screen_from_env(),
+        screen=build_screen_from_env(downloader=lambda url: ocr_fetcher.fetch(url)[0]),
         hashtags=build_hashtag_classifier(),
         attachments=build_attachment_fetcher_from_env(),
     )

@@ -2,7 +2,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -525,6 +525,100 @@ def test_video_without_text_requires_explicit_text(video_bytes):
         service.tag_hashtag("https://x/a.mp4", "Teste", text="description")["text"]
         == "description"
     )
+
+
+def _service_with_browser_download(monkeypatch, response):
+    from memes.hashtags import HashtagClassifier
+
+    spec = importlib.util.spec_from_file_location(
+        "meme_bootstrap_under_test", SERVICE_PATH.with_name("bootstrap.py")
+    )
+    bootstrap = importlib.util.module_from_spec(spec)
+    with patch.object(sys, "path", [str(SERVICE_PATH.parent), *sys.path]):
+        with patch.dict(sys.modules, {"config": SimpleNamespace(SCRAPERS=[])}):
+            spec.loader.exec_module(bootstrap)
+
+    monkeypatch.setenv("MEME_NSFW_FILTER", "on")
+    monkeypatch.setenv("MEME_ATTACHMENT_FETCH", "off")
+    monkeypatch.setattr(bootstrap, "SQLiteStorage", lambda *_: FakeStorage([]))
+    monkeypatch.setattr(bootstrap, "MemeWorker", lambda **_: None)
+    classifier = HashtagClassifier(
+        ":memory:", embedder=FakeHashtagEmbedder(), model="fake"
+    )
+    monkeypatch.setattr(bootstrap, "build_hashtag_classifier", lambda: classifier)
+    monkeypatch.setattr(
+        "memes.safety.build_text_reader_from_env", lambda: FakeReader("texto do meme")
+    )
+    browser = MagicMock()
+    browser.__enter__.return_value = browser
+    browser.get.return_value = response
+    monkeypatch.setattr("curl_cffi.requests.Session", lambda: browser)
+    plain_get = Mock(
+        side_effect=AssertionError("plain HTTP must not download OCR media")
+    )
+    monkeypatch.setattr("requests.Session.get", plain_get)
+    return bootstrap.build_service(), browser, plain_get
+
+
+@pytest.mark.parametrize("media", ["image", "video"])
+def test_service_tags_and_suggests_using_browser_download(
+    monkeypatch, video_bytes, media
+):
+    raw = video_bytes if media == "video" else _png_bytes()
+    url = (
+        "https://cdn.example/clip.mp4"
+        if media == "video"
+        else "https://cdn.example/a.png"
+    )
+    response = Mock(status_code=200, headers={})
+    response.iter_content.return_value = [raw]
+    service, browser, plain_get = _service_with_browser_download(monkeypatch, response)
+    try:
+        assert service.attachments is None
+        tagged = service.dispatch(
+            {"type": "meme.hashtag.tag", "payload": {"url": url, "hashtag": "Teste"}}
+        )
+        suggestion = service.dispatch(
+            {"type": "meme.hashtag.suggest", "payload": {"url": url}}
+        )
+        assert tagged["text"] == "texto do meme"
+        assert suggestion["hashtag"] == "#Teste"
+        assert suggestion["relevant"] is True
+        browser.get.assert_called_with(
+            url, impersonate="chrome", timeout=15, stream=True
+        )
+        assert browser.get.call_count == 2
+        assert response.close.call_count == 2
+        plain_get.assert_not_called()
+    finally:
+        service.hashtags.close()
+
+
+@pytest.mark.parametrize("failure", ["http", "declared_size", "stream_size", "timeout"])
+def test_ocr_browser_download_errors_do_not_save_tags(monkeypatch, failure):
+    response = Mock(status_code=403 if failure == "http" else 200, headers={})
+    response.iter_content.return_value = (
+        [b"x" * 8_000_001] if failure == "stream_size" else []
+    )
+    if failure == "declared_size":
+        response.headers["content-length"] = "8000001"
+    service, browser, plain_get = _service_with_browser_download(monkeypatch, response)
+    if failure == "timeout":
+        browser.get.side_effect = TimeoutError("timed out")
+    try:
+        error = (
+            "403"
+            if failure == "http"
+            else "timed out" if failure == "timeout" else "file too large"
+        )
+        with pytest.raises(RuntimeError, match=error):
+            service.tag_hashtag("https://cdn.example/clip.mp4", "Teste")
+        assert service.hashtags.list_examples()["total"] == 0
+        if failure != "timeout":
+            response.close.assert_called_once()
+        plain_get.assert_not_called()
+    finally:
+        service.hashtags.close()
 
 
 def test_read_text_propagates_download_and_decode_failures():

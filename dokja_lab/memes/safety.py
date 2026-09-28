@@ -8,7 +8,7 @@ import re
 import tempfile
 import unicodedata
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 from urllib.parse import urlsplit
 
 import requests
@@ -196,6 +196,7 @@ class NsfwScreen:
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         session: Any = None,
         detector: Any = None,
+        downloader: Callable[[str], bytes] | None = None,
     ) -> None:
         self.model_path = model_path or None
         self.threshold = threshold
@@ -212,6 +213,7 @@ class NsfwScreen:
         self.timeout = timeout
         self._session = session or requests.Session()
         self._detector = detector
+        self._downloader = downloader
 
     def check(self, meme: Any) -> Verdict:
         return self.inspect(meme).verdict
@@ -338,6 +340,11 @@ class NsfwScreen:
                 capture.release()
 
     def _download(self, url: str) -> bytes:
+        if self._downloader is not None:
+            raw = self._downloader(url)
+            if len(raw) > self.max_bytes:
+                raise ValueError("file too large")
+            return raw
         with self._session.get(url, timeout=self.timeout, stream=True) as response:
             response.raise_for_status()
             declared = int(response.headers.get("Content-Length") or 0)
@@ -381,7 +388,9 @@ def build_text_reader_from_env() -> Any:
     return TextReader(model_dir=os.getenv("DOKJA_OCR_MODEL_DIR", "").strip() or None)
 
 
-def build_screen_from_env() -> NsfwScreen | None:
+def build_screen_from_env(
+    downloader: Callable[[str], bytes] | None = None,
+) -> NsfwScreen | None:
     if os.getenv("MEME_NSFW_FILTER", "on").strip().lower() in {"off", "0", "false"}:
         logger.warning("meme nsfw filter is disabled")
         return None
@@ -398,6 +407,7 @@ def build_screen_from_env() -> NsfwScreen | None:
             *_split_words(os.getenv("MEME_NSFW_EXTRA_WORDS", "")),
         ),
         text_reader=build_text_reader_from_env(),
+        downloader=downloader,
     )
 
 
