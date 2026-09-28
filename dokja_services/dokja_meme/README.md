@@ -66,6 +66,9 @@ Supported event types:
   Flags one meme as delivered without going through `meme.fetch`.
 - `meme.hashtag.tag`, `meme.hashtag.suggest`, `meme.hashtag.list`, `meme.hashtag.untag`
   See "Hashtag suggestion" below.
+- `meme.attachment.fetch`
+  Downloads a pooled meme's raw bytes (base64-encoded) for a caller that cannot reach
+  the origin host directly. See "Attachment fetch" below.
 
 Response format:
 
@@ -111,6 +114,10 @@ Environment variables:
   shared code.
 - `MEME_HASHTAG_MIN_SCORE`
   Default `0.6`, provisional. See "Hashtag suggestion" below.
+- `MEME_ATTACHMENT_FETCH=off`
+  Disables `meme.attachment.fetch` (default `on`). See "Attachment fetch" below.
+- `MEME_ATTACHMENT_MAX_BYTES` (default `20000000`), `MEME_ATTACHMENT_TIMEOUT`
+  (default `30` seconds).
 
 ## Hashtag suggestion
 
@@ -144,3 +151,19 @@ configured model becomes available. Automatic reindexing is not implemented.
 Manual and scheduled delivery append only relevant suggestions. Suggestion failures
 leave the original message unchanged. Automatic OCR requires the text reader used
 by the screening component; explicit `--text` input works without that reader.
+
+## Attachment fetch
+
+Some hosts put media downloads behind a client-fingerprint check (Cloudflare and
+similar) that a plain HTTP client fails even with a correct `Referer`/`User-Agent`,
+because it inspects the TLS/HTTP client signature itself, not just the headers. The
+scraper's own session usually gets through, since it already has to; `meme.attachment.fetch`
+reuses that same approach (`curl_cffi`, impersonating a browser) so a caller that only
+has a URL — the Discord delivery interface, downloading a meme to attach it — can get
+the bytes without hitting that check itself.
+
+Scoped to URLs already in this service's own pool (`storage.exists`), so this is not a
+generic unauthenticated fetch-any-URL endpoint. The orchestrator calls it before
+delivering an attachment and falls back to sending the plain URL (the delivery
+interface's own fetch) on any failure, so this being off or unreachable never blocks
+delivery for hosts that do not need it.

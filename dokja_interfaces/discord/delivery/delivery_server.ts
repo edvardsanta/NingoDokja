@@ -11,6 +11,12 @@ export type DiscordDeliveryRequest = {
   channel_id: string;
   content?: string;
   attachment_url?: string;
+  // Set by callers (the orchestrator, backed by the meme service) that already
+  // downloaded the attachment themselves, for hosts this interface cannot reach
+  // directly (Cloudflare and similar bot checks). attachment_url is still sent, but
+  // only to derive a filename; it is not fetched again when this is set.
+  attachment_data_b64?: string;
+  attachment_content_type?: string;
 };
 
 export type DiscordDeliveryResponse = {
@@ -90,6 +96,7 @@ export async function handleDiscordDeliveryRequest(
   const channelId = body.channel_id;
   const content = body.content ?? "";
   const attachmentUrl = body.attachment_url ?? "";
+  const attachmentDataB64 = body.attachment_data_b64 ?? "";
   if (!channelId || (!content && !attachmentUrl)) {
     return {
       statusCode: 400,
@@ -113,7 +120,16 @@ export async function handleDiscordDeliveryRequest(
     hasAttachment: attachmentUrl.length > 0,
   }));
 
-  const response = attachmentUrl
+  const response = attachmentDataB64
+    ? await sendMessageWithAttachmentBytes(
+        deps.fetchImpl,
+        target,
+        content,
+        attachmentDataB64,
+        body.attachment_content_type ?? null,
+        attachmentUrl,
+      )
+    : attachmentUrl
     ? await sendMessageWithAttachment(deps.fetchImpl, target, content, attachmentUrl)
     : await deps.fetchImpl(target.url, {
         method: "POST",
@@ -169,10 +185,34 @@ async function sendMessageWithAttachment(
   }
 
   const bytes = await attachmentResponse.arrayBuffer();
-  const filename = buildAttachmentFilename(
-    attachmentUrl,
-    attachmentResponse.headers.get("content-type"),
-  );
+  return postAttachment(fetchImpl, target, content, bytes, attachmentResponse.headers.get("content-type"), attachmentUrl);
+}
+
+// sendMessageWithAttachmentBytes attaches bytes the caller already downloaded (the meme
+// service, for hosts a plain HTTP client cannot reach directly, such as Cloudflare and
+// similar bot checks), instead of fetching attachmentUrl again. attachmentUrl is kept
+// only to derive a filename.
+async function sendMessageWithAttachmentBytes(
+  fetchImpl: typeof fetch,
+  target: { url: string; headers: Record<string, string> },
+  content: string,
+  dataB64: string,
+  contentType: string | null,
+  attachmentUrl: string,
+) {
+  const bytes = Buffer.from(dataB64, "base64");
+  return postAttachment(fetchImpl, target, content, bytes, contentType, attachmentUrl);
+}
+
+async function postAttachment(
+  fetchImpl: typeof fetch,
+  target: { url: string; headers: Record<string, string> },
+  content: string,
+  bytes: ArrayBuffer | Buffer,
+  contentType: string | null,
+  attachmentUrl: string,
+) {
+  const filename = buildAttachmentFilename(attachmentUrl, contentType);
 
   const form = new FormData();
   form.append("payload_json", JSON.stringify({
@@ -181,7 +221,7 @@ async function sendMessageWithAttachment(
   }));
   form.append(
     "files[0]",
-    new Blob([bytes], { type: attachmentResponse.headers.get("content-type") ?? "application/octet-stream" }),
+    new Blob([bytes], { type: contentType ?? "application/octet-stream" }),
     filename,
   );
 
@@ -207,6 +247,8 @@ function parseDeliveryRequest(body: Record<string, unknown>): DiscordDeliveryReq
     channel_id: String(body.channel_id ?? "").trim(),
     content: String(body.content ?? "").trim() || undefined,
     attachment_url: String(body.attachment_url ?? "").trim() || undefined,
+    attachment_data_b64: String(body.attachment_data_b64 ?? "").trim() || undefined,
+    attachment_content_type: String(body.attachment_content_type ?? "").trim() || undefined,
   };
 }
 
