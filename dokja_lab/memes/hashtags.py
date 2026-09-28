@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 # dokja_knowledge's threshold, which was measured on real bge-m3 output). Retune once
 # there is a real set of tagged memes; see the README.
 DEFAULT_MIN_SCORE = 0.6
+LEARNING_BATCH_SIZE = 32
 
 MIGRATIONS = [
     """
@@ -207,9 +208,42 @@ class HashtagClassifier:
                 text, threshold, example_count, "no embedding server is configured"
             )
 
-        vector, embedded, reason = self._embed_one(text)
-        if not embedded:
-            return self._degraded(text, threshold, example_count, reason)
+        # Recover operator-labelled examples in bounded batches alongside the query.
+        # One embedding call keeps an unavailable server from multiplying timeouts.
+        pending = self.conn.execute(
+            "SELECT source_url, text FROM hashtag_examples"
+            " WHERE embedding IS NULL OR embed_model IS NULL OR embed_model != ?"
+            " ORDER BY id LIMIT ?",
+            (self.model, LEARNING_BATCH_SIZE),
+        ).fetchall()
+        try:
+            vectors = np.asarray(
+                self.embedder.embed([text] + [row["text"] for row in pending]),
+                dtype=np.float32,
+            )
+            if (
+                vectors.ndim != 2
+                or len(vectors) != len(pending) + 1
+                or vectors.shape[1] == 0
+                or not np.isfinite(vectors).all()
+                or np.any(np.linalg.norm(vectors, axis=1) == 0)
+            ):
+                raise ValueError("embedding server returned invalid learning vectors")
+            vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
+        except Exception as err:
+            logger.warning("hashtag learning unavailable: %s", err)
+            return self._degraded(text, threshold, example_count, str(err))
+
+        with self.conn:
+            for row, learned in zip(pending, vectors[1:]):
+                self.conn.execute(
+                    "UPDATE hashtag_examples SET embedding = ?, embed_model = ?"
+                    " WHERE source_url = ? AND text = ?",
+                    (learned.tobytes(), self.model, row["source_url"], row["text"]),
+                )
+        vector = vectors[0]
+        if pending:
+            logger.info("hashtag learning recovered examples=%d", len(pending))
 
         examples = self._embedded_examples()
         if not examples:

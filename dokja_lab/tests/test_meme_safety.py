@@ -1,6 +1,8 @@
 import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -16,7 +18,9 @@ def _load_meme_service():
         "meme_service_under_test", SERVICE_PATH
     )
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # Match script startup: sibling service modules must be importable too.
+    with patch.object(sys, "path", [str(SERVICE_PATH.parent), *sys.path]):
+        spec.loader.exec_module(module)
     return module
 
 

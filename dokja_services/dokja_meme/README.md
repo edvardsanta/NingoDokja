@@ -145,8 +145,11 @@ of guessing.
 in `dokja_lab/tests/test_hashtags_live.py` is skipped without a reachable embedding
 server; validate the threshold against representative tagged memes before relying on it.
 
-Re-tag examples saved without embeddings, or under a different model, after the
-configured model becomes available. Automatic reindexing is not implemented.
+Each suggestion embeds up to 32 pending examples (missing vectors or a different
+model) alongside the query in one request. Subsequent suggestions recover the rest
+after the configured model becomes available. Failed requests leave examples pending.
+Tagging the same URL again corrects its label instead of adding a duplicate. Automatic
+suggestions are never saved as training examples.
 
 Manual and scheduled delivery append only relevant suggestions. Suggestion failures
 leave the original message unchanged. Automatic OCR requires the text reader used

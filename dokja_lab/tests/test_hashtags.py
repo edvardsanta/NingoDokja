@@ -206,13 +206,64 @@ def test_suggest_when_the_embedder_is_down_is_degraded(classifier, embedder):
     assert result["degraded"] is True and "unreachable" in result["reason"]
 
 
-def test_examples_from_another_embedding_model_are_not_used(embedder):
+def test_examples_from_another_model_are_reembedded_before_use(embedder):
     conn = HashtagClassifier(":memory:", embedder=embedder, model="old")
     conn.tag("https://x/1.jpg", "TioDoPave", "o tio pegou o pave")
     conn.model = "new"  # simulate DOKJA_EMBED_MODEL changing between runs
     result = conn.suggest("o tio pegou o pave de novo")
-    assert result["hashtag"] is None
-    assert "no tagged examples" in result["reason"]
+    assert result["hashtag"] == "#TioDoPave"
+    assert conn.list_examples()["examples"][0]["embedded"] is True
+    assert embedder.calls[-1] == ["o tio pegou o pave de novo", "o tio pegou o pave"]
+
+
+def test_learning_recovers_saved_tags_after_outage(classifier, embedder):
+    embedder.down = True
+    classifier.tag("https://example.com/a.jpg", "Work", "meeting at work")
+    before = classifier.list_examples()["examples"][0]
+    assert before["embedded"] is False
+    embedder.down = False
+    result = classifier.suggest("meeting at work")
+    assert result["hashtag"] == "#Work" and result["relevant"]
+    after = classifier.list_examples()["examples"][0]
+    assert after["embedded"] is True
+    assert after["updated_at"] == before["updated_at"]
+    assert classifier.list_examples()["total"] == 1
+
+
+def test_learning_uses_corrected_tag_without_adding_predictions(classifier):
+    classifier.tag("https://example.com/a.jpg", "Old", "meeting at work")
+    classifier.tag("https://example.com/a.jpg", "Corrected", "meeting at work")
+    assert classifier.suggest("meeting at work")["hashtag"] == "#Corrected"
+    assert classifier.list_examples()["total"] == 1
+
+
+def test_pending_learning_is_bounded_and_eventually_complete(classifier, embedder):
+    embedder.down = True
+    for i in range(35):
+        classifier.tag(f"https://example.com/{i}.jpg", "Work", "meeting at work")
+    embedder.down = False
+    classifier.suggest("meeting at work")
+    assert len(embedder.calls[-1]) == 33
+    assert sum(row["embedded"] for row in classifier.list_examples()["examples"]) == 32
+    classifier.suggest("meeting at work")
+    assert len(embedder.calls[-1]) == 4
+    assert all(row["embedded"] for row in classifier.list_examples()["examples"])
+
+
+def test_failed_learning_keeps_pending_examples(classifier, embedder):
+    embedder.down = True
+    classifier.tag("https://example.com/a.jpg", "Work", "meeting at work")
+    result = classifier.suggest("meeting at work")
+    assert result["degraded"] and not result["relevant"]
+    assert classifier.list_examples()["examples"][0]["embedded"] is False
+
+
+def test_invalid_learning_vectors_do_not_mark_examples_ready(classifier, embedder):
+    embedder.down = True
+    classifier.tag("https://example.com/a.jpg", "Work", "meeting at work")
+    embedder.embed = lambda texts: np.full((len(texts), 3), np.nan)
+    assert classifier.suggest("meeting at work")["degraded"]
+    assert not classifier.list_examples()["examples"][0]["embedded"]
 
 
 def test_the_threshold_can_be_loosened_or_tightened_per_call(classifier):
