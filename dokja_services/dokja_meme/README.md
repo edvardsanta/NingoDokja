@@ -139,6 +139,10 @@ a video without legible text, needs explicit `text` to be tagged or matched.
 Videos use OCR on up to 12 frames spread across the clip, deduplicating repeated
 lines. The same download size limit (8 MB) and timeout as image OCR apply. Audio
 is not transcribed, and sampled OCR does not change the NSFW screening policy.
+OCR downloads use the same browser-compatible `curl_cffi` client as attachment
+delivery, including for images. OCR keeps its own 8 MB / 15 second download limits
+and remains available when attachment fetching is disabled. Restart the meme
+service after updating its code (rebuild its image when code is not bind-mounted).
 
 Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still stores
 the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
