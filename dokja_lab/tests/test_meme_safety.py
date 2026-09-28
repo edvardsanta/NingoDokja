@@ -450,11 +450,77 @@ def test_read_text_without_a_reader_configured_is_empty():
     assert screen(session=FakeSession(_png_bytes())).read_text("https://x/a.png") == ""
 
 
-def test_read_text_refuses_a_video_without_downloading_it():
-    session = FakeSession(_png_bytes())
-    with pytest.raises(ValueError, match="video"):
-        ocr_screen("text", session=session).read_text("https://x/clip.mp4")
-    assert session.calls == 0
+@pytest.fixture
+def video_bytes(tmp_path):
+    import cv2
+    import numpy as np
+
+    path = tmp_path / "clip.avi"
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), 10, (32, 32))
+    assert writer.isOpened()
+    try:
+        for value in range(30):
+            writer.write(np.full((32, 32, 3), value * 8, np.uint8))
+    finally:
+        writer.release()
+    return path.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "url", ["https://x/clip.avi", "https://x/clip.MP4?v=1", "https://x/media"]
+)
+def test_read_video_text_samples_whole_clip_and_deduplicates(video_bytes, url):
+    class Reader:
+        calls = 0
+
+        def read(self, frame):
+            self.calls += 1
+            return "repeated\n" + ("beginning" if frame.mean() < 100 else "ending")
+
+    reader = Reader()
+    detector = FakeDetector(error=AssertionError("must not screen"))
+    result = screen(body=video_bytes, text_reader=reader, detector=detector).read_text(
+        url
+    )
+    assert result == "repeated\nbeginning\nending"
+    assert reader.calls == 12
+
+
+def test_video_ocr_respects_download_limit(video_bytes):
+    reader = FakeReader("text")
+    with pytest.raises(ValueError, match="file too large"):
+        screen(body=video_bytes, text_reader=reader, max_bytes=1).read_text(
+            "https://x/a.mp4"
+        )
+    assert reader.calls == 0
+
+
+def test_video_hashtags_tag_suggest_list_and_remove(video_bytes):
+    service, classifier = _hashtag_service(text_reader_text="o tio pegou o pave")
+    service.screen._session = FakeSession(video_bytes)
+    url = "https://x/clip.mp4"
+    tagged = service.dispatch(
+        {"type": "meme.hashtag.tag", "payload": {"url": url, "hashtag": "TioDoPave"}}
+    )
+    assert tagged["hashtag"] == "#TioDoPave"
+    suggestion = service.dispatch(
+        {"type": "meme.hashtag.suggest", "payload": {"url": url}}
+    )
+    assert suggestion["hashtag"] == "#TioDoPave"
+    assert suggestion["relevant"] is True
+    assert classifier.list_examples()["examples"][0]["source_url"] == url
+    assert service.untag_hashtag(url)["deleted"] is True
+
+
+def test_video_without_text_requires_explicit_text(video_bytes):
+    service, _ = _hashtag_service()
+    service.screen._session = FakeSession(video_bytes)
+    with pytest.raises(ValueError, match="provide explicit text"):
+        service.tag_hashtag("https://x/a.mp4", "Teste")
+    assert (
+        service.tag_hashtag("https://x/a.mp4", "Teste", text="description")["text"]
+        == "description"
+    )
 
 
 def test_read_text_propagates_download_and_decode_failures():
