@@ -23,6 +23,11 @@ and compares.
   works in bounded batches and nothing here ingests documents, so one slow call cannot hold
   every other action for long.
 - A context is never logged: requests are logged by type and number of payload fields only.
+- A context is returned in one case only: `memory.list` and `memory.recall` hand back its first 160
+  characters, as `context_snippet`, when the request sets `include_context`. The cut is made here, so the
+  rest never leaves the service. It is how an operator recognizes an experience whose `ref` is a hash. The
+  orchestrator port has no authentication, the same as for `knowledge.search`: keep it off untrusted
+  networks. `memory.get` and `memory.resolved` never return a context.
 
 ## Events (ZeroMQ REQ/REP, port 5562)
 
@@ -34,14 +39,16 @@ Same envelope as the knowledge service: `{"type": ..., "payload": {...}}` in,
 | `memory.record` | `ref`, `action`, `context`, `detail?` (what exactly was done, up to 200 characters), `predicted_p?` and `baseline_p?` (together, 0 to 1) | `created`, `embedded`, `degraded`, `reason?` |
 | `memory.resolve` | `ref`, `outcome` (a short lowercase word) | `found`, `resolved`, `outcome` |
 | `memory.get` | `ref` | `found`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `created_at`, `resolved_at` (never the context) |
-| `memory.recall` | `context`, `action?`, `k?` (1-50) | `neighbors[]` (`ref`, `action`, `outcome`, `similarity`, `created_at`), `outcomes` (count per outcome), `degraded`, `reason?` |
+| `memory.recall` | `context`, `action?`, `k?` (1-50), `include_context?` | `neighbors[]` (`ref`, `action`, `detail`, `outcome`, `similarity`, `created_at`, `context_snippet?`), `outcomes` (count per outcome), `degraded`, `reason?` |
+| `memory.list` | `action?`, `state?` (`all`, `pending` or `resolved`), `limit?` (1-100, default 20), `offset?`, `include_context?` | `experiences[]` (`ref`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `created_at`, `resolved_at`, `context_snippet?`), newest first, plus `total`, `limit`, `offset` |
 | `memory.resolved` | `action?`, `limit?` | `experiences[]` (`ref`, `action`, `outcome`, `predicted_p`, `baseline_p`, `resolved_at`), latest first taken, oldest first returned |
 | `memory.forget` | `ref` | `deleted` |
 | `memory.status` | none | counts, `embed_model`, `embeddings`, `embedder_reachable`, `needs_reindex`, `degraded` |
 | `memory.reindex` | `limit?` (1-500, default 32) | `embedded`, `remaining` |
 
 Only experiences that have an outcome are neighbours or counted: a pending one has taught
-nothing yet. An unresolved experience older than `MEMORY_EXPIRE_AFTER` reads as `expired`.
+nothing yet (`memory.list` shows them all). `pending` and `resolved` in a listing follow the same
+reading of expiry as `memory.status`, so an expired experience lists as resolved. An unresolved experience older than `MEMORY_EXPIRE_AFTER` reads as `expired`.
 That is a view, not a write, so a verdict that finally arrives still replaces it.
 
 ## Variables

@@ -265,3 +265,105 @@ func TestGetReturnsWhatTheBotDidButNeverTheContext(t *testing.T) {
 		t.Fatalf("missing=%v", missing)
 	}
 }
+
+func TestListReturnsTheNewestFirstAndNeverTheContextUnlessAsked(t *testing.T) {
+	service, _, _ := newTestService(t, 0)
+	for _, ref := range []string{"e1", "e2", "e3"} {
+		dispatch(t, service, "memory.record", map[string]any{
+			"ref": ref, "action": "tag.suggest", "context": "private words " + ref, "detail": "#" + ref, "predicted_p": 0.7, "baseline_p": 0.5,
+		})
+	}
+	dispatch(t, service, "memory.resolve", map[string]any{"ref": "e2", "outcome": "accepted"})
+
+	plain := dispatch(t, service, "memory.list", map[string]any{})
+	rows := plain["experiences"].([]any)
+	if plain["total"] != 3 || plain["limit"] != defaultList || plain["offset"] != 0 || len(rows) != 3 {
+		t.Fatalf("plain=%v", plain)
+	}
+	first := rows[0].(map[string]any)
+	if first["ref"] != "e3" || first["detail"] != "#e3" || first["outcome"] != "" || first["predicted_p"] != 0.7 || first["baseline_p"] != 0.5 {
+		t.Fatalf("newest first, with what the bot did: %v", first)
+	}
+	if _, has := first["context_snippet"]; has {
+		t.Fatalf("a snippet is opt-in: %v", first)
+	}
+	if rows[1].(map[string]any)["outcome"] != "accepted" {
+		t.Fatalf("rows=%v", rows)
+	}
+	for _, raw := range rows {
+		for key, value := range raw.(map[string]any) {
+			if text, ok := value.(string); ok && strings.Contains(text, "private") {
+				t.Fatalf("the context must not come back unless asked (%s=%q)", key, text)
+			}
+		}
+	}
+
+	asked := dispatch(t, service, "memory.list", map[string]any{"include_context": true, "limit": 1})
+	only := asked["experiences"].([]any)[0].(map[string]any)
+	if only["context_snippet"] != "private words e3" || asked["total"] != 3 || asked["limit"] != 1 {
+		t.Fatalf("asked=%v", asked)
+	}
+}
+
+func TestListFiltersAndPagesAndKeepsTheSnippetShort(t *testing.T) {
+	service, _, c := newTestService(t, 24*time.Hour)
+	long := strings.Repeat("word ", 100)
+	dispatch(t, service, "memory.record", map[string]any{"ref": "old", "action": "a", "context": long})
+	c.Advance(25 * time.Hour)
+	dispatch(t, service, "memory.record", map[string]any{"ref": "waiting", "action": "a", "context": "x"})
+	dispatch(t, service, "memory.record", map[string]any{"ref": "other", "action": "b", "context": "x"})
+
+	if pending := dispatch(t, service, "memory.list", map[string]any{"state": "pending"}); pending["total"] != 2 {
+		t.Fatalf("pending=%v", pending)
+	}
+	resolved := dispatch(t, service, "memory.list", map[string]any{"state": "resolved", "include_context": true})
+	if resolved["total"] != 1 {
+		t.Fatalf("an expired experience lists as resolved: %v", resolved)
+	}
+	row := resolved["experiences"].([]any)[0].(map[string]any)
+	if row["outcome"] != "expired" || len([]rune(row["context_snippet"].(string))) > SnippetRunes {
+		t.Fatalf("row=%v", row)
+	}
+	if byAction := dispatch(t, service, "memory.list", map[string]any{"action": "b", "state": "all"}); byAction["total"] != 1 {
+		t.Fatalf("byAction=%v", byAction)
+	}
+	page := dispatch(t, service, "memory.list", map[string]any{"limit": 1, "offset": 2})
+	if len(page["experiences"].([]any)) != 1 || page["experiences"].([]any)[0].(map[string]any)["ref"] != "old" || page["total"] != 3 {
+		t.Fatalf("page=%v", page)
+	}
+}
+
+func TestRecallCarriesWhatTheBotDidAndOnlyAsksForSnippetsWhenTold(t *testing.T) {
+	service, _, _ := newTestService(t, 0)
+	dispatch(t, service, "memory.record", map[string]any{"ref": "e1", "action": "a", "context": "central bank rates outlook", "detail": "#Rates"})
+	dispatch(t, service, "memory.resolve", map[string]any{"ref": "e1", "outcome": "accepted"})
+
+	plain := dispatch(t, service, "memory.recall", map[string]any{"context": "central bank rates", "action": "a"})
+	first := plain["neighbors"].([]any)[0].(map[string]any)
+	if first["detail"] != "#Rates" {
+		t.Fatalf("first=%v", first)
+	}
+	if _, has := first["context_snippet"]; has {
+		t.Fatalf("a snippet is opt-in: %v", first)
+	}
+
+	asked := dispatch(t, service, "memory.recall", map[string]any{"context": "central bank rates", "action": "a", "include_context": true})
+	if got := asked["neighbors"].([]any)[0].(map[string]any)["context_snippet"]; got != "central bank rates outlook" {
+		t.Fatalf("snippet=%v", got)
+	}
+}
+
+func TestListRejectsMalformedRequests(t *testing.T) {
+	service, _, _ := newTestService(t, 0)
+	for name, payload := range map[string]map[string]any{
+		"unknown state":  {"state": "everything"},
+		"zero limit":     {"limit": 0},
+		"huge limit":     {"limit": maxList + 1},
+		"negative start": {"offset": -1},
+		"bad action":     {"action": "Bad Name"},
+	} {
+		if _, err := service.Dispatch(context.Background(), "memory.list", payload); err == nil {
+			t.Fatalf("%s: expected an error", name)
+		}
+	}
+}

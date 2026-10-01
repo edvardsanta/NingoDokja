@@ -3,6 +3,7 @@ package memory
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -267,5 +268,98 @@ func TestGetReadsAnExperienceBackWithoutItsContext(t *testing.T) {
 	}
 	if _, ok, err := store.Get("missing"); ok || err != nil {
 		t.Fatalf("an unknown ref is not found and not an error: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestListPagesNewestFirstWithATotal(t *testing.T) {
+	store, _ := newTestStore(t, 0)
+	for _, ref := range []string{"a1", "a2", "a3", "a4", "a5"} {
+		store.Insert(NewExperience{Ref: ref, Action: "tag.suggest", Context: "context " + ref, Detail: "#" + ref}, nil, "m")
+	}
+	store.Resolve("a2", "accepted")
+
+	refs := func(rows []Listed) string {
+		var out []string
+		for _, row := range rows {
+			out = append(out, row.Ref)
+		}
+		return strings.Join(out, ",")
+	}
+	first, total, err := store.List("", "", 2, 0, 0)
+	if err != nil || total != 5 || refs(first) != "a5,a4" {
+		t.Fatalf("first page %s total %d err %v", refs(first), total, err)
+	}
+	second, _, _ := store.List("", "", 2, 2, 0)
+	last, _, _ := store.List("", "", 2, 4, 0)
+	beyond, beyondTotal, _ := store.List("", "", 2, 10, 0)
+	if refs(second) != "a3,a2" || refs(last) != "a1" || len(beyond) != 0 || beyondTotal != 5 {
+		t.Fatalf("pages: %s | %s | beyond %d of %d", refs(second), refs(last), len(beyond), beyondTotal)
+	}
+	if second[1].Outcome != "accepted" || second[1].ResolvedAt == "" || second[0].Outcome != "" || second[0].Detail != "#a3" {
+		t.Fatalf("a row carries what the bot did and how it turned out: %+v", second)
+	}
+}
+
+func TestListFiltersByActionAndByStateWithTheSameReadingOfExpiryAsStatus(t *testing.T) {
+	store, c := newTestStore(t, 24*time.Hour)
+	store.Insert(NewExperience{Ref: "old", Action: "a", Context: "x"}, nil, "m")
+	c.Advance(25 * time.Hour) // "old" is past the window with no verdict: it reads as expired, not pending
+	store.Insert(NewExperience{Ref: "waiting", Action: "a", Context: "x"}, nil, "m")
+	store.Insert(NewExperience{Ref: "done", Action: "a", Context: "x"}, nil, "m")
+	store.Resolve("done", "replaced")
+	store.Insert(NewExperience{Ref: "elsewhere", Action: "b", Context: "x"}, nil, "m")
+
+	pending, pendingTotal, _ := store.List("", "pending", 10, 0, 0)
+	resolved, resolvedTotal, _ := store.List("", "resolved", 10, 0, 0)
+	onlyB, _, _ := store.List("b", "", 10, 0, 0)
+	if pendingTotal != 2 || len(pending) != 2 || resolvedTotal != 2 || len(resolved) != 2 || len(onlyB) != 1 {
+		t.Fatalf("pending %d/%d resolved %d/%d b %d", len(pending), pendingTotal, len(resolved), resolvedTotal, len(onlyB))
+	}
+	outcomes := map[string]string{}
+	for _, row := range resolved {
+		outcomes[row.Ref] = row.Outcome
+	}
+	if outcomes["old"] != ExpiredOutcome || outcomes["done"] != "replaced" {
+		t.Fatalf("expired must list as resolved with its own outcome: %v", outcomes)
+	}
+
+	stats, _ := store.Stats("m")
+	if stats.Pending != pendingTotal || stats.Resolved+stats.Expired != resolvedTotal {
+		t.Fatalf("the listing and the status must agree: stats %+v, pending %d resolved %d", stats, pendingTotal, resolvedTotal)
+	}
+}
+
+func TestListHandsBackOnlyTheStartOfAContextAndOnlyWhenAsked(t *testing.T) {
+	store, _ := newTestStore(t, 0)
+	long := strings.Repeat("é", 300)
+	store.Insert(NewExperience{Ref: "e1", Action: "a", Context: "first line\n\nsecond   line  " + long}, nil, "m")
+
+	without, _, _ := store.List("", "", 10, 0, 0)
+	if without[0].Snippet != "" {
+		t.Fatalf("no snippet unless asked for: %q", without[0].Snippet)
+	}
+	with, _, _ := store.List("", "", 10, 0, SnippetRunes)
+	snippet := with[0].Snippet
+	if !strings.HasPrefix(snippet, "first line second line é") || len([]rune(snippet)) > SnippetRunes || strings.ContainsAny(snippet, "\n\r\t") {
+		t.Fatalf("a snippet is one short line, cut by characters: %q (%d)", snippet, len([]rune(snippet)))
+	}
+
+	snippets, err := store.Snippets([]string{"e1", "unknown"}, 10)
+	if err != nil || len(snippets) != 1 || snippets["e1"] != "first line" {
+		t.Fatalf("snippets=%v err=%v", snippets, err)
+	}
+	if empty, err := store.Snippets(nil, 10); err != nil || len(empty) != 0 {
+		t.Fatalf("no refs, no snippets: %v %v", empty, err)
+	}
+}
+
+func TestNearestCarriesWhatTheBotDid(t *testing.T) {
+	store, _ := newTestStore(t, 0)
+	store.Insert(NewExperience{Ref: "e1", Action: "a", Context: "x", Detail: "#Label"}, unit(1, 0), "m")
+	store.Resolve("e1", "accepted")
+
+	near, err := store.Nearest(unit(1, 0), "a", "m", 5)
+	if err != nil || len(near) != 1 || near[0].Detail != "#Label" {
+		t.Fatalf("near=%+v err=%v", near, err)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -270,6 +271,7 @@ func (s *Store) OutcomeCounts(action string) (map[string]int, error) {
 type Neighbor struct {
 	Ref        string
 	Action     string
+	Detail     string
 	Outcome    string
 	Similarity float64
 	CreatedAt  string
@@ -283,7 +285,7 @@ type Neighbor struct {
 func (s *Store) Nearest(query []float32, action, model string, k int) ([]Neighbor, error) {
 	cutoff := s.cutoff()
 	rows, err := s.db.Query(
-		`SELECT ref, action, `+verdictSQL+`, created_at, embedding FROM experiences
+		`SELECT ref, action, detail, `+verdictSQL+`, created_at, embedding FROM experiences
 		 WHERE embedding IS NOT NULL AND embed_model = ? AND (? = '' OR action = ?)
 		   AND (outcome IS NOT NULL OR created_at < ?)`,
 		cutoff, model, action, action, cutoff)
@@ -297,7 +299,7 @@ func (s *Store) Nearest(query []float32, action, model string, k int) ([]Neighbo
 	for rows.Next() {
 		var n Neighbor
 		var blob []byte
-		if err := rows.Scan(&n.Ref, &n.Action, &n.Outcome, &n.CreatedAt, &blob); err != nil {
+		if err := rows.Scan(&n.Ref, &n.Action, &n.Detail, &n.Outcome, &n.CreatedAt, &blob); err != nil {
 			return nil, err
 		}
 		if len(blob) != 4*len(query) {
@@ -322,6 +324,108 @@ func insertTop(top []Neighbor, n Neighbor, k int) []Neighbor {
 		top = top[:k]
 	}
 	return top
+}
+
+// SnippetRunes is how much of a context a listing or a recall may hand back: enough to recognize
+// the experience, never the whole text. The cut is made here, so the rest never leaves the store.
+const SnippetRunes = 160
+
+// Listed is one experience in a listing. Snippet is empty unless it was asked for.
+type Listed struct {
+	Stored
+	Snippet string
+}
+
+// List returns one page of experiences, newest first, and how many match in all. state is "" (every
+// experience), "pending" (no outcome yet) or "resolved" (an outcome, possibly "expired"): the same
+// reading of expiry as everywhere else decides which is which. snippetRunes above zero adds the start
+// of each context.
+func (s *Store) List(action, state string, limit, offset, snippetRunes int) ([]Listed, int, error) {
+	cutoff := s.cutoff()
+	// With a snippet the select list carries one more placeholder, which sits between the cutoff and
+	// the action filter.
+	snippetExpr, snippetArgs := "''", []any(nil)
+	if snippetRunes > 0 {
+		snippetExpr, snippetArgs = "substr(context, 1, ?)", []any{snippetRunes}
+	}
+	base := "SELECT id, ref, action, detail, " + verdictSQL + " AS v, predicted_p, baseline_p, created_at, resolved_at, " +
+		snippetExpr + " AS snippet FROM experiences WHERE ? = '' OR action = ?"
+	baseArgs := append(append([]any{cutoff}, snippetArgs...), action, action)
+
+	outer := ""
+	switch state {
+	case "pending":
+		outer = " WHERE v IS NULL"
+	case "resolved":
+		outer = " WHERE v IS NOT NULL"
+	}
+
+	var total int
+	countBase := strings.Replace(base, snippetExpr+" AS snippet", "'' AS snippet", 1)
+	countArgs := append([]any{cutoff}, action, action)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM ("+countBase+")"+outer, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := s.db.Query(
+		"SELECT ref, action, detail, v, predicted_p, baseline_p, created_at, resolved_at, snippet FROM ("+base+")"+outer+
+			" ORDER BY id DESC LIMIT ? OFFSET ?",
+		append(baseArgs, limit, offset)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var out []Listed
+	for rows.Next() {
+		var row Listed
+		var outcome, resolvedAt sql.NullString
+		var predicted, baseline sql.NullFloat64
+		if err := rows.Scan(&row.Ref, &row.Action, &row.Detail, &outcome, &predicted, &baseline, &row.CreatedAt, &resolvedAt, &row.Snippet); err != nil {
+			return nil, 0, err
+		}
+		row.Outcome, row.ResolvedAt = outcome.String, resolvedAt.String
+		if predicted.Valid {
+			row.Predicted = &predicted.Float64
+		}
+		if baseline.Valid {
+			row.Baseline = &baseline.Float64
+		}
+		row.Snippet = tidySnippet(row.Snippet)
+		out = append(out, row)
+	}
+	return out, total, rows.Err()
+}
+
+// Snippets returns the start of the context of each given experience, keyed by ref.
+func (s *Store) Snippets(refs []string, runes int) (map[string]string, error) {
+	snippets := map[string]string{}
+	if len(refs) == 0 || runes <= 0 {
+		return snippets, nil
+	}
+	args := []any{runes}
+	for _, ref := range refs {
+		args = append(args, ref)
+	}
+	rows, err := s.db.Query(
+		"SELECT ref, substr(context, 1, ?) FROM experiences WHERE ref IN (?"+strings.Repeat(",?", len(refs)-1)+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ref, snippet string
+		if err := rows.Scan(&ref, &snippet); err != nil {
+			return nil, err
+		}
+		snippets[ref] = tidySnippet(snippet)
+	}
+	return snippets, rows.Err()
+}
+
+// tidySnippet puts a snippet on one line, so a context with line breaks cannot spoil a listing.
+func tidySnippet(text string) string {
+	return strings.Join(strings.Fields(text), " ")
 }
 
 // ResolvedExperience is an experience with an outcome as the scorecard reads it. The chances

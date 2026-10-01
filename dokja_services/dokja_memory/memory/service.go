@@ -21,6 +21,9 @@ const (
 	embedBatch      = 32
 	defaultResolved = 5000
 	maxResolved     = 20000
+	defaultList     = 20
+	maxList         = 100
+	maxOffset       = 1_000_000
 )
 
 var (
@@ -49,6 +52,8 @@ func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[st
 		return s.resolve(payload)
 	case "memory.get":
 		return s.get(payload)
+	case "memory.list":
+		return s.list(payload)
 	case "memory.recall":
 		return s.recall(ctx, payload)
 	case "memory.resolved":
@@ -124,6 +129,55 @@ func (s *Service) get(payload map[string]any) (map[string]any, error) {
 	}, nil
 }
 
+// list pages through the experiences, newest first. It is the one place besides recall that hands back
+// any of a context, and only the start of it and only when include_context asks: a listing is how an
+// operator recognizes an experience, whose ref is a hash.
+func (s *Service) list(payload map[string]any) (map[string]any, error) {
+	action, err := optionalAction(payload)
+	if err != nil {
+		return nil, err
+	}
+	state := text(payload, "state")
+	switch state {
+	case "", "all":
+		state = ""
+	case "pending", "resolved":
+	default:
+		return nil, fmt.Errorf("state must be all, pending or resolved")
+	}
+	limit, err := boundedInt(payload, "limit", defaultList, 1, maxList)
+	if err != nil {
+		return nil, err
+	}
+	offset, err := boundedInt(payload, "offset", 0, 0, maxOffset)
+	if err != nil {
+		return nil, err
+	}
+	withContext, _ := payload["include_context"].(bool)
+	snippetRunes := 0
+	if withContext {
+		snippetRunes = SnippetRunes
+	}
+
+	rows, total, err := s.store.List(action, state, limit, offset, snippetRunes)
+	if err != nil {
+		return nil, err
+	}
+	experiences := make([]any, 0, len(rows))
+	for _, row := range rows {
+		entry := map[string]any{
+			"ref": row.Ref, "action": row.Action, "detail": row.Detail, "outcome": row.Outcome,
+			"predicted_p": nullable(row.Predicted), "baseline_p": nullable(row.Baseline),
+			"created_at": row.CreatedAt, "resolved_at": row.ResolvedAt,
+		}
+		if withContext {
+			entry["context_snippet"] = row.Snippet
+		}
+		experiences = append(experiences, entry)
+	}
+	return map[string]any{"experiences": experiences, "total": total, "limit": limit, "offset": offset}, nil
+}
+
 func (s *Service) recall(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	query := text(payload, "context")
 	if query == "" {
@@ -140,6 +194,7 @@ func (s *Service) recall(ctx context.Context, payload map[string]any) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	withContext, _ := payload["include_context"].(bool)
 
 	counts, err := s.store.OutcomeCounts(action)
 	if err != nil {
@@ -161,12 +216,26 @@ func (s *Service) recall(ctx context.Context, payload map[string]any) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	var snippets map[string]string
+	if withContext {
+		refs := make([]string, 0, len(nearest))
+		for _, n := range nearest {
+			refs = append(refs, n.Ref)
+		}
+		if snippets, err = s.store.Snippets(refs, SnippetRunes); err != nil {
+			return nil, err
+		}
+	}
 	neighbors := make([]any, 0, len(nearest))
 	for _, n := range nearest {
-		neighbors = append(neighbors, map[string]any{
-			"ref": n.Ref, "action": n.Action, "outcome": n.Outcome,
+		entry := map[string]any{
+			"ref": n.Ref, "action": n.Action, "detail": n.Detail, "outcome": n.Outcome,
 			"similarity": n.Similarity, "created_at": n.CreatedAt,
-		})
+		}
+		if withContext {
+			entry["context_snippet"] = snippets[n.Ref]
+		}
+		neighbors = append(neighbors, entry)
 	}
 	result["neighbors"] = neighbors
 	return result, nil
