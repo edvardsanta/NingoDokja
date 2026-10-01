@@ -1,153 +1,118 @@
 # Experience Memory Plan
 
-Status: proposed implementation plan. No runtime changes are included.
+Status: implemented (see "Delivery sequence"). The thresholds are provisional and nothing has
+been calibrated against real data yet; the first consumer runs in shadow mode.
 
-## Objective and existing foundation
+This document replaces the earlier plan of the same name (commit `2733028`, a ledger of
+operator-recorded analyses). The rules that plan set and this one drops or changes are listed
+in "What changed from the earlier plan", so the repository holds one design, not two.
 
-Use accumulated knowledge and previous outcomes to support new analyses and
-predictions. The first release must demonstrate: record a prediction, attach an
-observed outcome, and retrieve that experience during a later analysis.
+## Objective
 
-The existing [knowledge service](../dokja_services/dokja_knowledge/README.md)
-already provides document ingestion, hybrid retrieval, source metadata, multiple
-formats and external plugins. The orchestrator already supplies relevant passages
-to chat. Reuse these capabilities.
+The bot acts: it speaks, reads, writes, listens and predicts. To choose well it needs a loop:
 
-Document updates currently replace their chunks. Source IDs alone therefore do
-not preserve the evidence available when a prediction was made. Each experience
-must retain the actual evidence excerpts used, with source references and hashes.
+```
+experience → memory → similar earlier experiences → prediction → choice of behaviour → new experience
+```
 
-The untracked prediction scaffold is experimental context, not an adopted storage
-or service contract. Its evidence-count confidence heuristic is not suitable for
-evaluating prediction quality.
-
-## First-release scope
-
-- Explicitly record an analysis or prediction through an operator request.
-- Persist its original text and evidence before background model processing.
-- Use a local language model to propose structured fields and a searchable summary.
-- Explicitly attach a sourced outcome and compare it with the original prediction.
-- Retrieve previous experiences with their outcome status for later analyses.
-- Expose inspection and correction through the CLI first.
-
-Automatic capture of every conversation, autonomous outcome collection, personal
-preference memory, model training and broad prediction-domain automation are outside
-this release. The first evaluation set should represent the user's actual analyses;
-no particular prediction subject has been selected yet.
+An **experience** is "in this context the bot took this action, and this was the outcome". The
+experience memory records them, finds the closest earlier ones, and lets the bot estimate how
+likely an action is to be accepted before it acts. It is not the research knowledge base
+([dokja_knowledge](../dokja_services/dokja_knowledge/README.md) stores documents) and it does
+not train or host a language model.
 
 ## Responsibility boundaries
 
 Follow `Interface → Event/Request → Orchestrator → Domain → Service`.
 
-- A proposed memory domain owns experience validation, revisions, outcome linkage
-  and the distinction between a source assertion and model interpretation.
-- The orchestrator coordinates capture, background enrichment, indexing and recall.
-  Domains do not call each other directly.
-- The existing knowledge capability provides retrieval and a derived search index.
-  Its document index is not the authoritative experience ledger.
-- Experience persistence uses a repository port backed by `dokja_store`, with its
-  existing migration mechanism. The knowledge service keeps its current database.
-- Local inference is exposed through a stateless service integration. Inspect the
-  existing text-generation service before extending its adapter or adding another.
-- Prediction-specific scoring belongs to the prediction domain; the memory domain
-  stores the evaluation and the scoring method/version.
-
-Implement cross-layer changes in the repository's documented order: domain actions,
-router, workflow steps, handlers and clients. Preserve the existing event envelope.
-
-## Durable records
-
-| Record | Required information |
+| Layer | What it owns |
 | --- | --- |
-| Experience | ID, scope, question, original analysis, creation time, revision |
-| Prediction | Experience ID, explicit claim, target/horizon when supplied, declared probability when supplied |
-| Evidence snapshot | Experience ID, source ID/reference, exact excerpt used, content hash, capture time, publication/event time when known |
-| Outcome | Experience ID, observation, source/evidence, occurrence time and recording time |
-| Evaluation | Prediction/outcome revisions, method/version, metrics where applicable, model interpretation separately |
-| Enrichment job | Experience revision, state, attempts, model/prompt/schema versions and failure details |
+| Service `dokja_services/dokja_memory` (Go) | Storage, embeddings and nearest-neighbour recall. No business rules. Its own SQLite file, readable by its owner only, because a context is the user's own text. Events are documented in its [README](../dokja_services/dokja_memory/README.md) |
+| Domain `dokja_domain/dokja_memory` (Go, pure) | Request validation, the prediction and its scoring. No IO |
+| Orchestrator | The `memory.*` events: one workflow action per event, routed to the domain; `memory` can be switched off like any service. Calls made by an action are best effort with a short time budget: an unreachable memory must never stop a reply or a meme dispatch |
+| CLI | `dokja-cli memory` to predict, recall, list, score, record, resolve and forget |
+| TUI | `m` on the Painel: the memory's state and how its predictions fare against the baseline (one key embeds a batch of experiences that have no vector), a browsable list of experiences with `l` (filter, page, forget after a confirmation), a prediction form with `p`, and, on the Memes tab, the chance a suggestion is kept next to the one `g` shows. Read on demand and kept out of the panel refresh, because a stopped service takes seconds to fail and must not stall the panel; the chance after `g` is a second request that never costs the suggestion anything |
 
-Missing dates, probabilities and outcomes remain unknown. Do not invent them from
-model confidence. Preserve separate occurrence and recording times. Revisions must
-retain the original claim, evidence and earlier evaluations.
+The service runs as its own process so that recording an experience on the path of an action
+never waits behind a slow document ingest or a reindex in another service.
 
-Use an explicit scope on records and retrieval. Initially support an operator-owned
-corpus; do not automatically ingest private conversations into a shared corpus.
-When historical analysis requests a cutoff, exclude knowledge recorded after it.
-An experience may be recalled while pending, but must never be presented as a
-confirmed success or failure until an outcome supports that classification.
+## Prediction and scoring
 
-## Local inference
+- **Predict.** For an action in a context, take the similar earlier experiences of that action
+  that have a verdict, weight them by similarity and pull the result toward the **baseline**,
+  the action's overall acceptance rate. With too little evidence, or no similarity (the
+  embedder is down), the prediction is the baseline and says so. A prediction never invents
+  confidence: it reports its support, the number of resolved experiences and why it was
+  insufficient.
+- **Outcomes.** `accepted` is the only success; `replaced` and `ignored` are failures;
+  `expired` is no verdict (nobody resolved it within `MEMORY_EXPIRE_AFTER`) and is left out of
+  every count that predicts or scores. Expiry is a view, not a write, so a late verdict still
+  counts. The first verdict wins.
+- **Score.** The prediction and the baseline are stored with the experience at the moment of
+  the decision and never recomputed. The Brier score compares both against what happened, only
+  on resolved experiences that carry a stored prediction, and reports the sample size and
+  whether there is enough data to judge. A prediction is only said to beat the baseline when
+  its skill is above zero.
+- The thresholds are provisional. They are deliberately not borrowed from the knowledge base
+  (calibrated on three long documents; a context here is a short message) and need calibrating
+  against real data.
 
-Available environment: Linux, an 8 GB GPU, a 4 GB GPU, an eight-core CPU and 58 GB
-of system RAM. GPU availability and driver compatibility still require verification.
+## First consumer
 
-Start evaluation with a 7–8 billion parameter model quantized to four bits on the
-8 GB GPU, around 4,000 context tokens and one concurrent job. These are benchmark
-candidates, not a guaranteed fit or a fixed deployment contract. Test a smaller
-model if memory usage or latency is unsuitable. Evaluate a Vulkan backend first.
+The suggestion of a hashtag for a meme (`meme.hashtag.suggest`, learned by example) already has
+the shape of the loop: a context (the text read from the image), an action (the suggested tag)
+and, later, a verdict (the operator keeps or replaces it).
 
-Keep the second GPU optional. Benchmark embeddings there only after establishing a
-working baseline. Keep model names, endpoints and device selection configurable.
+1. **Shadow mode.** When a suggestion is made, predict the chance it is accepted and record the
+   experience with that prediction. When the operator tags the same meme, resolve it as
+   `accepted` or `replaced`. Nothing changes for the operator; only the score accumulates.
+2. **Deciding.** Once there is data and the score beats the baseline, the prediction gates the
+   behaviour (append the tag or not). That is the "choice of behaviour" step of the loop.
 
-The model proposes extraction, summaries and retrospective interpretations. Code
-validates the output schema, resolves evidence references, enforces dates/scopes and
-computes defined metrics. Retrieved text is untrusted reference material.
+A suggestion and the tag that follows it meet at the meme's address, hashed into the
+experience's `ref`: the address is what the pool stores, what a scheduled delivery attaches and
+what the terminal interface tags with, and the meme service keeps a tag's address as it came. A
+tag typed with a different form of the address (a re-uploaded copy, say) does not match: that
+suggestion stays pending, expires and is left out of the score, which is the safe way to be
+wrong. A tag for a meme the bot never suggested a hashtag for finds no experience and changes
+nothing.
 
-Extraction must preserve the meaning of the original claim. Unsupported statements
-or uncertain matches remain reviewable proposals. A model-generated explanation
-for a failure is a hypothesis, not an established cause.
+## What changed from the earlier plan
 
-## Workflows and reliability
+| Earlier rule | Now |
+| --- | --- |
+| Experiences persist through a repository port on `dokja_store` and its migrations | **Dropped.** A dedicated service with its own SQLite file, so it can record on the path of an action without going through the orchestrator's store, and be exported or wiped on its own. `dokja.db` stays as it is |
+| Prediction scoring belongs to a separate prediction domain | **Changed.** The only prediction today is the chance an action is accepted, so it lives in the memory domain. Split it out when predictions about analyses return |
+| Records keep evidence snapshots (exact excerpt, hash, capture time) | **Dropped for now.** An action's context is the input the bot actually received and is immutable. Needed again only if analyses are recorded |
+| Revisions, explicit scope, separate occurrence and recording times | **Dropped for now.** An experience is immutable and has one resolution time. Same condition as above |
+| A pending experience may be recalled, never shown as success or failure | **Changed.** Pending ones are left out of neighbours and counts because they carry no label; they are counted in `memory.status`. None is ever presented as a success or a failure |
+| Recall goes through the knowledge index, then resolves the authoritative record | **Dropped.** The service keeps its own embeddings. The knowledge index stays for documents |
+| First release: analyses and predictions recorded by the operator | **Changed.** First release: outcomes of the bot's own actions, starting with hashtag suggestions. Operator-recorded analyses with evidence are deferred, not rejected |
+| A local language model enriches each record through a durable worker | **Dropped from memory.** Memory needs no language model. The hardware notes and model candidates of the earlier plan (GPUs, a 7-8 billion parameter model at four bits, a Vulkan backend to try first) still apply to the text-generation replacement for `chat_ai`, which is a separate track |
+| Automatic capture of conversations and autonomous outcome collection are out of scope | **Partly changed.** Recording the outcome of a bot action is automatic by design. Conversations are not captured |
+| New variables, volumes or services update the compose files and the production runbook together | **Kept** |
+| Duplicate capture is idempotent; unknown stays unknown; Brier only with explicit probabilities and with sample sizes | **Kept.** A repeated `ref` changes nothing; a prediction is optional; the scorecard counts unscored experiences and says when there is not enough data |
+| Contexts are the user's own text; private conversations do not enter a shared corpus | **Kept, with one deliberate exception.** Requests are logged by type and field count only, the database file is owner-only, nothing is shared. A context comes back in one case: the first 160 characters, as a snippet, when a listing, a recall or a prediction's evidence is asked for with `include_context`, because the ref of an experience is a hash and an operator cannot recognize one without a hint of what it was about. The cut is made in the service, so the rest never leaves it, and `memory.get` and `memory.resolved` never return a context. Like `knowledge.search`, the answer crosses the orchestrator port, which has no authentication: keep that port off untrusted networks |
+| No model training | **Kept.** A learned model is deferred until there are thousands of resolved experiences and the neighbour method stops improving on the baseline |
 
-1. Capture validates the request and atomically stores the experience, evidence
-   snapshots and durable enrichment job. Retrying the same request is idempotent.
-2. A background worker requests structured output, validates it and stores a derived
-   revision. Malformed output receives bounded retries, then a visible failed state.
-3. The orchestrator indexes the accepted summary through the knowledge domain using
-   a stable source ID. Persist indexing status so failures can be retried after restart.
-4. Outcome recording preserves the observation independently of model availability.
-   Evaluation links exact prediction and outcome revisions.
-5. Recall retrieves candidates, resolves their current authoritative records and
-   applies scope, time and status rules before assembling context and citations.
+## Delivery sequence
 
-The conversation and capture path must remain usable when inference is unavailable.
-Repeated delivery must not duplicate records or overwrite newer enrichment. A job
-for an older revision cannot replace a newer one. Deletion must also invalidate
-derived search entries; stale indexed entries must not bypass authoritative checks.
-
-## Delivery sequence and acceptance
-
-| Stage | Deliverable | Acceptance |
+| Stage | Deliverable | State |
 | --- | --- | --- |
-| 1. Contracts and fixtures | Record schema, repository operations, event payload drafts, representative Portuguese examples | Examples distinguish evidence, claim, unknown fields and observed result |
-| 2. Durable capture | Migrations, repository, domain actions, orchestrator routes and CLI | Duplicate capture is idempotent; restart retains records; editing source documents does not change evidence snapshots |
-| 3. Local enrichment | Inference adapter, durable worker, validated extraction and summary indexing | Invalid output and unavailable inference preserve the original record; retries and outdated jobs behave correctly |
-| 4. Outcomes and evaluations | Explicit outcome entry, revision linkage and defined scoring | Pending cases are not scored; corrections preserve history; an invented causal explanation cannot become a verified fact |
-| 5. Recall integration | Existing retrieval plus authoritative experience resolution | A later analysis cites an earlier case and its actual status; scope/cutoff exclusions hold; deleted cases do not surface |
+| 1 | Memory domain: validation, prediction, scoring | Implemented |
+| 2 | Memory service: storage, embeddings, recall | Implemented |
+| 3 | Orchestrator: `memory.*` routes, handler, client, service switch | Implemented |
+| 4 | Hashtag suggestions as the first consumer, in shadow mode | Implemented |
+| 5 | CLI: `dokja-cli memory` | Implemented |
+| 6 | TUI: the memory view, the experience list, the prediction form and the chance next to `g` | Implemented |
+| 7 | The service in the three compose files and the production runbook, added with the change each describes (the service, the orchestrator route, the hashtag use, the CLI and the TUI) | Implemented |
 
-For binary forecasts with explicit probabilities and resolved outcomes, a Brier
-score is a candidate metric. Do not apply it to narrative analyses, infer a missing
-probability, or label a model as calibrated from a few examples. Report sample sizes
-and unresolved cases alongside any aggregate metric.
+Production deployment remains a separate approval step. The database is one file: copy it while
+the service is stopped, or use SQLite's online backup, to back it up or move it. A new embedding
+model needs `memory.reindex` until nothing remains.
 
-## Evaluation and rollout
+## Not in scope
 
-Build a small reviewed Portuguese dataset covering explicit and ambiguous forecasts,
-missing deadlines/probabilities, conflicting evidence, unsuccessful predictions,
-pending outcomes, corrections and instruction-like text inside source material.
-
-Compare candidate local models on extraction fidelity, evidence traceability,
-schema validity, handling of unknowns, retrieval usefulness, latency and peak device
-memory. Set numerical performance targets after measuring this workload. No model
-or hardware benchmark has been run as part of this plan.
-
-Tests should exercise observable behavior across capture, restart, enrichment,
-outcome recording and later recall. Include source replacement, duplicate requests,
-scope isolation, historical cutoffs and stale-index cases. Test migrations against
-an existing database copy and document rollback/restore before deployment.
-
-All proposed contracts are additive. Review migration and wire compatibility before
-implementation; any breaking change requires the dedicated worktree process.
-Any new environment variables, volumes or inference services must update affected
-compose files and the [production runbook](./production-runbook.md) together.
-Production deployment remains a separate approval step.
+Recording analyses or forecasts written by the operator, evidence snapshots, revisions,
+conversation capture, citation outcomes in chat, and any learned model. Each can be added on top
+of the same experience log when there is a reason to.
