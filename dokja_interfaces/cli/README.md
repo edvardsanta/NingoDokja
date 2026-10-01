@@ -15,6 +15,7 @@ Behavior:
 
 - `meme ...` commands use synchronous request/reply with the orchestrator and print the returned JSON
 - `book ...` commands upload a file payload to the orchestrator and print the returned JSON
+- `memory ...` commands inspect the experience memory (what the bot did in a context and how it turned out) with request/reply
 - `discord ...` commands are administrative and also use request/reply
 - `emit ...` uses asynchronous event publishing
 - `--timeout` (default `2m`) bounds how long a request waits for the orchestrator
@@ -34,6 +35,10 @@ go run ./cmd/dokja-cli meme hashtag suggest https://example.com/new.jpg
 go run ./cmd/dokja-cli meme hashtag list
 go run ./cmd/dokja-cli meme hashtag untag https://example.com/pave.jpg
 go run ./cmd/dokja-cli services disable book
+go run ./cmd/dokja-cli memory status
+go run ./cmd/dokja-cli memory predict --action hashtag.suggest some words from a meme
+go run ./cmd/dokja-cli memory recall --action hashtag.suggest some words from a meme
+go run ./cmd/dokja-cli memory score --action hashtag.suggest
 go run ./cmd/dokja-cli jobs list
 go run ./cmd/dokja-cli jobs disable meme.dispatch
 go run ./cmd/dokja-cli jobs interval meme.refresh 30m
@@ -62,6 +67,15 @@ Administrative commands:
   and reports its hashtag; check the `relevant` field, a hit below the threshold is
   still shown but is not a match. `meme hashtag list` and `meme hashtag untag <url>`
   browse and remove tagged examples. See `dokja_services/dokja_meme/README.md`.
+- `memory ...` works with the experience memory, where an experience is "in this context the bot
+  took this action, and this was the outcome". `memory predict --action <name> <context...>`
+  estimates how likely the action is to be accepted from the similar earlier experiences, against
+  a baseline, and says when there is too little evidence. `memory recall` lists the closest
+  experiences with their outcomes, `memory score` scores the stored predictions against what
+  happened (and says when there are too few to judge), `memory record`, `memory resolve`
+  (`--outcome`, or `--observed` to compare with what the bot did), `memory show` and
+  `memory forget` manage single experiences, and `memory status` and `memory reindex` look
+  after the service. See `dokja_docs/experience-memory-plan.md`.
 - `discord send` posts text and/or an image (`--text`, `--image`) to `--channel <id>`
   (repeatable) or `--all`. The channel picked decides the transport: a channel with a
   webhook in `DOKJA_DISCORD_WEBHOOKS` goes through the webhook, any other through the
@@ -71,7 +85,7 @@ Administrative commands:
 
 Switches and jobs:
 
-- `services list|enable|disable <meme|chat_ai|book|scheduler>`: a logical switch in the orchestrator. While a
+- `services list|enable|disable <meme|chat_ai|book|memory|scheduler>`: a logical switch in the orchestrator. While a
   service is off its events are refused (scheduled jobs included). The container is not touched.
 - `jobs list`: state, interval, last and next run of every scheduler job.
 - `jobs enable|disable <job>`: pauses or resumes the job's scheduled runs; persisted across restarts.
