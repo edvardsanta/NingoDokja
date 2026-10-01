@@ -10,11 +10,15 @@ require read_books/dokja_domain/dokja_book v0.0.0
 
 require read_books/dokja_domain/dokja_knowledge v0.0.0
 
+require read_books/dokja_domain/dokja_memory v0.0.0
+
 require read_books/dokja_store v0.0.0
 
 replace read_books/dokja_domain/dokja_book => ../dokja_domain/dokja_book
 
 replace read_books/dokja_domain/dokja_knowledge => ../dokja_domain/dokja_knowledge
+
+replace read_books/dokja_domain/dokja_memory => ../dokja_domain/dokja_memory
 
 replace read_books/dokja_domain/dokja_meme => ../dokja_domain/dokja_meme
 

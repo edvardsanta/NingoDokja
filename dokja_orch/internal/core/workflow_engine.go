@@ -117,7 +117,30 @@ func actionFor(domain Domain, eventType string) string {
 			return "handle-knowledge-event"
 		}
 	case DomainMemory:
-		return "sync-memory"
+		switch eventType {
+		case "memory.record":
+			return "record-experience"
+		case "memory.resolve":
+			return "resolve-experience"
+		case "memory.recall":
+			return "recall-experience"
+		case "memory.get":
+			return "get-experience"
+		case "memory.predict":
+			return "predict-experience"
+		case "memory.stats":
+			return "score-experience"
+		case "memory.forget":
+			return "forget-experience"
+		case "memory.status":
+			return "inspect-memory"
+		case "memory.reindex":
+			return "reindex-memory"
+		case "memory.sync":
+			return "sync-memory"
+		default:
+			return "handle-memory-event"
+		}
 	case DomainAutomation:
 		return "execute-automation"
 	default:

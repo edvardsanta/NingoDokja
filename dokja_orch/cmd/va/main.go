@@ -45,6 +45,7 @@ func main() {
 
 	memeClient := clients.NewMemeServiceClient("")
 	knowledgeClient := clients.NewKnowledgeServiceClient("")
+	memoryClient := clients.NewMemoryServiceClient("")
 
 	service := core.DefaultService(
 		handlers.NewSystemDomainHandler(
@@ -62,7 +63,7 @@ func main() {
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		),
 		handlers.NewMemeDomainHandler(clients.NewMemeServiceClient("")),
-		handlers.NewLoggingDomainHandler(core.DomainMemory),
+		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls)
 

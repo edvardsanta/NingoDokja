@@ -358,3 +358,15 @@ func TestLastAnnounceIsTheNewestSchedulerReport(t *testing.T) {
 		t.Fatalf("expected the newest announce, got %s", controls.LastAnnounce())
 	}
 }
+
+func TestMemoryEventsBelongToTheMemoryService(t *testing.T) {
+	if got := ServiceForEvent("memory.record"); got != "memory" {
+		t.Fatalf("memory events need the memory service, got %q", got)
+	}
+	if !contains(KnownServices, "memory") {
+		t.Fatal("memory must be a service the operator can switch off")
+	}
+	if got := ServiceForEvent("meme.status"); got != "meme" {
+		t.Fatalf("meme events must keep their own service, got %q", got)
+	}
+}
