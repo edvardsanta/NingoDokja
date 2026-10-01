@@ -39,6 +39,7 @@ const (
 	overlayProfileForm
 	overlayHashtag
 	overlayHashtagList
+	overlayMemory
 )
 
 const (
@@ -53,6 +54,12 @@ type statusMsg struct {
 	data statusData
 	err  error
 }
+
+type memoryMsg struct{ view memoryView }
+
+// memoryScoredAction is the action the overlay scores: the hashtag suggestion is the only
+// one that records experiences so far.
+const memoryScoredAction = "hashtag.suggest"
 
 type memesMsg struct {
 	page memePage
@@ -147,6 +154,7 @@ type Model struct {
 	profileFocus  int
 	hashtagInput  textinput.Model
 	hashtagList   hashtagExamples
+	memory        memoryView
 
 	// reloadMemes chains a pool reload after the status refresh that follows an action,
 	// because each request must claim the single in-flight slot when it actually starts.
@@ -299,6 +307,39 @@ func (m *Model) cmdStatus() tea.Cmd {
 	}
 }
 
+// cmdMemory reads the experience memory for the overlay: its state and, if that answers, the
+// score of the stored predictions. A failure of either stays inside the overlay.
+func (m *Model) cmdMemory() tea.Cmd {
+	if !m.begin(tr("reading_the_experience_memory")) {
+		return nil
+	}
+	return func() tea.Msg {
+		view := memoryView{loaded: true}
+		res, err := m.request("memory.status", map[string]any{})
+		var skipped *skippedError
+		switch {
+		case errors.As(err, &skipped):
+			view.off = skipped.reason
+			return memoryMsg{view: view}
+		case err != nil:
+			// The service is down or failing: do not ask it a second question and wait again.
+			view.statusErr = err.Error()
+			return memoryMsg{view: view}
+		}
+		status := parseMemoryStatus(res)
+		view.status = &status
+
+		res, err = m.request("memory.stats", map[string]any{"action": memoryScoredAction})
+		if err != nil {
+			view.scoreErr = err.Error()
+			return memoryMsg{view: view}
+		}
+		score := parseMemoryScore(res)
+		view.score = &score
+		return memoryMsg{view: view}
+	}
+}
+
 func (m *Model) cmdMemes() tea.Cmd {
 	if !m.begin(tr("loading_memes")) {
 		return nil
@@ -378,6 +419,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reloadMemes = false
 			return m, m.reloadMemesIfLoaded()
 		}
+		return m, nil
+
+	case memoryMsg:
+		m.busy = false
+		m.memory = msg.view
 		return m, nil
 
 	case memesMsg:
@@ -474,6 +520,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyHashtag(msg)
 	case overlayHashtagList:
 		return m.keyHashtagList(key)
+	case overlayMemory:
+		return m.keyMemory(key)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -1138,12 +1186,42 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		}
 	case "p":
 		m.openProfiles()
+	case "m":
+		cmd := m.cmdMemory()
+		if cmd == nil {
+			return m, nil // another request is running; begin() already said so
+		}
+		m.memory = memoryView{}
+		m.overlay = overlayMemory
+		return m, cmd
 	case "i":
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.openInterval(row.name)
 		} else if ok {
 			m.setNotice(tr("only_jobs_have_an_interval_select_a_job"), true)
 		}
+	}
+	return m, nil
+}
+
+func (m *Model) keyMemory(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q":
+		m.overlay = overlayNone
+	case "r":
+		return m, m.cmdMemory()
+	case "x":
+		// One bounded batch per press: the service embeds a few dozen at a time, and the
+		// summary says how many remain.
+		return m, m.exec(&pendingAction{
+			label:     tr("reindex_memory"),
+			eventType: "memory.reindex",
+			payload:   map[string]any{},
+			summarize: func(res map[string]any) string {
+				return tr("d_embedded_d_remaining", num(res, "embedded"), num(res, "remaining"))
+			},
+			onSuccess: func(m *Model, _ map[string]any) tea.Cmd { return m.cmdMemory() },
+		})
 	}
 	return m, nil
 }

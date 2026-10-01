@@ -42,6 +42,7 @@ text while running in English. Text that comes from the orchestrator (for exampl
   accepts NSFW-screened memes is marked. Refreshes on its own while this tab is open; `r` forces it.
   Rows are selectable (`↑↓`): `space` switches a service off/on or pauses/resumes a job, `x` runs the
   selected job now (asks first), `i` changes its interval (`45m`, `6h`, or `default`).
+  `p` opens the chat profiles and `m` the experience memory (see below).
 - **Memes** (`2`): browse the pool without consuming it. `s` runs the NSFW screen on the selected meme
   (verdict, text read by OCR, detections). `enter` sends *that* meme to the channels you tick.
   `d` dispatches N memes from the top of the queue. `t` switches queue/already-sent, `n`/`p` page,
@@ -96,6 +97,20 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
   is screened server-side and skipped if flagged. Sending a picked meme from the queue also marks it as
   sent so the scheduler does not repeat it.
 - `chat_ai` shows `error` when that service is not running; the meme features do not depend on it.
+
+## Experience memory
+
+`m` on the Painel opens a read-only view of the experience memory (what the bot did in a context and how
+it turned out; see `dokja_docs/experience-memory-plan.md`): how many experiences there are and in which
+state, whether similarity is working, and how the stored predictions for the hashtag suggestion fare
+against the baseline. Until enough predictions are scored (30) it says so before it shows a number, and it
+never calls the result a win. `r` reloads, `x` embeds one batch of experiences that have no vector (press it
+again while some remain) and `esc` closes.
+
+It is read on demand and never as part of the panel refresh: a stopped memory service takes about five
+seconds to fail, and the panel must not wait for it. The `memory` row in the service list switches the
+service off like any other. There is no experience browser here; `dokja-cli memory` predicts, recalls,
+resolves and forgets single experiences.
 
 ## Chat profiles
 

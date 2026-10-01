@@ -39,6 +39,8 @@ func (m *Model) View() string {
 		body = m.viewHashtag()
 	case overlayHashtagList:
 		body = m.viewHashtagList()
+	case overlayMemory:
+		body = m.viewMemory()
 	default:
 		switch m.tab {
 		case tabPanel:
@@ -97,6 +99,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("enter_save_esc_cancel")
 	case overlayHashtagList:
 		hint = tr("hashtag_list_help")
+	case overlayMemory:
+		hint = tr("memory_overlay_help")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
@@ -523,6 +527,74 @@ func (m *Model) viewHashtagList() string {
 		image = "\n" + image
 	}
 	return styleBox.Render(top + "\n" + detail.String() + image)
+}
+
+// viewMemory shows the experience memory's state and how its predictions are doing. A score is
+// never called a win before there are enough scored predictions to say so.
+func (m *Model) viewMemory() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(tr("experience_memory")) + "\n\n")
+	v := m.memory
+	switch {
+	case !v.loaded:
+		b.WriteString(styleDim.Render(tr("loading")))
+	case v.off != "":
+		b.WriteString(styleWarn.Render(tr("memory_switched_off")))
+		b.WriteString(styleDim.Render("  (" + trunc(v.off, 60) + ")"))
+	case v.statusErr != "":
+		// The reason goes on its own line so a long error does not stretch the box.
+		b.WriteString(styleBad.Render(strings.TrimRight(tr("no_answer_from_the_memory_service"), " ")) + "\n")
+		b.WriteString("  " + styleDim.Render(trunc(v.statusErr, 68)))
+	default:
+		b.WriteString(viewMemoryStatus(*v.status))
+		b.WriteString("\n" + viewMemoryScore(v))
+	}
+	return styleBox.Render(strings.TrimRight(b.String(), "\n"))
+}
+
+func viewMemoryStatus(s memoryStatus) string {
+	var b strings.Builder
+	b.WriteString("  " + tr("memory_counts", s.Experiences, s.Pending, s.Resolved, s.Expired) + "\n")
+	switch {
+	case !s.Embeddings:
+		b.WriteString("  " + styleWarn.Render(tr("memory_embeddings_off")) + "\n")
+	case !s.EmbedderReachable:
+		b.WriteString("  " + styleWarn.Render(tr("memory_embedder_down")) + "\n")
+	default:
+		b.WriteString("  " + styleOK.Render(tr("memory_similarity_on", s.EmbedModel)) + "\n")
+	}
+	if s.NeedsReindex > 0 {
+		b.WriteString("  " + styleWarn.Render(tr("memory_needs_reindex", s.NeedsReindex)) + "\n")
+	}
+	return b.String()
+}
+
+func viewMemoryScore(v memoryView) string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(tr("memory_score_title", memoryScoredAction)) + "\n")
+	switch {
+	case v.scoreErr != "":
+		b.WriteString("  " + styleBad.Render(strings.TrimRight(tr("memory_score_failed"), " ")) + "\n")
+		b.WriteString("    " + styleDim.Render(trunc(v.scoreErr, 66)) + "\n")
+	case v.score == nil || v.score.Scored == 0:
+		b.WriteString("  " + styleDim.Render(tr("memory_nothing_scored")) + "\n")
+	default:
+		s := v.score
+		if !s.EnoughData {
+			b.WriteString("  " + styleWarn.Render(tr("memory_too_few_to_judge", s.Scored, s.MinScored)) + "\n")
+		}
+		b.WriteString("  " + tr("memory_scored_counts", s.Scored, s.Unscored) + "\n")
+		b.WriteString("  " + tr("memory_brier", s.BrierPrediction, s.BrierBaseline) + "\n")
+		switch {
+		case !s.EnoughData:
+			// No verdict until there are enough scored predictions to give one.
+		case s.BeatsBaseline:
+			b.WriteString("  " + styleOK.Render(tr("memory_beats_baseline", s.Skill)) + "\n")
+		default:
+			b.WriteString("  " + styleWarn.Render(tr("memory_does_not_beat_baseline", s.Skill)) + "\n")
+		}
+	}
+	return b.String()
 }
 
 func (m *Model) viewInterval() string {
