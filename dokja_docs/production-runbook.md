@@ -214,6 +214,11 @@ hashtag.suggest` compares the stored predictions with a baseline and says when t
 `record` and `resolve` add and settle one by hand, and `forget` deletes one. `dokja-cli services disable
 memory` switches the service off.
 
+The TUI shows the same on `m` from the Painel (read on demand, never as part of the panel refresh), lets you
+browse the experiences (`l`) and forget one, predict for a typed text (`p`), and shows the chance a suggestion
+is kept next to the hashtag `g` suggests on the Memes tab. The `memory` row in its service list switches the
+service off like any other.
+
 To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
 online backup. The schema is versioned in the file; a build refuses a database from a newer version.
 
