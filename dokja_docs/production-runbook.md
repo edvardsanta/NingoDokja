@@ -194,6 +194,11 @@ Port `5562` is published on `127.0.0.1` only because the service has no authenti
 returns the first 160 characters of a context (a snippet) only when the request sets `include_context`; the
 rest of the text never leaves the service.
 
+The orchestrator routes the `memory.*` events to the service (`MEMORY_SERVICE_ENDPOINT`, set in the compose
+files). `memory` is one of the services that can be switched off: while it is off, the orchestrator refuses
+these events. A listing, a recall and the evidence of a prediction cross the orchestrator port, which has no
+authentication, the same as `knowledge.search`: keep ports `5555` and `5558` off untrusted networks.
+
 To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
 online backup. The schema is versioned in the file; a build refuses a database from a newer version.
 
