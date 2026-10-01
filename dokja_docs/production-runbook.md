@@ -208,6 +208,12 @@ provisional and live in `dokja_domain/dokja_memory`: calibrate them against real
 Calls made by an action are best effort with a five second budget and run in the background: an unreachable
 `dokja-memory` never delays or fails a delivery or a tag. Switching `memory` off stops these notes too.
 
+`dokja-cli memory` works with it: `status` and `reindex` look after the service, `list`, `recall` and `show`
+inspect experiences, `predict` estimates the chance an action is kept for a context, `score --action
+hashtag.suggest` compares the stored predictions with a baseline and says when there are too few to judge,
+`record` and `resolve` add and settle one by hand, and `forget` deletes one. `dokja-cli services disable
+memory` switches the service off.
+
 To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
 online backup. The schema is versioned in the file; a build refuses a database from a newer version.
 
