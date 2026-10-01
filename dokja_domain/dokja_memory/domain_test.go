@@ -284,3 +284,103 @@ func TestResolvingByObservationPropagatesServiceErrors(t *testing.T) {
 		t.Fatalf("expected the service error, got %v", err)
 	}
 }
+
+func TestListForwardsACleanPagedRequestAndOnlyAsksForSnippetsWhenTold(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    map[string]any
+	}{
+		{"defaults", nil, map[string]any{"limit": defaultListLimit, "offset": 0}},
+		{"everything asked for",
+			map[string]any{"action": " tag.suggest ", "state": "pending", "limit": float64(5), "offset": float64(10), "include_context": true, "stray": "dropped"},
+			map[string]any{"action": "tag.suggest", "state": "pending", "limit": 5, "offset": 10, "include_context": true}},
+		{"all is a state", map[string]any{"state": "all", "include_context": false},
+			map[string]any{"state": "all", "limit": defaultListLimit, "offset": 0}},
+	}
+	for _, tc := range cases {
+		service := &fakeService{answers: map[string]map[string]any{"memory.list": {"experiences": []any{}, "total": 0}}}
+		if _, err := handle(New(service), ActionListExperience, tc.payload); err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if len(service.sent) != 1 || service.sent[0].eventType != "memory.list" {
+			t.Fatalf("%s: sent %+v", tc.name, service.sent)
+		}
+		got := service.sent[0].payload
+		if len(got) != len(tc.want) {
+			t.Fatalf("%s: forwarded %v, want %v", tc.name, got, tc.want)
+		}
+		for key, want := range tc.want {
+			if got[key] != want {
+				t.Fatalf("%s: forwarded %s=%v, want %v", tc.name, key, got[key], want)
+			}
+		}
+	}
+}
+
+func TestListRejectsMalformedRequestsBeforeCallingTheService(t *testing.T) {
+	for name, tc := range map[string]struct {
+		payload map[string]any
+		field   string
+	}{
+		"unknown state": {map[string]any{"state": "everything"}, "state"},
+		"zero limit":    {map[string]any{"limit": 0}, "limit"},
+		"huge limit":    {map[string]any{"limit": maxListLimit + 1}, "limit"},
+		"negative page": {map[string]any{"offset": -1}, "offset"},
+		"bad action":    {map[string]any{"action": "Bad Name"}, "action"},
+	} {
+		service := &fakeService{}
+		_, err := handle(New(service), ActionListExperience, tc.payload)
+		if err == nil || !strings.Contains(err.Error(), tc.field) || len(service.sent) != 0 {
+			t.Fatalf("%s: expected an error naming %q without calling the service, got %v (%d calls)", name, tc.field, err, len(service.sent))
+		}
+	}
+}
+
+func TestRecallPassesIncludeContextOnlyWhenTrue(t *testing.T) {
+	for asked, want := range map[bool]bool{true: true, false: false} {
+		service := &fakeService{answers: map[string]map[string]any{"memory.recall": {}}}
+		payload := map[string]any{"context": "text", "include_context": asked}
+		if _, err := handle(New(service), ActionRecallExperience, payload); err != nil {
+			t.Fatal(err)
+		}
+		_, has := service.sent[0].payload["include_context"]
+		if has != want {
+			t.Fatalf("asked=%v forwarded=%v: %v", asked, has, service.sent[0].payload)
+		}
+	}
+}
+
+func TestPredictAsksForSnippetsOnlyWhenToldAndTheEvidenceSaysWhatEachExperienceWas(t *testing.T) {
+	answer := map[string]any{
+		"neighbors": []any{
+			map[string]any{"ref": "e1", "action": "tag.suggest", "detail": "#Rates", "outcome": "accepted", "similarity": 0.9, "context_snippet": "central bank rates outlook"},
+			map[string]any{"ref": "e2", "action": "tag.suggest", "detail": "#Cake", "outcome": "replaced", "similarity": 0.8},
+		},
+		"outcomes": map[string]any{"accepted": float64(1), "replaced": float64(1)},
+	}
+
+	asked := &fakeService{answers: map[string]map[string]any{"memory.recall": answer}}
+	result, err := handle(New(asked), ActionPredictExperience, map[string]any{"context": "words", "action": "tag.suggest", "include_context": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asked.sent[0].payload["include_context"] != true {
+		t.Fatalf("the recall must ask for snippets: %v", asked.sent[0].payload)
+	}
+	evidence := result["evidence"].([]map[string]any)
+	if len(evidence) != 2 || evidence[0]["detail"] != "#Rates" || evidence[0]["context_snippet"] != "central bank rates outlook" || evidence[1]["detail"] != "#Cake" {
+		t.Fatalf("evidence=%v", evidence)
+	}
+	if _, has := evidence[1]["context_snippet"]; has {
+		t.Fatalf("an empty snippet is left out: %v", evidence[1])
+	}
+
+	plain := &fakeService{answers: map[string]map[string]any{"memory.recall": answer}}
+	if _, err := handle(New(plain), ActionPredictExperience, map[string]any{"context": "words", "action": "tag.suggest"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := plain.sent[0].payload["include_context"]; has {
+		t.Fatalf("snippets are opt-in: %v", plain.sent[0].payload)
+	}
+}

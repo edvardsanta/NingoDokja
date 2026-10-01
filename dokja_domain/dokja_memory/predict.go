@@ -64,8 +64,11 @@ func DefaultConfig() Config {
 type Neighbor struct {
 	Ref        string
 	Action     string
+	Detail     string
 	Outcome    string
 	Similarity float64
+	// Snippet is the start of the neighbour's context, present only when it was asked for.
+	Snippet string
 }
 
 type Prediction struct {
@@ -192,8 +195,10 @@ func neighborsFrom(answer map[string]any) []Neighbor {
 		neighbors = append(neighbors, Neighbor{
 			Ref:        text(entry, "ref"),
 			Action:     text(entry, "action"),
+			Detail:     text(entry, "detail"),
 			Outcome:    text(entry, "outcome"),
 			Similarity: similarity,
+			Snippet:    text(entry, "context_snippet"),
 		})
 	}
 	return neighbors

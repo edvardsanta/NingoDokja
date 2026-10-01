@@ -9,15 +9,21 @@
 //	                                                                    -> {created, embedded, degraded}
 //	memory.resolve   {ref, outcome}                                     -> {found, resolved, outcome}
 //	memory.get       {ref}  -> {found, action, detail, outcome, predicted_p, baseline_p, created_at, resolved_at}
-//	memory.recall    {context, action?, k?}  -> {neighbors[{ref, action, outcome, similarity}],
-//	                                             outcomes{outcome: count}, degraded, reason}
+//	memory.recall    {context, action?, k?, include_context?}
+//	                 -> {neighbors[{ref, action, detail, outcome, similarity, context_snippet?}],
+//	                     outcomes{outcome: count}, degraded, reason}
+//	memory.list      {action?, state?, limit?, offset?, include_context?}
+//	                 -> {experiences[{ref, action, detail, outcome, predicted_p, baseline_p, created_at,
+//	                     resolved_at, context_snippet?}], total, limit, offset}
 //	memory.resolved  {action?, limit?}       -> {experiences[{ref, action, outcome, predicted_p, baseline_p}]}
 //	memory.forget    {ref}                                              -> {deleted}
 //	memory.status    {}                                                 -> counts and embedder state
 //	memory.reindex   {limit?}                                           -> {embedded, remaining}
 //
 // detail is what exactly the bot did (the label it suggested, say), so a later observation can be
-// compared with it. A context is the user's own text, so nothing here logs or returns it.
+// compared with it. A context is the user's own text: nothing here logs it, and it comes back in one
+// case only, as a short snippet when a caller sets include_context (a listing, or the evidence of a
+// prediction), so an operator can recognize an experience whose ref is a hash.
 package memory
 
 import (
@@ -34,6 +40,7 @@ const (
 	ActionResolveExperience = "resolve-experience"
 	ActionRecallExperience  = "recall-experience"
 	ActionGetExperience     = "get-experience"
+	ActionListExperience    = "list-experience"
 	ActionPredictExperience = "predict-experience"
 	ActionScoreExperience   = "score-experience"
 	ActionForgetExperience  = "forget-experience"
@@ -50,6 +57,9 @@ const (
 	predictNeighbors = 20
 	scoreWindow      = 5000
 	maxReindexBatch  = 500
+	defaultListLimit = 20
+	maxListLimit     = 100
+	maxListOffset    = 1_000_000
 )
 
 // actionName is what a caller calls the thing it did, such as "hashtag.suggest".
@@ -98,6 +108,7 @@ var forwarded = map[string]struct {
 	ActionRecordExperience: {"memory.record", buildRecord},
 	ActionRecallExperience: {"memory.recall", buildRecall},
 	ActionGetExperience:    {"memory.get", buildGet},
+	ActionListExperience:   {"memory.list", buildList},
 	ActionForgetExperience: {"memory.forget", buildForget},
 	ActionInspectMemory:    {"memory.status", func(map[string]any) (map[string]any, error) { return map[string]any{}, nil }},
 	ActionReindexMemory:    {"memory.reindex", buildReindex},
@@ -194,9 +205,13 @@ func (d *Domain) predict(ctx context.Context, payload map[string]any) (map[strin
 		return nil, err
 	}
 
-	recalled, err := d.service.Dispatch(ctx, "memory.recall", map[string]any{
-		"context": experienceContext, "action": action, "k": predictNeighbors,
-	})
+	recall := map[string]any{"context": experienceContext, "action": action, "k": predictNeighbors}
+	// Asking for snippets lets the evidence say what each earlier experience was about. Only the
+	// caller who needs to show it asks.
+	if include, _ := payload["include_context"].(bool); include {
+		recall["include_context"] = true
+	}
+	recalled, err := d.service.Dispatch(ctx, "memory.recall", recall)
 	if err != nil {
 		return nil, err
 	}
@@ -204,9 +219,14 @@ func (d *Domain) predict(ctx context.Context, payload map[string]any) (map[strin
 
 	evidence := make([]map[string]any, 0, len(prediction.Evidence))
 	for _, neighbor := range prediction.Evidence {
-		evidence = append(evidence, map[string]any{
-			"ref": neighbor.Ref, "similarity": neighbor.Similarity, "outcome": neighbor.Outcome,
-		})
+		entry := map[string]any{"ref": neighbor.Ref, "similarity": neighbor.Similarity, "outcome": neighbor.Outcome}
+		if neighbor.Detail != "" {
+			entry["detail"] = neighbor.Detail
+		}
+		if neighbor.Snippet != "" {
+			entry["context_snippet"] = neighbor.Snippet
+		}
+		evidence = append(evidence, entry)
 	}
 	degraded, _ := recalled["degraded"].(bool)
 	return map[string]any{
@@ -313,6 +333,42 @@ func buildRecall(payload map[string]any) (map[string]any, error) {
 			return nil, fmt.Errorf("k must be between 1 and %d", maxRecallK)
 		}
 		clean["k"] = int(k)
+	}
+	if include, _ := payload["include_context"].(bool); include {
+		clean["include_context"] = true
+	}
+	return clean, nil
+}
+
+func buildList(payload map[string]any) (map[string]any, error) {
+	clean := map[string]any{"limit": defaultListLimit, "offset": 0}
+	if action := text(payload, "action"); action != "" {
+		if !actionName.MatchString(action) {
+			return nil, fmt.Errorf("action must be a short lowercase name such as hashtag.suggest")
+		}
+		clean["action"] = action
+	}
+	switch state := text(payload, "state"); state {
+	case "":
+	case "all", "pending", "resolved":
+		clean["state"] = state
+	default:
+		return nil, fmt.Errorf("state must be all, pending or resolved")
+	}
+	if limit, ok := number(payload, "limit"); ok {
+		if limit < 1 || limit > maxListLimit {
+			return nil, fmt.Errorf("limit must be between 1 and %d", maxListLimit)
+		}
+		clean["limit"] = int(limit)
+	}
+	if offset, ok := number(payload, "offset"); ok {
+		if offset < 0 || offset > maxListOffset {
+			return nil, fmt.Errorf("offset must be between 0 and %d", maxListOffset)
+		}
+		clean["offset"] = int(offset)
+	}
+	if include, _ := payload["include_context"].(bool); include {
+		clean["include_context"] = true
 	}
 	return clean, nil
 }
