@@ -1,5 +1,8 @@
 package tui
 
+// These tests run in Portuguese like the rest of this suite (TestMain in i18n_test.go), so they assert the
+// Portuguese catalog text. The English wording is checked in the tests that switch the language.
+
 import (
 	"errors"
 	"strings"

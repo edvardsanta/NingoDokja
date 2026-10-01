@@ -40,6 +40,8 @@ const (
 	overlayHashtag
 	overlayHashtagList
 	overlayMemory
+	overlayMemoryList
+	overlayMemoryPredict
 )
 
 const (
@@ -89,6 +91,10 @@ type pendingAction struct {
 
 	// local runs instead of an orchestrator request, for actions that must stay on this machine.
 	local func() (string, error)
+
+	// back is the overlay to return to once the confirmation is answered, either way. Zero means
+	// none: back to the screen underneath.
+	back overlayKind
 }
 
 type memeList struct {
@@ -155,6 +161,13 @@ type Model struct {
 	hashtagInput  textinput.Model
 	hashtagList   hashtagExamples
 	memory        memoryView
+	memoryList    memoryExperiences
+	memoryInput   textinput.Model
+	memoryResult  memoryPredictView
+
+	// chancePausedUntil is when the hashtag suggestion may ask the memory for a chance again, after
+	// a failure.
+	chancePausedUntil time.Time
 
 	// reloadMemes chains a pool reload after the status refresh that follows an action,
 	// because each request must claim the single in-flight slot when it actually starts.
@@ -193,6 +206,10 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	hashtag.CharLimit = 100
 	hashtag.Width = 40
 
+	memoryText := textinput.New()
+	memoryText.CharLimit = 1000
+	memoryText.Width = 52
+
 	var form [4]textinput.Model
 	for i, placeholder := range []string{tr("name_e_g_hosted"), "https://api.example.com/v1", tr("model_placeholder"), tr("token_not_shown_on_screen")} {
 		form[i] = textinput.New()
@@ -214,6 +231,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 		dispatchInput: dispatch,
 		intervalInput: interval,
 		hashtagInput:  hashtag,
+		memoryInput:   memoryText,
 		images:        newImageState(),
 	}
 }
@@ -426,6 +444,34 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memory = msg.view
 		return m, nil
 
+	case memoryListMsg:
+		m.busy = false
+		list := msg.list
+		if len(list.Items) == 0 && list.Total > 0 && list.Offset > 0 {
+			// The last experience of the last page was forgotten: step back a page.
+			return m, m.cmdMemoryList(list.State, max(0, list.Offset-memoryPageSize), 0)
+		}
+		list.Cursor = max(0, min(list.Cursor, len(list.Items)-1))
+		m.memoryList = list
+		return m, nil
+
+	case memoryPredictionMsg:
+		m.busy = false
+		m.memoryResult = msg.view
+		return m, nil
+
+	case suggestionChanceMsg:
+		m.busy = false
+		if msg.prediction == nil {
+			m.chancePausedUntil = m.now().Add(chancePause)
+			return m, nil
+		}
+		m.chancePausedUntil = time.Time{}
+		if m.notice == msg.base && !m.noticeErr {
+			m.setNotice(msg.base+" · "+chanceNotice(*msg.prediction), false)
+		}
+		return m, nil
+
 	case memesMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -522,6 +568,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyHashtagList(key)
 	case overlayMemory:
 		return m.keyMemory(key)
+	case overlayMemoryList:
+		return m.keyMemoryList(key)
+	case overlayMemoryPredict:
+		return m.keyMemoryPredict(msg)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -678,6 +728,7 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 				eventType: "meme.hashtag.suggest",
 				payload:   map[string]any{"url": item.URL},
 				summarize: summarizeHashtagSuggestion,
+				onSuccess: func(m *Model, res map[string]any) tea.Cmd { return m.cmdSuggestionChance(res) },
 			})
 		}
 	case "l":
@@ -874,10 +925,14 @@ func (m *Model) keyConfirm(key string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		action := m.pending
-		m.pending, m.overlay = nil, overlayNone
+		m.pending, m.overlay = nil, action.back
 		return m, m.exec(action)
 	case "n", "N", "esc":
-		m.pending, m.overlay = nil, overlayNone
+		back := overlayNone
+		if m.pending != nil {
+			back = m.pending.back
+		}
+		m.pending, m.overlay = nil, back
 		m.setNotice("cancelado", false)
 	}
 	return m, nil
@@ -1210,6 +1265,19 @@ func (m *Model) keyMemory(key string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 	case "r":
 		return m, m.cmdMemory()
+	case "l":
+		cmd := m.cmdMemoryList("", 0, 0)
+		if cmd == nil {
+			return m, nil // another request is running; begin() already said so
+		}
+		m.memoryList = memoryExperiences{}
+		m.overlay = overlayMemoryList
+		return m, cmd
+	case "p":
+		m.memoryInput.SetValue("")
+		m.memoryInput.Focus()
+		m.memoryResult = memoryPredictView{}
+		m.overlay = overlayMemoryPredict
 	case "x":
 		// One bounded batch per press: the service embeds a few dozen at a time, and the
 		// summary says how many remain.

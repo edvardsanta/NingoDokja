@@ -41,6 +41,10 @@ func (m *Model) View() string {
 		body = m.viewHashtagList()
 	case overlayMemory:
 		body = m.viewMemory()
+	case overlayMemoryList:
+		body = m.viewMemoryList()
+	case overlayMemoryPredict:
+		body = m.viewMemoryPredict()
 	default:
 		switch m.tab {
 		case tabPanel:
@@ -101,6 +105,10 @@ func (m *Model) viewFooter() string {
 		hint = tr("hashtag_list_help")
 	case overlayMemory:
 		hint = tr("memory_overlay_help")
+	case overlayMemoryList:
+		hint = tr("memory_list_help")
+	case overlayMemoryPredict:
+		hint = tr("memory_predict_help")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
