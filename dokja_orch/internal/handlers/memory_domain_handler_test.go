@@ -181,3 +181,32 @@ func (a *answeringMemoryService) Dispatch(_ context.Context, eventType string, _
 	a.sent = append(a.sent, eventType)
 	return a.answers[eventType], nil
 }
+
+func TestMemoryListFlowsThroughTheOrchestratorAndRefusesWhatTheDomainRefuses(t *testing.T) {
+	service := &answeringMemoryService{answers: map[string]map[string]any{
+		"memory.list": {"experiences": []any{}, "total": 0.0, "limit": 20.0, "offset": 0.0},
+	}}
+	orchestrator := core.DefaultService(NewMemoryDomainHandler(service))
+
+	result, err := orchestrator.ProcessWithResult(context.Background(), core.Event{
+		Source: core.SourceCLI, Type: "memory.list", Payload: map[string]any{"state": "pending", "include_context": true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(service.sent) != 1 || service.sent[0] != "memory.list" {
+		t.Fatalf("sent %v", service.sent)
+	}
+	if answer := result.Result["memory"].(map[string]any); answer["total"] != 0.0 {
+		t.Fatalf("answer %v", answer)
+	}
+
+	if _, err := orchestrator.ProcessWithResult(context.Background(), core.Event{
+		Source: core.SourceCLI, Type: "memory.list", Payload: map[string]any{"limit": 1000},
+	}); err == nil {
+		t.Fatal("a limit the domain refuses must not reach the service")
+	}
+	if len(service.sent) != 1 {
+		t.Fatalf("the refused request reached the service: %v", service.sent)
+	}
+}

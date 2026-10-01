@@ -126,6 +126,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "recall-experience"
 		case "memory.get":
 			return "get-experience"
+		case "memory.list":
+			return "list-experience"
 		case "memory.predict":
 			return "predict-experience"
 		case "memory.stats":

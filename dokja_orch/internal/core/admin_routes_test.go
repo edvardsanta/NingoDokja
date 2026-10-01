@@ -23,6 +23,7 @@ func TestAdminEventsAreRoutedAndPlanned(t *testing.T) {
 		{"memory.resolve", "memory", DomainMemory, "resolve-experience"},
 		{"memory.recall", "memory", DomainMemory, "recall-experience"},
 		{"memory.get", "memory", DomainMemory, "get-experience"},
+		{"memory.list", "memory", DomainMemory, "list-experience"},
 		{"memory.predict", "memory", DomainMemory, "predict-experience"},
 		{"memory.stats", "memory", DomainMemory, "score-experience"},
 		{"memory.forget", "memory", DomainMemory, "forget-experience"},
