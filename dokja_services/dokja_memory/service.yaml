@@ -1,0 +1,28 @@
+name: dokja-memory
+description: Experience memory that stores what the bot did in a context and how it turned out, and finds the closest earlier experiences
+
+type: service
+language: go
+entrypoint: ./cmd/dokja-memory/main.go
+
+exposes:
+  - requests
+
+consumes:
+  - embeddings
+
+depends_on:
+  - dokja-ollama
+
+tags:
+  - domain:memory
+  - criticality:low
+
+paths:
+  source: ./
+  tests: ./
+  docs: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev
