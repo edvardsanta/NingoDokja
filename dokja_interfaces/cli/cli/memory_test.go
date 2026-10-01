@@ -278,3 +278,134 @@ func TestMemoryCommandsReportASwitchedOffServiceAndBadInputWithoutAskingAnyone(t
 		}
 	}
 }
+
+func TestBuildMemoryListPayload(t *testing.T) {
+	payload, err := buildMemoryListPayload(" tag.suggest ", " pending ", 5, 10)
+	if err != nil || payload["action"] != "tag.suggest" || payload["state"] != "pending" || payload["limit"] != 5 || payload["offset"] != 10 || payload["include_context"] != true {
+		t.Fatalf("unexpected payload %#v (%v)", payload, err)
+	}
+	open, err := buildMemoryListPayload("", "", 20, 0)
+	if err != nil || open["state"] != nil || open["action"] != nil || open["limit"] != 20 {
+		t.Fatalf("no state or action means everything: %#v (%v)", open, err)
+	}
+	for name, run := range map[string]func() error{
+		"unknown state": func() error { _, err := buildMemoryListPayload("", "everything", 20, 0); return err },
+		"zero limit":    func() error { _, err := buildMemoryListPayload("", "all", 0, 0); return err },
+		"huge limit":    func() error { _, err := buildMemoryListPayload("", "all", 101, 0); return err },
+		"negative page": func() error { _, err := buildMemoryListPayload("", "all", 20, -1); return err },
+	} {
+		if err := run(); err == nil {
+			t.Fatalf("%s: expected a validation error", name)
+		}
+	}
+}
+
+func TestRecallAndPredictAskForSnippetsBecauseTheOperatorReadsThem(t *testing.T) {
+	recall, _ := buildMemoryRecallPayload([]string{"x"}, "", 5)
+	predict, _ := buildMemoryPredictPayload([]string{"x"}, "a")
+	if recall["include_context"] != true || predict["include_context"] != true {
+		t.Fatalf("recall %#v predict %#v", recall, predict)
+	}
+}
+
+func TestFormatExperiencesShowsOutcomeChanceAndSnippet(t *testing.T) {
+	out := FormatExperiences(map[string]any{
+		"total": 37.0, "offset": 20.0,
+		"experiences": []any{
+			map[string]any{"ref": "hashtag:aa", "action": "hashtag.suggest", "detail": "#Rates", "outcome": "accepted",
+				"predicted_p": 0.95, "baseline_p": 0.5, "created_at": "2026-10-01T03:27:52Z", "context_snippet": "  central   bank\npolicy rate "},
+			map[string]any{"ref": "hashtag:bb", "action": "hashtag.suggest", "detail": "#Cake", "outcome": "", "predicted_p": nil, "baseline_p": nil, "created_at": "2026-09-30T10:00:00Z"},
+		},
+	})
+	for _, want := range []string{
+		"37 experiences, newest first (showing 21-22)",
+		"21. accepted", "hashtag.suggest", "#Rates", "0.95/0.50", "2026-10-01", "hashtag:aa",
+		`"central bank policy rate"`,
+		"22. pending", "#Cake", "hashtag:bb",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, `"`) != 2 {
+		t.Fatalf("only the experience that has a snippet gets a snippet line:\n%s", out)
+	}
+
+	if got := FormatExperiences(map[string]any{"total": 0.0, "experiences": []any{}}); got != "no experiences\n" {
+		t.Fatalf("unexpected empty rendering %q", got)
+	}
+	if got := FormatExperiences(map[string]any{"total": 5.0, "offset": 40.0, "experiences": []any{}}); !strings.Contains(got, "nothing at offset 40: 5 in all") {
+		t.Fatalf("unexpected past-the-end rendering %q", got)
+	}
+}
+
+func TestRecallAndPredictShowWhatEachEarlierExperienceWasAbout(t *testing.T) {
+	recall := FormatRecall(map[string]any{
+		"outcomes": map[string]any{"accepted": 1.0},
+		"neighbors": []any{map[string]any{"ref": "hashtag:aa", "action": "hashtag.suggest", "detail": "#Rates", "outcome": "accepted",
+			"similarity": 0.91, "context_snippet": "central bank policy rate"}},
+	})
+	for _, want := range []string{" 1. [0.91] accepted", "#Rates", "hashtag:aa", `"central bank policy rate"`} {
+		if !strings.Contains(recall, want) {
+			t.Errorf("recall: expected %q in:\n%s", want, recall)
+		}
+	}
+
+	prediction := FormatPrediction(map[string]any{
+		"action": "hashtag.suggest", "predicted_p": 0.7, "baseline_p": 0.6, "support": 1.0, "resolved": 12.0,
+		"evidence": []any{map[string]any{"ref": "hashtag:aa", "detail": "#Rates", "outcome": "accepted", "similarity": 0.9, "context_snippet": "central bank policy rate"}},
+	})
+	for _, want := range []string{"[0.90] accepted", "#Rates", `"central bank policy rate"`} {
+		if !strings.Contains(prediction, want) {
+			t.Errorf("prediction: expected %q in:\n%s", want, prediction)
+		}
+	}
+}
+
+func TestListCommandAsksForSnippetsAndPrintsThePage(t *testing.T) {
+	endpoint, received := fakeOrchestrator(t, `{"status":"ok","result":{"event_id":"e1","workflow":"memory","domain":"memory","result":{`+
+		`"total":1,"limit":20,"offset":0,"experiences":[{"ref":"hashtag:aa","action":"hashtag.suggest","detail":"#Rates","outcome":"accepted",`+
+		`"predicted_p":0.9,"baseline_p":0.5,"created_at":"2026-10-01T03:27:52Z","context_snippet":"central bank policy rate"}]}}}`)
+
+	var runErr error
+	out := captureStdout(t, func() {
+		runErr = NewApp().Run(context.Background(), []string{
+			"dokja-cli", "--request-endpoint", endpoint, "memory", "list", "--state", "resolved", "--action", "hashtag.suggest", "--limit", "5",
+		})
+	})
+	if runErr != nil {
+		t.Fatalf("unexpected error: %v", runErr)
+	}
+
+	var event struct {
+		Type    string         `json:"type"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := json.Unmarshal([]byte(<-received), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.Type != "memory.list" || event.Payload["state"] != "resolved" || event.Payload["action"] != "hashtag.suggest" ||
+		event.Payload["limit"] != float64(5) || event.Payload["include_context"] != true {
+		t.Fatalf("the orchestrator received %+v", event)
+	}
+	if !strings.Contains(out, "1 experiences, newest first (showing 1-1)") || !strings.Contains(out, `"central bank policy rate"`) {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+}
+
+func TestListRefusesBadInputWithoutAskingAnyone(t *testing.T) {
+	app := NewApp()
+	app.newRequester = func(string) (*Requester, error) {
+		t.Fatal("a request with invalid input must never be sent")
+		return nil, nil
+	}
+	for name, args := range map[string][]string{
+		"unknown state": {"memory", "list", "--state", "everything"},
+		"zero limit":    {"memory", "list", "--limit", "0"},
+		"negative page": {"memory", "list", "--offset", "-3"},
+	} {
+		if err := app.Run(context.Background(), append([]string{"dokja-cli"}, args...)); err == nil {
+			t.Fatalf("%s: expected an error", name)
+		}
+	}
+}

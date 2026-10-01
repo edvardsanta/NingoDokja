@@ -24,7 +24,10 @@ func FormatRecall(answer map[string]any) string {
 	for rank, raw := range neighbors {
 		neighbor, _ := raw.(map[string]any)
 		similarity, _ := neighbor["similarity"].(float64)
-		fmt.Fprintf(&out, "%2d. [%.2f] %-9v %-20v %v\n", rank+1, similarity, neighbor["outcome"], neighbor["action"], neighbor["ref"])
+		fmt.Fprintf(&out, "%2d. [%.2f] %-9v %-14v %v\n", rank+1, similarity, neighbor["outcome"], neighbor["detail"], neighbor["ref"])
+		if text, _ := neighbor["context_snippet"].(string); text != "" {
+			fmt.Fprintf(&out, "      \"%s\"\n", snippet(text, 100))
+		}
 	}
 	return out.String()
 }
@@ -65,7 +68,10 @@ func FormatPrediction(answer map[string]any) string {
 	for _, raw := range evidence {
 		neighbor, _ := raw.(map[string]any)
 		similarity, _ := neighbor["similarity"].(float64)
-		fmt.Fprintf(&out, "  [%.2f] %-9v %v\n", similarity, neighbor["outcome"], neighbor["ref"])
+		fmt.Fprintf(&out, "  [%.2f] %-9v %-14v %v\n", similarity, neighbor["outcome"], neighbor["detail"], neighbor["ref"])
+		if text, _ := neighbor["context_snippet"].(string); text != "" {
+			fmt.Fprintf(&out, "      \"%s\"\n", snippet(text, 100))
+		}
 	}
 	return out.String()
 }
@@ -93,5 +99,46 @@ func FormatScore(answer map[string]any) string {
 		verdict = "beats the baseline"
 	}
 	fmt.Fprintf(&out, "skill %+.3f: %s\n", skill, verdict)
+	return out.String()
+}
+
+// FormatExperiences lists a page of experiences, newest first. Each line says how it turned out
+// (pending until a verdict arrives), what the bot did, the chance it predicted against the baseline
+// and the ref to use with show, resolve and forget; the snippet of its context is on the next line.
+func FormatExperiences(answer map[string]any) string {
+	items, _ := answer["experiences"].([]any)
+	total, _ := answer["total"].(float64)
+	offset, _ := answer["offset"].(float64)
+	if len(items) == 0 {
+		if total == 0 {
+			return "no experiences\n"
+		}
+		return fmt.Sprintf("nothing at offset %d: %d in all\n", int(offset), int(total))
+	}
+
+	var out strings.Builder
+	fmt.Fprintf(&out, "%d experiences, newest first (showing %d-%d)\n", int(total), int(offset)+1, int(offset)+len(items))
+	for i, raw := range items {
+		experience, _ := raw.(map[string]any)
+		outcome, _ := experience["outcome"].(string)
+		if outcome == "" {
+			outcome = "pending"
+		}
+		chance := "   -   "
+		if predicted, ok := experience["predicted_p"].(float64); ok {
+			if baseline, ok := experience["baseline_p"].(float64); ok {
+				chance = fmt.Sprintf("%.2f/%.2f", predicted, baseline)
+			}
+		}
+		created, _ := experience["created_at"].(string)
+		if len(created) > 10 {
+			created = created[:10]
+		}
+		fmt.Fprintf(&out, "%3d. %-8s %-16v %-12v %s %s %v\n",
+			int(offset)+i+1, outcome, experience["action"], experience["detail"], chance, created, experience["ref"])
+		if text, _ := experience["context_snippet"].(string); text != "" {
+			fmt.Fprintf(&out, "       \"%s\"\n", snippet(text, 100))
+		}
+	}
 	return out.String()
 }

@@ -39,6 +39,7 @@ go run ./cmd/dokja-cli memory status
 go run ./cmd/dokja-cli memory predict --action hashtag.suggest some words from a meme
 go run ./cmd/dokja-cli memory recall --action hashtag.suggest some words from a meme
 go run ./cmd/dokja-cli memory score --action hashtag.suggest
+go run ./cmd/dokja-cli memory list --state pending --limit 10
 go run ./cmd/dokja-cli jobs list
 go run ./cmd/dokja-cli jobs disable meme.dispatch
 go run ./cmd/dokja-cli jobs interval meme.refresh 30m
@@ -74,8 +75,10 @@ Administrative commands:
   experiences with their outcomes, `memory score` scores the stored predictions against what
   happened (and says when there are too few to judge), `memory record`, `memory resolve`
   (`--outcome`, or `--observed` to compare with what the bot did), `memory show` and
-  `memory forget` manage single experiences, and `memory status` and `memory reindex` look
-  after the service. See `dokja_docs/experience-memory-plan.md`.
+  `memory forget` manage single experiences, `memory list [--state pending|resolved] [--action]
+  [--limit] [--offset]` pages through them newest first with a snippet of each context (it is how you
+  recognize one, since the ref is a hash), and `memory status` and `memory reindex` look after the
+  service. See `dokja_docs/experience-memory-plan.md`.
 - `discord send` posts text and/or an image (`--text`, `--image`) to `--channel <id>`
   (repeatable) or `--all`. The channel picked decides the transport: a channel with a
   webhook in `DOKJA_DISCORD_WEBHOOKS` goes through the webhook, any other through the

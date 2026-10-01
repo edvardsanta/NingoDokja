@@ -60,7 +60,9 @@ func buildMemoryRecallPayload(contextWords []string, action string, k int) (map[
 	if k < 1 || k > 50 {
 		return nil, fmt.Errorf("k must be between 1 and 50")
 	}
-	payload := map[string]any{"context": joinWords(contextWords), "k": k}
+	// The CLI is the operator's own tool: it asks for a snippet of each neighbour's context, so a hash
+	// of a ref is not all there is to recognize it by.
+	payload := map[string]any{"context": joinWords(contextWords), "k": k, "include_context": true}
 	if action = strings.TrimSpace(action); action != "" {
 		payload["action"] = action
 	}
@@ -74,7 +76,30 @@ func buildMemoryPredictPayload(contextWords []string, action string) (map[string
 	if joinWords(contextWords) == "" {
 		return nil, fmt.Errorf("context is required")
 	}
-	return map[string]any{"context": joinWords(contextWords), "action": strings.TrimSpace(action)}, nil
+	return map[string]any{"context": joinWords(contextWords), "action": strings.TrimSpace(action), "include_context": true}, nil
+}
+
+func buildMemoryListPayload(action, state string, limit, offset int) (map[string]any, error) {
+	state = strings.TrimSpace(state)
+	switch state {
+	case "", "all", "pending", "resolved":
+	default:
+		return nil, fmt.Errorf("--state must be all, pending or resolved")
+	}
+	if limit < 1 || limit > 100 {
+		return nil, fmt.Errorf("--limit must be between 1 and 100")
+	}
+	if offset < 0 {
+		return nil, fmt.Errorf("--offset cannot be negative")
+	}
+	payload := map[string]any{"limit": limit, "offset": offset, "include_context": true}
+	if state != "" {
+		payload["state"] = state
+	}
+	if action = strings.TrimSpace(action); action != "" {
+		payload["action"] = action
+	}
+	return payload, nil
 }
 
 func buildMemoryResolvePayload(ref, outcome, observed string) (map[string]any, error) {
@@ -166,6 +191,32 @@ func (a *App) newMemoryCommand(ctx context.Context) *cobra.Command {
 	}
 	recall.Flags().StringVar(&recallAction, "action", "", "Only experiences of this action")
 	recall.Flags().IntVarP(&recallK, "k", "k", 10, "How many to show (1-50)")
+
+	var listAction, listState string
+	var listLimit, listOffset int
+	list := &cobra.Command{
+		Use:   "list",
+		Short: "Page through the experiences, newest first, with a snippet of each context (memory.list)",
+		Long: "Each experience shows how it turned out (pending until it is resolved), what the bot did, the\n" +
+			"chance it predicted against the baseline, and the start of its context. Use the ref with\n" +
+			"'memory show', 'memory resolve' or 'memory forget'.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			payload, err := buildMemoryListPayload(listAction, listState, listLimit, listOffset)
+			if err != nil {
+				return err
+			}
+			answer, err := a.memoryCall(ctx, "memory.list", payload)
+			if err != nil {
+				return err
+			}
+			fmt.Print(FormatExperiences(answer))
+			return nil
+		},
+	}
+	list.Flags().StringVar(&listAction, "action", "", "Only experiences of this action")
+	list.Flags().StringVar(&listState, "state", "all", "all, pending or resolved")
+	list.Flags().IntVar(&listLimit, "limit", 20, "Page size (1-100)")
+	list.Flags().IntVar(&listOffset, "offset", 0, "Experiences to skip")
 
 	var predictAction string
 	predict := &cobra.Command{
@@ -273,6 +324,6 @@ func (a *App) newMemoryCommand(ctx context.Context) *cobra.Command {
 	}
 	reindex.Flags().IntVar(&reindexLimit, "limit", 32, "How many to embed in this call (1-500); repeat until none remain")
 
-	command.AddCommand(record, resolve, recall, predict, score, show, forget, status, reindex)
+	command.AddCommand(record, resolve, recall, predict, score, list, show, forget, status, reindex)
 	return command
 }
