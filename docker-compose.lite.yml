@@ -76,6 +76,8 @@ services:
       MEME_SERVICE_SCRAPERS: ${MEME_SERVICE_SCRAPERS:-}
       DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
       DOKJA_OCR_MODEL_DIR: /models/rapidocr
+      # Optional: a recognizer file inside that folder (a Latin one keeps pt-BR accents).
+      DOKJA_OCR_REC_MODEL: ${DOKJA_OCR_REC_MODEL:-}
       DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
       DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
       MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
