@@ -354,7 +354,10 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content,
 		return content
 	}
 	if h.hashtagNotes != nil {
-		h.hashtagNotes.Suggested(url, resultString(result, "query_text"), hashtag)
+		score, _ := result["score"].(float64)
+		h.hashtagNotes.Suggested(url, resultString(result, "query_text"), hashtag, HashtagMatch{
+			Score: score, Text: resultString(result, "matched_text"),
+		})
 	}
 	if content == "" {
 		return hashtag

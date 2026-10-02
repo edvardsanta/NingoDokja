@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
 	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/logger"
 	"strings"
@@ -19,12 +20,24 @@ const (
 	// are best effort: a slow or unreachable memory never delays or fails a delivery.
 	experienceBudget  = 5 * time.Second
 	maxExperienceText = 4000
+	// maxMatchedText is how much of the earlier example's text a suggestion keeps as its evidence.
+	maxMatchedText = 200
 )
+
+// HashtagMatch is what a suggestion rested on: the earlier tagged meme it was closest to. A zero
+// value means the service did not say.
+type HashtagMatch struct {
+	// Score is how close that meme was, 0 to 1.
+	Score float64
+	// Text is what was read from that meme. It is the operator's own material.
+	Text string
+}
 
 // HashtagExperienceNotes is what the handlers tell the experience memory about hashtags.
 type HashtagExperienceNotes interface {
-	// Suggested notes that hashtag was appended to the meme at url, whose text is text.
-	Suggested(url, text, hashtag string)
+	// Suggested notes that hashtag was appended to the meme at url, whose text is text, and what
+	// the suggestion rested on.
+	Suggested(url, text, hashtag string, match HashtagMatch)
 	// Tagged notes that the operator tagged the meme at url with hashtag.
 	Tagged(url, hashtag string)
 }
@@ -56,12 +69,12 @@ func (e *HashtagExperience) active() bool {
 	return e != nil && e.domain != nil && (e.enabled == nil || e.enabled())
 }
 
-func (e *HashtagExperience) Suggested(url, text, hashtag string) {
+func (e *HashtagExperience) Suggested(url, text, hashtag string, match HashtagMatch) {
 	text, hashtag = truncateRunes(strings.TrimSpace(text), maxExperienceText), strings.TrimSpace(hashtag)
 	if !e.active() || url == "" || text == "" || hashtag == "" {
 		return
 	}
-	e.spawn(func() { e.recordSuggestion(experienceRef(url), text, hashtag) })
+	e.spawn(func() { e.recordSuggestion(experienceRef(url), text, hashtag, match) })
 }
 
 func (e *HashtagExperience) Tagged(url, hashtag string) {
@@ -72,11 +85,17 @@ func (e *HashtagExperience) Tagged(url, hashtag string) {
 	e.spawn(func() { e.resolveSuggestion(experienceRef(url), hashtag) })
 }
 
-func (e *HashtagExperience) recordSuggestion(ref, text, hashtag string) {
+func (e *HashtagExperience) recordSuggestion(ref, text, hashtag string, match HashtagMatch) {
 	ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
 	defer cancel()
 
 	record := map[string]any{"ref": ref, "action": hashtagSuggestAction, "context": text, "detail": hashtag}
+	if match.Score > 0 {
+		record["matched_score"] = math.Min(match.Score, 1)
+	}
+	if matched := truncateRunes(strings.TrimSpace(match.Text), maxMatchedText); matched != "" {
+		record["matched_context"] = matched
+	}
 	// The prediction is made before the experience exists, so it only uses what came earlier. If
 	// it cannot be made the experience is still worth keeping: it just has nothing to score.
 	prediction, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionPredictExperience, map[string]any{
