@@ -5,6 +5,7 @@ import { App } from "../../src/renderer/app.js";
 import { CARDS } from "../../src/renderer/cards/registry.js";
 import en from "../../src/renderer/i18n/locales/en.json";
 import pt from "../../src/renderer/i18n/locales/pt.json";
+import type { ActionType } from "../../src/shared/actions.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { TransportResult } from "../../src/shared/transport.js";
 import { ALL_UP, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
@@ -13,9 +14,15 @@ const wordmark = () => screen.getByRole("heading", { level: 1 });
 
 type Route = TransportResult | (() => Promise<TransportResult>);
 
-// Every card the screen shows needs a route; a memory that is switched off keeps this simple.
-const screenTransport = (health: Route, memory: Route = ok(OFF)) =>
-  routedTransport({ "ningo.status": health, "memory.status": memory });
+// Every card the screen shows needs a route. The cards a test does not care about answer that
+// their service is switched off, so adding a card means adding one line here.
+const QUIET: Partial<Record<ActionType, Route>> = {
+  "memory.status": ok(OFF),
+  "knowledge.status": ok(OFF),
+};
+
+const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route>> = {}) =>
+  routedTransport({ ...QUIET, "ningo.status": health, ...overrides });
 
 describe("the screen", () => {
   it("shows the name and the health card, in the language it was given", async () => {
@@ -25,11 +32,12 @@ describe("the screen", () => {
     expect(wordmark().textContent).toBe("Ningo");
     await screen.findByRole("heading", { name: "Serviços" });
     await screen.findByRole("heading", { name: "Memória de experiências" });
+    await screen.findByRole("heading", { name: "Base de pesquisa" });
     expect(document.documentElement.lang).toBe("pt");
   });
 
   it("keeps the other cards when one fails", async () => {
-    const { transport } = screenTransport(statusReply(ALL_UP), failure("unavailable"));
+    const { transport } = screenTransport(statusReply(ALL_UP), { "memory.status": failure("unavailable") });
     render(<App transport={transport} locale="en" />);
 
     await screen.findByText("2 up, 0 with problems, 0 switched off");
@@ -38,6 +46,7 @@ describe("the screen", () => {
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
       "Services",
       "Experience memory",
+      "Research base",
     ]);
   });
 

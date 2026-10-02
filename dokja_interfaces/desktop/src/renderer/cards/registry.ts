@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import { HealthCard } from "./health.js";
+import { KnowledgeCard } from "./knowledge.js";
 import { MemoryCard } from "./memory.js";
 
 export type CardEntry = { kind: string; Card: ComponentType<{ transport: Transport }> };
@@ -11,4 +12,5 @@ export type CardEntry = { kind: string; Card: ComponentType<{ transport: Transpo
 export const CARDS: readonly CardEntry[] = [
   { kind: "health", Card: HealthCard },
   { kind: "memory", Card: MemoryCard },
+  { kind: "knowledge", Card: KnowledgeCard },
 ];

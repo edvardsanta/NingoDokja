@@ -34,5 +34,20 @@
   "memory_scored_counts": "{scored} scored, {unscored} not scored yet.",
   "memory_brier": "Brier score, lower is better: prediction {prediction}, baseline {baseline}.",
   "memory_beats_baseline": "Skill {skill}: beats the baseline.",
-  "memory_does_not_beat": "Skill {skill}: does not beat the baseline."
+  "memory_does_not_beat": "Skill {skill}: does not beat the baseline.",
+  "kind_knowledge": "knowledge",
+  "knowledge_title": "Research base",
+  "knowledge_counts": "{documents} documents in {chunks} passages",
+  "knowledge_similarity_on": "Similarity is on ({model}).",
+  "knowledge_similarity_off": "Similarity is off: search matches words only.",
+  "knowledge_similarity_down": "Similarity is unavailable: search matches words only.",
+  "knowledge_pending": "{count} passages wait for an embedding.",
+  "knowledge_ask": "Ask the base",
+  "knowledge_search": "Search",
+  "knowledge_searching": "Searching…",
+  "knowledge_no_hits": "Nothing matches.",
+  "knowledge_none_relevant": "No relevant match. These are the closest passages.",
+  "knowledge_degraded": "Keyword search only.",
+  "knowledge_weak": "weak match",
+  "knowledge_score": "score {score}"
 }

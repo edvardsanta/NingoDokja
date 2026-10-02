@@ -34,5 +34,20 @@
   "memory_scored_counts": "{scored} pontuadas, {unscored} ainda não pontuadas.",
   "memory_brier": "Brier, menor é melhor: previsão {prediction}, baseline {baseline}.",
   "memory_beats_baseline": "Skill {skill}: supera o baseline.",
-  "memory_does_not_beat": "Skill {skill}: não supera o baseline."
+  "memory_does_not_beat": "Skill {skill}: não supera o baseline.",
+  "kind_knowledge": "conhecimento",
+  "knowledge_title": "Base de pesquisa",
+  "knowledge_counts": "{documents} documentos em {chunks} trechos",
+  "knowledge_similarity_on": "Similaridade ligada ({model}).",
+  "knowledge_similarity_off": "Similaridade desligada: a busca só casa palavras.",
+  "knowledge_similarity_down": "Similaridade indisponível: a busca só casa palavras.",
+  "knowledge_pending": "{count} trechos aguardam embedding.",
+  "knowledge_ask": "Perguntar à base",
+  "knowledge_search": "Buscar",
+  "knowledge_searching": "Buscando…",
+  "knowledge_no_hits": "Nada corresponde.",
+  "knowledge_none_relevant": "Nenhuma correspondência relevante. Estes são os trechos mais próximos.",
+  "knowledge_degraded": "Só busca por palavras.",
+  "knowledge_weak": "correspondência fraca",
+  "knowledge_score": "pontuação {score}"
 }

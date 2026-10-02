@@ -1,5 +1,8 @@
 import type { ActionType } from "../../src/shared/actions.js";
 import type {
+  KnowledgeHit,
+  KnowledgeSearch,
+  KnowledgeStatus,
   MemoryScore,
   MemoryStatus,
   StatusReply,
@@ -116,3 +119,35 @@ export const MEMORY_SCORE: MemoryScore = {
   beatsBaseline: true,
   enoughData: true,
 };
+
+export const KNOWLEDGE_STATUS: KnowledgeStatus = {
+  documents: 6,
+  chunks: 52,
+  embedded: 52,
+  pendingEmbeddings: 0,
+  embedModel: "model-1",
+  embedderReachable: true,
+};
+
+export const hit = (overrides: Partial<KnowledgeHit> = {}): KnowledgeHit => ({
+  rank: 1,
+  title: "Document one",
+  heading: "A section",
+  kind: "note",
+  sourceRef: "ref-1",
+  tags: ["a", "b"],
+  text: "A passage about the question.",
+  score: 0.61,
+  relevant: true,
+  ...overrides,
+});
+
+export const search = (hits: KnowledgeHit[], overrides: Partial<KnowledgeSearch> = {}): KnowledgeSearch => ({
+  query: "free will",
+  hits,
+  relevantCount: hits.filter((candidate) => candidate.relevant).length,
+  threshold: 0.45,
+  degraded: false,
+  reason: "",
+  ...overrides,
+});
