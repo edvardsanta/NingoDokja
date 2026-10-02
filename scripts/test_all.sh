@@ -188,6 +188,13 @@ run_suite \
   "pnpm not installed or missing package.json"
 
 run_suite \
+  "dokja_interfaces/desktop" \
+  "pnpm test" \
+  "$ROOT_DIR/dokja_interfaces/desktop" \
+  "command -v pnpm >/dev/null 2>&1 && [ -d '$ROOT_DIR/dokja_interfaces/desktop/node_modules' ]" \
+  "pnpm not installed or dependencies missing (run pnpm install in dokja_interfaces/desktop)"
+
+run_suite \
   "dokja_lab" \
   "python3 -m pytest" \
   "$ROOT_DIR/dokja_lab" \
