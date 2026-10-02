@@ -385,7 +385,10 @@ def build_text_reader_from_env() -> Any:
         return None
     from memes.ocr import TextReader
 
-    return TextReader(model_dir=os.getenv("DOKJA_OCR_MODEL_DIR", "").strip() or None)
+    return TextReader(
+        model_dir=os.getenv("DOKJA_OCR_MODEL_DIR", "").strip() or None,
+        rec_model=os.getenv("DOKJA_OCR_REC_MODEL", "").strip() or None,
+    )
 
 
 def build_screen_from_env(

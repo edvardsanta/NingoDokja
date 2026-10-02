@@ -235,7 +235,9 @@ only receive memes that passed. It needs two read-only model folders, mounted fr
 (`nudenet/320n.onnx` and `rapidocr/*.onnx`). The compose default is a path on the development machine, so
 set `DOKJA_MODELS_DIR` in [.env.prod](../.env.prod). If the models are missing the screen fails closed:
 safe-only channels receive nothing, other channels are unaffected. `MEME_NSFW_EXTRA_WORDS` adds words to the
-blacklist. `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) makes the delivery server
+blacklist. `DOKJA_OCR_REC_MODEL` (empty by default) names another text recognizer inside the `rapidocr` folder;
+a Latin-alphabet one keeps Portuguese accents that the default drops (see the meme service README, "OCR
+recognizer"). `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) makes the delivery server
 post to those channels through a webhook instead of the bot; the URLs are credentials, keep them in the
 env file only.
 
