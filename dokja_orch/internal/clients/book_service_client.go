@@ -15,6 +15,9 @@ import (
 
 const defaultBookServiceEndpoint = "http://127.0.0.1:8083"
 
+// bookHealthTimeout bounds a health probe; the client's own timeout is sized for summarizing.
+const bookHealthTimeout = 5 * time.Second
+
 type BookServiceClient struct {
 	endpoint   string
 	httpClient *http.Client
@@ -49,6 +52,46 @@ func (c *BookServiceClient) Summarize(ctx context.Context, input map[string]any)
 
 func (c *BookServiceClient) Classify(ctx context.Context, input map[string]any) (map[string]any, error) {
 	return c.post(ctx, "/books/classify", input)
+}
+
+// Health asks the book service whether it is up (GET /health).
+func (c *BookServiceClient) Health(ctx context.Context) error {
+	if c == nil || c.httpClient == nil {
+		return fmt.Errorf("book service client is not configured")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, bookHealthTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint+"/health", nil)
+	if err != nil {
+		return fmt.Errorf("build book health request: %w", err)
+	}
+
+	logger.Info(fmt.Sprintf("book service client sending health request endpoint=%s", c.endpoint+"/health"))
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("call book health: %w", err)
+	}
+	defer response.Body.Close()
+
+	var payload BookServiceResponse
+	decodeErr := json.NewDecoder(response.Body).Decode(&payload)
+	if response.StatusCode >= 400 {
+		if payload.Message == "" {
+			payload.Message = response.Status
+		}
+		return fmt.Errorf("book health error: %s", payload.Message)
+	}
+	if decodeErr != nil {
+		return fmt.Errorf("decode book health response: %w", decodeErr)
+	}
+	if payload.Status != "ok" {
+		if payload.Message == "" {
+			payload.Message = "book service returned non-ok health status"
+		}
+		return errors.New(payload.Message)
+	}
+	return nil
 }
 
 func (c *BookServiceClient) post(ctx context.Context, path string, input map[string]any) (map[string]any, error) {

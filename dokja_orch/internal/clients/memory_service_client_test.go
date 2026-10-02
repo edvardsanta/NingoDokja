@@ -135,3 +135,15 @@ func TestMemoryEndpointRejectsBindAddresses(t *testing.T) {
 		t.Fatalf("an explicit endpoint wins, got %q", got)
 	}
 }
+
+func TestMemoryClientStatusAsksForMemoryStatus(t *testing.T) {
+	requester := &fakeMemoryRequester{response: `{"status":"ok","result":{"experiences":3,"degraded":true}}`}
+
+	result, err := memoryClient(requester).Status(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["degraded"] != true || !strings.Contains(requester.request, `"type":"memory.status"`) {
+		t.Fatalf("unexpected result %#v for request %s", result, requester.request)
+	}
+}

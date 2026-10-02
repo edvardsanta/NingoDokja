@@ -105,6 +105,11 @@ func (c *KnowledgeServiceClient) Search(ctx context.Context, query string, k int
 	return c.Dispatch(ctx, "knowledge.search", map[string]any{"query": query, "k": k})
 }
 
+// Status reports the knowledge base's counts and whether its embedder answers.
+func (c *KnowledgeServiceClient) Status(ctx context.Context) (map[string]any, error) {
+	return c.Dispatch(ctx, "knowledge.status", nil)
+}
+
 func resolveKnowledgeServiceEndpoint(endpoint string) string {
 	if endpoint != "" {
 		return endpoint

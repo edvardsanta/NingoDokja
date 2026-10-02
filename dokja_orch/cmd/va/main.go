@@ -46,6 +46,7 @@ func main() {
 	memeClient := clients.NewMemeServiceClient("")
 	knowledgeClient := clients.NewKnowledgeServiceClient("")
 	memoryClient := clients.NewMemoryServiceClient("")
+	bookClient := clients.NewBookServiceClient("")
 	hashtagExperience := handlers.NewHashtagExperience(
 		memoryClient,
 		func() bool { return controls == nil || controls.ServiceEnabled("memory") },
@@ -58,9 +59,13 @@ func main() {
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(memeClient).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience),
+		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(memeClient).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).WithServiceProbes(map[string]handlers.ServiceProbe{
+			"book":      handlers.HealthProbe(bookClient),
+			"knowledge": handlers.StatusProbe(knowledgeClient),
+			"memory":    handlers.StatusProbe(memoryClient),
+		}),
 		handlers.NewModerationDomainHandler(nil),
-		handlers.NewBookDomainHandler(clients.NewBookServiceClient("")),
+		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")).WithKnowledge(
 			knowledgeClient,

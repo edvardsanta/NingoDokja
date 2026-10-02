@@ -127,6 +127,10 @@ Behavior:
 
 - checks `dokja-chat-ai` health
 - checks `dokja-meme` status
+- checks `dokja-book` health (`GET /health`), and `dokja-knowledge` and `dokja-memory` through their `*.status` events
+- probes run at the same time, so a service that is down costs one requester timeout (5s), not one each
+- a service that answers but cannot embed (Ollama down, `DOKJA_EMBED=off`) is `ok` with a `detail` note
+- a switched-off service is not probed; an enabled one that does not answer is `error` and the platform `degraded`
 - returns an aggregated compact status reply
 
 ## Package layout
