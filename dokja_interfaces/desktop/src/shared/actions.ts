@@ -10,6 +10,8 @@ export const ACTION_TYPES = [
   "knowledge.search",
   "meme.status",
   "meme.list",
+  "digest.status",
+  "digest.items",
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];

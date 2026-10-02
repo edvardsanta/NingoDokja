@@ -1,6 +1,8 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import type {
+  DigestPage,
+  DigestStatus,
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
@@ -24,6 +26,10 @@ export type ActionDefinition = {
 
 const MAX_DETAIL_CHARS = 200;
 const MAX_QUERY_CHARS = 500;
+
+// The states the feeds service reports for a source; anything else is shown as unknown.
+const SOURCE_STATES = new Set(["ok", "failed", "pending", "disabled", "invalid"]);
+const MAX_SOURCES = 50;
 
 // The action the TUI scores the experience memory by: the hashtag suggestion.
 const SCORED_ACTION = "hashtag.suggest";
@@ -177,6 +183,48 @@ function memePage(body: Record<string, unknown>): MemePage {
   };
 }
 
+function digestStatus(body: Record<string, unknown>): DigestStatus {
+  return {
+    configured: body.configured === true,
+    directoryError: shorten(text(body.directory_error)),
+    ok: count(body.ok),
+    failed: count(body.failed),
+    pending: count(body.pending),
+    disabled: count(body.disabled),
+    invalid: count(body.invalid),
+    items: count(body.items),
+    sources: records(body.plugins, (plugin) => {
+      const state = text(plugin.state);
+      return {
+        id: shorten(text(plugin.id), 64),
+        name: shorten(text(plugin.name) || text(plugin.id), 80),
+        state: SOURCE_STATES.has(state) ? state : "unknown",
+        running: plugin.running === true,
+        items: count(plugin.items),
+        skipped: count(plugin.skipped),
+        lastOk: text(plugin.last_ok),
+        error: shorten(text(plugin.last_error)),
+      };
+    }).slice(0, MAX_SOURCES),
+  };
+}
+
+function digestPage(body: Record<string, unknown>): DigestPage {
+  return {
+    items: records(body.items, (item) => ({
+      id: shorten(text(item.id), 120),
+      title: shorten(text(item.title), 300),
+      summary: shorten(text(item.summary), 600),
+      source: shorten(text(item.source), 80),
+      published: text(item.published),
+    })),
+    total: count(body.total),
+    offset: count(body.offset),
+    more: count(body.more),
+    updated: text(body.updated),
+  };
+}
+
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "ningo.status": {
     payload: noPayload,
@@ -217,5 +265,17 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       isRecord(projected) && Array.isArray(projected.memes)
         ? projected.memes.filter(isRecord).map((meme) => text(meme.url)).filter((url) => url !== "")
         : [],
+  },
+  "digest.status": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "digest", digestStatus),
+  },
+  "digest.items": {
+    // The first page is short on purpose; the screen asks for a longer one to see more.
+    payload: (raw) => ({
+      limit: clampInt(raw.limit, 1, 50, 8),
+      offset: clampInt(raw.offset, 0, 1000, 0),
+    }),
+    project: (result) => inDomain(result, "digest", digestPage),
   },
 };

@@ -1,4 +1,7 @@
 import type {
+  DigestItem,
+  DigestPage,
+  DigestStatus,
   KnowledgeSearch,
   KnowledgeStatus,
   MemeItem,
@@ -119,6 +122,46 @@ function memes(scope: "unsent" | "sent"): MemeItem[] {
   });
 }
 
+const DIGEST_STATUS: DigestStatus = {
+  configured: true,
+  directoryError: "",
+  ok: 2,
+  failed: 1,
+  pending: 0,
+  disabled: 1,
+  invalid: 1,
+  items: 24,
+  sources: [
+    { id: "local-file", name: "Local file example", state: "ok", running: false, items: 14, skipped: 0, lastOk: minutesAgo(6), error: "" },
+    { id: "second-source", name: "Second example source", state: "ok", running: false, items: 10, skipped: 1, lastOk: minutesAgo(21), error: "" },
+    { id: "flaky-one", name: "A flaky source", state: "failed", running: false, items: 0, skipped: 0, lastOk: "", error: "timed out after 30s" },
+    { id: "idle-one", name: "idle-one", state: "disabled", running: false, items: 0, skipped: 0, lastOk: "", error: "" },
+    { id: "broken-one", name: "", state: "invalid", running: false, items: 0, skipped: 0, lastOk: "", error: "program \"example-tool\" is not installed where the service runs" },
+  ],
+};
+
+const SUMMARY = "Two sentences that stand in for the summary a real source would give. They are shown as plain text, never as markup, and cut after two lines.";
+
+function digestItems(): DigestItem[] {
+  return Array.from({ length: 24 }, (_, index) => {
+    const number = index + 1;
+    return {
+      id: `item-${number}`,
+      title:
+        number === 3
+          ? "<b>Not bold</b> & <script>nothing runs</script>"
+          : `An example entry, number ${number}`,
+      summary: number % 4 === 0 ? "" : SUMMARY,
+      source: number % 3 === 0 ? "Second example source" : "Local file example",
+      published: number === 7 ? "" : minutesAgo(number * 47),
+    };
+  });
+}
+
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
 // A coloured card with the number of the image, so every address looks different.
 function placeholder(url: string): string {
   const seed = [...url].reduce((sum, character) => sum + character.charCodeAt(0), 0);
@@ -152,6 +195,22 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok(searchFor(String(payload?.query ?? "")));
         case "meme.status":
           return ok(MEME_STATUS);
+        case "digest.status":
+          return ok(DIGEST_STATUS);
+        case "digest.items": {
+          const limit = Math.min(Math.max(Number(payload?.limit) || 8, 1), 50);
+          const offset = Math.max(Number(payload?.offset) || 0, 0);
+          const all = digestItems();
+          const items = all.slice(offset, offset + limit);
+          const page: DigestPage = {
+            items,
+            total: all.length,
+            offset,
+            more: Math.max(all.length - offset - items.length, 0),
+            updated: minutesAgo(6),
+          };
+          return ok(page);
+        }
         case "meme.list": {
           const scope = payload?.scope === "sent" ? "sent" : "unsent";
           const limit = Number(payload?.limit) || 12;

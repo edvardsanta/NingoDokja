@@ -129,6 +129,14 @@ test("each action builds its own payload, so the screen cannot add fields", asyn
     limit: 12,
     offset: 0,
   });
+  assert.deepEqual(await sent("digest.status", { refresh: true }), {}, "digest.status takes no parameters");
+  assert.deepEqual(await sent("digest.items", {}), { limit: 8, offset: 0 });
+  assert.deepEqual(
+    await sent("digest.items", { limit: 500, offset: -3, per_source: 10, max_age_hours: 9999, refresh: true }),
+    { limit: 50, offset: 0 },
+    "the screen cannot change the digest's rules",
+  );
+  assert.deepEqual(await sent("digest.items", { limit: 16, offset: 2000 }), { limit: 16, offset: 1000 });
 });
 
 test("a search needs a query of a sensible size", async () => {

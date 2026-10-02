@@ -96,3 +96,53 @@ export type MemePage = {
   offset: number;
   memes: MemeItem[];
 };
+
+// One source the feeds service follows: a plugin, with how its last runs went. The reason in
+// `error` is a short fixed phrase from the service, never what the plugin printed.
+export type DigestSource = {
+  id: string;
+  name: string;
+  // ok, failed, pending, disabled, invalid, or unknown for anything else
+  state: string;
+  running: boolean;
+  items: number;
+  skipped: number;
+  // RFC 3339, or empty when it never succeeded
+  lastOk: string;
+  error: string;
+};
+
+export type DigestStatus = {
+  off?: false;
+  // false when the feeds service has no plugins directory at all
+  configured: boolean;
+  directoryError: string;
+  ok: number;
+  failed: number;
+  pending: number;
+  disabled: number;
+  invalid: number;
+  items: number;
+  sources: DigestSource[];
+};
+
+// An item of the digest. The address is not here: nothing in the app opens a link yet, so the
+// screen does not get one.
+export type DigestItem = {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  // RFC 3339, or empty when the source gave no date
+  published: string;
+};
+
+export type DigestPage = {
+  off?: false;
+  items: DigestItem[];
+  total: number;
+  offset: number;
+  // how many more items the digest holds after this page
+  more: number;
+  updated: string;
+};

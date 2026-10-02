@@ -153,6 +153,8 @@ test("a switched-off service projects to off, with its reason, for every action"
     ["knowledge.search", "knowledge"],
     ["meme.status", "meme"],
     ["meme.list", "meme"],
+    ["digest.status", "digest"],
+    ["digest.items", "digest"],
   ] as const) {
     const reply = compactOf(domain, { skipped: true, reason: "switched off by the operator" });
     assert.deepEqual(ACTIONS[type].project(reply), { off: true, reason: "switched off by the operator" }, type);
@@ -160,7 +162,7 @@ test("a switched-off service projects to off, with its reason, for every action"
 });
 
 test("every action refuses a reply from another domain", () => {
-  for (const type of ["memory.status", "knowledge.search", "meme.list"] as const) {
+  for (const type of ["memory.status", "knowledge.search", "meme.list", "digest.status", "digest.items"] as const) {
     assert.throws(() => ACTIONS[type].project(compactOf("system", {})), /unexpected .* reply/, type);
   }
 });
@@ -255,4 +257,80 @@ test("meme.list keeps the page and tells which images the screen may preview", (
     ],
   });
   assert.deepEqual(action.images?.(projected), ["https://images.example/a.png", "https://images.example/b.gif"]);
+});
+
+test("digest.status keeps the sources and how each is doing, and nothing the service did not say", () => {
+  const body = {
+    configured: true,
+    directory_error: "",
+    ok: 1, failed: 1, pending: 0, disabled: 1, invalid: 1, items: 3, enabled: 2,
+    plugins: [
+      { id: "source-1", name: "First source", state: "ok", running: true, items: 3, skipped: 1, last_ok: "2026-10-02T10:00:00Z", last_error: "", interval_seconds: 300, command: ["/secret/path"] },
+      { id: "source-2", name: "", state: "failed", running: false, items: 0, skipped: 0, last_ok: "", last_error: "exit status 2" },
+      { id: "source-3", name: "Third", state: "something new", last_error: "" },
+      { name: "no id" },
+      "not an object",
+    ],
+  };
+  assert.deepEqual(ACTIONS["digest.status"].project(compactOf("digest", body)), {
+    configured: true,
+    directoryError: "",
+    ok: 1, failed: 1, pending: 0, disabled: 1, invalid: 1, items: 3,
+    sources: [
+      { id: "source-1", name: "First source", state: "ok", running: true, items: 3, skipped: 1, lastOk: "2026-10-02T10:00:00Z", error: "" },
+      { id: "source-2", name: "source-2", state: "failed", running: false, items: 0, skipped: 0, lastOk: "", error: "exit status 2" },
+      { id: "source-3", name: "Third", state: "unknown", running: false, items: 0, skipped: 0, lastOk: "", error: "" },
+      { id: "", name: "no id", state: "unknown", running: false, items: 0, skipped: 0, lastOk: "", error: "" },
+    ],
+  });
+});
+
+test("digest.status cuts long texts and caps the number of sources", () => {
+  const long = "x".repeat(500);
+  const plugins = Array.from({ length: 80 }, (_, i) => ({ id: `source-${i}`, name: long, state: "ok", last_error: long }));
+  const projected = ACTIONS["digest.status"].project(compactOf("digest", { configured: true, plugins, directory_error: long })) as {
+    sources: Array<{ name: string; error: string }>;
+    directoryError: string;
+  };
+  assert.equal(projected.sources.length, 50);
+  assert.ok(projected.sources[0]!.name.length <= 80 && projected.sources[0]!.error.length <= 200);
+  assert.ok(projected.directoryError.length <= 200);
+});
+
+test("digest.status without sources still answers", () => {
+  assert.deepEqual(ACTIONS["digest.status"].project(compactOf("digest", { configured: false })), {
+    configured: false, directoryError: "", ok: 0, failed: 0, pending: 0, disabled: 0, invalid: 0, items: 0, sources: [],
+  });
+});
+
+test("digest.items keeps the page and never hands the screen an address or the plugin", () => {
+  const body = {
+    items: [
+      { id: "1", plugin: "source-1", title: "A title", summary: "Some text", url: "https://example.com/1", published: "2026-10-02T09:00:00Z", source: "Example" },
+      { id: "2", title: "No other fields" },
+      { title: "" , id: "empty title still passes through here"},
+      7,
+    ],
+    total: 20, offset: 0, more: 17, updated: "2026-10-02T10:00:00Z", duplicates: 4, older: 2, sources: 3,
+  };
+  const projected = ACTIONS["digest.items"].project(compactOf("digest", body));
+  assert.deepEqual(projected, {
+    items: [
+      { id: "1", title: "A title", summary: "Some text", source: "Example", published: "2026-10-02T09:00:00Z" },
+      { id: "2", title: "No other fields", summary: "", source: "", published: "" },
+      { id: "empty title still passes through here", title: "", summary: "", source: "", published: "" },
+    ],
+    total: 20, offset: 0, more: 17, updated: "2026-10-02T10:00:00Z",
+  });
+  assert.doesNotMatch(JSON.stringify(projected), /example\.com\/1|source-1/);
+  assert.equal(ACTIONS["digest.items"].images, undefined, "a digest item has nothing to preview");
+});
+
+test("digest.items cuts long texts", () => {
+  const long = "x".repeat(2000);
+  const projected = ACTIONS["digest.items"].project(compactOf("digest", { items: [{ id: long, title: long, summary: long, source: long }] })) as {
+    items: Array<{ id: string; title: string; summary: string; source: string }>;
+  };
+  const [item] = projected.items;
+  assert.ok(item!.id.length <= 120 && item!.title.length <= 300 && item!.summary.length <= 600 && item!.source.length <= 80);
 });
