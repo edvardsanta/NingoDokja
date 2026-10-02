@@ -1,8 +1,9 @@
-import { ACTION_TYPES, isWriteAction, type ActionType } from "../shared/actions.js";
+import { ACTION_TYPES, isWriteAction, needsConfirmation, type ActionType } from "../shared/actions.js";
 import { isRecord } from "../shared/records.js";
 import type { TransportErrorCode, TransportResult } from "../shared/transport.js";
 import { ACTIONS } from "./actions.js";
 import { OrchestratorError, type OrchestratorReply } from "./orchestrator_client.js";
+import type { Confirm } from "./dialogs.js";
 import type { Presence } from "./presence.js";
 
 type Orchestrator = {
@@ -43,6 +44,7 @@ export async function handleRequest(
   limits: RequestLimits,
   media?: MediaGate,
   presence?: Pick<Presence, "recent">,
+  confirm?: Confirm,
 ): Promise<TransportResult> {
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
@@ -59,6 +61,12 @@ export async function handleRequest(
 
   const wire = action.payload(payload);
   if (!wire) return fail("invalid", "the payload is not valid for this action");
+
+  // What cannot be undone waits for the person's yes, asked by the shell and not by the page.
+  if (needsConfirmation(type)) {
+    if (!confirm) return fail("denied", "this change needs the person's confirmation, and there is no way to ask");
+    if (!(await confirm(type, wire))) return fail("cancelled", "the person did not confirm");
+  }
 
   try {
     const reply = await orchestrator.request(type, wire, pickTimeout(raw.options, limits));

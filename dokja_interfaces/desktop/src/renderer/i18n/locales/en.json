@@ -129,5 +129,6 @@
   "add_id_hint": "Leave it empty and the id is made from what you add. Giving an id that already exists replaces that document.",
   "add_bad_kind": "A kind is one lowercase word, such as note, article or book.",
   "add_ref_too_long": "The reference is longer than {max} characters.",
-  "add_bad_id": "An id uses letters, digits and . _ : / # @ - (up to {max} characters)."
+  "add_bad_id": "An id uses letters, digits and . _ : / # @ - (up to {max} characters).",
+  "error_cancelled": "Cancelled."
 }

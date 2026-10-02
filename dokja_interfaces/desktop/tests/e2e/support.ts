@@ -44,6 +44,13 @@ function replyFor(type: string): Record<string, unknown> {
         source_id: "note:a-thought-0123456789",
         created: true, changed: true, chunks: 2, embedded: 0, degraded: true, reason: "no embedding server is configured",
       });
+    case "knowledge.list":
+      return wrap("knowledge", {
+        documents: [
+          { source_id: "note:a-1", title: HOSTILE_TITLE, kind: "note", source_ref: "Book, p. 12", tags: ["a"], chunks: 2, embedded: 2, updated_at: "2026-10-02T10:00:00", content_sha: "hash-1", path: "/private/path-1" },
+        ],
+        total: 1, offset: 0,
+      });
     case "digest.status":
       return wrap("digest", {
         configured: true,

@@ -160,3 +160,33 @@ export type IngestResult = {
   degraded: boolean;
   reason: string;
 };
+
+// One document of the research base.
+export type KnowledgeDocument = {
+  id: string;
+  title: string;
+  kind: string;
+  reference: string;
+  tags: string[];
+  chunks: number;
+  embedded: number;
+  updatedAt: string;
+};
+
+export type KnowledgeDocuments = {
+  off?: false;
+  documents: KnowledgeDocument[];
+  total: number;
+  offset: number;
+};
+
+export type DeleteResult = { off?: false; deleted: boolean };
+
+// What indexing the waiting passages did: how many now have a vector, and how many still wait.
+export type ReindexResult = {
+  off?: false;
+  embedded: number;
+  remaining: number;
+  degraded: boolean;
+  reason: string;
+};

@@ -1,10 +1,13 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { buildIngest } from "./ingest.js";
+import { INGEST_ID } from "../shared/ingest.js";
 import type {
+  DeleteResult,
   DigestPage,
   DigestStatus,
   IngestResult,
+  KnowledgeDocuments,
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
@@ -12,6 +15,7 @@ import type {
   MemoryScore,
   MemoryStatus,
   Off,
+  ReindexResult,
   ServiceState,
   StatusReply,
 } from "../shared/replies.js";
@@ -250,6 +254,32 @@ function ingestResult(body: Record<string, unknown>): IngestResult {
   };
 }
 
+function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
+  return {
+    documents: records(body.documents, (document) => ({
+      id: shorten(text(document.source_id), 200),
+      title: shorten(text(document.title), 300),
+      kind: shorten(text(document.kind), 32),
+      reference: shorten(text(document.source_ref), 300),
+      tags: words(document.tags).slice(0, 20).map((tag) => shorten(tag, 40)),
+      chunks: count(document.chunks),
+      embedded: count(document.embedded),
+      updatedAt: text(document.updated_at),
+    })),
+    total: count(body.total),
+    offset: count(body.offset),
+  };
+}
+
+function reindexResult(body: Record<string, unknown>): ReindexResult {
+  return {
+    embedded: count(body.embedded),
+    remaining: count(body.remaining),
+    degraded: body.degraded === true,
+    reason: shorten(text(body.reason)),
+  };
+}
+
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "ningo.status": {
     payload: noPayload,
@@ -308,5 +338,26 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     maxPayloadChars: 12_000_000,
     payload: buildIngest,
     project: (result) => inDomain(result, "knowledge", ingestResult),
+  },
+  "knowledge.list": {
+    payload: (raw) => ({
+      limit: clampInt(raw.limit, 1, 100, 20),
+      offset: clampInt(raw.offset, 0, 100_000, 0),
+    }),
+    project: (result) => inDomain(result, "knowledge", knowledgeDocuments),
+  },
+  "knowledge.delete": {
+    // The id of one document, in the shape the service allows. It is what the question names.
+    payload: (raw) => {
+      const id = text(raw.id);
+      return INGEST_ID.test(id) ? { source_id: id } : undefined;
+    },
+    project: (result) =>
+      inDomain(result, "knowledge", (body): DeleteResult => ({ deleted: body.deleted === true })),
+  },
+  "knowledge.reindex": {
+    // A batch at a time: the screen asks again while passages remain.
+    payload: (raw) => ({ limit: clampInt(raw.limit, 1, 500, 200) }),
+    project: (result) => inDomain(result, "knowledge", reindexResult),
   },
 };

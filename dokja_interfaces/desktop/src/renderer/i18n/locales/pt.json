@@ -129,5 +129,6 @@
   "add_id_hint": "Deixe vazio e o id é feito a partir do que você adiciona. Um id que já existe substitui aquele documento.",
   "add_bad_kind": "Um tipo é uma palavra em minúsculas, como note, article ou book.",
   "add_ref_too_long": "A referência passa de {max} caracteres.",
-  "add_bad_id": "Um id usa letras, números e . _ : / # @ - (até {max} caracteres)."
+  "add_bad_id": "Um id usa letras, números e . _ : / # @ - (até {max} caracteres).",
+  "error_cancelled": "Cancelado."
 }

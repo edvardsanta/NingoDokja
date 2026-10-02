@@ -51,8 +51,7 @@ test("refuses every action outside the allow-list before touching the orchestrat
     "memory.record",
     "memory.resolve",
     "knowledge.add",
-    "knowledge.delete",
-    "knowledge.reindex",
+    "knowledge.search ",
     "knowledge.ingest\n",
     "book.resource.classify",
     "message.created",
@@ -335,5 +334,114 @@ test("a switched-off knowledge service is an answer to a change too", async () =
     result: { workflow: "knowledge", domain: "knowledge", result: { skipped: true, reason: "paused by the operator" } },
   });
   const result = await handleRequest({ type: "knowledge.ingest", payload: note }, orchestrator, limits, undefined, here);
+  assert.deepEqual(result, { ok: true, result: { off: true, reason: "paused by the operator" } });
+});
+
+const documents = {
+  workflow: "knowledge",
+  domain: "knowledge",
+  result: {
+    documents: [
+      { source_id: "note:a-1", title: "A note", kind: "note", source_ref: "Book, p. 12", tags: ["a", "b"], chunks: 3, embedded: 2, updated_at: "2026-10-02T10:00:00", extra: "x" },
+    ],
+    total: 41,
+    offset: 20,
+  },
+};
+
+test("the list of documents needs no input, is clamped, and hands back only what a card reads", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: documents });
+  const result = await handleRequest(
+    { type: "knowledge.list", payload: { limit: 9999, offset: -5, filler: "x" } },
+    orchestrator, limits, undefined, away,
+  );
+
+  assert.deepEqual(calls[0]?.payload, { limit: 100, offset: 0 });
+  assert.deepEqual(result, {
+    ok: true,
+    result: {
+      documents: [{ id: "note:a-1", title: "A note", kind: "note", reference: "Book, p. 12", tags: ["a", "b"], chunks: 3, embedded: 2, updatedAt: "2026-10-02T10:00:00" }],
+      total: 41,
+      offset: 20,
+    },
+  });
+});
+
+test("indexing the waiting passages is a change, but not one to ask about", async () => {
+  const reindexed = { workflow: "knowledge", domain: "knowledge", result: { embedded: 7, remaining: 3, degraded: false } };
+  const { orchestrator, calls } = recorder({ status: "ok", result: reindexed });
+
+  assert.equal(failure(await handleRequest({ type: "knowledge.reindex" }, orchestrator, limits, undefined, away)).code, "denied");
+  assert.equal(calls.length, 0);
+
+  const asked: string[] = [];
+  const result = await handleRequest({ type: "knowledge.reindex", payload: { limit: 99_999, x: 1 } }, orchestrator, limits, undefined, here, async (type) => {
+    asked.push(type);
+    return true;
+  });
+  assert.deepEqual(result, { ok: true, result: { embedded: 7, remaining: 3, degraded: false, reason: "" } });
+  assert.deepEqual(calls[0]?.payload, { limit: 500 });
+  assert.deepEqual(asked, [], "nothing is lost by indexing, so nobody is asked");
+});
+
+const deleted = { workflow: "knowledge", domain: "knowledge", result: { source_id: "note:a-1", deleted: true } };
+
+test("a deletion is refused without recent input, before anyone is asked", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: deleted });
+  let asked = 0;
+  const confirm = async () => {
+    asked += 1;
+    return true;
+  };
+  for (const presence of [away, undefined]) {
+    const error = failure(await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1" } }, orchestrator, limits, undefined, presence, confirm));
+    assert.equal(error.code, "denied");
+  }
+  assert.equal(asked, 0, "a script that clicks nothing cannot even open the window");
+  assert.equal(calls.length, 0);
+});
+
+test("a deletion asks the person, names the id the shell will send, and goes through only on a yes", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: deleted });
+  const asked: Array<{ type: string; wire: Record<string, unknown> }> = [];
+
+  const no = await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1", source_id: "other:doc", title: "a fake title" } }, orchestrator, limits, undefined, here, async (type, wire) => {
+    asked.push({ type, wire });
+    return false;
+  });
+  assert.equal(failure(no).code, "cancelled");
+  assert.equal(calls.length, 0, "a no never reaches the orchestrator");
+  assert.deepEqual(asked, [{ type: "knowledge.delete", wire: { source_id: "note:a-1" } }]);
+
+  const yes = await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1" } }, orchestrator, limits, undefined, here, async () => true);
+  assert.deepEqual(yes, { ok: true, result: { deleted: true } });
+  assert.deepEqual(calls.map((call) => [call.type, call.payload]), [["knowledge.delete", { source_id: "note:a-1" }]]);
+});
+
+test("a deletion with nobody to ask is refused, and an id outside the rules is invalid before asking", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: deleted });
+  const noWay = failure(await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1" } }, orchestrator, limits, undefined, here));
+  assert.equal(noWay.code, "denied");
+  assert.match(noWay.message, /confirmation/);
+
+  let asked = 0;
+  const confirm = async () => {
+    asked += 1;
+    return true;
+  };
+  for (const id of ["", "has space", "a?b", "x".repeat(201), 5, null, {}]) {
+    assert.equal(failure(await handleRequest({ type: "knowledge.delete", payload: { id } }, orchestrator, limits, undefined, here, confirm)).code, "invalid", JSON.stringify(id)?.slice(0, 30));
+  }
+  assert.equal(failure(await handleRequest({ type: "knowledge.delete", payload: {} }, orchestrator, limits, undefined, here, confirm)).code, "invalid");
+  assert.equal(asked, 0);
+  assert.equal(calls.length, 0);
+});
+
+test("a switched-off knowledge service answers a deletion as off", async () => {
+  const { orchestrator } = recorder({
+    status: "ok",
+    result: { workflow: "knowledge", domain: "knowledge", result: { skipped: true, reason: "paused by the operator" } },
+  });
+  const result = await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1" } }, orchestrator, limits, undefined, here, async () => true);
   assert.deepEqual(result, { ok: true, result: { off: true, reason: "paused by the operator" } });
 });
