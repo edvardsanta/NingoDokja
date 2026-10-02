@@ -1,0 +1,22 @@
+name: dokja-feeds
+description: Follows the plugins the owner puts in a directory outside the repository and keeps their latest items in memory
+
+type: service
+language: go
+entrypoint: ./cmd/dokja-feeds/main.go
+
+exposes:
+  - requests
+
+tags:
+  - domain:digest
+  - criticality:low
+
+paths:
+  source: ./
+  tests: ./
+  docs: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev

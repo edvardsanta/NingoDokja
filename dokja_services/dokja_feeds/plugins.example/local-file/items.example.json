@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "example-1",
+      "title": "A first example entry",
+      "summary": "Two sentences that stand in for the summary a real source would give. They are shown as plain text.",
+      "url": "https://example.com/entries/1",
+      "published": "2026-10-01T08:00:00Z",
+      "source": "Example source A"
+    },
+    {
+      "id": "example-2",
+      "title": "A second example entry",
+      "summary": "Another stand-in summary.",
+      "url": "https://example.com/entries/2",
+      "published": "2026-10-01T09:30:00Z",
+      "source": "Example source B"
+    },
+    {
+      "id": "example-3",
+      "title": "An entry without a date or an address",
+      "summary": "The service accepts these; the digest puts them after the dated ones."
+    }
+  ]
+}
