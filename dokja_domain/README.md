@@ -30,6 +30,10 @@ Current domains:
   - chat history coordination for AI requests
 - `dokja_meme`
   - meme business actions such as fetch, refresh, and status
+- `dokja_memory`
+  - experience memory rules: predicting the outcome of an action from similar
+    earlier experiences against a frequency baseline, and scoring those
+    predictions once the outcome is known
 - `dokja_moderation`
   - moderation decisions for inbound message flows
 
