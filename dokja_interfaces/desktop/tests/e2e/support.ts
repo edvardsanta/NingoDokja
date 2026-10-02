@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -10,7 +11,14 @@ import { Reply } from "zeromq";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-export const hasDisplay = Boolean(process.env.WAYLAND_DISPLAY || process.env.DISPLAY);
+// The app needs a display. A person's own screen is the wrong place for it: the window takes the
+// focus, and whatever they type elsewhere lands in it as the real input the tests must be able to
+// rule out. So the app is shown in a Wayland compositor with no screen (weston's headless backend)
+// when there is one, and on the person's display only when there is not.
+const WESTON = ["/usr/bin/weston", "/usr/local/bin/weston"].find((path) => existsSync(path));
+const RUNTIME_DIR = process.env.XDG_RUNTIME_DIR ?? "";
+
+export const hasDisplay = Boolean((WESTON && RUNTIME_DIR) || process.env.WAYLAND_DISPLAY || process.env.DISPLAY);
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -102,16 +110,53 @@ export async function startTripwire(): Promise<Tripwire> {
   };
 }
 
-export type RunningApp = { cdpPort: number; stop(): Promise<void> };
+export type RunningApp = { cdpPort: number; isolated: boolean; stop(): Promise<void> };
+
+// A compositor with no screen, on a socket of its own. Undefined when weston is not installed.
+async function startHiddenDisplay(): Promise<{ socket: string; stop(): Promise<void> } | undefined> {
+  if (!WESTON || !RUNTIME_DIR) return undefined;
+  const socket = `dokja-e2e-${process.pid}-${Date.now()}`;
+  const child = spawn(
+    WESTON,
+    ["--backend=headless", "--renderer=pixman", `--socket=${socket}`, "--idle-time=0", "--width=1280", "--height=800"],
+    { stdio: "ignore", detached: true },
+  );
+  const stop = async () => {
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      await Promise.race([new Promise((resolve) => child.once("exit", resolve)), sleep(3000)]);
+    }
+    await rm(join(RUNTIME_DIR, socket), { force: true });
+    await rm(join(RUNTIME_DIR, `${socket}.lock`), { force: true });
+  };
+  for (let waited = 0; waited < 10_000; waited += 100) {
+    if (existsSync(join(RUNTIME_DIR, socket))) return { socket, stop };
+    if (child.exitCode !== null) break;
+    await sleep(100);
+  }
+  await stop();
+  return undefined;
+}
 
 // Starts the built app (run `pnpm build` first) with its own profile, against the fake
 // orchestrator, and waits for the debugging port Chromium reports.
 export async function launchApp(endpoint: string): Promise<RunningApp> {
   const profile = await mkdtemp(join(tmpdir(), "dokja-desktop-e2e-"));
+  const hidden = await startHiddenDisplay();
+  const env = hidden
+    ? { ...process.env, WAYLAND_DISPLAY: hidden.socket, DISPLAY: "" }
+    : process.env;
   const child: ChildProcess = spawn(
     join(ROOT, "node_modules", ".bin", "electron"),
-    [".", "--remote-debugging-port=0", `--user-data-dir=${profile}`, `--request-endpoint=${endpoint}`, "--lang=en"],
-    { cwd: ROOT, detached: true, stdio: ["ignore", "ignore", "ignore"] },
+    [
+      ".",
+      ...(hidden ? ["--ozone-platform=wayland", "--disable-gpu"] : []),
+      "--remote-debugging-port=0",
+      `--user-data-dir=${profile}`,
+      `--request-endpoint=${endpoint}`,
+      "--lang=en",
+    ],
+    { cwd: ROOT, env, detached: true, stdio: ["ignore", "ignore", "ignore"] },
   );
 
   const stop = async () => {
@@ -124,6 +169,7 @@ export async function launchApp(endpoint: string): Promise<RunningApp> {
       }
       await Promise.race([new Promise((resolve) => child.once("exit", resolve)), sleep(4000)]);
     }
+    await hidden?.stop();
     await rm(profile, { recursive: true, force: true });
   };
 
@@ -132,7 +178,7 @@ export async function launchApp(endpoint: string): Promise<RunningApp> {
     for (let waited = 0; waited < 40_000; waited += 200) {
       if (child.exitCode !== null) throw new Error(`the app exited with code ${child.exitCode}`);
       const port = Number((await readFile(join(profile, "DevToolsActivePort"), "utf8").catch(() => "")).split("\n")[0]);
-      if (port > 0) return { cdpPort: port, stop };
+      if (port > 0) return { cdpPort: port, isolated: hidden !== undefined, stop };
       await sleep(200);
     }
     throw new Error("the app did not open its debugging port");

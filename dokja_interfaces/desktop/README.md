@@ -79,7 +79,7 @@ functions to reach the shell, the content security policy is strict, it cannot n
 every permission is denied, it makes no request of its own to the network, an action outside the
 allow-list never reaches the orchestrator, a change is refused unless a real click or key press came
 just before it, a reply is cut down to what a card reads, and a picture is fetched only at an address
-the orchestrator listed. It needs a display and is skipped without one.
+the orchestrator listed. The app is shown in a compositor with no screen (weston's headless backend) when weston is installed, so the test never takes the focus of a person's screen; without weston it uses the display, and someone typing meanwhile can make it fail. Without any display it is skipped.
 
 `dev:web` is the fast loop for the look. To run the real shell against it, start the dev server and
 launch Electron with `DOKJA_DESKTOP_DEV_URL=http://localhost:5173` (only a local address is accepted).
