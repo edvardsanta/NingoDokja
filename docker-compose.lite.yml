@@ -89,6 +89,29 @@ services:
       - ./:/workspace
       - ${DOKJA_MODELS_DIR:-/gameNVME/dokja_models}:/models:ro
 
+  dokja-memory:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_memory/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_memory
+    command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-memory"]
+    environment:
+      MEMORY_SERVICE_ENDPOINT: tcp://*:5562
+      MEMORY_DB_FILE: /workspace/.dokja/dokja_memory.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      GOCACHE: /tmp/go-build
+    depends_on:
+      dokja-embedding-init:
+        condition: service_completed_successfully
+    # Private experiences and no authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:5562:5562"
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
+
 
   # Local embeddings run on CPU by default; no GPU passthrough is required.
   dokja-ollama:

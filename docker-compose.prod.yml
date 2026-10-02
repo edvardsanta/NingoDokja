@@ -84,6 +84,27 @@ services:
     networks:
       - dokja-net
 
+  dokja-memory:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_memory/Dockerfile
+    restart: unless-stopped
+    environment:
+      MEMORY_SERVICE_ENDPOINT: tcp://*:5562
+      MEMORY_DB_FILE: /data/dokja_memory.db
+      MEMORY_EXPIRE_AFTER: ${MEMORY_EXPIRE_AFTER:-720h}
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+    volumes:
+      - dokja-data:/data
+    # Private experiences and no authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:5562:5562"
+    depends_on:
+      - dokja-ollama
+    networks:
+      - dokja-net
+
   dokja-ollama:
     image: docker.io/ollama/ollama:latest
     restart: unless-stopped

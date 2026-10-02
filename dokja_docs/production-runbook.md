@@ -15,6 +15,7 @@ Production stack:
 - `dokja-meme`
 - `dokja-chat-ai`
 - `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
+- `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
 - `dokja-discord`
 - `dokja-scheduler`
 
@@ -170,6 +171,31 @@ Port `5561` is published on `127.0.0.1` only: the notes are private and the serv
 On every Discord message the orchestrator looks the question up and gives the chat model only the relevant
 hits, then ends the reply with the sources it consulted. Switching `knowledge` off (`dokja-cli services`)
 stops both that lookup and the `knowledge.*` events; chat keeps working either way.
+
+## Experience Memory
+
+`dokja-memory` stores experiences, "in this context the bot took this action, and this was the outcome",
+and finds the closest earlier ones (see its [README](../dokja_services/dokja_memory/README.md)). Its SQLite
+file is `/data/dokja_memory.db` on the `dokja-data` volume (separate from `dokja.db` and from the knowledge
+base), created readable by its owner only: a context is the user's own text, so do not share or publish the
+file. `memory.forget` deletes one experience.
+
+It uses the same embedding server and model as the knowledge base (`DOKJA_EMBED_ENDPOINT`,
+`DOKJA_EMBED_MODEL`), so provisioning the model once covers both (see "Research Knowledge Base"). Without the
+model, or while `dokja-ollama` is down, it still records experiences and counts outcomes and reports
+`degraded`; `memory.reindex` embeds what was missed, a batch at a time, and a changed `DOKJA_EMBED_MODEL`
+needs it too (repeat until `remaining` is 0). The embedding call is short on purpose (`DOKJA_EMBED_TIMEOUT`,
+5 seconds by default) because experiences are recorded on the path of an action.
+
+An experience nobody resolved within `MEMORY_EXPIRE_AFTER` (default `720h`, `0` never) reads as `expired` and
+is left out of every count and score; a verdict that arrives later still counts.
+
+Port `5562` is published on `127.0.0.1` only because the service has no authentication. A listing or a recall
+returns the first 160 characters of a context (a snippet) only when the request sets `include_context`; the
+rest of the text never leaves the service.
+
+To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
+online backup. The schema is versioned in the file; a build refuses a database from a newer version.
 
 ## NSFW Screening for Memes
 
