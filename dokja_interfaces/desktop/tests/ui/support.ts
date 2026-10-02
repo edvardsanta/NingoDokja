@@ -3,11 +3,15 @@ import type {
   KnowledgeHit,
   KnowledgeSearch,
   KnowledgeStatus,
+  MemeItem,
+  MemePage,
+  MemeStatus,
   MemoryScore,
   MemoryStatus,
   StatusReply,
 } from "../../src/shared/replies.js";
 import type {
+  PreviewResult,
   RequestOptions,
   Transport,
   TransportErrorCode,
@@ -22,6 +26,14 @@ export type Call = {
 
 type Scripted = TransportResult | (() => Promise<TransportResult>);
 
+type Preview = (url: string) => Promise<PreviewResult>;
+
+// A screen test that does not look at previews gets none.
+const NO_PREVIEW: Preview = async () => ({
+  ok: false,
+  error: { code: "denied", message: "no preview in this test" },
+});
+
 // A transport that answers from a script and records what it was asked. The last reply repeats;
 // a function reply lets a test decide when an answer arrives.
 export function scriptedTransport(...replies: Scripted[]) {
@@ -33,6 +45,7 @@ export function scriptedTransport(...replies: Scripted[]) {
       if (!reply) throw new Error("no scripted reply");
       return typeof reply === "function" ? reply() : reply;
     },
+    preview: NO_PREVIEW,
   };
   return { transport, calls };
 }
@@ -74,7 +87,10 @@ type Route = TransportResult | (() => Promise<TransportResult>);
 
 // A transport that answers by action: each action has a reply, or a list of replies used in turn
 // (the last one repeats). An action without a route is refused. Records what it was asked.
-export function routedTransport(routes: Partial<Record<ActionType, Route | Route[]>>) {
+export function routedTransport(
+  routes: Partial<Record<ActionType, Route | Route[]>>,
+  preview: Preview = NO_PREVIEW,
+) {
   const calls: Call[] = [];
   const used = new Map<string, number>();
   const transport: Transport = {
@@ -88,6 +104,7 @@ export function routedTransport(routes: Partial<Record<ActionType, Route | Route
       if (!reply) return failure("denied", `no route for ${type}`);
       return typeof reply === "function" ? reply() : reply;
     },
+    preview,
   };
   return { transport, calls };
 }
@@ -151,3 +168,35 @@ export const search = (hits: KnowledgeHit[], overrides: Partial<KnowledgeSearch>
   reason: "",
   ...overrides,
 });
+
+export const MEME_STATUS: MemeStatus = { status: "ok", unsent: 30, sent: 8 };
+
+export const meme = (number: number, overrides: Partial<MemeItem> = {}): MemeItem => ({
+  url: `https://images.example/${number}.png`,
+  title: `Meme ${number}`,
+  tags: "",
+  source: "source-1",
+  createdAt: "2026-09-03T10:00:00",
+  sentAt: "",
+  ...overrides,
+});
+
+export const memePage = (memes: MemeItem[], overrides: Partial<MemePage> = {}): MemePage => ({
+  total: memes.length,
+  offset: 0,
+  memes,
+  ...overrides,
+});
+
+// A preview that answers with a data URL named after the address, and records what it was asked.
+export function previewer(failing: string[] = []) {
+  const asked: string[] = [];
+  const preview: (url: string) => Promise<PreviewResult> = async (url) => {
+    asked.push(url);
+    if (failing.some((part) => url.includes(part))) {
+      return { ok: false, error: { code: "unavailable", message: "the image host did not answer" } };
+    }
+    return { ok: true, dataUrl: `data:image/png;base64,${btoa(url)}` };
+  };
+  return { asked, preview };
+};

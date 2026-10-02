@@ -3,9 +3,17 @@ import { join } from "node:path";
 import { app, ipcMain, session } from "electron";
 
 import { isRecord } from "../shared/records.js";
-import { CHANNELS, type Bootstrap, type TransportResult } from "../shared/transport.js";
+import {
+  CHANNELS,
+  type Bootstrap,
+  type PreviewResult,
+  type TransportResult,
+} from "../shared/transport.js";
 import { parseConfig } from "./config.js";
 import { isTrustedSender } from "./guards.js";
+import { fetchImage } from "./image_fetch.js";
+import { ImageGate } from "./image_gate.js";
+import { createPreviewer } from "./image_preview.js";
 import { handleRequest, isAllowedAction } from "./ipc.js";
 import { OrchestratorClient } from "./orchestrator_client.js";
 import { installPermissionPolicy } from "./permissions.js";
@@ -26,10 +34,9 @@ async function main(): Promise<void> {
 
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint });
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };
-  const untrusted: TransportResult = {
-    ok: false,
-    error: { code: "denied", message: "this page is not the app" },
-  };
+  const untrusted = { ok: false, error: { code: "denied", message: "this page is not the app" } } as const;
+  const images = new ImageGate();
+  const preview = createPreviewer({ gate: images, fetchImage: (url) => fetchImage(url) });
 
   ipcMain.handle(CHANNELS.bootstrap, (event): Bootstrap | null =>
     isTrustedSender(event.senderFrame?.url, page) ? { locale: config.locale } : null,
@@ -39,7 +46,7 @@ async function main(): Promise<void> {
     if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
 
     const started = Date.now();
-    const result = await handleRequest(raw, orchestrator, limits);
+    const result = await handleRequest(raw, orchestrator, limits, images);
     // Only the action name and the outcome are logged, never a payload or a reply.
     const type = isRecord(raw) && isAllowedAction(raw.type) ? raw.type : "(refused)";
     console.log(
@@ -47,6 +54,24 @@ async function main(): Promise<void> {
       "request",
       JSON.stringify({
         type,
+        ok: result.ok,
+        code: result.ok ? undefined : result.error.code,
+        ms: Date.now() - started,
+      }),
+    );
+    return result;
+  });
+
+  ipcMain.handle(CHANNELS.preview, async (event, url: unknown): Promise<PreviewResult> => {
+    if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
+
+    const started = Date.now();
+    const result = await preview(url);
+    // The address is never logged, only the outcome.
+    console.log(
+      LOG,
+      "preview",
+      JSON.stringify({
         ok: result.ok,
         code: result.ok ? undefined : result.error.code,
         ms: Date.now() - started,

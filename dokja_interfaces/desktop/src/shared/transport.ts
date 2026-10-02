@@ -18,6 +18,11 @@ export type TransportResult =
 
 export type RequestOptions = { timeoutMs?: number };
 
+// An image the shell fetched for the screen, as a data URL, or why it did not.
+export type PreviewResult =
+  | { ok: true; dataUrl: string }
+  | { ok: false; error: TransportError };
+
 // The only door between the screen and the orchestrator. In Electron the preload script
 // implements it over IPC; in a browser (development and tests) a hand-built fake does.
 export type Transport = {
@@ -26,6 +31,8 @@ export type Transport = {
     payload?: Record<string, unknown>,
     options?: RequestOptions,
   ): Promise<TransportResult>;
+  // Only an image address the orchestrator itself listed can be previewed.
+  preview(url: string): Promise<PreviewResult>;
 };
 
 export type Bootstrap = { locale: Locale };
@@ -33,4 +40,5 @@ export type Bootstrap = { locale: Locale };
 export const CHANNELS = {
   bootstrap: "dokja:bootstrap",
   request: "dokja:request",
+  preview: "dokja:preview",
 } as const;

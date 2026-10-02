@@ -3,13 +3,14 @@ import type { Transport } from "../shared/transport.js";
 
 export type Session = { transport: Transport; locale: Locale };
 
+const notInTheApp = {
+  ok: false,
+  error: { code: "unavailable", message: "the page is not running inside the app" },
+} as const;
+
 const noShell: Transport = {
-  async request() {
-    return {
-      ok: false,
-      error: { code: "unavailable", message: "the page is not running inside the app" },
-    };
-  },
+  request: async () => notInTheApp,
+  preview: async () => notInTheApp,
 };
 
 // Inside the app the shell supplies the transport and the language. In a plain browser there is no

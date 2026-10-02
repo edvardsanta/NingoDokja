@@ -8,6 +8,7 @@ type Shell = Transport & { bootstrap(): Promise<Bootstrap | null> };
 function installShell(bootstrap: Bootstrap | null): Shell {
   const shell: Shell = {
     request: async () => ({ ok: true, result: "from the shell" }),
+    preview: async () => ({ ok: true, dataUrl: "data:image/png;base64,AA==" }),
     bootstrap: async () => bootstrap,
   };
   window.dokja = shell;
