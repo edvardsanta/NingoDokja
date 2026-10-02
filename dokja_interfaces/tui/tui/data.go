@@ -370,6 +370,27 @@ func summarizeHashtagSuggestion(res map[string]any) string {
 	return tr("suggested") + hashtag
 }
 
+// suggestionEvidence is why a hashtag was suggested for one meme: how close the closest tagged meme
+// was, what was read from this meme and what was read from that one. Texts are the operator's own
+// material and stay on this screen.
+type suggestionEvidence struct {
+	URL, Hashtag, Reason string
+	Relevant, HasScore   bool
+	Score, Threshold     float64
+	TextRead, Matched    string
+}
+
+func parseSuggestionEvidence(url string, res map[string]any) suggestionEvidence {
+	relevant, _ := res["relevant"].(bool)
+	_, hasScore := res["score"].(float64)
+	return suggestionEvidence{
+		URL: url, Hashtag: str(res, "hashtag"), Reason: str(res, "reason"),
+		Relevant: relevant, HasScore: hasScore,
+		Score: flt(res, "score"), Threshold: flt(res, "threshold"),
+		TextRead: str(res, "query_text"), Matched: str(res, "matched_text"),
+	}
+}
+
 func summarizeHashtagList(res map[string]any) string {
 	return tr("d_hashtag_examples", num(res, "total"))
 }

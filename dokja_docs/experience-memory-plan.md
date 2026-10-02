@@ -64,7 +64,8 @@ the shape of the loop: a context (the text read from the image), an action (the 
 and, later, a verdict (the operator keeps or replaces it).
 
 1. **Shadow mode.** When a suggestion is made, predict the chance it is accepted and record the
-   experience with that prediction. When the operator tags the same meme, resolve it as
+   experience with that prediction and with what the suggestion rested on (how close the earlier tagged
+   meme was and the start of its text). When the operator tags the same meme, resolve it as
    `accepted` or `replaced`. Nothing changes for the operator; only the score accumulates.
 2. **Deciding.** Once there is data and the score beats the baseline, the prediction gates the
    behaviour (append the tag or not). That is the "choice of behaviour" step of the loop.
@@ -83,7 +84,7 @@ nothing.
 | --- | --- |
 | Experiences persist through a repository port on `dokja_store` and its migrations | **Dropped.** A dedicated service with its own SQLite file, so it can record on the path of an action without going through the orchestrator's store, and be exported or wiped on its own. `dokja.db` stays as it is |
 | Prediction scoring belongs to a separate prediction domain | **Changed.** The only prediction today is the chance an action is accepted, so it lives in the memory domain. Split it out when predictions about analyses return |
-| Records keep evidence snapshots (exact excerpt, hash, capture time) | **Dropped for now.** An action's context is the input the bot actually received and is immutable. Needed again only if analyses are recorded |
+| Records keep evidence snapshots (exact excerpt, hash, capture time) | **Partly changed.** An action's context is the input the bot actually received and is immutable, so it needs no snapshot. What a choice rested on is kept: a hashtag suggestion records how close the earlier tagged meme was (`matched_score`) and the start of its text (`matched_context`, 200 characters at most), so the memory can say why a tag was suggested. Hash and capture time stay dropped; they are needed again only if analyses are recorded |
 | Revisions, explicit scope, separate occurrence and recording times | **Dropped for now.** An experience is immutable and has one resolution time. Same condition as above |
 | A pending experience may be recalled, never shown as success or failure | **Changed.** Pending ones are left out of neighbours and counts because they carry no label; they are counted in `memory.status`. None is ever presented as a success or a failure |
 | Recall goes through the knowledge index, then resolves the authoritative record | **Dropped.** The service keeps its own embeddings. The knowledge index stays for documents |
@@ -92,7 +93,7 @@ nothing.
 | Automatic capture of conversations and autonomous outcome collection are out of scope | **Partly changed.** Recording the outcome of a bot action is automatic by design. Conversations are not captured |
 | New variables, volumes or services update the compose files and the production runbook together | **Kept** |
 | Duplicate capture is idempotent; unknown stays unknown; Brier only with explicit probabilities and with sample sizes | **Kept.** A repeated `ref` changes nothing; a prediction is optional; the scorecard counts unscored experiences and says when there is not enough data |
-| Contexts are the user's own text; private conversations do not enter a shared corpus | **Kept, with one deliberate exception.** Requests are logged by type and field count only, the database file is owner-only, nothing is shared. A context comes back in one case: the first 160 characters, as a snippet, when a listing, a recall or a prediction's evidence is asked for with `include_context`, because the ref of an experience is a hash and an operator cannot recognize one without a hint of what it was about. The cut is made in the service, so the rest never leaves it, and `memory.get` and `memory.resolved` never return a context. Like `knowledge.search`, the answer crosses the orchestrator port, which has no authentication: keep that port off untrusted networks |
+| Contexts are the user's own text; private conversations do not enter a shared corpus | **Kept, with one deliberate exception.** Requests are logged by type and field count only, the database file is owner-only, nothing is shared. A context comes back in one case: the first 160 characters, as a snippet, when a listing, a recall or a prediction's evidence is asked for with `include_context`, because the ref of an experience is a hash and an operator cannot recognize one without a hint of what it was about. The cut is made in the service, so the rest never leaves it, and `memory.get` and `memory.resolved` never return a context. The text of the earlier example a choice rested on follows the same rule: `matched_snippet`, only with `include_context`. Like `knowledge.search`, the answer crosses the orchestrator port, which has no authentication: keep that port off untrusted networks |
 | No model training | **Kept.** A learned model is deferred until there are thousands of resolved experiences and the neighbour method stops improving on the baseline |
 
 ## Delivery sequence

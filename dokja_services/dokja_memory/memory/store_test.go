@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -361,5 +362,52 @@ func TestNearestCarriesWhatTheBotDid(t *testing.T) {
 	near, err := store.Nearest(unit(1, 0), "a", "m", 5)
 	if err != nil || len(near) != 1 || near[0].Detail != "#Label" {
 		t.Fatalf("near=%+v err=%v", near, err)
+	}
+}
+
+func TestOpenStoreUpgradesADatabaseCreatedBeforeTheMatchedColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The schema as the first release left it: version 1, no columns for what a choice rested on.
+	if _, err := old.Exec(migrations[0]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO experiences(ref, action, context, detail, created_at)
+		VALUES ('before', 'tag.suggest', 'old words', '#Old', '2026-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	store, err := OpenStore(path, 0)
+	if err != nil {
+		t.Fatalf("an older database must upgrade in place: %v", err)
+	}
+	defer store.Close()
+
+	before, ok, err := store.Get("before")
+	if err != nil || !ok || before.Detail != "#Old" || before.MatchedScore != nil {
+		t.Fatalf("an experience from before reads as it did, with no match: %+v ok=%v err=%v", before, ok, err)
+	}
+	if snippets, _ := store.MatchedSnippets([]string{"before"}, SnippetRunes); len(snippets) != 0 {
+		t.Fatalf("nothing was recorded to show: %v", snippets)
+	}
+
+	created, err := store.Insert(NewExperience{Ref: "after", Action: "tag.suggest", Context: "new words", Detail: "#New",
+		MatchedScore: ptr(0.83), MatchedContext: "the earlier\nexample"}, nil, "m")
+	if err != nil || !created {
+		t.Fatalf("created=%v err=%v", created, err)
+	}
+	after, _, _ := store.Get("after")
+	if after.MatchedScore == nil || *after.MatchedScore != 0.83 {
+		t.Fatalf("after: %+v", after)
+	}
+	if snippets, _ := store.MatchedSnippets([]string{"before", "after"}, SnippetRunes); snippets["after"] != "the earlier example" || len(snippets) != 1 {
+		t.Fatalf("a snippet is one tidy line, only for what has one: %v", snippets)
 	}
 }

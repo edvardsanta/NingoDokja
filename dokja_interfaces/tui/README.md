@@ -109,13 +109,16 @@ remain) and `esc` closes.
 
 - `l` opens the **experiences**, newest first: how each turned out (pending until a verdict arrives), what
   the bot did, the chance it predicted against the baseline, and a snippet of the context, since the ref is
-  a hash. The selected one is shown in full below the list. `t` cycles the filter (all, pending, resolved),
+  a hash. The selected one is shown in full below the list, with how close the earlier tagged meme it rested on
+  was and the start of its text when it was recorded with them. `t` cycles the filter (all, pending, resolved),
   `n`/`p` page, `f` forgets the selected experience after a confirmation, `esc` goes back.
 - `p` opens a form to **predict**: type a text and `enter` shows the chance a suggestion for a text like it is
   kept, against the baseline, with the earlier experiences it rests on. With too little history, or without
   similarity, it says the number is only the baseline.
 - On the Memes tab, `g` (suggest a hashtag) shows the suggestion first and then appends the chance it is
-  kept. That chance is a second request, so a slow or stopped memory never costs the suggestion anything; it
+  kept. The selected meme's panel says why: how close the closest tagged meme was, the text OCR read from
+  this meme and the text of that one, so a wrong suggestion can be traced to what was read. It stays with the
+  meme it was asked for. That chance is a second request, so a slow or stopped memory never costs the suggestion anything; it
   is asked only for a relevant suggestion, skipped while the `memory` service is switched off, and after one
   failure it is not asked again for a minute.
 

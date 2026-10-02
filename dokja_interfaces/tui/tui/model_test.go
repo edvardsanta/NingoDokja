@@ -227,6 +227,99 @@ func TestMemesTabCanLearnAndSuggestAHashtag(t *testing.T) {
 	}
 }
 
+func TestSuggestionShowsWhyItWasMadeAndStaysWithTheMemeItIsAbout(t *testing.T) {
+	m, fake := started(t)
+	fake.responses["meme.hashtag.suggest"] = map[string]any{
+		"hashtag": "#TioDoPave", "relevant": true, "score": 0.8312, "threshold": 0.6,
+		"query_text": "texto lido da imagem", "matched_text": "texto do meme marcado",
+	}
+
+	press(m, "2", "g")
+
+	view := m.View()
+	for _, want := range []string{
+		"Sugestão de hashtag", "sugerido: #TioDoPave",
+		"proximidade: 0.83 (relevante a partir de 0.60)",
+		"texto lido: texto lido da imagem",
+		"texto marcado mais parecido: texto do meme marcado",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("the suggestion should say why it was made, missing %q:\n%s", want, view)
+		}
+	}
+
+	press(m, "down")
+	if strings.Contains(m.View(), "Sugestão de hashtag") {
+		t.Fatalf("the evidence is about the meme it was asked for, not the next one:\n%s", m.View())
+	}
+	press(m, "up")
+	if !strings.Contains(m.View(), "texto lido da imagem") {
+		t.Fatal("coming back to the meme shows its suggestion again")
+	}
+}
+
+func TestSuggestionBelowTheThresholdOrWithoutOneSaysSoAndKeepsWhatItKnows(t *testing.T) {
+	for name, tc := range map[string]struct {
+		response map[string]any
+		want     []string
+		absent   []string
+	}{
+		"below the threshold": {
+			response: map[string]any{
+				"hashtag": "#Cafe", "relevant": false, "score": 0.41, "threshold": 0.6,
+				"query_text": "lido", "matched_text": "parecido",
+			},
+			want:   []string{"mais próximo: #Cafe (abaixo do limiar de relevância)", "proximidade: 0.41 (relevante a partir de 0.60)", "texto lido: lido"},
+			absent: []string{"sugerido: #Cafe"},
+		},
+		"nothing tagged yet": {
+			response: map[string]any{"hashtag": nil, "relevant": false, "degraded": false, "reason": "no tagged examples with an embedding from this model yet", "query_text": "lido"},
+			want:     []string{"Sugestão de hashtag", "no tagged examples with an embedding", "texto lido: lido"},
+			absent:   []string{"proximidade", "texto marcado mais parecido"},
+		},
+	} {
+		m, fake := started(t)
+		fake.responses["meme.hashtag.suggest"] = tc.response
+
+		press(m, "2", "g")
+
+		view := m.View()
+		for _, want := range tc.want {
+			if !strings.Contains(view, want) {
+				t.Errorf("%s: missing %q:\n%s", name, want, view)
+			}
+		}
+		for _, absent := range tc.absent {
+			if strings.Contains(view, absent) {
+				t.Errorf("%s: %q must not be shown:\n%s", name, absent, view)
+			}
+		}
+	}
+}
+
+func TestSuggestionEvidenceExistsInEnglishAndLeaksNoPortuguese(t *testing.T) {
+	withLanguage(t, "en")
+	m, fake := started(t)
+	fake.responses["meme.hashtag.suggest"] = map[string]any{
+		"hashtag": "#TioDoPave", "relevant": true, "score": 0.83, "threshold": 0.6,
+		"query_text": "words read", "matched_text": "words of the match",
+	}
+
+	press(m, "2", "g")
+
+	view := m.View()
+	for _, want := range []string{"Hashtag suggestion", "suggested #TioDoPave", "closeness: 0.83 (relevant from 0.60)", "text read: words read", "closest tagged text: words of the match"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("missing %q:\n%s", want, view)
+		}
+	}
+	for _, portuguese := range []string{"Sugestão", "proximidade", "texto lido", "parecido"} {
+		if strings.Contains(view, portuguese) {
+			t.Errorf("Portuguese %q leaked into the English interface:\n%s", portuguese, view)
+		}
+	}
+}
+
 func TestHashtagListShowsTaggedMemesAndEmbeddingState(t *testing.T) {
 	m, fake := started(t)
 	press(m, "2", "l")

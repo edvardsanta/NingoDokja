@@ -327,6 +327,9 @@ func (m *Model) viewMemes() string {
 		if m.screen != nil && m.screen.URL == item.URL {
 			detail.WriteString("\n" + m.viewScreen(*m.screen))
 		}
+		if m.suggestion != nil && m.suggestion.URL == item.URL {
+			detail.WriteString("\n" + viewSuggestion(*m.suggestion))
+		}
 	}
 
 	top := strings.TrimRight(list.String(), "\n")
@@ -340,6 +343,31 @@ func (m *Model) viewMemes() string {
 		image = "\n" + image
 	}
 	return top + "\n" + detail.String() + image
+}
+
+// viewSuggestion says why a hashtag was suggested: how close the closest tagged meme was and what
+// was read from this meme and from that one, so a wrong suggestion can be traced to the text OCR read.
+func viewSuggestion(s suggestionEvidence) string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(tr("hashtag_suggestion")) + "\n")
+	switch {
+	case s.Hashtag == "":
+		b.WriteString("  " + styleDim.Render(trunc(firstNonEmpty(s.Reason, tr("no_hashtag_suggestion")), 90)) + "\n")
+	case s.Relevant:
+		b.WriteString("  " + tr("suggested") + s.Hashtag + "\n")
+	default:
+		b.WriteString("  " + styleWarn.Render(tr("closest_is")+s.Hashtag+tr("below_relevance_threshold")) + "\n")
+	}
+	if s.HasScore {
+		b.WriteString(tr("suggestion_closeness", s.Score, s.Threshold) + "\n")
+	}
+	if s.TextRead != "" {
+		b.WriteString(tr("text_read") + trunc(s.TextRead, 100) + "\n")
+	}
+	if s.Matched != "" {
+		b.WriteString(tr("suggestion_closest_text") + trunc(s.Matched, 100) + "\n")
+	}
+	return b.String()
 }
 
 // viewPreview draws the selected meme's image, or says why there is none.

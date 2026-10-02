@@ -14,6 +14,9 @@ const (
 	maxRefLen       = 512
 	maxContextRunes = 4000
 	maxDetailRunes  = 200
+	// maxMatchedRunes is how much of the earlier example's text an experience keeps: enough to see
+	// what the bot's choice rested on, and no more than a listing hands back.
+	maxMatchedRunes = 200
 	defaultK        = 10
 	maxK            = 50
 	defaultReindex  = 32
@@ -125,7 +128,8 @@ func (s *Service) get(payload map[string]any) (map[string]any, error) {
 	return map[string]any{
 		"found": true, "ref": stored.Ref, "action": stored.Action, "detail": stored.Detail, "outcome": stored.Outcome,
 		"predicted_p": nullable(stored.Predicted), "baseline_p": nullable(stored.Baseline),
-		"created_at": stored.CreatedAt, "resolved_at": stored.ResolvedAt,
+		"matched_score": nullable(stored.MatchedScore),
+		"created_at":    stored.CreatedAt, "resolved_at": stored.ResolvedAt,
 	}, nil
 }
 
@@ -163,15 +167,29 @@ func (s *Service) list(payload map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	var matched map[string]string
+	if withContext {
+		refs := make([]string, 0, len(rows))
+		for _, row := range rows {
+			refs = append(refs, row.Ref)
+		}
+		if matched, err = s.store.MatchedSnippets(refs, SnippetRunes); err != nil {
+			return nil, err
+		}
+	}
 	experiences := make([]any, 0, len(rows))
 	for _, row := range rows {
 		entry := map[string]any{
 			"ref": row.Ref, "action": row.Action, "detail": row.Detail, "outcome": row.Outcome,
 			"predicted_p": nullable(row.Predicted), "baseline_p": nullable(row.Baseline),
-			"created_at": row.CreatedAt, "resolved_at": row.ResolvedAt,
+			"matched_score": nullable(row.MatchedScore),
+			"created_at":    row.CreatedAt, "resolved_at": row.ResolvedAt,
 		}
 		if withContext {
 			entry["context_snippet"] = row.Snippet
+			if snippet, ok := matched[row.Ref]; ok {
+				entry["matched_snippet"] = snippet
+			}
 		}
 		experiences = append(experiences, entry)
 	}
@@ -389,6 +407,16 @@ func parseNew(payload map[string]any) (NewExperience, error) {
 			return NewExperience{}, fmt.Errorf("predicted_p and baseline_p must be between 0 and 1")
 		}
 		experience.Predicted, experience.Baseline = &predicted, &baseline
+	}
+	if matchedScore, ok := number(payload, "matched_score"); ok {
+		if matchedScore < 0 || matchedScore > 1 {
+			return NewExperience{}, fmt.Errorf("matched_score must be between 0 and 1")
+		}
+		experience.MatchedScore = &matchedScore
+	}
+	experience.MatchedContext = text(payload, "matched_context")
+	if utf8.RuneCountInString(experience.MatchedContext) > maxMatchedRunes {
+		return NewExperience{}, fmt.Errorf("matched_context is longer than %d characters", maxMatchedRunes)
 	}
 	return experience, nil
 }

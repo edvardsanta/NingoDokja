@@ -78,7 +78,7 @@ const (
 func TestSuggestionIsRecordedWithItsPredictionAndWithoutTheAddress(t *testing.T) {
 	service := &recordingMemory{answers: defaultAnswers()}
 
-	synchronous(service, nil).Suggested(testMemeURL, "  "+testMemeText+" ", "#Humor")
+	synchronous(service, nil).Suggested(testMemeURL, "  "+testMemeText+" ", "#Humor", HashtagMatch{})
 
 	if got := strings.Join(service.eventTypes(), ","); got != "memory.recall,memory.record" {
 		t.Fatalf("a suggestion is predicted, then recorded: %s", got)
@@ -102,7 +102,7 @@ func TestSuggestionIsRecordedWithItsPredictionAndWithoutTheAddress(t *testing.T)
 func TestSuggestionIsStillRecordedWhenItCannotBePredicted(t *testing.T) {
 	service := &recordingMemory{answers: defaultAnswers(), errors: map[string]error{"memory.recall": errors.New("offline")}}
 
-	synchronous(service, nil).Suggested(testMemeURL, testMemeText, "#Humor")
+	synchronous(service, nil).Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{})
 
 	if got := strings.Join(service.eventTypes(), ","); got != "memory.recall,memory.record" {
 		t.Fatalf("expected the record to follow the failed prediction: %s", got)
@@ -119,7 +119,7 @@ func TestMemoryFailuresNeverEscape(t *testing.T) {
 	}}
 	experience := synchronous(service, nil)
 
-	experience.Suggested(testMemeURL, testMemeText, "#Humor")
+	experience.Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{})
 	experience.Tagged(testMemeURL, "#Humor")
 
 	// The suggestion is predicted and its record fails; the tag finds no experience to compare with.
@@ -132,18 +132,18 @@ func TestNotesDoNothingWhenDisabledOrIncomplete(t *testing.T) {
 	service := &recordingMemory{answers: defaultAnswers()}
 
 	off := synchronous(service, func() bool { return false })
-	off.Suggested(testMemeURL, testMemeText, "#Humor")
+	off.Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{})
 	off.Tagged(testMemeURL, "#Humor")
 
 	on := synchronous(service, func() bool { return true })
-	on.Suggested("", testMemeText, "#Humor")
-	on.Suggested(testMemeURL, "   ", "#Humor")
-	on.Suggested(testMemeURL, testMemeText, " ")
+	on.Suggested("", testMemeText, "#Humor", HashtagMatch{})
+	on.Suggested(testMemeURL, "   ", "#Humor", HashtagMatch{})
+	on.Suggested(testMemeURL, testMemeText, " ", HashtagMatch{})
 	on.Tagged("", "#Humor")
 	on.Tagged(testMemeURL, "")
 
 	var missing *HashtagExperience
-	missing.Suggested(testMemeURL, testMemeText, "#Humor")
+	missing.Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{})
 	missing.Tagged(testMemeURL, "#Humor")
 
 	if len(service.sent()) != 0 {
@@ -151,10 +151,56 @@ func TestNotesDoNothingWhenDisabledOrIncomplete(t *testing.T) {
 	}
 }
 
+func TestSuggestionRecordsWhatItRestedOn(t *testing.T) {
+	service := &recordingMemory{answers: defaultAnswers()}
+
+	synchronous(service, nil).Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{Score: 0.83, Text: "  an earlier meme  "})
+
+	record := service.sent()[1].payload
+	if record["matched_score"] != 0.83 || record["matched_context"] != "an earlier meme" {
+		t.Fatalf("the experience should say how close the earlier example was and what it said: %v", record)
+	}
+}
+
+func TestSuggestionWithoutEvidenceRecordsNoneAndInventsNone(t *testing.T) {
+	for name, match := range map[string]HashtagMatch{
+		"nothing said":      {},
+		"a score of zero":   {Score: 0, Text: "   "},
+		"a negative score":  {Score: -0.2},
+		"only blank spaces": {Text: " \n "},
+	} {
+		service := &recordingMemory{answers: defaultAnswers()}
+
+		synchronous(service, nil).Suggested(testMemeURL, testMemeText, "#Humor", match)
+
+		record := service.sent()[1].payload
+		for _, key := range []string{"matched_score", "matched_context"} {
+			if _, has := record[key]; has {
+				t.Fatalf("%s: %s must be left out, got %v", name, key, record)
+			}
+		}
+	}
+}
+
+func TestEvidenceIsKeptWithinWhatTheMemoryAccepts(t *testing.T) {
+	service := &recordingMemory{answers: defaultAnswers()}
+
+	synchronous(service, nil).Suggested(testMemeURL, testMemeText, "#Humor",
+		HashtagMatch{Score: 1.0000001, Text: strings.Repeat("é", 5000)})
+
+	record := service.sent()[1].payload
+	if record["matched_score"] != 1.0 {
+		t.Fatalf("a score is a probability, rounding noise above 1 is clamped: %v", record["matched_score"])
+	}
+	if got := len([]rune(record["matched_context"].(string))); got != maxMatchedText {
+		t.Fatalf("the earlier example's text is cut to %d characters, got %d", maxMatchedText, got)
+	}
+}
+
 func TestVeryLongTextIsCutToWhatTheMemoryAccepts(t *testing.T) {
 	service := &recordingMemory{answers: defaultAnswers()}
 
-	synchronous(service, nil).Suggested(testMemeURL, strings.Repeat("é", 5000), "#Humor")
+	synchronous(service, nil).Suggested(testMemeURL, strings.Repeat("é", 5000), "#Humor", HashtagMatch{})
 
 	record := service.sent()[1].payload
 	if got := len([]rune(record["context"].(string))); got != maxExperienceText {
@@ -193,7 +239,7 @@ func TestNotesRunInTheBackgroundSoADeliveryIsNeverHeldUp(t *testing.T) {
 
 	returned := make(chan struct{})
 	go func() {
-		experience.Suggested(testMemeURL, testMemeText, "#Humor")
+		experience.Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{})
 		close(returned)
 	}()
 	select {
@@ -218,10 +264,10 @@ func TestNothingPrivateIsLogged(t *testing.T) {
 	service := &recordingMemory{answers: defaultAnswers()}
 	experience := synchronous(service, nil)
 
-	experience.Suggested(testMemeURL, testMemeText, "#Humor")
+	experience.Suggested(testMemeURL, testMemeText, "#Humor", HashtagMatch{Score: 0.83, Text: "words of the earlier meme"})
 	experience.Tagged(testMemeURL, "#Humor")
 
-	for _, secret := range []string{testMemeText, "media.example", "#Humor"} {
+	for _, secret := range []string{testMemeText, "media.example", "#Humor", "earlier meme"} {
 		if strings.Contains(logs.String(), secret) {
 			t.Fatalf("%q is the user's own material and must not be logged: %q", secret, logs.String())
 		}
@@ -237,11 +283,13 @@ func TestNothingPrivateIsLogged(t *testing.T) {
 
 type recordedNotes struct {
 	suggested [][3]string
+	matches   []HashtagMatch
 	tagged    [][2]string
 }
 
-func (r *recordedNotes) Suggested(url, text, hashtag string) {
+func (r *recordedNotes) Suggested(url, text, hashtag string, match HashtagMatch) {
 	r.suggested = append(r.suggested, [3]string{url, text, hashtag})
+	r.matches = append(r.matches, match)
 }
 
 func (r *recordedNotes) Tagged(url, hashtag string) {
@@ -255,7 +303,7 @@ func TestALearnedHashtagIsNotedOnlyWhenItIsAppended(t *testing.T) {
 		err    error
 		noted  bool
 	}{
-		{"relevant", map[string]any{"hashtag": "#Humor", "relevant": true, "query_text": testMemeText}, nil, true},
+		{"relevant", map[string]any{"hashtag": "#Humor", "relevant": true, "query_text": testMemeText, "score": 0.83, "matched_text": "an earlier meme"}, nil, true},
 		{"irrelevant", map[string]any{"hashtag": "#Humor", "relevant": false, "query_text": testMemeText}, nil, false},
 		{"no hashtag", map[string]any{"relevant": true, "query_text": testMemeText}, nil, false},
 		{"unavailable", nil, errors.New("offline"), false},
@@ -274,6 +322,9 @@ func TestALearnedHashtagIsNotedOnlyWhenItIsAppended(t *testing.T) {
 			if tc.noted {
 				if len(notes.suggested) != 1 || notes.suggested[0] != [3]string{testMemeURL, testMemeText, "#Humor"} {
 					t.Fatalf("expected the suggestion to be noted once, got %v", notes.suggested)
+				}
+				if notes.matches[0] != (HashtagMatch{Score: 0.83, Text: "an earlier meme"}) {
+					t.Fatalf("what the suggestion rested on should be passed on, got %v", notes.matches)
 				}
 			} else if len(notes.suggested) != 0 {
 				t.Fatalf("nothing was appended, so nothing should be noted: %v", notes.suggested)

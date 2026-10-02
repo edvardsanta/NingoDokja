@@ -198,7 +198,11 @@ is left out of every count and score; a verdict that arrives later still counts.
 
 Port `5562` is published on `127.0.0.1` only because the service has no authentication. A listing or a recall
 returns the first 160 characters of a context (a snippet) only when the request sets `include_context`; the
-rest of the text never leaves the service.
+rest of the text never leaves the service. A hashtag suggestion is recorded with how close the earlier tagged
+meme was and the start of its text; that text follows the same rule. The first start of the service after this
+change adds two nullable columns to the database in place; nothing to run by hand. The previous build refuses
+a database upgraded this way (it sees a newer schema version), so to roll back, restore a copy taken before
+the upgrade.
 
 The orchestrator routes the `memory.*` events to the service (`MEMORY_SERVICE_ENDPOINT`, set in the compose
 files). `memory` is one of the services that can be switched off: while it is off, the orchestrator refuses
@@ -260,7 +264,10 @@ Missing OCR text, unsupported video input, low similarity or a classifier error 
 the original message intact. Disabling the meme service also disables automatic suggestions
 for manual delivery. Channel validation and safe-only screening remain in effect.
 
-The TUI supports learning (`h`), suggestion (`g`), tagged examples (`l`) and removal (`u`).
+The TUI supports learning (`h`), suggestion (`g`), tagged examples (`l`) and removal (`u`). After `g` the
+selected meme's panel shows why: the closeness of the closest tagged meme, the text read from this meme and
+the text of that one. `dokja-cli meme hashtag suggest` prints the same fields (`score`, `query_text`,
+`matched_text`).
 Each suggestion recovers up to 32 examples without embeddings or from another model.
 After the embedding model becomes available, subsequent suggestions progressively
 recover the backlog. Corrections replace the example for the same URL; automatic

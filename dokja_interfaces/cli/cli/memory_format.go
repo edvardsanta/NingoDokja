@@ -139,6 +139,25 @@ func FormatExperiences(answer map[string]any) string {
 		if text, _ := experience["context_snippet"].(string); text != "" {
 			fmt.Fprintf(&out, "       \"%s\"\n", snippet(text, 100))
 		}
+		if matched := formatMatched(experience); matched != "" {
+			fmt.Fprintf(&out, "       %s\n", matched)
+		}
 	}
 	return out.String()
+}
+
+// formatMatched says what the bot's choice rested on: how close the earlier example was and the start
+// of its text. It is empty for an experience recorded without them.
+func formatMatched(experience map[string]any) string {
+	score, hasScore := experience["matched_score"].(float64)
+	text, _ := experience["matched_snippet"].(string)
+	switch {
+	case hasScore && text != "":
+		return fmt.Sprintf("matched %.2f: \"%s\"", score, snippet(text, 100))
+	case hasScore:
+		return fmt.Sprintf("matched %.2f", score)
+	case text != "":
+		return fmt.Sprintf("matched: \"%s\"", snippet(text, 100))
+	}
+	return ""
 }
