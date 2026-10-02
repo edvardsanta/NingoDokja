@@ -1,8 +1,8 @@
 # Desktop App Plan
 
-Status: proposed, 2026-10-02. Only the Phase 0 spike has run (results below); nothing else is
-implemented. The "Confirmed decisions" section records what was agreed with the owner; everything else
-is a recommendation to review.
+Status: proposed, 2026-10-02. The Phase 0 spike has run (results below) and the Phase 1 skeleton is in
+`dokja_interfaces/desktop/` with one card, service health. The "Confirmed decisions" section records
+what was agreed with the owner; everything else is a recommendation to review.
 
 ## Goal
 
@@ -16,8 +16,7 @@ at a time, and the assistant offers the rest instead of dumping everything.
 ## Identity: a pattern, not a look
 
 The reference is only a source of interaction patterns. Ningo is the arrogant philosopher described in
-the [README](../README.md): talkative, well read, opinionated. It is not a hero, and the screen should
-not look like a sci-fi console.
+the [README](../README.md): talkative, well read, opinionated. It is not a hero.
 
 Taken from the reference:
 
@@ -25,17 +24,28 @@ Taken from the reference:
 - cards of mixed kinds share one anatomy and arrive one at a time; the focused card then docks into a row;
 - an offer ("I have more observations, want them?") before the rest is shown.
 
-Not taken: the glowing orb, the neon HUD, the system gauges and the hero tone.
+Not taken: the glowing orb, the blue holographic HUD, the system gauges and the hero tone.
 
-Design principles:
+Visual direction: cyberpunk, the owner's choice on 2026-10-02. The first pass is specific to Ningo
+rather than neon on black, and is open to change:
 
-- Text is the main material. The screen is typographic and calm; motion explains order (what arrived,
-  what is in focus) and never decorates.
+- **Dead channel.** The page is the grey-blue of a television tuned to nothing (the opening line of
+  *Neuromancer*), with fine scanlines and noise. Neon never decorates; it only means something: cyan is
+  up, magenta is a problem, amber has not been checked.
+- **The name is the one memorable thing.** It is set in a Didone italic with a cyan and a magenta ghost
+  behind it, aligned when the system is well and drifting out of register as it gets worse.
+- **Structure carries information.** Panels with two cut corners, the kind of card cut into its top
+  edge, one segment per service.
+- **Type.** B612 Mono, made for cockpit displays, for everything; Bodoni Moda italic for the name.
+  Both are bundled under the SIL Open Font License, so nothing is fetched at run time.
+- **Motion.** One terminal-style print of the rows and a blinking cursor while loading. Both stop under
+  `prefers-reduced-motion`.
+
+Principles that stay:
+
 - One card anatomy for every kind: kind label, title, body, source and, when a text generator is
   available, Ningo's one-line take.
 - Offer, don't dump: a short digest first, the rest on request.
-
-Visual direction (palette, type, the mark) is its own step, decided before the first screen is built.
 
 ## Confirmed decisions
 
@@ -45,6 +55,7 @@ Visual direction (palette, type, the mark) is its own step, decided before the f
 | Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. |
 | Voice | Visual only in v1. Voice comes after the digest works (Phase 4). |
 | Cards | Knowledge and books, memes, memory and health, plus the personal cards (weather, agenda, mail). Feeds are the first new card. |
+| Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. |
 
 ## Where it fits
 
@@ -118,6 +129,9 @@ fail on missing or stale IDs and on Portuguese leaking into English mode.
 
 - Renderer sandboxed: context isolation on, no Node integration, strict CSP, a preload that exposes
   only `request`.
+- Allow-list: the main process forwards only the listed read-only actions (v1: `ningo.status`), so a
+  compromised screen cannot call `services.set` or `discord.send`. Each reply is projected to the fields
+  its card reads, so channel IDs and provider profiles never reach the screen.
 - Permissions denied by default: Electron approves every permission request unless a handler is set, so
   the session gets one that denies everything (Phase 4 allows only the microphone, for the app's own page).
 - Feed content is untrusted: rendered as text, never as HTML. The shell's main process fetches images
@@ -158,7 +172,8 @@ v1 covers Phases 0 to 3, personal cards included, behind the gate above. Phases 
    Tauri: cards arriving one at a time, a short tone played on load, a microphone request, and one
    `ningo.status` request sent from the shell's native side. Results below.
 1. **Skeleton and existing cards.** Shell, `Transport` over ZeroMQ, card registry, and the health,
-   memory, knowledge/books and memes cards. No backend change. The orchestrator answers requests one
+   memory, knowledge/books and memes cards. No backend change. The shell, the `Transport`, the registry
+   and the health card are built; the other three cards are next. The orchestrator answers requests one
    at a time and a stopped service can take about five seconds to fail (the TUI keeps memory out of
    its panel refresh for that reason), so the transport queues requests and each card loads on its own
    with a timeout. Tests: the transport adapter and the registry with the Node test runner (as the
@@ -248,8 +263,8 @@ Everything except the loopback binding is additive.
 - Is a text conversation part of v1? It depends on the same text-generation question.
 - Where feed following lives (new service or `dokja_knowledge`).
 - Overlay and ambient window modes are not verified in any candidate; they are out of v1.
-- Event source for the desktop app. The spike sent `source: cli`. The orchestrator does not reject
-  unknown sources: the only source-specific code is the chat handler reading the text from the context
-  for known sources, and `discord.send`, which requires `cli`. A `desktop` value would be additive;
-  choose it in Phase 1.
+- Event source for the desktop app: it sends `source: desktop`, which is additive. The orchestrator
+  does not reject unknown sources: the only source-specific code is the chat handler reading the text
+  from the context for known sources, and `discord.send`, which requires `cli`. If a text conversation
+  arrives, add `desktop` to the chat handler's list.
 - Mobile is assumed to be a PWA from the same UI, after authentication exists.
