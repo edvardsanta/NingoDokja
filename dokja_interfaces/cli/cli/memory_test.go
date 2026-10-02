@@ -339,6 +339,31 @@ func TestFormatExperiencesShowsOutcomeChanceAndSnippet(t *testing.T) {
 	}
 }
 
+func TestFormatExperiencesShowsWhatTheChoiceRestedOn(t *testing.T) {
+	out := FormatExperiences(map[string]any{
+		"total": 4.0, "offset": 0.0,
+		"experiences": []any{
+			map[string]any{"ref": "hashtag:aa", "action": "hashtag.suggest", "detail": "#Rates", "outcome": "accepted",
+				"matched_score": 0.8312, "matched_snippet": "  central  bank\nrate hike "},
+			map[string]any{"ref": "hashtag:bb", "action": "hashtag.suggest", "detail": "#Cake", "outcome": "", "matched_score": 0.7},
+			map[string]any{"ref": "hashtag:cc", "action": "hashtag.suggest", "detail": "#Pie", "outcome": "", "matched_snippet": "pie recipe"},
+			map[string]any{"ref": "hashtag:dd", "action": "hashtag.suggest", "detail": "#Old", "outcome": "", "matched_score": nil},
+		},
+	})
+	for _, want := range []string{
+		`matched 0.83: "central bank rate hike"`,
+		"matched 0.70\n",
+		`matched: "pie recipe"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "matched") != 3 {
+		t.Fatalf("an experience recorded without evidence gets no line:\n%s", out)
+	}
+}
+
 func TestRecallAndPredictShowWhatEachEarlierExperienceWasAbout(t *testing.T) {
 	recall := FormatRecall(map[string]any{
 		"outcomes": map[string]any{"accepted": 1.0},
