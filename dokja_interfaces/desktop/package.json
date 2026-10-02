@@ -10,7 +10,8 @@
     "start": "node ./scripts/build_shell.mjs && vite build && electron .",
     "dev:web": "vite",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test ./tests/*.test.ts && vitest run"
+    "test": "node --import tsx --test ./tests/*.test.ts && vitest run",
+    "test:e2e": "node ./scripts/build_shell.mjs && vite build && node --import tsx --test ./tests/e2e/*.e2e.ts"
   },
   "dependencies": {
     "zeromq": "^6.8.0"
