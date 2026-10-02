@@ -94,6 +94,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(a.newJobsCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
 	root.AddCommand(a.newKnowledgeCommand(ctx))
+	root.AddCommand(a.newMemoryCommand(ctx))
 	root.AddCommand(a.newEmitCommand(ctx))
 
 	return root

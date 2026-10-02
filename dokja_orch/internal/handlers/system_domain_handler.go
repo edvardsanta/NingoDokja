@@ -73,6 +73,7 @@ type SystemDomainHandler struct {
 	memeAttachments  MemeAttachmentFetcher
 	controls         *core.Controls
 	profiles         ChatProfiles
+	hashtagNotes     HashtagExperienceNotes
 }
 
 func NewSystemDomainHandler(
@@ -113,6 +114,13 @@ func (h *SystemDomainHandler) WithMemeTools(screener MemeScreener, marker MemeMa
 // A missing/low-confidence suggestion never blocks delivery.
 func (h *SystemDomainHandler) WithHashtagSuggestions(suggester MemeHashtagSuggester) *SystemDomainHandler {
 	h.memeHashtags = suggester
+	return h
+}
+
+// WithHashtagExperience notes each learned hashtag the handler appends, so the experience
+// memory can later score how often the operator keeps it.
+func (h *SystemDomainHandler) WithHashtagExperience(notes HashtagExperienceNotes) *SystemDomainHandler {
+	h.hashtagNotes = notes
 	return h
 }
 
@@ -344,6 +352,9 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content,
 	hashtag := strings.TrimSpace(resultString(result, "hashtag"))
 	if !relevant || hashtag == "" {
 		return content
+	}
+	if h.hashtagNotes != nil {
+		h.hashtagNotes.Suggested(url, resultString(result, "query_text"), hashtag)
 	}
 	if content == "" {
 		return hashtag

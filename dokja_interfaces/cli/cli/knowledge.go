@@ -241,6 +241,11 @@ func buildKnowledgeSearchPayload(query string, k int) (map[string]any, error) {
 // puts the domain's answer straight in "result", debug/verbose nests it under the domain
 // name. A switched-off service answers with a skip reason instead, returned as skipped.
 func knowledgeResult(result any) (answer map[string]any, skipped string, err error) {
+	return domainResult(result, "knowledge")
+}
+
+// domainResult unwraps the orchestrator's answer for one domain (see knowledgeResult).
+func domainResult(result any, domain string) (answer map[string]any, skipped string, err error) {
 	envelope, ok := result.(map[string]any)
 	if !ok {
 		return nil, "", fmt.Errorf("unexpected orchestrator response shape")
@@ -253,7 +258,7 @@ func knowledgeResult(result any) (answer map[string]any, skipped string, err err
 		reason, _ := body["reason"].(string)
 		return nil, reason, nil
 	}
-	if nested, ok := body["knowledge"].(map[string]any); ok {
+	if nested, ok := body[domain].(map[string]any); ok {
 		return nested, "", nil
 	}
 	return body, "", nil

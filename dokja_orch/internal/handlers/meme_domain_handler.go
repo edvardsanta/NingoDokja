@@ -9,11 +9,19 @@ import (
 )
 
 type MemeDomainHandler struct {
-	domain *memedomain.Domain
+	domain       *memedomain.Domain
+	hashtagNotes HashtagExperienceNotes
 }
 
 func NewMemeDomainHandler(service memedomain.Service) *MemeDomainHandler {
 	return &MemeDomainHandler{domain: memedomain.New(service)}
+}
+
+// WithHashtagExperience notes every hashtag the operator gives a meme, so the experience memory can
+// tell whether it was the one the bot had suggested.
+func (h *MemeDomainHandler) WithHashtagExperience(notes HashtagExperienceNotes) *MemeDomainHandler {
+	h.hashtagNotes = notes
+	return h
 }
 
 func (h *MemeDomainHandler) Domain() core.Domain {
@@ -44,6 +52,15 @@ func (h *MemeDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if h.hashtagNotes != nil && workflow.Action == memedomain.ActionTagMemeHashtag {
+		// The service returns the hashtag normalized ("Name" becomes "#Name"), which is how a
+		// suggestion was stored.
+		h.hashtagNotes.Tagged(
+			firstNonEmptyString(resultString(response, "source_url"), resultString(event.Payload, "url")),
+			firstNonEmptyString(resultString(response, "hashtag"), resultString(event.Payload, "hashtag")),
+		)
 	}
 
 	logger.Info(fmt.Sprintf(

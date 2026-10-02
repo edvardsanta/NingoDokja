@@ -199,6 +199,21 @@ files). `memory` is one of the services that can be switched off: while it is of
 these events. A listing, a recall and the evidence of a prediction cross the orchestrator port, which has no
 authentication, the same as `knowledge.search`: keep ports `5555` and `5558` off untrusted networks.
 
+The first use is the hashtag suggestion: each learned hashtag the orchestrator appends is recorded with the
+chance it would be kept, and when the operator tags the same meme it is resolved as accepted or replaced (the
+meme's address, hashed, links the two). This runs in shadow mode, so it changes nothing that is sent. The
+thresholds that decide what counts as similar, as enough evidence and as enough scored predictions are
+provisional and live in `dokja_domain/dokja_memory`: calibrate them against real data before trusting a score.
+
+Calls made by an action are best effort with a five second budget and run in the background: an unreachable
+`dokja-memory` never delays or fails a delivery or a tag. Switching `memory` off stops these notes too.
+
+`dokja-cli memory` works with it: `status` and `reindex` look after the service, `list`, `recall` and `show`
+inspect experiences, `predict` estimates the chance an action is kept for a context, `score --action
+hashtag.suggest` compares the stored predictions with a baseline and says when there are too few to judge,
+`record` and `resolve` add and settle one by hand, and `forget` deletes one. `dokja-cli services disable
+memory` switches the service off.
+
 To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
 online backup. The schema is versioned in the file; a build refuses a database from a newer version.
 
@@ -226,7 +241,8 @@ stores tagged text without a vector and `meme.hashtag.suggest` reports `degraded
 base's threshold, it needs validation on representative examples, so retune it once there is a real set of tagged
 memes. Its SQLite file is `MEME_HASHTAG_DB_FILE`, separate from `MEME_SERVICE_DB_FILE`.
 
-The orchestrator appends relevant suggestions to manual and scheduled deliveries.
+The orchestrator appends relevant suggestions to manual and scheduled deliveries, and notes each one in the
+experience memory (see "Experience Memory" above).
 Missing OCR text, unsupported video input, low similarity or a classifier error leaves
 the original message intact. Disabling the meme service also disables automatic suggestions
 for manual delivery. Channel validation and safe-only screening remain in effect.
