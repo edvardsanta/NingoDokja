@@ -182,6 +182,23 @@ describe("the tabs", () => {
       expect(selected()).toEqual(["memory"]);
     });
 
+    it("leave the tabs alone while a dialog is open over them", () => {
+      renderTabs();
+      fireEvent.click(tab("memory"));
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      document.body.append(dialog);
+      try {
+        fireEvent.keyDown(document.body, { key: "1" });
+        expect(selected()).toEqual(["memory"]);
+      } finally {
+        dialog.remove();
+      }
+      fireEvent.keyDown(document.body, { key: "1" });
+      expect(selected()).toEqual(["health"]);
+    });
+
     it("type a digit into a field instead of changing tabs", () => {
       renderTabs();
       fireEvent.click(tab("memory"));

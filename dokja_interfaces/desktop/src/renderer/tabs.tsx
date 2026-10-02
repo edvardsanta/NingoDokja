@@ -51,6 +51,8 @@ export function Tabs({ entries, transport }: { entries: readonly CardEntry[]; tr
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.ctrlKey || event.altKey || event.metaKey) return;
+      // a dialog is open: what is behind it is not for the keys
+      if (document.querySelector('[aria-modal="true"]')) return;
       const origin = event.target;
       if (origin instanceof HTMLElement && (origin.isContentEditable || TYPING.has(origin.tagName))) return;
       const entry = entries[Number(event.key) - 1];

@@ -13,10 +13,12 @@ opened, and then keeps what it showed:
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search` | the research base and a search over it |
-| memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell |
+| memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell; a click opens one large |
 
 The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
-a digit. Every action is read-only, and nothing in the app opens a link or changes anything.
+a digit. An opened meme is a dialog over the page: a video plays with its sound and controls, the left and
+right arrows move between the memes of the page, and Escape or a click outside closes it; while it is
+open the keys do not reach the tabs. Every action is read-only, and nothing in the app opens a link or changes anything.
 
 ## Run
 

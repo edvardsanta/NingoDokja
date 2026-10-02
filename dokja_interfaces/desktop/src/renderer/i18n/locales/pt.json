@@ -83,5 +83,10 @@
   "digest_state_invalid": "inválida",
   "digest_state_unknown": "desconhecido",
   "digest_source_items": "itens: {count}",
-  "digest_source_updated": "atualizado {ago}"
+  "digest_source_updated": "atualizado {ago}",
+  "memes_open": "Abrir {title}",
+  "memes_close": "Fechar",
+  "memes_viewer_previous": "Meme anterior",
+  "memes_viewer_next": "Próximo meme",
+  "memes_viewer_position": "{current} de {total}"
 }

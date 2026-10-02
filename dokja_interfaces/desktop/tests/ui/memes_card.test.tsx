@@ -75,13 +75,13 @@ describe("the memes card", () => {
     expect(image.getAttribute("src")).toBe(`data:image/png;base64,${btoa("https://images.example/1.png")}`);
     expect(image.getAttribute("alt")).toBe("");
 
-    // a clip plays by itself, silent, in a loop, with controls to pause it or turn the sound on
+    // in the grid a clip plays by itself, silent, in a loop; the controls are in the viewer
     const clips = view.container.querySelectorAll(".preview video");
     expect(clips).toHaveLength(1);
     const clip = clips[0] as HTMLVideoElement;
     expect(clip.getAttribute("src")).toBe(`data:video/mp4;base64,${btoa("https://images.example/clip.mp4")}`);
     expect(clip.getAttribute("aria-label")).toBe("Meme 2");
-    expect([clip.autoplay, clip.muted, clip.loop, clip.controls]).toEqual([true, true, true, true]);
+    expect([clip.autoplay, clip.muted, clip.loop, clip.controls]).toEqual([true, true, true, false]);
 
     // a failed picture, a failed clip and a meme with no address each say so; only the first two are asked for
     await waitFor(() => expect(screen.getAllByText("no preview")).toHaveLength(3));
@@ -220,6 +220,146 @@ describe("the memes card", () => {
     await screen.findAllByText(hostile, { exact: false });
     expect([...view.container.querySelectorAll("img")].every((image) => image.closest(".preview"))).toBe(true);
     expect((window as unknown as { __owned?: boolean }).__owned).toBeUndefined();
+  });
+
+  describe("opening a meme", () => {
+    const threeMemes = () => {
+      const { asked, preview } = previewer(["broken"]);
+      const route = routedTransport(
+        {
+          "meme.status": ok(MEME_STATUS),
+          "meme.list": ok(
+            memePage(
+              [
+                meme(1, { title: "First", tags: "cat" }),
+                meme(2, { title: "Second", url: "https://images.example/clip.mp4" }),
+                meme(3, { title: "Third" }),
+                meme(4, { title: "Broken", url: "https://images.example/broken.png" }),
+              ],
+              { total: 4 },
+            ),
+          ),
+        },
+        preview,
+      );
+      return { ...route, asked };
+    };
+
+    const tile = (name: string) => screen.findByRole("button", { name });
+    const dialog = () => screen.getByRole("dialog");
+
+    it("makes a tile a button naming its meme, and a meme with no preview has none", async () => {
+      const { transport } = threeMemes();
+      renderCard(transport);
+
+      await tile("Open First");
+      await tile("Open Second");
+      await screen.findByText("no preview");
+      expect(screen.queryByRole("button", { name: "Open Broken" })).toBeNull();
+    });
+
+    it("opens a picture large, with its details", async () => {
+      const { transport } = threeMemes();
+      const view = renderCard(transport);
+
+      fireEvent.click(await tile("Open First"));
+
+      expect(dialog().getAttribute("aria-modal")).toBe("true");
+      expect(dialog().getAttribute("aria-label")).toBe("First");
+      expect(within(dialog()).getByText("1 of 4")).toBeTruthy();
+      expect(within(dialog()).getByText(/cat/)).toBeTruthy();
+      expect(view.container.querySelectorAll(".viewer img")).toHaveLength(1);
+    });
+
+    it("opens a clip with its controls and its sound", async () => {
+      const { transport } = threeMemes();
+      const view = renderCard(transport);
+
+      fireEvent.click(await tile("Open Second"));
+
+      const clip = view.container.querySelector(".viewer video") as HTMLVideoElement;
+      expect(clip.getAttribute("src")).toBe(`data:video/mp4;base64,${btoa("https://images.example/clip.mp4")}`);
+      expect([clip.autoplay, clip.loop, clip.controls, clip.muted]).toEqual([true, true, true, false]);
+    });
+
+    it("opens without asking the shell again", async () => {
+      const { transport, asked } = threeMemes();
+      renderCard(transport);
+      await tile("Open First");
+      const before = asked.length;
+
+      fireEvent.click(screen.getByRole("button", { name: "Open First" }));
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+
+      expect(asked.length).toBe(before);
+    });
+
+    it("moves between the memes with the arrows and the buttons, and stops at the ends", async () => {
+      const { transport } = threeMemes();
+      renderCard(transport);
+      fireEvent.click(await tile("Open First"));
+
+      fireEvent.keyDown(document.body, { key: "ArrowLeft" });
+      expect(within(dialog()).getByText("1 of 4")).toBeTruthy();
+      expect((within(dialog()).getByRole("button", { name: "Previous meme" }) as HTMLButtonElement).disabled).toBe(true);
+
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      expect(within(dialog()).getByText("2 of 4")).toBeTruthy();
+      expect(dialog().getAttribute("aria-label")).toBe("Second");
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Next meme" }));
+      expect(within(dialog()).getByText("3 of 4")).toBeTruthy();
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Next meme" }));
+      expect(within(dialog()).getByText("4 of 4")).toBeTruthy();
+      await within(dialog()).findByText("no preview");
+      expect((within(dialog()).getByRole("button", { name: "Next meme" }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.keyDown(document.body, { key: "ArrowRight" });
+      expect(within(dialog()).getByText("4 of 4")).toBeTruthy();
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Previous meme" }));
+      expect(within(dialog()).getByText("3 of 4")).toBeTruthy();
+    });
+
+    it("closes with Escape, the button or a click outside, and gives the focus back", async () => {
+      const { transport } = threeMemes();
+      renderCard(transport);
+
+      const first = await tile("Open First");
+      fireEvent.click(first);
+      expect(document.activeElement).toBe(within(dialog()).getByRole("button", { name: "Close" }));
+      fireEvent.keyDown(document.body, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(first);
+
+      fireEvent.click(first);
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Close" }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+
+      fireEvent.click(first);
+      fireEvent.click(dialog().parentElement as HTMLElement);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("stays open when the click is inside it", async () => {
+      const { transport } = threeMemes();
+      renderCard(transport);
+      fireEvent.click(await tile("Open First"));
+
+      fireEvent.click(dialog());
+      fireEvent.click(within(dialog()).getByText("First"));
+
+      expect(screen.getByRole("dialog")).toBeTruthy();
+    });
+
+    it("speaks Portuguese when asked", async () => {
+      const { transport } = threeMemes();
+      renderCard(transport, "pt");
+
+      fireEvent.click(await tile("Abrir First"));
+
+      within(dialog()).getByText("1 de 4");
+      within(dialog()).getByRole("button", { name: "Fechar" });
+      within(dialog()).getByRole("button", { name: "Meme anterior" });
+      within(dialog()).getByRole("button", { name: "Próximo meme" });
+    });
   });
 
   it("speaks Portuguese when asked", async () => {

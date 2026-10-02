@@ -83,5 +83,10 @@
   "digest_state_invalid": "unusable",
   "digest_state_unknown": "unknown",
   "digest_source_items": "items: {count}",
-  "digest_source_updated": "updated {ago}"
+  "digest_source_updated": "updated {ago}",
+  "memes_open": "Open {title}",
+  "memes_close": "Close",
+  "memes_viewer_previous": "Previous meme",
+  "memes_viewer_next": "Next meme",
+  "memes_viewer_position": "{current} of {total}"
 }

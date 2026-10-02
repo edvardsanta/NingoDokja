@@ -515,3 +515,81 @@ button[aria-pressed="true"] {
   outline: 2px solid var(--cyan);
   outline-offset: 3px;
 }
+
+/* A meme in the grid is a button that opens it. The global button look is turned off for it, and
+   what is inside does not take the click away from the button. */
+.preview.preview-open,
+.preview.preview-open:hover:not(:disabled) {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.preview.preview-open:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+
+.preview.preview-open > * {
+  pointer-events: none;
+}
+
+.preview.preview-open:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* The opened meme: over the page, centred, as large as the window allows. */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.viewer-panel {
+  display: grid;
+  gap: 0.5rem;
+  max-width: min(100%, 56rem);
+  max-height: 100%;
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.viewer-media {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+  background: var(--static);
+}
+
+.viewer-media img,
+.viewer-media video {
+  max-width: 100%;
+  max-height: 66vh;
+  object-fit: contain;
+}
+
+.viewer .pager {
+  justify-content: center;
+}
+
+.viewer p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
