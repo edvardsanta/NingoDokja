@@ -233,7 +233,7 @@ test("meme.status keeps the queue counts", () => {
   );
 });
 
-test("meme.list keeps the page and tells which images the screen may preview", () => {
+test("meme.list keeps the page and tells which pictures and videos the screen may preview", () => {
   const body = {
     total: 30,
     offset: 12,
@@ -256,7 +256,7 @@ test("meme.list keeps the page and tells which images the screen may preview", (
       { url: "", title: "no address", tags: "", source: "", createdAt: "", sentAt: "" },
     ],
   });
-  assert.deepEqual(action.images?.(projected), ["https://images.example/a.png", "https://images.example/b.gif"]);
+  assert.deepEqual(action.media?.(projected), ["https://images.example/a.png", "https://images.example/b.gif"]);
 });
 
 test("digest.status keeps the sources and how each is doing, and nothing the service did not say", () => {
@@ -323,7 +323,7 @@ test("digest.items keeps the page and never hands the screen an address or the p
     total: 20, offset: 0, more: 17, updated: "2026-10-02T10:00:00Z",
   });
   assert.doesNotMatch(JSON.stringify(projected), /example\.com\/1|source-1/);
-  assert.equal(ACTIONS["digest.items"].images, undefined, "a digest item has nothing to preview");
+  assert.equal(ACTIONS["digest.items"].media, undefined, "a digest item has nothing to preview");
 });
 
 test("digest.items cuts long texts", () => {

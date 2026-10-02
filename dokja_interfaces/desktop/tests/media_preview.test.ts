@@ -1,16 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { ImageError } from "../src/main/image_fetch.js";
-import { ImageGate } from "../src/main/image_gate.js";
-import { createPreviewer } from "../src/main/image_preview.js";
+import { MediaError } from "../src/main/media_fetch.js";
+import { MediaGate } from "../src/main/media_gate.js";
+import { createPreviewer } from "../src/main/media_preview.js";
 import { sleep } from "./support/reply_server.js";
 
 const A = "https://images.example/a.png";
 const B = "https://images.example/b.png";
 
 function gateWith(...urls: string[]) {
-  const gate = new ImageGate();
+  const gate = new MediaGate();
   gate.remember(urls);
   return gate;
 }
@@ -19,7 +19,7 @@ test("an address the orchestrator did not list is refused without a fetch", asyn
   const fetched: string[] = [];
   const preview = createPreviewer({
     gate: gateWith(A),
-    fetchImage: async (url) => {
+    fetchMedia: async (url) => {
       fetched.push(url);
       return "data:image/png;base64,AA==";
     },
@@ -34,28 +34,28 @@ test("an address the orchestrator did not list is refused without a fetch", asyn
 });
 
 test("a listed address is fetched and its data URL handed back", async () => {
-  const preview = createPreviewer({ gate: gateWith(A), fetchImage: async () => "data:image/png;base64,AA==" });
+  const preview = createPreviewer({ gate: gateWith(A), fetchMedia: async () => "data:image/png;base64,AA==" });
   assert.deepEqual(await preview(A), { ok: true, dataUrl: "data:image/png;base64,AA==" });
 });
 
 test("a failed fetch is data with a code, and a surprise is unavailable", async () => {
   const slow = createPreviewer({
     gate: gateWith(A),
-    fetchImage: async () => {
-      throw new ImageError("timeout", "the image took too long");
+    fetchMedia: async () => {
+      throw new MediaError("timeout", "the image took too long");
     },
   });
   assert.deepEqual(await slow(A), { ok: false, error: { code: "timeout", message: "the image took too long" } });
 
   const broken = createPreviewer({
     gate: gateWith(A),
-    fetchImage: async () => {
+    fetchMedia: async () => {
       throw new Error("something internal with details");
     },
   });
   assert.deepEqual(await broken(A), {
     ok: false,
-    error: { code: "unavailable", message: "the image could not be fetched" },
+    error: { code: "unavailable", message: "the file could not be fetched" },
   });
 });
 
@@ -63,7 +63,7 @@ test("the same address asked twice at once is fetched once", async () => {
   let fetches = 0;
   const preview = createPreviewer({
     gate: gateWith(A),
-    fetchImage: async () => {
+    fetchMedia: async () => {
       fetches += 1;
       await sleep(30);
       return "data:image/png;base64,AA==";
@@ -78,14 +78,14 @@ test("the same address asked twice at once is fetched once", async () => {
   assert.equal(fetches, 2, "once it is done the next ask fetches again");
 });
 
-test("only a few images are fetched at a time", async () => {
+test("only a few files are fetched at a time", async () => {
   const urls = Array.from({ length: 8 }, (_, index) => `https://images.example/${index}.png`);
   let running = 0;
   let peak = 0;
   const preview = createPreviewer({
     gate: gateWith(...urls),
     concurrency: 3,
-    fetchImage: async () => {
+    fetchMedia: async () => {
       running += 1;
       peak = Math.max(peak, running);
       await sleep(20);

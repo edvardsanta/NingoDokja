@@ -6,30 +6,37 @@ import { BlockList, isIP, type LookupFunction } from "node:net";
 
 import type { TransportErrorCode } from "../shared/transport.js";
 
-const MAX_BYTES = 4 * 1024 * 1024;
-const TIMEOUT_MS = 12_000;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+// A meme video is a short clip, a few megabytes; the cap keeps one request from filling the shell's memory.
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+// How long a host may take to start answering, and how long the whole download may take: a video
+// is slower to arrive than a picture, but a host that says nothing is given up on sooner.
+const HEADER_TIMEOUT_MS = 12_000;
+const TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 3;
 
-// Many image hosts refuse a client that does not look like a browser or that hot-links, as the
-// TUI also works around: a generic browser identity and a Referer from the host's own site.
+// Many hosts refuse a client that does not look like a browser or that hot-links, as the TUI also
+// works around: a generic browser identity and a Referer from the host's own site.
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0 Safari/537.36";
 
-export class ImageError extends Error {
+export class MediaError extends Error {
   readonly code: TransportErrorCode;
 
   constructor(code: TransportErrorCode, message: string) {
     super(message);
-    this.name = "ImageError";
+    this.name = "MediaError";
     this.code = code;
   }
 }
 
 // Options exist so tests can reach a server on this machine. The shell passes none.
-export type ImageOptions = {
+export type MediaOptions = {
   guard?: (address: string) => boolean;
   ports?: number[];
+  // Replaces the size cap of both kinds (the defaults are 4 MiB for a picture, 20 MiB for a video).
   maxBytes?: number;
+  // Replaces the whole time limit; the wait for the first byte is the shorter of this and 12 s.
   timeoutMs?: number;
 };
 
@@ -100,39 +107,43 @@ function checkUrl(raw: string, ports: number[], guard: (address: string) => bool
   try {
     url = new URL(raw);
   } catch {
-    throw new ImageError("invalid", "not an address");
+    throw new MediaError("invalid", "not an address");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new ImageError("invalid", "only http and https images are previewed");
+    throw new MediaError("invalid", "only http and https addresses are previewed");
   }
   if (url.username !== "" || url.password !== "") {
-    throw new ImageError("denied", "an address with credentials is not previewed");
+    throw new MediaError("denied", "an address with credentials is not previewed");
   }
   const port = url.port !== "" ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
-  if (!ports.includes(port)) throw new ImageError("denied", "that port is not previewed");
+  if (!ports.includes(port)) throw new MediaError("denied", "that port is not previewed");
 
   // Node asks the lookup only for names. An address written as numbers (127.0.0.1, [::1], and the
   // forms the URL parser turns into them, such as 2130706433) connects directly, so it is checked here.
   const host = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname;
   if (isIP(host) !== 0 && !guard(host)) {
-    throw new ImageError("denied", "that host is not on a public address");
+    throw new MediaError("denied", "that host is not on a public address");
   }
   return url;
 }
 
-function toImageError(error: unknown, signal: AbortSignal): ImageError {
-  if (error instanceof ImageError) return error;
-  if (signal.aborted) return new ImageError("timeout", "the image took too long");
-  if ((error as NodeJS.ErrnoException)?.code === "EBLOCKED") {
-    return new ImageError("denied", "that host is not on a public address");
+function toMediaError(error: unknown, signal: AbortSignal): MediaError {
+  if (error instanceof MediaError) return error;
+  if ((error as NodeJS.ErrnoException)?.code === "ETIMEDOUT") {
+    return new MediaError("timeout", "the host took too long to answer");
   }
-  return new ImageError("unavailable", "the image host did not answer");
+  if (signal.aborted) return new MediaError("timeout", "the download took too long");
+  if ((error as NodeJS.ErrnoException)?.code === "EBLOCKED") {
+    return new MediaError("denied", "that host is not on a public address");
+  }
+  return new MediaError("unavailable", "the host did not answer");
 }
 
 function get(
   url: URL,
   lookup: LookupFunction,
   signal: AbortSignal,
+  headerTimeoutMs: number,
 ): Promise<IncomingMessage> {
   const client = url.protocol === "https:" ? https : http;
   return new Promise((resolve, reject) => {
@@ -143,15 +154,30 @@ function get(
         agent: false,
         lookup,
         signal,
+        // Host goes first, as every browser and curl send it. Node would add it last, and a host
+        // behind a bot filter answers 403 to a request that does not start the way a browser's does.
         headers: {
-          "user-agent": USER_AGENT,
-          accept: "image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8",
-          referer: `${url.origin}/`,
+          Host: url.host,
+          "User-Agent": USER_AGENT,
+          Accept:
+            "video/mp4,video/webm;q=0.9,video/*;q=0.8,image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.7",
+          Referer: `${url.origin}/`,
         },
       },
-      resolve,
+      (response) => {
+        clearTimeout(timer);
+        resolve(response);
+      },
     );
-    request.on("error", (error) => reject(toImageError(error, signal)));
+    // The total limit covers a slow download; this one gives up on a host that says nothing.
+    const timer = setTimeout(
+      () => request.destroy(Object.assign(new Error("no answer"), { code: "ETIMEDOUT" })),
+      headerTimeoutMs,
+    );
+    request.on("error", (error) => {
+      clearTimeout(timer);
+      reject(toMediaError(error, signal));
+    });
     request.end();
   });
 }
@@ -168,16 +194,43 @@ export function sniffImage(bytes: Buffer): string | undefined {
   return undefined;
 }
 
-async function readImage(response: IncomingMessage, maxBytes: number, signal: AbortSignal): Promise<string> {
-  const declared = String(response.headers["content-type"] ?? "").toLowerCase();
-  if (!declared.startsWith("image/") || declared.startsWith("image/svg")) {
-    response.destroy();
-    throw new ImageError("unexpected", "that is not a picture");
+// Only the containers a browser plays in a video element: MP4 (QuickTime too) and WebM. A file of
+// the MP4 family that is really a picture (AVIF, HEIC) is not a video.
+const PICTURE_BRANDS = new Set(["avif", "avis", "heic", "heix", "hevx", "mif1", "msf1"]);
+
+export function sniffVideo(bytes: Buffer): string | undefined {
+  if (bytes.subarray(4, 8).toString("latin1") === "ftyp") {
+    return PICTURE_BRANDS.has(bytes.subarray(8, 12).toString("latin1")) ? undefined : "video/mp4";
   }
-  const length = Number(response.headers["content-length"] ?? 0);
-  if (length > maxBytes) {
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return "video/webm";
+  return undefined;
+}
+
+// What the host says the file is decides which cap and which check apply. The bytes must then agree
+// with it, so a file cannot be passed off as the other kind.
+type Kind = "image" | "video";
+
+function kindOf(declared: string): Kind | undefined {
+  if (declared.startsWith("image/") && !declared.startsWith("image/svg")) return "image";
+  if (declared.startsWith("video/")) return "video";
+  return undefined;
+}
+
+async function readMedia(
+  response: IncomingMessage,
+  maxBytes: number | undefined,
+  signal: AbortSignal,
+): Promise<string> {
+  const kind = kindOf(String(response.headers["content-type"] ?? "").toLowerCase());
+  if (!kind) {
     response.destroy();
-    throw new ImageError("unexpected", "the image is too large");
+    throw new MediaError("unexpected", "that is not a picture or a video");
+  }
+  const cap = maxBytes ?? (kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES);
+  const length = Number(response.headers["content-length"] ?? 0);
+  if (length > cap) {
+    response.destroy();
+    throw new MediaError("unexpected", "that file is too large");
   }
 
   const chunks: Buffer[] = [];
@@ -185,48 +238,49 @@ async function readImage(response: IncomingMessage, maxBytes: number, signal: Ab
   try {
     for await (const chunk of response as AsyncIterable<Buffer>) {
       received += chunk.length;
-      if (received > maxBytes) {
+      if (received > cap) {
         response.destroy();
-        throw new ImageError("unexpected", "the image is too large");
+        throw new MediaError("unexpected", "that file is too large");
       }
       chunks.push(chunk);
     }
   } catch (error) {
-    throw toImageError(error, signal);
+    throw toMediaError(error, signal);
   }
 
   const bytes = Buffer.concat(chunks);
-  const type = sniffImage(bytes);
-  if (!type) throw new ImageError("unexpected", "that is not a picture");
+  const type = kind === "video" ? sniffVideo(bytes) : sniffImage(bytes);
+  if (!type) throw new MediaError("unexpected", "that is not a picture or a video");
   return `data:${type};base64,${bytes.toString("base64")}`;
 }
 
-// Fetches one image for a preview and returns it as a data URL. It is strict: http or https on the
-// default ports, no credentials, public addresses only (checked when connecting, and again after
-// every redirect), at most three redirects, a size cap and a time limit, and the bytes must be
-// a picture. Nothing is sent but a plain GET: no cookies and no authentication.
-export async function fetchImage(rawUrl: string, options: ImageOptions = {}): Promise<string> {
+// Fetches one picture or video for a preview and returns it as a data URL. It is strict: http or
+// https on the default ports, no credentials, public addresses only (checked when connecting, and
+// again after every redirect), at most three redirects, a size cap and a time limit, and the bytes
+// must be what the host said they are: a picture, or an MP4 or WebM video. Nothing is sent but a
+// plain GET: no cookies and no authentication.
+export async function fetchMedia(rawUrl: string, options: MediaOptions = {}): Promise<string> {
   const ports = options.ports ?? [80, 443];
-  const maxBytes = options.maxBytes ?? MAX_BYTES;
-  const signal = AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS);
+  const totalMs = options.timeoutMs ?? TIMEOUT_MS;
+  const signal = AbortSignal.timeout(totalMs);
   const guard = options.guard ?? isPublicAddress;
   const lookup = guardedLookup(guard);
 
   let url = checkUrl(rawUrl, ports, guard);
   for (let redirects = 0; ; redirects += 1) {
-    const response = await get(url, lookup, signal);
+    const response = await get(url, lookup, signal, Math.min(HEADER_TIMEOUT_MS, totalMs));
     const status = response.statusCode ?? 0;
     const next = response.headers.location;
     if (status >= 300 && status < 400 && next) {
       response.resume();
-      if (redirects >= MAX_REDIRECTS) throw new ImageError("unexpected", "too many redirects");
+      if (redirects >= MAX_REDIRECTS) throw new MediaError("unexpected", "too many redirects");
       url = checkUrl(new URL(next, url).href, ports, guard);
       continue;
     }
     if (status !== 200) {
       response.resume();
-      throw new ImageError("unavailable", `the image host answered ${status}`);
+      throw new MediaError("unavailable", `the host answered ${status}`);
     }
-    return readImage(response, maxBytes, signal);
+    return readMedia(response, options.maxBytes, signal);
   }
 }

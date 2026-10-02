@@ -13,7 +13,7 @@ type Orchestrator = {
 };
 
 // Remembers the image addresses the orchestrator handed out, so the shell previews only those.
-export type ImageGate = { remember(urls: string[]): void };
+export type MediaGate = { remember(urls: string[]): void };
 
 export type RequestLimits = {
   defaultTimeoutMs: number;
@@ -39,7 +39,7 @@ export async function handleRequest(
   raw: unknown,
   orchestrator: Orchestrator,
   limits: RequestLimits,
-  images?: ImageGate,
+  media?: MediaGate,
 ): Promise<TransportResult> {
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
@@ -60,7 +60,7 @@ export async function handleRequest(
       return fail("orchestrator", reply.error || "the orchestrator refused the request");
     }
     const projected = action.project(reply.result);
-    if (action.images) images?.remember(action.images(projected));
+    if (action.media) media?.remember(action.media(projected));
     return { ok: true, result: projected };
   } catch (error) {
     if (error instanceof OrchestratorError) return fail(error.code, error.message);

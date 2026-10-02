@@ -11,9 +11,9 @@ import {
 } from "../shared/transport.js";
 import { parseConfig } from "./config.js";
 import { isTrustedSender } from "./guards.js";
-import { fetchImage } from "./image_fetch.js";
-import { ImageGate } from "./image_gate.js";
-import { createPreviewer } from "./image_preview.js";
+import { fetchMedia } from "./media_fetch.js";
+import { MediaGate } from "./media_gate.js";
+import { createPreviewer } from "./media_preview.js";
 import { handleRequest, isAllowedAction } from "./ipc.js";
 import { OrchestratorClient } from "./orchestrator_client.js";
 import { installPermissionPolicy } from "./permissions.js";
@@ -35,8 +35,8 @@ async function main(): Promise<void> {
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint });
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };
   const untrusted = { ok: false, error: { code: "denied", message: "this page is not the app" } } as const;
-  const images = new ImageGate();
-  const preview = createPreviewer({ gate: images, fetchImage: (url) => fetchImage(url) });
+  const media = new MediaGate();
+  const preview = createPreviewer({ gate: media, fetchMedia: (url) => fetchMedia(url) });
 
   ipcMain.handle(CHANNELS.bootstrap, (event): Bootstrap | null =>
     isTrustedSender(event.senderFrame?.url, page) ? { locale: config.locale } : null,
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
     if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
 
     const started = Date.now();
-    const result = await handleRequest(raw, orchestrator, limits, images);
+    const result = await handleRequest(raw, orchestrator, limits, media);
     // Only the action name and the outcome are logged, never a payload or a reply.
     const type = isRecord(raw) && isAllowedAction(raw.type) ? raw.type : "(refused)";
     console.log(

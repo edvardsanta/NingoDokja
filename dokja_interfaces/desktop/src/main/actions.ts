@@ -20,8 +20,8 @@ export type ActionDefinition = {
   payload(raw: Record<string, unknown>): Record<string, unknown> | undefined;
   // Reduces the orchestrator's reply to what the card reads.
   project(result: unknown): unknown;
-  // Image addresses in the projected reply that the screen may later ask the shell to preview.
-  images?(projected: unknown): string[];
+  // Addresses of pictures and videos in the projected reply that the screen may later ask the shell to preview.
+  media?(projected: unknown): string[];
 };
 
 const MAX_DETAIL_CHARS = 200;
@@ -261,7 +261,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       offset: clampInt(raw.offset, 0, 100_000, 0),
     }),
     project: (result) => inDomain(result, "meme", memePage),
-    images: (projected) =>
+    media: (projected) =>
       isRecord(projected) && Array.isArray(projected.memes)
         ? projected.memes.filter(isRecord).map((meme) => text(meme.url)).filter((url) => url !== "")
         : [],

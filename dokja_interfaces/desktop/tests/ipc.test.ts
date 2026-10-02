@@ -176,7 +176,7 @@ test("the image addresses of a meme page are handed to the gate", async () => {
 
   const status = recorder({ status: "ok", result: compactStatus });
   await handleRequest({ type: "ningo.status" }, status.orchestrator, limits, { remember: (urls) => remembered.push(urls) });
-  assert.equal(remembered.length, 1, "an action without images does not touch the gate");
+  assert.equal(remembered.length, 1, "an action without media does not touch the gate");
 });
 
 test("the timeout is the one asked for, clamped to the limits", async () => {
