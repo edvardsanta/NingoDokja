@@ -112,6 +112,12 @@ Environment variables:
   still stores text, suggestion is `degraded`). Same names `dokja_knowledge` uses, both
   services talk to the same Ollama server; see its README for why the client is not
   shared code.
+- `DOKJA_OCR_MODEL_DIR`
+  Folder with the OCR models (`ch_PP-OCRv3_det_infer.onnx`, `ch_PP-OCRv3_rec_infer.onnx`,
+  `ch_ppocr_mobile_v2.0_cls_infer.onnx`). Unset, the models bundled with the OCR package are used.
+- `DOKJA_OCR_REC_MODEL`
+  Optional file name, inside `DOKJA_OCR_MODEL_DIR`, of another text recognizer. See "OCR
+  recognizer" below.
 - `MEME_HASHTAG_MIN_SCORE`
   Default `0.6`, provisional. See "Hashtag suggestion" below.
 - `MEME_ATTACHMENT_FETCH=off`
@@ -147,6 +153,23 @@ service after updating its code (rebuild its image when code is not bind-mounted
 Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still stores
 the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
 of guessing.
+
+### OCR recognizer
+
+The recognizer that ships in the OCR models folder only knows Chinese and English letters,
+so it reads Portuguese without its accents ("coração" becomes "coracao"). That is enough
+for the blacklist, which folds accents, and for similarity, but the text shown as "read"
+is not what is printed. Set `DOKJA_OCR_REC_MODEL` to the file name of a recognizer trained
+on the Latin alphabet, placed in `DOKJA_OCR_MODEL_DIR`, to keep them. The file must carry
+its character list (the ONNX `character` metadata, as RapidOCR's converted models do);
+the detector and the orientation classifier stay as they are because they do not depend on
+the language. A Latin recognizer cannot read Chinese or Japanese, which is why this is
+opt-in. A missing file fails the screen closed, like a missing model folder.
+
+Changing the recognizer does not rewrite what was already learned. A tagged example keeps
+the text it was tagged with: run `meme.hashtag.tag` again on its `url` without `text` to
+read it again and replace the example. Contexts in the experience memory are immutable and
+stay as they were recorded.
 
 `MEME_HASHTAG_MIN_SCORE` (default `0.6`) is provisional. The small evaluation corpus
 in `dokja_lab/tests/test_hashtags_live.py` is skipped without a reachable embedding
