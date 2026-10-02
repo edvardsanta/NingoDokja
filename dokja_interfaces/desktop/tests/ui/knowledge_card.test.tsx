@@ -194,6 +194,55 @@ describe("the knowledge card", () => {
     expect((window as unknown as { __owned?: boolean }).__owned).toBeUndefined();
   });
 
+  describe("adding", () => {
+    const fill = async () => {
+      fireEvent.change(await screen.findByLabelText("Title"), { target: { value: "A thought" } });
+      fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Something to keep." } });
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    };
+    const statuses = (calls: Array<{ type: string }>) => calls.filter((call) => call.type === "knowledge.status");
+
+    it("is offered under the search, and not when the service is switched off", async () => {
+      const on = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+      const view = renderCard(on.transport);
+      await screen.findByRole("heading", { name: "Add to the research base" });
+      view.unmount();
+
+      renderCard(routedTransport({ "knowledge.status": ok(OFF) }).transport);
+      await screen.findByText("Switched off.");
+      expect(screen.queryByRole("heading", { name: "Add to the research base" })).toBeNull();
+    });
+
+    it("reads the counts again, quietly, once something was added", async () => {
+      const { transport, calls } = routedTransport({
+        "knowledge.status": [ok(KNOWLEDGE_STATUS), ok({ ...KNOWLEDGE_STATUS, documents: 7, chunks: 55 })],
+        "knowledge.ingest": ok({ count: 1, created: 1, updated: 0, unchanged: 0, chunks: 3, degraded: false, reason: "" }),
+      });
+      renderCard(transport);
+      await screen.findByText("6 documents in 52 passages");
+
+      await fill();
+
+      await screen.findByText("7 documents in 55 passages");
+      expect(statuses(calls)).toHaveLength(2);
+      screen.getByText("Added. Passages stored: 3.");
+    });
+
+    it("leaves the counts alone when it was already there", async () => {
+      const { transport, calls } = routedTransport({
+        "knowledge.status": ok(KNOWLEDGE_STATUS),
+        "knowledge.ingest": ok({ count: 1, created: 0, updated: 0, unchanged: 1, chunks: 0, degraded: false, reason: "" }),
+      });
+      renderCard(transport);
+      await screen.findByText("6 documents in 52 passages");
+
+      await fill();
+
+      await screen.findByText("Already in the research base.");
+      expect(statuses(calls)).toHaveLength(1);
+    });
+  });
+
   it("speaks Portuguese when asked", async () => {
     const { transport } = routedTransport({
       "knowledge.status": ok(KNOWLEDGE_STATUS),

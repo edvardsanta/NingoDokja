@@ -593,3 +593,54 @@ button[aria-pressed="true"] {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Adding to the research base: the same plain fields as the search, one under another. */
+.add {
+  margin-top: 1.75rem;
+}
+
+.add-form fieldset {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.add-form label {
+  margin-top: 0.4rem;
+  font-weight: 700;
+}
+
+.add-form input:not([type="file"]),
+.add-form textarea {
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.add-form textarea {
+  resize: vertical;
+}
+
+.add-form input:focus-visible,
+.add-form textarea:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.add-form input[type="file"] {
+  color: var(--ink-dim);
+  font: inherit;
+}
+
+.add-form fieldset > div {
+  margin-top: 0.6rem;
+}
+
+.add-form fieldset:disabled {
+  opacity: 0.6;
+}
