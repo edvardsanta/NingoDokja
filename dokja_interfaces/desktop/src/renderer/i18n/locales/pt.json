@@ -1,0 +1,22 @@
+{
+  "refresh": "Atualizar",
+  "retry": "Tentar de novo",
+  "loading": "Carregando…",
+  "kind_health": "saúde",
+  "health_title": "Serviços",
+  "health_summary": "{ok} no ar, {problem} com problemas, {off} desligados",
+  "health_unchecked": "{count} sem verificação",
+  "health_empty": "O orquestrador não informou nenhum serviço.",
+  "status_ok": "no ar",
+  "status_error": "erro",
+  "status_stopped": "parado",
+  "status_degraded": "degradado",
+  "status_disabled": "desligado",
+  "status_unchecked": "sem verificação",
+  "error_unavailable": "O orquestrador não está respondendo. Ele está rodando?",
+  "error_timeout": "O orquestrador demorou demais para responder.",
+  "error_denied": "Esta tela não tem permissão para pedir isso.",
+  "error_invalid": "O pedido estava malformado.",
+  "error_orchestrator": "O orquestrador respondeu com um erro: {message}",
+  "error_unexpected": "A resposta não é a que este card espera."
+}

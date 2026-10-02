@@ -1,0 +1,22 @@
+{
+  "refresh": "Refresh",
+  "retry": "Try again",
+  "loading": "Loading…",
+  "kind_health": "health",
+  "health_title": "Services",
+  "health_summary": "{ok} up, {problem} with problems, {off} switched off",
+  "health_unchecked": "{count} not checked",
+  "health_empty": "The orchestrator reported no services.",
+  "status_ok": "up",
+  "status_error": "error",
+  "status_stopped": "stopped",
+  "status_degraded": "degraded",
+  "status_disabled": "switched off",
+  "status_unchecked": "not checked",
+  "error_unavailable": "The orchestrator is not answering. Is it running?",
+  "error_timeout": "The orchestrator took too long to answer.",
+  "error_denied": "This screen is not allowed to ask for that.",
+  "error_invalid": "The request was malformed.",
+  "error_orchestrator": "The orchestrator answered with an error: {message}",
+  "error_unexpected": "The reply was not what this card expects."
+}

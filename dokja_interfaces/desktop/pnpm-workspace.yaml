@@ -1,0 +1,9 @@
+# Install scripts that must run: esbuild and zeromq pick their prebuilt binaries. Electron has none;
+# it downloads its own binary the first time it runs (or use ELECTRON_OVERRIDE_DIST_PATH).
+# pnpm 10 reads onlyBuiltDependencies; newer pnpm reads allowBuilds.
+onlyBuiltDependencies:
+  - esbuild
+  - zeromq
+allowBuilds:
+  esbuild: true
+  zeromq: true
