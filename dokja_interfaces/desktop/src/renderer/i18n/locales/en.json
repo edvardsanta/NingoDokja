@@ -18,5 +18,21 @@
   "error_denied": "This screen is not allowed to ask for that.",
   "error_invalid": "The request was malformed.",
   "error_orchestrator": "The orchestrator answered with an error: {message}",
-  "error_unexpected": "The reply was not what this card expects."
+  "error_unexpected": "The reply was not what this card expects.",
+  "service_off": "Switched off.",
+  "kind_memory": "memory",
+  "memory_title": "Experience memory",
+  "memory_counts": "{experiences} experiences, {pending} pending, {resolved} resolved, {expired} expired",
+  "memory_similarity_on": "Similarity is on ({model}).",
+  "memory_similarity_off": "Similarity is off: predictions are only the baseline.",
+  "memory_similarity_down": "Similarity is unavailable: predictions are only the baseline.",
+  "memory_needs_reindex": "{count} experiences need embedding for this model.",
+  "memory_score_title": "How the predictions fare",
+  "memory_score_failed": "The score could not be read: {message}",
+  "memory_nothing_scored": "Nothing scored yet: no resolved experience has a prediction.",
+  "memory_too_few": "Too few to judge: {scored} scored, {needed} needed.",
+  "memory_scored_counts": "{scored} scored, {unscored} not scored yet.",
+  "memory_brier": "Brier score, lower is better: prediction {prediction}, baseline {baseline}.",
+  "memory_beats_baseline": "Skill {skill}: beats the baseline.",
+  "memory_does_not_beat": "Skill {skill}: does not beat the baseline."
 }

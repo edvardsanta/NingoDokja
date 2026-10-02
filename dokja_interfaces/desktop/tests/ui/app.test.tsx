@@ -7,18 +7,38 @@ import en from "../../src/renderer/i18n/locales/en.json";
 import pt from "../../src/renderer/i18n/locales/pt.json";
 import type { Locale } from "../../src/shared/locale.js";
 import type { TransportResult } from "../../src/shared/transport.js";
-import { ALL_UP, SERVICES, deferred, failure, scriptedTransport, statusReply } from "./support.js";
+import { ALL_UP, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
 
 const wordmark = () => screen.getByRole("heading", { level: 1 });
 
+type Route = TransportResult | (() => Promise<TransportResult>);
+
+// Every card the screen shows needs a route; a memory that is switched off keeps this simple.
+const screenTransport = (health: Route, memory: Route = ok(OFF)) =>
+  routedTransport({ "ningo.status": health, "memory.status": memory });
+
 describe("the screen", () => {
   it("shows the name and the health card, in the language it was given", async () => {
-    const { transport } = scriptedTransport(statusReply(ALL_UP));
+    const { transport } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="pt" />);
 
     expect(wordmark().textContent).toBe("Ningo");
     await screen.findByRole("heading", { name: "Serviços" });
+    await screen.findByRole("heading", { name: "Memória de experiências" });
     expect(document.documentElement.lang).toBe("pt");
+  });
+
+  it("keeps the other cards when one fails", async () => {
+    const { transport } = screenTransport(statusReply(ALL_UP), failure("unavailable"));
+    render(<App transport={transport} locale="en" />);
+
+    await screen.findByText("2 up, 0 with problems, 0 switched off");
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("The orchestrator is not answering. Is it running?");
+    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      "Services",
+      "Experience memory",
+    ]);
   });
 
   it("has one card per kind, each kind once", () => {
@@ -28,8 +48,8 @@ describe("the screen", () => {
   });
 
   describe("the pulse of the name", () => {
-    const pulseFor = async (reply: TransportResult | (() => Promise<TransportResult>)) => {
-      const { transport } = scriptedTransport(reply);
+    const pulseFor = async (reply: Route) => {
+      const { transport } = screenTransport(reply);
       render(<App transport={transport} locale="en" />);
       return transport;
     };
@@ -60,9 +80,10 @@ describe("the screen", () => {
       Object.values(catalog).filter((message) => message.length >= 7 && !message.includes("{"));
 
     const screenText = async (locale: Locale) => {
-      const { transport } = scriptedTransport(statusReply(SERVICES));
+      const { transport } = screenTransport(statusReply(SERVICES));
       render(<App transport={transport} locale={locale} />);
       await screen.findByText("meme");
+      await waitFor(() => expect(screen.queryAllByRole("status")).toHaveLength(0));
       return document.body.textContent ?? "";
     };
 

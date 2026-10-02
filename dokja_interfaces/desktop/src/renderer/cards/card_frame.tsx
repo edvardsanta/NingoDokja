@@ -14,8 +14,30 @@ const ERROR_IDS: Record<TransportErrorCode, MessageId> = {
   unexpected: "error_unexpected",
 };
 
-function describeError(error: TransportError, t: Translate): string {
+export function describeError(error: TransportError, t: Translate): string {
   return t(ERROR_IDS[error.code], { message: error.message });
+}
+
+// The three states every card body can be in besides showing its data.
+export function Pending() {
+  const t = useTranslate();
+  return <p role="status">{t("loading")}</p>;
+}
+
+export function Problem({ error }: { error: TransportError }) {
+  const t = useTranslate();
+  return <p role="alert">{describeError(error, t)}</p>;
+}
+
+// The operator switched the service off: an answer, not a failure.
+export function OffNotice({ reason }: { reason: string }) {
+  const t = useTranslate();
+  return (
+    <p className="note" data-tone="off">
+      {t("service_off")}
+      {reason && <span className="detail"> ({reason})</span>}
+    </p>
+  );
 }
 
 type CardFrameProps<T> = {
@@ -34,8 +56,8 @@ export function CardFrame<T>({ kindLabel, title, state, onReload, children }: Ca
     <section className="card" aria-labelledby={titleId} aria-busy={state.phase === "loading"}>
       <span className="card-kind">{kindLabel}</span>
       <h2 id={titleId}>{title}</h2>
-      {state.phase === "loading" && <p role="status">{t("loading")}</p>}
-      {state.phase === "error" && <p role="alert">{describeError(state.error, t)}</p>}
+      {state.phase === "loading" && <Pending />}
+      {state.phase === "error" && <Problem error={state.error} />}
       {state.phase === "ready" && children(state.data)}
       <footer>
         <button type="button" onClick={onReload} disabled={state.phase === "loading"}>

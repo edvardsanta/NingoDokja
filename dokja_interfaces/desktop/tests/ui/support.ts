@@ -1,4 +1,9 @@
-import type { StatusReply } from "../../src/shared/replies.js";
+import type { ActionType } from "../../src/shared/actions.js";
+import type {
+  MemoryScore,
+  MemoryStatus,
+  StatusReply,
+} from "../../src/shared/replies.js";
 import type {
   RequestOptions,
   Transport,
@@ -61,3 +66,53 @@ export function statusReply(
 export function failure(code: TransportErrorCode, message = ""): TransportResult {
   return { ok: false, error: { code, message } };
 }
+
+type Route = TransportResult | (() => Promise<TransportResult>);
+
+// A transport that answers by action: each action has a reply, or a list of replies used in turn
+// (the last one repeats). An action without a route is refused. Records what it was asked.
+export function routedTransport(routes: Partial<Record<ActionType, Route | Route[]>>) {
+  const calls: Call[] = [];
+  const used = new Map<string, number>();
+  const transport: Transport = {
+    async request(type, payload, options) {
+      calls.push({ type, payload, options });
+      const route = routes[type];
+      const list = Array.isArray(route) ? route : route ? [route] : [];
+      const turn = used.get(type) ?? 0;
+      used.set(type, turn + 1);
+      const reply = list[Math.min(turn, list.length - 1)];
+      if (!reply) return failure("denied", `no route for ${type}`);
+      return typeof reply === "function" ? reply() : reply;
+    },
+  };
+  return { transport, calls };
+}
+
+export const ok = (result: unknown): TransportResult => ({ ok: true, result });
+
+// The operator switched the service off.
+export const OFF = { off: true, reason: "paused by the operator" };
+
+export const MEMORY_STATUS: MemoryStatus = {
+  experiences: 40,
+  pending: 12,
+  resolved: 25,
+  expired: 3,
+  embedded: 38,
+  needsReindex: 0,
+  embedModel: "model-1",
+  embeddings: true,
+  embedderReachable: true,
+};
+
+export const MEMORY_SCORE: MemoryScore = {
+  scored: 31,
+  unscored: 4,
+  minScored: 30,
+  brierPrediction: 0.081,
+  brierBaseline: 0.27,
+  skill: 0.7,
+  beatsBaseline: true,
+  enoughData: true,
+};

@@ -18,5 +18,21 @@
   "error_denied": "Esta tela não tem permissão para pedir isso.",
   "error_invalid": "O pedido estava malformado.",
   "error_orchestrator": "O orquestrador respondeu com um erro: {message}",
-  "error_unexpected": "A resposta não é a que este card espera."
+  "error_unexpected": "A resposta não é a que este card espera.",
+  "service_off": "Desligado.",
+  "kind_memory": "memória",
+  "memory_title": "Memória de experiências",
+  "memory_counts": "{experiences} experiências, {pending} pendentes, {resolved} resolvidas, {expired} expiradas",
+  "memory_similarity_on": "Similaridade ligada ({model}).",
+  "memory_similarity_off": "Similaridade desligada: as previsões são só o baseline.",
+  "memory_similarity_down": "Similaridade indisponível: as previsões são só o baseline.",
+  "memory_needs_reindex": "{count} experiências precisam de embedding para este modelo.",
+  "memory_score_title": "Como as previsões se saem",
+  "memory_score_failed": "Não foi possível ler a pontuação: {message}",
+  "memory_nothing_scored": "Nada pontuado ainda: nenhuma experiência resolvida tem previsão.",
+  "memory_too_few": "Poucas para julgar: {scored} pontuadas, {needed} necessárias.",
+  "memory_scored_counts": "{scored} pontuadas, {unscored} ainda não pontuadas.",
+  "memory_brier": "Brier, menor é melhor: previsão {prediction}, baseline {baseline}.",
+  "memory_beats_baseline": "Skill {skill}: supera o baseline.",
+  "memory_does_not_beat": "Skill {skill}: não supera o baseline."
 }
