@@ -1,7 +1,7 @@
 import { ACTION_TYPES, type ActionType } from "../shared/actions.js";
 import { isRecord } from "../shared/records.js";
 import type { TransportErrorCode, TransportResult } from "../shared/transport.js";
-import { PROJECTIONS } from "./actions.js";
+import { ACTIONS } from "./actions.js";
 import { OrchestratorError, type OrchestratorReply } from "./orchestrator_client.js";
 
 type Orchestrator = {
@@ -11,6 +11,9 @@ type Orchestrator = {
     timeoutMs: number,
   ): Promise<OrchestratorReply>;
 };
+
+// Remembers the image addresses the orchestrator handed out, so the shell previews only those.
+export type ImageGate = { remember(urls: string[]): void };
 
 export type RequestLimits = {
   defaultTimeoutMs: number;
@@ -29,12 +32,14 @@ function fail(code: TransportErrorCode, message: string): TransportResult {
 }
 
 // Validates one request from the renderer and runs it. Nothing reaches the orchestrator unless
-// the action is on the allow-list and the payload is a small plain object, and the screen only
-// gets the projection of the reply that its action defines.
+// the action is on the allow-list and the payload is a small plain object, the payload that is
+// sent is the one the action builds (the screen cannot add fields), and the screen only gets the
+// projection of the reply that its action defines.
 export async function handleRequest(
   raw: unknown,
   orchestrator: Orchestrator,
   limits: RequestLimits,
+  images?: ImageGate,
 ): Promise<TransportResult> {
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
@@ -45,12 +50,18 @@ export async function handleRequest(
     return fail("invalid", "the payload must be a small object");
   }
 
+  const action = ACTIONS[type];
+  const wire = action.payload(payload);
+  if (!wire) return fail("invalid", "the payload is not valid for this action");
+
   try {
-    const reply = await orchestrator.request(type, payload, pickTimeout(raw.options, limits));
+    const reply = await orchestrator.request(type, wire, pickTimeout(raw.options, limits));
     if (reply.status !== "ok") {
       return fail("orchestrator", reply.error || "the orchestrator refused the request");
     }
-    return { ok: true, result: PROJECTIONS[type](reply.result) };
+    const projected = action.project(reply.result);
+    if (action.images) images?.remember(action.images(projected));
+    return { ok: true, result: projected };
   } catch (error) {
     if (error instanceof OrchestratorError) return fail(error.code, error.message);
     return fail("unexpected", "the reply was not what this action expects");

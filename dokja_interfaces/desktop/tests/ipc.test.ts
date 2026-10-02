@@ -102,7 +102,73 @@ test("only a small plain-object payload is forwarded", async () => {
   assert.equal(calls.length, 0);
 
   await handleRequest({ type: "ningo.status", payload: { limit: 3 } }, orchestrator, limits);
-  assert.deepEqual(calls[0]?.payload, { limit: 3 });
+  assert.deepEqual(calls[0]?.payload, {}, "an action without parameters sends none");
+});
+
+test("each action builds its own payload, so the screen cannot add fields", async () => {
+  const sent = async (type: string, payload: unknown) => {
+    const { orchestrator, calls } = recorder({ status: "ok", result: {} });
+    await handleRequest({ type, payload }, orchestrator, limits);
+    return calls[0]?.payload;
+  };
+
+  assert.deepEqual(
+    await sent("knowledge.search", { query: "  free will  ", k: 99, min_score: 0, source: "x" }),
+    { query: "free will", k: 10 },
+  );
+  assert.deepEqual(await sent("knowledge.search", { query: "free will" }), { query: "free will", k: 5 });
+  assert.deepEqual(await sent("memory.stats", { action: "something.else" }), { action: "hashtag.suggest" });
+  assert.deepEqual(await sent("meme.list", {}), { scope: "unsent", limit: 12, offset: 0 });
+  assert.deepEqual(await sent("meme.list", { scope: "sent", limit: 500, offset: -4, nsfw: false }), {
+    scope: "sent",
+    limit: 24,
+    offset: 0,
+  });
+  assert.deepEqual(await sent("meme.list", { scope: "../etc", limit: "many" }), {
+    scope: "unsent",
+    limit: 12,
+    offset: 0,
+  });
+});
+
+test("a search needs a query of a sensible size", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: {} });
+  for (const payload of [{}, { query: "" }, { query: "   " }, { query: 7 }, { query: "x".repeat(501) }]) {
+    const error = failure(await handleRequest({ type: "knowledge.search", payload }, orchestrator, limits));
+    assert.equal(error.code, "invalid", JSON.stringify(payload).slice(0, 40));
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("a switched-off service is an answer, not a failure", async () => {
+  const { orchestrator } = recorder({
+    status: "ok",
+    result: { workflow: "memory", domain: "memory", result: { skipped: true, reason: "switched off by the operator" } },
+  });
+
+  assert.deepEqual(await handleRequest({ type: "memory.status" }, orchestrator, limits), {
+    ok: true,
+    result: { off: true, reason: "switched off by the operator" },
+  });
+});
+
+test("the image addresses of a meme page are handed to the gate", async () => {
+  const remembered: string[][] = [];
+  const { orchestrator } = recorder({
+    status: "ok",
+    result: {
+      workflow: "meme",
+      domain: "meme",
+      result: { total: 2, offset: 0, memes: [{ url: "https://images.example/a.png" }, { url: "https://images.example/b.gif" }] },
+    },
+  });
+
+  await handleRequest({ type: "meme.list" }, orchestrator, limits, { remember: (urls) => remembered.push(urls) });
+  assert.deepEqual(remembered, [["https://images.example/a.png", "https://images.example/b.gif"]]);
+
+  const status = recorder({ status: "ok", result: compactStatus });
+  await handleRequest({ type: "ningo.status" }, status.orchestrator, limits, { remember: (urls) => remembered.push(urls) });
+  assert.equal(remembered.length, 1, "an action without images does not touch the gate");
 });
 
 test("the timeout is the one asked for, clamped to the limits", async () => {
