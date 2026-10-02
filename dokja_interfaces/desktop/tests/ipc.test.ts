@@ -48,7 +48,14 @@ test("refuses every action outside the allow-list before touching the orchestrat
     "meme.dispatch.scheduled",
     "chat.profile.use",
     "memory.forget",
+    "memory.record",
+    "memory.resolve",
     "knowledge.add",
+    "knowledge.delete",
+    "knowledge.reindex",
+    "knowledge.ingest\n",
+    "book.resource.classify",
+    "message.created",
     "NINGO.STATUS",
     "ningo.status ",
     " ningo.status",
@@ -261,4 +268,71 @@ test("isAllowedAction accepts only the exact action names", () => {
   for (const value of ["Ningo.status", "ningo.status ", "services.set", 1, null, undefined]) {
     assert.equal(isAllowedAction(value), false);
   }
+});
+
+// A change: the shell lets it through only just after real input.
+const note = { mode: "note", title: "A thought", body: "Something to keep." };
+const ingested = {
+  workflow: "knowledge",
+  domain: "knowledge",
+  result: { source_id: "note:a-thought-1", created: true, changed: true, chunks: 1, embedded: 1, degraded: false },
+};
+const here = { recent: () => true };
+const away = { recent: () => false };
+
+test("a change is refused without a recent click or key press, and the orchestrator never hears of it", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: ingested });
+  for (const presence of [away, undefined]) {
+    const error = failure(await handleRequest({ type: "knowledge.ingest", payload: note }, orchestrator, limits, undefined, presence));
+    assert.equal(error.code, "denied");
+    assert.match(error.message, /click or a key press/);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("a change goes through right after real input, with the payload the shell built", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: ingested });
+  const result = await handleRequest(
+    { type: "knowledge.ingest", payload: { ...note, kind: "secret", source_id: "other:document", source: "plugin:thing" } },
+    orchestrator, limits, undefined, here,
+  );
+
+  assert.deepEqual(result, { ok: true, result: { count: 1, created: 1, updated: 0, unchanged: 0, chunks: 1, degraded: false, reason: "" } });
+  assert.equal(calls.length, 1);
+  const sent = calls[0]?.payload ?? {};
+  assert.equal(sent.kind, "note", "the screen cannot choose the kind");
+  assert.match(String(sent.source_id), /^note:a-thought-[0-9a-f]{10}$/, "nor the id");
+  assert.equal(sent.source, undefined);
+});
+
+test("reading needs no input: only a change does", async () => {
+  const { orchestrator } = recorder({ status: "ok", result: compactStatus });
+  const result = await handleRequest({ type: "ningo.status" }, orchestrator, limits, undefined, away);
+  assert.equal(result.ok, true);
+});
+
+test("a file may weigh what a file weighs, a note not", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: ingested });
+  const file = { mode: "file", filename: "reading.txt", content: "QUJD".repeat(2_000_000) };
+  const big = await handleRequest({ type: "knowledge.ingest", payload: file }, orchestrator, limits, undefined, here);
+  assert.equal(big.ok, true, "a file of about 6 MB passes the outer bound");
+
+  const huge = { ...file, content: "QUJD".repeat(3_100_000) };
+  assert.equal(failure(await handleRequest({ type: "knowledge.ingest", payload: huge }, orchestrator, limits, undefined, here)).code, "invalid");
+  const longNote = { mode: "note", title: "T", body: "x".repeat(200_001) };
+  assert.equal(failure(await handleRequest({ type: "knowledge.ingest", payload: longNote }, orchestrator, limits, undefined, here)).code, "invalid");
+  assert.equal(calls.length, 1);
+
+  // the rest of the actions keep the small bound
+  const bigRead = { limit: 3, filler: "x".repeat(20_000) };
+  assert.equal(failure(await handleRequest({ type: "digest.items", payload: bigRead }, orchestrator, limits, undefined, here)).code, "invalid");
+});
+
+test("a switched-off knowledge service is an answer to a change too", async () => {
+  const { orchestrator } = recorder({
+    status: "ok",
+    result: { workflow: "knowledge", domain: "knowledge", result: { skipped: true, reason: "paused by the operator" } },
+  });
+  const result = await handleRequest({ type: "knowledge.ingest", payload: note }, orchestrator, limits, undefined, here);
+  assert.deepEqual(result, { ok: true, result: { off: true, reason: "paused by the operator" } });
 });

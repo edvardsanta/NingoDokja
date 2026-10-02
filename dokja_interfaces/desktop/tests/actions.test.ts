@@ -334,3 +334,31 @@ test("digest.items cuts long texts", () => {
   const [item] = projected.items;
   assert.ok(item!.id.length <= 120 && item!.title.length <= 300 && item!.summary.length <= 600 && item!.source.length <= 80);
 });
+
+test("knowledge.ingest says what a single document did, in the same counts as many", () => {
+  const project = ACTIONS["knowledge.ingest"].project;
+  assert.deepEqual(
+    project(compactOf("knowledge", { source_id: "note:a-1", created: true, changed: true, chunks: 3, embedded: 3, degraded: false })),
+    { count: 1, created: 1, updated: 0, unchanged: 0, chunks: 3, degraded: false, reason: "" },
+  );
+  assert.deepEqual(
+    project(compactOf("knowledge", { source_id: "url:x", created: false, changed: true, chunks: 2 })),
+    { count: 1, created: 0, updated: 1, unchanged: 0, chunks: 2, degraded: false, reason: "" },
+  );
+  assert.deepEqual(
+    project(compactOf("knowledge", { source_id: "note:a-1", created: false, changed: false, pending_embeddings: 0 })),
+    { count: 1, created: 0, updated: 0, unchanged: 1, chunks: 0, degraded: false, reason: "" },
+  );
+  assert.deepEqual(
+    project(compactOf("knowledge", {
+      documents: [{ created: true, changed: true }, { created: true, changed: true }, { created: false, changed: true }, { created: false, changed: false }],
+      count: 4, created: 2, unchanged: 1, chunks: 9, embedded: 0, degraded: true, reason: "no embedding server is configured",
+    })),
+    { count: 4, created: 2, updated: 1, unchanged: 1, chunks: 9, degraded: true, reason: "no embedding server is configured" },
+  );
+});
+
+test("knowledge.ingest cuts a long reason and is a change", () => {
+  const projected = ACTIONS["knowledge.ingest"].project(compactOf("knowledge", { created: true, changed: true, degraded: true, reason: "x".repeat(500) })) as { reason: string };
+  assert.ok(projected.reason.length <= 200);
+});

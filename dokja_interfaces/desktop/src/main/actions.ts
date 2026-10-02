@@ -1,8 +1,10 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
+import { buildIngest } from "./ingest.js";
 import type {
   DigestPage,
   DigestStatus,
+  IngestResult,
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
@@ -15,6 +17,9 @@ import type {
 } from "../shared/replies.js";
 
 export type ActionDefinition = {
+  // The most the payload may weigh, in characters, before the builder sees it. Small unless the action
+  // takes a file.
+  maxPayloadChars?: number;
   // Builds the payload from what the screen asked for. The screen cannot add fields of its own:
   // anything it sends beyond these is dropped. Returns undefined when the request is not valid.
   payload(raw: Record<string, unknown>): Record<string, unknown> | undefined;
@@ -225,6 +230,26 @@ function digestPage(body: Record<string, unknown>): DigestPage {
   };
 }
 
+// The knowledge service answers one document with its own fields and many (a feed file) with a
+// summary and the list. Either way the screen gets the same counts.
+function ingestResult(body: Record<string, unknown>): IngestResult {
+  const documents = records(body.documents, (document) => ({
+    created: document.created === true,
+    changed: document.changed === true,
+  }));
+  const many = Array.isArray(body.documents);
+  const list = many ? documents : [{ created: body.created === true, changed: body.changed === true }];
+  return {
+    count: list.length,
+    created: list.filter((document) => document.created).length,
+    updated: list.filter((document) => document.changed && !document.created).length,
+    unchanged: list.filter((document) => !document.changed).length,
+    chunks: count(body.chunks),
+    degraded: body.degraded === true,
+    reason: shorten(text(body.reason)),
+  };
+}
+
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "ningo.status": {
     payload: noPayload,
@@ -277,5 +302,11 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       offset: clampInt(raw.offset, 0, 1000, 0),
     }),
     project: (result) => inDomain(result, "digest", digestPage),
+  },
+  "knowledge.ingest": {
+    // A file travels as base64 text: the cap is the largest file, a third more.
+    maxPayloadChars: 12_000_000,
+    payload: buildIngest,
+    project: (result) => inDomain(result, "knowledge", ingestResult),
   },
 };

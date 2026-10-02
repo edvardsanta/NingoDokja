@@ -101,12 +101,61 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("refuses an action that is not on the allow-list, before the orchestrator hears of it", async () => {
-    for (const type of ["services.set", "discord.send", "digest.refresh", "scheduler.jobs.set"]) {
+    for (const type of [
+      "services.set", "discord.send", "digest.refresh", "scheduler.jobs.set",
+      "knowledge.delete", "knowledge.reindex", "memory.record", "memory.forget", "message.created",
+    ]) {
       const answer = (await ask(type, { name: "feeds", enabled: false })) as { ok: boolean; error?: { code: string } };
       assert.equal(answer.ok, false, type);
       assert.equal(answer.error?.code, "denied", type);
     }
-    assert.ok(!orchestrator.seen.some((event) => /^(services|discord|scheduler)\.|^digest\.refresh$/.test(event.type)));
+    assert.ok(
+      !orchestrator.seen.some((event) =>
+        /^(services|discord|scheduler)\.|^digest\.refresh$|^knowledge\.(delete|reindex)$|^memory\.(record|forget)$|^message\./.test(event.type),
+      ),
+    );
+  });
+
+  describe("a change", () => {
+    const note = { mode: "note", title: "A thought", body: "Something to keep.", kind: "secret", source_id: "other:document", source: "plugin:thing" };
+    const ingested = () => orchestrator.seen.filter((event) => event.type === "knowledge.ingest");
+
+    it("is refused when nothing real was pressed, even if a script clicks", async () => {
+      await page.evaluate("document.querySelectorAll('[role=tab]')[0].click()");
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string; message: string } };
+      assert.equal(answer.ok, false);
+      assert.equal(answer.error?.code, "denied");
+      assert.match(answer.error?.message ?? "", /click or a key press/);
+      assert.equal(ingested().length, 0, "the orchestrator never heard of it");
+    });
+
+    it("goes through right after a real click, with the payload the shell built", async () => {
+      await page.click(5, 5);
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; result?: Record<string, unknown> };
+      assert.equal(answer.ok, true);
+      assert.deepEqual(answer.result, { count: 1, created: 1, updated: 0, unchanged: 0, chunks: 2, degraded: true, reason: "no embedding server is configured" });
+
+      const [sent] = ingested();
+      assert.equal(sent?.source, "desktop");
+      assert.equal(sent?.payload.kind, "note", "the screen cannot choose the kind");
+      assert.match(String(sent?.payload.source_id), /^note:a-thought-[0-9a-f]{10}$/, "nor the id");
+      assert.equal(sent?.payload.source, undefined, "nor the source");
+    });
+
+    it("is refused again when the click was a while ago", async () => {
+      await sleep(3600);
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string } };
+      assert.equal(answer.ok, false);
+      assert.equal(answer.error?.code, "denied");
+      assert.equal(ingested().length, 1);
+    });
+
+    it("goes through right after a real key press too", async () => {
+      await page.press("a");
+      const answer = (await ask("knowledge.ingest", { ...note, title: "Another thought" })) as { ok: boolean };
+      assert.equal(answer.ok, true);
+      assert.equal(ingested().length, 2);
+    });
   });
 
   it("hands the screen only what a card reads", async () => {

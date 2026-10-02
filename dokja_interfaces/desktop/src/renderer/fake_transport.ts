@@ -1,5 +1,6 @@
 import type {
   DigestItem,
+  IngestResult,
   DigestPage,
   DigestStatus,
   KnowledgeSearch,
@@ -195,6 +196,14 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok(searchFor(String(payload?.query ?? "")));
         case "meme.status":
           return ok(MEME_STATUS);
+        case "knowledge.ingest": {
+          const body = String(payload?.body ?? payload?.content ?? payload?.address ?? "");
+          const result: IngestResult = {
+            count: 1, created: 1, updated: 0, unchanged: 0,
+            chunks: Math.max(1, Math.ceil(body.length / 900)), degraded: false, reason: "",
+          };
+          return ok(result);
+        }
         case "digest.status":
           return ok(DIGEST_STATUS);
         case "digest.items": {

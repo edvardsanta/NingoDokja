@@ -146,3 +146,17 @@ export type DigestPage = {
   more: number;
   updated: string;
 };
+
+// What adding to the research base did. One document or many (a feed file is many): how many were
+// new, how many replaced an earlier version of the same document, and how many were already there.
+export type IngestResult = {
+  off?: false;
+  count: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  chunks: number;
+  // true when the passages could not be indexed by meaning yet; they are still found by keywords
+  degraded: boolean;
+  reason: string;
+};

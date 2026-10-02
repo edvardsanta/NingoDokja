@@ -31,6 +31,11 @@ function replyFor(type: string): Record<string, unknown> {
         channels: { meme: ["channel-1"] },
         chat_profiles: { profiles: [{ name: "profile-1", base_url: "base-url-1", key_hint: "hint-1" }] },
       });
+    case "knowledge.ingest":
+      return wrap("knowledge", {
+        source_id: "note:a-thought-0123456789",
+        created: true, changed: true, chunks: 2, embedded: 0, degraded: true, reason: "no embedding server is configured",
+      });
     case "digest.status":
       return wrap("digest", {
         configured: true,
@@ -52,8 +57,8 @@ function replyFor(type: string): Record<string, unknown> {
 
 export type FakeOrchestrator = {
   endpoint: string;
-  // the type and the source of every event it received, in order
-  seen: Array<{ type: string; source: string }>;
+  // the type, the source and the payload of every event it received, in order
+  seen: Array<{ type: string; source: string; payload: Record<string, unknown> }>;
   stop(): Promise<void>;
 };
 
@@ -63,8 +68,8 @@ export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
   const seen: FakeOrchestrator["seen"] = [];
   const loop = (async () => {
     for await (const [frame] of socket) {
-      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string };
-      seen.push({ type: String(event.type), source: String(event.source) });
+      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown> };
+      seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
       await socket.send(JSON.stringify(replyFor(String(event.type))));
     }
   })().catch(() => undefined);
@@ -170,19 +175,34 @@ export class Page {
     throw new Error("the app page never appeared");
   }
 
-  async evaluate<T>(expression: string): Promise<T> {
+  private async send(method: string, params: Record<string, unknown>) {
     const id = ++this.next;
     const answer = new Promise<{ result?: { result?: { value?: unknown }; exceptionDetails?: unknown }; error?: unknown }>((resolve) =>
       this.waiting.set(id, resolve),
     );
-    this.socket.send(
-      JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, returnByValue: true, awaitPromise: true } }),
-    );
-    const message = await answer;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return answer;
+  }
+
+  async evaluate<T>(expression: string): Promise<T> {
+    const message = await this.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
     if (message.error || message.result?.exceptionDetails) {
       throw new Error(`evaluate failed: ${JSON.stringify(message.error ?? message.result?.exceptionDetails)}`);
     }
     return message.result?.result?.value as T;
+  }
+
+  // A press of the mouse as the browser itself reports it, unlike element.click() from a script.
+  async click(x: number, y: number): Promise<void> {
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+      await this.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+  }
+
+  // A key press as the browser itself reports it.
+  async press(key: string): Promise<void> {
+    await this.send("Input.dispatchKeyEvent", { type: "keyDown", key, text: key });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key });
   }
 
   // Polls until the expression is truthy, then returns its value.

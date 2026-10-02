@@ -18,7 +18,9 @@ opened, and then keeps what it showed:
 The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
 a digit. An opened meme is a dialog over the page: a video plays with its sound and controls, the left and
 right arrows move between the memes of the page, and Escape or a click outside closes it; while it is
-open the keys do not reach the tabs. Every action is read-only, and nothing in the app opens a link or changes anything.
+open the keys do not reach the tabs. Almost every action only reads. The one that changes something, adding to the research base
+(`knowledge.ingest`), goes through only just after a real click or key press in the window (see
+"How it is built"). Nothing in the app opens a link, deletes, or sends to Discord.
 
 ## Run
 
@@ -75,8 +77,9 @@ pnpm test:e2e    # builds, then runs the built app against a fake orchestrator
 debugging protocol. It checks at run time what no unit test can: the page has no Node and only three
 functions to reach the shell, the content security policy is strict, it cannot navigate or open a window,
 every permission is denied, it makes no request of its own to the network, an action outside the
-allow-list never reaches the orchestrator, a reply is cut down to what a card reads, and a picture is
-fetched only at an address the orchestrator listed. It needs a display and is skipped without one.
+allow-list never reaches the orchestrator, a change is refused unless a real click or key press came
+just before it, a reply is cut down to what a card reads, and a picture is fetched only at an address
+the orchestrator listed. It needs a display and is skipped without one.
 
 `dev:web` is the fast loop for the look. To run the real shell against it, start the dev server and
 launch Electron with `DOKJA_DESKTOP_DEV_URL=http://localhost:5173` (only a local address is accepted).
@@ -98,6 +101,14 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
 - **The allow-list** (`src/shared/actions.ts`) names the only actions the screen may ask for. Anything
   else is refused before the socket is touched: the orchestrator has no authentication and also
   exposes administrative actions (`services.set`, `discord.send`, `scheduler.*`).
+- **A change needs the person** (`src/main/presence.ts`): the actions in `WRITE_ACTION_TYPES` are refused
+  unless the browser reported a real mouse press or key press in the window in the last 3 seconds. A
+  script in the page can call the shell but cannot fake that input, so content that tricks the page into
+  running code cannot write on its own, and it cannot wait for an unrelated click either. The payload of
+  `knowledge.ingest` (a note, an address or a file) is built by the shell: the screen cannot choose the
+  kind, the id or the reference, an address must be `http` or `https` (anything else would be handed to
+  one of the owner's own plugins), and a note or a file gets an id made from what it holds, so adding the
+  same thing twice changes nothing and two notes with one title do not replace each other.
 - **Payloads and projections** (`src/main/actions.ts`): each action builds its own payload, so the
   screen cannot add fields or change the digest's rules, and hands the screen only the fields a card
   reads, so channel IDs, provider profiles, plugin names and item addresses never reach it. Long texts
