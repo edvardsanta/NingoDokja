@@ -95,6 +95,48 @@ func TestLOpensTheExperienceListWithWhatEachOneWasAndHowItTurnedOut(t *testing.T
 	}
 }
 
+func TestTheSelectedExperienceShowsWhatItsChoiceRestedOn(t *testing.T) {
+	m, fake := browseTUI(t)
+	first := fake.responses["memory.list"]["experiences"].([]any)[0].(map[string]any)
+	first["matched_score"], first["matched_snippet"] = 0.8312, "texto do meme marcado"
+
+	press(m, "m", "l")
+
+	if view := m.View(); !strings.Contains(view, `parecido com 0.83 "texto do meme marcado"`) {
+		t.Fatalf("the selected experience should say what its choice rested on:\n%s", view)
+	}
+	press(m, "down")
+	if view := m.View(); strings.Contains(view, "parecido com") {
+		t.Fatalf("an experience recorded without evidence shows none:\n%s", view)
+	}
+}
+
+func TestEvidenceWithOnlyAScoreOrOnlyATextIsShownAsFarAsItGoes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		fields map[string]any
+		want   string
+	}{
+		"only a score": {map[string]any{"matched_score": 0.7}, "parecido com 0.70 "},
+		"only a text":  {map[string]any{"matched_snippet": "so o texto"}, `parecido com "so o texto"`},
+	} {
+		m, fake := browseTUI(t)
+		first := fake.responses["memory.list"]["experiences"].([]any)[0].(map[string]any)
+		for key, value := range tc.fields {
+			first[key] = value
+		}
+
+		press(m, "m", "l")
+
+		view := m.View()
+		if !strings.Contains(view, tc.want) {
+			t.Errorf("%s: missing %q:\n%s", name, tc.want, view)
+		}
+		if name == "only a score" && strings.Contains(view, `parecido com 0.70 "`) {
+			t.Errorf("%s: there is no text to show:\n%s", name, view)
+		}
+	}
+}
+
 func TestTheListCursorMovesTheDetailAndStaysInsideTheList(t *testing.T) {
 	m, _ := browseTUI(t)
 	press(m, "m", "l", "down", "down")
@@ -503,7 +545,12 @@ func TestAChanceArrivingAfterTheNoticeChangedIsDropped(t *testing.T) {
 func TestTheBrowseScreensExistInEnglishAndLeakNoPortuguese(t *testing.T) {
 	withLanguage(t, "en")
 	screens := map[string]func(m *Model, fake *fakeClient){
-		"list":                  func(m *Model, _ *fakeClient) { press(m, "m", "l") },
+		"list": func(m *Model, _ *fakeClient) { press(m, "m", "l") },
+		"list matched selected": func(m *Model, f *fakeClient) {
+			first := f.responses["memory.list"]["experiences"].([]any)[0].(map[string]any)
+			first["matched_score"], first["matched_snippet"] = 0.83, "words of the match"
+			press(m, "m", "l")
+		},
 		"list pending selected": func(m *Model, _ *fakeClient) { press(m, "m", "l", "down", "down") },
 		"list expired selected": func(m *Model, _ *fakeClient) { press(m, "m", "l", "down", "down", "down") },
 		"list pending filter":   func(m *Model, _ *fakeClient) { press(m, "m", "l", "t") },

@@ -27,6 +27,10 @@ var memoryStates = []string{"", "pending", "resolved"}
 type memoryExperience struct {
 	Ref, Action, Detail, Outcome, Snippet, CreatedAt, ResolvedAt string
 	Predicted, Baseline                                          *float64
+	// MatchedScore and Matched are what the choice rested on: how close the earlier example was and
+	// the start of its text. Both are empty for an experience recorded without them.
+	MatchedScore *float64
+	Matched      string
 }
 
 type memoryExperiences struct {
@@ -83,6 +87,10 @@ func parseMemoryExperiences(res map[string]any) memoryExperiences {
 			Ref: str(fields, "ref"), Action: str(fields, "action"), Detail: str(fields, "detail"),
 			Outcome: str(fields, "outcome"), Snippet: str(fields, "context_snippet"),
 			CreatedAt: str(fields, "created_at"), ResolvedAt: str(fields, "resolved_at"),
+			Matched: str(fields, "matched_snippet"),
+		}
+		if value, ok := fields["matched_score"].(float64); ok {
+			experience.MatchedScore = &value
 		}
 		if value, ok := fields["predicted_p"].(float64); ok {
 			experience.Predicted = &value
@@ -388,6 +396,9 @@ func viewMemoryExperience(e memoryExperience) string {
 	if e.Snippet != "" {
 		b.WriteString("  " + styleDim.Render("\""+trunc(e.Snippet, 64)+"\"") + "\n")
 	}
+	if matched := matchedEvidence(e); matched != "" {
+		b.WriteString(tr("memory_detail_matched", matched) + "\n")
+	}
 	if e.Predicted != nil && e.Baseline != nil {
 		b.WriteString("  " + tr("memory_detail_chance", *e.Predicted, *e.Baseline) + "\n")
 	} else {
@@ -401,6 +412,19 @@ func viewMemoryExperience(e memoryExperience) string {
 	}
 	b.WriteString("  " + styleDim.Render("ref "+trunc(e.Ref, 60)))
 	return b.String()
+}
+
+// matchedEvidence is what an experience's choice rested on, as "0.83 "start of the text"", or empty
+// when it was recorded without it.
+func matchedEvidence(e memoryExperience) string {
+	var parts []string
+	if e.MatchedScore != nil {
+		parts = append(parts, fmt.Sprintf("%.2f", *e.MatchedScore))
+	}
+	if e.Matched != "" {
+		parts = append(parts, "\""+trunc(e.Matched, 50)+"\"")
+	}
+	return strings.Join(parts, " ")
 }
 
 // dateTime shortens a service timestamp such as 2026-10-01T03:27:52Z to 2026-10-01 03:27.

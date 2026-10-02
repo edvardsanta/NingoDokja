@@ -140,8 +140,10 @@ type Model struct {
 	statusErr string
 	memes     memeList
 	screen    *screenData
-	form      discordForm
-	history   []historyEntry
+	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
+	suggestion *suggestionEvidence
+	form       discordForm
+	history    []historyEntry
 
 	overlay       overlayKind
 	picker        picker
@@ -728,7 +730,11 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 				eventType: "meme.hashtag.suggest",
 				payload:   map[string]any{"url": item.URL},
 				summarize: summarizeHashtagSuggestion,
-				onSuccess: func(m *Model, res map[string]any) tea.Cmd { return m.cmdSuggestionChance(res) },
+				onSuccess: func(m *Model, res map[string]any) tea.Cmd {
+					evidence := parseSuggestionEvidence(item.URL, res)
+					m.suggestion = &evidence
+					return m.cmdSuggestionChance(res)
+				},
 			})
 		}
 	case "l":
