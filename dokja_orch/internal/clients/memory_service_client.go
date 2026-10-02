@@ -43,6 +43,11 @@ func (c *MemoryServiceClient) Dispatch(ctx context.Context, eventType string, pa
 	return dispatchJSON(ctx, "memory", c.requesterFactory, eventType, payload)
 }
 
+// Status reports the experience counts and whether the embedder answers.
+func (c *MemoryServiceClient) Status(ctx context.Context) (map[string]any, error) {
+	return c.Dispatch(ctx, "memory.status", nil)
+}
+
 func resolveMemoryServiceEndpoint(endpoint string) string {
 	if endpoint != "" {
 		return endpoint

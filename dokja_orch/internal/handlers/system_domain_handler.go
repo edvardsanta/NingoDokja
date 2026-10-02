@@ -74,6 +74,7 @@ type SystemDomainHandler struct {
 	controls         *core.Controls
 	profiles         ChatProfiles
 	hashtagNotes     HashtagExperienceNotes
+	probes           map[string]ServiceProbe
 }
 
 func NewSystemDomainHandler(
@@ -218,6 +219,9 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 			}
 			services["meme"] = entry
 		}
+	}
+	if h.probeServices(ctx, services) {
+		overallStatus = "degraded"
 	}
 	h.applySwitches(services)
 

@@ -96,3 +96,15 @@ func TestKnowledgeEndpointRejectsBindAddresses(t *testing.T) {
 		t.Fatalf("expected the default endpoint, got %q", got)
 	}
 }
+
+func TestKnowledgeClientStatusAsksForKnowledgeStatus(t *testing.T) {
+	requester := &fakeKnowledgeRequester{response: `{"status":"ok","result":{"documents":2,"embedder_reachable":false}}`}
+
+	result, err := knowledgeClient(requester).Status(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["embedder_reachable"] != false || !strings.Contains(requester.request, `"type":"knowledge.status"`) {
+		t.Fatalf("unexpected result %#v for request %s", result, requester.request)
+	}
+}
