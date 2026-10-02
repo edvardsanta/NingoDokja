@@ -68,7 +68,7 @@ calls a provider or holds a token.
 | Memory | `memory.*` | `dokja_memory` | none |
 | Knowledge, books | `knowledge.*`, `book.*` | `dokja_knowledge`, `dokja_book` | none |
 | Memes | `meme.*` | `dokja_meme` | none |
-| Feeds | none | none | service, domain, route |
+| Feeds | `digest.*` | `dokja_digest` | none in v1 (service, domain and route are built; no source ships) |
 | Weather, agenda, mail | none | none | services, plugins |
 
 Proposed home: `dokja_interfaces/desktop/`, TypeScript, file names in `snake_case` like the Discord
@@ -128,29 +128,51 @@ fail on missing or stale IDs and on Portuguese leaking into English mode.
 ### Security
 
 - Renderer sandboxed: context isolation on, no Node integration, strict CSP, a preload that exposes
-  only `request`.
-- Allow-list: the main process forwards only the listed read-only actions (v1: `ningo.status`), so a
-  compromised screen cannot call `services.set` or `discord.send`. Each reply is projected to the fields
-  its card reads, so channel IDs and provider profiles never reach the screen.
+  only `request` and `preview`.
+- Allow-list: the main process forwards only the listed read-only actions (`ningo.status`, `memory.*`,
+  `knowledge.status` and `knowledge.search`, `meme.status` and `meme.list`, `digest.status` and
+  `digest.items`), so a compromised screen cannot call `services.set`, `discord.send` or `digest.refresh`.
+  Each action builds its own payload, so the screen cannot add fields or change the digest's rules, and
+  each reply is projected to the fields its card reads, so channel IDs, provider profiles, plugin names
+  and item addresses never reach the screen.
 - Permissions denied by default: Electron approves every permission request unless a handler is set, so
   the session gets one that denies everything (Phase 4 allows only the microphone, for the app's own page).
 - Feed content is untrusted: rendered as text, never as HTML. The shell's main process fetches images
-  (as the TUI does) and hands them to the renderer, which never loads a remote image itself.
+  (as the TUI does) and hands them to the renderer, which never loads a remote image itself. It fetches
+  only addresses the orchestrator itself listed in a meme page, over http or https on the default ports,
+  to public addresses only (checked on connect and on every redirect, literal IP hosts included), with a
+  size and time limit, and accepts only bytes that are a picture (SVG is left out).
+- Nothing in the app opens a link yet, so a digest item reaches the screen without its address. Opening
+  links is a separate step: an IPC channel that opens only an `http` or `https` address the orchestrator
+  returned, the way the image fetch is gated.
 - No token in the app. Provider tokens live in the services' environment or volumes.
 
 ## Backend gaps
 
 Each one is its own PR, in layer order.
 
-1. **Feeds service.** A stateless integration that follows the feeds the owner configures, on a
-   scheduler job. Sources and any site-specific parsing are plugins in a directory outside the
-   repository, the pattern `KNOWLEDGE_PLUGINS_DIR` already uses. Open: a new small service (Go, like the
-   scheduler and memory services) or an extension of `dokja_knowledge`, which already parses feeds and
-   has the plugin mechanism but only reads a feed once.
-2. **Digest domain** (`dokja_digest`, Go, pure like `dokja_memory`). Decides which cards, in what order,
-   what is a duplicate and what is worth showing. The UI never ranks.
-3. **Orchestrator route** `digest.*`: a route in `router.go`, a step in `workflow_engine.go`, a handler
-   in `internal/handlers/` and a client in `internal/clients/`.
+1. **Feeds service** (`dokja_services/dokja_feeds`, Go, built). It follows the sources the owner chooses
+   and keeps their latest items in memory. The repository ships the mechanism only: a source is a
+   plugin, a directory with a `plugin.json` manifest and a program, kept outside the repository (see the
+   service's README for the contract). Two choices differ from the first draft of this plan:
+   - **A new service, not an extension of `dokja_knowledge`.** Feed items are many and short-lived;
+     put in the research base they would crowd its search and cost embeddings. The knowledge service
+     keeps reading a feed once, on request.
+   - **An in-service ticker, not a scheduler job.** The orchestrator answers one request at a time, so a
+     request must never run a plugin. Each enabled plugin runs on its own interval inside the service and
+     a request reads the last good result from memory.
+   The plugin contract borrows from the extension layout of another open-source assistant (OpenClaw's
+   `extensions/`), as a pattern only and with no code taken: a manifest read without running the plugin,
+   nothing runs until its manifest enables it, a failed plugin stays listed with its reason and never
+   hides the others, and secrets are passed by variable name. A plugin is an external program (a shell
+   script, a static binary) that prints JSON, so it can be written in any language the image has; each run
+   gets its own process group, a minimal environment, a time limit and an output limit.
+2. **Digest domain** (`dokja_domain/dokja_digest`, Go, pure like `dokja_memory`, built). Drops items older
+   than a window, orders newest first, drops duplicates (same address or same long title) and keeps one
+   source from filling the first places. The UI never ranks.
+3. **Orchestrator route** `digest.*` (built): `digest.status` and `digest.items`, with `feeds` a service
+   that can be switched off and a `ningo.status` probe. `digest.refresh` does not exist; the service
+   refreshes itself.
 4. **Personal cards.** Weather, agenda and mail as stateless services; provider code and endpoints are
    runtime inputs or plugins outside the repository, and tokens stay in the service environment. Agenda
    can start from a read-only calendar feed supplied at runtime, which needs no OAuth. Mail is the most
@@ -171,15 +193,20 @@ v1 covers Phases 0 to 3, personal cards included, behind the gate above. Phases 
 0. **Spike (done 2026-10-02, decided the shell).** One minimal page run in the system Electron and in
    Tauri: cards arriving one at a time, a short tone played on load, a microphone request, and one
    `ningo.status` request sent from the shell's native side. Results below.
-1. **Skeleton and existing cards.** Shell, `Transport` over ZeroMQ, card registry, and the health,
-   memory, knowledge/books and memes cards. No backend change. The shell, the `Transport`, the registry
-   and the health card are built; the other three cards are next. The orchestrator answers requests one
-   at a time and a stopped service can take about five seconds to fail (the TUI keeps memory out of
-   its panel refresh for that reason), so the transport queues requests and each card loads on its own
-   with a timeout. Tests: the transport adapter and the registry with the Node test runner (as the
-   Discord interface does), components with Vitest, and one Playwright smoke test of the packaged
-   shell.
-2. **Feeds and digest.** Backend gaps 1 to 3, then the digest screen with the progressive reveal.
+1. **Skeleton and existing cards (built).** Shell, `Transport` over ZeroMQ, card registry, one tab per
+   card, and the health, memory, knowledge and memes cards, with the memes' pictures fetched by the
+   shell. No backend change. The book summaries are not in the knowledge card: they call the chat
+   provider and their future is open, so the card shows the research base only. The orchestrator answers
+   requests one at a time and a stopped service can take about five seconds to fail (the TUI keeps
+   memory out of its panel refresh for that reason), so the transport queues requests, each card loads
+   on its own with a timeout, and a card is mounted, and asks its service, only when its tab is first
+   opened. Tests: the transport adapter and the shell's guards with the Node test runner (as the
+   Discord interface does), components with Vitest, and a smoke test of the built shell.
+2. **Feeds and digest (built, without sources).** Backend gaps 1 to 3, then the digest tab: how many
+   sources work, fail or are off, the first eight entries newest first, "show more" up to 50, and the
+   list of sources with the reason each one fails. With nothing followed the tab says why. The progressive
+   reveal that speaks the digest aloud belongs to Phase 4. Open links and Ningo's own take (it needs a
+   text generator) are not in this step.
 3. **Personal cards.** Weather, then agenda, then mail, one PR each, ordered by sensitivity, after the
    gate above.
 4. **Voice.** `voice.*` route, speech playback, and the "want to hear it?" offer. Microphone and wake
@@ -261,7 +288,7 @@ Everything except the loopback binding is additive.
 - Ningo's take needs a text generator. The digest must work without one: items and sources first,
   the take added when a generator is available.
 - Is a text conversation part of v1? It depends on the same text-generation question.
-- Where feed following lives (new service or `dokja_knowledge`).
+- Where feed following lives: decided, a new service (see Backend gaps).
 - Overlay and ambient window modes are not verified in any candidate; they are out of v1.
 - Event source for the desktop app: it sends `source: desktop`, which is additive. The orchestrator
   does not reject unknown sources: the only source-specific code is the chat handler reading the text

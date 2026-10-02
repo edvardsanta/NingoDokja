@@ -4,8 +4,19 @@ Desktop interface for Ningo. It is an interface adapter like the CLI, the TUI an
 talks to the orchestrator over ZeroMQ request/reply and holds no business logic. The plan, the
 decisions and the Phase 0 results are in [`dokja_docs/desktop-app-plan.md`](../../dokja_docs/desktop-app-plan.md).
 
-Status: Phase 1 skeleton. One card (service health, from `ningo.status`) goes through the whole
-path: screen, shell, orchestrator.
+Status: v1 without voice. Five tabs, each a card that asks its service only when the tab is first
+opened, and then keeps what it showed:
+
+| Tab | Asks | Shows |
+|---|---|---|
+| health | `ningo.status` | how every service is doing; the name's ghost follows it |
+| digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
+| memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
+| knowledge | `knowledge.status`, `knowledge.search` | the research base and a search over it |
+| memes | `meme.status`, `meme.list` | the queue, with pictures fetched by the shell |
+
+The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
+a digit. Every action is read-only, and nothing in the app opens a link or changes anything.
 
 ## Run
 
@@ -16,7 +27,16 @@ pnpm start     # builds, then opens the window
 ```
 
 It needs a running orchestrator. By default it asks `tcp://127.0.0.1:5558`, the port the compose
-stacks publish. Without one the card says so after about three seconds.
+stacks publish. Without one the card says so after about three seconds. Each tab needs the service
+behind it: a service that is stopped or switched off is said so on its tab, and the others keep working.
+
+### The digest tab
+
+The digest needs the feeds service (`dokja_services/dokja_feeds`) and, in the orchestrator, the
+`digest.*` route. The repository ships no source: a source is a plugin you keep outside it (see the
+service's README). With no plugin the tab says why there is nothing to read (no directory, no source,
+none enabled) instead of showing an empty list. A source that fails is listed with its reason, and the
+list opens by itself when one does.
 
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
@@ -46,7 +66,15 @@ Text that comes from the orchestrator (a service's `detail`) is shown as it arri
 pnpm dev:web     # the screen in a browser, with made-up data and no shell
 pnpm typecheck
 pnpm test        # Node test runner for the logic, Vitest for the screen
+pnpm test:e2e    # builds, then runs the built app against a fake orchestrator
 ```
+
+`test:e2e` starts the real Electron shell with its own profile and drives its page over the Chromium
+debugging protocol. It checks at run time what no unit test can: the page has no Node and only three
+functions to reach the shell, the content security policy is strict, it cannot navigate or open a window,
+every permission is denied, it makes no request of its own to the network, an action outside the
+allow-list never reaches the orchestrator, a reply is cut down to what a card reads, and a picture is
+fetched only at an address the orchestrator listed. It needs a display and is skipped without one.
 
 `dev:web` is the fast loop for the look. To run the real shell against it, start the dev server and
 launch Electron with `DOKJA_DESKTOP_DEV_URL=http://localhost:5173` (only a local address is accepted).
@@ -54,8 +82,8 @@ launch Electron with `DOKJA_DESKTOP_DEV_URL=http://localhost:5173` (only a local
 ## How it is built
 
 ```
-screen (React)  ->  preload (two functions)  ->  main process  ->  orchestrator
-src/renderer        src/preload                  src/main          ZeroMQ REQ
+screen (React)  ->  preload (three functions)  ->  main process  ->  orchestrator
+src/renderer        src/preload                    src/main          ZeroMQ REQ
 ```
 
 - **The screen** only knows a `Transport` (`src/shared/transport.ts`): `request(type, payload)`
@@ -68,8 +96,14 @@ src/renderer        src/preload                  src/main          ZeroMQ REQ
 - **The allow-list** (`src/shared/actions.ts`) names the only actions the screen may ask for. Anything
   else is refused before the socket is touched: the orchestrator has no authentication and also
   exposes administrative actions (`services.set`, `discord.send`, `scheduler.*`).
-- **Projections** (`src/main/actions.ts`) hand the screen only the fields a card reads, so channel
-  IDs and provider profiles never reach it. Long error texts are cut.
+- **Payloads and projections** (`src/main/actions.ts`): each action builds its own payload, so the
+  screen cannot add fields or change the digest's rules, and hands the screen only the fields a card
+  reads, so channel IDs, provider profiles, plugin names and item addresses never reach it. Long texts
+  are cut.
+- **Pictures:** the screen never loads a remote image. `preview(url)` asks the shell, which fetches
+  only an address the orchestrator itself listed in a meme page, over http or https on the default ports,
+  to public addresses only (checked on connect and on every redirect), with a size and time limit,
+  and only if the bytes are a picture. It hands back a data URL.
 - **Hardening:** sandboxed renderer with context isolation and no Node, IPC accepted only from the
   page the app loaded, every permission request denied, no navigation or new windows, no network
   requests (except the development server), and a strict Content-Security-Policy on the built page.
@@ -79,10 +113,13 @@ src/renderer        src/preload                  src/main          ZeroMQ REQ
 ## Adding a card
 
 1. Add its action to `ACTION_TYPES` in `src/shared/actions.ts` and a projection in
-   `src/main/actions.ts`, with tests that show what it leaves out.
+   `src/main/actions.ts`, with tests that show what it leaves out. Only add an action the orchestrator
+   really routes: it sends an event it does not know to the chat domain.
 2. Write the card in `src/renderer/cards/` with `useCard` and `CardFrame`, and its strings in both
-   catalogs.
-3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`.
+   catalogs, the name of its tab included.
+3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`: its kind, the id of its tab's name and the
+   component. The order of the lines is the order of the tabs; keep health first, because its answer
+   drives the name's pulse and it is the one card mounted at start.
 
 ## Look
 
