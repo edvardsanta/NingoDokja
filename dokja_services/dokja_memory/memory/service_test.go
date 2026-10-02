@@ -218,6 +218,8 @@ func TestDispatchRejectsMalformedRequests(t *testing.T) {
 		{"memory.record", map[string]any{"ref": "r", "action": "a", "context": "c", "detail": "bad\x00detail"}, "detail"},
 		{"memory.record", map[string]any{"ref": "r", "action": "a", "context": "c", "predicted_p": 0.5}, "go together"},
 		{"memory.record", map[string]any{"ref": "r", "action": "a", "context": "c", "predicted_p": 2.0, "baseline_p": 0.5}, "between 0 and 1"},
+		{"memory.record", map[string]any{"ref": "r", "action": "a", "context": "c", "matched_score": 1.5}, "matched_score"},
+		{"memory.record", map[string]any{"ref": "r", "action": "a", "context": "c", "matched_context": strings.Repeat("m", maxMatchedRunes+1)}, "matched_context"},
 		{"memory.resolve", map[string]any{"ref": "r", "outcome": "Not A Word"}, "outcome"},
 		{"memory.resolve", map[string]any{"outcome": "accepted"}, "ref"},
 		{"memory.recall", map[string]any{"action": "a"}, "context"},
@@ -364,6 +366,58 @@ func TestListRejectsMalformedRequests(t *testing.T) {
 	} {
 		if _, err := service.Dispatch(context.Background(), "memory.list", payload); err == nil {
 			t.Fatalf("%s: expected an error", name)
+		}
+	}
+}
+
+func TestRecordKeepsWhatTheChoiceRestedOnAndShowsItsTextOnlyWhenAsked(t *testing.T) {
+	service, _, _ := newTestService(t, 0)
+	dispatch(t, service, "memory.record", map[string]any{
+		"ref": "with", "action": "tag.suggest", "context": "private words", "detail": "#Label",
+		"matched_score": 0.83, "matched_context": "similar words " + strings.Repeat("y", 300)[:150],
+	})
+	dispatch(t, service, "memory.record", map[string]any{
+		"ref": "without", "action": "tag.suggest", "context": "other private words", "detail": "#Label",
+	})
+
+	got := dispatch(t, service, "memory.get", map[string]any{"ref": "with"})
+	if got["matched_score"] != 0.83 {
+		t.Fatalf("get=%v", got)
+	}
+	if none := dispatch(t, service, "memory.get", map[string]any{"ref": "without"}); none["matched_score"] != nil {
+		t.Fatalf("an experience recorded without a match has none: %v", none)
+	}
+
+	plain := dispatch(t, service, "memory.list", map[string]any{})
+	for _, raw := range plain["experiences"].([]any) {
+		for key, value := range raw.(map[string]any) {
+			if text, ok := value.(string); ok && strings.Contains(text, "similar") {
+				t.Fatalf("the earlier example is the user's text and must not come back unless asked (%s=%q)", key, text)
+			}
+		}
+	}
+	scores := map[any]any{}
+	for _, raw := range plain["experiences"].([]any) {
+		row := raw.(map[string]any)
+		scores[row["ref"]] = row["matched_score"]
+	}
+	if scores["with"] != 0.83 || scores["without"] != nil {
+		t.Fatalf("the score is not text and comes with every listing: %v", scores)
+	}
+
+	asked := dispatch(t, service, "memory.list", map[string]any{"include_context": true})
+	for _, raw := range asked["experiences"].([]any) {
+		row := raw.(map[string]any)
+		snippet, has := row["matched_snippet"].(string)
+		switch row["ref"] {
+		case "with":
+			if !has || !strings.HasPrefix(snippet, "similar words ") || len([]rune(snippet)) != SnippetRunes {
+				t.Fatalf("with=%v", row)
+			}
+		case "without":
+			if has {
+				t.Fatalf("nothing to show for an experience without a match: %v", row)
+			}
 		}
 	}
 }

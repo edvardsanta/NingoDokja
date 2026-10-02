@@ -28,6 +28,10 @@ and compares.
   rest never leaves the service. It is how an operator recognizes an experience whose `ref` is a hash. The
   orchestrator port has no authentication, the same as for `knowledge.search`: keep it off untrusted
   networks. `memory.get` and `memory.resolved` never return a context.
+- The text of the earlier example a choice rested on (`matched_context`) follows the same rule: `memory.list` hands back its first
+  160 characters as `matched_snippet`, only with `include_context`, and `memory.get` never returns it. `matched_score` is a number,
+  not text, and comes back whenever one was recorded. An experience recorded without them reads as before; a database created by an
+  earlier version upgrades in place when the service starts (two nullable columns).
 
 ## Events (ZeroMQ REQ/REP, port 5562)
 
@@ -36,11 +40,11 @@ Same envelope as the knowledge service: `{"type": ..., "payload": {...}}` in,
 
 | event | payload | result |
 | --- | --- | --- |
-| `memory.record` | `ref`, `action`, `context`, `detail?` (what exactly was done, up to 200 characters), `predicted_p?` and `baseline_p?` (together, 0 to 1) | `created`, `embedded`, `degraded`, `reason?` |
+| `memory.record` | `ref`, `action`, `context`, `detail?` (what exactly was done, up to 200 characters), `predicted_p?` and `baseline_p?` (together, 0 to 1), `matched_score?` (0 to 1) and `matched_context?` (up to 200 characters): what the choice rested on, how close the earlier example was and the start of its text | `created`, `embedded`, `degraded`, `reason?` |
 | `memory.resolve` | `ref`, `outcome` (a short lowercase word) | `found`, `resolved`, `outcome` |
-| `memory.get` | `ref` | `found`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `created_at`, `resolved_at` (never the context) |
+| `memory.get` | `ref` | `found`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `matched_score`, `created_at`, `resolved_at` (never the context, nor the text of the example it matched) |
 | `memory.recall` | `context`, `action?`, `k?` (1-50), `include_context?` | `neighbors[]` (`ref`, `action`, `detail`, `outcome`, `similarity`, `created_at`, `context_snippet?`), `outcomes` (count per outcome), `degraded`, `reason?` |
-| `memory.list` | `action?`, `state?` (`all`, `pending` or `resolved`), `limit?` (1-100, default 20), `offset?`, `include_context?` | `experiences[]` (`ref`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `created_at`, `resolved_at`, `context_snippet?`), newest first, plus `total`, `limit`, `offset` |
+| `memory.list` | `action?`, `state?` (`all`, `pending` or `resolved`), `limit?` (1-100, default 20), `offset?`, `include_context?` | `experiences[]` (`ref`, `action`, `detail`, `outcome`, `predicted_p`, `baseline_p`, `matched_score`, `created_at`, `resolved_at`, `context_snippet?`, `matched_snippet?`), newest first, plus `total`, `limit`, `offset` |
 | `memory.resolved` | `action?`, `limit?` | `experiences[]` (`ref`, `action`, `outcome`, `predicted_p`, `baseline_p`, `resolved_at`), latest first taken, oldest first returned |
 | `memory.forget` | `ref` | `deleted` |
 | `memory.status` | none | counts, `embed_model`, `embeddings`, `embedder_reachable`, `needs_reindex`, `degraded` |

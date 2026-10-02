@@ -43,6 +43,10 @@ var migrations = []string{
 		resolved_at TEXT
 	);
 	CREATE INDEX experiences_by_action ON experiences(action, outcome);`,
+	// What the bot's choice rested on: how close the earlier example was, and the start of its text.
+	// Both stay empty for an experience recorded without them, so older rows read as before.
+	`ALTER TABLE experiences ADD COLUMN matched_score REAL;
+	ALTER TABLE experiences ADD COLUMN matched_context TEXT;`,
 }
 
 // Store is the experiences database. It runs on one connection, so every call is serial.
@@ -145,6 +149,11 @@ type NewExperience struct {
 	Detail    string
 	Predicted *float64
 	Baseline  *float64
+	// MatchedScore and MatchedContext are what the choice rested on: how close the earlier example
+	// was (0 to 1) and the start of its text. They are the user's own text, so the context follows
+	// the same rule as Context: it only leaves the store as a snippet when a listing asks for it.
+	MatchedScore   *float64
+	MatchedContext string
 }
 
 // Exists reports whether an experience with this ref is already stored.
@@ -165,10 +174,16 @@ func (s *Store) Insert(e NewExperience, vector []float32, model string) (created
 	if vector != nil {
 		blob, embedModel = encodeVector(vector), model
 	}
+	var matchedContext any
+	if e.MatchedContext != "" {
+		matchedContext = e.MatchedContext
+	}
 	result, err := s.db.Exec(
-		`INSERT INTO experiences(ref, action, context, detail, embedding, embed_model, predicted_p, baseline_p, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(ref) DO NOTHING`,
-		e.Ref, e.Action, e.Context, e.Detail, blob, embedModel, nullFloat(e.Predicted), nullFloat(e.Baseline), s.stamp())
+		`INSERT INTO experiences(ref, action, context, detail, embedding, embed_model, predicted_p, baseline_p,
+		                         matched_score, matched_context, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(ref) DO NOTHING`,
+		e.Ref, e.Action, e.Context, e.Detail, blob, embedModel, nullFloat(e.Predicted), nullFloat(e.Baseline),
+		nullFloat(e.MatchedScore), matchedContext, s.stamp())
 	if err != nil {
 		return false, err
 	}
@@ -198,24 +213,27 @@ func (s *Store) Resolve(ref, outcome string) (found, resolved bool, current stri
 // Stored is one experience as it can be read back. The context is left out on purpose: it is
 // the user's own text and nothing that reads an experience back needs it.
 type Stored struct {
-	Ref        string
-	Action     string
-	Detail     string
-	Outcome    string
-	Predicted  *float64
-	Baseline   *float64
-	CreatedAt  string
-	ResolvedAt string
+	Ref       string
+	Action    string
+	Detail    string
+	Outcome   string
+	Predicted *float64
+	Baseline  *float64
+	// MatchedScore is how close the earlier example the bot's choice rested on was, when it was
+	// recorded. Its text is not part of this: see MatchedSnippets.
+	MatchedScore *float64
+	CreatedAt    string
+	ResolvedAt   string
 }
 
 // Get reads one experience. Outcome is empty while it is pending and "expired" once it has
 // waited past the expiry window with no verdict. ok is false for an unknown ref.
 func (s *Store) Get(ref string) (stored Stored, ok bool, err error) {
-	var predicted, baseline sql.NullFloat64
+	var predicted, baseline, matched sql.NullFloat64
 	var outcome, resolvedAt sql.NullString
 	err = s.db.QueryRow(
-		"SELECT ref, action, detail, "+verdictSQL+", predicted_p, baseline_p, created_at, resolved_at FROM experiences WHERE ref = ?",
-		s.cutoff(), ref).Scan(&stored.Ref, &stored.Action, &stored.Detail, &outcome, &predicted, &baseline, &stored.CreatedAt, &resolvedAt)
+		"SELECT ref, action, detail, "+verdictSQL+", predicted_p, baseline_p, matched_score, created_at, resolved_at FROM experiences WHERE ref = ?",
+		s.cutoff(), ref).Scan(&stored.Ref, &stored.Action, &stored.Detail, &outcome, &predicted, &baseline, &matched, &stored.CreatedAt, &resolvedAt)
 	if err == sql.ErrNoRows {
 		return Stored{}, false, nil
 	}
@@ -228,6 +246,9 @@ func (s *Store) Get(ref string) (stored Stored, ok bool, err error) {
 	}
 	if baseline.Valid {
 		stored.Baseline = &baseline.Float64
+	}
+	if matched.Valid {
+		stored.MatchedScore = &matched.Float64
 	}
 	return stored, true, nil
 }
@@ -348,7 +369,7 @@ func (s *Store) List(action, state string, limit, offset, snippetRunes int) ([]L
 	if snippetRunes > 0 {
 		snippetExpr, snippetArgs = "substr(context, 1, ?)", []any{snippetRunes}
 	}
-	base := "SELECT id, ref, action, detail, " + verdictSQL + " AS v, predicted_p, baseline_p, created_at, resolved_at, " +
+	base := "SELECT id, ref, action, detail, " + verdictSQL + " AS v, predicted_p, baseline_p, matched_score, created_at, resolved_at, " +
 		snippetExpr + " AS snippet FROM experiences WHERE ? = '' OR action = ?"
 	baseArgs := append(append([]any{cutoff}, snippetArgs...), action, action)
 
@@ -368,7 +389,7 @@ func (s *Store) List(action, state string, limit, offset, snippetRunes int) ([]L
 	}
 
 	rows, err := s.db.Query(
-		"SELECT ref, action, detail, v, predicted_p, baseline_p, created_at, resolved_at, snippet FROM ("+base+")"+outer+
+		"SELECT ref, action, detail, v, predicted_p, baseline_p, matched_score, created_at, resolved_at, snippet FROM ("+base+")"+outer+
 			" ORDER BY id DESC LIMIT ? OFFSET ?",
 		append(baseArgs, limit, offset)...)
 	if err != nil {
@@ -380,8 +401,8 @@ func (s *Store) List(action, state string, limit, offset, snippetRunes int) ([]L
 	for rows.Next() {
 		var row Listed
 		var outcome, resolvedAt sql.NullString
-		var predicted, baseline sql.NullFloat64
-		if err := rows.Scan(&row.Ref, &row.Action, &row.Detail, &outcome, &predicted, &baseline, &row.CreatedAt, &resolvedAt, &row.Snippet); err != nil {
+		var predicted, baseline, matched sql.NullFloat64
+		if err := rows.Scan(&row.Ref, &row.Action, &row.Detail, &outcome, &predicted, &baseline, &matched, &row.CreatedAt, &resolvedAt, &row.Snippet); err != nil {
 			return nil, 0, err
 		}
 		row.Outcome, row.ResolvedAt = outcome.String, resolvedAt.String
@@ -390,6 +411,9 @@ func (s *Store) List(action, state string, limit, offset, snippetRunes int) ([]L
 		}
 		if baseline.Valid {
 			row.Baseline = &baseline.Float64
+		}
+		if matched.Valid {
+			row.MatchedScore = &matched.Float64
 		}
 		row.Snippet = tidySnippet(row.Snippet)
 		out = append(out, row)
@@ -409,6 +433,34 @@ func (s *Store) Snippets(refs []string, runes int) (map[string]string, error) {
 	}
 	rows, err := s.db.Query(
 		"SELECT ref, substr(context, 1, ?) FROM experiences WHERE ref IN (?"+strings.Repeat(",?", len(refs)-1)+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ref, snippet string
+		if err := rows.Scan(&ref, &snippet); err != nil {
+			return nil, err
+		}
+		snippets[ref] = tidySnippet(snippet)
+	}
+	return snippets, rows.Err()
+}
+
+// MatchedSnippets returns the start of the text of the earlier example each given experience rested
+// on, keyed by ref. An experience recorded without one has no entry.
+func (s *Store) MatchedSnippets(refs []string, runes int) (map[string]string, error) {
+	snippets := map[string]string{}
+	if len(refs) == 0 || runes <= 0 {
+		return snippets, nil
+	}
+	args := []any{runes}
+	for _, ref := range refs {
+		args = append(args, ref)
+	}
+	rows, err := s.db.Query(
+		"SELECT ref, substr(matched_context, 1, ?) FROM experiences WHERE matched_context IS NOT NULL AND ref IN (?"+
+			strings.Repeat(",?", len(refs)-1)+")", args...)
 	if err != nil {
 		return nil, err
 	}
