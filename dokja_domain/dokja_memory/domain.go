@@ -5,16 +5,17 @@
 // The domain never touches storage or embeddings; the service behind Service only stores
 // experiences and finds the closest ones. It answers these events:
 //
-//	memory.record    {ref, action, context, detail?, predicted_p?, baseline_p?}
+//	memory.record    {ref, action, context, detail?, predicted_p?, baseline_p?, matched_score?, matched_context?}
 //	                                                                    -> {created, embedded, degraded}
 //	memory.resolve   {ref, outcome}                                     -> {found, resolved, outcome}
-//	memory.get       {ref}  -> {found, action, detail, outcome, predicted_p, baseline_p, created_at, resolved_at}
+//	memory.get       {ref}  -> {found, action, detail, outcome, predicted_p, baseline_p, matched_score,
+//	                     created_at, resolved_at}
 //	memory.recall    {context, action?, k?, include_context?}
 //	                 -> {neighbors[{ref, action, detail, outcome, similarity, context_snippet?}],
 //	                     outcomes{outcome: count}, degraded, reason}
 //	memory.list      {action?, state?, limit?, offset?, include_context?}
-//	                 -> {experiences[{ref, action, detail, outcome, predicted_p, baseline_p, created_at,
-//	                     resolved_at, context_snippet?}], total, limit, offset}
+//	                 -> {experiences[{ref, action, detail, outcome, predicted_p, baseline_p, matched_score,
+//	                     created_at, resolved_at, context_snippet?, matched_snippet?}], total, limit, offset}
 //	memory.resolved  {action?, limit?}       -> {experiences[{ref, action, outcome, predicted_p, baseline_p}]}
 //	memory.forget    {ref}                                              -> {deleted}
 //	memory.status    {}                                                 -> counts and embedder state
@@ -24,6 +25,10 @@
 // compared with it. A context is the user's own text: nothing here logs it, and it comes back in one
 // case only, as a short snippet when a caller sets include_context (a listing, or the evidence of a
 // prediction), so an operator can recognize an experience whose ref is a hash.
+//
+// matched_score and matched_context are what a choice rested on: how close the earlier example was
+// and the start of its text. The text follows the same rule as a context (matched_snippet, only
+// with include_context); the score is a number and always comes back.
 package memory
 
 import (
@@ -52,6 +57,7 @@ const (
 	maxRefLen        = 512
 	maxContextRunes  = 4000
 	maxDetailRunes   = 200
+	maxMatchedRunes  = 200
 	defaultRecallK   = 10
 	maxRecallK       = 50
 	predictNeighbors = 20
@@ -304,6 +310,19 @@ func buildRecord(payload map[string]any) (map[string]any, error) {
 		}
 		clean["predicted_p"] = predicted
 		clean["baseline_p"] = baseline
+	}
+
+	if matchedScore, ok := number(payload, "matched_score"); ok {
+		if !isProbability(matchedScore) {
+			return nil, fmt.Errorf("matched_score must be between 0 and 1")
+		}
+		clean["matched_score"] = matchedScore
+	}
+	if matchedContext := text(payload, "matched_context"); matchedContext != "" {
+		if utf8.RuneCountInString(matchedContext) > maxMatchedRunes {
+			return nil, fmt.Errorf("matched_context must be at most %d characters", maxMatchedRunes)
+		}
+		clean["matched_context"] = matchedContext
 	}
 	return clean, nil
 }
