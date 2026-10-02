@@ -42,6 +42,7 @@ text while running in English. Text that comes from the orchestrator (for exampl
   accepts NSFW-screened memes is marked. Refreshes on its own while this tab is open; `r` forces it.
   Rows are selectable (`↑↓`): `space` switches a service off/on or pauses/resumes a job, `x` runs the
   selected job now (asks first), `i` changes its interval (`45m`, `6h`, or `default`).
+  `p` opens the chat profiles and `m` the experience memory (see below).
 - **Memes** (`2`): browse the pool without consuming it. `s` runs the NSFW screen on the selected meme
   (verdict, text read by OCR, detections). `enter` sends *that* meme to the channels you tick.
   `d` dispatches N memes from the top of the queue. `t` switches queue/already-sent, `n`/`p` page,
@@ -96,6 +97,32 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
   is screened server-side and skipped if flagged. Sending a picked meme from the queue also marks it as
   sent so the scheduler does not repeat it.
 - `chat_ai` shows `error` when that service is not running; the meme features do not depend on it.
+
+## Experience memory
+
+`m` on the Painel opens the experience memory (what the bot did in a context and how it turned out; see
+`dokja_docs/experience-memory-plan.md`): how many experiences there are and in which state, whether
+similarity is working, and how the stored predictions for the hashtag suggestion fare against the baseline.
+Until enough predictions are scored (30) it says so before it shows a number, and it never calls the result
+a win. `r` reloads, `x` embeds one batch of experiences that have no vector (press it again while some
+remain) and `esc` closes.
+
+- `l` opens the **experiences**, newest first: how each turned out (pending until a verdict arrives), what
+  the bot did, the chance it predicted against the baseline, and a snippet of the context, since the ref is
+  a hash. The selected one is shown in full below the list. `t` cycles the filter (all, pending, resolved),
+  `n`/`p` page, `f` forgets the selected experience after a confirmation, `esc` goes back.
+- `p` opens a form to **predict**: type a text and `enter` shows the chance a suggestion for a text like it is
+  kept, against the baseline, with the earlier experiences it rests on. With too little history, or without
+  similarity, it says the number is only the baseline.
+- On the Memes tab, `g` (suggest a hashtag) shows the suggestion first and then appends the chance it is
+  kept. That chance is a second request, so a slow or stopped memory never costs the suggestion anything; it
+  is asked only for a relevant suggestion, skipped while the `memory` service is switched off, and after one
+  failure it is not asked again for a minute.
+
+The memory is read on demand and never as part of the panel refresh: a stopped memory service takes about
+five seconds to fail, and the panel must not wait for it. The `memory` row in the service list switches the
+service off like any other. A snippet is the first 160 characters of a context, asked for by the TUI only;
+`dokja-cli memory` does the same and also resolves and records single experiences.
 
 ## Chat profiles
 

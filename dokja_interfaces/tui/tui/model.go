@@ -39,6 +39,9 @@ const (
 	overlayProfileForm
 	overlayHashtag
 	overlayHashtagList
+	overlayMemory
+	overlayMemoryList
+	overlayMemoryPredict
 )
 
 const (
@@ -53,6 +56,12 @@ type statusMsg struct {
 	data statusData
 	err  error
 }
+
+type memoryMsg struct{ view memoryView }
+
+// memoryScoredAction is the action the overlay scores: the hashtag suggestion is the only
+// one that records experiences so far.
+const memoryScoredAction = "hashtag.suggest"
 
 type memesMsg struct {
 	page memePage
@@ -82,6 +91,10 @@ type pendingAction struct {
 
 	// local runs instead of an orchestrator request, for actions that must stay on this machine.
 	local func() (string, error)
+
+	// back is the overlay to return to once the confirmation is answered, either way. Zero means
+	// none: back to the screen underneath.
+	back overlayKind
 }
 
 type memeList struct {
@@ -147,6 +160,14 @@ type Model struct {
 	profileFocus  int
 	hashtagInput  textinput.Model
 	hashtagList   hashtagExamples
+	memory        memoryView
+	memoryList    memoryExperiences
+	memoryInput   textinput.Model
+	memoryResult  memoryPredictView
+
+	// chancePausedUntil is when the hashtag suggestion may ask the memory for a chance again, after
+	// a failure.
+	chancePausedUntil time.Time
 
 	// reloadMemes chains a pool reload after the status refresh that follows an action,
 	// because each request must claim the single in-flight slot when it actually starts.
@@ -185,6 +206,10 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	hashtag.CharLimit = 100
 	hashtag.Width = 40
 
+	memoryText := textinput.New()
+	memoryText.CharLimit = 1000
+	memoryText.Width = 52
+
 	var form [4]textinput.Model
 	for i, placeholder := range []string{tr("name_e_g_hosted"), "https://api.example.com/v1", tr("model_placeholder"), tr("token_not_shown_on_screen")} {
 		form[i] = textinput.New()
@@ -206,6 +231,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 		dispatchInput: dispatch,
 		intervalInput: interval,
 		hashtagInput:  hashtag,
+		memoryInput:   memoryText,
 		images:        newImageState(),
 	}
 }
@@ -299,6 +325,39 @@ func (m *Model) cmdStatus() tea.Cmd {
 	}
 }
 
+// cmdMemory reads the experience memory for the overlay: its state and, if that answers, the
+// score of the stored predictions. A failure of either stays inside the overlay.
+func (m *Model) cmdMemory() tea.Cmd {
+	if !m.begin(tr("reading_the_experience_memory")) {
+		return nil
+	}
+	return func() tea.Msg {
+		view := memoryView{loaded: true}
+		res, err := m.request("memory.status", map[string]any{})
+		var skipped *skippedError
+		switch {
+		case errors.As(err, &skipped):
+			view.off = skipped.reason
+			return memoryMsg{view: view}
+		case err != nil:
+			// The service is down or failing: do not ask it a second question and wait again.
+			view.statusErr = err.Error()
+			return memoryMsg{view: view}
+		}
+		status := parseMemoryStatus(res)
+		view.status = &status
+
+		res, err = m.request("memory.stats", map[string]any{"action": memoryScoredAction})
+		if err != nil {
+			view.scoreErr = err.Error()
+			return memoryMsg{view: view}
+		}
+		score := parseMemoryScore(res)
+		view.score = &score
+		return memoryMsg{view: view}
+	}
+}
+
 func (m *Model) cmdMemes() tea.Cmd {
 	if !m.begin(tr("loading_memes")) {
 		return nil
@@ -377,6 +436,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.reloadMemes {
 			m.reloadMemes = false
 			return m, m.reloadMemesIfLoaded()
+		}
+		return m, nil
+
+	case memoryMsg:
+		m.busy = false
+		m.memory = msg.view
+		return m, nil
+
+	case memoryListMsg:
+		m.busy = false
+		list := msg.list
+		if len(list.Items) == 0 && list.Total > 0 && list.Offset > 0 {
+			// The last experience of the last page was forgotten: step back a page.
+			return m, m.cmdMemoryList(list.State, max(0, list.Offset-memoryPageSize), 0)
+		}
+		list.Cursor = max(0, min(list.Cursor, len(list.Items)-1))
+		m.memoryList = list
+		return m, nil
+
+	case memoryPredictionMsg:
+		m.busy = false
+		m.memoryResult = msg.view
+		return m, nil
+
+	case suggestionChanceMsg:
+		m.busy = false
+		if msg.prediction == nil {
+			m.chancePausedUntil = m.now().Add(chancePause)
+			return m, nil
+		}
+		m.chancePausedUntil = time.Time{}
+		if m.notice == msg.base && !m.noticeErr {
+			m.setNotice(msg.base+" · "+chanceNotice(*msg.prediction), false)
 		}
 		return m, nil
 
@@ -474,6 +566,12 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyHashtag(msg)
 	case overlayHashtagList:
 		return m.keyHashtagList(key)
+	case overlayMemory:
+		return m.keyMemory(key)
+	case overlayMemoryList:
+		return m.keyMemoryList(key)
+	case overlayMemoryPredict:
+		return m.keyMemoryPredict(msg)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -630,6 +728,7 @@ func (m *Model) keyMemes(key string) (tea.Model, tea.Cmd) {
 				eventType: "meme.hashtag.suggest",
 				payload:   map[string]any{"url": item.URL},
 				summarize: summarizeHashtagSuggestion,
+				onSuccess: func(m *Model, res map[string]any) tea.Cmd { return m.cmdSuggestionChance(res) },
 			})
 		}
 	case "l":
@@ -826,10 +925,14 @@ func (m *Model) keyConfirm(key string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		action := m.pending
-		m.pending, m.overlay = nil, overlayNone
+		m.pending, m.overlay = nil, action.back
 		return m, m.exec(action)
 	case "n", "N", "esc":
-		m.pending, m.overlay = nil, overlayNone
+		back := overlayNone
+		if m.pending != nil {
+			back = m.pending.back
+		}
+		m.pending, m.overlay = nil, back
 		m.setNotice("cancelado", false)
 	}
 	return m, nil
@@ -1138,12 +1241,55 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		}
 	case "p":
 		m.openProfiles()
+	case "m":
+		cmd := m.cmdMemory()
+		if cmd == nil {
+			return m, nil // another request is running; begin() already said so
+		}
+		m.memory = memoryView{}
+		m.overlay = overlayMemory
+		return m, cmd
 	case "i":
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.openInterval(row.name)
 		} else if ok {
 			m.setNotice(tr("only_jobs_have_an_interval_select_a_job"), true)
 		}
+	}
+	return m, nil
+}
+
+func (m *Model) keyMemory(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q":
+		m.overlay = overlayNone
+	case "r":
+		return m, m.cmdMemory()
+	case "l":
+		cmd := m.cmdMemoryList("", 0, 0)
+		if cmd == nil {
+			return m, nil // another request is running; begin() already said so
+		}
+		m.memoryList = memoryExperiences{}
+		m.overlay = overlayMemoryList
+		return m, cmd
+	case "p":
+		m.memoryInput.SetValue("")
+		m.memoryInput.Focus()
+		m.memoryResult = memoryPredictView{}
+		m.overlay = overlayMemoryPredict
+	case "x":
+		// One bounded batch per press: the service embeds a few dozen at a time, and the
+		// summary says how many remain.
+		return m, m.exec(&pendingAction{
+			label:     tr("reindex_memory"),
+			eventType: "memory.reindex",
+			payload:   map[string]any{},
+			summarize: func(res map[string]any) string {
+				return tr("d_embedded_d_remaining", num(res, "embedded"), num(res, "remaining"))
+			},
+			onSuccess: func(m *Model, _ map[string]any) tea.Cmd { return m.cmdMemory() },
+		})
 	}
 	return m, nil
 }

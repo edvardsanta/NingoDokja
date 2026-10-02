@@ -89,6 +89,34 @@ func (s *statusData) service(name string) (serviceRow, bool) {
 	return serviceRow{}, false
 }
 
+// memoryStatus is what the experience memory reports about itself.
+type memoryStatus struct {
+	Experiences, Pending, Resolved, Expired, Embedded, NeedsReindex int
+	// Embeddings is whether an embedding server is configured at all; EmbedderReachable is
+	// whether it answers right now.
+	Embeddings, EmbedderReachable bool
+	EmbedModel                    string
+}
+
+// memoryScore is how the stored predictions fared against what happened.
+type memoryScore struct {
+	Scored, Unscored, MinScored           int
+	BrierPrediction, BrierBaseline, Skill float64
+	BeatsBaseline, EnoughData             bool
+}
+
+// memoryView is the memory overlay's content. It is read on demand and never as part of the
+// panel refresh: a stopped memory service takes seconds to fail, and the panel must not wait.
+type memoryView struct {
+	loaded bool
+	// off is the reason the orchestrator refused the request, when the service is switched off.
+	off       string
+	statusErr string
+	scoreErr  string
+	status    *memoryStatus
+	score     *memoryScore
+}
+
 type memeItem struct {
 	URL, Title, Tags, Source, DateCreated, DateSent string
 }
@@ -138,6 +166,16 @@ func num(m map[string]any, key string) int {
 		return int(v)
 	case int:
 		return v
+	}
+	return 0
+}
+
+func flt(m map[string]any, key string) float64 {
+	switch v := m[key].(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
 	}
 	return 0
 }
@@ -228,6 +266,35 @@ func parseStatus(system, meme map[string]any, now time.Time) statusData {
 		}
 	}
 	return data
+}
+
+func parseMemoryStatus(res map[string]any) memoryStatus {
+	status := memoryStatus{
+		Experiences:  num(res, "experiences"),
+		Pending:      num(res, "pending"),
+		Resolved:     num(res, "resolved"),
+		Expired:      num(res, "expired"),
+		Embedded:     num(res, "embedded"),
+		NeedsReindex: num(res, "needs_reindex"),
+		EmbedModel:   str(res, "embed_model"),
+	}
+	status.Embeddings, _ = res["embeddings"].(bool)
+	status.EmbedderReachable, _ = res["embedder_reachable"].(bool)
+	return status
+}
+
+func parseMemoryScore(res map[string]any) memoryScore {
+	score := memoryScore{
+		Scored:          num(res, "scored"),
+		Unscored:        num(res, "unscored"),
+		MinScored:       num(res, "min_scored"),
+		BrierPrediction: flt(res, "brier_prediction"),
+		BrierBaseline:   flt(res, "brier_baseline"),
+		Skill:           flt(res, "skill"),
+	}
+	score.BeatsBaseline, _ = res["beats_baseline"].(bool)
+	score.EnoughData, _ = res["enough_data"].(bool)
+	return score
 }
 
 func parseMemePage(res map[string]any) memePage {
