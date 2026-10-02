@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY dokja_interfaces/discord/package.json /app/package.json
 COPY dokja_interfaces/discord/pnpm-lock.yaml /app/pnpm-lock.yaml
+COPY dokja_interfaces/discord/pnpm-workspace.yaml /app/pnpm-workspace.yaml
 
 RUN pnpm install --frozen-lockfile
 
