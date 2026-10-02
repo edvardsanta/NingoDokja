@@ -2,7 +2,7 @@ import { useCallback, useId, useState } from "react";
 
 import type { KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
-import { useTranslate } from "../i18n/context.js";
+import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
 import {
   parseKnowledgeSearch,
@@ -127,6 +127,7 @@ function SearchBox({ transport }: { transport: Transport }) {
 
 function SearchResults({ search }: { search: KnowledgeSearch | Off }) {
   const t = useTranslate();
+  const { fixed } = useNumbers();
   if (search.off) return <OffNotice reason={search.reason} />;
   if (search.hits.length === 0) {
     return (
@@ -160,7 +161,7 @@ function SearchResults({ search }: { search: KnowledgeSearch | Off }) {
             <p className="detail">
               {[
                 hit.relevant ? "" : t("knowledge_weak"),
-                hit.score === null ? "" : t("knowledge_score", { score: hit.score.toFixed(2) }),
+                hit.score === null ? "" : t("knowledge_score", { score: fixed(hit.score, 2) }),
                 hit.kind,
                 hit.tags.join(", "),
                 hit.sourceRef,

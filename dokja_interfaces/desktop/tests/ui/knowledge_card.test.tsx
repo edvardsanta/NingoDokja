@@ -205,6 +205,6 @@ describe("the knowledge card", () => {
     screen.getByRole("heading", { name: "Base de pesquisa" });
     await ask("livre-arbítrio");
     await screen.findByText("Nenhuma correspondência relevante. Estes são os trechos mais próximos.");
-    screen.getByText("correspondência fraca, pontuação 0.61, note, a, b, ref-1");
+    screen.getByText("correspondência fraca, pontuação 0,61, note, a, b, ref-1");
   });
 });

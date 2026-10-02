@@ -153,4 +153,15 @@ describe("the memory card", () => {
     screen.getByRole("heading", { name: "Memória de experiências" });
     screen.getByText("memória");
   });
+
+  it("writes its decimals the way Portuguese does", async () => {
+    const { transport } = routedTransport({
+      "memory.status": ok(MEMORY_STATUS),
+      "memory.stats": ok(MEMORY_SCORE),
+    });
+    renderCard(transport, "pt");
+
+    await screen.findByText("Skill +0,70: supera o baseline.");
+    screen.getByText("Brier, menor é melhor: previsão 0,081, baseline 0,270.");
+  });
 });

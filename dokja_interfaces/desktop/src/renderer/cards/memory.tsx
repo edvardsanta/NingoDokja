@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
 import type { Transport } from "../../shared/transport.js";
-import { useTranslate } from "../i18n/context.js";
+import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice } from "./card_frame.js";
 import {
   parseMemoryStatus,
@@ -41,9 +41,6 @@ export function MemoryCard({ transport }: { transport: Transport }) {
   );
 }
 
-const fixed = (value: number, digits: number) => value.toFixed(digits);
-const signed = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
-
 function MemoryBody({ view }: { view: MemoryView }) {
   const t = useTranslate();
   if (view.off) return <OffNotice reason={view.reason} />;
@@ -78,6 +75,7 @@ function MemoryBody({ view }: { view: MemoryView }) {
 
 function ScoreBody({ score }: { score: ScoreView }) {
   const t = useTranslate();
+  const { fixed, signed } = useNumbers();
   switch (score.kind) {
     case "off":
       return <OffNotice reason={score.reason} />;
@@ -114,7 +112,7 @@ function ScoreBody({ score }: { score: ScoreView }) {
           {score.kind === "judged" && (
             <p className="note" data-tone={beatsBaseline ? "ok" : "unchecked"}>
               {t(beatsBaseline ? "memory_beats_baseline" : "memory_does_not_beat", {
-                skill: signed(skill),
+                skill: signed(skill, 2),
               })}
             </p>
           )}
