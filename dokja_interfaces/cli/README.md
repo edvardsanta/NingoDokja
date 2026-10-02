@@ -77,7 +77,8 @@ Administrative commands:
   (`--outcome`, or `--observed` to compare with what the bot did), `memory show` and
   `memory forget` manage single experiences, `memory list [--state pending|resolved] [--action]
   [--limit] [--offset]` pages through them newest first with a snippet of each context (it is how you
-  recognize one, since the ref is a hash), and `memory status` and `memory reindex` look after the
+  recognize one, since the ref is a hash) and, for a hashtag suggestion, how close the earlier tagged meme it
+  rested on was and the start of its text, and `memory status` and `memory reindex` look after the
   service. See `dokja_docs/experience-memory-plan.md`.
 - `discord send` posts text and/or an image (`--text`, `--image`) to `--channel <id>`
   (repeatable) or `--all`. The channel picked decides the transport: a channel with a
