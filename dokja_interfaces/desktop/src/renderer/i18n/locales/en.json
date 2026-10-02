@@ -63,5 +63,6 @@
   "memes_no_preview": "no preview",
   "memes_untitled": "untitled",
   "memes_added": "added {date}",
-  "memes_sent_on": "sent {date}"
+  "memes_sent_on": "sent {date}",
+  "tabs_label": "Sections"
 }

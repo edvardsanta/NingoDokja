@@ -73,7 +73,7 @@ body {
 }
 
 main {
-  max-width: 46rem;
+  max-width: 64rem;
   margin: 0 auto;
   padding: 2.25rem 1.25rem 4rem;
 }
@@ -239,7 +239,7 @@ main {
   margin-top: 1.25rem;
 }
 
-button {
+button:not([role="tab"]) {
   padding: 0.35rem 1rem;
   border: 1px solid var(--cyan);
   background: transparent;
@@ -248,7 +248,7 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
+button:not([role="tab"]):hover:not(:disabled) {
   background: var(--cyan);
   color: var(--panel);
 }
@@ -420,4 +420,33 @@ button[aria-pressed="true"] {
 
 .meme-title {
   font-size: 0.875rem;
+}
+
+/* One tab per card. The open tab is cyan with a lit underline; the rest are dim. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.75rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.tab {
+  margin-bottom: -1px;
+  padding: 0.6rem 0.1rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--cyan);
+  color: var(--cyan);
+  text-shadow: 0 0 0.6rem color-mix(in srgb, var(--cyan) 55%, transparent);
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../../src/renderer/app.js";
@@ -11,6 +11,7 @@ import type { TransportResult } from "../../src/shared/transport.js";
 import { ALL_UP, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
 
 const wordmark = () => screen.getByRole("heading", { level: 1 });
+const tabNamed = (name: string) => screen.getByRole("tab", { name });
 
 type Route = TransportResult | (() => Promise<TransportResult>);
 
@@ -26,31 +27,65 @@ const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Ro
   routedTransport({ ...QUIET, "ningo.status": health, ...overrides });
 
 describe("the screen", () => {
-  it("shows the name and the health card, in the language it was given", async () => {
+  it("shows the name and the tabs, with the health card open, in the language it was given", async () => {
     const { transport } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="pt" />);
 
     expect(wordmark().textContent).toBe("Ningo");
+    expect(screen.getByRole("tablist", { name: "Seções" })).toBeTruthy();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "saúde",
+      "memória",
+      "conhecimento",
+      "memes",
+    ]);
     await screen.findByRole("heading", { name: "Serviços" });
-    await screen.findByRole("heading", { name: "Memória de experiências" });
-    await screen.findByRole("heading", { name: "Base de pesquisa" });
-    await screen.findByRole("heading", { name: "Fila de memes" });
     expect(document.documentElement.lang).toBe("pt");
+  });
+
+  it("asks nothing for a card nobody opened", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP));
+    render(<App transport={transport} locale="en" />);
+
+    await screen.findByText("2 up, 0 with problems, 0 switched off");
+    expect(calls.map((call) => call.type)).toEqual(["ningo.status"]);
+    expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
+  });
+
+  it("opens each card from its tab", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP));
+    render(<App transport={transport} locale="en" />);
+
+    fireEvent.click(tabNamed("memory"));
+    await screen.findByRole("heading", { name: "Experience memory" });
+    fireEvent.click(tabNamed("knowledge"));
+    await screen.findByRole("heading", { name: "Research base" });
+    fireEvent.click(tabNamed("memes"));
+    await screen.findByRole("heading", { name: "Meme queue" });
+
+    await waitFor(() =>
+      expect(calls.map((call) => call.type)).toEqual([
+        "ningo.status",
+        "memory.status",
+        "knowledge.status",
+        "meme.status",
+      ]),
+    );
   });
 
   it("keeps the other cards when one fails", async () => {
     const { transport } = screenTransport(statusReply(ALL_UP), { "memory.status": failure("unavailable") });
     render(<App transport={transport} locale="en" />);
-
     await screen.findByText("2 up, 0 with problems, 0 switched off");
+
+    fireEvent.click(tabNamed("memory"));
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("The orchestrator is not answering. Is it running?");
-    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
-      "Services",
-      "Experience memory",
-      "Research base",
-      "Meme queue",
-    ]);
+
+    fireEvent.click(tabNamed("knowledge"));
+    await screen.findByText("Switched off.");
+    fireEvent.click(tabNamed("health"));
+    expect(screen.getByRole("tabpanel").textContent).toContain("2 up, 0 with problems, 0 switched off");
   });
 
   it("has one card per kind, each kind once", () => {
@@ -95,7 +130,9 @@ describe("the screen", () => {
       const { transport } = screenTransport(statusReply(SERVICES));
       render(<App transport={transport} locale={locale} />);
       await screen.findByText("meme");
-      await waitFor(() => expect(screen.queryAllByRole("status")).toHaveLength(0));
+      // every card, not only the open one: a closed tab keeps its text in the page
+      for (const tab of screen.getAllByRole("tab")) fireEvent.click(tab);
+      await waitFor(() => expect(screen.queryAllByRole("status", { hidden: true })).toHaveLength(0));
       return document.body.textContent ?? "";
     };
 
