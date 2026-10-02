@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 )
@@ -30,13 +31,37 @@ func HealthProbe(checker HealthChecker) ServiceProbe {
 // StatusProbe probes a service through its status request. A service that is up but
 // cannot embed (Ollama down, or embeddings switched off) still answers ok, with a note.
 func StatusProbe(reader ServiceStatusReader) ServiceProbe {
+	return StatusProbeWith(reader, embedderNote)
+}
+
+// StatusProbeWith is StatusProbe with the note a service adds to its own ok.
+func StatusProbeWith(reader ServiceStatusReader, note func(status map[string]any) string) ServiceProbe {
 	return func(ctx context.Context) (string, error) {
 		result, err := reader.Status(ctx)
 		if err != nil {
 			return "", err
 		}
-		return embedderNote(result), nil
+		return note(result), nil
 	}
+}
+
+// feedsNote says what the feeds service cannot say by being up: that nothing is following
+// anything yet, or that some of the plugins it follows are failing. Only counts are read.
+func feedsNote(status map[string]any) string {
+	enabled, _ := status["enabled"].(float64)
+	failed, _ := status["failed"].(float64)
+	switch {
+	case enabled == 0:
+		return "no plugins enabled"
+	case failed > 0:
+		return fmt.Sprintf("%d of %d plugins failing", int(failed), int(enabled))
+	}
+	return ""
+}
+
+// FeedsProbe probes the feeds service through its status request.
+func FeedsProbe(reader ServiceStatusReader) ServiceProbe {
+	return StatusProbeWith(reader, feedsNote)
 }
 
 // embedderNote reads the embedder fields the knowledge and memory services share. Only

@@ -116,6 +116,15 @@ func actionFor(domain Domain, eventType string) string {
 		default:
 			return "handle-knowledge-event"
 		}
+	case DomainDigest:
+		switch eventType {
+		case "digest.status":
+			return "inspect-digest"
+		case "digest.items":
+			return "read-digest"
+		default:
+			return "handle-digest-event"
+		}
 	case DomainMemory:
 		switch eventType {
 		case "memory.record":

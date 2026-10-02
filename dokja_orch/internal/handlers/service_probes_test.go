@@ -162,3 +162,43 @@ func TestStatusRunsProbesAtTheSameTime(t *testing.T) {
 		t.Fatal("probes ran one after the other: a slow service would hold up the whole status")
 	}
 }
+
+func TestFeedsProbeSaysWhenNothingIsFollowedOrSomethingFails(t *testing.T) {
+	cases := map[string]struct {
+		status map[string]any
+		detail string
+	}{
+		"nothing enabled":          {map[string]any{"enabled": float64(0), "failed": float64(0)}, "no plugins enabled"},
+		"no counts at all":         {map[string]any{}, "no plugins enabled"},
+		"all plugins fine":         {map[string]any{"enabled": float64(2), "failed": float64(0)}, ""},
+		"some plugins failing":     {map[string]any{"enabled": float64(3), "failed": float64(2)}, "2 of 3 plugins failing"},
+		"every plugin failing":     {map[string]any{"enabled": float64(1), "failed": float64(1)}, "1 of 1 plugins failing"},
+		"counts of the wrong type": {map[string]any{"enabled": "3", "failed": "1"}, "no plugins enabled"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			detail, err := FeedsProbe(fakeStatus{result: c.status})(context.Background())
+			if err != nil || detail != c.detail {
+				t.Fatalf("detail=%q err=%v, want %q", detail, err, c.detail)
+			}
+		})
+	}
+
+	if _, err := FeedsProbe(fakeStatus{err: errors.New("connection refused")})(context.Background()); err == nil {
+		t.Fatal("a feeds service that does not answer must fail its probe")
+	}
+}
+
+func TestStatusShowsTheFeedsServiceWithItsNote(t *testing.T) {
+	handler, _ := controlledHandler(t)
+	handler.WithServiceProbes(map[string]ServiceProbe{
+		"feeds": FeedsProbe(fakeStatus{result: map[string]any{"enabled": float64(0)}}),
+	})
+
+	_, services := statusServices(t, handler)
+
+	feeds := services["feeds"].(map[string]any)
+	if feeds["status"] != "ok" || feeds["enabled"] != true || feeds["detail"] != "no plugins enabled" {
+		t.Fatalf("unexpected feeds entry %#v", feeds)
+	}
+}
