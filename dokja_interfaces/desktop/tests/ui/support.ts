@@ -1,5 +1,9 @@
 import type { ActionType } from "../../src/shared/actions.js";
 import type {
+  DigestItem,
+  DigestPage,
+  DigestSource,
+  DigestStatus,
   KnowledgeHit,
   KnowledgeSearch,
   KnowledgeStatus,
@@ -200,3 +204,41 @@ export function previewer(failing: string[] = []) {
   };
   return { asked, preview };
 };
+
+// The digest. Times are relative to the real clock, in the middle of a unit ("2 hours ago" holds
+// from 2 hours to 2 hours 59 minutes), so a test cannot cross a boundary while it runs.
+export const minutesAgo = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
+
+export const digestSource = (id: string, overrides: Partial<DigestSource> = {}): DigestSource => ({
+  id, name: id, state: "ok", running: false, items: 0, skipped: 0, lastOk: "", error: "", ...overrides,
+});
+
+export const DIGEST_STATUS: DigestStatus = {
+  configured: true,
+  directoryError: "",
+  ok: 2,
+  failed: 1,
+  pending: 0,
+  disabled: 1,
+  invalid: 0,
+  items: 5,
+  sources: [
+    digestSource("alpha", { name: "Alpha source", items: 3, lastOk: minutesAgo(10) }),
+    digestSource("beta", { name: "Beta source", items: 2, lastOk: minutesAgo(130) }),
+    digestSource("gamma", { name: "Gamma source", state: "failed", error: "exit status 2" }),
+    digestSource("delta", { name: "Delta source", state: "disabled" }),
+  ],
+};
+
+export const digestItem = (number: number, overrides: Partial<DigestItem> = {}): DigestItem => ({
+  id: `item-${number}`,
+  title: `Entry ${number}`,
+  summary: `Summary ${number}`,
+  source: "Alpha source",
+  published: minutesAgo(150),
+  ...overrides,
+});
+
+export const digestPage = (items: DigestItem[], overrides: Partial<DigestPage> = {}): DigestPage => ({
+  items, total: items.length, offset: 0, more: 0, updated: minutesAgo(10), ...overrides,
+});

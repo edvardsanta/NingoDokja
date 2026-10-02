@@ -18,6 +18,7 @@ type Route = TransportResult | (() => Promise<TransportResult>);
 // Every card the screen shows needs a route. The cards a test does not care about answer that
 // their service is switched off, so adding a card means adding one line here.
 const QUIET: Partial<Record<ActionType, Route>> = {
+  "digest.status": ok(OFF),
   "memory.status": ok(OFF),
   "knowledge.status": ok(OFF),
   "meme.status": ok(OFF),
@@ -35,6 +36,7 @@ describe("the screen", () => {
     expect(screen.getByRole("tablist", { name: "Seções" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "saúde",
+      "leituras",
       "memória",
       "conhecimento",
       "memes",
@@ -56,6 +58,8 @@ describe("the screen", () => {
     const { transport, calls } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="en" />);
 
+    fireEvent.click(tabNamed("digest"));
+    await screen.findByRole("heading", { name: "Reading digest" });
     fireEvent.click(tabNamed("memory"));
     await screen.findByRole("heading", { name: "Experience memory" });
     fireEvent.click(tabNamed("knowledge"));
@@ -66,6 +70,7 @@ describe("the screen", () => {
     await waitFor(() =>
       expect(calls.map((call) => call.type)).toEqual([
         "ningo.status",
+        "digest.status",
         "memory.status",
         "knowledge.status",
         "meme.status",

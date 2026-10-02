@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import type { MessageId } from "../i18n/i18n.js";
+import { DigestCard } from "./digest.js";
 import { HealthCard } from "./health.js";
 import { KnowledgeCard } from "./knowledge.js";
 import { MemesCard } from "./memes.js";
@@ -18,6 +19,7 @@ export type CardEntry = {
 // line here (and its action to the allow-list in src/shared/actions.ts).
 export const CARDS: readonly CardEntry[] = [
   { kind: "health", labelId: "kind_health", Card: HealthCard },
+  { kind: "digest", labelId: "kind_digest", Card: DigestCard },
   { kind: "memory", labelId: "kind_memory", Card: MemoryCard },
   { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard },
   { kind: "memes", labelId: "kind_memes", Card: MemesCard },

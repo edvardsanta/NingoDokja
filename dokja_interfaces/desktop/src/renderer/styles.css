@@ -279,8 +279,13 @@ button:focus-visible {
 }
 
 @media (max-width: 34rem) {
+  /* The name may wrap rather than push the state out of the row. */
   .services {
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: minmax(0, max-content) 1fr;
+  }
+
+  .service-name {
+    overflow-wrap: anywhere;
   }
 
   .service-detail {
@@ -449,4 +454,63 @@ button[aria-pressed="true"] {
   border-bottom-color: var(--cyan);
   color: var(--cyan);
   text-shadow: 0 0 0.6rem color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+
+/* The digest: one entry per row, the title first, a short summary cut after two lines. */
+.digest {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.digest li {
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 3px solid var(--cyan);
+}
+
+.digest p {
+  overflow-wrap: anywhere;
+}
+
+.digest-title {
+  font-weight: 700;
+}
+
+.digest-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-dim);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* The button that shows more, and the line after it, sit apart from the list. */
+.digest + button {
+  margin-top: 1rem;
+}
+
+.digest ~ .detail {
+  margin-top: 0.5rem;
+}
+
+.sources {
+  margin-top: 1.25rem;
+}
+
+.sources summary {
+  width: max-content;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.sources summary:hover {
+  color: var(--ink);
+}
+
+.sources summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
 }

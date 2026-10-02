@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import type { Locale } from "../../shared/locale.js";
-import { formatNumber } from "./format.js";
+import { formatAgo, formatNumber } from "./format.js";
 import { createTranslator, type Translate } from "./i18n.js";
 
 const TranslateContext = createContext<Translate>(createTranslator("en"));
@@ -27,4 +27,10 @@ export function useNumbers() {
     fixed: (value: number, digits: number) => formatNumber(locale, value, digits),
     signed: (value: number, digits: number) => formatNumber(locale, value, digits, { signed: true }),
   };
+}
+
+// Times as the language of the screen says them.
+export function useTimes() {
+  const locale = useContext(LocaleContext);
+  return { ago: (iso: string) => formatAgo(locale, iso) };
 }
