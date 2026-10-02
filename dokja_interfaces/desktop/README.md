@@ -105,10 +105,13 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
   unless the browser reported a real mouse press or key press in the window in the last 3 seconds. A
   script in the page can call the shell but cannot fake that input, so content that tricks the page into
   running code cannot write on its own, and it cannot wait for an unrelated click either. The payload of
-  `knowledge.ingest` (a note, an address or a file) is built by the shell: the screen cannot choose the
-  kind, the id or the reference, an address must be `http` or `https` (anything else would be handed to
-  one of the owner's own plugins), and a note or a file gets an id made from what it holds, so adding the
-  same thing twice changes nothing and two notes with one title do not replace each other.
+  `knowledge.ingest` (a note, an address or a file) is built by the shell: the person chooses its kind,
+  where it came from and an id, within the service's own rules (a kind is one lowercase word, an id uses
+  letters, digits and `. _ : / # @ -`), but never the service's `source` field: an address must be `http`
+  or `https` (anything else would be handed to one of the owner's own plugins). Without an id of its own,
+  a note or a file gets one made from what it holds, so adding the same thing twice changes nothing and
+  two notes with one title do not replace each other; an id the person chose replaces the document that
+  has it.
 - **Payloads and projections** (`src/main/actions.ts`): each action builds its own payload, so the
   screen cannot add fields or change the digest's rules, and hands the screen only the fields a card
   reads, so channel IDs, provider profiles, plugin names and item addresses never reach it. Long texts

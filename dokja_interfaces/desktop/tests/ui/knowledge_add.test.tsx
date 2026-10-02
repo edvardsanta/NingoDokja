@@ -47,6 +47,64 @@ describe("adding to the research base", () => {
     screen.getByLabelText("File");
   });
 
+  it("sends the kind, the reference and the id that were chosen, and keeps the kind for the next one", async () => {
+    const { transport, calls } = routedTransport({ "knowledge.ingest": ok(CREATED) });
+    renderForm(transport);
+    expect((screen.getByLabelText("Kind") as HTMLInputElement).placeholder).toBe("note");
+
+    type("Title", "A thought");
+    type("Text", "Something to keep.");
+    type("Kind", "idea");
+    type("Where it came from (optional)", " Book, p. 12 ");
+    fireEvent.click(screen.getByText("More options"));
+    type("Id (optional)", "my:thought-1");
+    send();
+
+    await screen.findByText("Added. Passages stored: 2.");
+    expect(sent(calls)[0]?.payload).toEqual({
+      mode: "note", title: "A thought", body: "Something to keep.", kind: "idea", reference: "Book, p. 12", id: "my:thought-1",
+    });
+    await waitFor(() => expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe(""));
+    expect((screen.getByLabelText("Where it came from (optional)") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Id (optional)") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Kind") as HTMLInputElement).value).toBe("idea");
+  });
+
+  it("offers kinds to pick from, shows the default of each way of adding, and takes any other word", () => {
+    const view = renderForm(routedTransport({}).transport);
+
+    const options = [...view.container.querySelectorAll("datalist option")].map((option) => option.getAttribute("value"));
+    expect(options).toEqual(["note", "article", "book", "paper", "document", "list"]);
+    mode("Address");
+    expect((screen.getByLabelText("Kind") as HTMLInputElement).placeholder).toBe("article");
+    mode("File");
+    expect((screen.getByLabelText("Kind") as HTMLInputElement).placeholder).toBe("document");
+  });
+
+  it("says when a kind, a reference or an id is not allowed, before sending", () => {
+    const { transport, calls } = routedTransport({ "knowledge.ingest": ok(CREATED) });
+    renderForm(transport);
+    type("Title", "T");
+    type("Text", "text");
+
+    type("Kind", "Two Words");
+    send();
+    expect(screen.getByRole("alert").textContent).toBe("A kind is one lowercase word, such as note, article or book.");
+    type("Kind", "idea");
+    fireEvent.click(screen.getByText("More options"));
+    type("Id (optional)", "has space");
+    send();
+    expect(screen.getByRole("alert").textContent).toBe("An id uses letters, digits and . _ : / # @ - (up to 200 characters).");
+    expect(sent(calls)).toHaveLength(0);
+  });
+
+  it("warns that an id that already exists replaces that document", () => {
+    renderForm(routedTransport({}).transport);
+    fireEvent.click(screen.getByText("More options"));
+
+    screen.getByText("Leave it empty and the id is made from what you add. Giving an id that already exists replaces that document.");
+  });
+
   it("sends a note as the shell expects, then clears the form and says what happened", async () => {
     const { transport, calls } = routedTransport({ "knowledge.ingest": ok(CREATED) });
     renderForm(transport);

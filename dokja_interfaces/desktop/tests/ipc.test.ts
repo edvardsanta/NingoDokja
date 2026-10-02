@@ -293,15 +293,16 @@ test("a change is refused without a recent click or key press, and the orchestra
 test("a change goes through right after real input, with the payload the shell built", async () => {
   const { orchestrator, calls } = recorder({ status: "ok", result: ingested });
   const result = await handleRequest(
-    { type: "knowledge.ingest", payload: { ...note, kind: "secret", source_id: "other:document", source: "plugin:thing" } },
+    { type: "knowledge.ingest", payload: { ...note, kind: "idea", reference: "Book, p. 12", source_id: "other:document", source: "plugin:thing" } },
     orchestrator, limits, undefined, here,
   );
 
   assert.deepEqual(result, { ok: true, result: { count: 1, created: 1, updated: 0, unchanged: 0, chunks: 1, degraded: false, reason: "" } });
   assert.equal(calls.length, 1);
   const sent = calls[0]?.payload ?? {};
-  assert.equal(sent.kind, "note", "the screen cannot choose the kind");
-  assert.match(String(sent.source_id), /^note:a-thought-[0-9a-f]{10}$/, "nor the id");
+  assert.equal(sent.kind, "idea", "the person chooses the kind");
+  assert.equal(sent.source_ref, "Book, p. 12", "and where it came from");
+  assert.match(String(sent.source_id), /^note:a-thought-[0-9a-f]{10}$/, "the id the screen named is not the service's field");
   assert.equal(sent.source, undefined);
 });
 

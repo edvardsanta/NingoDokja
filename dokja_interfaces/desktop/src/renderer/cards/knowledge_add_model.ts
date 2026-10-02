@@ -1,4 +1,4 @@
-import { INGEST_LIMITS as LIMITS, base64Length, type IngestMode } from "../../shared/ingest.js";
+import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, base64Length, type IngestMode } from "../../shared/ingest.js";
 import { isRecord, text } from "../../shared/records.js";
 import type { IngestResult, Off } from "../../shared/replies.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -13,8 +13,18 @@ export type Draft = {
   body: string;
   address: string;
   tags: string;
+  // blank means the default of the mode, the address itself, and an id made from what is added
+  kind: string;
+  reference: string;
+  id: string;
   file?: FileDraft;
 };
+
+// What a kind is when none is chosen, per way of adding.
+export const DEFAULT_KINDS: Record<IngestMode, string> = { note: "note", address: "article", file: "document" };
+
+// Kinds worth offering; any one lowercase word is allowed.
+export const KIND_SUGGESTIONS = ["note", "article", "book", "paper", "document", "list"] as const;
 
 // What the screen says when it cannot send: a message and the numbers it needs.
 export type Problem = { id: MessageId; params?: Record<string, number> };
@@ -54,7 +64,20 @@ export function check(draft: Draft): Checked {
   const tags = tagsOf(draft.tags);
   if (tags.length > LIMITS.tags) return refuse("add_too_many_tags", { max: LIMITS.tags });
   if (tags.some((tag) => tag.length > LIMITS.tagChars)) return refuse("add_tag_too_long", { max: LIMITS.tagChars });
-  const common = { mode: draft.mode, ...(title === "" ? {} : { title }), ...(tags.length === 0 ? {} : { tags }) };
+  const kind = draft.kind.trim();
+  if (kind !== "" && !INGEST_KIND.test(kind)) return refuse("add_bad_kind");
+  const reference = draft.reference.trim();
+  if (reference.length > LIMITS.referenceChars) return refuse("add_ref_too_long", { max: LIMITS.referenceChars });
+  const id = draft.id.trim();
+  if (id !== "" && !INGEST_ID.test(id)) return refuse("add_bad_id", { max: LIMITS.idChars });
+  const common = {
+    mode: draft.mode,
+    ...(title === "" ? {} : { title }),
+    ...(tags.length === 0 ? {} : { tags }),
+    ...(kind === "" ? {} : { kind }),
+    ...(reference === "" ? {} : { reference }),
+    ...(id === "" ? {} : { id }),
+  };
 
   switch (draft.mode) {
     case "note":

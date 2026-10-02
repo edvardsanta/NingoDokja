@@ -120,5 +120,14 @@
   "add_nothing": "There was nothing to add.",
   "add_many": "{count} entries: {created} added, {updated} updated, {unchanged} already there.",
   "add_degraded": "Not indexed by meaning yet, so for now it is found by keywords.",
-  "add_timeout": "No answer in time. It may have been added; sending it again is safe."
+  "add_timeout": "No answer in time. It may have been added; sending it again is safe.",
+  "add_field_kind": "Kind",
+  "add_field_reference": "Where it came from (optional)",
+  "add_reference_placeholder": "such as a web address, or a book and page",
+  "add_more": "More options",
+  "add_field_id": "Id (optional)",
+  "add_id_hint": "Leave it empty and the id is made from what you add. Giving an id that already exists replaces that document.",
+  "add_bad_kind": "A kind is one lowercase word, such as note, article or book.",
+  "add_ref_too_long": "The reference is longer than {max} characters.",
+  "add_bad_id": "An id uses letters, digits and . _ : / # @ - (up to {max} characters)."
 }

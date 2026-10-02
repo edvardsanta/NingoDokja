@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { INGEST_LIMITS as LIMITS, INGEST_MODES, base64Length } from "../shared/ingest.js";
+import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, INGEST_MODES, base64Length } from "../shared/ingest.js";
 import { text } from "../shared/records.js";
 
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -63,30 +63,57 @@ function webAddress(raw: unknown): string | undefined {
   return url.href;
 }
 
+// An optional text field: empty when it is absent or blank, undefined when it is not text at all.
+function optional(value: unknown): string | undefined {
+  if (value === undefined || value === null) return "";
+  return typeof value === "string" ? value.trim() : undefined;
+}
+
 // Builds the payload of knowledge.ingest from what the screen asked for: a note, an address or a
-// file. The screen cannot choose the kind, the id or the reference; what it sends beyond these
-// fields is dropped. Undefined when the request is not valid.
+// file, and optionally its kind, where it came from (reference) and the id it is known by. The
+// screen chooses these, within the service's own rules; what it sends beyond these fields (the
+// service's source, source_id, source_ref) is dropped. Undefined when the request is not valid.
 //
-// An id comes from what was added, so adding the same thing twice changes nothing and two notes
-// that share a title do not replace each other. An address keeps the service's own id, made of
-// the address, so adding it again refreshes that page.
+// Without an id of its own, a note or a file gets one made from what it holds, so adding the same
+// thing twice changes nothing and two notes that share a title do not replace each other. An
+// address keeps the service's own id, made of the address, so adding it again refreshes that page.
+// An id the person chose replaces the document that has it: that is what an id is for.
 export function buildIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const mode = raw.mode;
   if (!(INGEST_MODES as readonly unknown[]).includes(mode)) return undefined;
   const tags = cleanTags(raw.tags);
   const title = text(raw.title);
+  const chosenKind = optional(raw.kind);
+  const reference = optional(raw.reference);
+  const chosenId = optional(raw.id);
   if (!tags || title.length > LIMITS.titleChars) return undefined;
-  const common = { ...(title === "" ? {} : { title }), ...(tags.length === 0 ? {} : { tags }) };
+  if (chosenKind === undefined || (chosenKind !== "" && !INGEST_KIND.test(chosenKind))) return undefined;
+  if (reference === undefined || reference.length > LIMITS.referenceChars) return undefined;
+  if (chosenId === undefined || (chosenId !== "" && !INGEST_ID.test(chosenId))) return undefined;
+  const common = {
+    ...(title === "" ? {} : { title }),
+    ...(tags.length === 0 ? {} : { tags }),
+    ...(reference === "" ? {} : { source_ref: reference }),
+  };
+  const idOr = (derived?: string) => {
+    const id = chosenId !== "" ? chosenId : derived;
+    return id === undefined ? {} : { source_id: id };
+  };
 
   switch (mode) {
     case "note": {
       const body = typeof raw.body === "string" ? raw.body : "";
       if (title === "" || body.trim() === "" || body.length > LIMITS.noteChars) return undefined;
-      return { ...common, body, kind: "note", source_id: `note:${slug(title) || "note"}-${fingerprint(title, body)}` };
+      return {
+        ...common,
+        body,
+        kind: chosenKind || "note",
+        ...idOr(`note:${slug(title) || "note"}-${fingerprint(title, body)}`),
+      };
     }
     case "address": {
       const source = webAddress(raw.address);
-      return source === undefined ? undefined : { ...common, source, kind: "article" };
+      return source === undefined ? undefined : { ...common, source, kind: chosenKind || "article", ...idOr() };
     }
     default: {
       const filename = baseName(raw.filename);
@@ -99,8 +126,8 @@ export function buildIngest(raw: Record<string, unknown>): Record<string, unknow
         ...common,
         content_b64: content,
         filename,
-        kind: "document",
-        source_id: `file:${slug(stem) || "file"}-${fingerprint(filename, content)}`,
+        kind: chosenKind || "document",
+        ...idOr(`file:${slug(stem) || "file"}-${fingerprint(filename, content)}`),
       };
     }
   }

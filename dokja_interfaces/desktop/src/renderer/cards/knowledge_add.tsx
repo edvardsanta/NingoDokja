@@ -7,7 +7,9 @@ import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { OffNotice, Problem as ErrorLine } from "./card_frame.js";
 import {
+  DEFAULT_KINDS,
   FILE_MEGABYTES,
+  KIND_SUGGESTIONS,
   check,
   outcomeOf,
   parseIngestResult,
@@ -41,7 +43,7 @@ export async function addToBase(
     : { ok: false, error: { code: "unexpected", message: "unexpected ingest reply" } };
 }
 
-const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "" };
+const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "", kind: "", reference: "", id: "" };
 
 // A note, an address or a file, added to the research base. The form is off while a request is on
 // its way and never sends again by itself.
@@ -59,7 +61,8 @@ export function AddToBase({ transport, onAdded }: { transport: Transport; onAdde
   // What was sent is cleared once it is in; what failed stays, so nothing typed is lost.
   useEffect(() => {
     if (state.phase !== "ready" || state.data.off) return;
-    setDraft((current) => ({ ...current, title: "", body: "", address: "", tags: "", file: undefined }));
+    // The kind stays: documents of one kind tend to come together.
+    setDraft((current) => ({ ...current, title: "", body: "", address: "", tags: "", reference: "", id: "", file: undefined }));
     if (state.data.created + state.data.updated > 0) onAdded?.();
     // onAdded is a new function on every render of the card; what matters is a new answer
   }, [state]);
@@ -190,6 +193,32 @@ export function AddToBase({ transport, onAdded }: { transport: Transport; onAdde
             </>
           )}
 
+          <label htmlFor={field("kind")}>{t("add_field_kind")}</label>
+          <input
+            id={field("kind")}
+            list={field("kinds")}
+            value={draft.kind}
+            maxLength={INGEST_LIMITS.kindChars}
+            placeholder={DEFAULT_KINDS[draft.mode]}
+            autoComplete="off"
+            onChange={(event) => set("kind", event.target.value)}
+          />
+          <datalist id={field("kinds")}>
+            {KIND_SUGGESTIONS.map((kind) => (
+              <option key={kind} value={kind} />
+            ))}
+          </datalist>
+
+          <label htmlFor={field("reference")}>{t("add_field_reference")}</label>
+          <input
+            id={field("reference")}
+            value={draft.reference}
+            maxLength={INGEST_LIMITS.referenceChars}
+            placeholder={t("add_reference_placeholder")}
+            autoComplete="off"
+            onChange={(event) => set("reference", event.target.value)}
+          />
+
           <label htmlFor={field("tags")}>{t("add_field_tags")}</label>
           <input
             id={field("tags")}
@@ -197,6 +226,19 @@ export function AddToBase({ transport, onAdded }: { transport: Transport; onAdde
             autoComplete="off"
             onChange={(event) => set("tags", event.target.value)}
           />
+
+          <details className="more">
+            <summary>{t("add_more")}</summary>
+            <label htmlFor={field("id")}>{t("add_field_id")}</label>
+            <input
+              id={field("id")}
+              value={draft.id}
+              maxLength={INGEST_LIMITS.idChars}
+              autoComplete="off"
+              onChange={(event) => set("id", event.target.value)}
+            />
+            <p className="detail">{t("add_id_hint")}</p>
+          </details>
           <div>
             <button type="submit">{t("add_submit")}</button>
           </div>

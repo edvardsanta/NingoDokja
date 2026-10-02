@@ -117,7 +117,10 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   describe("a change", () => {
-    const note = { mode: "note", title: "A thought", body: "Something to keep.", kind: "secret", source_id: "other:document", source: "plugin:thing" };
+    const note = {
+      mode: "note", title: "A thought", body: "Something to keep.",
+      kind: "idea", reference: "Book, p. 12", id: "my:thought", source: "plugin:thing", source_id: "other:document",
+    };
     const ingested = () => orchestrator.seen.filter((event) => event.type === "knowledge.ingest");
 
     it("is refused when nothing real was pressed, even if a script clicks", async () => {
@@ -137,9 +140,10 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
       const [sent] = ingested();
       assert.equal(sent?.source, "desktop");
-      assert.equal(sent?.payload.kind, "note", "the screen cannot choose the kind");
-      assert.match(String(sent?.payload.source_id), /^note:a-thought-[0-9a-f]{10}$/, "nor the id");
-      assert.equal(sent?.payload.source, undefined, "nor the source");
+      assert.equal(sent?.payload.kind, "idea", "the person chooses the kind");
+      assert.equal(sent?.payload.source_ref, "Book, p. 12", "and the reference");
+      assert.equal(sent?.payload.source_id, "my:thought", "and the id");
+      assert.equal(sent?.payload.source, undefined, "but the service's own source field is never taken from the page");
     });
 
     it("is refused again when the click was a while ago", async () => {

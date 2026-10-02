@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { check, outcomeOf, parseIngestResult, type Draft } from "../src/renderer/cards/knowledge_add_model.js";
 import { INGEST_LIMITS } from "../src/shared/ingest.js";
 
-const draft = (overrides: Partial<Draft> = {}): Draft => ({ mode: "note", title: "", body: "", address: "", tags: "", ...overrides });
+const draft = (overrides: Partial<Draft> = {}): Draft => ({
+  mode: "note", title: "", body: "", address: "", tags: "", kind: "", reference: "", id: "", ...overrides,
+});
 
 test("a note needs a title and a text; both are sent trimmed where it matters", () => {
   assert.deepEqual(check(draft({ title: "  A thought ", body: "Keep this.\n", tags: "ethics, kant , ethics" })), {
@@ -78,4 +80,29 @@ test("what is said depends on what happened", () => {
     params: { count: 5, created: 2, updated: 1, unchanged: 2 },
   });
   assert.deepEqual(outcomeOf({ ...result, count: 0 }), { id: "add_nothing" });
+});
+
+test("the kind, the reference and the id go along when chosen, trimmed, and not when blank", () => {
+  assert.deepEqual(check(draft({ title: "T", body: "b", kind: " idea ", reference: " Book, p. 12 ", id: " my:note " })), {
+    ok: true,
+    payload: { mode: "note", title: "T", kind: "idea", reference: "Book, p. 12", id: "my:note", body: "b" },
+  });
+  assert.deepEqual(check(draft({ title: "T", body: "b", kind: "  ", reference: " ", id: "" })), {
+    ok: true,
+    payload: { mode: "note", title: "T", body: "b" },
+  });
+});
+
+test("a kind, a reference or an id outside the rules is said before sending", () => {
+  const base = { title: "T", body: "b" };
+  for (const kind of ["Note", "two words", "1x", "x".repeat(INGEST_LIMITS.kindChars + 1)]) {
+    assert.deepEqual(check(draft({ ...base, kind })), { ok: false, problem: { id: "add_bad_kind" } }, kind);
+  }
+  assert.deepEqual(check(draft({ ...base, reference: "x".repeat(INGEST_LIMITS.referenceChars + 1) })), {
+    ok: false,
+    problem: { id: "add_ref_too_long", params: { max: INGEST_LIMITS.referenceChars } },
+  });
+  for (const id of ["has space", "a?b", "a".repeat(INGEST_LIMITS.idChars + 1)]) {
+    assert.deepEqual(check(draft({ ...base, id })), { ok: false, problem: { id: "add_bad_id", params: { max: INGEST_LIMITS.idChars } } }, id);
+  }
 });

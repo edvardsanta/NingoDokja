@@ -112,8 +112,61 @@ test("only the name of a file is sent, never the path in front of it", () => {
   assert.ok(long.length <= INGEST_LIMITS.filenameChars && long.endsWith(".pdf"));
 });
 
-test("the screen cannot choose the kind, the id, the reference or the source of a note or a file", () => {
-  const extras = { kind: "secret", source_id: "other:doc", source_ref: "elsewhere", source: "plugin:x", unknown: 1 };
+test("the person chooses the kind, where it came from and the id", () => {
+  assert.deepEqual(build({ mode: "note", title: "T", body: "text", kind: "idea", reference: " Book, p. 12 ", id: "my:thought-1" }), {
+    title: "T",
+    source_ref: "Book, p. 12",
+    body: "text",
+    kind: "idea",
+    source_id: "my:thought-1",
+  });
+  assert.deepEqual(build({ mode: "address", address: "https://example.com/a", kind: "book", id: "web:a", reference: "A friend" }), {
+    source_ref: "A friend",
+    source: "https://example.com/a",
+    kind: "book",
+    source_id: "web:a",
+  });
+  const file = build({ mode: "file", filename: "a.txt", content: "QUJD", kind: "paper", id: "files/a.txt#1", reference: "doi:10.1/x" });
+  assert.equal(file?.kind, "paper");
+  assert.equal(file?.source_id, "files/a.txt#1");
+  assert.equal(file?.source_ref, "doi:10.1/x");
+});
+
+test("without a choice the kind, the reference and the id are the shell's own", () => {
+  const note = build({ mode: "note", title: "T", body: "text" });
+  assert.equal(note?.kind, "note");
+  assert.equal(note?.source_ref, undefined);
+  assert.match(String(note?.source_id), /^note:t-[0-9a-f]{10}$/);
+  assert.equal(build({ mode: "address", address: "https://example.com/" })?.kind, "article");
+  assert.equal(build({ mode: "address", address: "https://example.com/" })?.source_id, undefined, "the service makes it from the address");
+  assert.equal(build({ mode: "file", filename: "a.txt", content: "QUJD" })?.kind, "document");
+  // blank is the same as not given
+  assert.deepEqual(build({ mode: "note", title: "T", body: "text", kind: "  ", reference: " ", id: "" }), note);
+  assert.deepEqual(build({ mode: "note", title: "T", body: "text", kind: null, reference: null, id: null }), note);
+});
+
+test("a kind, a reference or an id outside the service's rules is refused", () => {
+  const base = { mode: "note", title: "T", body: "text" };
+  for (const kind of ["Note", "1abc", "has space", "x".repeat(INGEST_LIMITS.kindChars + 1), "a.b", "caf\u00e9", 5, {}, ["note"]]) {
+    assert.equal(build({ ...base, kind }), undefined, JSON.stringify(kind));
+  }
+  assert.ok(build({ ...base, kind: "x".repeat(INGEST_LIMITS.kindChars) }));
+  assert.ok(build({ ...base, kind: "a1_b-2" }));
+
+  for (const reference of ["x".repeat(INGEST_LIMITS.referenceChars + 1), 5, {}, ["a"]]) {
+    assert.equal(build({ ...base, reference }), undefined, JSON.stringify(reference).slice(0, 40));
+  }
+  assert.ok(build({ ...base, reference: "x".repeat(INGEST_LIMITS.referenceChars) }));
+
+  for (const id of ["has space", "a".repeat(INGEST_LIMITS.idChars + 1), "caf\u00e9", "a\nb", "a?b", "a,b", 5, {}]) {
+    assert.equal(build({ ...base, id }), undefined, JSON.stringify(id).slice(0, 40));
+  }
+  assert.ok(build({ ...base, id: "a".repeat(INGEST_LIMITS.idChars) }));
+  assert.ok(build({ ...base, id: "Az09._:/#@-" }));
+});
+
+test("what the service calls source, source_id and source_ref is never taken from the screen", () => {
+  const extras = { source: "plugin:x", source_id: "other:doc", source_ref: "elsewhere", unknown: 1 };
   const note = build({ mode: "note", title: "T", body: "text", ...extras }) ?? {};
   const file = build({ mode: "file", filename: "a.txt", content: "QUJD", ...extras }) ?? {};
   for (const sent of [note, file]) {
@@ -121,12 +174,11 @@ test("the screen cannot choose the kind, the id, the reference or the source of 
     assert.equal(sent.source_ref, undefined);
     assert.equal(sent.source, undefined);
     assert.equal(sent.unknown, undefined);
-    assert.notEqual(sent.kind, "secret");
   }
   const address = build({ mode: "address", address: "https://example.com/", ...extras }) ?? {};
-  assert.equal(address.source, "https://example.com/");
+  assert.equal(address.source, "https://example.com/", "an address is the shell's own reading of what was typed");
   assert.equal(address.source_id, undefined);
-  assert.equal(address.kind, "article");
+  assert.equal(address.source_ref, undefined);
 });
 
 test("an unknown mode is refused", () => {
