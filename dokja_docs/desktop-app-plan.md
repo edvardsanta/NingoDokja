@@ -141,7 +141,9 @@ fail on missing or stale IDs and on Portuguese leaking into English mode.
   (as the TUI does) and hands them to the renderer, which never loads a remote image itself. It fetches
   only addresses the orchestrator itself listed in a meme page, over http or https on the default ports,
   to public addresses only (checked on connect and on every redirect, literal IP hosts included), with a
-  size and time limit, and accepts only bytes that are a picture (SVG is left out).
+  time limit and a size cap (4 MiB for a picture, 20 MiB for a video), and accepts only bytes that match
+  what the host said: a picture (SVG is left out) or an MP4 or WebM video. The page's policy allows
+  `data:` media for the result and nothing remote.
 - Nothing in the app opens a link yet, so a digest item reaches the screen without its address. Opening
   links is a separate step: an IPC channel that opens only an `http` or `https` address the orchestrator
   returned, the way the image fetch is gated.

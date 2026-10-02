@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import {
   PAGE_SIZE,
-  isVideoAddress,
   pageRange,
   parseMemePage,
   parseMemeStatus,
@@ -34,15 +33,6 @@ test("a page keeps its memes and drops what is not a meme", () => {
   assert.deepEqual(parseMemePage({ off: true, reason: "paused" }), { off: true, reason: "paused" });
   for (const reply of [null, [], {}, { memes: "none" }]) {
     assert.equal(parseMemePage(reply), undefined, JSON.stringify(reply));
-  }
-});
-
-test("a video has no preview, a picture does", () => {
-  for (const url of ["https://v.example/a.mp4", "https://v.example/A.MP4?x=1", "https://v.example/clip.webm", "https://v.example/a.gifv", "https://v.example/m.mov"]) {
-    assert.equal(isVideoAddress(url), true, url);
-  }
-  for (const url of ["https://i.example/a.png", "https://i.example/a.gif", "https://i.example/mp4/a.jpg", "https://i.example/a", "not an address", ""]) {
-    assert.equal(isVideoAddress(url), false, url);
   }
 });
 

@@ -200,7 +200,9 @@ export function previewer(failing: string[] = []) {
     if (failing.some((part) => url.includes(part))) {
       return { ok: false, error: { code: "unavailable", message: "the image host did not answer" } };
     }
-    return { ok: true, dataUrl: `data:image/png;base64,${btoa(url)}` };
+    // a clip when the address says so, a picture otherwise: the screen goes by the data's type
+    const type = url.includes(".mp4") ? "video/mp4" : "image/png";
+    return { ok: true, dataUrl: `data:${type};base64,${btoa(url)}` };
   };
   return { asked, preview };
 };

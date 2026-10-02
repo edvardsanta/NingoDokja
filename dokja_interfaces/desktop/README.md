@@ -13,7 +13,7 @@ opened, and then keeps what it showed:
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search` | the research base and a search over it |
-| memes | `meme.status`, `meme.list` | the queue, with pictures fetched by the shell |
+| memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell |
 
 The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
 a digit. Every action is read-only, and nothing in the app opens a link or changes anything.
@@ -100,10 +100,13 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
   screen cannot add fields or change the digest's rules, and hands the screen only the fields a card
   reads, so channel IDs, provider profiles, plugin names and item addresses never reach it. Long texts
   are cut.
-- **Pictures:** the screen never loads a remote image. `preview(url)` asks the shell, which fetches
-  only an address the orchestrator itself listed in a meme page, over http or https on the default ports,
-  to public addresses only (checked on connect and on every redirect), with a size and time limit,
-  and only if the bytes are a picture. It hands back a data URL.
+- **Pictures and videos:** the screen never loads a remote file. `preview(url)` asks the shell, which
+  fetches only an address the orchestrator itself listed in a meme page, over http or https on the default
+  ports, to public addresses only (checked on connect and on every redirect), with a time limit and a
+  size cap (4 MiB for a picture, 20 MiB for a video), and only if the bytes are what the host said: a
+  picture, or an MP4 or WebM video. It hands back a data URL, and the screen shows a picture as an image and
+  a video as a silent loop with controls. The request starts with `Host`, as a browser's does: a host
+  behind a bot filter refuses a client whose headers start another way.
 - **Hardening:** sandboxed renderer with context isolation and no Node, IPC accepted only from the
   page the app loaded, every permission request denied, no navigation or new windows, no network
   requests (except the development server), and a strict Content-Security-Policy on the built page.

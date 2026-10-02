@@ -6,7 +6,6 @@ import { useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Pending, Problem } from "./card_frame.js";
 import {
   PAGE_SIZE,
-  isVideoAddress,
   pageRange,
   parseMemePage,
   parseMemeStatus,
@@ -155,14 +154,31 @@ function MemePageView({
   );
 }
 
+// A meme is a picture or a short video; the shell says which by the type of the data it hands back.
 function MemePreview({ transport, meme }: { transport: Transport; meme: MemeItem }) {
   const t = useTranslate();
-  const video = meme.url === "" || isVideoAddress(meme.url);
-  const preview = usePreview(transport, meme.url, !video);
+  const preview = usePreview(transport, meme.url, meme.url !== "");
 
-  if (video) return <div className="preview">{t("memes_video")}</div>;
-  if (preview.phase === "failed") return <div className="preview">{t("memes_no_preview")}</div>;
+  if (meme.url === "" || preview.phase === "failed") return <div className="preview">{t("memes_no_preview")}</div>;
   if (preview.phase === "loading") return <div className="preview" aria-busy="true" />;
+  if (preview.dataUrl.startsWith("data:video/")) {
+    // A clip plays by itself, silent and in a loop like a GIF, and can be paused or unmuted.
+    return (
+      <div className="preview">
+        <video
+          src={preview.dataUrl}
+          aria-label={meme.title || t("memes_untitled")}
+          autoPlay
+          muted
+          loop
+          controls
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+        />
+      </div>
+    );
+  }
   return (
     <div className="preview">
       <img src={preview.dataUrl} alt="" />

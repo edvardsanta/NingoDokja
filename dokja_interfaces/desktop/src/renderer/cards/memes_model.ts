@@ -39,18 +39,6 @@ export function parseMemePage(value: unknown): MemePage | Off | undefined {
   };
 }
 
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".mkv", ".m4v", ".gifv"];
-
-// A video has no preview: the shell only fetches pictures.
-export function isVideoAddress(url: string): boolean {
-  try {
-    const path = new URL(url).pathname.toLowerCase();
-    return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
-  } catch {
-    return false;
-  }
-}
-
 // The first to the last meme of a page, counting from 1.
 export function pageRange(page: MemePage): { from: number; to: number } {
   if (page.memes.length === 0) return { from: 0, to: 0 };

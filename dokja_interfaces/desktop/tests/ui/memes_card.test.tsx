@@ -51,7 +51,7 @@ describe("the memes card", () => {
     expect(screen.getAllByText("added 2026-09-03")).toHaveLength(2);
   });
 
-  it("previews each picture through the shell, and only what is a picture", async () => {
+  it("previews each picture and each clip through the shell", async () => {
     const { asked, preview } = previewer(["broken"]);
     const { transport } = routedTransport(
       {
@@ -62,6 +62,7 @@ describe("the memes card", () => {
             meme(2, { url: "https://images.example/clip.mp4" }),
             meme(3, { url: "https://images.example/broken.png" }),
             meme(4, { url: "" }),
+            meme(5, { url: "https://images.example/broken.mp4" }),
           ]),
         ),
       },
@@ -73,9 +74,23 @@ describe("the memes card", () => {
     const image = view.container.querySelector(".preview img") as HTMLImageElement;
     expect(image.getAttribute("src")).toBe(`data:image/png;base64,${btoa("https://images.example/1.png")}`);
     expect(image.getAttribute("alt")).toBe("");
-    expect(screen.getAllByText("video, no preview")).toHaveLength(2);
-    await screen.findByText("no preview");
-    expect(asked.sort()).toEqual(["https://images.example/1.png", "https://images.example/broken.png"]);
+
+    // a clip plays by itself, silent, in a loop, with controls to pause it or turn the sound on
+    const clips = view.container.querySelectorAll(".preview video");
+    expect(clips).toHaveLength(1);
+    const clip = clips[0] as HTMLVideoElement;
+    expect(clip.getAttribute("src")).toBe(`data:video/mp4;base64,${btoa("https://images.example/clip.mp4")}`);
+    expect(clip.getAttribute("aria-label")).toBe("Meme 2");
+    expect([clip.autoplay, clip.muted, clip.loop, clip.controls]).toEqual([true, true, true, true]);
+
+    // a failed picture, a failed clip and a meme with no address each say so; only the first two are asked for
+    await waitFor(() => expect(screen.getAllByText("no preview")).toHaveLength(3));
+    expect(asked.sort()).toEqual([
+      "https://images.example/1.png",
+      "https://images.example/broken.mp4",
+      "https://images.example/broken.png",
+      "https://images.example/clip.mp4",
+    ]);
   });
 
   it("pages forward and back, and the buttons stop at the ends", async () => {
@@ -209,16 +224,25 @@ describe("the memes card", () => {
 
   it("speaks Portuguese when asked", async () => {
     const { transport } = routedTransport(
-      { "meme.status": ok(MEME_STATUS), "meme.list": ok(memePage([meme(1, { title: "" }), meme(2, { url: "https://images.example/a.mp4" })], { total: 30 })) },
-      previewer().preview,
+      {
+        "meme.status": ok(MEME_STATUS),
+        "meme.list": ok(
+          memePage(
+            [meme(1, { title: "" }), meme(2, { url: "https://images.example/a.mp4" }), meme(3, { url: "https://images.example/broken.png" })],
+            { total: 30 },
+          ),
+        ),
+      },
+      previewer(["broken"]).preview,
     );
-    renderCard(transport, "pt");
+    const view = renderCard(transport, "pt");
 
     await screen.findByText("30 na fila, 8 enviados");
     screen.getByRole("heading", { name: "Fila de memes" });
-    screen.getByText("sem título");
-    screen.getByText("vídeo, sem prévia");
-    screen.getByText("1 a 2 de 30");
+    await screen.findByText("sem título");
+    await screen.findByText("sem prévia");
+    expect(view.container.querySelector(".preview video")?.getAttribute("aria-label")).toBe("Meme 2");
+    screen.getByText("1 a 3 de 30");
     within(screen.getByRole("group")).getByRole("button", { name: "Na fila" });
   });
 });

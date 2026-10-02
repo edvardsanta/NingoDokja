@@ -8,6 +8,7 @@ const POLICY = [
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' data:",
+  "media-src data:",
   "font-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",

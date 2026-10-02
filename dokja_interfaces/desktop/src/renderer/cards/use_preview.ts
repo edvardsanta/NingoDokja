@@ -1,32 +1,23 @@
 import { useEffect, useState } from "react";
 
 import type { Transport, TransportError } from "../../shared/transport.js";
+import { PreviewCache } from "./preview_cache.js";
 
 export type PreviewState =
   | { phase: "loading" }
   | { phase: "ready"; dataUrl: string }
   | { phase: "failed"; error: TransportError };
 
-const CACHE_LIMIT = 24;
-
-// The latest previews, so paging back does not fetch the same images again.
-const cache = new Map<string, string>();
-
-function remember(url: string, dataUrl: string): void {
-  cache.delete(url);
-  cache.set(url, dataUrl);
-  for (const oldest of cache.keys()) {
-    if (cache.size <= CACHE_LIMIT) break;
-    cache.delete(oldest);
-  }
-}
+// A page holds twelve memes: keep about two pages, within 96 million characters of data URL
+// (about 70 MB of files).
+const cache = new PreviewCache(24, 96_000_000);
 
 export function clearPreviewCache(): void {
   cache.clear();
 }
 
-// Asks the shell for the picture at an address. `enabled` is false for what has no preview (a video),
-// so no request is made. An answer that arrives after the address changed is dropped.
+// Asks the shell for the picture or video at an address. `enabled` is false for what has none, so no
+// request is made. An answer that arrives after the address changed is dropped.
 export function usePreview(transport: Transport, url: string, enabled: boolean): PreviewState {
   const [state, setState] = useState<PreviewState>({ phase: "loading" });
 
@@ -44,7 +35,7 @@ export function usePreview(transport: Transport, url: string, enabled: boolean):
       (result) => {
         if (!current) return;
         if (result.ok) {
-          remember(url, result.dataUrl);
+          cache.remember(url, result.dataUrl);
           setState({ phase: "ready", dataUrl: result.dataUrl });
         } else {
           setState({ phase: "failed", error: result.error });
