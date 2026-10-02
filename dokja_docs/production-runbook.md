@@ -83,6 +83,7 @@ Things to confirm:
 - orchestrator starts both ZeroMQ and HTTP ingress
 - Discord bot logs in successfully
 - chat AI `/health` responds internally
+- `dokja-cli status` (or the TUI panel) shows `ok` for every service you deployed
 - meme service starts and opens SQLite
 - scheduler emits bootstrap refresh and scheduled dispatch
 
@@ -125,6 +126,11 @@ Without a writable volume both files would be lost on every deploy.
 Startup still emits every scheduled job once, but the orchestrator skips the ones an operator paused, so a
 restart never posts something that was switched off. `dokja-cli services list` and `dokja-cli jobs list` show
 the current state.
+
+The status probe covers `chat_ai`, `meme`, `book`, `knowledge` and `memory`. A stack that does not run one of
+them (`docker-compose.lite.yml` has no knowledge service, `docker-compose.prod.yml` has no book service) shows
+it as `error` and the platform as `degraded` until you switch it off (`dokja-cli services disable <name>` or
+`space` in the TUI); a switched-off service is not probed.
 
 Chat profiles are created and removed on the machine that holds the database (`dokja-cli chat profile add`
 with `DOKJA_DB_FILE` pointing at it, or `p` in the TUI panel), never through the orchestrator. The
