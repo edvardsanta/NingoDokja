@@ -40,9 +40,12 @@ describe("the catalogs", () => {
     expect(unused).toEqual([]);
   });
 
+  // Words that are the same in both languages by nature, not because a message was forgotten.
+  const SAME_IN_BOTH = new Set(["kind_memes"]);
+
   it("translate every message, so none was left in English", () => {
     const same = Object.keys(en).filter(
-      (id) => (en as Record<string, string>)[id] === (pt as Record<string, string>)[id],
+      (id) => !SAME_IN_BOTH.has(id) && (en as Record<string, string>)[id] === (pt as Record<string, string>)[id],
     );
     expect(same).toEqual([]);
   });

@@ -19,6 +19,7 @@ type Route = TransportResult | (() => Promise<TransportResult>);
 const QUIET: Partial<Record<ActionType, Route>> = {
   "memory.status": ok(OFF),
   "knowledge.status": ok(OFF),
+  "meme.status": ok(OFF),
 };
 
 const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route>> = {}) =>
@@ -33,6 +34,7 @@ describe("the screen", () => {
     await screen.findByRole("heading", { name: "Serviços" });
     await screen.findByRole("heading", { name: "Memória de experiências" });
     await screen.findByRole("heading", { name: "Base de pesquisa" });
+    await screen.findByRole("heading", { name: "Fila de memes" });
     expect(document.documentElement.lang).toBe("pt");
   });
 
@@ -47,6 +49,7 @@ describe("the screen", () => {
       "Services",
       "Experience memory",
       "Research base",
+      "Meme queue",
     ]);
   });
 

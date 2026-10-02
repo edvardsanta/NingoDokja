@@ -49,5 +49,19 @@
   "knowledge_none_relevant": "Nenhuma correspondência relevante. Estes são os trechos mais próximos.",
   "knowledge_degraded": "Só busca por palavras.",
   "knowledge_weak": "correspondência fraca",
-  "knowledge_score": "pontuação {score}"
+  "knowledge_score": "pontuação {score}",
+  "kind_memes": "memes",
+  "memes_title": "Fila de memes",
+  "memes_counts": "{unsent} na fila, {sent} enviados",
+  "memes_scope_unsent": "Na fila",
+  "memes_scope_sent": "Enviados",
+  "memes_empty": "Nenhum meme nesta visão.",
+  "memes_range": "{from} a {to} de {total}",
+  "memes_previous": "Anterior",
+  "memes_next": "Próximos",
+  "memes_video": "vídeo, sem prévia",
+  "memes_no_preview": "sem prévia",
+  "memes_untitled": "sem título",
+  "memes_added": "adicionado em {date}",
+  "memes_sent_on": "enviado em {date}"
 }

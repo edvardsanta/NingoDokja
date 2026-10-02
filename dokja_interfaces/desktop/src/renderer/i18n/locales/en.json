@@ -49,5 +49,19 @@
   "knowledge_none_relevant": "No relevant match. These are the closest passages.",
   "knowledge_degraded": "Keyword search only.",
   "knowledge_weak": "weak match",
-  "knowledge_score": "score {score}"
+  "knowledge_score": "score {score}",
+  "kind_memes": "memes",
+  "memes_title": "Meme queue",
+  "memes_counts": "{unsent} waiting, {sent} sent",
+  "memes_scope_unsent": "Waiting",
+  "memes_scope_sent": "Sent",
+  "memes_empty": "No memes in this view.",
+  "memes_range": "{from} to {to} of {total}",
+  "memes_previous": "Previous",
+  "memes_next": "Next",
+  "memes_video": "video, no preview",
+  "memes_no_preview": "no preview",
+  "memes_untitled": "untitled",
+  "memes_added": "added {date}",
+  "memes_sent_on": "sent {date}"
 }
