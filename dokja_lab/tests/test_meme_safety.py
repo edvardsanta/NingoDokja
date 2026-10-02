@@ -637,6 +637,107 @@ def test_text_reader_reports_missing_model_files(tmp_path):
         TextReader(model_dir=str(tmp_path)).read(object())
 
 
+class RecordingRapidOCR:
+    """Stands in for rapidocr_onnxruntime.RapidOCR and remembers how it was built."""
+
+    built_with: dict = {}
+
+    def __init__(self, **kwargs):
+        type(self).built_with = kwargs
+
+
+def model_dir_with(tmp_path, *extra):
+    from memes.ocr import MODEL_FILES
+
+    for name in (*MODEL_FILES.values(), *extra):
+        (tmp_path / name).write_bytes(b"")
+    return str(tmp_path)
+
+
+@pytest.fixture
+def fake_rapidocr(monkeypatch):
+    RecordingRapidOCR.built_with = {}
+    monkeypatch.setitem(
+        sys.modules,
+        "rapidocr_onnxruntime",
+        SimpleNamespace(RapidOCR=RecordingRapidOCR),
+    )
+    return RecordingRapidOCR
+
+
+def test_text_reader_keeps_the_default_recognizer_without_an_override(
+    tmp_path, fake_rapidocr
+):
+    from memes.ocr import MODEL_FILES, TextReader
+
+    directory = model_dir_with(tmp_path)
+    TextReader(model_dir=directory)._get_engine()
+
+    assert fake_rapidocr.built_with == {
+        key: str(tmp_path / name) for key, name in MODEL_FILES.items()
+    }
+
+
+def test_text_reader_swaps_only_the_recognizer(tmp_path, fake_rapidocr):
+    from memes.ocr import MODEL_FILES, TextReader
+
+    directory = model_dir_with(tmp_path, "latin_rec.onnx")
+    TextReader(model_dir=directory, rec_model="latin_rec.onnx")._get_engine()
+
+    expected = {key: str(tmp_path / name) for key, name in MODEL_FILES.items()}
+    expected["rec_model_path"] = str(tmp_path / "latin_rec.onnx")
+    assert fake_rapidocr.built_with == expected
+
+
+def test_text_reader_fails_loudly_when_the_chosen_recognizer_is_missing(
+    tmp_path, fake_rapidocr
+):
+    from memes.ocr import TextReader
+
+    directory = model_dir_with(tmp_path)
+    with pytest.raises(FileNotFoundError, match="latin_rec.onnx"):
+        TextReader(model_dir=directory, rec_model="latin_rec.onnx")._get_engine()
+    assert fake_rapidocr.built_with == {}
+
+
+def test_text_reader_refuses_a_recognizer_outside_the_model_directory(
+    tmp_path, fake_rapidocr
+):
+    from memes.ocr import TextReader
+
+    directory = model_dir_with(tmp_path)
+    with pytest.raises(ValueError, match="inside the model directory"):
+        TextReader(model_dir=directory, rec_model="../elsewhere.onnx")._get_engine()
+
+
+def test_text_reader_needs_a_model_directory_for_a_custom_recognizer(fake_rapidocr):
+    from memes.ocr import TextReader
+
+    with pytest.raises(ValueError, match="DOKJA_OCR_MODEL_DIR"):
+        TextReader(rec_model="latin_rec.onnx")._get_engine()
+
+
+def test_text_reader_is_built_from_the_environment(monkeypatch):
+    from memes.safety import build_text_reader_from_env
+
+    monkeypatch.setenv("DOKJA_OCR_MODEL_DIR", " /models/rapidocr ")
+    monkeypatch.setenv("DOKJA_OCR_REC_MODEL", " latin_rec.onnx ")
+    reader = build_text_reader_from_env()
+    assert (reader.model_dir, reader.rec_model) == (
+        "/models/rapidocr",
+        "latin_rec.onnx",
+    )
+
+    monkeypatch.delenv("DOKJA_OCR_REC_MODEL")
+    assert build_text_reader_from_env().rec_model is None
+
+
+def test_accented_ocr_text_is_still_screened_against_the_blacklist():
+    # A Latin recognizer returns the accents the default one drops; the screen folds both.
+    assert not ocr_screen("ELE TORAVA, VOCÊ NÃO VIU?").check(meme()).safe
+    assert not ocr_screen("Você TÓRAVA").check(meme()).safe
+
+
 def test_text_reader_joins_detected_lines():
     from memes.ocr import TextReader
 
