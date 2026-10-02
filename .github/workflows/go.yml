@@ -29,3 +29,11 @@ jobs:
     - name: Test
       working-directory: ./dokja_orch
       run: go test -v ./...
+
+    - name: Test the feeds service
+      working-directory: ./dokja_services/dokja_feeds
+      run: go test -v ./...
+
+    - name: Test the digest domain
+      working-directory: ./dokja_domain/dokja_digest
+      run: go test -v ./...

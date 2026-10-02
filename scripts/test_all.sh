@@ -151,6 +151,20 @@ run_suite \
   "missing go.mod"
 
 run_suite \
+  "dokja_services/dokja_feeds" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_services/dokja_feeds" \
+  "[ -f '$ROOT_DIR/dokja_services/dokja_feeds/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
+  "dokja_domain/dokja_digest" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_domain/dokja_digest" \
+  "[ -f '$ROOT_DIR/dokja_domain/dokja_digest/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
   "dokja_domain/dokja_book" \
   "GOCACHE='$GOCACHE_DIR' go test ./..." \
   "$ROOT_DIR/dokja_domain/dokja_book" \
