@@ -1,5 +1,10 @@
 import type {
+  DeleteResult,
   DigestItem,
+  IngestResult,
+  KnowledgeDocument,
+  KnowledgeDocuments,
+  ReindexResult,
   DigestPage,
   DigestStatus,
   KnowledgeSearch,
@@ -175,10 +180,29 @@ function placeholder(url: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function knowledgeDocuments(): KnowledgeDocument[] {
+  const kinds = ["note", "article", "book", "paper", "document"];
+  return Array.from({ length: 23 }, (_, index) => {
+    const number = index + 1;
+    return {
+      id: `${kinds[index % kinds.length]}:example-${number}`,
+      title: number === 4 ? "<b>Not bold</b> & <script>nothing runs</script>" : `An example document, number ${number}`,
+      kind: kinds[index % kinds.length] ?? "note",
+      reference: number % 3 === 0 ? "A book, page 12" : "",
+      tags: number % 2 === 0 ? ["example", "demo"] : [],
+      chunks: (number % 5) + 1,
+      embedded: number % 7 === 0 ? 0 : (number % 5) + 1,
+      updatedAt: minutesAgo(number * 130),
+    };
+  });
+}
+
 const ok = (result: unknown): TransportResult => ({ ok: true, result });
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createFakeTransport(delayMs = 400): Transport {
+  // What was added, removed and indexed stays for the life of the page, so the list follows.
+  let documents = knowledgeDocuments();
   return {
     async request(type, payload) {
       await sleep(delayMs);
@@ -190,11 +214,69 @@ export function createFakeTransport(delayMs = 400): Transport {
         case "memory.stats":
           return ok(MEMORY_SCORE);
         case "knowledge.status":
-          return ok(KNOWLEDGE_STATUS);
+          return ok({
+            ...KNOWLEDGE_STATUS,
+            documents: documents.length,
+            chunks: documents.reduce((sum, document) => sum + document.chunks, 0),
+            embedded: documents.reduce((sum, document) => sum + document.embedded, 0),
+            pendingEmbeddings: documents.reduce((sum, document) => sum + document.chunks - document.embedded, 0),
+          });
         case "knowledge.search":
           return ok(searchFor(String(payload?.query ?? "")));
         case "meme.status":
           return ok(MEME_STATUS);
+        case "knowledge.ingest": {
+          const body = String(payload?.body ?? payload?.content ?? payload?.address ?? "");
+          const id = String(payload?.source_id ?? `${String(payload?.kind ?? "note")}:added-${documents.length + 1}`);
+          const existing = documents.some((document) => document.id === id);
+          documents = [
+            {
+              id,
+              title: String(payload?.title ?? "A new document"),
+              kind: String(payload?.kind ?? "note"),
+              reference: String(payload?.source_ref ?? ""),
+              tags: Array.isArray(payload?.tags) ? payload.tags.map(String) : [],
+              chunks: Math.max(1, Math.ceil(body.length / 900)),
+              embedded: 0,
+              updatedAt: new Date().toISOString(),
+            },
+            ...documents.filter((document) => document.id !== id),
+          ];
+          const result: IngestResult = {
+            count: 1, created: existing ? 0 : 1, updated: existing ? 1 : 0, unchanged: 0,
+            chunks: Math.max(1, Math.ceil(body.length / 900)), degraded: false, reason: "",
+          };
+          return ok(result);
+        }
+        case "knowledge.list": {
+          const limit = Math.min(Math.max(Number(payload?.limit) || 20, 1), 100);
+          const offset = Math.max(Number(payload?.offset) || 0, 0);
+          const page: KnowledgeDocuments = {
+            documents: documents.slice(offset, offset + limit),
+            total: documents.length,
+            offset,
+          };
+          return ok(page);
+        }
+        case "knowledge.delete": {
+          const before = documents.length;
+          documents = documents.filter((document) => document.id !== payload?.id);
+          const result: DeleteResult = { deleted: documents.length < before };
+          return ok(result);
+        }
+        case "knowledge.reindex": {
+          let budget = Math.min(64, Math.max(1, Number(payload?.limit) || 32));
+          let embedded = 0;
+          documents = documents.map((document) => {
+            const added = Math.min(budget, document.chunks - document.embedded);
+            budget -= added;
+            embedded += added;
+            return { ...document, embedded: document.embedded + added };
+          });
+          const remaining = documents.reduce((sum, document) => sum + document.chunks - document.embedded, 0);
+          const result: ReindexResult = { embedded, remaining, degraded: false, reason: "" };
+          return ok(result);
+        }
         case "digest.status":
           return ok(DIGEST_STATUS);
         case "digest.items": {

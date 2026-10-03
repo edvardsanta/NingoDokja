@@ -7,7 +7,8 @@ export type TransportErrorCode =
   | "unavailable" // nobody accepted the request: the orchestrator is not running or not reachable
   | "timeout" // no answer before the deadline
   | "orchestrator" // the orchestrator answered with an error
-  | "unexpected"; // the reply was not what the action expects
+  | "unexpected" // the reply was not what the action expects
+  | "cancelled"; // the person said no to the question the shell asked first
 
 export type TransportError = { code: TransportErrorCode; message: string };
 

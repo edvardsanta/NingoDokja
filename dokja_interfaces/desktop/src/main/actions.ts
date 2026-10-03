@@ -1,8 +1,13 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
+import { buildIngest } from "./ingest.js";
+import { INGEST_ID } from "../shared/ingest.js";
 import type {
+  DeleteResult,
   DigestPage,
   DigestStatus,
+  IngestResult,
+  KnowledgeDocuments,
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
@@ -10,11 +15,15 @@ import type {
   MemoryScore,
   MemoryStatus,
   Off,
+  ReindexResult,
   ServiceState,
   StatusReply,
 } from "../shared/replies.js";
 
 export type ActionDefinition = {
+  // The most the payload may weigh, in characters, before the builder sees it. Small unless the action
+  // takes a file.
+  maxPayloadChars?: number;
   // Builds the payload from what the screen asked for. The screen cannot add fields of its own:
   // anything it sends beyond these is dropped. Returns undefined when the request is not valid.
   payload(raw: Record<string, unknown>): Record<string, unknown> | undefined;
@@ -225,6 +234,52 @@ function digestPage(body: Record<string, unknown>): DigestPage {
   };
 }
 
+// The knowledge service answers one document with its own fields and many (a feed file) with a
+// summary and the list. Either way the screen gets the same counts.
+function ingestResult(body: Record<string, unknown>): IngestResult {
+  const documents = records(body.documents, (document) => ({
+    created: document.created === true,
+    changed: document.changed === true,
+  }));
+  const many = Array.isArray(body.documents);
+  const list = many ? documents : [{ created: body.created === true, changed: body.changed === true }];
+  return {
+    count: list.length,
+    created: list.filter((document) => document.created).length,
+    updated: list.filter((document) => document.changed && !document.created).length,
+    unchanged: list.filter((document) => !document.changed).length,
+    chunks: count(body.chunks),
+    degraded: body.degraded === true,
+    reason: shorten(text(body.reason)),
+  };
+}
+
+function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
+  return {
+    documents: records(body.documents, (document) => ({
+      id: shorten(text(document.source_id), 200),
+      title: shorten(text(document.title), 300),
+      kind: shorten(text(document.kind), 32),
+      reference: shorten(text(document.source_ref), 300),
+      tags: words(document.tags).slice(0, 20).map((tag) => shorten(tag, 40)),
+      chunks: count(document.chunks),
+      embedded: count(document.embedded),
+      updatedAt: text(document.updated_at),
+    })),
+    total: count(body.total),
+    offset: count(body.offset),
+  };
+}
+
+function reindexResult(body: Record<string, unknown>): ReindexResult {
+  return {
+    embedded: count(body.embedded),
+    remaining: count(body.remaining),
+    degraded: body.degraded === true,
+    reason: shorten(text(body.reason)),
+  };
+}
+
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "ningo.status": {
     payload: noPayload,
@@ -277,5 +332,34 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       offset: clampInt(raw.offset, 0, 1000, 0),
     }),
     project: (result) => inDomain(result, "digest", digestPage),
+  },
+  "knowledge.ingest": {
+    // A file travels as base64 text: the cap is the largest file, a third more.
+    maxPayloadChars: 12_000_000,
+    payload: buildIngest,
+    project: (result) => inDomain(result, "knowledge", ingestResult),
+  },
+  "knowledge.list": {
+    payload: (raw) => ({
+      limit: clampInt(raw.limit, 1, 100, 20),
+      offset: clampInt(raw.offset, 0, 100_000, 0),
+    }),
+    project: (result) => inDomain(result, "knowledge", knowledgeDocuments),
+  },
+  "knowledge.delete": {
+    // The id of one document, in the shape the service allows. It is what the question names.
+    payload: (raw) => {
+      const id = text(raw.id);
+      return INGEST_ID.test(id) ? { source_id: id } : undefined;
+    },
+    project: (result) =>
+      inDomain(result, "knowledge", (body): DeleteResult => ({ deleted: body.deleted === true })),
+  },
+  "knowledge.reindex": {
+    // One small batch per click. A change needs a click just before it, so there is no loop to
+    // run on the screen's own, and the orchestrator answers one request at a time: a long batch
+    // would hold every other card. The service embeds 16 passages per call to the embedder.
+    payload: (raw) => ({ limit: clampInt(raw.limit, 1, 64, 32) }),
+    project: (result) => inDomain(result, "knowledge", reindexResult),
   },
 };

@@ -1,8 +1,10 @@
-import { ACTION_TYPES, type ActionType } from "../shared/actions.js";
+import { ACTION_TYPES, isWriteAction, needsConfirmation, type ActionType } from "../shared/actions.js";
 import { isRecord } from "../shared/records.js";
 import type { TransportErrorCode, TransportResult } from "../shared/transport.js";
 import { ACTIONS } from "./actions.js";
 import { OrchestratorError, type OrchestratorReply } from "./orchestrator_client.js";
+import type { Confirm } from "./dialogs.js";
+import type { Presence } from "./presence.js";
 
 type Orchestrator = {
   request(
@@ -21,7 +23,7 @@ export type RequestLimits = {
   maxTimeoutMs: number;
 };
 
-const MAX_PAYLOAD_CHARS = 16 * 1024;
+const DEFAULT_MAX_PAYLOAD_CHARS = 16 * 1024;
 
 export function isAllowedAction(type: unknown): type is ActionType {
   return typeof type === "string" && (ACTION_TYPES as readonly string[]).includes(type);
@@ -32,7 +34,8 @@ function fail(code: TransportErrorCode, message: string): TransportResult {
 }
 
 // Validates one request from the renderer and runs it. Nothing reaches the orchestrator unless
-// the action is on the allow-list and the payload is a small plain object, the payload that is
+// the action is on the allow-list, an action that changes something comes just after a real click
+// or key press, and the payload is a plain object within the action's size. The payload that is
 // sent is the one the action builds (the screen cannot add fields), and the screen only gets the
 // projection of the reply that its action defines.
 export async function handleRequest(
@@ -40,19 +43,30 @@ export async function handleRequest(
   orchestrator: Orchestrator,
   limits: RequestLimits,
   media?: MediaGate,
+  presence?: Pick<Presence, "recent">,
+  confirm?: Confirm,
 ): Promise<TransportResult> {
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
   if (!isAllowedAction(type)) return fail("denied", "this action is not allowed");
-
-  const payload = raw.payload ?? {};
-  if (!isRecord(payload) || !fitsInPayload(payload)) {
-    return fail("invalid", "the payload must be a small object");
+  if (isWriteAction(type) && !presence?.recent()) {
+    return fail("denied", "a change needs a click or a key press just before it");
   }
 
   const action = ACTIONS[type];
+  const payload = raw.payload ?? {};
+  if (!isRecord(payload) || !fitsInPayload(payload, action.maxPayloadChars ?? DEFAULT_MAX_PAYLOAD_CHARS)) {
+    return fail("invalid", "the payload must be a small object");
+  }
+
   const wire = action.payload(payload);
   if (!wire) return fail("invalid", "the payload is not valid for this action");
+
+  // What cannot be undone waits for the person's yes, asked by the shell and not by the page.
+  if (needsConfirmation(type)) {
+    if (!confirm) return fail("denied", "this change needs the person's confirmation, and there is no way to ask");
+    if (!(await confirm(type, wire))) return fail("cancelled", "the person did not confirm");
+  }
 
   try {
     const reply = await orchestrator.request(type, wire, pickTimeout(raw.options, limits));
@@ -68,9 +82,9 @@ export async function handleRequest(
   }
 }
 
-function fitsInPayload(payload: Record<string, unknown>): boolean {
+function fitsInPayload(payload: Record<string, unknown>, limit: number): boolean {
   try {
-    return JSON.stringify(payload).length <= MAX_PAYLOAD_CHARS;
+    return JSON.stringify(payload).length <= limit;
   } catch {
     return false; // not serializable, for example a cycle
   }

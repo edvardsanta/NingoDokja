@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -10,7 +11,14 @@ import { Reply } from "zeromq";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-export const hasDisplay = Boolean(process.env.WAYLAND_DISPLAY || process.env.DISPLAY);
+// The app needs a display. A person's own screen is the wrong place for it: the window takes the
+// focus, and whatever they type elsewhere lands in it as the real input the tests must be able to
+// rule out. So the app is shown in a Wayland compositor with no screen (weston's headless backend)
+// when there is one, and on the person's display only when there is not.
+const WESTON = ["/usr/bin/weston", "/usr/local/bin/weston"].find((path) => existsSync(path));
+const RUNTIME_DIR = process.env.XDG_RUNTIME_DIR ?? "";
+
+export const hasDisplay = Boolean((WESTON && RUNTIME_DIR) || process.env.WAYLAND_DISPLAY || process.env.DISPLAY);
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -30,6 +38,18 @@ function replyFor(type: string): Record<string, unknown> {
         services: { meme: { status: "ok", enabled: true }, feeds: { status: "ok", detail: "no plugins enabled" } },
         channels: { meme: ["channel-1"] },
         chat_profiles: { profiles: [{ name: "profile-1", base_url: "base-url-1", key_hint: "hint-1" }] },
+      });
+    case "knowledge.ingest":
+      return wrap("knowledge", {
+        source_id: "note:a-thought-0123456789",
+        created: true, changed: true, chunks: 2, embedded: 0, degraded: true, reason: "no embedding server is configured",
+      });
+    case "knowledge.list":
+      return wrap("knowledge", {
+        documents: [
+          { source_id: "note:a-1", title: HOSTILE_TITLE, kind: "note", source_ref: "Book, p. 12", tags: ["a"], chunks: 2, embedded: 2, updated_at: "2026-10-02T10:00:00", content_sha: "hash-1", path: "/private/path-1" },
+        ],
+        total: 1, offset: 0,
       });
     case "digest.status":
       return wrap("digest", {
@@ -52,8 +72,8 @@ function replyFor(type: string): Record<string, unknown> {
 
 export type FakeOrchestrator = {
   endpoint: string;
-  // the type and the source of every event it received, in order
-  seen: Array<{ type: string; source: string }>;
+  // the type, the source and the payload of every event it received, in order
+  seen: Array<{ type: string; source: string; payload: Record<string, unknown> }>;
   stop(): Promise<void>;
 };
 
@@ -63,8 +83,8 @@ export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
   const seen: FakeOrchestrator["seen"] = [];
   const loop = (async () => {
     for await (const [frame] of socket) {
-      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string };
-      seen.push({ type: String(event.type), source: String(event.source) });
+      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown> };
+      seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
       await socket.send(JSON.stringify(replyFor(String(event.type))));
     }
   })().catch(() => undefined);
@@ -97,16 +117,53 @@ export async function startTripwire(): Promise<Tripwire> {
   };
 }
 
-export type RunningApp = { cdpPort: number; stop(): Promise<void> };
+export type RunningApp = { cdpPort: number; isolated: boolean; stop(): Promise<void> };
+
+// A compositor with no screen, on a socket of its own. Undefined when weston is not installed.
+async function startHiddenDisplay(): Promise<{ socket: string; stop(): Promise<void> } | undefined> {
+  if (!WESTON || !RUNTIME_DIR) return undefined;
+  const socket = `dokja-e2e-${process.pid}-${Date.now()}`;
+  const child = spawn(
+    WESTON,
+    ["--backend=headless", "--renderer=pixman", `--socket=${socket}`, "--idle-time=0", "--width=1280", "--height=800"],
+    { stdio: "ignore", detached: true },
+  );
+  const stop = async () => {
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      await Promise.race([new Promise((resolve) => child.once("exit", resolve)), sleep(3000)]);
+    }
+    await rm(join(RUNTIME_DIR, socket), { force: true });
+    await rm(join(RUNTIME_DIR, `${socket}.lock`), { force: true });
+  };
+  for (let waited = 0; waited < 10_000; waited += 100) {
+    if (existsSync(join(RUNTIME_DIR, socket))) return { socket, stop };
+    if (child.exitCode !== null) break;
+    await sleep(100);
+  }
+  await stop();
+  return undefined;
+}
 
 // Starts the built app (run `pnpm build` first) with its own profile, against the fake
 // orchestrator, and waits for the debugging port Chromium reports.
 export async function launchApp(endpoint: string): Promise<RunningApp> {
   const profile = await mkdtemp(join(tmpdir(), "dokja-desktop-e2e-"));
+  const hidden = await startHiddenDisplay();
+  const env = hidden
+    ? { ...process.env, WAYLAND_DISPLAY: hidden.socket, DISPLAY: "" }
+    : process.env;
   const child: ChildProcess = spawn(
     join(ROOT, "node_modules", ".bin", "electron"),
-    [".", "--remote-debugging-port=0", `--user-data-dir=${profile}`, `--request-endpoint=${endpoint}`, "--lang=en"],
-    { cwd: ROOT, detached: true, stdio: ["ignore", "ignore", "ignore"] },
+    [
+      ".",
+      ...(hidden ? ["--ozone-platform=wayland", "--disable-gpu"] : []),
+      "--remote-debugging-port=0",
+      `--user-data-dir=${profile}`,
+      `--request-endpoint=${endpoint}`,
+      "--lang=en",
+    ],
+    { cwd: ROOT, env, detached: true, stdio: ["ignore", "ignore", "ignore"] },
   );
 
   const stop = async () => {
@@ -119,6 +176,7 @@ export async function launchApp(endpoint: string): Promise<RunningApp> {
       }
       await Promise.race([new Promise((resolve) => child.once("exit", resolve)), sleep(4000)]);
     }
+    await hidden?.stop();
     await rm(profile, { recursive: true, force: true });
   };
 
@@ -127,7 +185,7 @@ export async function launchApp(endpoint: string): Promise<RunningApp> {
     for (let waited = 0; waited < 40_000; waited += 200) {
       if (child.exitCode !== null) throw new Error(`the app exited with code ${child.exitCode}`);
       const port = Number((await readFile(join(profile, "DevToolsActivePort"), "utf8").catch(() => "")).split("\n")[0]);
-      if (port > 0) return { cdpPort: port, stop };
+      if (port > 0) return { cdpPort: port, isolated: hidden !== undefined, stop };
       await sleep(200);
     }
     throw new Error("the app did not open its debugging port");
@@ -170,19 +228,34 @@ export class Page {
     throw new Error("the app page never appeared");
   }
 
-  async evaluate<T>(expression: string): Promise<T> {
+  private async send(method: string, params: Record<string, unknown>) {
     const id = ++this.next;
     const answer = new Promise<{ result?: { result?: { value?: unknown }; exceptionDetails?: unknown }; error?: unknown }>((resolve) =>
       this.waiting.set(id, resolve),
     );
-    this.socket.send(
-      JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, returnByValue: true, awaitPromise: true } }),
-    );
-    const message = await answer;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return answer;
+  }
+
+  async evaluate<T>(expression: string): Promise<T> {
+    const message = await this.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
     if (message.error || message.result?.exceptionDetails) {
       throw new Error(`evaluate failed: ${JSON.stringify(message.error ?? message.result?.exceptionDetails)}`);
     }
     return message.result?.result?.value as T;
+  }
+
+  // A press of the mouse as the browser itself reports it, unlike element.click() from a script.
+  async click(x: number, y: number): Promise<void> {
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+      await this.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+  }
+
+  // A key press as the browser itself reports it.
+  async press(key: string): Promise<void> {
+    await this.send("Input.dispatchKeyEvent", { type: "keyDown", key, text: key });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key });
   }
 
   // Polls until the expression is truthy, then returns its value.

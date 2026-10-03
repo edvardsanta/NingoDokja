@@ -12,6 +12,7 @@ const ERROR_IDS: Record<TransportErrorCode, MessageId> = {
   invalid: "error_invalid",
   orchestrator: "error_orchestrator",
   unexpected: "error_unexpected",
+  cancelled: "error_cancelled",
 };
 
 export function describeError(error: TransportError, t: Translate): string {

@@ -101,12 +101,89 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("refuses an action that is not on the allow-list, before the orchestrator hears of it", async () => {
-    for (const type of ["services.set", "discord.send", "digest.refresh", "scheduler.jobs.set"]) {
+    for (const type of [
+      "services.set", "discord.send", "digest.refresh", "scheduler.jobs.set",
+      "knowledge.add", "memory.record", "memory.forget", "message.created",
+    ]) {
       const answer = (await ask(type, { name: "feeds", enabled: false })) as { ok: boolean; error?: { code: string } };
       assert.equal(answer.ok, false, type);
       assert.equal(answer.error?.code, "denied", type);
     }
-    assert.ok(!orchestrator.seen.some((event) => /^(services|discord|scheduler)\.|^digest\.refresh$/.test(event.type)));
+    assert.ok(
+      !orchestrator.seen.some((event) =>
+        /^(services|discord|scheduler)\.|^digest\.refresh$|^knowledge\.add$|^memory\.(record|forget)$|^message\./.test(event.type),
+      ),
+    );
+  });
+
+  describe("a change", () => {
+    const note = {
+      mode: "note", title: "A thought", body: "Something to keep.",
+      kind: "idea", reference: "Book, p. 12", id: "my:thought", source: "plugin:thing", source_id: "other:document",
+    };
+    const ingested = () => orchestrator.seen.filter((event) => event.type === "knowledge.ingest");
+
+    it("is refused when nothing real was pressed, even if a script clicks", async () => {
+      await page.evaluate("document.querySelectorAll('[role=tab]')[0].click()");
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string; message: string } };
+      assert.equal(answer.ok, false);
+      assert.equal(answer.error?.code, "denied");
+      assert.match(answer.error?.message ?? "", /click or a key press/);
+      assert.equal(ingested().length, 0, "the orchestrator never heard of it");
+    });
+
+    it("goes through right after a real click, with the payload the shell built", async () => {
+      await page.click(5, 5);
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; result?: Record<string, unknown> };
+      assert.equal(answer.ok, true);
+      assert.deepEqual(answer.result, { count: 1, created: 1, updated: 0, unchanged: 0, chunks: 2, degraded: true, reason: "no embedding server is configured" });
+
+      const [sent] = ingested();
+      assert.equal(sent?.source, "desktop");
+      assert.equal(sent?.payload.kind, "idea", "the person chooses the kind");
+      assert.equal(sent?.payload.source_ref, "Book, p. 12", "and the reference");
+      assert.equal(sent?.payload.source_id, "my:thought", "and the id");
+      assert.equal(sent?.payload.source, undefined, "but the service's own source field is never taken from the page");
+    });
+
+    it("is refused again when the click was a while ago", async () => {
+      await sleep(3600);
+      const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string } };
+      assert.equal(answer.ok, false);
+      assert.equal(answer.error?.code, "denied");
+      assert.equal(ingested().length, 1);
+    });
+
+    it("goes through right after a real key press too", async () => {
+      await page.press("a");
+      const answer = (await ask("knowledge.ingest", { ...note, title: "Another thought" })) as { ok: boolean };
+      assert.equal(answer.ok, true);
+      assert.equal(ingested().length, 2);
+    });
+
+    const removals = () => orchestrator.seen.filter((event) => /^knowledge\.(delete|reindex)$/.test(event.type));
+
+    it("refuses a deletion or an indexing a script asks for, without opening any window", async () => {
+      await sleep(3600);
+      for (const [type, payload] of [["knowledge.delete", { id: "note:a-1" }], ["knowledge.reindex", {}]] as const) {
+        const started = Date.now();
+        const answer = (await ask(type, payload)) as { ok: boolean; error?: { code: string } };
+        assert.equal(answer.ok, false, type);
+        assert.equal(answer.error?.code, "denied", type);
+        assert.ok(Date.now() - started < 2000, `${type} was refused at once, so nobody was asked`);
+      }
+      assert.equal(removals().length, 0);
+    });
+
+    it("holds a deletion for the person after a real click, and sends nothing until they answer", async () => {
+      await page.click(5, 5);
+      await page.evaluate(
+        "(window.__deleted = false, window.dokja.request('knowledge.delete', { id: 'note:a-1' }).then((answer) => { window.__deleted = answer; }), 'asked')",
+      );
+      await sleep(2500);
+      assert.equal(await page.evaluate("window.__deleted"), false, "still waiting for the person");
+      assert.equal(removals().length, 0, "the orchestrator has not heard of it");
+    });
   });
 
   it("hands the screen only what a card reads", async () => {
@@ -117,6 +194,11 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     const items = JSON.stringify(await ask("digest.items", { limit: 8, per_source: 10, max_age_hours: 9999 }));
     assert.match(items, /A plain title/);
     assert.doesNotMatch(items, /example\.com|source-1|entry-1/, "no address and no plugin name");
+
+    const documents = (await ask("knowledge.list", { limit: 20 })) as { ok: boolean; result?: { documents: Array<Record<string, unknown>> } };
+    assert.equal(documents.ok, true);
+    assert.deepEqual(Object.keys(documents.result?.documents[0] ?? {}).sort(), ["chunks", "embedded", "id", "kind", "reference", "tags", "title", "updatedAt"]);
+    assert.doesNotMatch(JSON.stringify(documents), /hash-1|private\/path-1/, "no hash and no path");
   });
 
   it("fetches a picture only at an address the orchestrator listed", async () => {

@@ -4,6 +4,8 @@ import type { KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
+import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
+import { AddToBase } from "./knowledge_add.js";
 import {
   parseKnowledgeSearch,
   parseKnowledgeStatus,
@@ -55,13 +57,33 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
         status.off ? (
           <OffNotice reason={status.reason} />
         ) : (
-          <>
-            <KnowledgeStatusLines status={status} />
-            <SearchBox transport={transport} />
-          </>
+          <KnowledgeBody transport={transport} initial={status} />
         )
       }
     </CardFrame>
+  );
+}
+
+// The counts are read once when the card opens; adding a document reads them again, quietly, so
+// they do not stay behind what the search now finds.
+function KnowledgeBody({ transport, initial }: { transport: Transport; initial: KnowledgeStatus }) {
+  const [status, setStatus] = useState(initial);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => {
+    setRevision((value) => value + 1);
+    void loadKnowledge(transport).then((result) => {
+      if (result.ok && !result.data.off) setStatus(result.data);
+    });
+  }, [transport]);
+
+  return (
+    <>
+      <KnowledgeStatusLines status={status} />
+      <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
+      <SearchBox transport={transport} />
+      <AddToBase transport={transport} onAdded={refresh} />
+      <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} />
+    </>
   );
 }
 
