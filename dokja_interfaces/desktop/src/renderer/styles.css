@@ -1,0 +1,595 @@
+/*
+ * Dead-channel cyberpunk. The page is the grey-blue of a television tuned to nothing; neon only
+ * ever means something: cyan is up, magenta is a problem, amber has not been checked.
+ * Contrast of every text colour on the panel is above 5:1 except --off, which only fills shapes.
+ */
+:root {
+  color-scheme: dark;
+
+  --static: #101b25;
+  --panel: #0a1119;
+  --edge: #456a80;
+  --ink: #d6e6f3;
+  --ink-dim: #8ea3b5;
+  --cyan: #3be8f5;
+  --magenta: #ff3d8b;
+  --magenta-text: #ff6aa5;
+  --amber: #ffb22e;
+  --off: #62768a;
+
+  --cut: 12px;
+  --chamfer: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+
+  --mono: "B612 Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  --serif: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
+
+  --scanlines: repeating-linear-gradient(
+    to bottom,
+    transparent 0 3px,
+    rgb(0 0 0 / 0.16) 3px 4px
+  );
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .75 0 0 0 0 .88 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+[data-tone="ok"] {
+  --tone: var(--cyan);
+  --tone-text: var(--cyan);
+}
+
+[data-tone="problem"] {
+  --tone: var(--magenta);
+  --tone-text: var(--magenta-text);
+}
+
+[data-tone="unchecked"] {
+  --tone: var(--amber);
+  --tone-text: var(--amber);
+}
+
+[data-tone="off"],
+[data-tone="other"] {
+  --tone: var(--off);
+  --tone-text: var(--ink-dim);
+}
+
+html {
+  background: var(--static);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font: 0.9375rem/1.6 var(--mono);
+  background-color: var(--static);
+  background-image: var(--scanlines), var(--noise);
+}
+
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2.25rem 1.25rem 4rem;
+}
+
+/*
+ * The one memorable thing: the name has a ghost, a cyan and a magenta copy of itself behind it.
+ * Aligned, the system is well; the worse it gets, the further the ghost drifts out of register.
+ */
+.wordmark {
+  --ghost: 3;
+  margin: 0 0 2.5rem;
+  font: italic 700 clamp(3.5rem, 14vw, 6rem) / 1 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-shadow:
+    calc(var(--ghost) * -1px) 0 var(--cyan),
+    calc(var(--ghost) * 1px) 0 var(--magenta);
+  transition: text-shadow 0.45s steps(5);
+}
+
+.wordmark[data-pulse="calm"] {
+  --ghost: 0;
+}
+
+.wordmark[data-pulse="tuning"] {
+  --ghost: 3;
+}
+
+.wordmark[data-pulse="unwell"] {
+  --ghost: 6;
+}
+
+.wordmark[data-pulse="lost"] {
+  --ghost: 9;
+}
+
+/*
+ * A panel with two cut corners. One layer: the straight edges are a native border, so they stay
+ * crisp, and the two diagonals the clip leaves bare are drawn with gradients just inside the cut.
+ */
+.card {
+  position: relative;
+  isolation: isolate;
+  margin-block: 2.25rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid transparent;
+  clip-path: var(--chamfer);
+  background:
+    linear-gradient(
+        to top right,
+        transparent calc(50% - 1.42px),
+        var(--edge) calc(50% - 1.42px) 50%,
+        transparent 50%
+      )
+      top right / var(--cut) var(--cut) no-repeat border-box,
+    linear-gradient(
+        to top right,
+        transparent 50%,
+        var(--edge) 50% calc(50% + 1.42px),
+        transparent calc(50% + 1.42px)
+      )
+      bottom left / var(--cut) var(--cut) no-repeat border-box,
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    var(--edge) border-box;
+}
+
+/* The kind of card is cut into its top edge, like the legend of a fieldset. */
+.card-kind {
+  position: absolute;
+  top: -0.7rem;
+  left: 1.25rem;
+  z-index: 1;
+  padding: 0 0.5rem;
+  background: var(--static);
+  color: var(--cyan);
+  font-size: 0.8125rem;
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font: 700 1.0625rem/1.3 var(--mono);
+}
+
+.card p {
+  margin: 0;
+}
+
+.summary {
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+/* One segment per service, coloured by its state: the whole system in a glance. */
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 0.75rem;
+}
+
+.strip span {
+  width: 1.5rem;
+  height: 0.5rem;
+  background: var(--tone);
+  box-shadow: 0 0 0.5rem color-mix(in srgb, var(--tone) 55%, transparent);
+}
+
+/* The list is the grid and each row a subgrid of it: a column is as wide as its widest cell. */
+.services {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  gap: 2px 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.services li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  padding: 0.35rem 0.75rem;
+  border-left: 3px solid var(--tone);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%);
+  animation: print 0.5s steps(24) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.service-status {
+  color: var(--tone-text);
+}
+
+.service-detail {
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.card [role="status"] {
+  color: var(--ink-dim);
+}
+
+.card [role="status"]::after {
+  content: "▌";
+  margin-left: 0.25ch;
+  animation: blink 1s steps(2, jump-none) infinite;
+}
+
+.card [role="alert"] {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--magenta);
+  color: var(--magenta-text);
+}
+
+.card footer {
+  margin-top: 1.25rem;
+}
+
+button:not([role="tab"]) {
+  padding: 0.35rem 1rem;
+  border: 1px solid var(--cyan);
+  background: transparent;
+  color: var(--cyan);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:not([role="tab"]):hover:not(:disabled) {
+  background: var(--cyan);
+  color: var(--panel);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+@keyframes print {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (max-width: 34rem) {
+  /* The name may wrap rather than push the state out of the row. */
+  .services {
+    grid-template-columns: minmax(0, max-content) 1fr;
+  }
+
+  .service-name {
+    overflow-wrap: anywhere;
+  }
+
+  .service-detail {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .services li,
+  .card [role="status"]::after {
+    animation: none;
+  }
+
+  .wordmark {
+    transition: none;
+  }
+}
+
+/* A short statement with its state in the left bar: similarity on or off, a verdict, a notice. */
+.note {
+  margin: 0.5rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--tone, var(--off));
+  color: var(--tone-text, var(--ink-dim));
+}
+
+.detail {
+  color: var(--ink-dim);
+}
+
+.card h3 {
+  margin: 1.5rem 0 0.5rem;
+  font: 700 0.9375rem/1.3 var(--mono);
+}
+
+.search {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.search label {
+  grid-column: 1 / -1;
+  font-weight: 700;
+}
+
+.search input {
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.search input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.hits {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hits li {
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 3px solid var(--tone);
+}
+
+.hits li[data-relevant="true"] {
+  --tone: var(--cyan);
+}
+
+.hits li[data-relevant="false"] {
+  --tone: var(--off);
+  color: var(--ink-dim);
+}
+
+.hits p {
+  overflow-wrap: anywhere;
+}
+
+.hit-text {
+  margin: 0.25rem 0;
+}
+
+.scope,
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1rem;
+}
+
+button[aria-pressed="true"] {
+  background: var(--cyan);
+  color: var(--panel);
+}
+
+.memes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  padding: 0.25rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.preview img,
+.preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.memes p {
+  margin: 0.4rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.meme-title {
+  font-size: 0.875rem;
+}
+
+/* One tab per card. The open tab is cyan with a lit underline; the rest are dim. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.75rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.tab {
+  margin-bottom: -1px;
+  padding: 0.6rem 0.1rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--cyan);
+  color: var(--cyan);
+  text-shadow: 0 0 0.6rem color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+
+/* The digest: one entry per row, the title first, a short summary cut after two lines. */
+.digest {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.digest li {
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 3px solid var(--cyan);
+}
+
+.digest p {
+  overflow-wrap: anywhere;
+}
+
+.digest-title {
+  font-weight: 700;
+}
+
+.digest-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-dim);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* The button that shows more, and the line after it, sit apart from the list. */
+.digest + button {
+  margin-top: 1rem;
+}
+
+.digest ~ .detail {
+  margin-top: 0.5rem;
+}
+
+.sources {
+  margin-top: 1.25rem;
+}
+
+.sources summary {
+  width: max-content;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.sources summary:hover {
+  color: var(--ink);
+}
+
+.sources summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+/* A meme in the grid is a button that opens it. The global button look is turned off for it, and
+   what is inside does not take the click away from the button. */
+.preview.preview-open,
+.preview.preview-open:hover:not(:disabled) {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.preview.preview-open:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+
+.preview.preview-open > * {
+  pointer-events: none;
+}
+
+.preview.preview-open:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* The opened meme: over the page, centred, as large as the window allows. */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.viewer-panel {
+  display: grid;
+  gap: 0.5rem;
+  max-width: min(100%, 56rem);
+  max-height: 100%;
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.viewer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.viewer-media {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+  background: var(--static);
+}
+
+.viewer-media img,
+.viewer-media video {
+  max-width: 100%;
+  max-height: 66vh;
+  object-fit: contain;
+}
+
+.viewer .pager {
+  justify-content: center;
+}
+
+.viewer p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

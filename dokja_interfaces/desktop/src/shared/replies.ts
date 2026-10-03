@@ -1,0 +1,148 @@
+// What the main process hands to the renderer for each action: a projection of the orchestrator
+// reply with only the fields a card reads, so channel IDs, provider profiles and other detail
+// never reach the screen.
+
+export type ServiceState = {
+  status: string;
+  detail: string;
+  enabled?: boolean;
+};
+
+export type StatusReply = {
+  status: string;
+  services: Record<string, ServiceState>;
+};
+
+// The orchestrator understood the request but the operator switched that service off.
+export type Off = { off: true; reason: string };
+
+export type MemoryStatus = {
+  off?: false;
+  experiences: number;
+  pending: number;
+  resolved: number;
+  expired: number;
+  embedded: number;
+  needsReindex: number;
+  embedModel: string;
+  embeddings: boolean;
+  embedderReachable: boolean;
+};
+
+export type MemoryScore = {
+  off?: false;
+  scored: number;
+  unscored: number;
+  minScored: number;
+  brierPrediction: number;
+  brierBaseline: number;
+  skill: number;
+  beatsBaseline: boolean;
+  enoughData: boolean;
+};
+
+export type KnowledgeStatus = {
+  off?: false;
+  documents: number;
+  chunks: number;
+  embedded: number;
+  pendingEmbeddings: number;
+  embedModel: string;
+  // null when the service does not say (similarity is switched off)
+  embedderReachable: boolean | null;
+};
+
+export type KnowledgeHit = {
+  rank: number;
+  title: string;
+  heading: string;
+  kind: string;
+  sourceRef: string;
+  tags: string[];
+  text: string;
+  score: number | null;
+  relevant: boolean;
+};
+
+export type KnowledgeSearch = {
+  off?: false;
+  query: string;
+  hits: KnowledgeHit[];
+  relevantCount: number;
+  threshold: number;
+  degraded: boolean;
+  reason: string;
+};
+
+export type MemeStatus = {
+  off?: false;
+  status: string;
+  unsent: number;
+  sent: number;
+};
+
+export type MemeItem = {
+  url: string;
+  title: string;
+  tags: string;
+  source: string;
+  createdAt: string;
+  sentAt: string;
+};
+
+export type MemePage = {
+  off?: false;
+  total: number;
+  offset: number;
+  memes: MemeItem[];
+};
+
+// One source the feeds service follows: a plugin, with how its last runs went. The reason in
+// `error` is a short fixed phrase from the service, never what the plugin printed.
+export type DigestSource = {
+  id: string;
+  name: string;
+  // ok, failed, pending, disabled, invalid, or unknown for anything else
+  state: string;
+  running: boolean;
+  items: number;
+  skipped: number;
+  // RFC 3339, or empty when it never succeeded
+  lastOk: string;
+  error: string;
+};
+
+export type DigestStatus = {
+  off?: false;
+  // false when the feeds service has no plugins directory at all
+  configured: boolean;
+  directoryError: string;
+  ok: number;
+  failed: number;
+  pending: number;
+  disabled: number;
+  invalid: number;
+  items: number;
+  sources: DigestSource[];
+};
+
+// An item of the digest. The address is not here: nothing in the app opens a link yet, so the
+// screen does not get one.
+export type DigestItem = {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  // RFC 3339, or empty when the source gave no date
+  published: string;
+};
+
+export type DigestPage = {
+  off?: false;
+  items: DigestItem[];
+  total: number;
+  offset: number;
+  // how many more items the digest holds after this page
+  more: number;
+  updated: string;
+};

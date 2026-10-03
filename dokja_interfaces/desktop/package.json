@@ -1,0 +1,38 @@
+{
+  "name": "dokja-desktop",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/main.cjs",
+  "scripts": {
+    "build": "node ./scripts/build_shell.mjs && vite build",
+    "build:shell": "node ./scripts/build_shell.mjs",
+    "build:ui": "vite build",
+    "start": "node ./scripts/build_shell.mjs && vite build && electron .",
+    "dev:web": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test ./tests/*.test.ts && vitest run",
+    "test:e2e": "node ./scripts/build_shell.mjs && vite build && node --import tsx --test ./tests/e2e/*.e2e.ts"
+  },
+  "dependencies": {
+    "zeromq": "^6.8.0"
+  },
+  "devDependencies": {
+    "@fontsource/b612-mono": "^5.3.0",
+    "@fontsource/bodoni-moda": "^5.3.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "43.7.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}
