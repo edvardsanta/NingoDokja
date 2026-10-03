@@ -211,6 +211,20 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
       assert.equal(switches().length, 0, "the orchestrator never heard of it");
     });
 
+    it("goes through from the card's own switch right after a real press, with the flag alone", async () => {
+      // other tests have opened other tabs; the switch is on the health tab
+      await page.evaluate("document.querySelectorAll('[role=tab]')[0].click()");
+      const button = "document.querySelector('button[role=switch][aria-label=\"meme switch\"]')";
+      await page.waitFor(`${button} !== null`);
+      // The press is what the shell counts. The button itself is pressed by the script here: in the
+      // hidden display the rows' entrance animation never advances, and a row that is still clipped
+      // takes no mouse click. A real click on the button was checked in the running app.
+      await page.click(5, 5);
+      await page.evaluate(`(${button}.click(), 'pressed')`);
+      await until(() => switches().length === 1 && statusReadsAfterSwitch() === 1);
+      assert.deepEqual(switches().map((event) => [event.type, event.payload]), [["services.set", { name: "meme", enabled: false }]]);
+    });
+
     it("sends what the shell built, and nobody is asked", async () => {
       await page.click(5, 5);
       const started = Date.now();
