@@ -7,6 +7,8 @@ import type {
   DigestPage,
   DigestStatus,
   IngestResult,
+  JobState,
+  JobSwitched,
   KnowledgeDocuments,
   KnowledgeSearch,
   KnowledgeStatus,
@@ -17,6 +19,7 @@ import type {
   Off,
   ReindexResult,
   ServiceState,
+  ServiceSwitched,
   StatusReply,
 } from "../shared/replies.js";
 
@@ -34,6 +37,14 @@ export type ActionDefinition = {
 };
 
 const MAX_DETAIL_CHARS = 200;
+
+// The orchestrator checks the name against the services and jobs it knows; this only keeps the
+// wrong shape from reaching it. An interval is "default" (drop the override) or whole minutes or
+// hours: the empty text must never get through, because the orchestrator reads it as "default".
+// Five digits cover the longest interval it keeps (thirty days is 43200 minutes); it checks the range.
+const SWITCH_NAME = /^[a-z][a-z_.]{0,39}$/;
+const JOB_INTERVAL = /^(default|[0-9]{1,5}[mh])$/;
+const MAX_JOBS = 20;
 const MAX_QUERY_CHARS = 500;
 
 // The states the feeds service reports for a source; anything else is shown as unknown.
@@ -107,7 +118,21 @@ function systemStatus(body: Record<string, unknown>): StatusReply {
       };
     }
   }
-  return { status: text(body.status) || "ok", services };
+  const jobs = Array.isArray(body.jobs) ? records(body.jobs, jobState).slice(0, MAX_JOBS) : undefined;
+  return { status: text(body.status) || "ok", services, ...(jobs ? { jobs } : {}) };
+}
+
+function jobState(job: Record<string, unknown>): JobState {
+  return {
+    name: shorten(text(job.name), 40),
+    enabled: job.enabled === true,
+    interval: shorten(text(job.interval), 30),
+    intervalOverride: job.interval_override === true,
+    nextAt: shorten(text(job.next_at), 40),
+    lastAt: shorten(text(job.last_at), 40),
+    lastOutcome: shorten(text(job.last_outcome), 30),
+    lastError: shorten(text(job.last_error)),
+  };
 }
 
 function memoryStatus(body: Record<string, unknown>): MemoryStatus {
@@ -314,6 +339,41 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     },
     project: (result) => inDomain(result, "system", (body) => ({
       sent: words(body.sent_to).length === 1, skipped: words(body.skipped_unsafe).length > 0,
+    })),
+  },
+  "services.set": {
+    payload: (raw) => {
+      const name = text(raw.name);
+      if (!SWITCH_NAME.test(name) || typeof raw.enabled !== "boolean") return undefined;
+      return { name, enabled: raw.enabled };
+    },
+    project: (result) => inDomain(result, "system", (body): ServiceSwitched => ({
+      name: shorten(text(body.name), 40),
+      enabled: body.enabled === true,
+    })),
+  },
+  "scheduler.jobs.set": {
+    // Only what the screen supplied is sent: the orchestrator treats an interval that is present as
+    // a change, so a switch must not carry one, and an interval must not carry a switch.
+    payload: (raw) => {
+      const name = text(raw.name);
+      if (!SWITCH_NAME.test(name)) return undefined;
+      const wire: Record<string, unknown> = { name };
+      if (raw.enabled !== undefined) {
+        if (typeof raw.enabled !== "boolean") return undefined;
+        wire.enabled = raw.enabled;
+      }
+      if (raw.interval !== undefined) {
+        if (typeof raw.interval !== "string" || !JOB_INTERVAL.test(raw.interval)) return undefined;
+        wire.interval = raw.interval;
+      }
+      return Object.keys(wire).length > 1 ? wire : undefined;
+    },
+    project: (result) => inDomain(result, "system", (body): JobSwitched => ({
+      name: shorten(text(body.name), 40),
+      enabled: body.enabled === true,
+      interval: shorten(text(body.interval), 30),
+      intervalOverride: body.interval_override === true,
     })),
   },
   "ningo.status": {
