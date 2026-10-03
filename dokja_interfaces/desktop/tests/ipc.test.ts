@@ -41,8 +41,7 @@ function failure(result: Awaited<ReturnType<typeof handleRequest>>) {
 test("refuses every action outside the allow-list before touching the orchestrator", async () => {
   const { orchestrator, calls } = recorder({ status: "ok", result: compactStatus });
   const refused = [
-    "services.set",
-    "scheduler.jobs.set",
+    "services.set ",
     "scheduler.jobs.announce",
     "discord.send",
     "meme.dispatch.scheduled",
@@ -264,7 +263,9 @@ test("end to end over a real socket, the renderer never sees channel IDs or prov
 
 test("isAllowedAction accepts only the exact action names", () => {
   assert.equal(isAllowedAction("ningo.status"), true);
-  for (const value of ["Ningo.status", "ningo.status ", "services.set", 1, null, undefined]) {
+  assert.equal(isAllowedAction("services.set"), true);
+  assert.equal(isAllowedAction("scheduler.jobs.set"), true);
+  for (const value of ["Ningo.status", "ningo.status ", "services.set ", "scheduler.jobs.announce", 1, null, undefined]) {
     assert.equal(isAllowedAction(value), false);
   }
 });
@@ -467,4 +468,125 @@ test("the wait for the person's answer does not count against the request's own 
   } finally {
     await server.close();
   }
+});
+
+// The switches: they change something, but only what the operator can switch back.
+const switched = { workflow: "ningo", domain: "system", result: { name: "meme", enabled: false } };
+
+test("a switch is refused without a recent click or key press, and the orchestrator never hears of it", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: switched });
+  for (const type of ["services.set", "scheduler.jobs.set"]) {
+    for (const presence of [away, undefined]) {
+      const error = failure(await handleRequest({ type, payload: { name: "meme", enabled: false } }, orchestrator, limits, undefined, presence));
+      assert.equal(error.code, "denied", type);
+    }
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("a service switch sends only the name and the flag, and asks nobody", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: switched });
+  let asked = 0;
+  const confirm = async () => { asked += 1; return true; };
+  const result = await handleRequest(
+    { type: "services.set", payload: { name: "meme", enabled: false, interval: "1m", extra: "x" } },
+    orchestrator, limits, undefined, here, confirm,
+  );
+  assert.deepEqual(result, { ok: true, result: { name: "meme", enabled: false } });
+  assert.deepEqual(calls.map((call) => [call.type, call.payload]), [["services.set", { name: "meme", enabled: false }]]);
+  assert.equal(asked, 0, "a switch can be switched back, so nobody is asked");
+});
+
+test("a service switch with a name or a flag outside the rules is invalid before the orchestrator", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: switched });
+  const bad = [
+    { enabled: true }, { name: "meme" }, { name: "meme", enabled: "false" }, { name: "meme", enabled: 0 }, { name: "meme", enabled: null },
+    { name: "", enabled: true }, { name: "Meme", enabled: true }, { name: "has space", enabled: true }, { name: "a/b", enabled: true },
+    { name: "x".repeat(41), enabled: true }, { name: 5, enabled: true },
+  ];
+  for (const payload of bad) {
+    assert.equal(failure(await handleRequest({ type: "services.set", payload }, orchestrator, limits, undefined, here)).code, "invalid", JSON.stringify(payload));
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("switching a job on or off does not touch its interval, and an interval does not touch its switch", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: { workflow: "ningo", domain: "system", result: { name: "meme.refresh", enabled: true, interval_override: true, interval: "6h0m0s" } } });
+  const run = (payload: Record<string, unknown>) => handleRequest({ type: "scheduler.jobs.set", payload }, orchestrator, limits, undefined, here);
+
+  assert.deepEqual(await run({ name: "meme.refresh", enabled: false, extra: "x" }), { ok: true, result: { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: true } });
+  await run({ name: "meme.refresh", interval: "45m" });
+  await run({ name: "meme.refresh", interval: "default" });
+  await run({ name: "meme.refresh", enabled: true, interval: "6h" });
+
+  assert.deepEqual(calls.map((call) => call.payload), [
+    { name: "meme.refresh", enabled: false },
+    { name: "meme.refresh", interval: "45m" },
+    { name: "meme.refresh", interval: "default" },
+    { name: "meme.refresh", enabled: true, interval: "6h" },
+  ]);
+});
+
+test("a job change that says nothing, or says it wrongly, is invalid: an empty interval would clear the override", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: switched });
+  const bad = [
+    { name: "meme.refresh" }, { enabled: true }, { name: "meme.refresh", enabled: "yes" },
+    { name: "meme.refresh", interval: "" }, { name: "meme.refresh", interval: " " }, { name: "meme.refresh", interval: "soon" },
+    { name: "meme.refresh", interval: "0.5h" }, { name: "meme.refresh", interval: "-5m" }, { name: "meme.refresh", interval: "100000m" },
+    { name: "meme.refresh", interval: "5m; rm" }, { name: "meme.refresh", interval: 45 }, { name: "meme.refresh", interval: null },
+    { name: "Meme Refresh", enabled: true },
+  ];
+  for (const payload of bad) {
+    assert.equal(failure(await handleRequest({ type: "scheduler.jobs.set", payload }, orchestrator, limits, undefined, here)).code, "invalid", JSON.stringify(payload));
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("the scheduler's own heartbeat stays out of reach of the screen", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: switched });
+  const error = failure(await handleRequest({ type: "scheduler.jobs.announce", payload: { jobs: [] } }, orchestrator, limits, undefined, here));
+  assert.equal(error.code, "denied");
+  assert.equal(calls.length, 0);
+});
+
+test("the status carries the jobs when the orchestrator reports them, and nothing when it does not", async () => {
+  const withJobs = {
+    workflow: "ningo",
+    domain: "system",
+    result: {
+      status: "ok",
+      services: { meme: { status: "ok", enabled: true }, scheduler: { status: "ok", detail: "rodando", enabled: true } },
+      jobs: [
+        { name: "meme.refresh", enabled: true, interval: "6h0m0s", interval_override: false, next_at: "2026-10-03T12:00:00Z", last_at: "2026-10-03T06:00:00Z", last_outcome: "ran", last_error: "", announced_at: "x", secret: "y" },
+        { name: "meme.dispatch", enabled: false, interval_override: true, last_outcome: "error", last_error: "e".repeat(500) },
+        "not a job",
+      ],
+    },
+  };
+  const { orchestrator } = recorder({ status: "ok", result: withJobs });
+  const result = await handleRequest({ type: "ningo.status" }, orchestrator, limits);
+  assert.ok(result.ok);
+  const body = result.result as { services: Record<string, unknown>; jobs: Array<Record<string, unknown>> };
+  assert.deepEqual(body.services.meme, { status: "ok", detail: "", enabled: true });
+  assert.equal(body.jobs.length, 2);
+  assert.deepEqual(body.jobs[0], { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "2026-10-03T12:00:00Z", lastAt: "2026-10-03T06:00:00Z", lastOutcome: "ran", lastError: "" });
+  assert.equal(body.jobs[1]?.enabled, false);
+  assert.equal(body.jobs[1]?.intervalOverride, true);
+  assert.ok(String(body.jobs[1]?.lastError).length <= 200, "a long error is cut");
+  assert.doesNotMatch(JSON.stringify(result), /secret|announced_at/);
+
+  const bare = recorder({ status: "ok", result: compactStatus });
+  const plain = await handleRequest({ type: "ningo.status" }, bare.orchestrator, limits);
+  assert.ok(plain.ok);
+  assert.equal("jobs" in (plain.result as object), false);
+});
+
+test("every interval the card's editor can offer goes through the shell, up to the longest the orchestrator keeps", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: { workflow: "ningo", domain: "system", result: { name: "meme.refresh", enabled: true, interval_override: true, interval: "168h0m0s" } } });
+  const intervals = ["1m", "45m", "10080m", "43200m", "1h", "168h", "720h"];
+  for (const interval of intervals) {
+    const result = await handleRequest({ type: "scheduler.jobs.set", payload: { name: "meme.refresh", interval } }, orchestrator, limits, undefined, here);
+    assert.ok(result.ok, interval);
+  }
+  assert.deepEqual(calls.map((call) => call.payload.interval), intervals);
 });

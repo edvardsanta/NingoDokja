@@ -191,7 +191,7 @@ main {
 /* The list is the grid and each row a subgrid of it: a column is as wide as its widest cell. */
 .services {
   display: grid;
-  grid-template-columns: max-content max-content 1fr;
+  grid-template-columns: max-content max-content 1fr max-content;
   gap: 2px 1rem;
   margin: 1rem 0 0;
   padding: 0;
@@ -217,6 +217,66 @@ main {
   color: var(--ink-dim);
   font-size: 0.8125rem;
   overflow-wrap: anywhere;
+}
+
+/* A service or a job the operator can switch has its button at the end of the row. */
+.switch {
+  grid-column: 4;
+  justify-self: end;
+  min-width: 5.5rem;
+}
+
+button[role="switch"][aria-checked="true"] {
+  background: var(--cyan);
+  color: var(--panel);
+}
+
+.card h3 {
+  margin: 1.5rem 0 0;
+  font-size: 1rem;
+}
+
+.jobs {
+  display: grid;
+  gap: 2px;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jobs li {
+  display: grid;
+  grid-template-columns: 1fr max-content;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--ink-dim);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ink-dim) 10%, transparent), transparent 60%);
+}
+
+.jobs li[data-enabled="true"] {
+  border-left-color: var(--cyan);
+}
+
+.jobs .switch {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.jobs .service-detail {
+  grid-column: 1 / -1;
+}
+
+.job-interval {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.job-interval input {
+  width: 6rem;
 }
 
 .card [role="status"] {
@@ -288,8 +348,10 @@ button:focus-visible {
     overflow-wrap: anywhere;
   }
 
-  .service-detail {
+  .service-detail,
+  .services .switch {
     grid-column: 1 / -1;
+    justify-self: start;
   }
 }
 

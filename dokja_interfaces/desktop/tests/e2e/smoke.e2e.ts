@@ -102,7 +102,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
   it("refuses an action that is not on the allow-list, before the orchestrator hears of it", async () => {
     for (const type of [
-      "services.set", "discord.send", "digest.refresh", "scheduler.jobs.set",
+      "discord.send", "digest.refresh", "scheduler.jobs.announce",
       "knowledge.add", "memory.record", "memory.forget", "message.created",
     ]) {
       const answer = (await ask(type, { name: "feeds", enabled: false })) as { ok: boolean; error?: { code: string } };
@@ -111,7 +111,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     }
     assert.ok(
       !orchestrator.seen.some((event) =>
-        /^(services|discord|scheduler)\.|^digest\.refresh$|^knowledge\.add$|^memory\.(record|forget)$|^message\./.test(event.type),
+        /^discord\.|^scheduler\.jobs\.announce$|^digest\.refresh$|^knowledge\.add$|^memory\.(record|forget)$|^message\./.test(event.type),
       ),
     );
   });
@@ -186,10 +186,80 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     });
   });
 
+  describe("a switch", () => {
+    const switches = () => orchestrator.seen.filter((event) => /^(services|scheduler\.jobs)\.set$/.test(event.type));
+    const until = async (check: () => boolean, limitMs = 8000) => {
+      const end = Date.now() + limitMs;
+      while (!check()) {
+        if (Date.now() > end) throw new Error(`timed out waiting for the orchestrator; it saw ${JSON.stringify(orchestrator.seen.slice(-6))}`);
+        await sleep(100);
+      }
+    };
+    const statusReadsAfterSwitch = () => {
+      const types = orchestrator.seen.map((event) => event.type);
+      return types.slice(types.lastIndexOf("services.set") + 1).filter((type) => type === "ningo.status").length;
+    };
+
+    it("is refused when nothing real was pressed, even if a script asks", async () => {
+      await sleep(3600);
+      for (const [type, payload] of [["services.set", { name: "meme", enabled: false }], ["scheduler.jobs.set", { name: "meme.refresh", enabled: false }]] as const) {
+        const answer = (await ask(type, payload)) as { ok: boolean; error?: { code: string; message: string } };
+        assert.equal(answer.ok, false, type);
+        assert.equal(answer.error?.code, "denied", type);
+        assert.match(answer.error?.message ?? "", /click or a key press/);
+      }
+      assert.equal(switches().length, 0, "the orchestrator never heard of it");
+    });
+
+    it("goes through from the card's own switch right after a real press, with the flag alone", async () => {
+      // other tests have opened other tabs; the switch is on the health tab
+      await page.evaluate("document.querySelectorAll('[role=tab]')[0].click()");
+      const button = "document.querySelector('button[role=switch][aria-label=\"meme switch\"]')";
+      await page.waitFor(`${button} !== null`);
+      // The press is what the shell counts. The button itself is pressed by the script here: in the
+      // hidden display the rows' entrance animation never advances, and a row that is still clipped
+      // takes no mouse click. A real click on the button was checked in the running app.
+      await page.click(5, 5);
+      await page.evaluate(`(${button}.click(), 'pressed')`);
+      await until(() => switches().length === 1 && statusReadsAfterSwitch() === 1);
+      assert.deepEqual(switches().map((event) => [event.type, event.payload]), [["services.set", { name: "meme", enabled: false }]]);
+    });
+
+    it("sends what the shell built, and nobody is asked", async () => {
+      await page.click(5, 5);
+      const started = Date.now();
+      const service = (await ask("services.set", { name: "meme", enabled: false, interval: "1m", extra: "x" })) as { ok: boolean; result?: unknown };
+      assert.equal(service.ok, true);
+      assert.deepEqual(service.result, { name: "meme", enabled: false });
+      assert.ok(Date.now() - started < 2500, "no window was opened");
+      assert.deepEqual(switches().at(-1)?.payload, { name: "meme", enabled: false });
+
+      await page.click(5, 5);
+      const job = (await ask("scheduler.jobs.set", { name: "meme.refresh", enabled: false })) as { ok: boolean; result?: unknown };
+      assert.equal(job.ok, true);
+      assert.deepEqual(job.result, { name: "meme.refresh", enabled: false, interval: "6h0m0s", intervalOverride: false });
+      assert.doesNotMatch(JSON.stringify(job), /private-field/);
+      assert.deepEqual(switches().at(-1)?.payload, { name: "meme.refresh", enabled: false }, "no interval rides along");
+    });
+
+    it("does not let an empty interval through, which the orchestrator would read as the default", async () => {
+      await page.click(5, 5);
+      const before = switches().length;
+      for (const interval of ["", " ", "soon"]) {
+        const answer = (await ask("scheduler.jobs.set", { name: "meme.refresh", interval })) as { ok: boolean; error?: { code: string } };
+        assert.equal(answer.ok, false, JSON.stringify(interval));
+        assert.equal(answer.error?.code, "invalid", JSON.stringify(interval));
+      }
+      assert.equal(switches().length, before);
+    });
+  });
+
   it("hands the screen only what a card reads", async () => {
     const status = JSON.stringify(await ask("ningo.status"));
     assert.match(status, /"ok":true/);
     assert.doesNotMatch(status, /channel-1|base-url-1|hint-1|profile-1/);
+    assert.match(status, /"jobs":\[\{"name":"meme.refresh"/);
+    assert.doesNotMatch(status, /announced-1/, "what the scheduler stamps on itself stays behind");
 
     const items = JSON.stringify(await ask("digest.items", { limit: 8, per_source: 10, max_age_hours: 9999 }));
     assert.match(items, /A plain title/);

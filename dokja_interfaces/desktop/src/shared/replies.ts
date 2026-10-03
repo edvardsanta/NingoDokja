@@ -8,10 +8,27 @@ export type ServiceState = {
   enabled?: boolean;
 };
 
+// One scheduled job as the orchestrator reports it. The times are RFC 3339 and empty when unknown.
+export type JobState = {
+  name: string;
+  enabled: boolean;
+  interval: string;
+  intervalOverride: boolean;
+  nextAt: string;
+  lastAt: string;
+  lastOutcome: string;
+  lastError: string;
+};
+
 export type StatusReply = {
   status: string;
   services: Record<string, ServiceState>;
+  jobs?: JobState[];
 };
+
+// What the orchestrator says after a switch: the state it now holds, not the one that was asked for.
+export type ServiceSwitched = { off?: false; name: string; enabled: boolean };
+export type JobSwitched = { off?: false; name: string; enabled: boolean; interval: string; intervalOverride: boolean };
 
 // The orchestrator understood the request but the operator switched that service off.
 export type Off = { off: true; reason: string };

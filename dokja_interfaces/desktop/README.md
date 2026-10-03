@@ -9,7 +9,7 @@ opened, and then keeps what it showed:
 
 | Tab | Asks | Shows |
 |---|---|---|
-| health | `ningo.status` | how every service is doing; the name's ghost follows it |
+| health | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
@@ -25,6 +25,14 @@ batch of up to 32 pending passages per click, and delete a selected document aft
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
 document list. The communications tab sends to Discord through its own confirmed action. Nothing opens an external link.
+
+The health tab is also where things are switched on and off. Each service the orchestrator can switch
+(`meme`, `chat_ai`, `book`, `knowledge`, `memory`, `scheduler`) has a switch, and each scheduled job has a
+switch and an interval (minutes or hours, between one minute and thirty days; "Back to default" drops a
+custom one). Switching `scheduler` off pauses every job. A switch needs a real click or key press just
+before it, like any change, and asks for no window, because the operator can switch it back at once. The
+screen never trusts its own guess: after every change it reads the status again and shows what the
+orchestrator holds, and a refused or timed-out change says so.
 
 ## Run
 
@@ -136,7 +144,10 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
   makes it fail fast, as "unavailable", when nobody is listening.
 - **The allow-list** (`src/shared/actions.ts`) names the only actions the screen may ask for. Anything
   else is refused before the socket is touched: the orchestrator has no authentication and also
-  exposes administrative actions (`services.set`, `discord.send`, `scheduler.*`).
+  exposes administrative actions (`discord.send`, `scheduler.jobs.announce`, `chat.profile.use`). The
+  switches (`services.set`, `scheduler.jobs.set`) are on the list as changes, and the scheduler's own
+  heartbeat is not: a page could otherwise fake a running scheduler. A job change carries only what the
+  screen supplied, so switching a job never clears its interval.
 - **A change needs the person** (`src/main/presence.ts`): the actions in `WRITE_ACTION_TYPES` are refused
   unless the browser reported a real mouse press or key press in the window in the last 3 seconds. A
   script in the page can call the shell but cannot fake that input, so content that tricks the page into

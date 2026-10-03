@@ -313,3 +313,20 @@ local history database, attachment downloads or external link opening were intro
 This supersedes the earlier read-only security description for this tab. Provider credentials
 remain in the backend; only the restricted communications credential resides in the desktop's
 main process. Existing ingress bindings are unchanged.
+
+## Switches increment (2026-10-03)
+
+The desktop is meant to be the one place from which the operator runs Ningo, so the allow-list no
+longer keeps it from switching things. The health card now carries a switch for every service the
+orchestrator can switch and, below the services, the scheduled jobs with a switch and an interval each.
+This supersedes the allow-list sentence under Security above: `services.set` and `scheduler.jobs.set`
+are on the list as changes. They need a real click or key press just before, like every change, and
+open no confirmation window, because the operator can switch them back at once. `scheduler.jobs.announce`
+(the scheduler's own heartbeat), `discord.send`, `digest.refresh` and `chat.profile.use` stay off the list.
+
+A job change sends only what the screen supplied: the orchestrator reads an interval that is present as a
+change and an empty one as "back to the default", so a switch must never carry an interval and an interval
+must never be empty. The screen reads `ningo.status` again after every change instead of trusting its own
+guess. Not covered yet: switching the communications service (it is not among the orchestrator's known
+services), feed sources (they live on the feeds-service branch) and chat profiles (their reply carries a
+provider address the shell deliberately strips).

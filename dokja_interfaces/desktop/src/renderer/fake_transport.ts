@@ -24,12 +24,16 @@ import type { PreviewResult, Transport, TransportResult } from "../shared/transp
 const STATUS: StatusReply = {
   status: "degraded",
   services: {
-    meme: { status: "ok", detail: "" },
-    chat_ai: { status: "error", detail: "connection refused" },
-    book: { status: "unchecked", detail: "" },
-    memory: { status: "ok", detail: "" },
-    scheduler: { status: "stopped", detail: "no announce for 12m (stopped?)" },
+    meme: { status: "ok", detail: "", enabled: true },
+    chat_ai: { status: "error", detail: "connection refused", enabled: true },
+    book: { status: "unchecked", detail: "", enabled: true },
+    memory: { status: "ok", detail: "", enabled: true },
+    scheduler: { status: "stopped", detail: "no announce for 12m (stopped?)", enabled: true },
   },
+  jobs: [
+    { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "ran", lastError: "" },
+    { name: "meme.dispatch", enabled: true, interval: "1h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "skipped", lastError: "" },
+  ],
 };
 
 const MEMORY_STATUS: MemoryStatus = {
@@ -203,6 +207,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createFakeTransport(delayMs = 400): Transport {
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   let documents = knowledgeDocuments();
+  // Switches stay where they were put, as the orchestrator keeps them.
+  let status = structuredClone(STATUS);
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     async request(type, payload) {
@@ -214,8 +220,29 @@ export function createFakeTransport(delayMs = 400): Transport {
           conversation = [...conversation, { id: String(101 + conversation.length), author: "Ningo", bot: true, content: String(payload?.content ?? ""), timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: payload?.attachment_url ? ["meme"] : [] }];
           return ok({ sent: true, skipped: false });
         }
+        case "services.set": {
+          const entry = status.services[String(payload?.name)];
+          if (!entry) return { ok: false, error: { code: "orchestrator", message: "unknown service" } };
+          const enabled = payload?.enabled === true;
+          entry.enabled = enabled;
+          if (!enabled) entry.status = "disabled";
+          else if (entry.status === "disabled") entry.status = STATUS.services[String(payload?.name)]?.status ?? "ok";
+          return ok({ name: String(payload?.name), enabled });
+        }
+        case "scheduler.jobs.set": {
+          const job = status.jobs?.find((candidate) => candidate.name === payload?.name);
+          if (!job) return { ok: false, error: { code: "orchestrator", message: "unknown job" } };
+          if (typeof payload?.enabled === "boolean") job.enabled = payload.enabled;
+          if (typeof payload?.interval === "string") {
+            const original = STATUS.jobs?.find((candidate) => candidate.name === job.name);
+            const custom = payload.interval !== "default";
+            job.intervalOverride = custom;
+            job.interval = custom ? payload.interval.replace(/^(\d+)m$/, "$1m0s").replace(/^(\d+)h$/, "$1h0m0s") : original?.interval ?? "";
+          }
+          return ok({ name: job.name, enabled: job.enabled, interval: job.interval, intervalOverride: job.intervalOverride });
+        }
         case "ningo.status":
-          return ok(STATUS);
+          return ok(status);
         case "memory.status":
           return ok(MEMORY_STATUS);
         case "memory.stats":

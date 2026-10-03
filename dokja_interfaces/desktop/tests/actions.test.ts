@@ -16,7 +16,7 @@ const domainResult = {
   },
   channels: { meme: ["channel-1"], safe_only: ["channel-1"] },
   chat_profiles: { profiles: [{ name: "profile-1", base_url: "base-url-1", key_hint: "hint-1" }] },
-  jobs: [{ name: "job-1", last_error: "job-error-1" }],
+  jobs: [{ name: "job-1", last_error: "job-error-1", announced_at: "announced-1", token: "job-token-1" }],
 };
 
 const compact = { event_id: "event-1", workflow: "ningo", domain: "system", result: domainResult };
@@ -39,10 +39,12 @@ test("ningo.status keeps only what the health card reads", () => {
       meme: { status: "ok", detail: "", enabled: true },
       scheduler: { status: "stopped", detail: "never announced", enabled: false },
     },
+    // the card reads each job's switch, interval, last run and last error, and nothing else of it
+    jobs: [{ name: "job-1", enabled: false, interval: "", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "", lastError: "job-error-1" }],
   });
 
   const serialized = JSON.stringify(projected);
-  for (const leaked of ["channel-1", "base-url-1", "hint-1", "job-error-1", "unsent_count"]) {
+  for (const leaked of ["channel-1", "base-url-1", "hint-1", "announced-1", "job-token-1", "unsent_count"]) {
     assert.ok(!serialized.includes(leaked), `${leaked} must not reach the renderer`);
   }
 });
