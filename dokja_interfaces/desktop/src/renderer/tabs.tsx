@@ -94,7 +94,7 @@ export function Tabs({ entries, transport }: { entries: readonly CardEntry[]; tr
           aria-labelledby={`${baseId}-tab-${kind}`}
           hidden={selected !== kind}
         >
-          {opened.has(kind) && <Card transport={transport} />}
+          {opened.has(kind) && <Card transport={transport} active={selected === kind} />}
         </div>
       ))}
     </>

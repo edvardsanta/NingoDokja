@@ -25,17 +25,20 @@ type ClientOptions = {
   endpoint: string;
   // How long to wait for the orchestrator to accept a request before calling it unavailable.
   connectTimeoutMs?: number;
+  communicationsToken?: string;
 };
 
 // Sends requests to the orchestrator over ZeroMQ REQ/REP, the same wire format the CLI and the
 // TUI use. The orchestrator answers one request at a time, so requests wait here in line.
 export class OrchestratorClient {
   private readonly endpoint: string;
+  private readonly communicationsToken: string;
   private readonly connectTimeoutMs: number;
   private line: Promise<void> = Promise.resolve();
 
   constructor(options: ClientOptions) {
     this.endpoint = options.endpoint;
+    this.communicationsToken = options.communicationsToken ?? "";
     this.connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   }
 
@@ -44,6 +47,14 @@ export class OrchestratorClient {
     payload: Record<string, unknown>,
     timeoutMs: number,
   ): Promise<OrchestratorReply> {
+    if (type.startsWith("communications.")) {
+      if (this.communicationsToken.length < 32 || this.communicationsToken.startsWith("CHANGE_ME")) {
+        return Promise.reject(new OrchestratorError("orchestrator", "Communications access is not configured."));
+      }
+      if (!localEndpoint(this.endpoint)) {
+        return Promise.reject(new OrchestratorError("denied", "communications requires a local endpoint or a local tunnel"));
+      }
+    }
     const deadline = Date.now() + timeoutMs;
     return new Promise<OrchestratorReply>((resolve, reject) => {
       let settled = false;
@@ -92,7 +103,7 @@ export class OrchestratorClient {
     try {
       socket.connect(this.endpoint);
       try {
-        await socket.send(JSON.stringify(buildEnvelope(type, payload)));
+        await socket.send(JSON.stringify(buildEnvelope(type, payload, this.communicationsToken)));
       } catch (error) {
         throw new OrchestratorError("unavailable", describe("the orchestrator did not accept the request", error));
       }
@@ -115,7 +126,7 @@ export class OrchestratorClient {
   }
 }
 
-function buildEnvelope(type: string, payload: Record<string, unknown>) {
+function buildEnvelope(type: string, payload: Record<string, unknown>, token: string) {
   return {
     event_id: randomUUID(),
     timestamp: new Date().toISOString(),
@@ -124,7 +135,7 @@ function buildEnvelope(type: string, payload: Record<string, unknown>) {
     user: { id: SOURCE, name: SOURCE },
     channel: { id: SOURCE },
     payload,
-    context: { interface: SOURCE },
+    context: { interface: SOURCE, ...(type.startsWith("communications.") ? { communications_token: token } : {}) },
   };
 }
 
@@ -154,4 +165,12 @@ function toOrchestratorError(error: unknown): OrchestratorError {
 function describe(prefix: string, error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   return `${prefix}: ${detail}`;
+}
+
+function localEndpoint(endpoint: string): boolean {
+  if (endpoint.startsWith("ipc:///")) return true;
+  try {
+    const url = new URL(endpoint);
+    return url.protocol === "tcp:" && ["127.0.0.1", "[::1]", "localhost"].includes(url.hostname);
+  } catch { return false; }
 }

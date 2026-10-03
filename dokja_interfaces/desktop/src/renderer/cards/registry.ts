@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import type { MessageId } from "../i18n/i18n.js";
+import { CommunicationsCard } from "./communications.js";
 import { DigestCard } from "./digest.js";
 import { HealthCard } from "./health.js";
 import { KnowledgeCard } from "./knowledge.js";
@@ -12,7 +13,7 @@ export type CardEntry = {
   kind: string;
   // The tab's name: the same word as the card's kind.
   labelId: MessageId;
-  Card: ComponentType<{ transport: Transport }>;
+  Card: ComponentType<{ transport: Transport; active?: boolean }>;
 };
 
 // Every card the screen knows, one tab each, in the order of the tabs. Adding a card is adding a
@@ -23,4 +24,5 @@ export const CARDS: readonly CardEntry[] = [
   { kind: "memory", labelId: "kind_memory", Card: MemoryCard },
   { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard },
   { kind: "memes", labelId: "kind_memes", Card: MemesCard },
+  { kind: "communications", labelId: "kind_communications", Card: CommunicationsCard },
 ];

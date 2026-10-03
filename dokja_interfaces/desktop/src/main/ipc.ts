@@ -15,7 +15,7 @@ type Orchestrator = {
 };
 
 // Remembers the image addresses the orchestrator handed out, so the shell previews only those.
-export type MediaGate = { remember(urls: string[]): void };
+export type MediaGate = { remember(urls: string[]): void; has?(url: string): boolean };
 
 export type RequestLimits = {
   defaultTimeoutMs: number;
@@ -61,6 +61,10 @@ export async function handleRequest(
 
   const wire = action.payload(payload);
   if (!wire) return fail("invalid", "the payload is not valid for this action");
+
+  if (type === "communications.send" && wire.attachment_url && !media?.has?.(String(wire.attachment_url))) {
+    return fail("denied", "only a meme listed by the orchestrator can be attached");
+  }
 
   // What cannot be undone waits for the person's yes, asked by the shell and not by the page.
   if (needsConfirmation(type)) {

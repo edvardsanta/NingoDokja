@@ -281,6 +281,41 @@ function reindexResult(body: Record<string, unknown>): ReindexResult {
 }
 
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
+  "communications.channels": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "communications", (body) => ({
+      channels: records(body.channels, (channel) => ({ id: text(channel.id), name: shorten(text(channel.name), 100) })).slice(0, 100),
+    })),
+  },
+  "communications.history": {
+    payload: (raw) => {
+      if (!/^[0-9]{1,20}$/.test(text(raw.channel_id))) return undefined;
+      const before = text(raw.before);
+      if (before && !/^[0-9]{1,20}$/.test(before)) return undefined;
+      return { channel_id: raw.channel_id, before };
+    },
+    project: (result) => inDomain(result, "communications", (body) => ({
+      channelId: text(body.channel_id), before: text(body.before),
+      messages: records(body.messages, (message) => ({
+        id: text(message.id), author: shorten(text(message.author), 100), bot: message.bot === true,
+        content: shorten(text(message.content), 4000), timestamp: shorten(text(message.timestamp), 40),
+        edited: message.edited === true, replyTo: text(message.reply_to),
+        attachments: words(message.attachments).slice(0, 10).map((name) => shorten(name, 200)),
+      })).slice(0, 30),
+    })),
+  },
+  "communications.send": {
+    payload: (raw) => {
+      const content = text(raw.content).trim();
+      const attachment = text(raw.attachment_url);
+      if (!/^[0-9]{1,20}$/.test(text(raw.channel_id)) || content.length > 2000 || (!content && !attachment)) return undefined;
+      if (attachment && (!/^https?:\/\//.test(attachment) || attachment.length > 2048)) return undefined;
+      return { channel_ids: [raw.channel_id], content, ...(attachment ? { attachment_url: attachment } : {}) };
+    },
+    project: (result) => inDomain(result, "system", (body) => ({
+      sent: words(body.sent_to).length === 1, skipped: words(body.skipped_unsafe).length > 0,
+    })),
+  },
   "ningo.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "system", systemStatus),

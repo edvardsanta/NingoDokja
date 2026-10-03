@@ -171,6 +171,20 @@ run_suite \
   "[ -f '$ROOT_DIR/dokja_domain/dokja_moderation/go.mod' ]" \
   "missing go.mod"
 
+run_suite \
+  "dokja_domain/dokja_communications" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_domain/dokja_communications" \
+  "[ -f '$ROOT_DIR/dokja_domain/dokja_communications/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
+  "dokja_services/dokja_communications" \
+  "python3 -m unittest -v" \
+  "$ROOT_DIR/dokja_services/dokja_communications" \
+  "command -v python3 >/dev/null 2>&1" \
+  "python3 not installed"
+
 if [ "$INCLUDE_LEGACY" = "1" ]; then
   run_suite \
     "dokja_legacy" \

@@ -366,3 +366,45 @@ Check:
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod down
 ```
+
+
+## Optional desktop communications
+
+The desktop communications tab adds authenticated actions without changing the existing ingress
+addresses or the event envelope. `communications.channels` and `communications.history` route
+through `dokja_domain/dokja_communications` to the read-only `dokja-communications` HTTP service.
+`communications.send` reuses the existing Discord delivery workflow and safe-only channel rules.
+
+- Set `DOKJA_COMMUNICATIONS_TOKEN` to a randomly generated value of at least 32 characters in the
+  desktop shell, orchestrator and service. Empty, short and `CHANGE_ME` credentials disable the
+  new routes. Keep the value in the ignored environment configuration, never in Git. The
+  orchestrator removes the credential before dispatch and debug responses.
+- `COMMUNICATIONS_SERVICE_ENDPOINT` is `http://dokja-communications:8084` in all three Compose
+  stacks. The service has no host port mapping and starts only with the `communications` profile.
+- The read service receives `DISCORD_BOT_TOKEN`, optional `DISCORD_GUILD_ID` for channel labels,
+  `DOKJA_DISCORD_API_BASE_URL` (the same operator input the delivery interface uses; the service
+  has no built-in address and answers `not_configured` without it) and the existing comma-separated
+  `DISCORD_SCHEDULED_MEME_CHANNEL_ID`. Both domain and service
+  enforce this channel list. A webhook alone cannot read message history.
+- The desktop uses loopback/IPC for these requests. Remote use requires a secure tunnel ending at
+  loopback; this shared credential does not encrypt ZeroMQ. Existing unauthenticated actions and
+  port publishing remain as documented above.
+
+After configuring the ignored environment file, the production command is:
+
+```sh
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile communications up -d --build dokja-orchestrator dokja-communications
+```
+
+This is a production deployment and still requires the owner's approval. Development uses
+`--env-file .env -f docker-compose.dev.yml`; the lite stack uses `docker-compose.lite.yml`.
+The existing Discord delivery interface must also be running for sends.
+
+The bot needs channel visibility, message history and the applicable message content permission.
+The desktop shows names of attachments; it does not download arbitrary conversation attachments
+or open their links. It can attach a meme from the existing queue to a new message after native
+confirmation. Polling pauses when hidden, on older pages and after errors (including rate limits).
+No send is retried automatically. On timeout verify the channel before resending.
+
+Compatibility: new routes, new optional environment settings and one internal service; no change
+to CLI/Discord commands, SQLite schemas, existing port mappings or existing HTTP contracts.

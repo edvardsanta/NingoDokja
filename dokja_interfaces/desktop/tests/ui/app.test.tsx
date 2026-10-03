@@ -40,6 +40,7 @@ describe("the screen", () => {
       "memória",
       "conhecimento",
       "memes",
+      "comunicações",
     ]);
     await screen.findByRole("heading", { name: "Serviços" });
     expect(document.documentElement.lang).toBe("pt");
