@@ -24,6 +24,7 @@ export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 
 // What the fake orchestrator says. Hand-built, never a captured reply, and seeded with what must
 // not reach the screen: a channel ID, a provider profile, a plugin name and an item address.
+export const COMMUNICATIONS_TOKEN = "test-communications-token-0000000000";
 export const HOSTILE_TITLE = '<img src="x" onerror="window.__owned = 1">';
 
 function replyFor(type: string): Record<string, unknown> {
@@ -32,6 +33,13 @@ function replyFor(type: string): Record<string, unknown> {
     result: { event_id: "event-1", workflow: domain, domain, result: body },
   });
   switch (type) {
+    case "communications.channels":
+      return wrap("communications", { channels: [{ id: "123", name: "reading-room" }] });
+    case "communications.history":
+      return wrap("communications", { channel_id: "123", before: "", messages: [
+        { id: "100", author: "A reader", bot: false, content: HOSTILE_TITLE, timestamp: "2026-10-03T00:00:00Z", attachments: ["clip.mp4"], token: "private-field" },
+        { id: "101", author: "Ningo", bot: true, content: "Every reading deserves a question.", timestamp: "2026-10-03T00:01:00Z", attachments: [] },
+      ] });
     case "ningo.status":
       return wrap("system", {
         status: "ok",
@@ -83,9 +91,11 @@ export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
   const seen: FakeOrchestrator["seen"] = [];
   const loop = (async () => {
     for await (const [frame] of socket) {
-      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown> };
+      const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown>; context?: Record<string, unknown> };
       seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
-      await socket.send(JSON.stringify(replyFor(String(event.type))));
+      const answer = String(event.type).startsWith("communications.") && event.context?.communications_token !== COMMUNICATIONS_TOKEN
+        ? { status: "error", error: "communications access denied" } : replyFor(String(event.type));
+      await socket.send(JSON.stringify(answer));
     }
   })().catch(() => undefined);
   return {
@@ -147,7 +157,7 @@ async function startHiddenDisplay(): Promise<{ socket: string; stop(): Promise<v
 
 // Starts the built app (run `pnpm build` first) with its own profile, against the fake
 // orchestrator, and waits for the debugging port Chromium reports.
-export async function launchApp(endpoint: string): Promise<RunningApp> {
+export async function launchApp(endpoint: string, communicationsToken = ""): Promise<RunningApp> {
   const profile = await mkdtemp(join(tmpdir(), "dokja-desktop-e2e-"));
   const hidden = await startHiddenDisplay();
   const env = hidden
@@ -163,7 +173,7 @@ export async function launchApp(endpoint: string): Promise<RunningApp> {
       `--request-endpoint=${endpoint}`,
       "--lang=en",
     ],
-    { cwd: ROOT, env, detached: true, stdio: ["ignore", "ignore", "ignore"] },
+    { cwd: ROOT, env: { ...env, DOKJA_COMMUNICATIONS_TOKEN: communicationsToken }, detached: true, stdio: ["ignore", "ignore", "ignore"] },
   );
 
   const stop = async () => {
@@ -230,9 +240,17 @@ export class Page {
 
   private async send(method: string, params: Record<string, unknown>) {
     const id = ++this.next;
-    const answer = new Promise<{ result?: { result?: { value?: unknown }; exceptionDetails?: unknown }; error?: unknown }>((resolve) =>
-      this.waiting.set(id, resolve),
-    );
+    const answer = new Promise<{ result?: { result?: { value?: unknown }; exceptionDetails?: unknown }; error?: unknown }>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(id);
+        reject(new Error(`debugging command timed out: ${method}`));
+      }, 10000);
+      this.waiting.set(id, (result) => {
+        clearTimeout(timer);
+        this.waiting.delete(id);
+        resolve(result);
+      });
+    });
     this.socket.send(JSON.stringify({ id, method, params }));
     return answer;
   }
