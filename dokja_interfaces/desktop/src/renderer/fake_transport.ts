@@ -203,10 +203,17 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createFakeTransport(delayMs = 400): Transport {
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   let documents = knowledgeDocuments();
+  let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     async request(type, payload) {
       await sleep(delayMs);
       switch (type) {
+        case "communications.channels": return ok({ channels: [{ id: "123", name: "reading-room" }] });
+        case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
+        case "communications.send": {
+          conversation = [...conversation, { id: String(101 + conversation.length), author: "Ningo", bot: true, content: String(payload?.content ?? ""), timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: payload?.attachment_url ? ["meme"] : [] }];
+          return ok({ sent: true, skipped: false });
+        }
         case "ningo.status":
           return ok(STATUS);
         case "memory.status":

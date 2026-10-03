@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   installPermissionPolicy(session.defaultSession);
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
-  const orchestrator = new OrchestratorClient({ endpoint: config.endpoint });
+  const orchestrator = new OrchestratorClient({ endpoint: config.endpoint, communicationsToken: process.env.DOKJA_COMMUNICATIONS_TOKEN });
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };
   const untrusted = { ok: false, error: { code: "denied", message: "this page is not the app" } } as const;
   const media = new MediaGate();

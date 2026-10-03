@@ -4,8 +4,11 @@
 // Almost all of them only read. The ones in WRITE_ACTION_TYPES change something, and the shell lets
 // them through only just after a real click or key press, and the ones that cannot be undone also
 // need the person to say yes in a window the shell opens. What else changes something (forget,
-// record, switch, send) is not here.
+// record, switch, discord.send) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
+  "communications.channels",
+  "communications.history",
+  "communications.send",
   "ningo.status",
   "memory.status",
   "memory.stats",
@@ -23,10 +26,10 @@ export const ACTION_TYPES = [
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
-export const WRITE_ACTION_TYPES: readonly ActionType[] = ["knowledge.ingest", "knowledge.delete", "knowledge.reindex"];
+export const WRITE_ACTION_TYPES: readonly ActionType[] = ["communications.send", "knowledge.ingest", "knowledge.delete", "knowledge.reindex"];
 
 // The ones that cannot be undone: the shell asks the person first, in a window of its own.
-export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = ["knowledge.delete"];
+export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = ["communications.send", "knowledge.delete"];
 
 export function needsConfirmation(type: ActionType): boolean {
   return CONFIRMED_ACTION_TYPES.includes(type);

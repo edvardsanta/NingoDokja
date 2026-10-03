@@ -190,3 +190,11 @@ export type ReindexResult = {
   degraded: boolean;
   reason: string;
 };
+
+export type CommunicationChannel = { id: string; name: string };
+export type CommunicationMessage = {
+  id: string; author: string; bot: boolean; content: string; timestamp: string;
+  edited: boolean; replyTo: string; attachments: string[];
+};
+export type CommunicationHistory = { channelId: string; messages: CommunicationMessage[]; before: string };
+export type CommunicationSend = { off?: false; sent: boolean; skipped: boolean };
