@@ -4,7 +4,7 @@ Desktop interface for Ningo. It is an interface adapter like the CLI, the TUI an
 talks to the orchestrator over ZeroMQ request/reply and holds no business logic. The plan, the
 decisions and the Phase 0 results are in [`dokja_docs/desktop-app-plan.md`](../../dokja_docs/desktop-app-plan.md).
 
-Status: v1 without voice. Five tabs, each a card that asks its service only when the tab is first
+Status: v1 without voice. Six tabs, each a card that asks its service only when the tab is first
 opened, and then keeps what it showed:
 
 | Tab | Asks | Shows |
@@ -13,9 +13,10 @@ opened, and then keeps what it showed:
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
+| communications | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels, paginated history, text and meme delivery through Ningo |
 | memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell; a click opens one large |
 
-The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
+The keys `1` to `6` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
 a digit. An opened meme is a dialog over the page: a video plays with its sound and controls, the left and
 right arrows move between the memes of the page, and Escape or a click outside closes it; while it is
 open the keys do not reach the tabs. Changes to the research base require a real click or key press in the window (see
@@ -23,7 +24,7 @@ open the keys do not reach the tabs. Changes to the research base require a real
 batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
-document list. Nothing in the app opens a link or sends to Discord.
+document list. The communications tab sends to Discord through its own confirmed action. Nothing opens an external link.
 
 ## Run
 
@@ -48,6 +49,38 @@ list opens by itself when one does.
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). Pass them after `--`, for example `pnpm start -- --lang=pt`.
+
+## Communications
+
+The sixth tab centralizes the configured Discord channels. It lists 30 messages at a time,
+including messages written before the desktop started, with author, bot marker, time, edits,
+reply ids and attachment filenames. Older pages are read on demand. The latest page refreshes
+every 15 seconds only while the tab and window document are visible; uncheck the refresh option
+to stop. An error pauses polling until a manual retry succeeds.
+
+The composer sends text (up to 2000 characters) and optionally a meme selected from the existing
+queue. The main process confirms the exact channel id, text and attachment address in a native
+window. The renderer cannot request broadcast, force a safety bypass, mark a meme as sent, choose
+an unlisted attachment, or retry a delivery automatically. On cancellation or failure the draft
+stays in the form. On timeout, check the latest messages before retrying because delivery may
+have succeeded. Changing channels clears that channel's current draft; switching tabs preserves it.
+
+Setup:
+
+1. Run an orchestrator built with the `communications.*` routes and the new
+   [`dokja_communications` service](../../dokja_services/dokja_communications/README.md).
+2. Configure `DOKJA_COMMUNICATIONS_TOKEN` with the same random value of at least 32 characters
+   in the desktop shell, orchestrator and service. It is separate from the bot token and never
+   enters the renderer. Missing credentials leave the other cards usable.
+3. Use a loopback or IPC request endpoint. For a remote orchestrator use a secure local tunnel;
+   the desktop refuses to send this credential directly to a remote ZeroMQ address.
+4. Keep `DISCORD_SCHEDULED_MEME_CHANNEL_ID` consistent between orchestrator and service. These
+   are the existing permitted delivery channels. Set the bot token in the service, and optionally
+   `DISCORD_GUILD_ID` for friendly channel names. The service also needs `DOKJA_DISCORD_API_BASE_URL`,
+   the same operator input the delivery interface uses; it has no built-in value.
+
+No channel history is stored locally. The ordinary bot and configured delivery webhooks retain
+ their current behavior. This tab does not log in as the operator's personal Discord account.
 
 ## Language
 

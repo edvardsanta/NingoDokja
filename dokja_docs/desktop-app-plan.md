@@ -297,3 +297,19 @@ Everything except the loopback binding is additive.
   from the context for known sources, and `discord.send`, which requires `cli`. If a text conversation
   arrives, add `desktop` to the chat handler's list.
 - Mobile is assumed to be a PWA from the same UI, after authentication exists.
+
+
+## Communications increment (2026-10-03)
+
+The desktop now has a sixth tab for configured Discord conversations. It reads channel names and
+paginated history through the new communications domain and read service, and sends through the
+existing orchestrator delivery workflow. The shell confirms channel and content before sending,
+and may attach only a meme listed by the orchestrator. Polling runs only on the visible latest
+page and pauses on errors. These actions require a separate shared credential, stripped before
+orchestrator dispatch and never exposed to the renderer; the shell uses only loopback or IPC.
+See the desktop README and production runbook for configuration. No personal-account login,
+local history database, attachment downloads or external link opening were introduced.
+
+This supersedes the earlier read-only security description for this tab. Provider credentials
+remain in the backend; only the restricted communications credential resides in the desktop's
+main process. Existing ingress bindings are unchanged.
