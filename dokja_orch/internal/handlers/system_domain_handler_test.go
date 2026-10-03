@@ -1129,14 +1129,16 @@ func TestProfilesAreListedMaskedAndSelectableThroughTheOrchestrator(t *testing.T
 func TestTheTokenNeverAppearsInAnyOrchestratorResponse(t *testing.T) {
 	handler, _ := profileHandler(t)
 	responses := map[string]map[string]any{}
-	for name, request := range map[string]struct {
+	for _, request := range []struct {
+		name      string
 		eventType string
 		payload   map[string]any
 	}{
-		"list":   {"chat.profiles.list", map[string]any{}},
-		"use":    {"chat.profile.use", map[string]any{"name": "hosted"}},
-		"status": {"ningo.status", map[string]any{}},
+		{"list", "chat.profiles.list", map[string]any{}},
+		{"use", "chat.profile.use", map[string]any{"name": "hosted"}},
+		{"status", "ningo.status", map[string]any{}},
 	} {
+		name := request.name
 		event, step := adminEvent(request.eventType, request.payload)
 		result, err := handler.Handle(context.Background(), event, step)
 		if err != nil {

@@ -1,0 +1,4 @@
+name: dokja-communications
+language: python
+protocol: http
+port: 8084

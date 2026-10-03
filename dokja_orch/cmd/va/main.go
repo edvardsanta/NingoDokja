@@ -54,6 +54,7 @@ func main() {
 	)
 
 	service := core.DefaultService(
+		handlers.NewCommunicationsDomainHandler(clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")), os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID")),
 		handlers.NewSystemDomainHandler(
 			clients.NewChatAIServiceClient(""),
 			memeClient,
@@ -77,7 +78,7 @@ func main() {
 		handlers.NewMemeDomainHandler(clients.NewMemeServiceClient("")).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
-	).WithControls(controls)
+	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))

@@ -59,7 +59,7 @@ keywords = ["http"]
   description = "Reserved placeholders, loopback, compose service names, hosts that are a single label (they cannot be a public site) and this repository. An address may carry user info (user:pass@host)."
   regexTarget = "match"
   regexes = [
-    '''(?i)^https?://(?:[^/@\s]+@)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:[0-9]+)?([/?#].*)?$''',
+    '''(?i)^https?://(?:[^/@\s]+@)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:([0-9]+|\$\{[A-Za-z_.]+\}))?([/?#].*)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*(example|test|invalid|localhost)(:[0-9]+)?([/?#].*)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*example\.(com|org|net)(:[0-9]+)?([/?#].*)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?(dokja-[a-z-]+|ollama|orchestrator)(:[0-9]+)?([/?#].*)?$''',
@@ -67,6 +67,22 @@ keywords = ["http"]
     '''(?i)^https?://github\.com/edvardsanta/NingoDokja([/?#].*)?$''',
     '''^https?:///''',
     '''^https?://\.\.\.$''',
+    # The XML namespace of SVG: an identifier that is written in the file, never a request.
+    '''(?i)^https?://www\.w3\.org/2000/svg$''',
+    # The scheme named in a sentence ("starts with http:// or https://."), with no address after it.
+    '''^https?://\.$''',
+  ]
+
+  [[rules.allowlists]]
+  description = "Addresses that are refused on purpose: the tests of the desktop shell's picture and video fetchers feed them loopback, private, link-local and obfuscated addresses to prove they are never fetched"
+  condition = "AND"
+  regexTarget = "match"
+  paths = [
+    '''^dokja_interfaces/desktop/tests/(image|media)_fetch\.test\.ts$''',
+  ]
+  regexes = [
+    # an IPv4 address in any spelling (dotted, decimal, hex, octal, short), a bracketed IPv6 address, or localhost
+    '''(?i)^https?://(\[[0-9a-f:.]*|[0-9a-fx.]+|localhost)(:.*)?([/?#].*)?$''',
   ]
 
   [[rules.allowlists]]
@@ -98,9 +114,9 @@ secretGroup = 1
 keywords = ["/home/", "/users/"]
 
   [[rules.allowlists]]
-  description = "Generic accounts used by CI and containers"
+  description = "Generic accounts used by CI and containers, and `me`, the placeholder in the tests of the file-name helper"
   regexes = [
-    '''^(runner|user|app|node|nonroot|vscode)$''',
+    '''^(runner|user|app|node|nonroot|vscode|me)$''',
   ]
 
 [[rules]]

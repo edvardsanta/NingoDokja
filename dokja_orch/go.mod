@@ -56,3 +56,7 @@ require (
 )
 
 require golang.org/x/sys v0.47.0 // indirect
+
+require read_books/dokja_domain/dokja_communications v0.0.0
+
+replace read_books/dokja_domain/dokja_communications => ../dokja_domain/dokja_communications

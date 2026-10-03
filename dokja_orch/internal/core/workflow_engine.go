@@ -45,7 +45,7 @@ func actionFor(domain Domain, eventType string) string {
 			return "inspect-ningo-platform"
 		case "meme.dispatch.scheduled":
 			return "deliver-scheduled-memes"
-		case "discord.send":
+		case "discord.send", "communications.send":
 			return "send-discord-message"
 		case "services.set":
 			return "set-service"
@@ -59,6 +59,15 @@ func actionFor(domain Domain, eventType string) string {
 			return "use-chat-profile"
 		default:
 			return "inspect-system"
+		}
+	case DomainCommunications:
+		switch eventType {
+		case "communications.channels":
+			return "list-communication-channels"
+		case "communications.history":
+			return "read-communication-history"
+		default:
+			return "unsupported-communications"
 		}
 	case DomainModeration:
 		return "screen-event"

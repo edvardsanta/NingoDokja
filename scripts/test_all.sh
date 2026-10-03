@@ -185,6 +185,20 @@ run_suite \
   "[ -f '$ROOT_DIR/dokja_domain/dokja_moderation/go.mod' ]" \
   "missing go.mod"
 
+run_suite \
+  "dokja_domain/dokja_communications" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_domain/dokja_communications" \
+  "[ -f '$ROOT_DIR/dokja_domain/dokja_communications/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
+  "dokja_services/dokja_communications" \
+  "python3 -m unittest -v" \
+  "$ROOT_DIR/dokja_services/dokja_communications" \
+  "command -v python3 >/dev/null 2>&1" \
+  "python3 not installed"
+
 if [ "$INCLUDE_LEGACY" = "1" ]; then
   run_suite \
     "dokja_legacy" \
@@ -200,6 +214,13 @@ run_suite \
   "$ROOT_DIR/dokja_interfaces/discord" \
   "command -v pnpm >/dev/null 2>&1 && [ -f '$ROOT_DIR/dokja_interfaces/discord/package.json' ]" \
   "pnpm not installed or missing package.json"
+
+run_suite \
+  "dokja_interfaces/desktop" \
+  "pnpm test" \
+  "$ROOT_DIR/dokja_interfaces/desktop" \
+  "command -v pnpm >/dev/null 2>&1 && [ -d '$ROOT_DIR/dokja_interfaces/desktop/node_modules' ]" \
+  "pnpm not installed or dependencies missing (run pnpm install in dokja_interfaces/desktop)"
 
 run_suite \
   "dokja_lab" \

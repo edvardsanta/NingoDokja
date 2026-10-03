@@ -19,6 +19,8 @@ services:
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
+      COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
+      DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
       DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
@@ -34,6 +36,20 @@ services:
       - "5558:5558"
       - "8091:8091"
       - "40000:40000"
+    networks:
+      - dokja-net
+
+  dokja-communications:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_communications/Dockerfile
+    profiles: [communications]
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DOKJA_DISCORD_API_BASE_URL: ${DOKJA_DISCORD_API_BASE_URL:-}
+      DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID:-}
+      DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
     networks:
       - dokja-net
 

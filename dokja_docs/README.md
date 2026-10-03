@@ -12,3 +12,4 @@ Available docs:
 - [domain-responsibilities.md](./domain-responsibilities.md)
 - [voice-planning.md](./voice-planning.md)
 - [voice-service-proposal.md](./voice-service-proposal.md)
+- [desktop-app-plan.md](./desktop-app-plan.md)
