@@ -16,11 +16,12 @@ type ProcessResult struct {
 }
 
 type Service struct {
-	router         EventRouter
-	contextBuilder ContextBuilder
-	workflowEngine WorkflowEngine
-	dispatcher     DomainDispatcher
-	controls       *Controls
+	router              EventRouter
+	contextBuilder      ContextBuilder
+	workflowEngine      WorkflowEngine
+	dispatcher          DomainDispatcher
+	controls            *Controls
+	communicationsToken string
 }
 
 // WithControls makes the service honour the operator's service and job switches.
@@ -120,6 +121,10 @@ func (s *Service) ProcessWithResult(ctx context.Context, event Event) (ProcessRe
 	}
 
 	if err := event.Normalize(); err != nil {
+		return ProcessResult{}, err
+	}
+
+	if err := s.authorizeCommunications(&event); err != nil {
 		return ProcessResult{}, err
 	}
 

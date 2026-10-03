@@ -167,7 +167,7 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 	if event.Type == "meme.dispatch.scheduled" {
 		return h.handleScheduledMemeDispatch(ctx, event, workflow)
 	}
-	if event.Type == "discord.send" {
+	if event.Type == "discord.send" || event.Type == "communications.send" {
 		return h.handleDiscordSend(ctx, event, workflow)
 	}
 	switch event.Type {

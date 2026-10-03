@@ -22,14 +22,15 @@ const (
 type Domain string
 
 const (
-	DomainSystem     Domain = "system"
-	DomainBook       Domain = "book"
-	DomainChat       Domain = "chat"
-	DomainMemory     Domain = "memory"
-	DomainMeme       Domain = "meme"
-	DomainKnowledge  Domain = "knowledge"
-	DomainAutomation Domain = "automation"
-	DomainModeration Domain = "moderation"
+	DomainCommunications Domain = "communications"
+	DomainSystem         Domain = "system"
+	DomainBook           Domain = "book"
+	DomainChat           Domain = "chat"
+	DomainMemory         Domain = "memory"
+	DomainMeme           Domain = "meme"
+	DomainKnowledge      Domain = "knowledge"
+	DomainAutomation     Domain = "automation"
+	DomainModeration     Domain = "moderation"
 )
 
 type Event struct {
