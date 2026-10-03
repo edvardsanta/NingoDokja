@@ -448,3 +448,23 @@ test("a switched-off knowledge service answers a deletion as off", async () => {
   const result = await handleRequest({ type: "knowledge.delete", payload: { id: "note:a-1" } }, orchestrator, limits, undefined, here, async () => true);
   assert.deepEqual(result, { ok: true, result: { off: true, reason: "paused by the operator" } });
 });
+
+test("the wait for the person's answer does not count against the request's own time", async () => {
+  const server = await startReplyServer(() => ok(deleted));
+  try {
+    const client = new OrchestratorClient({ endpoint: server.endpoint });
+    const slowConfirm = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return true;
+    };
+    // the request may take 300 ms, the person takes 600 ms: only the request is timed
+    const result = await handleRequest(
+      { type: "knowledge.delete", payload: { id: "note:a-1" }, options: { timeoutMs: 300 } },
+      client, limits, undefined, here, slowConfirm,
+    );
+    assert.deepEqual(result, { ok: true, result: { deleted: true } });
+    assert.equal(server.requests.length, 1);
+  } finally {
+    await server.close();
+  }
+});
