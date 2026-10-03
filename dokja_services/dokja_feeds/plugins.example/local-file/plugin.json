@@ -1,0 +1,11 @@
+{
+  "id": "local-file",
+  "name": "Local file example",
+  "category": "feed",
+  "enabled": false,
+  "command": ["./run.sh"],
+  "interval": "5m",
+  "timeout": "10s",
+  "env": ["EXAMPLE_FEED_FILE"],
+  "max_items": 20
+}

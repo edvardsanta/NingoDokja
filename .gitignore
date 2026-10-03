@@ -70,5 +70,8 @@ models/
 # Operator switches written by the orchestrator
 .dokja/
 
+# Feeds plugins are user-owned and kept out of the repository (the directory compose mounts by default)
+feeds_plugins/
+
 # Knowledge base plugins are user-owned and kept out of the repository
 dokja_services/dokja_knowledge/plugins.local/

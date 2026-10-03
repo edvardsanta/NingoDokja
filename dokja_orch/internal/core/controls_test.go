@@ -370,3 +370,14 @@ func TestMemoryEventsBelongToTheMemoryService(t *testing.T) {
 		t.Fatalf("meme events must keep their own service, got %q", got)
 	}
 }
+
+func TestDigestEventsBelongToTheFeedsService(t *testing.T) {
+	for _, eventType := range []string{"digest.items", "digest.status", "digest.refresh"} {
+		if got := ServiceForEvent(eventType); got != "feeds" {
+			t.Fatalf("%s needs the feeds service, got %q", eventType, got)
+		}
+	}
+	if !contains(KnownServices, "feeds") {
+		t.Fatal("feeds must be a service the operator can switch off")
+	}
+}

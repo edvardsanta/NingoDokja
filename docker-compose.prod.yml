@@ -16,6 +16,7 @@ services:
       CHAT_AI_SERVICE_ENDPOINT: ${CHAT_AI_SERVICE_ENDPOINT}
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
+      FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: ${DISCORD_INTERFACE_ENDPOINT}
@@ -121,6 +122,23 @@ services:
       - "127.0.0.1:5562:5562"
     depends_on:
       - dokja-ollama
+    networks:
+      - dokja-net
+
+  dokja-feeds:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_feeds/Dockerfile
+    restart: unless-stopped
+    environment:
+      FEEDS_SERVICE_ENDPOINT: tcp://*:5563
+      FEEDS_PLUGINS_DIR: /plugins
+    volumes:
+      # Plugins are the owner's and stay out of git; an empty directory means no plugins.
+      - ${FEEDS_PLUGINS_HOST_DIR:-./feeds_plugins}:/plugins:ro
+    # The items of the owner's own sources and no authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:5563:5563"
     networks:
       - dokja-net
 

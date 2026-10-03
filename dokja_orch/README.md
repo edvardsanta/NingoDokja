@@ -127,11 +127,31 @@ Behavior:
 
 - checks `dokja-chat-ai` health
 - checks `dokja-meme` status
-- checks `dokja-book` health (`GET /health`), and `dokja-knowledge` and `dokja-memory` through their `*.status` events
+- checks `dokja-book` health (`GET /health`), and `dokja-knowledge`, `dokja-memory` and `dokja-feeds` through their `*.status` events
+- `dokja-feeds` is `ok` with a `detail` note when no plugin is enabled or some of them are failing
 - probes run at the same time, so a service that is down costs one requester timeout (5s), not one each
 - a service that answers but cannot embed (Ollama down, `DOKJA_EMBED=off`) is `ok` with a `detail` note
 - a switched-off service is not probed; an enabled one that does not answer is `error` and the platform `degraded`
 - returns an aggregated compact status reply
+
+### Digest
+
+Triggered by:
+
+- `digest.status`
+- `digest.items`
+
+Route:
+
+- workflow: `digest`
+- domains: `digest`
+
+Behavior:
+
+- `digest.status` returns the feeds service's status: its plugins, each with a state (`ok`, `failed`, `pending`, `disabled` or `invalid`) and the reason
+- `digest.items` returns a page of the digest that `dokja_domain/dokja_digest` composes from the service's items: it drops items older than a window, orders newest first, drops duplicates and keeps one source from filling the first places
+- the payload of `digest.items` is optional: `limit` (default 12, at most 50), `offset`, `per_source` (default 3) and `max_age_hours` (default 168); a value of the wrong kind is refused before the service is asked, as is any other `digest.*` event
+- `feeds` can be switched off like the other services; while it is off these events return `skipped`
 
 ## Package layout
 

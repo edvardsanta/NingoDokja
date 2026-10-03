@@ -46,6 +46,7 @@ func main() {
 	memeClient := clients.NewMemeServiceClient("")
 	knowledgeClient := clients.NewKnowledgeServiceClient("")
 	memoryClient := clients.NewMemoryServiceClient("")
+	feedsClient := clients.NewFeedsServiceClient("")
 	bookClient := clients.NewBookServiceClient("")
 	hashtagExperience := handlers.NewHashtagExperience(
 		memoryClient,
@@ -64,10 +65,12 @@ func main() {
 			"book":      handlers.HealthProbe(bookClient),
 			"knowledge": handlers.StatusProbe(knowledgeClient),
 			"memory":    handlers.StatusProbe(memoryClient),
+			"feeds":     handlers.FeedsProbe(feedsClient),
 		}),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),
+		handlers.NewDigestDomainHandler(feedsClient),
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },

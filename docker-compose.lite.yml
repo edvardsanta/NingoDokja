@@ -17,6 +17,7 @@ services:
       BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
+      FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
@@ -131,6 +132,26 @@ services:
     volumes:
       - ./:/workspace
 
+
+  dokja-feeds:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_feeds/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_feeds
+    command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-feeds"]
+    environment:
+      FEEDS_SERVICE_ENDPOINT: tcp://*:5563
+      FEEDS_PLUGINS_DIR: /plugins
+      GOCACHE: /tmp/go-build
+    # The items of the owner's own sources and no authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:5563:5563"
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
+      # Plugins are the owner's and stay out of git; an empty directory means no plugins.
+      - ${FEEDS_PLUGINS_HOST_DIR:-./feeds_plugins}:/plugins:ro
 
   # Local embeddings run on CPU by default; no GPU passthrough is required.
   dokja-ollama:

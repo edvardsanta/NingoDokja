@@ -14,7 +14,7 @@ import (
 // KnownServices are the only services that can be switched off. Anything else is
 // rejected, so an unauthenticated caller cannot invent keys.
 // "scheduler" is special: switching it off pauses every scheduled run at once.
-var KnownServices = []string{"meme", "chat_ai", "book", "knowledge", "memory", "scheduler"}
+var KnownServices = []string{"meme", "chat_ai", "book", "knowledge", "memory", "feeds", "scheduler"}
 
 // KnownJobs are the scheduler jobs, named as the scheduler stamps them in Context["schedule"].
 var KnownJobs = []string{
@@ -39,6 +39,8 @@ func ServiceForEvent(eventType string) string {
 		return "knowledge"
 	case strings.HasPrefix(eventType, "memory."):
 		return "memory"
+	case strings.HasPrefix(eventType, "digest."):
+		return "feeds"
 	case strings.HasPrefix(eventType, "message."):
 		return "chat_ai"
 	}

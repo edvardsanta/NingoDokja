@@ -29,6 +29,7 @@ const (
 	DomainMemory         Domain = "memory"
 	DomainMeme           Domain = "meme"
 	DomainKnowledge      Domain = "knowledge"
+	DomainDigest         Domain = "digest"
 	DomainAutomation     Domain = "automation"
 	DomainModeration     Domain = "moderation"
 )

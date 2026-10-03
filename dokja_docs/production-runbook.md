@@ -16,6 +16,7 @@ Production stack:
 - `dokja-chat-ai`
 - `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
+- `dokja-feeds` (follows the sources the owner chooses, as plugins kept outside the repository)
 - `dokja-discord`
 - `dokja-scheduler`
 
@@ -231,6 +232,33 @@ service off like any other.
 
 To back up or move the data, copy `/data/dokja_memory.db` while the service is stopped, or use SQLite's
 online backup. The schema is versioned in the file; a build refuses a database from a newer version.
+
+## Feeds
+
+`dokja-feeds` follows the sources the owner chooses and keeps their latest items in memory, so the digest
+(`digest.status` and `digest.items`) can show them (see its [README](../dokja_services/dokja_feeds/README.md)).
+The repository ships the mechanism only: a source is a plugin, a directory with a `plugin.json` manifest and
+a program, kept outside the repository. Compose mounts `${FEEDS_PLUGINS_HOST_DIR:-./feeds_plugins}` read-only
+at `/plugins` (that default directory is git-ignored). With no plugin the service still answers and the
+digest is empty.
+
+A plugin runs only when its manifest says `"enabled": true`, and changes to the directory are read when the
+service starts. Its program runs inside the `dokja-feeds` container, so it must exist in the image: the image
+has a POSIX shell and the usual command-line tools, and no Python. For anything else, extend the image or put
+a static binary in the plugin directory. A manifest whose program is missing shows as `invalid` with the
+program's name in the status.
+
+A token a plugin needs belongs to the service's environment, not to the manifest: the manifest lists only the
+variable names, and only those variables reach the plugin. A failed run keeps the previous items and the
+status says why (`exit status 2`, `timed out after 30s`); what the plugin wrote to stderr goes to the service
+log and nowhere else, so read that log to debug a plugin.
+
+Port `5563` is published on `127.0.0.1` only because the service has no authentication. The orchestrator
+routes the `digest.*` events to it (`FEEDS_SERVICE_ENDPOINT`, set in the compose files). `feeds` is one of the
+services that can be switched off: while it is off, the orchestrator answers these events as skipped. The
+items cross the orchestrator port, which has no authentication, the same as `knowledge.search`: keep ports
+`5555` and `5558` off untrusted networks. `ningo.status` lists `feeds` with a note when no plugin is enabled
+or some of them are failing.
 
 ## NSFW Screening for Memes
 
