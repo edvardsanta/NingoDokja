@@ -12,15 +12,18 @@ opened, and then keeps what it showed:
 | health | `ningo.status` | how every service is doing; the name's ghost follows it |
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
-| knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
+| knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
 | memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell; a click opens one large |
 
 The keys `1` to `5` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
 a digit. An opened meme is a dialog over the page: a video plays with its sound and controls, the left and
 right arrows move between the memes of the page, and Escape or a click outside closes it; while it is
-open the keys do not reach the tabs. Almost every action only reads. The one that changes something, adding to the research base
-(`knowledge.ingest`), goes through only just after a real click or key press in the window (see
-"How it is built"). Nothing in the app opens a link, deletes, or sends to Discord.
+open the keys do not reach the tabs. Changes to the research base require a real click or key press in the window (see
+"How it is built"). The knowledge tab can list documents on demand, page through them, index one
+batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
+naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
+changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
+document list. Nothing in the app opens a link or sends to Discord.
 
 ## Run
 

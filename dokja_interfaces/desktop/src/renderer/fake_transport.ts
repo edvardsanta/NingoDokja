@@ -214,7 +214,13 @@ export function createFakeTransport(delayMs = 400): Transport {
         case "memory.stats":
           return ok(MEMORY_SCORE);
         case "knowledge.status":
-          return ok(KNOWLEDGE_STATUS);
+          return ok({
+            ...KNOWLEDGE_STATUS,
+            documents: documents.length,
+            chunks: documents.reduce((sum, document) => sum + document.chunks, 0),
+            embedded: documents.reduce((sum, document) => sum + document.embedded, 0),
+            pendingEmbeddings: documents.reduce((sum, document) => sum + document.chunks - document.embedded, 0),
+          });
         case "knowledge.search":
           return ok(searchFor(String(payload?.query ?? "")));
         case "meme.status":
@@ -254,14 +260,21 @@ export function createFakeTransport(delayMs = 400): Transport {
         }
         case "knowledge.delete": {
           const before = documents.length;
-          documents = documents.filter((document) => document.id !== payload?.source_id);
+          documents = documents.filter((document) => document.id !== payload?.id);
           const result: DeleteResult = { deleted: documents.length < before };
           return ok(result);
         }
         case "knowledge.reindex": {
-          const waiting = documents.filter((document) => document.embedded < document.chunks);
-          documents = documents.map((document) => ({ ...document, embedded: document.chunks }));
-          const result: ReindexResult = { embedded: waiting.reduce((sum, document) => sum + document.chunks - document.embedded, 0), remaining: 0, degraded: false, reason: "" };
+          let budget = Math.min(64, Math.max(1, Number(payload?.limit) || 32));
+          let embedded = 0;
+          documents = documents.map((document) => {
+            const added = Math.min(budget, document.chunks - document.embedded);
+            budget -= added;
+            embedded += added;
+            return { ...document, embedded: document.embedded + added };
+          });
+          const remaining = documents.reduce((sum, document) => sum + document.chunks - document.embedded, 0);
+          const result: ReindexResult = { embedded, remaining, degraded: false, reason: "" };
           return ok(result);
         }
         case "digest.status":
