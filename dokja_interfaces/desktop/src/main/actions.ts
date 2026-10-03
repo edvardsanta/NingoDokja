@@ -356,8 +356,10 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       inDomain(result, "knowledge", (body): DeleteResult => ({ deleted: body.deleted === true })),
   },
   "knowledge.reindex": {
-    // A batch at a time: the screen asks again while passages remain.
-    payload: (raw) => ({ limit: clampInt(raw.limit, 1, 500, 200) }),
+    // One small batch per click. A change needs a click just before it, so there is no loop to
+    // run on the screen's own, and the orchestrator answers one request at a time: a long batch
+    // would hold every other card. The service embeds 16 passages per call to the embedder.
+    payload: (raw) => ({ limit: clampInt(raw.limit, 1, 64, 32) }),
     project: (result) => inDomain(result, "knowledge", reindexResult),
   },
 };

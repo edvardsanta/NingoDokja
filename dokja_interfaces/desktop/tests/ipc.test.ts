@@ -380,8 +380,11 @@ test("indexing the waiting passages is a change, but not one to ask about", asyn
     return true;
   });
   assert.deepEqual(result, { ok: true, result: { embedded: 7, remaining: 3, degraded: false, reason: "" } });
-  assert.deepEqual(calls[0]?.payload, { limit: 500 });
+  assert.deepEqual(calls[0]?.payload, { limit: 64 }, "a batch stays small, whatever the screen asks for");
   assert.deepEqual(asked, [], "nothing is lost by indexing, so nobody is asked");
+
+  await handleRequest({ type: "knowledge.reindex" }, orchestrator, limits, undefined, here);
+  assert.deepEqual(calls[1]?.payload, { limit: 32 });
 });
 
 const deleted = { workflow: "knowledge", domain: "knowledge", result: { source_id: "note:a-1", deleted: true } };
