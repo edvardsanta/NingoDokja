@@ -669,3 +669,35 @@ button[aria-pressed="true"] {
 .add-form .more p {
   margin: 0;
 }
+
+.conversation {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  max-height: 28rem;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.conversation li {
+  padding: 0.7rem 0.8rem;
+  border-left: 2px solid var(--edge);
+  margin-bottom: 0.75rem;
+}
+.conversation li[data-bot="true"] { border-color: var(--cyan); }
+.conversation time { font-size: 0.75rem; color: var(--ink-dim); }
+.message-content { white-space: pre-wrap; }
+.message-compose { display: grid; gap: 0.6rem; margin-top: 1.5rem; }
+.message-compose textarea, .card select {
+  min-width: 0;
+  max-width: 100%;
+  background: var(--static);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  padding: 0.5rem;
+  font: inherit;
+}
+.message-compose textarea { resize: vertical; }
+.message-compose textarea:focus-visible, .card select:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
