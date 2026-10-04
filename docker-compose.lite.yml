@@ -18,6 +18,7 @@ services:
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
@@ -132,6 +133,28 @@ services:
     volumes:
       - ./:/workspace
 
+  dokja-knowledge:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_knowledge/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_knowledge
+    command: python main.py
+    environment:
+      KNOWLEDGE_SERVICE_ENDPOINT: tcp://*:5561
+      KNOWLEDGE_DB_FILE: /workspace/.dokja/dokja_knowledge.db
+      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
+      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
+      KNOWLEDGE_MIN_SCORE: ${KNOWLEDGE_MIN_SCORE:-0.45}
+      KNOWLEDGE_FETCH: ${KNOWLEDGE_FETCH:-on}
+    depends_on:
+      dokja-embedding-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:5561:5561"
+    networks:
+      - dokja-net
+    volumes:
+      - ./:/workspace
 
   dokja-feeds:
     build:
