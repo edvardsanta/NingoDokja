@@ -129,8 +129,7 @@ restart never posts something that was switched off. `dokja-cli services list` a
 the current state.
 
 The status probe covers `chat_ai`, `meme`, `book`, `knowledge` and `memory`. A stack that does not run one of
-them (`docker-compose.lite.yml` has no knowledge service, `docker-compose.prod.yml` has no book service) shows
-it as `error` and the platform as `degraded` until you switch it off (`dokja-cli services disable <name>` or
+them (`docker-compose.prod.yml` has no book service) shows it as `error` and the platform as `degraded` until you switch it off (`dokja-cli services disable <name>` or
 `space` in the TUI); a switched-off service is not probed.
 
 Chat profiles are created and removed on the machine that holds the database (`dokja-cli chat profile add`
