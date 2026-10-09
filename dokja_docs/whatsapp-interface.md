@@ -121,12 +121,28 @@ The service owns the connection. A lost connection is retried after 1 s, doublin
 wait starts over once a connection opens. Linking ends with WhatsApp asking for a new connection;
 that one reconnects at once.
 
-Two situations stop the service instead of retrying, with a message that says what to do:
+Three situations stop the service instead of retrying, with a message that says what to do:
 
 - the session was **logged out** from the phone (or by WhatsApp): remove the session volume and link again
 - the session is **in use by another connection**: stop the other one
+- the account is **not linked yet** and either a link code was shown but not scanned in time, or
+  WhatsApp closed the connection 5 times in a row before issuing any code
+
+Every reconnect line and every one of those messages carries the status code WhatsApp gave.
 
 The session folder is never deleted by the service.
+
+## Troubleshooting
+
+- **The service stops before any QR code appears, with a status code (for example 405).** WhatsApp
+  refused the connection. If the network is fine, the Baileys version is usually too old for the
+  current WhatsApp and needs an upgrade (it is pinned in `package.json`; run the tests and check a
+  real account after upgrading).
+- **The QR code expired.** Start the service again; each start issues a new one.
+- **Nothing happens when a friend writes.** Their number must be in `DOKJA_WHATSAPP_ALLOW_FROM`; an
+  ignored message is not logged on purpose. A group is logged once with its id.
+- **A recipient sees "waiting for this message".** The bot keeps what it sent for about 10 minutes so
+  WhatsApp can encrypt it again on request; after that a retry cannot be answered.
 
 ## Limits
 
@@ -136,6 +152,9 @@ The session folder is never deleted by the service.
   `whatsapp` interface: its event type is fixed to `message.created`.
 - A group message triggers an answer for **anyone** in the group who mentions the bot. There is no
   per-sender limit yet, so allow only groups you trust.
+- On a personal number the bot is you: what the account owner writes in a group is the owner's own
+  message and is ignored, so only other members can summon Ningo there. The owner talks to it in the
+  "message yourself" chat.
 - A reply to a bot message counts as a mention only for about 10 minutes after the bot sent it.
 - Baileys 7 is a release candidate that follows WhatsApp's own changes: the version is pinned and a
   test checks the parts of its API that the interface uses, but an upgrade needs a real-account check.
