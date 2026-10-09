@@ -8,6 +8,7 @@ Available docs:
 - [events-vs-requests.md](./events-vs-requests.md)
 - [workflows.md](./workflows.md)
 - [discord-interface.md](./discord-interface.md)
+- [whatsapp-interface.md](./whatsapp-interface.md)
 - [production-runbook.md](./production-runbook.md)
 - [domain-responsibilities.md](./domain-responsibilities.md)
 - [voice-planning.md](./voice-planning.md)
