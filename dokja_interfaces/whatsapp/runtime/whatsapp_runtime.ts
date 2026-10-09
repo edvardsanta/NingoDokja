@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import {
   createWhatsAppMessageHandler,
   type WhatsAppMessageConfig,
@@ -40,7 +42,8 @@ type Dependencies = {
   connect: (auth: AuthBundle) => WhatsAppSocketLike;
   renderQr: (qr: string) => void | Promise<void>;
   handler?: WhatsAppMessageHandler;
-  newMessageId?: () => string;
+  // Builds the id of a message the bot is about to send, from the account's own id.
+  newMessageId?: (userJid?: string) => string;
   sleep?: (ms: number) => Promise<void>;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
@@ -57,14 +60,17 @@ export const disconnectReason = { loggedOut: 401, connectionReplaced: 440, resta
 
 const firstRetryMs = 1000;
 const maxRetryMs = 60_000;
+// Failures in a row before WhatsApp ever issued a link code. A few are a network that is not
+// ready yet; this many are a client WhatsApp no longer accepts.
+const maxFailuresBeforeLinkCode = 5;
 
-type Outcome = { code: number | undefined; opened: boolean; linked: boolean };
+type Outcome = { code: number | undefined; opened: boolean; linked: boolean; linkCodeShown: boolean };
 
 export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies): WhatsAppRuntime {
   const handler = deps.handler ?? createWhatsAppMessageHandler(config, { log: deps.log, error: deps.error });
   const sent = new RecentKeys();
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const newMessageId = deps.newMessageId ?? (() => `DOKJA${crypto.randomUUID().replaceAll("-", "").toUpperCase()}`);
+  const newMessageId = deps.newMessageId ?? randomMessageId;
   let stopped = false;
   let current: WhatsAppSocketLike | null = null;
 
@@ -79,7 +85,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         resolveNumber: socket.signalRepository?.lidMapping
           ? (jid) => socket.signalRepository!.lidMapping!.getPNForLID(jid)
           : undefined,
-        newMessageId,
+        newMessageId: () => newMessageId(socket.user?.id),
       });
     } catch {
       deps.error?.(JSON.stringify({ message: "unreadable message" }));
@@ -103,6 +109,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
 
     return new Promise<Outcome>((resolve) => {
       let opened = false;
+      let linkCodeShown = false;
       let saving: Promise<unknown> = Promise.resolve();
 
       socket.ev.on("creds.update", () => {
@@ -129,6 +136,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
 
       socket.ev.on("connection.update", (update) => {
         if (update.qr) {
+          linkCodeShown = true;
           deps.log?.(JSON.stringify({ whatsapp: "waiting for the link", hint: "scan with Settings > Linked devices" }));
           void Promise.resolve(deps.renderQr(update.qr)).catch(() => {
             deps.error?.(JSON.stringify({ message: "could not show the link code" }));
@@ -143,6 +151,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
             code: statusCodeOf(update.lastDisconnect?.error),
             opened,
             linked: Boolean(auth.state.creds.me),
+            linkCodeShown,
           });
         }
       });
@@ -152,6 +161,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
   return {
     async run() {
       let attempt = 0;
+      let failuresBeforeLinkCode = 0;
       while (!stopped) {
         let outcome: Outcome;
         try {
@@ -161,7 +171,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
             message: "could not connect",
             error: error instanceof Error ? error.message : String(error),
           }));
-          outcome = { code: undefined, opened: false, linked: true };
+          outcome = { code: undefined, opened: false, linked: true, linkCodeShown: false };
         }
         if (stopped) {
           return;
@@ -184,12 +194,28 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
           throw new Error("Another connection is using this session. Stop it, or remove the saved session and link again.");
         }
         if (!outcome.linked) {
-          throw new Error("The account was not linked in time. Start the service again to get a new code.");
+          if (outcome.linkCodeShown) {
+            throw new Error(
+              `The account was not linked in time (status ${describe(outcome.code)}). Start the service again to get a new code.`,
+            );
+          }
+          failuresBeforeLinkCode += 1;
+          if (failuresBeforeLinkCode >= maxFailuresBeforeLinkCode) {
+            throw new Error(
+              `WhatsApp closed the connection ${failuresBeforeLinkCode} times (status ${describe(outcome.code)}) before issuing a link code. ` +
+                "If the network is fine, the Baileys version is probably too old for WhatsApp and needs an upgrade.",
+            );
+          }
         }
 
         const delay = Math.min(maxRetryMs, firstRetryMs * 2 ** attempt);
         attempt += 1;
-        deps.log?.(JSON.stringify({ whatsapp: "reconnecting", reason: "connection lost", inMs: delay }));
+        deps.log?.(JSON.stringify({
+          whatsapp: "reconnecting",
+          reason: "connection lost",
+          status: describe(outcome.code),
+          inMs: delay,
+        }));
         await sleep(delay);
       }
     },
@@ -198,6 +224,15 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
       current?.end(undefined);
     },
   };
+}
+
+// The id of a message in the shape the official client uses. Only used when none is injected.
+function randomMessageId(): string {
+  return `3EB0${randomBytes(9).toString("hex").toUpperCase()}`;
+}
+
+function describe(code: number | undefined): string {
+  return code === undefined ? "unknown" : String(code);
 }
 
 function statusCodeOf(error: unknown): number | undefined {

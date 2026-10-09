@@ -159,6 +159,18 @@ test("a reply is remembered before it is sent, so its echo is recognised", async
   assert.equal(context.sentByBot, false);
 });
 
+test("the id a message really went out with is remembered as well", async () => {
+  const sent = new RecentKeys();
+  const { deps } = setup({ sent, send: async () => ({ key: { id: "REAL-ID" } }) });
+
+  const context = await toMessageContext(direct(), deps);
+  const result = await context.reply("answer");
+
+  assert.deepEqual(result, { key: { id: "REAL-ID" } });
+  assert.equal(sent.has("BOTID1"), true);
+  assert.equal(sent.has("REAL-ID"), true);
+});
+
 test("typing is shown in the chat the message came from", async () => {
   const { deps, presence } = setup();
 

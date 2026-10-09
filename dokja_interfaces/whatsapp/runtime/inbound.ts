@@ -103,12 +103,21 @@ export async function toMessageContext(
     sentByBot: deps.sent.has(messageId),
     mentionsBot: mentioned || repliesToBot,
     timestampMs: timestampMs(message.messageTimestamp) ?? now(),
-    reply: (text) => {
+    reply: async (text) => {
       // The id is remembered before the send: the echo of this message can come back before
       // the send call returns, and it must not be answered as if the owner had typed it.
       const sentId = deps.newMessageId();
       deps.sent.add(sentId);
-      return deps.send(chatId, text, { messageId: sentId, ...(chatKind === "group" ? { quoted: message } : {}) });
+      const result = await deps.send(chatId, text, {
+        messageId: sentId,
+        ...(chatKind === "group" ? { quoted: message } : {}),
+      });
+      // Whatever id the message really went out with is remembered too, in case it differs.
+      const actualId = (result as { key?: { id?: string | null } } | undefined)?.key?.id;
+      if (actualId) {
+        deps.sent.add(actualId);
+      }
+      return result;
     },
     typing: (active) => deps.presence(chatId, active),
   };

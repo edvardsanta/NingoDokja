@@ -50,7 +50,14 @@ class FakeSocket implements WhatsAppSocketLike {
 
 type Script = (socket: FakeSocket, auth: AuthBundle) => void;
 
-function harness(scripts: Script[], options: { linked?: boolean; handler?: (context: WhatsAppMessageContext) => Promise<void> } = {}) {
+function harness(
+  scripts: Script[],
+  options: {
+    linked?: boolean;
+    handler?: (context: WhatsAppMessageContext) => Promise<void>;
+    newMessageId?: ((userJid?: string) => string) | null;
+  } = {},
+) {
   const sockets: FakeSocket[] = [];
   const saved: number[] = [];
   const sleeps: number[] = [];
@@ -83,7 +90,7 @@ function harness(scripts: Script[], options: { linked?: boolean; handler?: (cont
         qrs.push(qr);
       },
       handler: options.handler,
-      newMessageId: () => "BOTID",
+      newMessageId: options.newMessageId === null ? undefined : (options.newMessageId ?? (() => "BOTID")),
       sleep: async (ms) => {
         sleeps.push(ms);
       },
@@ -279,12 +286,78 @@ test("a session taken over by another connection stops the service instead of fi
   assert.equal(sockets.length, 1);
 });
 
-test("a link that was never completed stops the service", async () => {
-  const { runtime, sockets } = harness([(socket) => socket.close(408)], { linked: false });
+test("a link code that was shown but never scanned stops the service, with the status", async () => {
+  const { runtime, sockets } = harness([
+    (socket) => {
+      socket.emit("connection.update", { qr: "QR" });
+      socket.close(408);
+    },
+  ], { linked: false });
 
-  await assert.rejects(runtime.run(), /not linked in time/);
+  await assert.rejects(runtime.run(), /not linked in time \(status 408\)/);
 
   assert.equal(sockets.length, 1);
+});
+
+test("a client WhatsApp refuses before any link code stops the service and names the status", async () => {
+  const refused: Script = (socket) => socket.close(405);
+  const { runtime, sockets, sleeps } = harness(Array.from({ length: 6 }, () => refused), { linked: false });
+
+  await assert.rejects(runtime.run(), (error: Error) => /5 times \(status 405\)/.test(error.message) && /upgrade/.test(error.message));
+
+  assert.equal(sockets.length, 5);
+  assert.deepEqual(sleeps, [1000, 2000, 4000, 8000]);
+});
+
+test("a few failures before the first link code are retried, as a network may not be ready yet", async () => {
+  const { runtime, sockets } = harness([
+    (socket) => socket.close(408),
+    (socket) => socket.close(),
+    (socket) => {
+      socket.emit("connection.update", { qr: "QR" });
+      runtime.stop();
+    },
+  ], { linked: false });
+
+  await runtime.run();
+
+  assert.equal(sockets.length, 3);
+});
+
+test("the reconnecting log tells one failure from another by its status", async () => {
+  const { runtime, logs } = harness([
+    (socket) => socket.close(408),
+    (socket) => socket.close(),
+    (socket) => {
+      open(socket);
+      runtime.stop();
+    },
+  ]);
+
+  await runtime.run();
+
+  const reconnects = logs.filter((line) => line.includes("connection lost")).map((line) => JSON.parse(line).status);
+  assert.deepEqual(reconnects, ["408", "unknown"]);
+});
+
+test("message ids are built from the account's own id, or look like the official client's when none is given", async () => {
+  const reply = (socket: FakeSocket) => {
+    open(socket);
+    socket.emit("messages.upsert", {
+      type: "notify",
+      messages: [{ key: { id: "m1", remoteJid: "5511987654321@s.whatsapp.net" }, message: { conversation: "hi" } }],
+    });
+    setTimeout(() => runtime.stop(), 20);
+  };
+  const handler = async (context: WhatsAppMessageContext) => void (await context.reply("answer"));
+  const injected = harness([reply], { handler, newMessageId: (jid) => `ID-FOR-${jid}` });
+  const fallback = harness([reply], { handler, newMessageId: null });
+  const runtime = { stop: () => (injected.runtime.stop(), fallback.runtime.stop()) };
+
+  await Promise.all([injected.runtime.run(), fallback.runtime.run()]);
+
+  assert.equal(injected.sockets[0].sendCalls[0].options?.messageId, "ID-FOR-5511900000001:4@s.whatsapp.net");
+  assert.match(fallback.sockets[0].sendCalls[0].options?.messageId ?? "", /^3EB0[0-9A-F]{18}$/);
 });
 
 test("a failure while loading or connecting is retried", async () => {

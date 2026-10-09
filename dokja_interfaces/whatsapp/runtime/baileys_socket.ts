@@ -1,7 +1,13 @@
 import { chmod, mkdir } from "node:fs/promises";
 
-import makeWASocket, { Browsers, makeCacheableSignalKeyStore, useMultiFileAuthState } from "baileys";
+import makeWASocket, {
+  Browsers,
+  generateMessageIDV2,
+  makeCacheableSignalKeyStore,
+  useMultiFileAuthState,
+} from "baileys";
 
+import { SentMessages } from "./sent_messages.js";
 import type { AuthBundle, WhatsAppSocketLike } from "./whatsapp_runtime.js";
 
 // The only file that talks to Baileys. The session folder holds the keys of a linked device,
@@ -12,10 +18,21 @@ export async function loadAuth(dir: string): Promise<AuthBundle> {
   return useMultiFileAuthState(dir);
 }
 
+// The part of the Baileys socket the adapter reads. Sending resolves with the message as it was
+// sent, which carries the id and the content.
+export type RawSocket = Omit<WhatsAppSocketLike, "sendMessage"> & {
+  sendMessage(
+    jid: string,
+    content: { text: string },
+    options?: { quoted?: unknown; messageId?: string },
+  ): Promise<{ key?: { id?: string | null }; message?: unknown } | undefined>;
+};
+
 export function connectSocket(auth: AuthBundle, error: (...args: unknown[]) => void): WhatsAppSocketLike {
   const logger = quietLogger(error);
   const bundle = auth as Awaited<ReturnType<typeof useMultiFileAuthState>>;
-  return makeWASocket({
+  const sent = new SentMessages<unknown>();
+  const socket = makeWASocket({
     auth: { creds: bundle.state.creds, keys: makeCacheableSignalKeyStore(bundle.state.keys, logger) },
     logger,
     browser: Browsers.ubuntu("Ningo"),
@@ -23,9 +40,39 @@ export function connectSocket(auth: AuthBundle, error: (...args: unknown[]) => v
     markOnlineOnConnect: false,
     syncFullHistory: false,
     generateHighQualityLinkPreview: false,
-    // Nothing is kept to resend, so a retry request is simply not answered.
-    getMessage: async () => undefined,
-  }) as unknown as WhatsAppSocketLike;
+    getMessage: async (key) => lookupSent(sent, key.id) as never,
+  }) as unknown as RawSocket;
+  return adaptSocket(socket, sent);
+}
+
+// What WhatsApp asks for again: only the bot's own recent messages are known.
+export function lookupSent(sent: SentMessages<unknown>, id: string | null | undefined): unknown {
+  return id ? sent.get(id) : undefined;
+}
+
+// Remembers the content of every message sent, so a device that could not decrypt one can get it again.
+export function adaptSocket(socket: RawSocket, sent: SentMessages<unknown>): WhatsAppSocketLike {
+  return {
+    ev: socket.ev,
+    get user() {
+      return socket.user;
+    },
+    signalRepository: socket.signalRepository,
+    sendPresenceUpdate: (type, jid) => socket.sendPresenceUpdate(type, jid),
+    end: (reason) => socket.end(reason),
+    async sendMessage(jid, content, options) {
+      const result = await socket.sendMessage(jid, content, options);
+      if (result?.key?.id && result.message) {
+        sent.set(result.key.id, result.message);
+      }
+      return result;
+    },
+  };
+}
+
+// The id of a message in the format the official client uses, so the bot's messages look like any other's.
+export function newMessageId(userJid?: string): string {
+  return generateMessageIDV2(userJid);
 }
 
 type Logger = Parameters<typeof makeCacheableSignalKeyStore>[1];

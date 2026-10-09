@@ -6,7 +6,8 @@ import test from "node:test";
 
 import * as baileys from "baileys";
 
-import { loadAuth, quietLogger } from "../runtime/baileys_socket.js";
+import { adaptSocket, loadAuth, lookupSent, newMessageId, quietLogger, type RawSocket } from "../runtime/baileys_socket.js";
+import { SentMessages } from "../runtime/sent_messages.js";
 import { disconnectReason } from "../runtime/whatsapp_runtime.js";
 
 // Baileys is a release candidate that follows WhatsApp's own changes. These tests fail when an
@@ -17,6 +18,40 @@ test("the Baileys exports used by the interface exist", () => {
   assert.equal(typeof baileys.useMultiFileAuthState, "function");
   assert.equal(typeof baileys.makeCacheableSignalKeyStore, "function");
   assert.equal(typeof baileys.Browsers.ubuntu, "function");
+  assert.equal(typeof baileys.generateMessageIDV2, "function");
+});
+
+test("message ids have the format of the official client's", () => {
+  const own = "5511900000001:4@s.whatsapp.net";
+
+  assert.match(newMessageId(own), /^3EB0[0-9A-F]{18}$/);
+  assert.match(newMessageId(), /^3EB0[0-9A-F]{18}$/);
+  assert.notEqual(newMessageId(own), newMessageId(own));
+});
+
+test("the content of what the bot sends is kept so a retry request can be answered", async () => {
+  const sent = new SentMessages<unknown>();
+  const calls: unknown[][] = [];
+  const raw: RawSocket = {
+    ev: { on: () => undefined },
+    user: { id: "5511900000001:4@s.whatsapp.net" },
+    sendMessage: async (...args) => {
+      calls.push(args);
+      return { key: { id: "SENT1" }, message: { conversation: "answer" } };
+    },
+    sendPresenceUpdate: async () => undefined,
+    end: () => undefined,
+  };
+  const socket = adaptSocket(raw, sent);
+
+  const result = await socket.sendMessage("5511987654321@s.whatsapp.net", { text: "answer" }, { messageId: "SENT1" });
+
+  assert.deepEqual(result, { key: { id: "SENT1" }, message: { conversation: "answer" } });
+  assert.deepEqual(calls, [["5511987654321@s.whatsapp.net", { text: "answer" }, { messageId: "SENT1" }]]);
+  assert.deepEqual(lookupSent(sent, "SENT1"), { conversation: "answer" });
+  assert.equal(lookupSent(sent, "SOMEONE-ELSES"), undefined);
+  assert.equal(lookupSent(sent, undefined), undefined);
+  assert.equal(socket.user?.id, "5511900000001:4@s.whatsapp.net");
 });
 
 test("the disconnect codes the loop reacts to are the ones Baileys uses", () => {

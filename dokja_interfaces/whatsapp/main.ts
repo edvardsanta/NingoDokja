@@ -1,5 +1,5 @@
 import { buildConfig } from "./config.js";
-import { connectSocket, loadAuth } from "./runtime/baileys_socket.js";
+import { connectSocket, loadAuth, newMessageId } from "./runtime/baileys_socket.js";
 import { renderQr } from "./runtime/qr.js";
 import { createWhatsAppRuntime } from "./runtime/whatsapp_runtime.js";
 
@@ -20,6 +20,7 @@ async function main() {
     loadAuth,
     connect: (auth) => connectSocket(auth, error),
     renderQr: (qr) => renderQr(qr),
+    newMessageId,
     log,
     error,
   });
