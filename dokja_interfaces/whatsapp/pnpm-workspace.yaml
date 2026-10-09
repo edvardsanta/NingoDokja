@@ -1,0 +1,8 @@
+# Newer pnpm releases refuse to install while a dependency with a build script is neither allowed
+# nor denied. esbuild needs its install step; neither of the other two does: Baileys ships its
+# compiled files in the package (its build script is for installs from git), and protobufjs's
+# install step is an optional version check.
+allowBuilds:
+  baileys: false
+  esbuild: true
+  protobufjs: false

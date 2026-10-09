@@ -1,0 +1,28 @@
+name: dokja-whatsapp
+description: WhatsApp interface that forwards messages from a linked WhatsApp account to the orchestrator and posts the replies
+
+type: interface
+language: typescript
+entrypoint: ./main.ts
+
+exposes:
+  - events
+
+consumes:
+  - events
+
+depends_on:
+  - dokja-orchestrator
+
+tags:
+  - domain:whatsapp
+  - criticality:low
+
+paths:
+  source: ./
+  tests: ./tests
+  docs: ../../dokja_docs/whatsapp-interface.md
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile.dev
