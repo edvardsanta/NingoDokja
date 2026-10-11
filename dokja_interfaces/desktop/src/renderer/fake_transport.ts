@@ -29,6 +29,8 @@ const STATUS: StatusReply = {
     book: { status: "unchecked", detail: "", enabled: true },
     memory: { status: "ok", detail: "", enabled: true },
     scheduler: { status: "stopped", detail: "no announce for 12m (stopped?)", enabled: true },
+    discord: { status: "ok", detail: "", enabled: true, kind: "interface", state: "connected" },
+    whatsapp: { status: "error", detail: "", enabled: true, kind: "interface", state: "waiting_for_link" },
   },
   jobs: [
     { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "ran", lastError: "" },
@@ -201,6 +203,14 @@ function knowledgeDocuments(): KnowledgeDocument[] {
   });
 }
 
+// A checkerboard standing in for the picture of a link code, so the panel can be seen without a phone.
+const FAKE_CODE =
+  "data:image/svg+xml;base64," +
+  btoa(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect width="8" height="8" fill="#fff"/>' +
+      '<path d="M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1zM6 0h1v1h-1zM1 1h1v1h-1zM3 1h1v1h-1zM5 1h1v1h-1zM7 1h1v1h-1z" fill="#000"/></svg>',
+  );
+
 const ok = (result: unknown): TransportResult => ({ ok: true, result });
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -216,6 +226,17 @@ export function createFakeTransport(delayMs = 400): Transport {
       switch (type) {
         case "communications.channels": return ok({ channels: [{ id: "123", name: "reading-room" }] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
+        case "communications.link.status":
+        case "communications.link.start":
+        case "communications.link.reset": {
+          const entry = status.services.whatsapp;
+          if (type === "communications.link.reset" && entry) {
+            entry.state = "waiting_for_link";
+            entry.status = "error";
+          }
+          const state = entry?.state ?? "unknown";
+          return ok({ state, ...(state === "waiting_for_link" ? { image: FAKE_CODE } : {}) });
+        }
         case "communications.send": {
           conversation = [...conversation, { id: String(101 + conversation.length), author: "Ningo", bot: true, content: String(payload?.content ?? ""), timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: payload?.attachment_url ? ["meme"] : [] }];
           return ok({ sent: true, skipped: false });

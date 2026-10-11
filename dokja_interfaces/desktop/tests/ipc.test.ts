@@ -590,3 +590,74 @@ test("every interval the card's editor can offer goes through the shell, up to t
   }
   assert.deepEqual(calls.map((call) => call.payload.interval), intervals);
 });
+
+// ---- linking an interface ----
+
+const linked = {
+  workflow: "interface-link",
+  domain: "system",
+  result: { interface: "whatsapp", state: "connecting" },
+};
+const linkPayload = { interface: "whatsapp" };
+
+test("reading the link state needs no click, and sends the fixed interface", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: linked });
+
+  const result = await handleRequest({ type: "communications.link.status", payload: { ...linkPayload, extra: 1 } }, orchestrator, limits, undefined, away);
+
+  assert.deepEqual(result, { ok: true, result: { state: "connecting" } });
+  assert.deepEqual(calls.map((call) => [call.type, call.payload]), [["communications.link.status", { interface: "whatsapp" }]]);
+});
+
+test("asking for a new code is a change: refused without recent input, never asked in a window", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: linked });
+  let asked = 0;
+  const confirm = async () => {
+    asked += 1;
+    return true;
+  };
+
+  for (const presence of [away, undefined]) {
+    const error = failure(await handleRequest({ type: "communications.link.start", payload: linkPayload }, orchestrator, limits, undefined, presence, confirm));
+    assert.equal(error.code, "denied");
+  }
+  assert.equal(calls.length, 0);
+
+  const result = await handleRequest({ type: "communications.link.start", payload: linkPayload }, orchestrator, limits, undefined, here, confirm);
+  assert.equal(result.ok, true);
+  assert.equal(asked, 0, "a new code asks for no window");
+});
+
+test("starting over waits for the person's yes, asked by the shell, and a no never reaches the orchestrator", async () => {
+  const { orchestrator, calls } = recorder({ status: "ok", result: linked });
+  const asked: Array<{ type: string; wire: Record<string, unknown> }> = [];
+
+  for (const presence of [away, undefined]) {
+    const error = failure(await handleRequest({ type: "communications.link.reset", payload: linkPayload }, orchestrator, limits, undefined, presence, async () => true));
+    assert.equal(error.code, "denied");
+  }
+
+  const no = await handleRequest({ type: "communications.link.reset", payload: linkPayload }, orchestrator, limits, undefined, here, async (type, wire) => {
+    asked.push({ type, wire });
+    return false;
+  });
+  assert.equal(failure(no).code, "cancelled");
+  assert.equal(calls.length, 0);
+  assert.deepEqual(asked, [{ type: "communications.link.reset", wire: { interface: "whatsapp" } }]);
+
+  const yes = await handleRequest({ type: "communications.link.reset", payload: linkPayload }, orchestrator, limits, undefined, here, async () => true);
+  assert.equal(yes.ok, true);
+  assert.deepEqual(calls.map((call) => call.type), ["communications.link.reset"]);
+
+  const noWindow = failure(await handleRequest({ type: "communications.link.reset", payload: linkPayload }, orchestrator, limits, undefined, here));
+  assert.equal(noWindow.code, "denied", "with no way to ask, starting over is refused");
+});
+
+test("the link actions are on the allow-list and no neighbour is", () => {
+  for (const type of ["communications.link.status", "communications.link.start", "communications.link.reset"]) {
+    assert.equal(isAllowedAction(type), true, type);
+  }
+  for (const type of ["communications.link", "communications.link.stop", "communications.link.status ", "link.reset"]) {
+    assert.equal(isAllowedAction(type), false, type);
+  }
+});

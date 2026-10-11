@@ -404,3 +404,45 @@ test("ningo.status keeps an interface's kind and its state, and drops anything e
     assert.ok(!serialized.includes(leaked), `${leaked} must not reach the renderer`);
   }
 });
+
+// ---- linking an interface ----
+
+const linkStatus = ACTIONS["communications.link.status"];
+const linkReset = ACTIONS["communications.link.reset"];
+const square = (side: number) => Array.from({ length: side }, (_, y) => Array.from({ length: side }, (_, x) => ((x + y) % 2 ? "1" : "0")).join(""));
+
+test("the link actions send only the interface, fixed, whatever the screen adds", () => {
+  for (const action of ["communications.link.status", "communications.link.start", "communications.link.reset"] as const) {
+    const { payload } = ACTIONS[action];
+    assert.deepEqual(payload({ interface: "whatsapp", name: "x", token: "t", enabled: true }), { interface: "whatsapp" });
+    assert.equal(payload({ interface: "discord" }), undefined);
+    assert.equal(payload({ interface: "whatsapp2" }), undefined);
+    assert.equal(payload({}), undefined);
+  }
+});
+
+test("a link reply keeps the state and the picture, never the rows or the interface's own fields", () => {
+  const reply = {
+    workflow: "interface-link",
+    domain: "system",
+    result: { interface: "whatsapp", state: "waiting_for_link", matrix: square(25), code: "2@secret-code", chat: "chat-id-1" },
+  };
+
+  const projected = linkStatus.project(reply) as { state: string; image?: string };
+
+  assert.deepEqual(Object.keys(projected).sort(), ["image", "state"]);
+  assert.equal(projected.state, "waiting_for_link");
+  assert.ok(projected.image?.startsWith("data:image/svg+xml;base64,"));
+  const serialized = JSON.stringify(projected);
+  for (const leaked of ["secret-code", "chat-id-1", square(25)[0] ?? "no-row"]) {
+    assert.ok(!serialized.includes(leaked), `${leaked} must not reach the renderer`);
+  }
+});
+
+test("a link reply without a code, or with a bad one, has no picture", () => {
+  const wrap = (result: Record<string, unknown>) => ({ workflow: "interface-link", domain: "system", result });
+
+  assert.deepEqual(linkStatus.project(wrap({ state: "connected" })), { state: "connected" });
+  assert.deepEqual(linkStatus.project(wrap({ state: "waiting_for_link", matrix: ["<svg onload=x>"] })), { state: "waiting_for_link" });
+  assert.deepEqual(linkReset.project(wrap({ state: "NOT A NAME" })), { state: "unknown" });
+});

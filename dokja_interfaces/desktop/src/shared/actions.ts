@@ -5,12 +5,17 @@
 // them through only just after a real click or key press, and the ones that cannot be undone also
 // need the person to say yes in a window the shell opens. The switches (services.set and
 // scheduler.jobs.set) are changes too, but the operator can switch them back at once, so they ask
-// for no window. What else changes something (forget, record, discord.send, the scheduler's own
+// for no window. Linking WhatsApp is the same: reading the code (communications.link.status) is
+// only a read, asking for a new one is a change, and starting over also unlinks the device and
+// erases the saved session, so it is asked in a window. What else changes something (forget, record, discord.send, the scheduler's own
 // heartbeat) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
   "communications.channels",
   "communications.history",
   "communications.send",
+  "communications.link.status",
+  "communications.link.start",
+  "communications.link.reset",
   "services.set",
   "scheduler.jobs.set",
   "ningo.status",
@@ -32,6 +37,8 @@ export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "communications.send",
+  "communications.link.start",
+  "communications.link.reset",
   "services.set",
   "scheduler.jobs.set",
   "knowledge.ingest",
@@ -40,7 +47,11 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
 ];
 
 // The ones that cannot be undone: the shell asks the person first, in a window of its own.
-export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = ["communications.send", "knowledge.delete"];
+export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
+  "communications.send",
+  "communications.link.reset",
+  "knowledge.delete",
+];
 
 export function needsConfirmation(type: ActionType): boolean {
   return CONFIRMED_ACTION_TYPES.includes(type);

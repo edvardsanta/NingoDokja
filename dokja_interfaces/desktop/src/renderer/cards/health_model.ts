@@ -132,6 +132,16 @@ export function intervalOf(amount: string, unit: IntervalUnit): string | undefin
   return minutes >= 1 && minutes <= MAX_INTERVAL_MINUTES ? `${Number(amount)}${unit}` : undefined;
 }
 
+// The link reply the shell projected. It crossed a process boundary, so its shape is checked here too:
+// the picture is accepted only as the SVG data URL the shell builds.
+export type LinkView = { state: string; image?: string };
+
+export function parseLink(value: unknown): LinkView | undefined {
+  if (!isRecord(value) || typeof value.state !== "string" || !/^[a-z][a-z_]{0,31}$/.test(value.state)) return undefined;
+  const image = typeof value.image === "string" && value.image.startsWith("data:image/svg+xml;base64,") ? value.image : undefined;
+  return { state: value.state, ...(image ? { image } : {}) };
+}
+
 // What the name on top of the screen shows: loading is tuning, no answer is lost, and an answer
 // is calm unless some service has a problem.
 export function pulseOf(state: CardState<Health>): Pulse {

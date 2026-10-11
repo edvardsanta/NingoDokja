@@ -1,12 +1,14 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { buildIngest } from "./ingest.js";
+import { linkImage } from "./link_image.js";
 import { INGEST_ID } from "../shared/ingest.js";
 import type {
   DeleteResult,
   DigestPage,
   DigestStatus,
   IngestResult,
+  InterfaceLink,
   JobState,
   JobSwitched,
   KnowledgeDocuments,
@@ -47,6 +49,8 @@ const JOB_INTERVAL = /^(default|[0-9]{1,5}[mh])$/;
 const MAX_JOBS = 20;
 // The state an interface reports comes from a closed list of short names; anything else is dropped.
 const INTERFACE_STATE = /^[a-z][a-z_]{0,31}$/;
+// The only interface the desktop links. The name is fixed here and never taken from the screen.
+const LINKABLE_INTERFACE = "whatsapp";
 const MAX_QUERY_CHARS = 500;
 
 // The states the feeds service reports for a source; anything else is shown as unknown.
@@ -107,6 +111,19 @@ function inDomain<T>(
 }
 
 const noPayload = (): Record<string, unknown> => ({});
+
+// The three link actions share one payload (the interface, fixed) and one projection (the state and
+// the picture of the code), so a screen cannot ask the orchestrator for anything else.
+const linkPayload = (raw: Record<string, unknown>): Record<string, unknown> | undefined =>
+  raw.interface === LINKABLE_INTERFACE ? { interface: LINKABLE_INTERFACE } : undefined;
+
+function linkProjection(result: unknown): InterfaceLink | Off {
+  return inDomain(result, "system", (body): InterfaceLink => {
+    const state = text(body.state);
+    const image = linkImage(body.matrix);
+    return { state: INTERFACE_STATE.test(state) ? state : "unknown", ...(image ? { image } : {}) };
+  });
+}
 
 function systemStatus(body: Record<string, unknown>): StatusReply {
   const services: Record<string, ServiceState> = {};
@@ -345,6 +362,9 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       sent: words(body.sent_to).length === 1, skipped: words(body.skipped_unsafe).length > 0,
     })),
   },
+  "communications.link.status": { payload: linkPayload, project: linkProjection },
+  "communications.link.start": { payload: linkPayload, project: linkProjection },
+  "communications.link.reset": { payload: linkPayload, project: linkProjection },
   "services.set": {
     payload: (raw) => {
       const name = text(raw.name);

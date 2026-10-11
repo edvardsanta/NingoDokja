@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
 import type { JobState } from "../../shared/replies.js";
-import type { Transport, TransportError } from "../../shared/transport.js";
+import type { Transport, TransportError, TransportResult } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { usePulse } from "../pulse.js";
@@ -11,8 +11,10 @@ import {
   intervalFields,
   intervalOf,
   parseHealth,
+  parseLink,
   pulseOf,
   type Health,
+  type LinkView,
   type IntervalUnit,
   type ServiceRow,
 } from "./health_model.js";
@@ -66,6 +68,12 @@ async function applyChange(transport: Transport, change: Change): Promise<LoadRe
   return answer.ok ? { ok: true, data: true } : answer;
 }
 
+// The interface the desktop links. The shell fixes the name again before anything is sent.
+const LINKABLE = "whatsapp";
+const LINK_POLL_MS = 2000;
+// Unlinking asks WhatsApp to drop the device first, which can take a while.
+const LINK_RESET_TIMEOUT_MS = 45_000;
+
 export function HealthCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const { report } = usePulse();
@@ -96,11 +104,18 @@ export function HealthCard({ transport }: { transport: Transport }) {
     setFailure(undefined);
     reload();
   }, [reload]);
+  const link = useLink(transport, reload);
 
   return (
     <CardFrame kindLabel={t("kind_health")} title={t("health_title")} state={state} onReload={refresh}>
       {(health) => (
-        <HealthBody health={health} busy={change.state.phase === "loading"} failure={failure} onChange={change.start} />
+        <HealthBody
+          health={health}
+          busy={change.state.phase === "loading"}
+          failure={failure}
+          onChange={change.start}
+          link={link}
+        />
       )}
     </CardFrame>
   );
@@ -112,9 +127,10 @@ type BodyProps = {
   busy: boolean;
   failure: TransportError | undefined;
   onChange: (change: Change) => void;
+  link: Link;
 };
 
-function HealthBody({ health, busy, failure, onChange }: BodyProps) {
+function HealthBody({ health, busy, failure, onChange, link }: BodyProps) {
   const t = useTranslate();
   if (health.rows.length === 0 && health.interfaces.length === 0) return <p>{t("health_empty")}</p>;
 
@@ -142,7 +158,16 @@ function HealthBody({ health, busy, failure, onChange }: BodyProps) {
           <h3>{t("interfaces_title")}</h3>
           <ul className="services interfaces">
             {health.interfaces.map((row, index) => (
-              <ServiceRowItem key={row.name} row={row} index={health.rows.length + index} busy={busy} onChange={onChange} />
+              <ServiceRowItem
+                key={row.name}
+                row={row}
+                index={health.rows.length + index}
+                busy={busy}
+                onChange={onChange}
+                extra={
+                  row.name === LINKABLE ? <LinkControl link={link} /> : undefined
+                }
+              />
             ))}
           </ul>
           <p className="note">{t("interfaces_hint")}</p>
@@ -168,9 +193,11 @@ type RowProps = {
   index: number;
   busy: boolean;
   onChange: (change: Change) => void;
+  // Whatever an interface needs beyond its switch, shown across the row (the link panel).
+  extra?: ReactNode;
 };
 
-function ServiceRowItem({ row, index, busy, onChange }: RowProps) {
+function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
   const t = useTranslate();
   // An interface says its state; a switched-off one has none and says only that it is off.
   const stateId = row.state ? STATE_IDS[row.state] : undefined;
@@ -188,7 +215,137 @@ function ServiceRowItem({ row, index, busy, onChange }: RowProps) {
           onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
         />
       )}
+      {extra}
     </li>
+  );
+}
+
+type LinkAction = "communications.link.start" | "communications.link.reset";
+
+// The state of the link panel. It lives in the card, above its body: reading the status again
+// replaces the body, and a panel that closed itself every time the account changed (or a new code
+// was asked for) would never show the code it was opened for.
+//
+// While the panel is open it reads the state of the link every couple of seconds. The code only
+// ever arrives as the picture the shell drew; asking for a new one, or starting over, is a change
+// the shell lets through just after a click, and starting over is asked in a window of its own.
+function useLink(transport: Transport, onChanged: () => void) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<LinkView>();
+  const [failure, setFailure] = useState<TransportError>();
+  const [busy, setBusy] = useState(false);
+  const lastState = useRef<string | undefined>(undefined);
+
+  const apply = useCallback(
+    (answer: TransportResult) => {
+      if (!answer.ok) {
+        // Saying no to the window is an answer, not a failure.
+        setFailure(answer.error.code === "cancelled" ? undefined : answer.error);
+        return;
+      }
+      const next = parseLink(answer.result);
+      if (!next) {
+        setFailure({ code: "unexpected", message: "unexpected link reply" });
+        return;
+      }
+      setFailure(undefined);
+      setView(next);
+      if (lastState.current !== undefined && lastState.current !== next.state) onChanged();
+      lastState.current = next.state;
+    },
+    [onChanged],
+  );
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    const read = async () => {
+      if (document.visibilityState === "hidden") return;
+      const answer = await transport.request("communications.link.status", { interface: LINKABLE }, { timeoutMs: 8000 });
+      if (!cancelled) apply(answer);
+    };
+    void read();
+    const timer = setInterval(() => void read(), LINK_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [open, transport, apply]);
+
+  const toggle = useCallback(() => {
+    setOpen((current) => {
+      if (current) {
+        // A code that was on screen is not worth showing again when the panel is reopened.
+        setView(undefined);
+        setFailure(undefined);
+        lastState.current = undefined;
+      }
+      return !current;
+    });
+  }, []);
+
+  const run = useCallback(
+    async (type: LinkAction) => {
+      setBusy(true);
+      const timeoutMs = type === "communications.link.reset" ? LINK_RESET_TIMEOUT_MS : 10_000;
+      const answer = await transport.request(type, { interface: LINKABLE }, { timeoutMs });
+      setBusy(false);
+      apply(answer);
+      onChanged();
+    },
+    [transport, apply, onChanged],
+  );
+
+  return { open, toggle, view, failure, busy, run };
+}
+
+type Link = ReturnType<typeof useLink>;
+
+// The button that opens the panel to link the account, and the panel.
+function LinkControl({ link }: { link: Link }) {
+  const t = useTranslate();
+  return (
+    <>
+      <button type="button" className="link-open" aria-expanded={link.open} onClick={link.toggle}>
+        {link.open ? t("link_close") : t("link_open")}
+      </button>
+      {link.open && <LinkPanel link={link} />}
+    </>
+  );
+}
+
+function LinkPanel({ link }: { link: Link }) {
+  const t = useTranslate();
+  const { view, failure, busy, run } = link;
+  const state = view?.state;
+  const canAskForCode = state === "waiting_for_link" || state === "refused" || state === "connecting";
+  return (
+    <div className="link-panel" aria-busy={busy}>
+      <h4>{t("link_title")}</h4>
+      {failure && <Problem error={failure} />}
+      {state === "connected" ? (
+        <p className="note" data-tone="ok">
+          {t("link_done")}
+        </p>
+      ) : view?.image ? (
+        <>
+          <p>{t("link_steps")}</p>
+          <img className="link-code" src={view.image} alt={t("link_code_alt")} width={232} height={232} />
+        </>
+      ) : (
+        <p role="status">{busy ? t("link_working") : t("link_waiting")}</p>
+      )}
+      <div className="link-actions">
+        {canAskForCode && (
+          <button type="button" disabled={busy} onClick={() => void run("communications.link.start")}>
+            {t("link_new")}
+          </button>
+        )}
+        <button type="button" disabled={busy} onClick={() => void run("communications.link.reset")}>
+          {t("link_unlink")}
+        </button>
+      </div>
+    </div>
   );
 }
 
