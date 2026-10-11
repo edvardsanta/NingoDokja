@@ -162,3 +162,46 @@ func TestWithoutConversationsAWhatsAppIdIsNotAChannel(t *testing.T) {
 		t.Fatal("reached the Discord service")
 	}
 }
+
+type failingService struct{}
+
+func (failingService) Dispatch(context.Context, string, map[string]any) (map[string]any, error) {
+	return nil, context.DeadlineExceeded
+}
+
+func TestADiscordServiceThatIsDownDoesNotHideTheConversations(t *testing.T) {
+	c := &fakeConversations{listed: []Conversation{{Alias: "friend", Kind: "direct", RetentionDays: 30}}}
+	d := New(failingService{}, "123").WithConversations(c)
+
+	answer, err := d.Handle(context.Background(), ActionChannels, nil)
+
+	if err != nil {
+		t.Fatalf("the conversations must still list, got %v", err)
+	}
+	channels := answer["channels"].([]any)
+	if len(channels) != 1 || channels[0].(map[string]any)["id"] != "whatsapp:friend" {
+		t.Fatalf("unexpected channels %#v", channels)
+	}
+	if unavailable, _ := answer["unavailable"].([]any); len(unavailable) != 1 || unavailable[0] != "discord" {
+		t.Fatalf("expected Discord to be said unavailable, got %#v", answer["unavailable"])
+	}
+}
+
+func TestADiscordServiceThatIsDownIsStillAnErrorWhenThereIsNothingElse(t *testing.T) {
+	for name, d := range map[string]*Domain{
+		"no conversations configured": New(failingService{}, "123"),
+		"conversations empty":         New(failingService{}, "123").WithConversations(&fakeConversations{}),
+	} {
+		if _, err := d.Handle(context.Background(), ActionChannels, nil); err == nil {
+			t.Fatalf("%s: a Discord-only setup must keep failing loudly", name)
+		}
+	}
+}
+
+func TestBothSourcesDownIsReportedAsTheDiscordError(t *testing.T) {
+	d := New(failingService{}, "123").WithConversations(&fakeConversations{listErr: context.DeadlineExceeded})
+
+	if _, err := d.Handle(context.Background(), ActionChannels, nil); err == nil {
+		t.Fatal("with nothing to show, the error stands")
+	}
+}
