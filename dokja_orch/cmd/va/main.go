@@ -65,6 +65,13 @@ func main() {
 		}
 	}
 
+	// The interfaces that link to an account, linkable from the desktop through the communications
+	// actions (and so behind their credential). Their address is the status address.
+	interfaceLinks := map[string]handlers.InterfaceLinker{}
+	if client := clients.NewInterfaceLinkClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); client != nil {
+		interfaceLinks["whatsapp"] = client
+	}
+
 	service := core.DefaultService(
 		handlers.NewCommunicationsDomainHandler(clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")), os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID")),
 		handlers.NewSystemDomainHandler(
@@ -78,7 +85,7 @@ func main() {
 			"knowledge": handlers.StatusProbe(knowledgeClient),
 			"memory":    handlers.StatusProbe(memoryClient),
 			"feeds":     handlers.FeedsProbe(feedsClient),
-		}).WithInterfaceProbes(interfaceProbes),
+		}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),

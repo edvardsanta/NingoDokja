@@ -77,6 +77,7 @@ type SystemDomainHandler struct {
 	hashtagNotes     HashtagExperienceNotes
 	probes           map[string]ServiceProbe
 	interfaceProbes  map[string]InterfaceProbe
+	links            map[string]InterfaceLinker
 }
 
 func NewSystemDomainHandler(
@@ -189,6 +190,8 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 		return h.handleDiscordSend(ctx, event, workflow)
 	}
 	switch event.Type {
+	case "communications.link.status", "communications.link.start", "communications.link.reset":
+		return h.handleInterfaceLink(ctx, event)
 	case "services.set":
 		return h.handleServiceSet(event)
 	case "scheduler.jobs.set":
