@@ -310,11 +310,17 @@ services:
       DOKJA_WHATSAPP_ALLOW_FROM: ${DOKJA_WHATSAPP_ALLOW_FROM:-}
       DOKJA_WHATSAPP_ALLOWED_GROUPS: ${DOKJA_WHATSAPP_ALLOWED_GROUPS:-}
       DOKJA_WHATSAPP_STATUS_PORT: 8094
+      # Only the conversations named here are recorded, as text, for this many days.
+      DOKJA_WHATSAPP_CONVERSATIONS: ${DOKJA_WHATSAPP_CONVERSATIONS:-}
+      DOKJA_WHATSAPP_HISTORY_DIR: /history
+      DOKJA_WHATSAPP_HISTORY_DAYS: ${DOKJA_WHATSAPP_HISTORY_DAYS:-30}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
     volumes:
       - ./:/workspace
       # The linked-device session. It lives in a named volume so it never lands in the repository.
       - dokja-whatsapp-auth:/auth
+      # The recorded text of the named conversations. Its own volume, so it can be erased alone.
+      - dokja-whatsapp-history:/history
     # No published port: the service only connects out.
     depends_on:
       - dokja-orchestrator
@@ -373,6 +379,7 @@ services:
 
 volumes:
   dokja-whatsapp-auth:
+  dokja-whatsapp-history:
 
 networks:
   dokja-net:
