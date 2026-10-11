@@ -333,8 +333,9 @@ provider address the shell deliberately strips).
 
 ## Interfaces increment (2026-10-11)
 
-Status: proposed. Increment 1 is built (branch `feat/interfaces-health`); the others are ordered but
-not started. Each increment is its own branch, stacked in this order.
+Status: proposed. Increments 1 (branch `feat/interfaces-health`) and 2 (branch
+`feat/desktop-whatsapp-link`) are built; 3 and 4 are ordered but not started. Each increment is its
+own branch, stacked in this order.
 
 The Switches increment made the desktop the one place from which the operator runs Ningo. The people
 talk to Ningo through the Discord and WhatsApp interfaces, so the desktop should show their
@@ -379,6 +380,11 @@ the interfaces.
   as interfaces under their own heading, and both locales get the new labels.
 
 ### Increment 2: link WhatsApp from the desktop
+
+Built. The interface offers the rows of the code's picture (never the code string) on `GET /link`,
+only while it waits for one, plus `POST /link/start` and `POST /link/reset`; the orchestrator relays
+them as `communications.link.status|start|reset` behind the communications credential; the shell draws
+the picture from validated rows and the renderer shows it in a panel on the WhatsApp row.
 
 - The interface exposes the current link code only while it waits for one, on its internal listener.
   The orchestrator relays it under `communications.`; the shell's main process draws it as an image and

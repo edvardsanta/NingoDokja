@@ -103,7 +103,13 @@ page.close();
 - The window can open on a tab other than health: press `1` first. The switch labels follow the
   language (`chave de meme` in Portuguese), so match on the label of the locale you forced.
 - The entrance animations do not advance while the window is not being drawn, and a clipped row takes
-  no click. Run `document.getAnimations().forEach((a) => a.finish())` before clicking a row.
+  no click. Run `document.getAnimations().forEach((a) => { try { a.finish(); } catch {} })` before
+  clicking a row (the cursor's animation never ends, so finishing it throws).
+- To try the link panel without a phone: start the real `startStatusServer` of the WhatsApp interface
+  with `link` controls over a fake state, give the orchestrator `WHATSAPP_INTERFACE_STATUS_ENDPOINT`
+  and an ephemeral `DOKJA_COMMUNICATIONS_TOKEN` (32 characters or more), and give the same token to
+  the desktop process. The native "Unlink" window cannot be answered by the script, so leave that
+  action to the unit tests.
 - Read the effect in `$SP/state.json`, `$SP/electron.log` (one line per request, with the time it took)
   and `$SP/va.log`.
 - Put back what a check changed (switch it on again) before handing the window over.
