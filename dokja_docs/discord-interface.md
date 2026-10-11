@@ -31,6 +31,9 @@ through `DISCORD_INTERFACE_STATUS_ENDPOINT` (set in the Compose stacks) and list
 nothing and leaves Discord channels out of scheduled and manual deliveries (reported as skipped); the
 gateway connection stays up. The reply never carries a channel, a guild or a token.
 
+While Discord is off, a plain message gets no reply at all. A slash command is answered
+`No response.` to the person who ran it only (an ephemeral reply), so nothing is posted in the channel.
+
 ## Inbound Flows
 
 ### Plain Messages

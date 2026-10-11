@@ -48,6 +48,12 @@ echo $! > va.pid
 
 - Loopback ports away from the defaults (5555, 5558, 8091), so a stack the person already runs is
   not hit. Check with `ss -ltn` first.
+- To make the interfaces appear in the health tab, give the orchestrator
+  `DISCORD_INTERFACE_STATUS_ENDPOINT` and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` (an interface is listed
+  only when its address is set). Point them at loopback listeners you start yourself with each
+  interface's own `startStatusServer` / `startDiscordDeliveryServer` and a fixed state: they answer
+  `GET /status` and touch no network. Never start the interface itself (it would connect to the
+  service, and the Discord one needs the bot token).
 - `VA_STATE_FILE` is where the switches persist (`{"services":{"book":true}}` means `book` is OFF,
   `{}` means everything is on). Delete it to reset.
 - Do not set `DISCORD_*`, `COMMUNICATIONS_*` or `DOKJA_COMMUNICATIONS_TOKEN`: the communications tab
@@ -58,6 +64,11 @@ echo $! > va.pid
 ```bash
 cd dokja_interfaces/desktop
 ls node_modules >/dev/null || ln -s <another-worktree>/dokja_interfaces/desktop/node_modules node_modules
+# A fresh `pnpm install` skips Electron's binary download. Reuse the one of a worktree that has it
+# (same version, see package.json) by linking its dist into this worktree's electron package:
+#   P=$(readlink -f node_modules/electron)
+#   ln -sfn <worktree-with-electron>/dokja_interfaces/desktop/node_modules/electron/dist "$P/dist"
+#   cp <worktree-with-electron>/dokja_interfaces/desktop/node_modules/electron/path.txt "$P/path.txt"
 pnpm run build                          # renderer and shell; `pnpm start` builds too but is not detached
 nohup ./node_modules/.bin/electron . --ozone-platform=wayland \
   --remote-debugging-port=9333 --user-data-dir=$SP/electron-profile \
@@ -89,6 +100,10 @@ page.close();
   Before clicking an element, wait until `document.elementFromPoint(x, y)?.closest('button')` is that
   element: the rows play an entrance animation (`clip-path`) when a tab opens, and a clipped row takes
   no click.
+- The window can open on a tab other than health: press `1` first. The switch labels follow the
+  language (`chave de meme` in Portuguese), so match on the label of the locale you forced.
+- The entrance animations do not advance while the window is not being drawn, and a clipped row takes
+  no click. Run `document.getAnimations().forEach((a) => a.finish())` before clicking a row.
 - Read the effect in `$SP/state.json`, `$SP/electron.log` (one line per request, with the time it took)
   and `$SP/va.log`.
 - Put back what a check changed (switch it on again) before handing the window over.

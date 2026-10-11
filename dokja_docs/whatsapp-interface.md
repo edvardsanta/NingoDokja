@@ -70,8 +70,9 @@ the reason `policy`, so the id can be copied into `DOKJA_WHATSAPP_ALLOWED_GROUPS
 ### Replies
 
 The reply is plain text, cut at 8,000 characters. In a group it quotes the message that triggered it.
-While the orchestrator works the chat shows "typing"; the interface never marks messages as read and
-never sets the account online, so the phone keeps its own notifications.
+When the answer takes more than a second the chat shows "typing" until it arrives; a quick answer, or
+no answer because the interface is switched off, shows nothing. The interface never marks messages as
+read and never sets the account online, so the phone keeps its own notifications.
 
 A failing orchestrator is answered with a short apology.
 
