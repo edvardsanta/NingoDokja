@@ -188,7 +188,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
       socket.ev.on("connection.update", (update) => {
         if (update.qr) {
           linkCodeShown = true;
-          setState("waiting_for_link", "waiting for the account to be linked");
+          setState("waiting_for_link");
           deps.log?.(JSON.stringify({ whatsapp: "waiting for the link", hint: "scan with Settings > Linked devices" }));
           void Promise.resolve(deps.renderQr(update.qr)).catch(() => {
             deps.error?.(JSON.stringify({ message: "could not show the link code" }));
@@ -256,7 +256,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
           if (outcome.linkCodeShown) {
             const delay = Math.min(maxLinkRetryMs, firstLinkRetryMs * 2 ** linkAttempt);
             linkAttempt += 1;
-            setState("waiting_for_link", "the link code expired; a new one follows");
+            setState("waiting_for_link", "the last link code expired; a new one follows");
             deps.log?.(JSON.stringify({
               whatsapp: "link code expired",
               status: describe(outcome.code),
