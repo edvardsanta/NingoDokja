@@ -83,7 +83,7 @@ test("a reply without services, or with odd entries, is handled", () => {
 test("the name's pulse follows what the card knows", () => {
   const ready = (counts: Partial<Health["counts"]>): Parameters<typeof pulseOf>[0] => ({
     phase: "ready",
-    data: { rows: [], jobs: [], counts: { ok: 0, problem: 0, off: 0, unchecked: 0, other: 0, ...counts } },
+    data: { rows: [], interfaces: [], jobs: [], counts: { ok: 0, problem: 0, off: 0, unchecked: 0, other: 0, ...counts } },
   });
 
   assert.equal(pulseOf({ phase: "loading" }), "tuning");
@@ -161,4 +161,38 @@ test("whatever interval the editor offers, the shell lets it through", () => {
     }
   }
   assert.ok(offered >= 15, "the check really covered the editor's range");
+});
+
+test("interfaces are listed apart from the services, in the desktop's order, and counted with them", () => {
+  const health = parseHealth({
+    status: "degraded",
+    services: {
+      whatsapp: { status: "error", detail: "", kind: "interface", state: "logged_out", enabled: true },
+      meme: entry("ok"),
+      discord: { status: "disabled", detail: "switched off", kind: "interface", enabled: false },
+      slack: { status: "ok", detail: "", kind: "interface", state: "connected" },
+    },
+  });
+
+  assert.deepEqual(health?.rows.map((row) => row.name), ["meme"]);
+  assert.deepEqual(health?.interfaces.map((row) => row.name), ["discord", "whatsapp", "slack"]);
+  assert.equal(health?.interfaces[1]?.state, "logged_out");
+  assert.equal(health?.interfaces[1]?.kind, "interface");
+  assert.equal(health?.interfaces[0]?.state, undefined);
+  assert.deepEqual(health?.counts, { ok: 2, problem: 1, off: 1, unchecked: 0, other: 0 });
+});
+
+test("a service whose name is an interface's is still a service unless it says it is an interface", () => {
+  const health = parseHealth({ services: { whatsapp: entry("ok") } });
+
+  assert.deepEqual(health?.rows.map((row) => row.name), ["whatsapp"]);
+  assert.deepEqual(health?.interfaces, []);
+});
+
+test("an interface with a problem makes the name unwell", () => {
+  const health = parseHealth({
+    services: { whatsapp: { status: "error", detail: "", kind: "interface", state: "refused" } },
+  }) as Health;
+
+  assert.equal(pulseOf({ phase: "ready", data: health }), "unwell");
 });

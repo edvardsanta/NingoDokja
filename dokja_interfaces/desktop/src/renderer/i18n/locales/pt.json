@@ -187,5 +187,17 @@
   "communications_sending": "Aguardando confirmação ou envio…",
   "communications_uncertain": "Sem resposta do envio. Confira as mensagens recentes antes de enviar novamente; a mensagem pode já ter chegado.",
   "communications_sent": "Mensagem enviada.",
-  "communications_not_sent": "A mensagem não foi enviada."
+  "communications_not_sent": "A mensagem não foi enviada.",
+  "interfaces_title": "Interfaces de conversa",
+  "interfaces_hint": "Desligar uma interface a faz parar de responder e de receber entregas; a conexão continua.",
+  "state_connected": "conectada",
+  "state_connecting": "conectando",
+  "state_disconnected": "desconectada",
+  "state_listening": "ouvindo",
+  "state_waiting_for_link": "aguardando vínculo",
+  "state_logged_out": "deslogada",
+  "state_replaced": "em uso em outro lugar",
+  "state_refused": "não aceita",
+  "state_unreachable": "sem resposta",
+  "state_off": "parada"
 }

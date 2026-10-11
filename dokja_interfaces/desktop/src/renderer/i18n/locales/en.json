@@ -187,5 +187,17 @@
   "communications_sending": "Waiting for confirmation or delivery…",
   "communications_uncertain": "No delivery reply. Check the latest messages before sending again; it may already have arrived.",
   "communications_sent": "Message sent.",
-  "communications_not_sent": "Message was not sent."
+  "communications_not_sent": "Message was not sent.",
+  "interfaces_title": "Chat interfaces",
+  "interfaces_hint": "Switching an interface off stops it answering and receiving deliveries; its connection stays up.",
+  "state_connected": "connected",
+  "state_connecting": "connecting",
+  "state_disconnected": "disconnected",
+  "state_listening": "listening",
+  "state_waiting_for_link": "waiting for the link",
+  "state_logged_out": "logged out",
+  "state_replaced": "in use elsewhere",
+  "state_refused": "not accepted",
+  "state_unreachable": "no answer",
+  "state_off": "stopped"
 }

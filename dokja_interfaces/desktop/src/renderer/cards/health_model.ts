@@ -10,9 +10,23 @@ export const SERVICE_ORDER = ["meme", "chat_ai", "book", "knowledge", "memory", 
 export type Tone = "ok" | "problem" | "off" | "unchecked" | "other";
 
 // `enabled` is there when the orchestrator has a switch for the service, and only then.
-export type ServiceRow = { name: string; status: string; detail: string; tone: Tone; enabled?: boolean };
+// `kind` is "interface" for Discord and WhatsApp, which are listed apart from the services,
+// and `state` is the name of the state they report.
+export type ServiceRow = {
+  name: string;
+  status: string;
+  detail: string;
+  tone: Tone;
+  enabled?: boolean;
+  kind?: "interface";
+  state?: string;
+};
 
-export type Health = { rows: ServiceRow[]; counts: Record<Tone, number>; jobs: JobState[] };
+// `rows` are the services and `interfaces` the chat interfaces; `counts` covers both.
+export type Health = { rows: ServiceRow[]; interfaces: ServiceRow[]; counts: Record<Tone, number>; jobs: JobState[] };
+
+// The interfaces the desktop knows, in the order it lists them. Any other interface comes after them.
+export const INTERFACE_ORDER = ["discord", "whatsapp"];
 
 export function toneOf(status: string): Tone {
   switch (status) {
@@ -36,23 +50,34 @@ export function parseHealth(value: unknown): Health | undefined {
   if (!isRecord(value) || !isRecord(value.services)) return undefined;
   const { services } = value;
 
-  const known = SERVICE_ORDER.filter((name) => name in services);
-  const extra = Object.keys(services)
-    .filter((name) => !SERVICE_ORDER.includes(name))
-    .sort();
+  const isInterface = (name: string) => isRecord(services[name]) && services[name].kind === "interface";
+  const names = Object.keys(services).filter((name) => isRecord(services[name]));
+  const known = SERVICE_ORDER.filter((name) => names.includes(name) && !isInterface(name));
+  const extra = names.filter((name) => !SERVICE_ORDER.includes(name) && !isInterface(name)).sort();
+  const interfaceNames = names.filter(isInterface);
+  const interfaceKnown = INTERFACE_ORDER.filter((name) => interfaceNames.includes(name));
+  const interfaceExtra = interfaceNames.filter((name) => !INTERFACE_ORDER.includes(name)).sort();
 
   const counts: Record<Tone, number> = { ok: 0, problem: 0, off: 0, unchecked: 0, other: 0 };
-  const rows: ServiceRow[] = [];
-  for (const name of [...known, ...extra]) {
-    const entry = services[name];
-    if (!isRecord(entry)) continue;
+  const rowOf = (name: string): ServiceRow => {
+    const entry = services[name] as Record<string, unknown>;
     const status = text(entry.status);
     const tone = toneOf(status);
     counts[tone] += 1;
-    rows.push({ name, status, detail: text(entry.detail), tone, ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}) });
-  }
+    return {
+      name,
+      status,
+      detail: text(entry.detail),
+      tone,
+      ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
+      ...(entry.kind === "interface" ? { kind: "interface" as const } : {}),
+      ...(entry.kind === "interface" && text(entry.state) ? { state: text(entry.state) } : {}),
+    };
+  };
+  const rows = [...known, ...extra].map(rowOf);
+  const interfaces = [...interfaceKnown, ...interfaceExtra].map(rowOf);
   const jobs = Array.isArray(value.jobs) ? value.jobs.map(parseJob).filter((job): job is JobState => job !== undefined) : [];
-  return { rows, counts, jobs };
+  return { rows, interfaces, counts, jobs };
 }
 
 function parseJob(value: unknown): JobState | undefined {
