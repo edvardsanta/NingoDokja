@@ -39,6 +39,8 @@ class FakeSocket implements WhatsAppSocketLike {
   }
   async sendMessage(jid: string, content: { text: string }, options?: { quoted?: unknown; messageId?: string }) {
     this.sendCalls.push({ jid, text: content.text, options });
+    // Like Baileys: the message as it went out, with the id it was given.
+    return { key: { id: options?.messageId } };
   }
   async sendPresenceUpdate(type: "composing" | "paused", jid?: string) {
     this.presenceCalls.push([type, jid]);
@@ -62,6 +64,7 @@ function harness(
   options: {
     linked?: boolean;
     handler?: (context: WhatsAppMessageContext) => Promise<void>;
+    recorder?: Parameters<typeof createWhatsAppRuntime>[1]["recorder"];
     newMessageId?: ((userJid?: string) => string) | null;
   } = {},
 ) {
@@ -101,6 +104,7 @@ function harness(
         qrs.push(qr);
       },
       handler: options.handler,
+      recorder: options.recorder,
       newMessageId: options.newMessageId === null ? undefined : (options.newMessageId ?? (() => "BOTID")),
       sleep: async (ms) => {
         sleeps.push(ms);
@@ -609,4 +613,30 @@ test("a session that cannot be erased is reported and the loop goes on", async (
 
   assert.equal(connections, 2);
   assert.match(errors.join("\n"), /could not erase the session.*read-only folder/);
+});
+
+test("the recorder hears every message that arrives and what the bot sends, with the id it went out with", async () => {
+  const heard: Array<[string, string]> = [];
+  const { runtime } = harness([
+    (socket) => {
+      open(socket);
+      socket.emit("messages.upsert", {
+        type: "notify",
+        messages: [{ key: { id: "m1", remoteJid: "5511987654321@s.whatsapp.net" }, message: { conversation: "hello" } }],
+      });
+      setTimeout(() => runtime.stop(), 30);
+    },
+  ], {
+    handler: async (context) => {
+      await context.reply("an answer");
+    },
+    recorder: {
+      inbound: async (context) => void heard.push(["in", context.text]),
+      outbound: async (_context, text, id) => void heard.push(["out", `${text}|${id}`]),
+    },
+  });
+
+  await runtime.run();
+
+  assert.deepEqual(heard, [["in", "hello"], ["out", "an answer|BOTID"]]);
 });
