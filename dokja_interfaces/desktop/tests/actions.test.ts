@@ -446,3 +446,42 @@ test("a link reply without a code, or with a bad one, has no picture", () => {
   assert.deepEqual(linkStatus.project(wrap({ state: "waiting_for_link", matrix: ["<svg onload=x>"] })), { state: "waiting_for_link" });
   assert.deepEqual(linkReset.project(wrap({ state: "NOT A NAME" })), { state: "unknown" });
 });
+
+// ---- conversations an interface keeps ----
+
+const history = ACTIONS["communications.history"];
+const channels = ACTIONS["communications.channels"];
+
+test("history accepts a Discord channel id or a WhatsApp alias, and nothing that could name a path", () => {
+  assert.deepEqual(history.payload({ channel_id: "123456789012345678", before: "55" }), { channel_id: "123456789012345678", before: "55" });
+  assert.deepEqual(history.payload({ channel_id: "whatsapp:friend", before: "12" }), { channel_id: "whatsapp:friend", before: "12" });
+  assert.deepEqual(history.payload({ channel_id: "whatsapp:team-chat_2" }), { channel_id: "whatsapp:team-chat_2", before: "" });
+  for (const channel_id of ["whatsapp:", "whatsapp:../friend", "whatsapp:Friend", "whatsapp:a b", "whatsapp:" + "x".repeat(40), "discord:123", "friend", "../1"]) {
+    assert.equal(history.payload({ channel_id }), undefined, channel_id);
+  }
+  assert.equal(history.payload({ channel_id: "whatsapp:friend", before: "1;drop" }), undefined);
+});
+
+test("the channel list keeps the retention of a WhatsApp conversation and nothing else it reports", () => {
+  const reply = {
+    workflow: "communications",
+    domain: "communications",
+    result: {
+      channels: [
+        { id: "123", name: "reading-room" },
+        { id: "whatsapp:friend", name: "friend", kind: "direct", retention_days: 30, number: "5511987654321", jid: "x@s.whatsapp.net" },
+        { id: "whatsapp:odd", name: "odd", retention_days: 99999 },
+      ],
+      unavailable: ["whatsapp"],
+    },
+  };
+
+  const projected = channels.project(reply) as { channels: Array<Record<string, unknown>> };
+
+  assert.deepEqual(projected.channels, [
+    { id: "123", name: "reading-room" },
+    { id: "whatsapp:friend", name: "friend", retentionDays: 30 },
+    { id: "whatsapp:odd", name: "odd", retentionDays: 365 },
+  ]);
+  assert.ok(!JSON.stringify(projected).includes("5511987654321"));
+});

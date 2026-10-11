@@ -330,12 +330,17 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "communications.channels": {
     payload: noPayload,
     project: (result) => inDomain(result, "communications", (body) => ({
-      channels: records(body.channels, (channel) => ({ id: text(channel.id), name: shorten(text(channel.name), 100) })).slice(0, 100),
+      channels: records(body.channels, (channel) => ({
+        id: text(channel.id),
+        name: shorten(text(channel.name), 100),
+        ...(count(channel.retention_days) > 0 ? { retentionDays: clampInt(channel.retention_days, 1, 365, 1) } : {}),
+      })).slice(0, 100),
     })),
   },
   "communications.history": {
     payload: (raw) => {
-      if (!/^[0-9]{1,20}$/.test(text(raw.channel_id))) return undefined;
+      // A Discord channel is a number; a WhatsApp conversation is the alias the owner gave it.
+      if (!/^([0-9]{1,20}|whatsapp:[a-z0-9][a-z0-9_-]{0,31})$/.test(text(raw.channel_id))) return undefined;
       const before = text(raw.before);
       if (before && !/^[0-9]{1,20}$/.test(before)) return undefined;
       return { channel_id: raw.channel_id, before };

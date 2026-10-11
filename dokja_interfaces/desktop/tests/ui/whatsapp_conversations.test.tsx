@@ -1,0 +1,95 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
+import { I18nProvider } from "../../src/renderer/i18n/context.js";
+import { PulseProvider } from "../../src/renderer/pulse.js";
+import type { Locale } from "../../src/shared/locale.js";
+import type { Transport } from "../../src/shared/transport.js";
+import { ok, routedTransport } from "./support.js";
+
+function renderCard(transport: Transport, locale: Locale = "en") {
+  return render(
+    <I18nProvider locale={locale}>
+      <PulseProvider>
+        <CommunicationsCard transport={transport} />
+      </PulseProvider>
+    </I18nProvider>,
+  );
+}
+
+const channels = ok({
+  channels: [
+    { id: "whatsapp:friend", name: "friend", retentionDays: 30 },
+    { id: "123456789012345678", name: "reading-room" },
+  ],
+});
+
+const page = (channelId: string) =>
+  ok({
+    channelId,
+    before: "",
+    messages: [
+      { id: "1", author: "contact", bot: false, content: "are you coming?", timestamp: "2026-10-11T12:00:00.000Z", edited: false, replyTo: "", attachments: [] },
+      { id: "2", author: "owner", bot: false, content: "yes", timestamp: "2026-10-11T12:01:00.000Z", edited: false, replyTo: "", attachments: [] },
+      { id: "3", author: "bot", bot: true, content: "He will be there.", timestamp: "2026-10-11T12:02:00.000Z", edited: false, replyTo: "", attachments: [] },
+    ],
+  });
+
+describe("a WhatsApp conversation in the communications tab", () => {
+  it("is listed by its alias, shows who wrote in words, and says how long the text is kept", async () => {
+    const { transport, calls } = routedTransport({
+      "communications.channels": channels,
+      "communications.history": page("whatsapp:friend"),
+    });
+    renderCard(transport);
+
+    await screen.findByText("are you coming?");
+
+    expect(screen.getByRole("option", { name: "WhatsApp · friend" })).toBeTruthy();
+    expect(screen.getByText(/kept on this machine for 30 days/)).toBeTruthy();
+    const messages = screen.getByRole("list", { name: "Conversation history" });
+    expect(within(messages).getByText("Contact")).toBeTruthy();
+    expect(within(messages).getByText("You")).toBeTruthy();
+    expect(within(messages).getByText("Ningo")).toBeTruthy();
+    expect(calls.find((call) => call.type === "communications.history")?.payload).toEqual({ channel_id: "whatsapp:friend", before: "" });
+  });
+
+  it("offers no composer yet, so nothing can be sent to it from here", async () => {
+    const { transport } = routedTransport({
+      "communications.channels": channels,
+      "communications.history": page("whatsapp:friend"),
+    });
+    renderCard(transport);
+    await screen.findByText("are you coming?");
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText("Sending to WhatsApp from here is not available yet.")).toBeTruthy();
+  });
+
+  it("says it in Portuguese", async () => {
+    const { transport } = routedTransport({
+      "communications.channels": channels,
+      "communications.history": page("whatsapp:friend"),
+    });
+    renderCard(transport, "pt");
+
+    await screen.findByText("are you coming?");
+
+    expect(screen.getByText(/guardado nesta máquina por 30 dias/)).toBeTruthy();
+    expect(screen.getByText("Contato")).toBeTruthy();
+    expect(screen.getByText("Você")).toBeTruthy();
+  });
+
+  it("leaves a Discord channel as it was, with its composer", async () => {
+    const { transport } = routedTransport({
+      "communications.channels": ok({ channels: [{ id: "123456789012345678", name: "reading-room" }] }),
+      "communications.history": page("123456789012345678"),
+    });
+    renderCard(transport);
+
+    await waitFor(() => expect(screen.getByRole("textbox")).toBeTruthy());
+    expect(screen.queryByText(/kept on this machine/)).toBeNull();
+    expect(screen.getByRole("option", { name: "#reading-room · 123456789012345678" })).toBeTruthy();
+  });
+});

@@ -25,19 +25,40 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
   </CardFrame>;
 }
 
+// A conversation an interface keeps the text of is told apart by its id, which carries the platform.
+const WHATSAPP = "whatsapp:";
+const isWhatsApp = (id: string) => id.startsWith(WHATSAPP);
+
 function ChannelList({ channels, transport, active }: { channels: CommunicationChannel[]; transport: Transport; active: boolean }) {
   const t = useTranslate();
   const id = useId();
   const [selected, setSelected] = useState(channels[0]?.id ?? "");
   const [sending, setSending] = useState(false);
+  const chosen = channels.find((channel) => channel.id === selected);
   return <>
     <p className="note">{t("communications_identity")}</p>
     <label htmlFor={id}>{t("communications_channel")}</label>{" "}
     <select id={id} value={selected} disabled={sending} onChange={(event) => setSelected(event.target.value)}>
-      {channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name === channel.id ? channel.id : `#${channel.name} · ${channel.id}`}</option>)}
+      {channels.map((channel) => <option key={channel.id} value={channel.id}>{isWhatsApp(channel.id)
+        ? t("communications_whatsapp_label", { name: channel.name })
+        : channel.name === channel.id ? channel.id : `#${channel.name} · ${channel.id}`}</option>)}
     </select>
+    {chosen && isWhatsApp(chosen.id) && chosen.retentionDays !== undefined && <p className="note">{t("communications_retention", { days: chosen.retentionDays })}</p>}
     <Conversation key={selected} channel={selected} transport={transport} active={active} onSending={setSending} />
   </>;
+}
+
+// Who wrote a message of a WhatsApp conversation: the interface sends a fixed label, said here in the
+// language of the screen. A Discord author is a name and is shown as it is.
+function authorLabel(channel: string, author: string, t: ReturnType<typeof useTranslate>): string {
+  if (!isWhatsApp(channel)) return author;
+  switch (author) {
+    case "owner": return t("communications_who_owner");
+    case "bot": return t("communications_who_bot");
+    case "contact": return t("communications_who_contact");
+    case "member": return t("communications_who_member");
+    default: return author;
+  }
 }
 
 function Conversation({ channel, transport, active, onSending }: { channel: string; transport: Transport; active: boolean; onSending: (busy: boolean) => void }) {
@@ -81,7 +102,7 @@ function Conversation({ channel, transport, active, onSending }: { channel: stri
       {page.messages.length === 0 && <p>{t("communications_empty")}</p>}
       <ol className="conversation" aria-label={t("communications_history")}>
         {page.messages.map((message) => <li key={message.id} data-bot={message.bot}>
-          <p><strong>{message.author}</strong>{message.bot && <span className="detail"> · {t("communications_bot")}</span>}
+          <p><strong>{authorLabel(channel, message.author, t)}</strong>{message.bot && !isWhatsApp(channel) && <span className="detail"> · {t("communications_bot")}</span>}
             {" "}<time dateTime={message.timestamp} title={message.timestamp}>{ago(message.timestamp)}</time>
             {message.edited && <span className="detail"> · {t("communications_edited")}</span>}
           </p>
@@ -91,7 +112,9 @@ function Conversation({ channel, transport, active, onSending }: { channel: stri
         </li>)}
       </ol>
     </>}
-    <Composer channel={channel} transport={transport} onSent={latest} onSending={onSending} />
+    {isWhatsApp(channel)
+      ? <p className="note">{t("communications_whatsapp_read_only")}</p>
+      : <Composer channel={channel} transport={transport} onSent={latest} onSending={onSending} />}
   </>;
 }
 
