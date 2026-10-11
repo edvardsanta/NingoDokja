@@ -85,6 +85,8 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_WHATSAPP_ALLOWED_GROUPS` | WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated |
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
+| `DOKJA_WHATSAPP_STATUS_PORT` | WhatsApp interface | Internal port that answers the interface's state, default `8094`. Never published |
+| `WHATSAPP_INTERFACE_STATUS_ENDPOINT` | Orchestrator | `http://dokja-whatsapp:8094/status` in Compose. Empty (the default) means the desktop does not list WhatsApp |
 
 The service refuses to start, naming the variable and the position of the entry (never its value),
 when an entry is not a phone number or a group id, and when nothing at all would be answered (self
@@ -102,8 +104,12 @@ docker compose -f docker-compose.lite.yml logs -f dokja-whatsapp
 
 1. The log shows a QR code. On the phone open WhatsApp > Settings > Linked devices > Link a device
    and scan it. The code lasts about a minute.
-2. If the link is not completed in time the service stops with a message. Start it again for a new code.
+2. If nobody scans it in time, a new code follows after 5 s, then 10 s, 20 s and so on up to 5 minutes,
+   and the state stays `waiting_for_link`.
 3. After linking the log shows `"whatsapp":"connected"`. Write to your own "message yourself" chat to try it.
+
+To see and switch it from the desktop, set `WHATSAPP_INTERFACE_STATUS_ENDPOINT` in the ignored
+environment file (see "State and the desktop") and recreate the orchestrator.
 
 ### Unlink and start over
 
@@ -115,30 +121,48 @@ docker compose -f docker-compose.lite.yml logs -f dokja-whatsapp
   docker volume rm <compose project>_dokja-whatsapp-auth
   ```
 
+## State and the Desktop
+
+The service never ends the process on its own. It runs an internal listener that answers
+`GET /status` with a level, one state from the list below and a short sentence, and the orchestrator
+shows it in `ningo.status`, so the desktop can list WhatsApp next to Discord and switch it.
+The reply never carries a phone number, a chat id or a link code, and the port is not published.
+
+| State | Meaning | What to do |
+| --- | --- | --- |
+| `connected` | Linked and receiving | nothing |
+| `connecting` | Opening the connection, or retrying after a lost one | wait |
+| `waiting_for_link` | Not linked yet; a link code is in the log | scan it, or wait for the next one |
+| `logged_out` | The account was logged out from the phone or by WhatsApp | remove the session volume and link again |
+| `replaced` | Another connection is using the same session | stop the other one |
+| `refused` | WhatsApp closed the connection 5 times in a row before issuing any code | check the network, then the Baileys version |
+| `off` | The service is shutting down | |
+
+Setting `WHATSAPP_INTERFACE_STATUS_ENDPOINT` on the orchestrator is what makes the desktop list the
+interface; without it WhatsApp is simply not shown, never shown as a failure.
+
+**The switch.** Switching WhatsApp off in the desktop makes the interface answer nothing: the
+orchestrator skips the message and the bot says nothing in the chat, not even "switched off". The
+linked session and the connection are left alone, so switching it back on takes effect at once.
+
 ## Reconnection
 
 The service owns the connection. A lost connection is retried after 1 s, doubling up to 60 s, and the
 wait starts over once a connection opens. Linking ends with WhatsApp asking for a new connection;
-that one reconnects at once.
+that one reconnects at once. The states that need the operator (`logged_out`, `replaced`, `refused`)
+are kept, and logged once, until the service is restarted.
 
-Three situations stop the service instead of retrying, with a message that says what to do:
-
-- the session was **logged out** from the phone (or by WhatsApp): remove the session volume and link again
-- the session is **in use by another connection**: stop the other one
-- the account is **not linked yet** and either a link code was shown but not scanned in time, or
-  WhatsApp closed the connection 5 times in a row before issuing any code
-
-Every reconnect line and every one of those messages carries the status code WhatsApp gave.
-
-The session folder is never deleted by the service.
+Every reconnect line, and `refused`, carries the status code WhatsApp gave. The session folder is
+never deleted by the service.
 
 ## Troubleshooting
 
-- **The service stops before any QR code appears, with a status code (for example 405).** WhatsApp
-  refused the connection. If the network is fine, the Baileys version is usually too old for the
+- **The state is `refused`, with a status code (for example 405).** WhatsApp refused the connection
+  before any link code. If the network is fine, the Baileys version is usually too old for the
   current WhatsApp and needs an upgrade (it is pinned in `package.json`; run the tests and check a
   real account after upgrading).
-- **The QR code expired.** Start the service again; each start issues a new one.
+- **The QR code expired.** A new one follows by itself; the wait between codes grows up to 5 minutes,
+  so restart the service if you want one now.
 - **Nothing happens when a friend writes.** Their number must be in `DOKJA_WHATSAPP_ALLOW_FROM`; an
   ignored message is not logged on purpose. A group is logged once with its id.
 - **A recipient sees "waiting for this message".** The bot keeps what it sent for about 10 minutes so

@@ -12,6 +12,7 @@ Environment variables:
 - `DOKJA_WHATSAPP_ALLOWED_GROUPS` group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated
 - `DOKJA_ORCH_HTTP_ENDPOINT`
 - `DOKJA_ORCHESTRATOR_TIMEOUT_MS`
+- `DOKJA_WHATSAPP_STATUS_PORT` internal port that answers the interface's state (default `8094`, never published)
 
 Run (a QR code appears in the log on the first start; scan it in WhatsApp > Linked devices):
 

@@ -333,11 +333,11 @@ provider address the shell deliberately strips).
 
 ## Interfaces increment (2026-10-11)
 
-Status: proposed. Increment 1 is in progress; the others are ordered but not started. Each increment
-is its own branch, stacked in this order.
+Status: proposed. Increment 1 is built (branch `feat/interfaces-health`); the others are ordered but
+not started. Each increment is its own branch, stacked in this order.
 
 The Switches increment made the desktop the one place from which the operator runs Ningo. The people
-talk to Ningo through the Discord, Teams and WhatsApp interfaces, so the desktop should show their
+talk to Ningo through the Discord and WhatsApp interfaces, so the desktop should show their
 state, switch them, link WhatsApp, and, for the conversations the operator names, show and send
 messages. The flow does not change: the desktop talks to the orchestrator, the orchestrator talks to
 the interfaces.
@@ -347,11 +347,11 @@ the interfaces.
 - **One status vocabulary.** Every interface runs a small internal listener that is always on, whether
   or not it delivers anything, and answers `GET /status` with `{status, state, detail}`. `state` comes
   from a closed list per interface and never carries a phone number, a chat id, a token or a link code:
-  - discord: `connected`, `connecting`, `disconnected`, `not_configured`
-  - teams: `listening`, `not_configured`
-  - whatsapp: `connected`, `connecting`, `waiting_for_link`, `logged_out`, `replaced`, `off`
+  - discord: `connected`, `connecting`, `disconnected`
+  - whatsapp: `connected`, `connecting`, `waiting_for_link`, `logged_out`, `replaced`, `refused`, `off`
 
-  The listener port is not published in Compose.
+  An interface that does not answer is shown as `unreachable` by the orchestrator, with a fixed
+  sentence. The listener port is not published in Compose.
 - **What a switch means.** An interface that is off neither answers nor receives deliveries. It answers
   nothing at all in the chat: the "switched off" reply that services give is wrong here, because it
   would post in every channel the bot sits in. Credentials and the linked session are untouched, and the
@@ -368,12 +368,11 @@ the interfaces.
 ### Increment 1: interfaces in the health tab
 
 - Each interface gets its always-on status listener. Discord reports the gateway state, not that the
-  process is up. Teams already has `/health` on the delivery server, which only starts when webhooks
-  are set: the listener moves out of that condition. WhatsApp gets a new listener.
+  process is up, and answers on the port of its delivery server. WhatsApp gets a new listener.
 - The WhatsApp runtime stops exiting when the session is logged out or replaced, or when a link code
   expires: it stays alive in that state and says so. This is what lets a later increment link from the
   desktop, since the desktop cannot restart a container.
-- The orchestrator probes each configured interface, adds `discord`, `teams` and `whatsapp` to the
+- The orchestrator probes each configured interface, adds `discord` and `whatsapp` to the
   switchable names, and enforces the meaning above in the service gate and at delivery. An interface
   without a configured endpoint is not listed.
 - The health tab already appends any service the orchestrator reports; it now groups the entries marked
