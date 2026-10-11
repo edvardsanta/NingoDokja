@@ -158,3 +158,19 @@ func TestDiscordKeepsItsMemeTextCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractBridgeReplyIsSilentOnlyForAnInterfaceThatIsOff(t *testing.T) {
+	silent := core.ProcessResult{Result: map[string]any{
+		"skipped": true, "silent": true, "reason": "interface whatsapp is switched off",
+	}}
+	if reply := extractBridgeReply(silent); reply != "" {
+		t.Fatalf("an interface that is off must answer nothing, got %q", reply)
+	}
+
+	service := core.ProcessResult{Result: map[string]any{
+		"skipped": true, "silent": false, "reason": "service meme is disabled",
+	}}
+	if reply := extractBridgeReply(service); !strings.Contains(reply, "switched off right now") {
+		t.Fatalf("a service that is off keeps its visible reply, got %q", reply)
+	}
+}

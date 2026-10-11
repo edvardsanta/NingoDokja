@@ -143,6 +143,10 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 func extractBridgeReply(result core.ProcessResult) string {
 	// The operator switched this off: say so instead of answering with silence.
 	if skipped, _ := result.Result["skipped"].(bool); skipped {
+		// An interface that is off answers nothing at all.
+		if silent, _ := result.Result["silent"].(bool); silent {
+			return ""
+		}
 		reason, _ := result.Result["reason"].(string)
 		return fmt.Sprintf("That is switched off right now (%s).", strings.TrimSpace(reason))
 	}

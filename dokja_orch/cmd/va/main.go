@@ -53,6 +53,18 @@ func main() {
 		func() bool { return controls == nil || controls.ServiceEnabled("memory") },
 	)
 
+	// An interface is listed (and switchable from the desktop) only when its status address is set:
+	// one that is not deployed has none, so it never shows up as a failure.
+	interfaceProbes := map[string]handlers.InterfaceProbe{}
+	for name, variable := range map[string]string{
+		"discord":  "DISCORD_INTERFACE_STATUS_ENDPOINT",
+		"whatsapp": "WHATSAPP_INTERFACE_STATUS_ENDPOINT",
+	} {
+		if client := clients.NewInterfaceStatusClient(os.Getenv(variable)); client != nil {
+			interfaceProbes[name] = client.Status
+		}
+	}
+
 	service := core.DefaultService(
 		handlers.NewCommunicationsDomainHandler(clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")), os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID")),
 		handlers.NewSystemDomainHandler(
@@ -66,7 +78,7 @@ func main() {
 			"knowledge": handlers.StatusProbe(knowledgeClient),
 			"memory":    handlers.StatusProbe(memoryClient),
 			"feeds":     handlers.FeedsProbe(feedsClient),
-		}),
+		}).WithInterfaceProbes(interfaceProbes),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),
