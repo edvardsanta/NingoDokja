@@ -485,3 +485,33 @@ test("the channel list keeps the retention of a WhatsApp conversation and nothin
   ]);
   assert.ok(!JSON.stringify(projected).includes("5511987654321"));
 });
+
+// ---- sending to a WhatsApp conversation ----
+
+const send = ACTIONS["communications.send"];
+
+test("a send to a WhatsApp alias is text only, and the alias is the only thing that names the chat", () => {
+  assert.deepEqual(send.payload({ channel_id: "whatsapp:friend", content: "  hello  " }), {
+    channel_ids: ["whatsapp:friend"],
+    content: "hello",
+  });
+  for (const raw of [
+    { channel_id: "whatsapp:friend", content: "hi", attachment_url: "https://example.com/meme.jpg" },
+    { channel_id: "whatsapp:friend", content: "   " },
+    { channel_id: "whatsapp:friend", content: "x".repeat(2001) },
+    { channel_id: "whatsapp:../friend", content: "hi" },
+    { channel_id: "whatsapp:Friend", content: "hi" },
+    { channel_id: "5511987654321@s.whatsapp.net", content: "hi" },
+  ]) {
+    assert.equal(send.payload(raw), undefined, JSON.stringify(raw).slice(0, 60));
+  }
+});
+
+test("a Discord send is built as before", () => {
+  assert.deepEqual(send.payload({ channel_id: "123456789", content: "hi", attachment_url: "https://example.com/a.jpg" }), {
+    channel_ids: ["123456789"],
+    content: "hi",
+    attachment_url: "https://example.com/a.jpg",
+  });
+  assert.deepEqual(send.payload({ channel_id: "123456789", content: "hi" }), { channel_ids: ["123456789"], content: "hi" });
+});

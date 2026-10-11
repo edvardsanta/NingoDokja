@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
@@ -55,7 +55,7 @@ describe("a WhatsApp conversation in the communications tab", () => {
     expect(calls.find((call) => call.type === "communications.history")?.payload).toEqual({ channel_id: "whatsapp:friend", before: "" });
   });
 
-  it("offers no composer yet, so nothing can be sent to it from here", async () => {
+  it("offers a text-only composer, with no memes to attach", async () => {
     const { transport } = routedTransport({
       "communications.channels": channels,
       "communications.history": page("whatsapp:friend"),
@@ -63,8 +63,28 @@ describe("a WhatsApp conversation in the communications tab", () => {
     renderCard(transport);
     await screen.findByText("are you coming?");
 
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.getByText("Sending to WhatsApp from here is not available yet.")).toBeTruthy();
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load memes" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /meme/i })).toBeNull();
+    expect(screen.getByText(/go out from your own account, as you/)).toBeTruthy();
+  });
+
+  it("sends the text to the alias and nothing else", async () => {
+    const { transport, calls } = routedTransport({
+      "communications.channels": channels,
+      "communications.history": page("whatsapp:friend"),
+      "communications.send": ok({ sent: true, skipped: false }),
+    });
+    renderCard(transport);
+    await screen.findByText("are you coming?");
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "  see you there  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Send as you" }));
+
+    await screen.findByText("Message sent.");
+    const sent = calls.filter((call) => call.type === "communications.send");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.payload).toEqual({ channel_id: "whatsapp:friend", content: "see you there" });
   });
 
   it("says it in Portuguese", async () => {

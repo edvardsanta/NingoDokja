@@ -36,7 +36,7 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
   const [sending, setSending] = useState(false);
   const chosen = channels.find((channel) => channel.id === selected);
   return <>
-    <p className="note">{t("communications_identity")}</p>
+    <p className="note">{chosen && isWhatsApp(chosen.id) ? t("communications_whatsapp_identity") : t("communications_identity")}</p>
     <label htmlFor={id}>{t("communications_channel")}</label>{" "}
     <select id={id} value={selected} disabled={sending} onChange={(event) => setSelected(event.target.value)}>
       {channels.map((channel) => <option key={channel.id} value={channel.id}>{isWhatsApp(channel.id)
@@ -112,9 +112,7 @@ function Conversation({ channel, transport, active, onSending }: { channel: stri
         </li>)}
       </ol>
     </>}
-    {isWhatsApp(channel)
-      ? <p className="note">{t("communications_whatsapp_read_only")}</p>
-      : <Composer channel={channel} transport={transport} onSent={latest} onSending={onSending} />}
+    <Composer channel={channel} transport={transport} onSent={latest} onSending={onSending} />
   </>;
 }
 
@@ -126,12 +124,14 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
   const busy = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // A WhatsApp conversation takes text only, so it has no memes to attach.
+  const textOnly = isWhatsApp(channel);
   const run = useCallback(async (draft: { content: string; attachment: string }): Promise<LoadResult<CommunicationSend | Off>> => {
     if (busy.current) return unexpected();
     busy.current = true;
     onSending(true);
     try {
-      const answer = await transport.request("communications.send", { channel_id: channel, content: draft.content, attachment_url: draft.attachment }, { timeoutMs: 60_000 });
+      const answer = await transport.request("communications.send", { channel_id: channel, content: draft.content, ...(textOnly ? {} : { attachment_url: draft.attachment }) }, { timeoutMs: 60_000 });
       if (!answer.ok) return answer;
       if (!isRecord(answer.result)) return unexpected();
       if (answer.result.off === true) return { ok: true, data: { off: true, reason: String(answer.result.reason ?? "") } };
@@ -140,7 +140,7 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
       if (data.sent && mounted.current) { setContent(""); setAttachment(""); onSent(); }
       return { ok: true, data };
     } finally { busy.current = false; if (mounted.current) onSending(false); }
-  }, [transport, channel, onSent, onSending]);
+  }, [transport, channel, textOnly, onSent, onSending]);
   const send = useAction(run);
   const sending = send.state.phase === "loading";
   const loadMemes = useCallback(async (): Promise<LoadResult<MemePage | Off>> => {
@@ -158,12 +158,12 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
     <label htmlFor={id}>{t("communications_message")}</label>
     <textarea id={id} value={content} maxLength={2000} rows={4} disabled={sending} onChange={(event) => setContent(event.target.value)} />
     <div className="pager">
-      <button type="button" disabled={sending || memes.state.phase === "loading"} onClick={() => memes.start(undefined)}>{t("communications_memes")}</button>
-      {memes.state.phase === "ready" && !memes.state.data.off && <select aria-label={t("communications_meme")} value={attachment} disabled={sending} onChange={(event) => setAttachment(event.target.value)}>
+      {!textOnly && <button type="button" disabled={sending || memes.state.phase === "loading"} onClick={() => memes.start(undefined)}>{t("communications_memes")}</button>}
+      {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <select aria-label={t("communications_meme")} value={attachment} disabled={sending} onChange={(event) => setAttachment(event.target.value)}>
         <option value="">{t("communications_no_meme")}</option>
         {memes.state.data.memes.map((meme) => <option key={meme.url} value={meme.url}>{meme.title || meme.url}</option>)}
       </select>}
-      <button type="submit" disabled={sending || (!content.trim() && !attachment)}>{t("communications_send")}</button>
+      <button type="submit" disabled={sending || (!content.trim() && !(attachment && !textOnly))}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</button>
     </div>
     {memes.state.phase === "error" && <Problem error={memes.state.error} />}
     {memes.state.phase === "ready" && memes.state.data.off && <OffNotice reason={memes.state.data.reason} />}

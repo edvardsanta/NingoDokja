@@ -47,6 +47,17 @@ export function createConfirmer(locale: Locale, show: ShowQuestion): Confirm {
 export function questionFor(locale: Locale, type: ActionType, wire: Record<string, unknown>): Question | undefined {
   if (type === "communications.send") {
     const pt = locale === "pt";
+    const channel = String((wire.channel_ids as string[])[0]);
+    if (channel.startsWith("whatsapp:")) {
+      return {
+        message: pt ? "Enviar pelo WhatsApp como você?" : "Send on WhatsApp as you?",
+        detail: `${pt ? "Conversa" : "Conversation"}: ${channel.slice("whatsapp:".length)}\n\n${String(wire.content ?? "")}\n\n${
+          pt ? "A mensagem sai da sua própria conta do WhatsApp." : "The message goes out from your own WhatsApp account."
+        }`,
+        accept: pt ? "Enviar" : "Send",
+        cancel: pt ? "Cancelar" : "Cancel",
+      };
+    }
     return {
       message: pt ? "Enviar pelo Ningo ao Discord?" : "Send to Discord as Ningo?",
       detail: `${pt ? "Canal" : "Channel"}: ${String((wire.channel_ids as string[])[0])}\n\n${String(wire.content ?? "")}\n\n${String(wire.attachment_url ?? "")}`,
