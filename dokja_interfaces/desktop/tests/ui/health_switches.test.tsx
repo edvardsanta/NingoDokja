@@ -252,7 +252,7 @@ describe("the interfaces on the health card", () => {
     discord: { status: "ok", detail: "", enabled: true, kind: "interface", state: "connected" },
     whatsapp: { status: "error", detail: "remove the saved session and link again", enabled: true, kind: "interface", state: "logged_out" },
   };
-  const WHATSAPP_OFF = { ...INTERFACES, whatsapp: { status: "disabled", detail: "switched off", enabled: false, kind: "interface" } };
+  const WHATSAPP_OFF = { ...INTERFACES, whatsapp: { status: "disabled", detail: "", enabled: false, kind: "interface" } };
 
   it("lists them under their own heading with their state in words, not the status", async () => {
     const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });

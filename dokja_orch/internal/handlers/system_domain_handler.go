@@ -725,7 +725,8 @@ func (h *SystemDomainHandler) applySwitches(services map[string]any) {
 		}
 		entry["enabled"] = enabled
 		if !enabled {
-			entry["status"], entry["detail"] = "disabled", "switched off"
+			// The status says it is off; a sentence of its own would only repeat it, in English.
+			entry["status"] = "disabled"
 		}
 		services[name] = entry
 	}

@@ -109,8 +109,11 @@ func TestASwitchedOffInterfaceIsNotReadAndSaysOnlyThatItIsOff(t *testing.T) {
 	result, services := statusServices(t, handler)
 
 	entry := services["whatsapp"].(map[string]any)
-	if entry["status"] != "disabled" || entry["enabled"] != false || entry["kind"] != "interface" || entry["detail"] != "switched off" {
+	if entry["status"] != "disabled" || entry["enabled"] != false || entry["kind"] != "interface" {
 		t.Fatalf("unexpected entry %#v", entry)
+	}
+	if _, repeated := entry["detail"]; repeated {
+		t.Fatalf("an interface that is off needs no sentence beside its status, got %#v", entry)
 	}
 	if _, leaked := entry["state"]; leaked {
 		t.Fatalf("an interface that is off reports no state, got %#v", entry)
