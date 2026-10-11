@@ -1,5 +1,5 @@
 import { buildConfig } from "./config.js";
-import { connectSocket, loadAuth, newMessageId } from "./runtime/baileys_socket.js";
+import { connectSocket, loadAuth, newMessageId, wipeAuth } from "./runtime/baileys_socket.js";
 import { renderQr } from "./runtime/qr.js";
 import { startStatusServer } from "./runtime/status_server.js";
 import { createWhatsAppRuntime } from "./runtime/whatsapp_runtime.js";
@@ -19,13 +19,19 @@ async function main() {
 
   const runtime = createWhatsAppRuntime(config, {
     loadAuth,
+    wipeAuth,
     connect: (auth) => connectSocket(auth, error),
     renderQr: (qr) => renderQr(qr),
     newMessageId,
     log,
     error,
   });
-  startStatusServer({ port: config.statusPort, status: () => runtime.status(), log });
+  startStatusServer({
+    port: config.statusPort,
+    status: () => runtime.status(),
+    link: { code: () => runtime.linkCode(), start: () => runtime.restart(), reset: () => runtime.resetSession() },
+    log,
+  });
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => runtime.stop());
   }

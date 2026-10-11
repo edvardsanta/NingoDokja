@@ -25,6 +25,8 @@ export type WhatsAppSocketLike = {
     options?: { quoted?: unknown; messageId?: string },
   ): Promise<unknown>;
   sendPresenceUpdate(type: "composing" | "paused", jid?: string): Promise<void>;
+  // Removes this device from the account, on WhatsApp's side as well.
+  logout(): Promise<void>;
   signalRepository?: { lidMapping?: { getPNForLID(lid: string): Promise<string | null> } };
   end(error: Error | undefined): void;
 };
@@ -39,6 +41,8 @@ export type RuntimeConfig = WhatsAppMessageConfig & { authDir: string };
 
 type Dependencies = {
   loadAuth: (dir: string) => Promise<AuthBundle>;
+  // Erases the saved session, so the next connection asks for a new link code.
+  wipeAuth: (dir: string) => Promise<void>;
   connect: (auth: AuthBundle) => WhatsAppSocketLike;
   renderQr: (qr: string) => void | Promise<void>;
   handler?: WhatsAppMessageHandler;
@@ -69,6 +73,11 @@ export type WhatsAppRuntime = {
   status(): RuntimeStatus;
   // Leaves a waiting state at once (a new link attempt, or a retry after a refusal).
   restart(): void;
+  // The code to scan, only while the state is `waiting_for_link`.
+  linkCode(): string | undefined;
+  // Unlinks the account (on WhatsApp's side too, when it is connected), erases the saved session and
+  // asks for a new link code. Nothing else of the interface is touched.
+  resetSession(): Promise<void>;
 };
 
 // The values of Baileys' DisconnectReason this loop reacts to (a test keeps them in step).
@@ -95,9 +104,15 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
   let current: WhatsAppSocketLike | null = null;
   let status: RuntimeStatus = { state: "connecting", detail: "" };
   let wake: (() => void) | null = null;
+  let linkCode: string | undefined;
+  let resetPending = false;
 
   function setState(state: InterfaceState, detail = ""): void {
     status = { state, detail };
+    // A code is only worth showing while the account waits for it.
+    if (state !== "waiting_for_link") {
+      linkCode = undefined;
+    }
     // These are the ones that need the operator; the others are already logged where they happen.
     if (state === "logged_out" || state === "replaced" || state === "refused") {
       deps.log?.(JSON.stringify({ whatsapp: state, detail }));
@@ -189,6 +204,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         if (update.qr) {
           linkCodeShown = true;
           setState("waiting_for_link");
+          linkCode = update.qr;
           deps.log?.(JSON.stringify({ whatsapp: "waiting for the link", hint: "scan with Settings > Linked devices" }));
           void Promise.resolve(deps.renderQr(update.qr)).catch(() => {
             deps.error?.(JSON.stringify({ message: "could not show the link code" }));
@@ -217,6 +233,21 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
       let linkAttempt = 0;
       let failuresBeforeLinkCode = 0;
       while (!stopped) {
+        if (resetPending) {
+          resetPending = false;
+          try {
+            await deps.wipeAuth(config.authDir);
+            deps.log?.(JSON.stringify({ whatsapp: "session erased", next: "a new link code follows" }));
+          } catch (error) {
+            deps.error?.(JSON.stringify({
+              message: "could not erase the session",
+              error: error instanceof Error ? error.message : String(error),
+            }));
+          }
+          attempt = 0;
+          linkAttempt = 0;
+          failuresBeforeLinkCode = 0;
+        }
         setState("connecting");
         let outcome: Outcome;
         try {
@@ -230,6 +261,11 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         }
         if (stopped) {
           break;
+        }
+        // The operator asked to start over: this close was theirs, and the top of the loop erases
+        // the session before the next connection.
+        if (resetPending) {
+          continue;
         }
         if (outcome.opened) {
           attempt = 0;
@@ -286,7 +322,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
           status: describe(outcome.code),
           inMs: delay,
         }));
-        await sleep(delay);
+        await waitForWake(delay);
       }
       setState("off");
     },
@@ -300,6 +336,24 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
       return status;
     },
     restart() {
+      wake?.();
+    },
+    linkCode() {
+      return status.state === "waiting_for_link" ? linkCode : undefined;
+    },
+    async resetSession() {
+      resetPending = true;
+      const socket = current;
+      if (socket && status.state === "connected") {
+        // Tell WhatsApp to drop this device; if that fails the phone may still list it, and the
+        // operator can remove it there.
+        try {
+          await socket.logout();
+        } catch {
+          deps.error?.(JSON.stringify({ message: "could not unlink on WhatsApp's side" }));
+        }
+      }
+      socket?.end(undefined);
       wake?.();
     },
   };

@@ -43,6 +43,12 @@ class FakeSocket implements WhatsAppSocketLike {
   async sendPresenceUpdate(type: "composing" | "paused", jid?: string) {
     this.presenceCalls.push([type, jid]);
   }
+  loggedOut = false;
+  // Like Baileys: logging out closes the connection with the "logged out" status.
+  async logout() {
+    this.loggedOut = true;
+    this.close(disconnectReason.loggedOut);
+  }
   end() {
     this.ended = true;
     this.close();
@@ -60,6 +66,7 @@ function harness(
   } = {},
 ) {
   const sockets: FakeSocket[] = [];
+  const wiped: string[] = [];
   const saved: number[] = [];
   const sleeps: number[] = [];
   const qrs: string[] = [];
@@ -80,6 +87,9 @@ function harness(
           saved.push(saved.length);
         },
       }),
+      wipeAuth: async (dir) => {
+        wiped.push(dir);
+      },
       connect: (auth) => {
         const socket = new FakeSocket();
         sockets.push(socket);
@@ -99,7 +109,7 @@ function harness(
       error: (...args) => errors.push(args.join(" ")),
     },
   );
-  return { runtime, sockets, saved, sleeps, qrs, logs, errors, failSaves: (error: Error) => (saveFailure = error) };
+  return { runtime, sockets, wiped, saved, sleeps, qrs, logs, errors, failSaves: (error: Error) => (saveFailure = error) };
 }
 
 const open = (socket: FakeSocket) => socket.emit("connection.update", { connection: "open" });
@@ -456,6 +466,7 @@ test("a failure while loading or connecting is retried", async () => {
         }
         return { state: { creds: { me: {} } }, saveCreds: async () => undefined };
       },
+      wipeAuth: async () => undefined,
       connect: () => {
         setImmediate(() => runtime.stop());
         return socket;
@@ -482,4 +493,120 @@ test("stop ends the socket and lets run finish", async () => {
   await runtime.run();
 
   assert.equal(sockets[0].ended, true);
+});
+
+test("the link code is offered only while the account waits for it, and goes when it is linked", async () => {
+  const seen: Array<string | undefined> = [];
+  const { runtime } = harness([
+    (socket) => {
+      seen.push(runtime.linkCode());
+      socket.emit("connection.update", { qr: "CODE-1" });
+      seen.push(runtime.linkCode());
+      socket.emit("connection.update", { qr: "CODE-2" });
+      seen.push(runtime.linkCode());
+      open(socket);
+      seen.push(runtime.linkCode());
+      runtime.stop();
+    },
+  ], { linked: false });
+
+  await runtime.run();
+
+  assert.deepEqual(seen, [undefined, "CODE-1", "CODE-2", undefined]);
+});
+
+test("a session reset while waiting for the link erases the session and asks for a new code", async () => {
+  const seen: Array<string | undefined> = [];
+  const { runtime, sockets, wiped } = harness([
+    (socket) => {
+      socket.emit("connection.update", { qr: "CODE-1" });
+      setTimeout(() => void runtime.resetSession(), 10);
+    },
+    (socket) => {
+      socket.emit("connection.update", { qr: "CODE-2" });
+      seen.push(runtime.linkCode());
+      runtime.stop();
+    },
+  ], { linked: false });
+
+  await runtime.run();
+
+  assert.deepEqual(wiped, ["/auth/test"]);
+  assert.equal(sockets.length, 2);
+  assert.deepEqual(seen, ["CODE-2"]);
+  assert.equal(sockets[0].loggedOut, false, "an account that was never linked has nothing to log out of");
+});
+
+test("a session reset after a logout starts over without logging out again", async () => {
+  let seen: ReturnType<WhatsAppRuntime["status"]> | undefined;
+  const { runtime, sockets, wiped } = harness([
+    (socket) => {
+      socket.close(disconnectReason.loggedOut);
+      setTimeout(() => {
+        seen = runtime.status();
+        void runtime.resetSession();
+      }, 10);
+    },
+    (socket) => {
+      socket.emit("connection.update", { qr: "CODE-1" });
+      runtime.stop();
+    },
+  ], { linked: false });
+
+  await runtime.run();
+
+  assert.equal(seen?.state, "logged_out");
+  assert.deepEqual(wiped, ["/auth/test"]);
+  assert.equal(sockets.length, 2);
+  assert.equal(sockets[0].loggedOut, false);
+});
+
+test("a session reset while connected unlinks the device on WhatsApp's side first", async () => {
+  const { runtime, sockets, wiped } = harness([
+    (socket) => {
+      open(socket);
+      setTimeout(() => void runtime.resetSession(), 10);
+    },
+    (socket) => {
+      socket.emit("connection.update", { qr: "CODE-1" });
+      runtime.stop();
+    },
+  ]);
+
+  await runtime.run();
+
+  assert.equal(sockets[0].loggedOut, true);
+  assert.deepEqual(wiped, ["/auth/test"]);
+  assert.equal(sockets.length, 2);
+});
+
+test("a session that cannot be erased is reported and the loop goes on", async () => {
+  const errors: string[] = [];
+  const socket = new FakeSocket();
+  let connections = 0;
+  const runtime = createWhatsAppRuntime(
+    { orchestratorEndpoint: "http://o", orchestratorTimeoutMs: 1000, selfChat: true, allowedNumbers: [], allowedGroups: [], authDir: "/auth/test" },
+    {
+      loadAuth: async () => ({ state: { creds: { me: undefined } }, saveCreds: async () => undefined }),
+      wipeAuth: async () => {
+        throw new Error("read-only folder");
+      },
+      connect: () => {
+        connections += 1;
+        if (connections === 1) {
+          setTimeout(() => void runtime.resetSession(), 10);
+        } else {
+          setImmediate(() => runtime.stop());
+        }
+        return socket;
+      },
+      renderQr: () => undefined,
+      error: (...args) => errors.push(args.join(" ")),
+    },
+  );
+
+  await runtime.run();
+
+  assert.equal(connections, 2);
+  assert.match(errors.join("\n"), /could not erase the session.*read-only folder/);
 });
