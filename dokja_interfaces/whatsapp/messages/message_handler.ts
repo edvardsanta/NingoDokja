@@ -7,6 +7,9 @@ export const maxReplyLength = 8000;
 export const failureReply = "I could not reach the orchestrator right now. Try again in a moment.";
 // Messages that arrive late (the bot was offline or reconnecting) are not answered.
 export const maxMessageAgeMs = 5 * 60_000;
+// "Typing" is shown only when the answer is slow. An interface that is switched off in the desktop
+// is skipped by the orchestrator at once, and must not make the chat flash "typing" first.
+export const typingDelayMs = 1000;
 
 export type WhatsAppMessageConfig = Pick<
   WhatsAppConfig,
@@ -39,6 +42,7 @@ export type WhatsAppMessageContext = {
 export type WhatsAppMessageHandler = (context: WhatsAppMessageContext) => Promise<void>;
 
 type Dependencies = {
+  typingDelayMs?: number;
   dispatch?: typeof dispatchToOrchestrator;
   recent?: RecentKeys;
   now?: () => number;
@@ -81,7 +85,17 @@ export function createWhatsAppMessageHandler(
     }));
 
     let reply: string;
-    await context.typing(true).catch(() => undefined);
+    let typing = false;
+    const typingTimer = setTimeout(() => {
+      typing = true;
+      void context.typing(true).catch(() => undefined);
+    }, deps.typingDelayMs ?? typingDelayMs);
+    const stopTyping = async () => {
+      clearTimeout(typingTimer);
+      if (typing) {
+        await context.typing(false).catch(() => undefined);
+      }
+    };
     try {
       reply = await dispatch(
         config.orchestratorEndpoint,
@@ -99,12 +113,12 @@ export function createWhatsAppMessageHandler(
         messageId: context.messageId,
         error: error instanceof Error ? error.message : String(error),
       }));
-      await context.typing(false).catch(() => undefined);
+      await stopTyping();
       await context.reply(failureReply);
       return;
     }
 
-    await context.typing(false).catch(() => undefined);
+    await stopTyping();
     if (!reply.trim()) {
       deps.log?.(JSON.stringify({ message: "completed", messageId: context.messageId, replyLength: 0 }));
       return;
