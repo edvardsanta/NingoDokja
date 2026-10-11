@@ -4,6 +4,7 @@ import { createInteractionDefinitions } from "./commands/interactions.js";
 import { startDiscordDeliveryServer } from "./delivery/delivery_server.js";
 import { createDiscordMessageHandler } from "./messages/message_listener.js";
 import { startDiscordJsRuntime } from "./runtime/discordjs_runtime.js";
+import { createGatewayState, discordStatusReply } from "./runtime/gateway_state.js";
 import { createDiscordVoiceController } from "./voice/voice.js";
 
 export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig): Promise<void> {
@@ -11,6 +12,8 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     log: (...args: unknown[]) => console.log("[dokja-discord]", ...args),
     error: (...args: unknown[]) => console.error("[dokja-discord]", ...args),
   };
+
+  const gateway = createGatewayState();
 
   const voice = createDiscordVoiceController({
     token,
@@ -55,6 +58,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
       token,
       port: cfg.deliveryPort,
       webhooks: cfg.deliveryWebhooks,
+      status: () => discordStatusReply(gateway.get()),
       log: runtime.log,
       error: runtime.error,
     });
@@ -75,6 +79,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     log: runtime.log,
     error: runtime.error,
     commands,
+    gateway,
     buttons: interactions.buttons,
     selects: interactions.selects,
     modals: interactions.modals,

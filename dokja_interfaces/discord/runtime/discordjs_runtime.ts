@@ -35,6 +35,7 @@ import type {
   DiscordSelectContext,
   DiscordSlashCommand,
 } from "../types.js";
+import { trackGatewayState, type GatewayStateTracker } from "./gateway_state.js";
 
 type StartDiscordJsRuntimeParams = {
   token: string;
@@ -48,6 +49,8 @@ type StartDiscordJsRuntimeParams = {
   selects?: DiscordSelectAction[];
   modals?: DiscordModalAction[];
   onReady?: (client: Client, meta: { botUserId?: string }) => Promise<void> | void;
+  // Told whether the gateway is connected, for the interface's status.
+  gateway?: GatewayStateTracker;
 };
 
 export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams): Promise<void> {
@@ -141,6 +144,9 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
   client.on(Events.Error, (error) => {
     params.error?.("[dokja-discord] discord.js runtime error", error);
   });
+  if (params.gateway) {
+    trackGatewayState(client, params.gateway);
+  }
 
   await client.login(params.token);
 }
