@@ -482,6 +482,12 @@ heading, with their state and a switch each. See the interface docs for each sta
 - `ningo.status` is not authenticated and the request port is published, so it carries only these
   states. Anything that would carry a link code, history or a send travels under the
   `communications.` event types, which need the communications credential.
+- **WhatsApp conversations in the communications tab.** Name them in `DOKJA_WHATSAPP_CONVERSATIONS`
+  (`alias=<number or group id>`); only those are recorded, as text, in the `dokja-whatsapp-history`
+  volume for `DOKJA_WHATSAPP_HISTORY_DAYS` days (30 by default). The orchestrator reads them from the
+  interface's status address and lists them as `whatsapp:<alias>` next to the Discord channels,
+  behind the communications credential. A named group records every member's text. To erase the
+  history now, remove that volume.
 - **Linking WhatsApp from the desktop** uses `communications.link.status`, `.start` and `.reset`. They
   need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and on the desktop process; the desktop
   draws the code itself and never shows it as text. The orchestrator derives the link routes from

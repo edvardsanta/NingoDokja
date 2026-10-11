@@ -86,6 +86,9 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_WHATSAPP_ALLOWED_GROUPS` | WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated |
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
+| `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing |
+| `DOKJA_WHATSAPP_HISTORY_DIR` | WhatsApp interface | Folder of the recorded text. Required when a conversation is named; `/history` (its own volume) in Compose |
+| `DOKJA_WHATSAPP_HISTORY_DAYS` | WhatsApp interface | How long the text is kept, 1 to 365 days, default `30` |
 | `DOKJA_WHATSAPP_STATUS_PORT` | WhatsApp interface | Internal port that answers the interface's state, default `8094`. Never published |
 | `WHATSAPP_INTERFACE_STATUS_ENDPOINT` | Orchestrator | `http://dokja-whatsapp:8094/status` in Compose. Empty (the default) means the desktop does not list WhatsApp |
 
@@ -181,6 +184,40 @@ How the code is handled:
 
 The code is the way to attach a device to the account, so show it only on the screen of the person
 who is linking.
+
+## Conversations in the Desktop
+
+WhatsApp has no history to read from a server, so what the desktop shows is what this interface
+recorded itself. It records **only the conversations you name**:
+
+```text
+DOKJA_WHATSAPP_CONVERSATIONS=family=<phone number>,project=<group id>
+```
+
+The alias is the only name that ever leaves the interface for a conversation: the desktop lists it as
+"WhatsApp · family", and the number or the group id is never sent, listed or asked for.
+
+What is recorded, for a named conversation only:
+
+- the text, who wrote it as a label (`owner`, `bot`, `contact` or `member`), and when
+- messages that arrive whether or not the bot answers them, what the bot sends, and what you type in
+  that chat on the phone
+- never media, a phone number or a name; a message is cut at 4000 characters, a conversation keeps at
+  most 2000 messages, and what is older than `DOKJA_WHATSAPP_HISTORY_DAYS` is forgotten at start-up
+  and once a day
+
+In a named **group** every member's text is recorded, not only the messages that mention the bot, so
+name a group only when its members would expect that. The folder is readable by its owner only and
+lives in its own volume (`dokja-whatsapp-history`); to erase it now, remove the volume or the
+`<alias>.jsonl` file. Removing an alias stops recording and listing it; the file is dropped when its
+text passes the retention.
+
+The internal listener answers two more read routes, `GET /conversations` (aliases and the
+retention) and `GET /history?alias=..&before=..` (a page of 30, shaped like a page of Discord
+messages). The orchestrator relays them under the existing `communications.channels` and
+`communications.history` actions, so they sit behind the communications credential and the desktop
+shows them in the communications tab. An alias that is not named, and a cursor that is not a number,
+are refused before anything is read. Sending to a conversation from the desktop is not available yet.
 
 ## Reconnection
 
