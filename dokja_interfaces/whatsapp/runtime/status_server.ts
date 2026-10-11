@@ -1,6 +1,7 @@
-import { createServer, type Server, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import type { HistoryEntry } from "../history/store.js";
+import type { DeliverOutcome } from "../messages/desk_sender.js";
 import { qrRows } from "./qr.js";
 import type { InterfaceState, RuntimeStatus } from "./whatsapp_runtime.js";
 
@@ -31,11 +32,15 @@ export type ConversationControls = {
   page: (alias: string, before?: number) => Promise<{ messages: HistoryEntry[]; before: string }>;
 };
 
+// Sends what the owner typed in the desktop into a named conversation, by its alias.
+export type DeliverControls = (alias: string, text: string) => Promise<DeliverOutcome>;
+
 type Options = {
   port: number;
   status: () => RuntimeStatus;
   link?: LinkControls;
   conversations?: ConversationControls;
+  deliver?: DeliverControls;
   log?: (...args: unknown[]) => void;
 };
 
@@ -49,6 +54,9 @@ export function startStatusServer(options: Options): Server {
     }
     if (request.method === "GET" && request.url === "/health") {
       return reply(response, 200, { status: "ok" });
+    }
+    if (options.deliver && request.method === "POST" && request.url === "/deliver") {
+      return deliver(request, response, options.deliver);
     }
     if (options.conversations && request.method === "GET") {
       const url = new URL(request.url ?? "/", "http://internal");
@@ -87,6 +95,60 @@ export function startStatusServer(options: Options): Server {
     options.log?.(JSON.stringify({ status: "listening", port: options.port }));
   });
   return server;
+}
+
+const maxDeliverBody = 8 * 1024;
+const maxDeliverChars = 2000;
+const deliverStatus: Record<DeliverOutcome, [number, string]> = {
+  sent: [200, "ok"],
+  not_named: [404, "not found"],
+  not_connected: [409, "the account is not connected"],
+  limited: [429, "too many messages; wait a moment"],
+  failed: [502, "the message could not be sent"],
+};
+
+// POST /deliver {alias, content}. Only text, only into a conversation the owner named, and under a
+// fixed budget. What went wrong is a fixed sentence: nothing of the chat is echoed.
+async function deliver(request: IncomingMessage, response: ServerResponse, send: DeliverControls): Promise<void> {
+  let body: unknown;
+  try {
+    body = JSON.parse(await readBody(request));
+  } catch (error) {
+    if (error instanceof TooLarge) {
+      return reply(response, 413, { status: "error", message: "the body is too large" });
+    }
+    return reply(response, 400, { status: "error", message: "the body must be a small JSON object" });
+  }
+  const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const alias = typeof record.alias === "string" ? record.alias : "";
+  const content = typeof record.content === "string" ? record.content.trim() : "";
+  if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(alias) || !content || content.length > maxDeliverChars || content.includes("\u0000")) {
+    return reply(response, 400, { status: "error", message: "alias and text (up to 2000 characters) are required" });
+  }
+  const outcome = await send(alias, content);
+  const [code, message] = deliverStatus[outcome];
+  return reply(response, code, outcome === "sent" ? { status: "ok", alias } : { status: "error", message });
+}
+
+class TooLarge extends Error {}
+
+// Reads the body up to a limit. What is past it is drained and dropped, so the caller can still answer.
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    let tooLarge = false;
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxDeliverBody) {
+        tooLarge = true;
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => (tooLarge ? reject(new TooLarge()) : resolve(Buffer.concat(chunks).toString("utf8"))));
+    request.on("error", reject);
+  });
 }
 
 // A page of the recorded text of one named conversation, shaped like a page of Discord messages so the

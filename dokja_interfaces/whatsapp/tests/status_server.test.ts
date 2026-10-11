@@ -219,3 +219,74 @@ test("without named conversations the routes do not exist", async () => {
     assert.equal((await fetch(`${base}/history?alias=friend`)).status, 404);
   });
 });
+
+async function withDeliver(
+  deliver: (alias: string, text: string) => Promise<"sent" | "not_named" | "not_connected" | "limited" | "failed">,
+  run: (post: (body: unknown) => Promise<Response>) => Promise<void>,
+) {
+  const server = startStatusServer({ port: 0, status: () => ({ state: "connected", detail: "" }), deliver });
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const { port } = server.address() as AddressInfo;
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    await run((body) => fetch(`${base}/deliver`, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) }));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+test("a delivery names a conversation by alias, and the answer says only whether it went out", async () => {
+  const asked: Array<[string, string]> = [];
+  await withDeliver(async (alias, text) => {
+    asked.push([alias, text]);
+    return "sent";
+  }, async (post) => {
+    const answer = await post({ alias: "friend", content: "  hello there  ", jid: "5511987654321@s.whatsapp.net" });
+
+    assert.equal(answer.status, 200);
+    assert.deepEqual(await answer.json(), { status: "ok", alias: "friend" });
+  });
+
+  assert.deepEqual(asked, [["friend", "hello there"]]);
+});
+
+test("every outcome that is not a send has its own status and a fixed sentence", async () => {
+  for (const [outcome, code] of [["not_named", 404], ["not_connected", 409], ["limited", 429], ["failed", 502]] as const) {
+    await withDeliver(async () => outcome, async (post) => {
+      const answer = await post({ alias: "friend", content: "hello" });
+      assert.equal(answer.status, code, outcome);
+      const text = await answer.text();
+      assert.ok(!text.includes("friend") && !text.includes("hello"), "nothing of the request is echoed");
+    });
+  }
+});
+
+test("a delivery with a bad alias, no text, too much text or a body that is not JSON is refused unread", async () => {
+  const asked: string[] = [];
+  await withDeliver(async (alias) => {
+    asked.push(alias);
+    return "sent";
+  }, async (post) => {
+    for (const body of [
+      { alias: "../friend", content: "x" },
+      { alias: "Friend", content: "x" },
+      { alias: "friend", content: "   " },
+      { alias: "friend", content: "x".repeat(2001) },
+      { alias: "friend", content: "a\u0000b" },
+      { alias: "friend" },
+      "not json",
+      "[]",
+    ]) {
+      assert.equal((await post(body)).status, 400, JSON.stringify(body).slice(0, 40));
+    }
+    assert.equal((await post("x".repeat(20_000))).status, 413);
+  });
+
+  assert.deepEqual(asked, []);
+});
+
+test("without a way to deliver the route does not exist", async () => {
+  await withConversations(undefined, async (base) => {
+    assert.equal((await fetch(`${base}/deliver`, { method: "POST", body: "{}" })).status, 404);
+  });
+});

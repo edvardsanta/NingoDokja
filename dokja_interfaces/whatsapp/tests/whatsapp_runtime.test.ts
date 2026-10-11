@@ -640,3 +640,50 @@ test("the recorder hears every message that arrives and what the bot sends, with
 
   assert.deepEqual(heard, [["in", "hello"], ["out", "an answer|BOTID"]]);
 });
+
+test("sendText goes out only while connected, with an id the interface remembers, and gives that id", async () => {
+  const refusals: string[] = [];
+  const { runtime, sockets } = harness([
+    async (socket) => {
+      await runtime.sendText("5511987654321@s.whatsapp.net", "too early").catch((error: Error) => refusals.push(error.message));
+      open(socket);
+      const id = await runtime.sendText("5511987654321@s.whatsapp.net", "hello from the desktop");
+      refusals.push(`id=${id}`);
+      runtime.stop();
+    },
+  ]);
+
+  await runtime.run();
+
+  assert.deepEqual(refusals, ["the account is not connected", "id=BOTID"]);
+  assert.deepEqual(
+    sockets[0].sendCalls.map((call) => [call.jid, call.text, call.options?.messageId]),
+    [["5511987654321@s.whatsapp.net", "hello from the desktop", "BOTID"]],
+  );
+});
+
+test("the echo of a desktop send is recognised even when it arrives before the send call returns", async () => {
+  const echoes: boolean[] = [];
+  const { runtime } = harness([
+    async (socket) => {
+      open(socket);
+      const original = socket.sendMessage.bind(socket);
+      socket.sendMessage = async (jid, content, options) => {
+        // WhatsApp can deliver the sent message back before the call that sent it has returned.
+        socket.emit("messages.upsert", {
+          type: "notify",
+          messages: [{ key: { id: options?.messageId, remoteJid: jid, fromMe: true }, message: { conversation: content.text } }],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        return original(jid, content, options);
+      };
+      await runtime.sendText("5511987654321@s.whatsapp.net", "from the desktop");
+      setTimeout(() => runtime.stop(), 20);
+    },
+  ], { handler: async (context) => void echoes.push(context.sentByBot) });
+
+  await runtime.run();
+
+  // The handler may not see it at all (it is recognised as the bot's own); if it does, it is flagged.
+  assert.ok(echoes.every((flag) => flag === true), `echo seen as not the bot's own: ${JSON.stringify(echoes)}`);
+});
