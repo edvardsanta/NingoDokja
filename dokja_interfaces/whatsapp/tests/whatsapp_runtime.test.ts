@@ -8,6 +8,7 @@ import {
   disconnectReason,
   type AuthBundle,
   type SocketEvents,
+  type WhatsAppRuntime,
   type WhatsAppSocketLike,
 } from "../runtime/whatsapp_runtime.js";
 
@@ -104,17 +105,19 @@ function harness(
 const open = (socket: FakeSocket) => socket.emit("connection.update", { connection: "open" });
 
 test("the link code is drawn and the log only says that the link is waited for", async () => {
+  let seen = "";
   const { runtime, qrs, logs } = harness([
-    (socket, auth) => {
-      (auth.state.creds as { me?: unknown }).me = undefined;
+    (socket) => {
       socket.emit("connection.update", { qr: "SECRET-QR-PAYLOAD" });
-      socket.close(disconnectReason.loggedOut);
+      seen = runtime.status().state;
+      runtime.stop();
     },
   ], { linked: false });
 
-  await assert.rejects(runtime.run());
+  await runtime.run();
 
   assert.deepEqual(qrs, ["SECRET-QR-PAYLOAD"]);
+  assert.equal(seen, "waiting_for_link");
   assert.doesNotMatch(logs.join("\n"), /SECRET-QR-PAYLOAD/);
   assert.match(logs.join("\n"), /waiting for the link/);
 });
@@ -269,44 +272,122 @@ test("the wait between retries is capped", async () => {
   assert.equal(Math.max(...sleeps), 60_000);
 });
 
-test("a session logged out from the phone stops the service instead of retrying", async () => {
-  const { runtime, sockets, sleeps } = harness([(socket) => socket.close(disconnectReason.loggedOut)]);
+test("a session logged out from the phone is reported and the service keeps running", async () => {
+  let seen: ReturnType<WhatsAppRuntime["status"]> | undefined;
+  const { runtime, sockets, sleeps, logs } = harness([
+    (socket) => {
+      socket.close(disconnectReason.loggedOut);
+      setTimeout(() => {
+        seen = runtime.status();
+        runtime.stop();
+      }, 20);
+    },
+  ]);
 
-  await assert.rejects(runtime.run(), /logged out/);
+  await runtime.run();
 
+  assert.equal(seen?.state, "logged_out");
+  assert.match(seen?.detail ?? "", /link again/);
   assert.equal(sockets.length, 1);
   assert.deepEqual(sleeps, []);
+  assert.match(logs.join("\n"), /"whatsapp":"logged_out"/);
 });
 
-test("a session taken over by another connection stops the service instead of fighting for it", async () => {
-  const { runtime, sockets } = harness([(socket) => socket.close(disconnectReason.connectionReplaced)]);
+test("a session taken over by another connection is reported instead of fought for", async () => {
+  let seen: ReturnType<WhatsAppRuntime["status"]> | undefined;
+  const { runtime, sockets } = harness([
+    (socket) => {
+      socket.close(disconnectReason.connectionReplaced);
+      setTimeout(() => {
+        seen = runtime.status();
+        runtime.stop();
+      }, 20);
+    },
+  ]);
 
-  await assert.rejects(runtime.run(), /Another connection/);
+  await runtime.run();
 
+  assert.equal(seen?.state, "replaced");
   assert.equal(sockets.length, 1);
 });
 
-test("a link code that was shown but never scanned stops the service, with the status", async () => {
-  const { runtime, sockets } = harness([
+test("a link code nobody scanned is followed by a new one, less and less often", async () => {
+  const unscanned: Script = (socket) => {
+    socket.emit("connection.update", { qr: "QR" });
+    socket.close(408);
+  };
+  const { runtime, sockets, sleeps, logs } = harness([
+    unscanned,
+    unscanned,
+    unscanned,
     (socket) => {
       socket.emit("connection.update", { qr: "QR" });
-      socket.close(408);
+      runtime.stop();
     },
   ], { linked: false });
 
-  await assert.rejects(runtime.run(), /not linked in time \(status 408\)/);
+  await runtime.run();
+
+  assert.equal(sockets.length, 4);
+  assert.deepEqual(sleeps, [5000, 10_000, 20_000]);
+  assert.match(logs.join("\n"), /"whatsapp":"link code expired","status":"408","newCodeInMs":5000/);
+});
+
+test("a client WhatsApp refuses before any link code is reported with the status, and can be retried", async () => {
+  let seen: ReturnType<WhatsAppRuntime["status"]> | undefined;
+  const refused: Script = (socket) => socket.close(405);
+  const { runtime, sockets, sleeps } = harness([
+    refused,
+    refused,
+    refused,
+    refused,
+    (socket) => {
+      socket.close(405);
+      setTimeout(() => {
+        seen = runtime.status();
+        runtime.restart();
+      }, 20);
+    },
+    () => runtime.stop(),
+  ], { linked: false });
+
+  await runtime.run();
+
+  assert.equal(seen?.state, "refused");
+  assert.match(seen?.detail ?? "", /5 times .*status 405.*upgrade/);
+  assert.equal(sockets.length, 6);
+  assert.deepEqual(sleeps, [1000, 2000, 4000, 8000]);
+});
+
+test("restart does nothing while the service is not waiting", async () => {
+  const { runtime, sockets } = harness([
+    (socket) => {
+      open(socket);
+      runtime.restart();
+      setTimeout(() => runtime.stop(), 10);
+    },
+  ]);
+
+  await runtime.run();
 
   assert.equal(sockets.length, 1);
 });
 
-test("a client WhatsApp refuses before any link code stops the service and names the status", async () => {
-  const refused: Script = (socket) => socket.close(405);
-  const { runtime, sockets, sleeps } = harness(Array.from({ length: 6 }, () => refused), { linked: false });
+test("the state follows the connection and ends off", async () => {
+  const seen: string[] = [];
+  const { runtime } = harness([
+    (socket) => {
+      seen.push(runtime.status().state);
+      open(socket);
+      seen.push(runtime.status().state);
+      runtime.stop();
+    },
+  ]);
 
-  await assert.rejects(runtime.run(), (error: Error) => /5 times \(status 405\)/.test(error.message) && /upgrade/.test(error.message));
+  await runtime.run();
+  seen.push(runtime.status().state);
 
-  assert.equal(sockets.length, 5);
-  assert.deepEqual(sleeps, [1000, 2000, 4000, 8000]);
+  assert.deepEqual(seen, ["connecting", "connected", "off"]);
 });
 
 test("a few failures before the first link code are retried, as a network may not be ready yet", async () => {
