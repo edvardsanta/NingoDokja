@@ -123,6 +123,48 @@ func (c *WhatsAppConversationsClient) History(ctx context.Context, alias, before
 	return map[string]any{"messages": messages, "before": next}, nil
 }
 
+// deliverMessages say why a delivery was not made. They are fixed sentences chosen from the status
+// code, so nothing of the request or of the interface's reply is ever echoed.
+var deliverMessages = map[int]string{
+	http.StatusBadRequest:      "the text was not accepted",
+	http.StatusNotFound:        "that conversation is not named on the interface",
+	http.StatusConflict:        "the WhatsApp account is not connected",
+	http.StatusTooManyRequests: "too many messages: wait a moment before sending again",
+}
+
+// Deliver sends text into a named conversation, as the linked account. The interface enforces the
+// alias, the length and the budget; this only carries the request.
+func (c *WhatsAppConversationsClient) Deliver(ctx context.Context, alias, content string) error {
+	if c == nil || c.httpClient == nil {
+		return fmt.Errorf("whatsapp conversations client is not configured")
+	}
+	if !conversationAlias.MatchString(alias) || strings.TrimSpace(content) == "" {
+		return fmt.Errorf("invalid whatsapp delivery")
+	}
+	body, err := json.Marshal(map[string]string{"alias": alias, "content": content})
+	if err != nil {
+		return fmt.Errorf("encode whatsapp delivery: %w", err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/deliver", strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("build whatsapp delivery: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("the WhatsApp interface did not answer")
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, conversationsMaxBody))
+	if response.StatusCode == http.StatusOK {
+		return nil
+	}
+	if message, ok := deliverMessages[response.StatusCode]; ok {
+		return fmt.Errorf("%s", message)
+	}
+	return fmt.Errorf("the message could not be sent")
+}
+
 func (c *WhatsAppConversationsClient) get(ctx context.Context, path string, into any) error {
 	if c == nil || c.httpClient == nil {
 		return fmt.Errorf("whatsapp conversations client is not configured")

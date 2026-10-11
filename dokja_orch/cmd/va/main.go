@@ -78,8 +78,11 @@ func main() {
 		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
 		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
 	)
-	if conversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); conversations != nil {
-		communicationsHandler.WithConversations(conversations)
+	// A nil client must stay a nil interface, so "not configured" is still seen as such.
+	var whatsappSender handlers.WhatsAppSender
+	if whatsappConversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); whatsappConversations != nil {
+		communicationsHandler.WithConversations(whatsappConversations)
+		whatsappSender = whatsappConversations
 	}
 
 	service := core.DefaultService(
@@ -95,7 +98,7 @@ func main() {
 			"knowledge": handlers.StatusProbe(knowledgeClient),
 			"memory":    handlers.StatusProbe(memoryClient),
 			"feeds":     handlers.FeedsProbe(feedsClient),
-		}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks),
+		}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),

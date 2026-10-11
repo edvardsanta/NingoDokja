@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	communications "read_books/dokja_domain/dokja_communications"
 	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -78,6 +79,7 @@ type SystemDomainHandler struct {
 	probes           map[string]ServiceProbe
 	interfaceProbes  map[string]InterfaceProbe
 	links            map[string]InterfaceLinker
+	whatsapp         WhatsAppSender
 }
 
 func NewSystemDomainHandler(
@@ -106,9 +108,12 @@ func (h *SystemDomainHandler) WithSafeOnlyChannels(channels string) *SystemDomai
 	return h
 }
 
-// interfaceOfChannel names the interface a delivery channel belongs to. Every delivery channel is
-// a Discord channel id today; the name is how the interface switch finds it.
-func interfaceOfChannel(string) string {
+// interfaceOfChannel names the interface a delivery channel belongs to. A channel without a
+// prefix is a Discord channel id.
+func interfaceOfChannel(channelID string) string {
+	if strings.HasPrefix(channelID, communications.WhatsAppPrefix) {
+		return "whatsapp"
+	}
 	return "discord"
 }
 
@@ -425,6 +430,9 @@ func (h *SystemDomainHandler) deliverAttachment(ctx context.Context, channelID, 
 // accepts channels the orchestrator already delivers to, so the request port cannot
 // be used to post anywhere the bot can reach.
 func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
+	if channels := stringSlice(event.Payload["channel_ids"]); anyWhatsApp(channels) {
+		return h.handleWhatsAppSend(ctx, event, workflow, channels)
+	}
 	if h.discord == nil {
 		return nil, fmt.Errorf("discord deliverer is not configured")
 	}

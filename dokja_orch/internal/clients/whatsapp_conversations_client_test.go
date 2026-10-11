@@ -112,3 +112,47 @@ func TestConversationsFailuresAreErrorsAndNilIsNotConfigured(t *testing.T) {
 		t.Fatal("no address must give no client")
 	}
 }
+
+func TestDeliverPostsTheAliasAndTextAndMapsEachRefusalToAFixedSentence(t *testing.T) {
+	for status, want := range map[int]string{
+		http.StatusBadRequest:      "the text was not accepted",
+		http.StatusNotFound:        "not named",
+		http.StatusConflict:        "not connected",
+		http.StatusTooManyRequests: "too many messages",
+		http.StatusBadGateway:      "could not be sent",
+	} {
+		client, seen := conversationsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(`{"message":"leaky 5511987654321 detail"}`))
+		})
+
+		err := client.Deliver(context.Background(), "friend", "a private sentence")
+
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("status %d: expected %q, got %v", status, want, err)
+		}
+		if strings.Contains(err.Error(), "5511987654321") || strings.Contains(err.Error(), "private") {
+			t.Fatalf("status %d: the error must not echo anything, got %v", status, err)
+		}
+		if len(*seen) != 1 || (*seen)[0] != "POST /deliver" {
+			t.Fatalf("unexpected requests %v", *seen)
+		}
+	}
+}
+
+func TestDeliverSucceedsOn200AndRefusesABadAliasBeforeSending(t *testing.T) {
+	client, seen := conversationsServer(t, func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"status": "ok"}) })
+
+	if err := client.Deliver(context.Background(), "friend", "hello"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Deliver(context.Background(), "../friend", "hello"); err == nil {
+		t.Fatal("a bad alias must be refused")
+	}
+	if err := client.Deliver(context.Background(), "friend", "   "); err == nil {
+		t.Fatal("empty text must be refused")
+	}
+	if len(*seen) != 1 {
+		t.Fatalf("only the valid request is sent, saw %v", *seen)
+	}
+}
