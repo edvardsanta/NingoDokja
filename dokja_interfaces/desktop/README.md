@@ -62,8 +62,10 @@ Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127
 
 The communications tab also lists the WhatsApp conversations the owner named on the interface
 (`DOKJA_WHATSAPP_CONVERSATIONS`), as "WhatsApp · alias". Their text is what the interface recorded
-itself, shown with who wrote in words and a note on how long it stays on the machine. There is no
-composer for them yet. The chat itself is never named: only its alias reaches the desktop.
+itself, shown with who wrote in words and a note on how long it stays on the machine. The composer of
+one sends text only, as the owner, from the linked account: the shell asks in a window of its own,
+naming the conversation by its alias, and the interface keeps a fixed budget (6 a minute, 40 an
+hour). The chat itself is never named: only its alias reaches the desktop.
 
 ## Linking WhatsApp
 

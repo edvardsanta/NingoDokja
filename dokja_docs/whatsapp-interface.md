@@ -217,7 +217,27 @@ retention) and `GET /history?alias=..&before=..` (a page of 30, shaped like a pa
 messages). The orchestrator relays them under the existing `communications.channels` and
 `communications.history` actions, so they sit behind the communications credential and the desktop
 shows them in the communications tab. An alias that is not named, and a cursor that is not a number,
-are refused before anything is read. Sending to a conversation from the desktop is not available yet.
+are refused before anything is read.
+
+### Sending from the desktop
+
+The composer of a named conversation sends text **as you**, through the linked account. It is the
+one place where this interface writes to a chat on its own, so it is the strictest:
+
+- **Text only, one conversation at a time**, by alias, up to 2000 characters. The chat is found by the
+  alias in the interface's own configuration; a number or a group id in the request is never used.
+- **A fixed budget**: 6 messages a minute and 40 an hour, for all conversations together. It is not
+  a setting. A burst of automated messages is what gets a number restricted, so a message past the
+  budget is refused ("too many messages") and a refused message costs nothing from it.
+- **Confirmed in a window the shell opens**, naming the conversation by its alias and showing the
+  exact text, and only just after a real click or key press. The page cannot ask on its own.
+- **Only through `communications.send`**, behind the communications credential: not `discord.send`,
+  not the scheduler, and never "all". The WhatsApp switch in the health tab turns it off too.
+- Nothing is sent while the account is not `connected`.
+
+What was sent is recorded in the conversation as yours, with the id it went out with. The route
+behind it is `POST /deliver` on the internal listener; its answers are fixed sentences and never echo
+the request.
 
 ## Reconnection
 

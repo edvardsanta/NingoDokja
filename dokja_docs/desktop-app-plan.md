@@ -333,9 +333,9 @@ provider address the shell deliberately strips).
 
 ## Interfaces increment (2026-10-11)
 
-Status: proposed. Increments 1 (branch `feat/interfaces-health`), 2 (`feat/desktop-whatsapp-link`)
-and 3 (`feat/whatsapp-conversations`) are built; 4 is ordered but not started. Each increment is its
-own branch, stacked in this order.
+Status: all four increments are built: 1 (branch `feat/interfaces-health`), 2
+(`feat/desktop-whatsapp-link`), 3 (`feat/whatsapp-conversations`) and 4 (`feat/whatsapp-send`). Each
+increment is its own branch, stacked in this order. Nothing has been linked to a real account.
 
 The Switches increment made the desktop the one place from which the operator runs Ningo. The people
 talk to Ningo through the Discord and WhatsApp interfaces, so the desktop should show their
@@ -411,6 +411,11 @@ interface answers `GET /conversations` and `GET /history`; the communications do
   A bare numeric id still means Discord, so existing clients and requests do not change.
 
 ### Increment 4: send from the desktop
+
+Built. `POST /deliver` on the interface (alias and text, one named conversation, 6 a minute and 40 an
+hour), `communications.send` accepting one `whatsapp:<alias>` target in the orchestrator (only that
+event type, text only, never "all", the alias must be one the interface names), a text-only composer,
+and a confirmation window that names the alias and says the message leaves from the owner's account.
 
 - `communications.send` accepts `whatsapp:<alias>`; the interface delivers only to its aliases, at a
   low fixed rate, text only and up to the same length as Discord. The shell confirms the alias and the
