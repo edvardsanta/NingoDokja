@@ -69,6 +69,8 @@ keywords = ["http"]
     '''^https?://\.\.\.$''',
     # The XML namespace of SVG: an identifier that is written in the file, never a request.
     '''(?i)^https?://www\.w3\.org/2000/svg$''',
+    # The ai-memory project, linked from the routing block that `ai-memory install-instructions` writes into AGENTS.md.
+    '''^https://github\.com/akitaonrails/ai-memory$''',
     # The scheme named in a sentence ("starts with http:// or https://."), with no address after it.
     '''^https?://\.$''',
   ]

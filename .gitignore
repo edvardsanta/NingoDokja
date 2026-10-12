@@ -75,3 +75,9 @@ feeds_plugins/
 
 # Knowledge base plugins are user-owned and kept out of the repository
 dokja_services/dokja_knowledge/plugins.local/
+
+# Agent worktrees live inside the repository
+.worktrees/
+
+# ai-memory regenerates its managed skills (ai-memory install-instructions)
+.agents/skills/ai-memory-*/
