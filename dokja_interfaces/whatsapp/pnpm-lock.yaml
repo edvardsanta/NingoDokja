@@ -11,12 +11,12 @@ importers:
       baileys:
         specifier: 7.0.0-rc14
         version: 7.0.0-rc14(sharp@0.35.5)
-      qrcode-terminal:
-        specifier: 0.12.0
-        version: 0.12.0
       tsx:
         specifier: ^4.21.0
         version: 4.23.15
+      uqr:
+        specifier: 0.1.3
+        version: 0.1.3
 
 packages:
 
@@ -526,10 +526,6 @@ packages:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
 
-  qrcode-terminal@0.12.0:
-    resolution: {integrity: sha512-EXtzRZmC+YGmGlDFbXKxQiMZNwCLEO6BANKXG4iCtSIM0yqc/pappSx3RIKr4r0uh5JsBckOXeKrB3Iz7mdQpQ==}
-    hasBin: true
-
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
@@ -587,6 +583,9 @@ packages:
 
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
 
   whatsapp-rust-bridge@0.5.4:
     resolution: {integrity: sha512-yYO1qSs0Fe7tGtnxOFHomocUD6IZtoAgmA4oDFyGIRZ67D3QZk3w7swA6XXFXNQngiyrg2k7tul6IrM3eUFh7A==}
@@ -1043,8 +1042,6 @@ snapshots:
     dependencies:
       hookified: 2.2.0
 
-  qrcode-terminal@0.12.0: {}
-
   quick-format-unescaped@4.0.4: {}
 
   real-require@0.2.0: {}
@@ -1116,6 +1113,8 @@ snapshots:
   uint8array-extras@1.6.0: {}
 
   undici-types@8.9.0: {}
+
+  uqr@0.1.3: {}
 
   whatsapp-rust-bridge@0.5.4: {}
 

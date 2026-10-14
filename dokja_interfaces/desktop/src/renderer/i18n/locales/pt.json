@@ -199,5 +199,15 @@
   "state_replaced": "em uso em outro lugar",
   "state_refused": "não aceita",
   "state_unreachable": "sem resposta",
-  "state_off": "parada"
+  "state_off": "parada",
+  "link_open": "Vincular",
+  "link_close": "Fechar",
+  "link_title": "Vincular o WhatsApp",
+  "link_steps": "No celular: WhatsApp > Configurações > Aparelhos conectados > Conectar um aparelho, e escaneie este código.",
+  "link_code_alt": "Código para escanear com o celular",
+  "link_waiting": "Aguardando um código…",
+  "link_working": "Trabalhando…",
+  "link_done": "Vinculado e conectado.",
+  "link_new": "Novo código",
+  "link_unlink": "Desvincular e recomeçar"
 }

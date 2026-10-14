@@ -482,6 +482,11 @@ heading, with their state and a switch each. See the interface docs for each sta
 - `ningo.status` is not authenticated and the request port is published, so it carries only these
   states. Anything that would carry a link code, history or a send travels under the
   `communications.` event types, which need the communications credential.
+- **Linking WhatsApp from the desktop** uses `communications.link.status`, `.start` and `.reset`. They
+  need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and on the desktop process; the desktop
+  draws the code itself and never shows it as text. The orchestrator derives the link routes from
+  `WHATSAPP_INTERFACE_STATUS_ENDPOINT`, so that is the only address to set. Starting over unlinks the
+  device and erases the saved session; the session volume itself is not removed.
 
 Compatibility: additive. New optional environment variables on the orchestrator, one status route on
 each interface, new names in the switchable set (listed apart from the services) and extra fields

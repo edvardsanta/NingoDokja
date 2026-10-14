@@ -24,6 +24,10 @@ export type JobState = {
   lastError: string;
 };
 
+// The state of an interface that links to an account and, while it waits for the link, the picture
+// of the code as a data URL. The code itself, as text, never reaches the screen.
+export type InterfaceLink = { state: string; image?: string };
+
 export type StatusReply = {
   status: string;
   services: Record<string, ServiceState>;

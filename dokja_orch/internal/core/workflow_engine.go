@@ -47,6 +47,12 @@ func actionFor(domain Domain, eventType string) string {
 			return "deliver-scheduled-memes"
 		case "discord.send", "communications.send":
 			return "send-discord-message"
+		case "communications.link.status":
+			return "read-interface-link"
+		case "communications.link.start":
+			return "start-interface-link"
+		case "communications.link.reset":
+			return "reset-interface-link"
 		case "services.set":
 			return "set-service"
 		case "scheduler.jobs.set":

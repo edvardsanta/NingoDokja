@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import * as baileys from "baileys";
 
-import { adaptSocket, loadAuth, lookupSent, newMessageId, quietLogger, type RawSocket } from "../runtime/baileys_socket.js";
+import {
+  adaptSocket,
+  loadAuth,
+  lookupSent,
+  newMessageId,
+  quietLogger,
+  wipeAuth,
+  type RawSocket,
+} from "../runtime/baileys_socket.js";
 import { SentMessages } from "../runtime/sent_messages.js";
 import { disconnectReason } from "../runtime/whatsapp_runtime.js";
 
@@ -40,6 +48,7 @@ test("the content of what the bot sends is kept so a retry request can be answer
       return { key: { id: "SENT1" }, message: { conversation: "answer" } };
     },
     sendPresenceUpdate: async () => undefined,
+    logout: async () => undefined,
     end: () => undefined,
   };
   const socket = adaptSocket(raw, sent);
@@ -97,4 +106,22 @@ test("the quiet logger keeps warnings and errors as short text and nothing else"
   assert.doesNotMatch(lines.join("\n"), /5511987654321|secret/);
   assert.match(lines[1], /failed: stream errored out/);
   assert.ok(JSON.parse(lines[2]).text.length <= 200);
+});
+
+test("wiping the session leaves an empty folder that only its owner can read", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "dokja-wa-"));
+  try {
+    const dir = path.join(root, "default");
+    await loadAuth(dir);
+    await writeFile(path.join(dir, "creds.json"), "{}");
+    await mkdir(path.join(dir, "nested"));
+    await writeFile(path.join(dir, "nested", "key.json"), "{}");
+
+    await wipeAuth(dir);
+
+    assert.deepEqual(await readdir(dir), []);
+    assert.equal((await stat(dir)).mode & 0o777, 0o700);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

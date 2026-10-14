@@ -54,6 +54,17 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       cancel: pt ? "Cancelar" : "Cancel",
     };
   }
+  if (type === "communications.link.reset") {
+    const pt = locale === "pt";
+    return {
+      message: pt ? "Desvincular o WhatsApp?" : "Unlink WhatsApp?",
+      detail: pt
+        ? "O aparelho vinculado é removido da conta e a sessão salva é apagada. Será preciso escanear um novo código para usar de novo."
+        : "The linked device is removed from the account and the saved session is erased. A new code has to be scanned to use it again.",
+      accept: pt ? "Desvincular" : "Unlink",
+      cancel: pt ? "Cancelar" : "Cancel",
+    };
+  }
   if (type !== "knowledge.delete") return undefined;
   const texts = TEXTS[locale] ?? TEXTS.en;
   return {

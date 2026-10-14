@@ -146,6 +146,42 @@ interface; without it WhatsApp is simply not shown, never shown as a failure.
 orchestrator skips the message and the bot says nothing in the chat, not even "switched off". The
 linked session and the connection are left alone, so switching it back on takes effect at once.
 
+## Linking from the Desktop
+
+The health tab of the desktop has a **Link** button on the WhatsApp row. It opens a panel with the
+code to scan (read again every couple of seconds while it is open), a **New code** button and
+**Unlink and start over**.
+
+The internal listener has three routes for it, next to `/status`:
+
+| Route | What it does |
+| --- | --- |
+| `GET /link` | The state and, only while it is `waiting_for_link`, the code as rows of `0` and `1` |
+| `POST /link/start` | Asks for a new link attempt now |
+| `POST /link/reset` | Unlinks the device on WhatsApp's side when connected, erases the saved session and asks for a new code |
+
+The orchestrator relays them as `communications.link.status`, `.start` and `.reset`. They sit under
+the `communications.` prefix, so they need the communications credential (`DOKJA_COMMUNICATIONS_TOKEN`)
+like the Discord history and send actions: set it for the orchestrator **and** for the desktop
+process, or the panel says the access is not configured. The listener itself has no authentication,
+like the other internal ones, so its port must stay unpublished.
+
+How the code is handled:
+
+- the code string never leaves the WhatsApp process; only the rows of its picture do, and the
+  orchestrator accepts nothing but a square grid of `0` and `1` within QR sizes
+- the desktop's main process draws the picture itself; the page receives the picture and never the
+  code as text, and nothing logs it
+- reading the state is a read; asking for a new code is a change that needs a real click or key
+  press; starting over also asks in a window the shell opens, because it unlinks the device and
+  erases the session
+- starting over from `logged_out` erases the dead session and asks for a new code; from `connected`
+  it removes the device from the phone's list as well (if WhatsApp cannot be reached the device may
+  stay listed there, and can be removed on the phone)
+
+The code is the way to attach a device to the account, so show it only on the screen of the person
+who is linking.
+
 ## Reconnection
 
 The service owns the connection. A lost connection is retried after 1 s, doubling up to 60 s, and the

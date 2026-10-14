@@ -81,3 +81,17 @@ test("a window that fails to open leaves the confirmer usable and is not a yes",
   await assert.rejects(confirm("knowledge.delete", { source_id: "a" }), /no window/);
   assert.equal(await confirm("knowledge.delete", { source_id: "a" }), true);
 });
+
+test("starting over has a question that says what is lost, in both languages, and names no id", () => {
+  const en = questionFor("en", "communications.link.reset", { interface: "whatsapp" });
+  assert.equal(en?.message, "Unlink WhatsApp?");
+  assert.match(en?.detail ?? "", /erased/);
+  assert.deepEqual([en?.accept, en?.cancel], ["Unlink", "Cancel"]);
+
+  const pt = questionFor("pt", "communications.link.reset", { interface: "whatsapp" });
+  assert.equal(pt?.message, "Desvincular o WhatsApp?");
+  assert.deepEqual([pt?.accept, pt?.cancel], ["Desvincular", "Cancelar"]);
+
+  assert.equal(questionFor("en", "communications.link.start", { interface: "whatsapp" }), undefined);
+  assert.equal(questionFor("en", "communications.link.status", { interface: "whatsapp" }), undefined);
+});

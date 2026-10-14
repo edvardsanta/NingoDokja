@@ -36,6 +36,8 @@ func (r *RuleBasedEventRouter) Route(_ context.Context, event Event) (Route, err
 		}, nil
 	case eventType == "communications.send":
 		return Route{Workflow: "communications-send", Domains: []Domain{DomainSystem}}, nil
+	case strings.HasPrefix(eventType, "communications.link."):
+		return Route{Workflow: "interface-link", Domains: []Domain{DomainSystem}}, nil
 	case strings.HasPrefix(eventType, "communications."):
 		return Route{Workflow: "communications", Domains: []Domain{DomainCommunications}}, nil
 	case eventType == "discord.send":

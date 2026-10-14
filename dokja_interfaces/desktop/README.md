@@ -58,6 +58,16 @@ Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127
 `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). Pass them after `--`, for example `pnpm start -- --lang=pt`.
 
+## Linking WhatsApp
+
+On the health tab, the WhatsApp row has a **Link** button. It shows the code to scan while the
+account waits for a link, and **New code** and **Unlink and start over**. It needs the
+communications credential in the environment of the desktop (`DOKJA_COMMUNICATIONS_TOKEN`, the same
+one the orchestrator has) and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` set on the orchestrator. The shell
+draws the code from rows of modules it validated, so the page gets a picture and never the code as
+text. Starting over is asked in a window the shell owns, because it unlinks the device and erases the
+session. See [`dokja_docs/whatsapp-interface.md`](../../dokja_docs/whatsapp-interface.md).
+
 ## Communications
 
 The sixth tab centralizes the configured Discord channels. It lists 30 messages at a time,

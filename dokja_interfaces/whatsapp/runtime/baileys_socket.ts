@@ -1,4 +1,5 @@
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, readdir, rm } from "node:fs/promises";
+import path from "node:path";
 
 import makeWASocket, {
   Browsers,
@@ -27,6 +28,13 @@ export type RawSocket = Omit<WhatsAppSocketLike, "sendMessage"> & {
     options?: { quoted?: unknown; messageId?: string },
   ): Promise<{ key?: { id?: string | null }; message?: unknown } | undefined>;
 };
+
+// Erases what the session folder holds and keeps the folder, with its mode, for the next link.
+export async function wipeAuth(dir: string): Promise<void> {
+  for (const name of await readdir(dir)) {
+    await rm(path.join(dir, name), { recursive: true, force: true });
+  }
+}
 
 export function connectSocket(auth: AuthBundle, error: (...args: unknown[]) => void): WhatsAppSocketLike {
   const logger = quietLogger(error);
@@ -59,6 +67,7 @@ export function adaptSocket(socket: RawSocket, sent: SentMessages<unknown>): Wha
     },
     signalRepository: socket.signalRepository,
     sendPresenceUpdate: (type, jid) => socket.sendPresenceUpdate(type, jid),
+    logout: () => socket.logout(),
     end: (reason) => socket.end(reason),
     async sendMessage(jid, content, options) {
       const result = await socket.sendMessage(jid, content, options);

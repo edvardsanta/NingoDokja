@@ -219,6 +219,41 @@ main {
   overflow-wrap: anywhere;
 }
 
+/* The panel that links the account: the code to scan, and what can be done about it. */
+.link-open {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+
+.link-panel {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--cyan);
+}
+
+.link-panel h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.link-code {
+  display: block;
+  margin: 0.5rem 0;
+  background: #fff;
+  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
+}
+
+.link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 /* A service or a job the operator can switch has its button at the end of the row. */
 .switch {
   grid-column: 4;

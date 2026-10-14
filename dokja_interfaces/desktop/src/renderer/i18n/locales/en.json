@@ -199,5 +199,15 @@
   "state_replaced": "in use elsewhere",
   "state_refused": "not accepted",
   "state_unreachable": "no answer",
-  "state_off": "stopped"
+  "state_off": "stopped",
+  "link_open": "Link",
+  "link_close": "Close",
+  "link_title": "Link WhatsApp",
+  "link_steps": "On the phone: WhatsApp > Settings > Linked devices > Link a device, then scan this code.",
+  "link_code_alt": "Code to scan with the phone",
+  "link_waiting": "Waiting for a code…",
+  "link_working": "Working…",
+  "link_done": "Linked and connected.",
+  "link_new": "New code",
+  "link_unlink": "Unlink and start over"
 }

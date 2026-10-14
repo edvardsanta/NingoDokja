@@ -37,7 +37,14 @@ func TestCommunicationsAccessAndCredentialRedaction(t *testing.T) {
 	}
 }
 func TestCommunicationsRoutes(t *testing.T) {
-	for eventType, domain := range map[string]Domain{"communications.channels": DomainCommunications, "communications.history": DomainCommunications, "communications.send": DomainSystem} {
+	for eventType, domain := range map[string]Domain{
+		"communications.channels":    DomainCommunications,
+		"communications.history":     DomainCommunications,
+		"communications.send":        DomainSystem,
+		"communications.link.status": DomainSystem,
+		"communications.link.start":  DomainSystem,
+		"communications.link.reset":  DomainSystem,
+	} {
 		event := Event{Type: eventType}
 		route, err := NewRuleBasedEventRouter().Route(context.Background(), event)
 		if err != nil || len(route.Domains) != 1 || route.Domains[0] != domain {
@@ -46,6 +53,52 @@ func TestCommunicationsRoutes(t *testing.T) {
 		workflow, _ := NewDefaultWorkflowEngine().Plan(context.Background(), event, route)
 		if workflow.Steps[0].Action == "handle-event" {
 			t.Fatal("missing action")
+		}
+	}
+}
+
+type systemRecorder struct {
+	events []Event
+}
+
+func (h *systemRecorder) Domain() Domain { return DomainSystem }
+func (h *systemRecorder) Handle(_ context.Context, event Event, step WorkflowStep) (map[string]any, error) {
+	h.events = append(h.events, event)
+	return map[string]any{"action": step.Action}, nil
+}
+
+func TestLinkActionsNeedTheCommunicationsCredentialAndGetTheirOwnAction(t *testing.T) {
+	token := strings.Repeat("x", 32)
+	for eventType, action := range map[string]string{
+		"communications.link.status": "read-interface-link",
+		"communications.link.start":  "start-interface-link",
+		"communications.link.reset":  "reset-interface-link",
+	} {
+		denied := &systemRecorder{}
+		service := DefaultService(denied).WithCommunicationsToken(token)
+		_, err := service.ProcessWithResult(context.Background(), Event{
+			Source: SourceCLI, Type: eventType, Payload: map[string]any{"interface": "whatsapp"},
+			Context: map[string]any{"communications_token": "wrong"},
+		})
+		if err == nil || len(denied.events) != 0 {
+			t.Fatalf("%s must be refused without the credential, err=%v", eventType, err)
+		}
+
+		allowed := &systemRecorder{}
+		service = DefaultService(allowed).WithCommunicationsToken(token)
+		result, err := service.ProcessWithResult(context.Background(), Event{
+			Source: EventSource("desktop"), Type: eventType, Payload: map[string]any{"interface": "whatsapp"},
+			Context: map[string]any{"communications_token": token},
+		})
+		if err != nil || len(allowed.events) != 1 {
+			t.Fatalf("%s must reach the system handler, err=%v", eventType, err)
+		}
+		raw, _ := json.Marshal(result)
+		if strings.Contains(string(raw), token) || allowed.events[0].Context["communications_token"] != nil {
+			t.Fatal("credential leaked")
+		}
+		if got := result.Result["system"].(map[string]any)["action"]; got != action {
+			t.Fatalf("%s got action %v, want %s", eventType, got, action)
 		}
 	}
 }
