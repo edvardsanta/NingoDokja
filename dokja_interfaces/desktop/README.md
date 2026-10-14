@@ -13,7 +13,7 @@ opened, and then keeps what it showed:
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
-| communications | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels, paginated history, text and meme delivery through Ningo |
+| communications | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord |
 | memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell; a click opens one large |
 
 The keys `1` to `6` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
@@ -57,6 +57,13 @@ list opens by itself when one does.
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). Pass them after `--`, for example `pnpm start -- --lang=pt`.
+
+## WhatsApp conversations
+
+The communications tab also lists the WhatsApp conversations the owner named on the interface
+(`DOKJA_WHATSAPP_CONVERSATIONS`), as "WhatsApp · alias". Their text is what the interface recorded
+itself, shown with who wrote in words and a note on how long it stays on the machine. There is no
+composer for them yet. The chat itself is never named: only its alias reaches the desktop.
 
 ## Linking WhatsApp
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 
-import { startStatusServer, statusReply, type LinkControls } from "../runtime/status_server.js";
+import { startStatusServer, statusReply, type ConversationControls, type LinkControls } from "../runtime/status_server.js";
 import type { InterfaceState, RuntimeStatus } from "../runtime/whatsapp_runtime.js";
 
 test("each state maps to a level and carries nothing else", () => {
@@ -133,4 +133,89 @@ test("a reset that fails answers an error without saying why", async () => {
       assert.ok(!(await answer.text()).includes("creds.json"));
     },
   );
+});
+
+async function withConversations(
+  controls: ConversationControls | undefined,
+  run: (base: string) => Promise<void>,
+) {
+  const server = startStatusServer({ port: 0, status: () => ({ state: "connected", detail: "" }), conversations: controls });
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  try {
+    const { port } = server.address() as AddressInfo;
+    await run(`http://127.0.0.1:${port}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+function fakeConversations(): ConversationControls & { asked: Array<[string, number | undefined]> } {
+  const asked: Array<[string, number | undefined]> = [];
+  return {
+    asked,
+    list: () => [
+      { alias: "friend", kind: "direct" },
+      { alias: "team", kind: "group" },
+    ],
+    retentionDays: 14,
+    page: async (alias, before) => {
+      asked.push([alias, before]);
+      return {
+        messages: [
+          { seq: 7, id: "3EB0A", at: "2026-10-11T12:00:00.000Z", who: "owner", text: "hi" },
+          { seq: 8, id: "3EB0B", at: "2026-10-11T12:01:00.000Z", who: "bot", text: "hello" },
+        ],
+        before: "7",
+      };
+    },
+  };
+}
+
+test("the named conversations are listed by alias with the retention, and nothing else about them", async () => {
+  await withConversations(fakeConversations(), async (base) => {
+    const listed = await (await fetch(`${base}/conversations`)).json();
+
+    assert.deepEqual(listed, {
+      conversations: [
+        { alias: "friend", kind: "direct", retention_days: 14 },
+        { alias: "team", kind: "group", retention_days: 14 },
+      ],
+    });
+  });
+});
+
+test("a page of history has the shape of a page of Discord messages, with labels for who wrote", async () => {
+  const controls = fakeConversations();
+  await withConversations(controls, async (base) => {
+    const page = await (await fetch(`${base}/history?alias=friend&before=12`)).json();
+
+    assert.deepEqual(page, {
+      alias: "friend",
+      messages: [
+        { id: "7", author: "owner", bot: false, content: "hi", timestamp: "2026-10-11T12:00:00.000Z", edited: false, reply_to: "", attachments: [] },
+        { id: "8", author: "bot", bot: true, content: "hello", timestamp: "2026-10-11T12:01:00.000Z", edited: false, reply_to: "", attachments: [] },
+      ],
+      before: "7",
+    });
+    assert.deepEqual(controls.asked, [["friend", 12]]);
+  });
+});
+
+test("history refuses an alias that is not named and a cursor that is not a number, before reading", async () => {
+  const controls = fakeConversations();
+  await withConversations(controls, async (base) => {
+    assert.equal((await fetch(`${base}/history?alias=stranger`)).status, 404);
+    assert.equal((await fetch(`${base}/history?alias=../friend`)).status, 404);
+    assert.equal((await fetch(`${base}/history`)).status, 404);
+    assert.equal((await fetch(`${base}/history?alias=friend&before=1;drop`)).status, 400);
+    assert.equal((await fetch(`${base}/history?alias=friend`, { method: "POST" })).status, 404);
+  });
+  assert.deepEqual(controls.asked, []);
+});
+
+test("without named conversations the routes do not exist", async () => {
+  await withConversations(undefined, async (base) => {
+    assert.equal((await fetch(`${base}/conversations`)).status, 404);
+    assert.equal((await fetch(`${base}/history?alias=friend`)).status, 404);
+  });
 });

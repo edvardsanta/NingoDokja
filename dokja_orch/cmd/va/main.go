@@ -72,8 +72,18 @@ func main() {
 		interfaceLinks["whatsapp"] = client
 	}
 
+	// The conversations the owner named on the WhatsApp interface are listed and read next to the
+	// Discord channels, and only when the interface's address is set.
+	communicationsHandler := handlers.NewCommunicationsDomainHandler(
+		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
+		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
+	)
+	if conversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); conversations != nil {
+		communicationsHandler.WithConversations(conversations)
+	}
+
 	service := core.DefaultService(
-		handlers.NewCommunicationsDomainHandler(clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")), os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID")),
+		communicationsHandler,
 		handlers.NewSystemDomainHandler(
 			clients.NewChatAIServiceClient(""),
 			memeClient,

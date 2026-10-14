@@ -5,6 +5,7 @@ import {
   type WhatsAppMessageConfig,
   type WhatsAppMessageHandler,
 } from "../messages/message_handler.js";
+import type { Recorder } from "../messages/recorder.js";
 import { RecentKeys } from "../messages/recent_keys.js";
 import { toMessageContext, type InboundMessage } from "./inbound.js";
 
@@ -46,6 +47,8 @@ type Dependencies = {
   connect: (auth: AuthBundle) => WhatsAppSocketLike;
   renderQr: (qr: string) => void | Promise<void>;
   handler?: WhatsAppMessageHandler;
+  // Records the conversations the owner named. Absent when none is.
+  recorder?: Recorder;
   // Builds the id of a message the bot is about to send, from the account's own id.
   newMessageId?: (userJid?: string) => string;
   sleep?: (ms: number) => Promise<void>;
@@ -156,6 +159,18 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
     } catch {
       deps.error?.(JSON.stringify({ message: "unreadable message" }));
       return;
+    }
+    if (deps.recorder) {
+      const recorder = deps.recorder;
+      void recorder.inbound(context);
+      // What the bot sends into a named conversation is recorded with the id it went out with.
+      const send = context.reply;
+      context.reply = async (text) => {
+        const result = await send(text);
+        const id = (result as { key?: { id?: string | null } } | undefined)?.key?.id ?? undefined;
+        void recorder.outbound(context, text, id);
+        return result;
+      };
     }
     try {
       await handler(context);

@@ -80,3 +80,53 @@ test("numberAllowed matches any known number of the sender", () => {
   assert.equal(numberAllowed([], ["5511912345678"]), false);
   assert.equal(numberAllowed(["5511912345678"], []), false);
 });
+
+test("no conversation is named by default, so nothing is recorded", () => {
+  const config = buildConfig(base);
+
+  assert.deepEqual(config.conversations, []);
+  assert.equal(config.historyDays, 30);
+});
+
+test("named conversations keep an alias and either a number or a group id", () => {
+  const config = buildConfig({
+    ...base,
+    DOKJA_WHATSAPP_CONVERSATIONS: "friend=+55 11 98765-4321, team-chat=120363000000000001@g.us",
+    DOKJA_WHATSAPP_HISTORY_DIR: "/history",
+    DOKJA_WHATSAPP_HISTORY_DAYS: "7",
+  });
+
+  assert.deepEqual(config.conversations, [
+    { alias: "friend", number: "5511987654321" },
+    { alias: "team-chat", group: "120363000000000001@g.us" },
+  ]);
+  assert.equal(config.historyDir, "/history");
+  assert.equal(config.historyDays, 7);
+});
+
+test("a bad conversation entry names its position and never its value", () => {
+  const history = { ...base, DOKJA_WHATSAPP_HISTORY_DIR: "/history" };
+  for (const [raw, pattern] of [
+    ["no-separator", /entry 1 needs an alias/],
+    ["Friend=5511987654321", /entry 1 needs an alias/],
+    ["friend=not-a-number", /entry 1 is not a phone number or a group id/],
+    ["ok=5511987654321,ok=5511912345678", /entry 2 repeats/],
+    ["a=5511987654321,b=551187654321", /entry 2 repeats/],
+  ] as const) {
+    assert.throws(
+      () => buildConfig({ ...history, DOKJA_WHATSAPP_CONVERSATIONS: raw }),
+      (error: Error) => pattern.test(error.message) && !/5511987654321|not-a-number/.test(error.message),
+      raw,
+    );
+  }
+});
+
+test("named conversations need a folder for their history, and the days are bounded", () => {
+  assert.throws(
+    () => buildConfig({ ...base, DOKJA_WHATSAPP_CONVERSATIONS: "friend=5511987654321" }),
+    /DOKJA_WHATSAPP_HISTORY_DIR/,
+  );
+  for (const days of ["0", "366", "abc", "1.5"]) {
+    assert.throws(() => buildConfig({ ...base, DOKJA_WHATSAPP_HISTORY_DAYS: days }), /number of days from 1 to 365/, days);
+  }
+});

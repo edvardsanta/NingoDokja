@@ -333,8 +333,8 @@ provider address the shell deliberately strips).
 
 ## Interfaces increment (2026-10-11)
 
-Status: proposed. Increments 1 (branch `feat/interfaces-health`) and 2 (branch
-`feat/desktop-whatsapp-link`) are built; 3 and 4 are ordered but not started. Each increment is its
+Status: proposed. Increments 1 (branch `feat/interfaces-health`), 2 (`feat/desktop-whatsapp-link`)
+and 3 (`feat/whatsapp-conversations`) are built; 4 is ordered but not started. Each increment is its
 own branch, stacked in this order.
 
 The Switches increment made the desktop the one place from which the operator runs Ningo. The people
@@ -394,6 +394,11 @@ the picture from validated rows and the renderer shows it in a panel on the What
   needs a real click or key press and a native confirmation that names the interface.
 
 ### Increment 3: conversations in the communications tab
+
+Built. `DOKJA_WHATSAPP_CONVERSATIONS` names the chats (`alias=<number or group id>`); only those are
+recorded, as text, in a folder of the interface's own with a retention (30 days by default); the
+interface answers `GET /conversations` and `GET /history`; the communications domain accepts
+`whatsapp:<alias>` next to a Discord channel id; the tab lists and reads them, without a composer.
 
 - **This supersedes the line above that says no local history database is introduced, for aliased
   WhatsApp chats only.** WhatsApp has no history to read from a server, so what the interface saw is

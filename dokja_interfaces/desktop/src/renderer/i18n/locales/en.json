@@ -165,7 +165,7 @@
   "index_result": "{count} passages indexed; {remaining} still pending.",
   "index_degraded": "Similarity indexing is unavailable. Keyword search still works.",
   "kind_communications": "communications",
-  "communications_title": "Discord conversations",
+  "communications_title": "Conversations",
   "communications_no_channels": "No delivery channels are configured.",
   "communications_identity": "Messages are sent as Ningo. Only configured channels appear here.",
   "communications_channel": "Channel",
@@ -209,5 +209,12 @@
   "link_working": "Working…",
   "link_done": "Linked and connected.",
   "link_new": "New code",
-  "link_unlink": "Unlink and start over"
+  "link_unlink": "Unlink and start over",
+  "communications_whatsapp_label": "WhatsApp · {name}",
+  "communications_retention": "The text of this conversation is kept on this machine for {days} days, then forgotten. Nothing else of it is kept.",
+  "communications_who_owner": "You",
+  "communications_who_bot": "Ningo",
+  "communications_who_contact": "Contact",
+  "communications_who_member": "Member",
+  "communications_whatsapp_read_only": "Sending to WhatsApp from here is not available yet."
 }

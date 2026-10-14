@@ -165,7 +165,7 @@
   "index_result": "{count} trechos indexados; {remaining} ainda pendentes.",
   "index_degraded": "A indexação por similaridade está indisponível. A busca por palavras continua funcionando.",
   "kind_communications": "comunicações",
-  "communications_title": "Conversas do Discord",
+  "communications_title": "Conversas",
   "communications_no_channels": "Nenhum canal de entrega configurado.",
   "communications_identity": "As mensagens são enviadas pelo Ningo. Somente canais configurados aparecem aqui.",
   "communications_channel": "Canal",
@@ -209,5 +209,12 @@
   "link_working": "Trabalhando…",
   "link_done": "Vinculado e conectado.",
   "link_new": "Novo código",
-  "link_unlink": "Desvincular e recomeçar"
+  "link_unlink": "Desvincular e recomeçar",
+  "communications_whatsapp_label": "WhatsApp · {name}",
+  "communications_retention": "O texto desta conversa fica guardado nesta máquina por {days} dias e depois é esquecido. Nada mais dela é guardado.",
+  "communications_who_owner": "Você",
+  "communications_who_bot": "Ningo",
+  "communications_who_contact": "Contato",
+  "communications_who_member": "Membro",
+  "communications_whatsapp_read_only": "O envio ao WhatsApp por aqui ainda não está disponível."
 }
