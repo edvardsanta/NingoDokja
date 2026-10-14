@@ -22,6 +22,10 @@ services:
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
+      # Where each interface answers its state. The desktop lists an interface only when its
+      # address is set: set the WhatsApp one when you start its profile.
+      DISCORD_INTERFACE_STATUS_ENDPOINT: http://dokja-discord:8092/status
+      WHATSAPP_INTERFACE_STATUS_ENDPOINT: ${WHATSAPP_INTERFACE_STATUS_ENDPOINT:-}
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
       DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
       # Operator switches (services on/off, job pause, intervals); shared with the scheduler.
@@ -281,6 +285,7 @@ services:
       DOKJA_WHATSAPP_SELF_CHAT: ${DOKJA_WHATSAPP_SELF_CHAT:-true}
       DOKJA_WHATSAPP_ALLOW_FROM: ${DOKJA_WHATSAPP_ALLOW_FROM:-}
       DOKJA_WHATSAPP_ALLOWED_GROUPS: ${DOKJA_WHATSAPP_ALLOWED_GROUPS:-}
+      DOKJA_WHATSAPP_STATUS_PORT: 8094
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
     volumes:
       - ./:/workspace

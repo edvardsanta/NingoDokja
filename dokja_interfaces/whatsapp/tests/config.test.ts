@@ -19,6 +19,13 @@ test("defaults answer only the account's own chat", () => {
   assert.equal(config.orchestratorEndpoint, "http://dokja-orchestrator:8091/orchestrator");
 });
 
+test("the status port defaults and is validated", () => {
+  assert.equal(buildConfig(base).statusPort, 8094);
+  assert.equal(buildConfig({ ...base, DOKJA_WHATSAPP_STATUS_PORT: "9001" }).statusPort, 9001);
+  assert.throws(() => buildConfig({ ...base, DOKJA_WHATSAPP_STATUS_PORT: "70000" }), /STATUS_PORT must be a port number/);
+  assert.throws(() => buildConfig({ ...base, DOKJA_WHATSAPP_STATUS_PORT: "abc" }), /STATUS_PORT must be a port number/);
+});
+
 test("numbers are normalised and listed once", () => {
   const config = buildConfig({
     ...base,

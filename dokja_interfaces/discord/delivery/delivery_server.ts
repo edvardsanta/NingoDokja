@@ -39,6 +39,9 @@ type DeliveryHandlerDependencies = {
 type DeliveryServerOptions = {
   token: string;
   port: number;
+  // The state of the interface, answered on GET /status. Only the level, a state from a closed
+  // list and a fixed sentence: never an id or an address.
+  status?: () => { status: "ok" | "degraded" | "error"; state: string; detail: string };
   webhooks?: Record<string, string>;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
@@ -50,6 +53,11 @@ export function startDiscordDeliveryServer(options: DeliveryServerOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
 
   const server = createServer(async (req, res) => {
+    if (req.method === "GET" && req.url === "/status" && options.status) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(options.status()));
+      return;
+    }
     if (req.method !== "POST" || req.url !== "/deliver") {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "error", message: "not found" }));

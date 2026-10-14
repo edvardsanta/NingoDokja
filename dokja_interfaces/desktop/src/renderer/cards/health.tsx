@@ -14,6 +14,7 @@ import {
   pulseOf,
   type Health,
   type IntervalUnit,
+  type ServiceRow,
 } from "./health_model.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
@@ -28,6 +29,21 @@ const STATUS_IDS: Record<string, MessageId> = {
   degraded: "status_degraded",
   disabled: "status_disabled",
   unchecked: "status_unchecked",
+};
+
+// What an interface says about itself, from the closed list each one reports. A state this screen
+// does not know is shown as it came.
+const STATE_IDS: Record<string, MessageId> = {
+  connected: "state_connected",
+  connecting: "state_connecting",
+  disconnected: "state_disconnected",
+  listening: "state_listening",
+  waiting_for_link: "state_waiting_for_link",
+  logged_out: "state_logged_out",
+  replaced: "state_replaced",
+  refused: "state_refused",
+  unreachable: "state_unreachable",
+  off: "state_off",
 };
 
 export async function loadHealth(transport: Transport): Promise<LoadResult<Health>> {
@@ -100,7 +116,7 @@ type BodyProps = {
 
 function HealthBody({ health, busy, failure, onChange }: BodyProps) {
   const t = useTranslate();
-  if (health.rows.length === 0) return <p>{t("health_empty")}</p>;
+  if (health.rows.length === 0 && health.interfaces.length === 0) return <p>{t("health_empty")}</p>;
 
   const { ok, problem, off, unchecked } = health.counts;
   const summary = t("health_summary", { ok, problem, off });
@@ -108,7 +124,7 @@ function HealthBody({ health, busy, failure, onChange }: BodyProps) {
   return (
     <>
       <div className="strip" aria-hidden="true">
-        {health.rows.map((row) => (
+        {[...health.rows, ...health.interfaces].map((row) => (
           <span key={row.name} data-tone={row.tone} />
         ))}
       </div>
@@ -117,25 +133,21 @@ function HealthBody({ health, busy, failure, onChange }: BodyProps) {
       </p>
       {failure && <Problem error={failure} />}
       <ul className="services">
-        {health.rows.map((row, index) => {
-          const label = STATUS_IDS[row.status];
-          return (
-            <li key={row.name} data-tone={row.tone} style={{ "--i": index } as CSSProperties}>
-              <span className="service-name">{row.name}</span>
-              <span className="service-status">{label ? t(label) : row.status}</span>
-              {row.detail && <span className="service-detail">{row.detail}</span>}
-              {row.enabled !== undefined && (
-                <Switch
-                  label={t("switch_for", { name: row.name })}
-                  on={row.enabled}
-                  busy={busy}
-                  onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
-                />
-              )}
-            </li>
-          );
-        })}
+        {health.rows.map((row, index) => (
+          <ServiceRowItem key={row.name} row={row} index={index} busy={busy} onChange={onChange} />
+        ))}
       </ul>
+      {health.interfaces.length > 0 && (
+        <>
+          <h3>{t("interfaces_title")}</h3>
+          <ul className="services interfaces">
+            {health.interfaces.map((row, index) => (
+              <ServiceRowItem key={row.name} row={row} index={health.rows.length + index} busy={busy} onChange={onChange} />
+            ))}
+          </ul>
+          <p className="note">{t("interfaces_hint")}</p>
+        </>
+      )}
       {switchableScheduler && <p className="note">{t("scheduler_hint")}</p>}
       {health.jobs.length > 0 && (
         <>
@@ -148,6 +160,35 @@ function HealthBody({ health, busy, failure, onChange }: BodyProps) {
         </>
       )}
     </>
+  );
+}
+
+type RowProps = {
+  row: ServiceRow;
+  index: number;
+  busy: boolean;
+  onChange: (change: Change) => void;
+};
+
+function ServiceRowItem({ row, index, busy, onChange }: RowProps) {
+  const t = useTranslate();
+  // An interface says its state; a switched-off one has none and says only that it is off.
+  const stateId = row.state ? STATE_IDS[row.state] : undefined;
+  const label = stateId ?? STATUS_IDS[row.status];
+  return (
+    <li data-tone={row.tone} data-kind={row.kind} style={{ "--i": index } as CSSProperties}>
+      <span className="service-name">{row.name}</span>
+      <span className="service-status">{label ? t(label) : row.state || row.status}</span>
+      {row.detail && <span className="service-detail">{row.detail}</span>}
+      {row.enabled !== undefined && (
+        <Switch
+          label={t("switch_for", { name: row.name })}
+          on={row.enabled}
+          busy={busy}
+          onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
+        />
+      )}
+    </li>
   );
 }
 

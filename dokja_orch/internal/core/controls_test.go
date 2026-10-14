@@ -381,3 +381,102 @@ func TestDigestEventsBelongToTheFeedsService(t *testing.T) {
 		t.Fatal("feeds must be a service the operator can switch off")
 	}
 }
+
+func processFrom(t *testing.T, service *Service, source EventSource, eventType string) ProcessResult {
+	t.Helper()
+	event := Event{Type: eventType, Source: source, Payload: map[string]any{}, Context: map[string]any{}}
+	result, err := service.ProcessWithResult(context.Background(), event)
+	if err != nil {
+		t.Fatalf("%s from %s: unexpected error: %v", eventType, source, err)
+	}
+	return result
+}
+
+func TestInterfaceSwitchSilencesOnlyThatInterface(t *testing.T) {
+	service, controls, handlers := gatedService(t)
+	if err := controls.SetService("whatsapp", false); err != nil {
+		t.Fatal(err)
+	}
+
+	off := processFrom(t, service, SourceWhatsApp, "meme.status")
+	if off.Result["skipped"] != true || off.Result["silent"] != true {
+		t.Fatalf("an interface that is off must be skipped silently, got %#v", off.Result)
+	}
+	if !strings.Contains(off.Result["reason"].(string), "interface whatsapp is switched off") {
+		t.Fatalf("unexpected reason %#v", off.Result["reason"])
+	}
+	if handlers[DomainMeme].calls != 0 {
+		t.Fatal("no handler may run for an interface that is off")
+	}
+
+	for _, source := range []EventSource{SourceDiscord, SourceCLI, EventSource("desktop")} {
+		if result := processFrom(t, service, source, "meme.status"); result.Result["skipped"] != nil {
+			t.Fatalf("%s must not be affected by the whatsapp switch, got %#v", source, result.Result)
+		}
+	}
+
+	if err := controls.SetService("whatsapp", true); err != nil {
+		t.Fatal(err)
+	}
+	if result := processFrom(t, service, SourceWhatsApp, "meme.status"); result.Result["skipped"] != nil {
+		t.Fatalf("switching back on must let the interface through, got %#v", result.Result)
+	}
+}
+
+func TestAServiceThatIsOffKeepsItsVisibleReply(t *testing.T) {
+	service, controls, _ := gatedService(t)
+	if err := controls.SetService("meme", false); err != nil {
+		t.Fatal(err)
+	}
+
+	result := processFrom(t, service, SourceDiscord, "meme.status")
+
+	if result.Result["skipped"] != true || result.Result["silent"] != false {
+		t.Fatalf("a service that is off still says so, got %#v", result.Result)
+	}
+}
+
+func TestInterfaceSwitchesNeverBlockTheDesktopFromSwitchingThemBack(t *testing.T) {
+	service, controls, handlers := gatedService(t)
+	for _, name := range KnownInterfaces {
+		if err := controls.SetService(name, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, eventType := range []string{"ningo.status", "services.set", "scheduler.jobs.set"} {
+		if result := processFrom(t, service, EventSource("desktop"), eventType); result.Result["skipped"] != nil {
+			t.Fatalf("%s from the desktop must never be gated, got %#v", eventType, result.Result)
+		}
+	}
+	if handlers[DomainSystem].calls != 3 {
+		t.Fatalf("expected the admin events to reach the system handler, got %d", handlers[DomainSystem].calls)
+	}
+}
+
+func TestInterfaceNamesAreSwitchableButAreNotServices(t *testing.T) {
+	_, controls, _ := gatedService(t)
+
+	for _, name := range KnownInterfaces {
+		if err := controls.SetService(name, false); err != nil || controls.ServiceEnabled(name) {
+			t.Fatalf("%s should be switchable, err=%v", name, err)
+		}
+	}
+	for _, info := range controls.Services() {
+		if contains(KnownInterfaces, info.Name) {
+			t.Fatalf("interfaces must not be listed with the services: %s", info.Name)
+		}
+	}
+	if err := controls.SetService("slack", false); err == nil || !strings.Contains(err.Error(), "whatsapp") {
+		t.Fatalf("an unknown name must be refused and list the interfaces too, got %v", err)
+	}
+
+	for source, want := range map[EventSource]string{
+		SourceDiscord: "discord", SourceWhatsApp: "whatsapp",
+		SourceCLI: "", SourceAPI: "", EventSource("desktop"): "",
+	} {
+		if got := InterfaceForSource(source); got != want {
+			t.Fatalf("%s resolved to %q, want %q", source, got, want)
+		}
+	}
+}

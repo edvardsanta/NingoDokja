@@ -330,3 +330,87 @@ must never be empty. The screen reads `ningo.status` again after every change in
 guess. Not covered yet: switching the communications service (it is not among the orchestrator's known
 services), feed sources (they live on the feeds-service branch) and chat profiles (their reply carries a
 provider address the shell deliberately strips).
+
+## Interfaces increment (2026-10-11)
+
+Status: proposed. Increment 1 is built (branch `feat/interfaces-health`); the others are ordered but
+not started. Each increment is its own branch, stacked in this order.
+
+The Switches increment made the desktop the one place from which the operator runs Ningo. The people
+talk to Ningo through the Discord and WhatsApp interfaces, so the desktop should show their
+state, switch them, link WhatsApp, and, for the conversations the operator names, show and send
+messages. The flow does not change: the desktop talks to the orchestrator, the orchestrator talks to
+the interfaces.
+
+### Rules that hold for every increment
+
+- **One status vocabulary.** Every interface runs a small internal listener that is always on, whether
+  or not it delivers anything, and answers `GET /status` with `{status, state, detail}`. `state` comes
+  from a closed list per interface and never carries a phone number, a chat id, a token or a link code:
+  - discord: `connected`, `connecting`, `disconnected`
+  - whatsapp: `connected`, `connecting`, `waiting_for_link`, `logged_out`, `replaced`, `refused`, `off`
+
+  An interface that does not answer is shown as `unreachable` by the orchestrator, with a fixed
+  sentence. The listener port is not published in Compose.
+- **What a switch means.** An interface that is off neither answers nor receives deliveries. It answers
+  nothing at all in the chat: the "switched off" reply that services give is wrong here, because it
+  would post in every channel the bot sits in. Credentials and the linked session are untouched, and the
+  interface keeps running so the switch can be flipped back from the desktop. A scheduled or manual
+  delivery to a channel of an interface that is off is left out and reported as skipped, not failed.
+- **Authentication.** `ningo.status` is unauthenticated and the request port is published, so it carries
+  only the vocabulary above. Anything that carries a link code, history or a send travels under the
+  `communications.` event type prefix, which the existing credential gate already covers, and the
+  credential is stripped before dispatch like today.
+- **One alias map.** Increments 3 and 4 share `alias=chat` entries in the WhatsApp interface's own
+  configuration. Only aliased chats are recorded, listed and sendable; the chat id never leaves the
+  interface on those paths, only the alias does.
+
+### Increment 1: interfaces in the health tab
+
+- Each interface gets its always-on status listener. Discord reports the gateway state, not that the
+  process is up, and answers on the port of its delivery server. WhatsApp gets a new listener.
+- The WhatsApp runtime stops exiting when the session is logged out or replaced, or when a link code
+  expires: it stays alive in that state and says so. This is what lets a later increment link from the
+  desktop, since the desktop cannot restart a container.
+- The orchestrator probes each configured interface, adds `discord` and `whatsapp` to the
+  switchable names, and enforces the meaning above in the service gate and at delivery. An interface
+  without a configured endpoint is not listed.
+- The health tab already appends any service the orchestrator reports; it now groups the entries marked
+  as interfaces under their own heading, and both locales get the new labels.
+
+### Increment 2: link WhatsApp from the desktop
+
+- The interface exposes the current link code only while it waits for one, on its internal listener.
+  The orchestrator relays it under `communications.`; the shell's main process draws it as an image and
+  the renderer receives only that image, never the code. The code is a short-lived way to attach a
+  device to an account, so it never reaches a log, a status reply or the page's own state.
+- Starting a link and wiping the session are separate actions. Wiping a session is destructive: it
+  needs a real click or key press and a native confirmation that names the interface.
+
+### Increment 3: conversations in the communications tab
+
+- **This supersedes the line above that says no local history database is introduced, for aliased
+  WhatsApp chats only.** WhatsApp has no history to read from a server, so what the interface saw is
+  all there is. Discord keeps reading its own history from its API and stores nothing here.
+- What is stored: text only, after the interface's policy has accepted the message, for aliased chats,
+  including the bot's replies and the desktop's own sends. No media, no phone numbers, no sender other
+  than `owner`, `bot` or `member`. It lives in the interface's own volume with a default retention and a
+  purge, and the tab shows the retention.
+- The communications domain accepts a platform-prefixed channel id (`discord:<id>`, `whatsapp:<alias>`).
+  A bare numeric id still means Discord, so existing clients and requests do not change.
+
+### Increment 4: send from the desktop
+
+- `communications.send` accepts `whatsapp:<alias>`; the interface delivers only to its aliases, at a
+  low fixed rate, text only and up to the same length as Discord. The shell confirms the alias and the
+  text natively before anything is sent, the same way it confirms a Discord send.
+- It sends as the owner's own account. A burst of automated messages is what gets a number
+  restricted, so the rate limit is part of the feature, not an option.
+
+### Compatibility
+
+Additive: new optional environment variables, new internal listeners, additional values in an existing
+status reply and in the switchable names, and an optional platform prefix on the channel id of
+communications requests. The event envelope, the existing ports, the Discord text commands and the HTTP
+contracts of the services do not change. Existing `VA_STATE_FILE` files stay valid: they list only the
+services that are off.

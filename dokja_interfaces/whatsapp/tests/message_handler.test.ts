@@ -23,13 +23,21 @@ const config: WhatsAppMessageConfig = {
   allowedGroups: ["120363000000000001@g.us"],
 };
 
-function setup(overrides: Partial<WhatsAppMessageConfig> = {}, answer: string | Error = "Hello there.") {
+function setup(
+  overrides: Partial<WhatsAppMessageConfig> = {},
+  answer: string | Error = "Hello there.",
+  answerAfterMs = 0,
+) {
   const dispatched: WhatsAppBridgeRequest[] = [];
   const logs: string[] = [];
   const errors: string[] = [];
   const handler = createWhatsAppMessageHandler({ ...config, ...overrides }, {
+    typingDelayMs: 5,
     dispatch: async (_endpoint, _timeout, body) => {
       dispatched.push(body);
+      if (answerAfterMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, answerAfterMs));
+      }
       if (answer instanceof Error) {
         throw answer;
       }
@@ -83,7 +91,7 @@ function setup(overrides: Partial<WhatsAppMessageConfig> = {}, answer: string | 
 }
 
 test("a message from an allowed number goes to the orchestrator and the reply comes back", async () => {
-  const { handler, dispatched, replies, typing, context } = setup();
+  const { handler, dispatched, replies, typing, context } = setup({}, "Hello there.", 40);
 
   await handler(context());
 
@@ -211,7 +219,7 @@ test("the same message delivered twice is answered once", async () => {
 });
 
 test("a failing orchestrator is answered with a short apology and logged without the text", async () => {
-  const { handler, replies, typing, errors, context } = setup({}, new Error("orchestrator http 502"));
+  const { handler, replies, typing, errors, context } = setup({}, new Error("orchestrator http 502"), 40);
 
   await handler(context());
 
@@ -254,4 +262,13 @@ test("the log never carries the message text or a phone number", async () => {
   const all = logs.join("\n");
   assert.doesNotMatch(all, /stoicism/);
   assert.doesNotMatch(all, new RegExp(friend));
+});
+
+test("an answer that comes at once never shows typing, so a switched-off interface stays quiet", async () => {
+  const { handler, typing, context } = setup({}, "");
+
+  await handler(context());
+  await new Promise((resolve) => setTimeout(resolve, 30));
+
+  assert.deepEqual(typing, []);
 });

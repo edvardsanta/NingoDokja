@@ -245,3 +245,59 @@ describe("the scheduled jobs on the health card", () => {
     screen.getByText(/a cada 6h · última execução há 2 horas: ran/);
   });
 });
+
+describe("the interfaces on the health card", () => {
+  const INTERFACES = {
+    meme: { status: "ok", detail: "", enabled: true },
+    discord: { status: "ok", detail: "", enabled: true, kind: "interface", state: "connected" },
+    whatsapp: { status: "error", detail: "remove the saved session and link again", enabled: true, kind: "interface", state: "logged_out" },
+  };
+  const WHATSAPP_OFF = { ...INTERFACES, whatsapp: { status: "disabled", detail: "", enabled: false, kind: "interface" } };
+
+  it("lists them under their own heading with their state in words, not the status", async () => {
+    const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });
+    renderCard(transport);
+    await screen.findByText("meme");
+
+    expect(screen.getByRole("heading", { name: "Chat interfaces" })).toBeTruthy();
+    const items = [...document.querySelectorAll("ul.interfaces li")];
+    expect(items.map((item) => item.querySelector(".service-name")?.textContent)).toEqual(["discord", "whatsapp"]);
+    expect(items[0]?.querySelector(".service-status")?.textContent).toBe("connected");
+    expect(items[1]?.querySelector(".service-status")?.textContent).toBe("logged out");
+    expect(items[1]?.textContent).toContain("remove the saved session and link again");
+    expect(items[1]?.getAttribute("data-tone")).toBe("problem");
+  });
+
+  it("says the state in Portuguese too", async () => {
+    const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });
+    renderCard(transport, "pt");
+    await screen.findByText("meme");
+
+    expect(screen.getByRole("heading", { name: "Interfaces de conversa" })).toBeTruthy();
+    expect(document.querySelector("ul.interfaces li .service-status")?.textContent).toBe("conectada");
+  });
+
+  it("switches an interface with the same request as a service and reads the status again", async () => {
+    const { transport, calls } = routedTransport({
+      "ningo.status": [status(INTERFACES), status(WHATSAPP_OFF)],
+      "services.set": ok({ name: "whatsapp", enabled: false }),
+    });
+    renderCard(transport);
+    await screen.findByText("whatsapp");
+
+    fireEvent.click(switchOf("whatsapp"));
+
+    await waitFor(() => expect(switchOf("whatsapp").getAttribute("aria-checked")).toBe("false"));
+    expect(changes(calls)).toEqual([["services.set", { name: "whatsapp", enabled: false }]]);
+    const off = [...document.querySelectorAll("ul.interfaces li")][1];
+    expect(off?.querySelector(".service-status")?.textContent).toBe("switched off");
+  });
+
+  it("shows no heading when the orchestrator reports no interface", async () => {
+    const { transport } = routedTransport({ "ningo.status": status({ meme: { status: "ok", detail: "" } }) });
+    renderCard(transport);
+    await screen.findByText("meme");
+
+    expect(screen.queryByRole("heading", { name: "Chat interfaces" })).toBeNull();
+  });
+});

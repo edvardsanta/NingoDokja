@@ -43,7 +43,12 @@ func (s *Service) skipped(event Event, route Route) (ProcessResult, bool) {
 	}
 	schedule := scheduleOf(event)
 	reason := ""
-	if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) {
+	// An interface that is off says nothing in its chat: "that is switched off" posted in every
+	// channel the bot sits in would be worse than the silence.
+	silent := false
+	if name := InterfaceForSource(event.Source); name != "" && !s.controls.ServiceEnabled(name) {
+		reason, silent = fmt.Sprintf("interface %s is switched off", name), true
+	} else if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) {
 		reason = fmt.Sprintf("service %s is disabled", service)
 	} else if schedule != "" && !s.controls.ServiceEnabled("scheduler") {
 		reason = "scheduler is paused"
@@ -60,7 +65,7 @@ func (s *Service) skipped(event Event, route Route) (ProcessResult, bool) {
 		Event:    event,
 		Workflow: route.Workflow,
 		Domains:  domainsToStrings(route.Domains),
-		Result:   map[string]any{"skipped": true, "reason": reason},
+		Result:   map[string]any{"skipped": true, "reason": reason, "silent": silent},
 	}, true
 }
 

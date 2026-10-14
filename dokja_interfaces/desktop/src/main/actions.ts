@@ -45,6 +45,8 @@ const MAX_DETAIL_CHARS = 200;
 const SWITCH_NAME = /^[a-z][a-z_.]{0,39}$/;
 const JOB_INTERVAL = /^(default|[0-9]{1,5}[mh])$/;
 const MAX_JOBS = 20;
+// The state an interface reports comes from a closed list of short names; anything else is dropped.
+const INTERFACE_STATE = /^[a-z][a-z_]{0,31}$/;
 const MAX_QUERY_CHARS = 500;
 
 // The states the feeds service reports for a source; anything else is shown as unknown.
@@ -115,6 +117,8 @@ function systemStatus(body: Record<string, unknown>): StatusReply {
         status: text(entry.status),
         detail: shorten(text(entry.error) || text(entry.detail)),
         ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
+        ...(entry.kind === "interface" ? { kind: "interface" as const } : {}),
+        ...(entry.kind === "interface" && INTERFACE_STATE.test(text(entry.state)) ? { state: text(entry.state) } : {}),
       };
     }
   }

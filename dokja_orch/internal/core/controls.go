@@ -16,6 +16,24 @@ import (
 // "scheduler" is special: switching it off pauses every scheduled run at once.
 var KnownServices = []string{"meme", "chat_ai", "book", "knowledge", "memory", "feeds", "scheduler"}
 
+// KnownInterfaces are the interfaces people talk to Ningo through. They are switched like
+// services, but they are not listed with them: an interface only shows up when the orchestrator
+// can read its state. Off means it neither answers nor receives deliveries, and says nothing about
+// being off in the chat; its connection and its credentials are left alone.
+var KnownInterfaces = []string{"discord", "whatsapp"}
+
+// InterfaceForSource names the switchable interface an event came from, or "" for any other
+// source (the desktop, the CLI and the scheduler are never gated by an interface switch).
+func InterfaceForSource(source EventSource) string {
+	switch source {
+	case SourceDiscord:
+		return "discord"
+	case SourceWhatsApp:
+		return "whatsapp"
+	}
+	return ""
+}
+
 // KnownJobs are the scheduler jobs, named as the scheduler stamps them in Context["schedule"].
 var KnownJobs = []string{
 	"meme.refresh",
@@ -146,8 +164,11 @@ func (c *Controls) ServiceEnabled(name string) bool {
 }
 
 func (c *Controls) SetService(name string, enabled bool) error {
-	if !contains(KnownServices, name) {
-		return fmt.Errorf("unknown service %q (known: %s)", name, strings.Join(KnownServices, ", "))
+	if !contains(KnownServices, name) && !contains(KnownInterfaces, name) {
+		return fmt.Errorf(
+			"unknown service %q (known: %s)", name,
+			strings.Join(append(append([]string{}, KnownServices...), KnownInterfaces...), ", "),
+		)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()

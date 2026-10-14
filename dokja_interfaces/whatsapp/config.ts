@@ -3,6 +3,8 @@ export type WhatsAppConfig = {
   authDir: string;
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
+  // Internal port the orchestrator reads the interface's state from. Never published.
+  statusPort: number;
   // Answer the account's own "message yourself" chat.
   selfChat: boolean;
   // Phone numbers (digits only) whose direct messages are answered.
@@ -33,6 +35,7 @@ export function buildConfig(source: Environment = process.env): WhatsAppConfig {
     authDir,
     orchestratorEndpoint: env("DOKJA_ORCH_HTTP_ENDPOINT", "http://dokja-orchestrator:8091/orchestrator", source),
     orchestratorTimeoutMs: Number(env("DOKJA_ORCHESTRATOR_TIMEOUT_MS", "180000", source)),
+    statusPort: parsePort("DOKJA_WHATSAPP_STATUS_PORT", 8094, source),
     selfChat: parseFlag("DOKJA_WHATSAPP_SELF_CHAT", true, source),
     allowedNumbers: parseList("DOKJA_WHATSAPP_ALLOW_FROM", source).map((entry, index) => {
       const number = normalizeNumber(entry);
@@ -87,6 +90,14 @@ function parseList(name: string, source: Environment): string[] {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function parsePort(name: string, fallback: number, source: Environment): number {
+  const port = Number(env(name, String(fallback), source));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${name} must be a port number`);
+  }
+  return port;
 }
 
 function parseFlag(name: string, fallback: boolean, source: Environment): boolean {

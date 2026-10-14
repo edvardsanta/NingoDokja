@@ -49,10 +49,26 @@ type Dependencies = {
   error?: (...args: unknown[]) => void;
 };
 
+// The closed list of states the interface reports. None of them carries an id of any kind.
+export type InterfaceState =
+  | "connecting"
+  | "connected"
+  | "waiting_for_link"
+  | "logged_out"
+  | "replaced"
+  | "refused"
+  | "off";
+
+export type RuntimeStatus = { state: InterfaceState; detail: string };
+
 export type WhatsAppRuntime = {
-  // Resolves after stop(); rejects when the session cannot continue without the operator.
+  // Resolves after stop(). It never gives up on its own: a session that cannot continue without
+  // the operator stays in a state that says so, and the process keeps answering its status.
   run(): Promise<void>;
   stop(): void;
+  status(): RuntimeStatus;
+  // Leaves a waiting state at once (a new link attempt, or a retry after a refusal).
+  restart(): void;
 };
 
 // The values of Baileys' DisconnectReason this loop reacts to (a test keeps them in step).
@@ -60,6 +76,10 @@ export const disconnectReason = { loggedOut: 401, connectionReplaced: 440, resta
 
 const firstRetryMs = 1000;
 const maxRetryMs = 60_000;
+// Between two link attempts nobody scanned: a fresh code soon, then less and less often, so an
+// unlinked service left running does not keep asking WhatsApp for codes.
+const firstLinkRetryMs = 5000;
+const maxLinkRetryMs = 5 * 60_000;
 // Failures in a row before WhatsApp ever issued a link code. A few are a network that is not
 // ready yet; this many are a client WhatsApp no longer accepts.
 const maxFailuresBeforeLinkCode = 5;
@@ -73,6 +93,37 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
   const newMessageId = deps.newMessageId ?? randomMessageId;
   let stopped = false;
   let current: WhatsAppSocketLike | null = null;
+  let status: RuntimeStatus = { state: "connecting", detail: "" };
+  let wake: (() => void) | null = null;
+
+  function setState(state: InterfaceState, detail = ""): void {
+    status = { state, detail };
+    // These are the ones that need the operator; the others are already logged where they happen.
+    if (state === "logged_out" || state === "replaced" || state === "refused") {
+      deps.log?.(JSON.stringify({ whatsapp: state, detail }));
+    }
+  }
+
+  // Waits for stop() or restart(), or for the given time when there is one.
+  function waitForWake(ms?: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) {
+          return;
+        }
+        done = true;
+        if (wake === finish) {
+          wake = null;
+        }
+        resolve();
+      };
+      wake = finish;
+      if (ms !== undefined) {
+        void sleep(ms).then(finish);
+      }
+    });
+  }
 
   async function processMessage(socket: WhatsAppSocketLike, message: InboundMessage): Promise<void> {
     let context;
@@ -137,6 +188,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
       socket.ev.on("connection.update", (update) => {
         if (update.qr) {
           linkCodeShown = true;
+          setState("waiting_for_link");
           deps.log?.(JSON.stringify({ whatsapp: "waiting for the link", hint: "scan with Settings > Linked devices" }));
           void Promise.resolve(deps.renderQr(update.qr)).catch(() => {
             deps.error?.(JSON.stringify({ message: "could not show the link code" }));
@@ -144,6 +196,7 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         }
         if (update.connection === "open") {
           opened = true;
+          setState("connected");
           deps.log?.(JSON.stringify({ whatsapp: "connected" }));
         }
         if (update.connection === "close") {
@@ -161,8 +214,10 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
   return {
     async run() {
       let attempt = 0;
+      let linkAttempt = 0;
       let failuresBeforeLinkCode = 0;
       while (!stopped) {
+        setState("connecting");
         let outcome: Outcome;
         try {
           outcome = await connectOnce();
@@ -174,10 +229,12 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
           outcome = { code: undefined, opened: false, linked: true, linkCodeShown: false };
         }
         if (stopped) {
-          return;
+          break;
         }
         if (outcome.opened) {
           attempt = 0;
+          linkAttempt = 0;
+          failuresBeforeLinkCode = 0;
         }
 
         // Linking ends with the server asking for a new connection: that is the normal path.
@@ -186,25 +243,38 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
           continue;
         }
         if (outcome.code === disconnectReason.loggedOut) {
-          throw new Error(
-            "The linked session was logged out from the phone. Remove the saved session and link again.",
-          );
+          setState("logged_out", "logged out from the phone; remove the saved session and link again");
+          await waitForWake();
+          continue;
         }
         if (outcome.code === disconnectReason.connectionReplaced) {
-          throw new Error("Another connection is using this session. Stop it, or remove the saved session and link again.");
+          setState("replaced", "another connection is using the session");
+          await waitForWake();
+          continue;
         }
         if (!outcome.linked) {
           if (outcome.linkCodeShown) {
-            throw new Error(
-              `The account was not linked in time (status ${describe(outcome.code)}). Start the service again to get a new code.`,
-            );
+            const delay = Math.min(maxLinkRetryMs, firstLinkRetryMs * 2 ** linkAttempt);
+            linkAttempt += 1;
+            setState("waiting_for_link", "the last link code expired; a new one follows");
+            deps.log?.(JSON.stringify({
+              whatsapp: "link code expired",
+              status: describe(outcome.code),
+              newCodeInMs: delay,
+            }));
+            await waitForWake(delay);
+            continue;
           }
           failuresBeforeLinkCode += 1;
           if (failuresBeforeLinkCode >= maxFailuresBeforeLinkCode) {
-            throw new Error(
-              `WhatsApp closed the connection ${failuresBeforeLinkCode} times (status ${describe(outcome.code)}) before issuing a link code. ` +
-                "If the network is fine, the Baileys version is probably too old for WhatsApp and needs an upgrade.",
+            setState(
+              "refused",
+              `closed ${failuresBeforeLinkCode} times before issuing a link code (status ${describe(outcome.code)}); ` +
+                "if the network is fine the Baileys version probably needs an upgrade",
             );
+            failuresBeforeLinkCode = 0;
+            await waitForWake();
+            continue;
           }
         }
 
@@ -218,10 +288,19 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         }));
         await sleep(delay);
       }
+      setState("off");
     },
     stop() {
       stopped = true;
+      setState("off");
+      wake?.();
       current?.end(undefined);
+    },
+    status() {
+      return status;
+    },
+    restart() {
+      wake?.();
     },
   };
 }

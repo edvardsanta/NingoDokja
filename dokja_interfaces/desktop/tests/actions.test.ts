@@ -364,3 +364,43 @@ test("knowledge.ingest cuts a long reason and is a change", () => {
   const projected = ACTIONS["knowledge.ingest"].project(compactOf("knowledge", { created: true, changed: true, degraded: true, reason: "x".repeat(500) })) as { reason: string };
   assert.ok(projected.reason.length <= 200);
 });
+
+test("ningo.status keeps an interface's kind and its state, and drops anything else it reports", () => {
+  const reply = {
+    workflow: "ningo",
+    domain: "system",
+    result: {
+      services: {
+        whatsapp: {
+          status: "error",
+          kind: "interface",
+          state: "waiting_for_link",
+          detail: "the last link code expired",
+          enabled: true,
+          link_code: "secret-code-1",
+          chat: "chat-id-1",
+        },
+        discord: { status: "ok", kind: "interface", state: "NOT A NAME", detail: "" },
+        meme: { status: "ok", kind: "something-else", state: "connected" },
+      },
+    },
+  };
+
+  const projected = project(reply) as { services: Record<string, unknown> };
+
+  assert.deepEqual(projected.services, {
+    whatsapp: {
+      status: "error",
+      detail: "the last link code expired",
+      enabled: true,
+      kind: "interface",
+      state: "waiting_for_link",
+    },
+    discord: { status: "ok", detail: "", kind: "interface" },
+    meme: { status: "ok", detail: "" },
+  });
+  const serialized = JSON.stringify(projected);
+  for (const leaked of ["secret-code-1", "chat-id-1", "NOT A NAME"]) {
+    assert.ok(!serialized.includes(leaked), `${leaked} must not reach the renderer`);
+  }
+});

@@ -6,6 +6,10 @@ export type ServiceState = {
   status: string;
   detail: string;
   enabled?: boolean;
+  // An interface (Discord, WhatsApp) is listed with the services but carries its kind and a
+  // state from the interface's own closed list ("connected", "waiting_for_link", ...).
+  kind?: "interface";
+  state?: string;
 };
 
 // One scheduled job as the orchestrator reports it. The times are RFC 3339 and empty when unknown.

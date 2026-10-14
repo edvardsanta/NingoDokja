@@ -21,6 +21,19 @@ Current capabilities:
 - modals
 - internal outbound message delivery for orchestrator-driven sends
 
+## State
+
+The delivery listener also answers `GET /status` with a level, a gateway state (`connected`,
+`connecting` or `disconnected`) and an empty sentence. The state follows the discord.js gateway, so a
+dropped shard is reported as `disconnected` even while the process is up. The orchestrator reads it
+through `DISCORD_INTERFACE_STATUS_ENDPOINT` (set in the Compose stacks) and lists Discord in
+`ningo.status`, so the desktop shows it and can switch it. Switching it off makes the bot answer
+nothing and leaves Discord channels out of scheduled and manual deliveries (reported as skipped); the
+gateway connection stays up. The reply never carries a channel, a guild or a token.
+
+While Discord is off, a plain message gets no reply at all. A slash command is answered
+`No response.` to the person who ran it only (an ephemeral reply), so nothing is posted in the channel.
+
 ## Inbound Flows
 
 ### Plain Messages

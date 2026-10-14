@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"read_books/internal/core"
 	"sort"
 	"sync"
 )
@@ -16,6 +17,10 @@ type HealthChecker interface {
 type ServiceStatusReader interface {
 	Status(ctx context.Context) (map[string]any, error)
 }
+
+// InterfaceProbe reads the state of an interface: a level (ok, degraded or error), a state from
+// the interface's own closed list and a fixed sentence about it. An error means no answer.
+type InterfaceProbe func(ctx context.Context) (level, state, detail string, err error)
 
 // ServiceProbe checks one service. A nil error means it answers; detail is a short note
 // shown beside the ok ("" when there is nothing to add).
@@ -81,6 +86,52 @@ func embedderNote(status map[string]any) string {
 func (h *SystemDomainHandler) WithServiceProbes(probes map[string]ServiceProbe) *SystemDomainHandler {
 	h.probes = probes
 	return h
+}
+
+// WithInterfaceProbes names the interfaces whose state the orchestrator can read (see
+// core.KnownInterfaces). An interface without a probe is not listed at all.
+func (h *SystemDomainHandler) WithInterfaceProbes(probes map[string]InterfaceProbe) *SystemDomainHandler {
+	h.interfaceProbes = probes
+	return h
+}
+
+// probeInterfaces reads every enabled interface at once, like probeServices. An interface that
+// does not answer is reported with a fixed sentence: the error text could carry an address, and
+// this reply is not authenticated. A switched-off interface is not read.
+func (h *SystemDomainHandler) probeInterfaces(ctx context.Context, services map[string]any) (failed bool) {
+	names := make([]string, 0, len(h.interfaceProbes))
+	for _, name := range core.KnownInterfaces {
+		if probe := h.interfaceProbes[name]; probe != nil && h.serviceEnabled(name) {
+			names = append(names, name)
+		}
+	}
+
+	entries := make([]map[string]any, len(names))
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			level, state, detail, err := h.interfaceProbes[name](ctx)
+			if err != nil {
+				entries[i] = map[string]any{
+					"status": "error", "state": "unreachable", "detail": "no answer from the interface",
+				}
+				return
+			}
+			entries[i] = map[string]any{"status": level, "state": state, "detail": detail}
+		}()
+	}
+	wg.Wait()
+
+	for i, name := range names {
+		entries[i]["kind"] = "interface"
+		services[name] = entries[i]
+		if entries[i]["status"] == "error" {
+			failed = true
+		}
+	}
+	return failed
 }
 
 // probeServices runs every probe of an enabled service at once, so a few services that

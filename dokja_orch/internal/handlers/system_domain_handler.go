@@ -7,6 +7,7 @@ import (
 	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"read_books/internal/logger"
+	"slices"
 	"strings"
 	"time"
 )
@@ -75,6 +76,7 @@ type SystemDomainHandler struct {
 	profiles         ChatProfiles
 	hashtagNotes     HashtagExperienceNotes
 	probes           map[string]ServiceProbe
+	interfaceProbes  map[string]InterfaceProbe
 }
 
 func NewSystemDomainHandler(
@@ -101,6 +103,21 @@ func (h *SystemDomainHandler) WithSafeOnlyChannels(channels string) *SystemDomai
 		h.safeOnlyChannels[channelID] = struct{}{}
 	}
 	return h
+}
+
+// interfaceOfChannel names the interface a delivery channel belongs to. Every delivery channel is
+// a Discord channel id today; the name is how the interface switch finds it.
+func interfaceOfChannel(string) string {
+	return "discord"
+}
+
+func sortedKeys(set map[string]struct{}) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // WithMemeTools gives admin sends what they need to enforce the safe-only rule
@@ -223,6 +240,9 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 	if h.probeServices(ctx, services) {
 		overallStatus = "degraded"
 	}
+	if h.probeInterfaces(ctx, services) {
+		overallStatus = "degraded"
+	}
 	h.applySwitches(services)
 
 	response := map[string]any{
@@ -274,6 +294,9 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 	delivered := 0
 	failed := map[string]error{}
 	skippedUnsafe := map[string]int{}
+	// A channel of an interface that is switched off is left out, not failed: it would otherwise
+	// log a failure on every tick for as long as the switch stays off.
+	switchedOff := map[string]struct{}{}
 	for _, meme := range memesFromResult(result) {
 		content, attachmentURL := formatScheduledMeme(meme)
 		if content == "" {
@@ -284,6 +307,10 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 		sent := false
 		for _, channelID := range h.deliveryChannels {
 			if _, skip := failed[channelID]; skip {
+				continue
+			}
+			if !h.serviceEnabled(interfaceOfChannel(channelID)) {
+				switchedOff[channelID] = struct{}{}
 				continue
 			}
 			if _, safeOnly := h.safeOnlyChannels[channelID]; safeOnly && !safe {
@@ -331,6 +358,9 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 	}
 	if len(skippedUnsafe) > 0 {
 		response["skipped_unsafe"] = skippedUnsafe
+	}
+	if len(switchedOff) > 0 {
+		response["skipped_interfaces"] = sortedKeys(switchedOff)
 	}
 	logger.Info(fmt.Sprintf(
 		"system handler completed event_id=%s type=%s action=%s delivered_count=%d channel_ids=%s",
@@ -428,6 +458,21 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 			return nil, fmt.Errorf("channel %s is not a configured delivery channel", channelID)
 		}
 	}
+
+	// A channel of an interface that is switched off is left out and reported, not failed.
+	var switchedOff []string
+	live := make([]string, 0, len(targets))
+	for _, channelID := range targets {
+		if h.serviceEnabled(interfaceOfChannel(channelID)) {
+			live = append(live, channelID)
+			continue
+		}
+		switchedOff = append(switchedOff, channelID)
+	}
+	if len(live) == 0 {
+		return nil, fmt.Errorf("nothing sent: %s is switched off", strings.Join(switchedOff, ","))
+	}
+	targets = live
 	content = h.appendLearnedHashtag(ctx, content, attachmentURL)
 
 	// The safe-only rule applies here too. Only an explicit TUI --force bypasses it;
@@ -488,6 +533,9 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	}
 	if forceNSFW && len(restricted) > 0 {
 		response["nsfw_bypassed"] = true
+	}
+	if len(switchedOff) > 0 {
+		response["skipped_interfaces"] = switchedOff
 	}
 	if len(skipped) > 0 {
 		response["skipped_unsafe"] = skipped
@@ -663,6 +711,24 @@ func formatScheduledMeme(meme map[string]any) (string, string) {
 func (h *SystemDomainHandler) applySwitches(services map[string]any) {
 	if h.controls == nil {
 		return
+	}
+	// An interface is listed only when it can be read, and carries its kind so a screen can
+	// group it. A switched-off one is not read: it says only that it is off.
+	for _, name := range core.KnownInterfaces {
+		if h.interfaceProbes[name] == nil {
+			continue
+		}
+		enabled := h.controls.ServiceEnabled(name)
+		entry, _ := services[name].(map[string]any)
+		if entry == nil || !enabled {
+			entry = map[string]any{"kind": "interface"}
+		}
+		entry["enabled"] = enabled
+		if !enabled {
+			// The status says it is off; a sentence of its own would only repeat it, in English.
+			entry["status"] = "disabled"
+		}
+		services[name] = entry
 	}
 	for _, info := range h.controls.Services() {
 		entry, _ := services[info.Name].(map[string]any)

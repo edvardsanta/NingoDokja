@@ -448,8 +448,9 @@ account can be restricted or banned, so prefer a dedicated number). See
 - First start: read the QR code from the `dokja-whatsapp` log and scan it in Linked devices within
   about a minute. The session lives in the `dokja-whatsapp-auth` volume and is the whole account:
   back it up like a secret and never copy it into the repository.
-- The service stops instead of retrying when the session was logged out or is used by another
-  connection. Remove the volume and link again, as described in the interface doc.
+- The service keeps running, in a state that says what it needs, when the session was logged out
+  (`logged_out`), is used by another connection (`replaced`) or was refused (`refused`). Remove the
+  volume and link again, as described in the interface doc.
 - Check that it works in the `dokja-whatsapp` log (`"whatsapp":"connected"`, then
   `"message":"replied"`). Ignored messages are not logged on purpose; a group that is not allowed
   is logged once with its id and `"reason":"policy"`.
@@ -460,3 +461,28 @@ Compatibility: new optional environment settings, one optional service and one n
 additive value for the optional `interface` field of the HTTP bridge request (the `whatsapp` event
 source already existed); no change to the event envelope, existing ports, CLI/Discord commands or
 HTTP contracts.
+
+## Interfaces in the desktop
+
+The desktop's health tab lists the chat interfaces (Discord, WhatsApp) under their own
+heading, with their state and a switch each. See the interface docs for each state list.
+
+- Each interface runs an internal listener that answers `GET /status` (Discord `8092`, WhatsApp
+  `8094`). Neither port is published; the orchestrator reads them over the Compose network. A reply carries a level, a state from a closed list and a short sentence, never an id.
+- The orchestrator lists an interface only when its address is set: `DISCORD_INTERFACE_STATUS_ENDPOINT`
+  is set in the stacks; set `WHATSAPP_INTERFACE_STATUS_ENDPOINT` (`http://dokja-whatsapp:8094/status`)
+  in the ignored environment file when you start its profile, then recreate the orchestrator. An interface that is not
+  deployed has no address and is never shown as a failure.
+- **Switching an interface off** makes it answer nothing at all in its chats (no "switched off"
+  reply) and leaves its channels out of scheduled and manual deliveries, which are reported as
+  `skipped_interfaces` and are not failures. Its connection and credentials are left alone, and the
+  desktop and the CLI are never gated, so it can always be switched back on.
+- A listed interface that is not `connected` or `listening` makes `ningo.status` report `degraded`.
+  An interface that is switched off never does.
+- `ningo.status` is not authenticated and the request port is published, so it carries only these
+  states. Anything that would carry a link code, history or a send travels under the
+  `communications.` event types, which need the communications credential.
+
+Compatibility: additive. New optional environment variables on the orchestrator, one status route on
+each interface, new names in the switchable set (listed apart from the services) and extra fields
+(`kind`, `state`) on interface entries of `ningo.status`. Existing `VA_STATE_FILE` files stay valid.
