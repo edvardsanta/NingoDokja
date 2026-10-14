@@ -359,7 +359,13 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => {
       const content = text(raw.content).trim();
       const attachment = text(raw.attachment_url);
-      if (!/^[0-9]{1,20}$/.test(text(raw.channel_id)) || content.length > 2000 || (!content && !attachment)) return undefined;
+      const channel = text(raw.channel_id);
+      // A WhatsApp conversation takes text only: it goes out as the owner's own account.
+      if (/^whatsapp:[a-z0-9][a-z0-9_-]{0,31}$/.test(channel)) {
+        if (!content || content.length > 2000 || attachment) return undefined;
+        return { channel_ids: [channel], content };
+      }
+      if (!/^[0-9]{1,20}$/.test(channel) || content.length > 2000 || (!content && !attachment)) return undefined;
       if (attachment && (!/^https?:\/\//.test(attachment) || attachment.length > 2048)) return undefined;
       return { channel_ids: [raw.channel_id], content, ...(attachment ? { attachment_url: attachment } : {}) };
     },

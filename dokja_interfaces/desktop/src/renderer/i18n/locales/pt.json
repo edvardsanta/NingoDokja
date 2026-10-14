@@ -216,5 +216,6 @@
   "communications_who_bot": "Ningo",
   "communications_who_contact": "Contato",
   "communications_who_member": "Membro",
-  "communications_whatsapp_read_only": "O envio ao WhatsApp por aqui ainda não está disponível."
+  "communications_whatsapp_identity": "As mensagens para uma conversa do WhatsApp saem da sua própria conta, como você, só em texto. No máximo algumas por minuto.",
+  "communications_send_whatsapp": "Enviar como você"
 }

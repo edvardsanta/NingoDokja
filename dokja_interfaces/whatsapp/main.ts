@@ -1,7 +1,9 @@
 import { buildConfig } from "./config.js";
 import { connectSocket, loadAuth, newMessageId, wipeAuth } from "./runtime/baileys_socket.js";
 import { HistoryStore } from "./history/store.js";
+import { createDeskSender } from "./messages/desk_sender.js";
 import { createRecorder } from "./messages/recorder.js";
+import { SendLimit } from "./runtime/send_limit.js";
 import { renderQr } from "./runtime/qr.js";
 import { startStatusServer } from "./runtime/status_server.js";
 import { createWhatsAppRuntime } from "./runtime/whatsapp_runtime.js";
@@ -45,6 +47,16 @@ async function main() {
     port: config.statusPort,
     status: () => runtime.status(),
     link: { code: () => runtime.linkCode(), start: () => runtime.restart(), reset: () => runtime.resetSession() },
+    deliver: store
+      ? createDeskSender({
+          conversations: config.conversations,
+          send: (jid, text) => runtime.sendText(jid, text),
+          connected: () => runtime.status().state === "connected",
+          limit: new SendLimit(),
+          record: (alias, text, id) =>
+            store.append(alias, { id: id ?? `out-${Date.now()}`, at: Date.now(), who: "owner", text }),
+        })
+      : undefined,
     conversations: store
       ? {
           list: () => config.conversations.map((entry) => ({ alias: entry.alias, kind: entry.group ? "group" : "direct" })),

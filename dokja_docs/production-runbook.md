@@ -488,6 +488,10 @@ heading, with their state and a switch each. See the interface docs for each sta
   interface's status address and lists them as `whatsapp:<alias>` next to the Discord channels,
   behind the communications credential. A named group records every member's text. To erase the
   history now, remove that volume.
+- **Sending from the desktop to a WhatsApp conversation** goes out as the owner's own account, through
+  `communications.send` only, one named conversation at a time, as text, under a fixed budget of 6 a
+  minute and 40 an hour. The desktop asks in a window of its own first. Turning WhatsApp off in the
+  health tab stops it as well.
 - **Linking WhatsApp from the desktop** uses `communications.link.status`, `.start` and `.reset`. They
   need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and on the desktop process; the desktop
   draws the code itself and never shows it as text. The orchestrator derives the link routes from

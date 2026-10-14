@@ -95,3 +95,17 @@ test("starting over has a question that says what is lost, in both languages, an
   assert.equal(questionFor("en", "communications.link.start", { interface: "whatsapp" }), undefined);
   assert.equal(questionFor("en", "communications.link.status", { interface: "whatsapp" }), undefined);
 });
+
+test("a send to WhatsApp says it goes out from the owner's own account and names the conversation by its alias", () => {
+  const en = questionFor("en", "communications.send", { channel_ids: ["whatsapp:friend"], content: "see you there" });
+  assert.equal(en?.message, "Send on WhatsApp as you?");
+  assert.match(en?.detail ?? "", /^Conversation: friend\n\nsee you there\n\n.*your own WhatsApp account/s);
+  assert.doesNotMatch(en?.detail ?? "", /whatsapp:/);
+
+  const pt = questionFor("pt", "communications.send", { channel_ids: ["whatsapp:friend"], content: "nos vemos" });
+  assert.equal(pt?.message, "Enviar pelo WhatsApp como você?");
+  assert.match(pt?.detail ?? "", /^Conversa: friend/);
+
+  const discord = questionFor("en", "communications.send", { channel_ids: ["123"], content: "hi" });
+  assert.equal(discord?.message, "Send to Discord as Ningo?");
+});

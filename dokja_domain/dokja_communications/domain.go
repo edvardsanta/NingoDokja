@@ -84,23 +84,26 @@ func (d *Domain) Handle(ctx context.Context, action string, payload map[string]a
 func (d *Domain) listChannels(ctx context.Context) (map[string]any, error) {
 	answer := map[string]any{}
 	channels := []any{}
+	unavailable := []any{}
+	var discordErr error
 	if d.service != nil && len(d.channels) > 0 {
 		result, err := d.service.Dispatch(ctx, "channels", map[string]any{"channel_ids": d.channels})
 		if err != nil {
-			return nil, err
-		}
-		for key, value := range result {
-			answer[key] = value
-		}
-		if listed, ok := result["channels"].([]any); ok {
-			channels = append(channels, listed...)
+			discordErr = err
+		} else {
+			for key, value := range result {
+				answer[key] = value
+			}
+			if listed, ok := result["channels"].([]any); ok {
+				channels = append(channels, listed...)
+			}
 		}
 	}
 	if d.conversations != nil {
 		listed, err := d.conversations.List(ctx)
 		if err != nil {
-			// The Discord channels still list; what could not be read is said apart.
-			answer["unavailable"] = []any{"whatsapp"}
+			// What could not be read is said apart; the other source still lists.
+			unavailable = append(unavailable, "whatsapp")
 		}
 		for _, conversation := range listed {
 			channels = append(channels, map[string]any{
@@ -110,6 +113,17 @@ func (d *Domain) listChannels(ctx context.Context) (map[string]any, error) {
 				"retention_days": conversation.RetentionDays,
 			})
 		}
+	}
+	if discordErr != nil {
+		// A Discord read service that is down must not hide the conversations that can be read. With
+		// nothing else to show, the error stands, as it always did.
+		if len(channels) == 0 {
+			return nil, discordErr
+		}
+		unavailable = append(unavailable, "discord")
+	}
+	if len(unavailable) > 0 {
+		answer["unavailable"] = unavailable
 	}
 	answer["channels"] = channels
 	return answer, nil

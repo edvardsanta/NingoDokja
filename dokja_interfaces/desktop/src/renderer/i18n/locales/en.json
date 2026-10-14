@@ -216,5 +216,6 @@
   "communications_who_bot": "Ningo",
   "communications_who_contact": "Contact",
   "communications_who_member": "Member",
-  "communications_whatsapp_read_only": "Sending to WhatsApp from here is not available yet."
+  "communications_whatsapp_identity": "Messages to a WhatsApp conversation go out from your own account, as you, as text only. A few a minute at most.",
+  "communications_send_whatsapp": "Send as you"
 }

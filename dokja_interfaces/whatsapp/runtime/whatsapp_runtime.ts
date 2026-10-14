@@ -81,6 +81,9 @@ export type WhatsAppRuntime = {
   // Unlinks the account (on WhatsApp's side too, when it is connected), erases the saved session and
   // asks for a new link code. Nothing else of the interface is touched.
   resetSession(): Promise<void>;
+  // Sends text into a chat as the linked account, for what the owner asked for by name. It never
+  // answers anyone, and refuses while the account is not connected. Gives the id it went out with.
+  sendText(jid: string, text: string): Promise<string | undefined>;
 };
 
 // The values of Baileys' DisconnectReason this loop reacts to (a test keeps them in step).
@@ -355,6 +358,21 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
     },
     linkCode() {
       return status.state === "waiting_for_link" ? linkCode : undefined;
+    },
+    async sendText(jid, text) {
+      const socket = current;
+      if (!socket || status.state !== "connected") {
+        throw new Error("the account is not connected");
+      }
+      // Remembered before the send, so its echo is never answered as if someone had written it.
+      const id = newMessageId(socket.user?.id);
+      sent.add(id);
+      const result = await socket.sendMessage(jid, { text }, { messageId: id });
+      const actual = (result as { key?: { id?: string | null } } | undefined)?.key?.id ?? undefined;
+      if (actual) {
+        sent.add(actual);
+      }
+      return actual ?? id;
     },
     async resetSession() {
       resetPending = true;
