@@ -435,3 +435,28 @@ No send is retried automatically. On timeout verify the channel before resending
 
 Compatibility: new routes, new optional environment settings and one internal service; no change
 to CLI/Discord commands, SQLite schemas, existing port mappings or existing HTTP contracts.
+
+## Optional WhatsApp interface
+
+People can talk to Ningo in WhatsApp through a linked device (Baileys, an unofficial protocol: the
+account can be restricted or banned, so prefer a dedicated number). See
+[whatsapp-interface.md](./whatsapp-interface.md) for the policy, setup and limits.
+
+- The service starts only with the `whatsapp` Compose profile, has no published port and listens on
+  nothing. Set `DOKJA_WHATSAPP_ALLOW_FROM` and/or `DOKJA_WHATSAPP_ALLOWED_GROUPS` in the ignored
+  environment file; self chat is on by default. Nothing is answered unless it is listed.
+- First start: read the QR code from the `dokja-whatsapp` log and scan it in Linked devices within
+  about a minute. The session lives in the `dokja-whatsapp-auth` volume and is the whole account:
+  back it up like a secret and never copy it into the repository.
+- The service stops instead of retrying when the session was logged out or is used by another
+  connection. Remove the volume and link again, as described in the interface doc.
+- Check that it works in the `dokja-whatsapp` log (`"whatsapp":"connected"`, then
+  `"message":"replied"`). Ignored messages are not logged on purpose; a group that is not allowed
+  is logged once with its id and `"reason":"policy"`.
+- The orchestrator bridge accepts the `whatsapp` interface next to `discord`, limited to
+  `message.created`; requests without the field are Discord requests, as before.
+
+Compatibility: new optional environment settings, one optional service and one named volume; an
+additive value for the optional `interface` field of the HTTP bridge request (the `whatsapp` event
+source already existed); no change to the event envelope, existing ports, CLI/Discord commands or
+HTTP contracts.

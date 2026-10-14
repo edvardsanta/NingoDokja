@@ -1,0 +1,16 @@
+{
+  "name": "dokja-whatsapp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx ./main.ts",
+    "dev": "node --import tsx ./main.ts",
+    "dev:watch": "tsx watch --clear-screen=false ./main.ts",
+    "test": "node --import tsx --test ./tests/*.test.ts"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "qrcode-terminal": "0.12.0",
+    "tsx": "^4.21.0"
+  }
+}

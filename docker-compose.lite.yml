@@ -292,6 +292,30 @@ services:
     networks:
       - dokja-net
 
+  dokja-whatsapp:
+    build:
+      context: .
+      dockerfile: dokja_interfaces/whatsapp/Dockerfile.dev
+    profiles: [whatsapp]
+    working_dir: /workspace/dokja_interfaces/whatsapp
+    command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
+    environment:
+      CI: "true"
+      DOKJA_WHATSAPP_AUTH_DIR: /auth/default
+      DOKJA_WHATSAPP_SELF_CHAT: ${DOKJA_WHATSAPP_SELF_CHAT:-true}
+      DOKJA_WHATSAPP_ALLOW_FROM: ${DOKJA_WHATSAPP_ALLOW_FROM:-}
+      DOKJA_WHATSAPP_ALLOWED_GROUPS: ${DOKJA_WHATSAPP_ALLOWED_GROUPS:-}
+      DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
+    volumes:
+      - ./:/workspace
+      # The linked-device session. It lives in a named volume so it never lands in the repository.
+      - dokja-whatsapp-auth:/auth
+    # No published port: the service only connects out.
+    depends_on:
+      - dokja-orchestrator
+    networks:
+      - dokja-net
+
   dokja-discord:
     build:
       context: .
@@ -341,6 +365,9 @@ services:
       - dokja-orchestrator
     networks:
       - dokja-net
+
+volumes:
+  dokja-whatsapp-auth:
 
 networks:
   dokja-net:

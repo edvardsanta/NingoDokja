@@ -21,6 +21,9 @@ type HTTPBridgeIngress struct {
 
 type BridgeRequest struct {
 	EventType string `json:"event_type"`
+	// Interface names the interface the request came from. Empty means Discord, which is
+	// what every existing client sends; only the values in bridgeInterfaces are accepted.
+	Interface string `json:"interface"`
 	Payload   struct {
 		Content    string `json:"content"`
 		Limit      *int   `json:"limit"`
@@ -92,6 +95,18 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		})
 	}
 
+	if _, source, ok := bridgeInterface(bridgeRequest.Interface); !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{
+			Status: "error",
+			Error:  "unknown interface",
+		})
+	} else if chatOnlySources[source] && !chatEventTypeAllowed(bridgeRequest.EventType) {
+		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{
+			Status: "error",
+			Error:  "event type is not allowed for this interface",
+		})
+	}
+
 	logger.Info(fmt.Sprintf(
 		"http bridge received event_type=%s user=%s channel=%s message_id=%s content_chars=%d",
 		bridgeRequest.EventType,
@@ -151,11 +166,48 @@ func extractBridgeReply(result core.ProcessResult) string {
 	return ""
 }
 
+// bridgeInterfaces are the interfaces allowed to use the bridge, with the source their
+// events carry. An unknown name is refused rather than mapped to a source of its own.
+var bridgeInterfaces = map[string]core.EventSource{
+	"discord":  core.SourceDiscord,
+	"whatsapp": core.SourceWhatsApp,
+}
+
+// chatOnlySources are the interfaces whose text is chat and nothing else. Their text is user
+// input in a shared or personal chat, so it must not pick another event type or reach the
+// Discord text commands.
+var chatOnlySources = map[core.EventSource]bool{
+	core.SourceWhatsApp: true,
+}
+
+// bridgeInterface resolves the request's interface, treating an empty one as Discord.
+func bridgeInterface(name string) (string, core.EventSource, bool) {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" {
+		name = "discord"
+	}
+	source, ok := bridgeInterfaces[name]
+	return name, source, ok
+}
+
+// chatEventTypeAllowed limits the chat-only interfaces to chat messages, so their text cannot
+// pick any other event type for the generic branch of mapBridgeRequestToEvent.
+func chatEventTypeAllowed(eventType string) bool {
+	return strings.TrimSpace(eventType) == "message.created"
+}
+
 func bridgeEventFromRequest(request BridgeRequest) core.Event {
 	content := strings.TrimSpace(request.Payload.Content)
+	interfaceName, source, _ := bridgeInterface(request.Interface)
 	eventType, payload := mapBridgeRequestToEvent(request, content)
+	if chatOnlySources[source] {
+		// WhatsApp text is chat and nothing else. The Discord text commands ("meme fetch",
+		// "meme refresh") would let anyone allowed to write to a personal number drive the
+		// operator's commands, so they are not parsed here.
+		eventType, payload = "message.created", map[string]any{"content": content}
+	}
 	context := map[string]any{
-		"interface":         "discord",
+		"interface":         interfaceName,
 		"message_id":        strings.TrimSpace(request.Payload.MessageID),
 		"guild_id":          strings.TrimSpace(request.Payload.GuildID),
 		"session_key":       strings.TrimSpace(request.Payload.SessionKey),
@@ -168,7 +220,7 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 	}
 
 	return core.Event{
-		Source: core.SourceDiscord,
+		Source: source,
 		Type:   eventType,
 		User: core.EventUser{
 			ID:   strings.TrimSpace(request.Payload.UserID),
