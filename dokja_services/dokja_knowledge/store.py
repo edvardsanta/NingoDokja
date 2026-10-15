@@ -141,11 +141,16 @@ class Store:
 
     def list_documents(self, limit: int, offset: int, kind: str = "") -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT d.*, COUNT(c.id) AS chunks,"
-            " SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) AS embedded"
-            " FROM documents d LEFT JOIN chunks c ON c.document_id = d.id"
-            " WHERE (? = '' OR d.kind = ?)"
-            " GROUP BY d.id ORDER BY d.updated_at DESC, d.id DESC LIMIT ? OFFSET ?",
+            """
+            SELECT d.*, COUNT(c.id) AS chunks,
+                   SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) AS embedded
+            FROM documents d
+            LEFT JOIN chunks c ON c.document_id = d.id
+            WHERE (? = '' OR d.kind = ?)
+            GROUP BY d.id
+            ORDER BY d.updated_at DESC, d.id DESC
+            LIMIT ? OFFSET ?
+            """,
             (kind, kind, limit, offset),
         ).fetchall()
 
@@ -201,10 +206,15 @@ class Store:
     def embedding_matrix(self, model: str, kind: str = "") -> tuple[np.ndarray, np.ndarray]:
         """(chunk ids, matrix) of every chunk embedded by `model`. Rows are unit vectors."""
         rows = self.conn.execute(
-            "SELECT c.id, c.embedding FROM chunks c"
-            " JOIN documents d ON d.id = c.document_id"
-            " WHERE c.embedding IS NOT NULL AND c.embed_model = ? AND (? = '' OR d.kind = ?)"
-            " ORDER BY c.id",
+            """
+            SELECT c.id, c.embedding
+            FROM chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE c.embedding IS NOT NULL
+              AND c.embed_model = ?
+              AND (? = '' OR d.kind = ?)
+            ORDER BY c.id
+            """,
             (model, kind, kind),
         ).fetchall()
         if not rows:
@@ -220,11 +230,16 @@ class Store:
         if not fts_query:
             return []
         rows = self.conn.execute(
-            "SELECT chunks_fts.rowid, bm25(chunks_fts) AS score FROM chunks_fts"
-            " JOIN chunks c ON c.id = chunks_fts.rowid"
-            " JOIN documents d ON d.id = c.document_id"
-            " WHERE chunks_fts MATCH ? AND (? = '' OR d.kind = ?)"
-            " ORDER BY score LIMIT ?",
+            """
+            SELECT chunks_fts.rowid, bm25(chunks_fts) AS score
+            FROM chunks_fts
+            JOIN chunks c ON c.id = chunks_fts.rowid
+            JOIN documents d ON d.id = c.document_id
+            WHERE chunks_fts MATCH ?
+              AND (? = '' OR d.kind = ?)
+            ORDER BY score
+            LIMIT ?
+            """,
             (fts_query, kind, kind, limit),
         ).fetchall()
         return [(row["rowid"], row["score"]) for row in rows]

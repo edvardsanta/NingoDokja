@@ -23,8 +23,8 @@ func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 	tag := &cobra.Command{
 		Use:   "tag <image-url> <hashtag>",
 		Short: "Store knowledge: this meme's text means this hashtag (meme.hashtag.tag)",
-		Long: "Reads the hashtag from the image's own text (via the same OCR the NSFW filter uses)\n" +
-			"unless --text is given. A meme with no legible text cannot be tagged.",
+		Long: `Reads the hashtag from the image's own text (via the same OCR the NSFW filter uses)
+unless --text is given. A meme with no legible text cannot be tagged.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.request(ctx, EmitOptions{
@@ -50,8 +50,8 @@ func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 	suggest := &cobra.Command{
 		Use:   "suggest [image-url]",
 		Short: "Suggest a hashtag for a meme by its closest tagged example (meme.hashtag.suggest)",
-		Long: "Check the result's \"relevant\" field: a hit below the threshold is still\n" +
-			"reported for visibility, but must not be treated as a match.",
+		Long: `Check the result's "relevant" field: a hit below the threshold is still
+reported for visibility, but must not be treated as a match.`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			suggestMinScoreSet = cmd.Flags().Changed("min-score")

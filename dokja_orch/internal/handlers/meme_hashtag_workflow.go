@@ -214,7 +214,7 @@ func normalizeHashtag(raw string) (string, error) {
 		return "", fmt.Errorf("hashtag is required")
 	}
 	if !strings.HasPrefix(value, "#") {
-		value = "#" + value
+		value = fmt.Sprintf("#%s", value)
 	}
 	for _, char := range strings.TrimPrefix(value, "#") {
 		if char != '_' && !unicode.IsLetter(char) && !unicode.IsDigit(char) {
@@ -229,7 +229,7 @@ func normalizeHashtag(raw string) (string, error) {
 
 func hashtagKnowledgeID(url string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(url)))
-	return "meme-hashtag:" + hex.EncodeToString(sum[:])[:32]
+	return fmt.Sprintf("meme-hashtag:%s", hex.EncodeToString(sum[:])[:32])
 }
 
 func stringValue(values map[string]any, key string) string {
