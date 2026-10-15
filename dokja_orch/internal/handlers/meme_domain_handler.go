@@ -10,6 +10,7 @@ import (
 
 type MemeDomainHandler struct {
 	domain       *memedomain.Domain
+	hashtags     MemeHashtagActions
 	hashtagNotes HashtagExperienceNotes
 }
 
@@ -21,6 +22,15 @@ func NewMemeDomainHandler(service memedomain.Service) *MemeDomainHandler {
 // tell whether it was the one the bot had suggested.
 func (h *MemeDomainHandler) WithHashtagExperience(notes HashtagExperienceNotes) *MemeDomainHandler {
 	h.hashtagNotes = notes
+	return h
+}
+
+type MemeHashtagActions interface {
+	Handle(ctx context.Context, action string, payload map[string]any) (map[string]any, error)
+}
+
+func (h *MemeDomainHandler) WithHashtagWorkflow(workflow MemeHashtagActions) *MemeDomainHandler {
+	h.hashtags = workflow
 	return h
 }
 
@@ -40,16 +50,25 @@ func (h *MemeDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		event.Source,
 	))
 
-	response, err := h.domain.Handle(ctx, memedomain.Request{
-		Action: workflow.Action,
-		Event: memedomain.Event{
-			ID:      event.EventID,
-			Source:  string(event.Source),
-			Type:    event.Type,
-			Payload: event.Payload,
-			Context: event.Context,
-		},
-	})
+	var response map[string]any
+	var err error
+	if isMemeHashtagAction(workflow.Action) {
+		if h.hashtags == nil {
+			return nil, fmt.Errorf("meme hashtag workflow is not configured")
+		}
+		response, err = h.hashtags.Handle(ctx, workflow.Action, event.Payload)
+	} else {
+		response, err = h.domain.Handle(ctx, memedomain.Request{
+			Action: workflow.Action,
+			Event: memedomain.Event{
+				ID:      event.EventID,
+				Source:  string(event.Source),
+				Type:    event.Type,
+				Payload: event.Payload,
+				Context: event.Context,
+			},
+		})
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -71,4 +90,14 @@ func (h *MemeDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		len(response),
 	))
 	return response, nil
+}
+
+func isMemeHashtagAction(action string) bool {
+	switch action {
+	case memedomain.ActionTagMemeHashtag, memedomain.ActionSuggestMemeHashtag,
+		memedomain.ActionListMemeHashtags, memedomain.ActionUntagMemeHashtag:
+		return true
+	default:
+		return false
+	}
 }

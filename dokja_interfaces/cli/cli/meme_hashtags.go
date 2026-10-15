@@ -8,11 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newMemeHashtagCommand is "meme hashtag": train and query the hashtag classifier that
+// newMemeHashtagCommand is "meme hashtag": capture and query hashtag knowledge that
 // suggests a meme's hashtag from the text printed on the image (its OCR text, not the
 // scraper's title or tags, which are often meaningless). Training is per this project's
-// own scheme: the operator tags examples, and the orchestrator's meme service finds the
-// closest one for a new meme; nothing here decides that on its own.
+// own scheme: the operator tags examples, and the orchestrator coordinates meme OCR,
+// Knowledge retrieval and Prediction/Experience; nothing here decides that on its own.
 func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 	hashtagCommand := &cobra.Command{
 		Use:   "hashtag",
@@ -22,9 +22,9 @@ func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 	var tagText string
 	tag := &cobra.Command{
 		Use:   "tag <image-url> <hashtag>",
-		Short: "Train the classifier: this meme's text means this hashtag (meme.hashtag.tag)",
-		Long: "Reads the hashtag from the image's own text (via the same OCR the NSFW filter uses)\n" +
-			"unless --text is given. A meme with no legible text cannot be tagged.",
+		Short: "Store knowledge: this meme's text means this hashtag (meme.hashtag.tag)",
+		Long: `Reads the hashtag from the image's own text (via the same OCR the NSFW filter uses)
+unless --text is given. A meme with no legible text cannot be tagged.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.request(ctx, EmitOptions{
@@ -50,8 +50,8 @@ func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 	suggest := &cobra.Command{
 		Use:   "suggest [image-url]",
 		Short: "Suggest a hashtag for a meme by its closest tagged example (meme.hashtag.suggest)",
-		Long: "Check the result's \"relevant\" field: a hit below the threshold is still\n" +
-			"reported for visibility, but must not be treated as a match.",
+		Long: `Check the result's "relevant" field: a hit below the threshold is still
+reported for visibility, but must not be treated as a match.`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			suggestMinScoreSet = cmd.Flags().Changed("min-score")
@@ -74,7 +74,7 @@ func (a *App) newMemeHashtagCommand(ctx context.Context) *cobra.Command {
 		},
 	}
 	suggest.Flags().StringVar(&suggestText, "text", "", "Suggest for this text instead of an image's url")
-	suggest.Flags().Float64Var(&suggestMinScore, "min-score", 0, "Override the service's relevance threshold for this call")
+	suggest.Flags().Float64Var(&suggestMinScore, "min-score", 0, "Override the hashtag relevance threshold for this call")
 
 	var listLimit, listOffset int
 	list := &cobra.Command{

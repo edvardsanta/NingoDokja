@@ -11,6 +11,7 @@ import (
 	"read_books/internal/handlers"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
+	"strconv"
 	"syscall"
 )
 
@@ -52,6 +53,13 @@ func main() {
 		memoryClient,
 		func() bool { return controls == nil || controls.ServiceEnabled("memory") },
 	)
+	hashtagMinScore := 0.6
+	if configured, parseErr := strconv.ParseFloat(os.Getenv("MEME_HASHTAG_MIN_SCORE"), 64); parseErr == nil && configured >= 0 && configured <= 1 {
+		hashtagMinScore = configured
+	}
+	hashtagWorkflow := handlers.NewMemeHashtagWorkflow(memeClient, knowledgeClient).
+		WithMinScore(hashtagMinScore).
+		WithKnowledgeEnabled(func() bool { return controls == nil || controls.ServiceEnabled("knowledge") })
 
 	// An interface is listed (and switchable from the desktop) only when its status address is set:
 	// one that is not deployed has none, so it never shows up as a failure.
@@ -93,7 +101,7 @@ func main() {
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(memeClient).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).WithServiceProbes(map[string]handlers.ServiceProbe{
+		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(hashtagWorkflow).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).WithServiceProbes(map[string]handlers.ServiceProbe{
 			"book":      handlers.HealthProbe(bookClient),
 			"knowledge": handlers.StatusProbe(knowledgeClient),
 			"memory":    handlers.StatusProbe(memoryClient),
@@ -107,7 +115,7 @@ func main() {
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		),
-		handlers.NewMemeDomainHandler(clients.NewMemeServiceClient("")).WithHashtagExperience(hashtagExperience),
+		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))

@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
-	"read_books/internal/clients"
 	"read_books/internal/core"
-	"read_books/internal/infrastructure/repreq"
 	"regexp"
 	"strings"
 	"sync"
@@ -334,10 +333,34 @@ func TestALearnedHashtagIsNotedOnlyWhenItIsAppended(t *testing.T) {
 }
 
 func memeHandlerAnswering(response string, err error, notes HashtagExperienceNotes) *MemeDomainHandler {
-	client := clients.NewMemeServiceClientWithFactory(func() (repreq.RequesterReply, error) {
-		return &fakeMemeRequester{response: response, err: err}, nil
-	})
-	return NewMemeDomainHandler(client).WithHashtagExperience(notes)
+	var envelope struct {
+		Result map[string]any `json:"result"`
+	}
+	_ = json.Unmarshal([]byte(response), &envelope)
+	return NewMemeDomainHandler(&fakeMemeService{}).
+		WithHashtagWorkflow(fakeHashtagActions{result: envelope.Result, err: err}).
+		WithHashtagExperience(notes)
+}
+
+type fakeHashtagActions struct {
+	result map[string]any
+	err    error
+}
+
+func (f fakeHashtagActions) Handle(context.Context, string, map[string]any) (map[string]any, error) {
+	return f.result, f.err
+}
+
+type fakeMemeService struct{}
+
+func (*fakeMemeService) Fetch(context.Context, *int) (map[string]any, error)      { return nil, nil }
+func (*fakeMemeService) RefreshPool(context.Context, int) (map[string]any, error) { return nil, nil }
+func (*fakeMemeService) Status(context.Context) (map[string]any, error)           { return nil, nil }
+func (*fakeMemeService) Screen(context.Context, string, string) (map[string]any, error) {
+	return nil, nil
+}
+func (*fakeMemeService) List(context.Context, string, int, int) (map[string]any, error) {
+	return nil, nil
 }
 
 func TestTheOperatorsTagIsNotedButAnUntagIsNot(t *testing.T) {

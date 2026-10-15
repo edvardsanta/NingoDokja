@@ -17,6 +17,7 @@ services:
       BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
       CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
+      MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
@@ -100,12 +101,7 @@ services:
       DOKJA_OCR_MODEL_DIR: /models/rapidocr
       # Optional: a recognizer file inside that folder (a Latin one keeps pt-BR accents).
       DOKJA_OCR_REC_MODEL: ${DOKJA_OCR_REC_MODEL:-}
-      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
-      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
       MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
-    depends_on:
-      dokja-embedding-init:
-        condition: service_completed_successfully
     ports:
       - "5557:5557"
     networks:

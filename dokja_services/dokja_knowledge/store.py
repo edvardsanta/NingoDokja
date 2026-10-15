@@ -139,14 +139,36 @@ class Store:
         self.version += 1
         return True
 
-    def list_documents(self, limit: int, offset: int) -> list[sqlite3.Row]:
+    def list_documents(self, limit: int, offset: int, kind: str = "") -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT d.*, COUNT(c.id) AS chunks,"
-            " SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) AS embedded"
-            " FROM documents d LEFT JOIN chunks c ON c.document_id = d.id"
-            " GROUP BY d.id ORDER BY d.updated_at DESC, d.id DESC LIMIT ? OFFSET ?",
-            (limit, offset),
+            """
+            SELECT d.*, COUNT(c.id) AS chunks,
+                   SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) AS embedded
+            FROM documents d
+            LEFT JOIN chunks c ON c.document_id = d.id
+            WHERE (? = '' OR d.kind = ?)
+            GROUP BY d.id
+            ORDER BY d.updated_at DESC, d.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (kind, kind, limit, offset),
         ).fetchall()
+
+    def document_count(self, kind: str = "") -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM documents WHERE (? = '' OR kind = ?)",
+            (kind, kind),
+        ).fetchone()[0]
+
+    def document_text(self, document_id: int) -> str:
+        rows = self.conn.execute(
+            "SELECT heading, text FROM chunks WHERE document_id = ? ORDER BY position",
+            (document_id,),
+        ).fetchall()
+        return "\n\n".join(
+            "\n".join(part for part in (row["heading"], row["text"]) if part)
+            for row in rows
+        )
 
     def stats(self, model: str) -> dict:
         row = self.conn.execute(
@@ -181,11 +203,19 @@ class Store:
             )
         self.version += 1
 
-    def embedding_matrix(self, model: str) -> tuple[np.ndarray, np.ndarray]:
+    def embedding_matrix(self, model: str, kind: str = "") -> tuple[np.ndarray, np.ndarray]:
         """(chunk ids, matrix) of every chunk embedded by `model`. Rows are unit vectors."""
         rows = self.conn.execute(
-            "SELECT id, embedding FROM chunks WHERE embedding IS NOT NULL AND embed_model = ? ORDER BY id",
-            (model,),
+            """
+            SELECT c.id, c.embedding
+            FROM chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE c.embedding IS NOT NULL
+              AND c.embed_model = ?
+              AND (? = '' OR d.kind = ?)
+            ORDER BY c.id
+            """,
+            (model, kind, kind),
         ).fetchall()
         if not rows:
             return np.zeros(0, dtype=np.int64), np.zeros((0, 0), dtype=np.float32)
@@ -195,14 +225,22 @@ class Store:
 
     # ---- keyword search -------------------------------------------------------------
 
-    def keyword_search(self, fts_query: str, limit: int) -> list[tuple[int, float]]:
+    def keyword_search(self, fts_query: str, limit: int, kind: str = "") -> list[tuple[int, float]]:
         """(chunk id, bm25) best first. bm25 is lower for better matches in SQLite."""
         if not fts_query:
             return []
         rows = self.conn.execute(
-            "SELECT rowid, bm25(chunks_fts) AS score FROM chunks_fts WHERE chunks_fts MATCH ?"
-            " ORDER BY score LIMIT ?",
-            (fts_query, limit),
+            """
+            SELECT chunks_fts.rowid, bm25(chunks_fts) AS score
+            FROM chunks_fts
+            JOIN chunks c ON c.id = chunks_fts.rowid
+            JOIN documents d ON d.id = c.document_id
+            WHERE chunks_fts MATCH ?
+              AND (? = '' OR d.kind = ?)
+            ORDER BY score
+            LIMIT ?
+            """,
+            (fts_query, kind, kind, limit),
         ).fetchall()
         return [(row["rowid"], row["score"]) for row in rows]
 
