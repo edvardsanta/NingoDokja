@@ -312,11 +312,14 @@ class KnowledgeService:
             raise ValueError(f"query is required (up to {MAX_QUERY_CHARS} characters)")
         k = min(max(int(payload.get("k") or 5), 1), 20)
         min_score = float(payload.get("min_score") if payload.get("min_score") is not None else self.min_score)
+        kind = str(payload.get("kind") or "").strip().lower()
+        if kind and not KIND.match(kind):
+            raise ValueError("kind must be a short lowercase word such as note, article or book")
 
-        semantic, degraded, reason = self._semantic_candidates(query)
+        semantic, degraded, reason = self._semantic_candidates(query, kind)
         query_terms = terms(query)
         fts_query = " OR ".join(f'"{term}"' for term in query_terms)
-        keyword = dict(self.store.keyword_search(fts_query, CANDIDATES))
+        keyword = dict(self.store.keyword_search(fts_query, CANDIDATES, kind))
 
         # Reciprocal rank fusion over the two rankings.
         fused: dict[int, float] = {}
@@ -351,7 +354,7 @@ class KnowledgeService:
             result["reason"] = reason
         return result
 
-    def _semantic_candidates(self, query: str) -> tuple[dict[int, float], bool, str]:
+    def _semantic_candidates(self, query: str, kind: str = "") -> tuple[dict[int, float], bool, str]:
         """chunk id -> cosine for the closest chunks. Empty and degraded if embeddings are out."""
         if self.embedder is None:
             return {}, True, "no embedding server is configured; keyword search only"
@@ -360,8 +363,10 @@ class KnowledgeService:
         except EmbedUnavailable as err:
             logger.warning("semantic search unavailable: %s", err)
             return {}, True, f"{err}; keyword search only"
-        ids, matrix = self._embeddings()
+        ids, matrix = self._embeddings(kind)
         if len(ids) == 0 or matrix.shape[1] != vector.shape[1]:
+            if kind and self.store.document_count(kind) == 0:
+                return {}, False, ""
             if self.store.stats(self.model)["chunks"] > 0:
                 # Stored text exists but none of it has a vector from this model, for
                 # example right after a model change: say so instead of looking healthy.
@@ -371,7 +376,9 @@ class KnowledgeService:
         top = np.argsort(-scores)[:CANDIDATES]
         return {int(ids[i]): float(scores[i]) for i in top}, False, ""
 
-    def _embeddings(self) -> tuple[np.ndarray, np.ndarray]:
+    def _embeddings(self, kind: str = "") -> tuple[np.ndarray, np.ndarray]:
+        if kind:
+            return self.store.embedding_matrix(self.model, kind)
         if self._matrix_version != self.store.version:
             self._ids, self._matrix = self.store.embedding_matrix(self.model)
             self._matrix_version = self.store.version
@@ -380,15 +387,23 @@ class KnowledgeService:
     # ---- housekeeping ---------------------------------------------------------------
 
     def list_documents(self, payload: dict) -> dict:
-        limit = min(max(int(payload.get("limit") or 20), 1), 100)
+        limit = min(max(int(payload.get("limit") or 20), 1), 200)
         offset = max(int(payload.get("offset") or 0), 0)
-        documents = [
-            {"source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
-             "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
-             "chunks": row["chunks"], "embedded": row["embedded"] or 0, "updated_at": row["updated_at"]}
-            for row in self.store.list_documents(limit, offset)
-        ]
-        return {"documents": documents, "total": self.store.stats(self.model)["documents"],
+        kind = str(payload.get("kind") or "").strip().lower()
+        if kind and not KIND.match(kind):
+            raise ValueError("kind must be a short lowercase word such as note, article or book")
+        include_text = payload.get("include_text") is True
+        documents = []
+        for row in self.store.list_documents(limit, offset, kind):
+            document = {
+                "source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
+                "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
+                "chunks": row["chunks"], "embedded": row["embedded"] or 0, "updated_at": row["updated_at"],
+            }
+            if include_text:
+                document["text"] = self.store.document_text(row["id"])
+            documents.append(document)
+        return {"documents": documents, "total": self.store.document_count(kind),
                 "offset": offset}
 
     def delete(self, payload: dict) -> dict:

@@ -60,12 +60,13 @@ Supported event types:
 - `meme.screen`
   Runs the NSFW filter on one image URL and returns the verdict, the OCR text and the
   detections. See `dokja_lab/memes/safety.py`.
+- `meme.text.read`
+  Internal orchestrator capability that returns OCR text without running hashtag storage
+  or retrieval. Hashtag labels belong to the knowledge service.
 - `meme.list`
   Browses the pool (`unsent` or `sent`) without consuming it.
 - `meme.mark_sent`
   Flags one meme as delivered without going through `meme.fetch`.
-- `meme.hashtag.tag`, `meme.hashtag.suggest`, `meme.hashtag.list`, `meme.hashtag.untag`
-  See "Hashtag suggestion" below.
 - `meme.attachment.fetch`
   Downloads a pooled meme's raw bytes (base64-encoded) for a caller that cannot reach
   the origin host directly. See "Attachment fetch" below.
@@ -105,21 +106,12 @@ Environment variables:
   Optional comma-separated list of scraper keys.
   When omitted, the service uses the scraper set defined in `dokja_lab/config.py`.
   When provided, the keys are resolved against that same legacy scraper registry.
-- `MEME_HASHTAG_DB_FILE`
-  Default: `<repo>/ningo_hashtags.db`. Its own file, separate from the meme pool.
-- `DOKJA_EMBED_ENDPOINT` (default `http://127.0.0.1:11434`), `DOKJA_EMBED_MODEL`
-  (default `bge-m3`), `DOKJA_EMBED_TIMEOUT`, `DOKJA_EMBED=off` (no embedder; tagging
-  still stores text, suggestion is `degraded`). Same names `dokja_knowledge` uses, both
-  services talk to the same Ollama server; see its README for why the client is not
-  shared code.
 - `DOKJA_OCR_MODEL_DIR`
   Folder with the OCR models (`ch_PP-OCRv3_det_infer.onnx`, `ch_PP-OCRv3_rec_infer.onnx`,
   `ch_ppocr_mobile_v2.0_cls_infer.onnx`). Unset, the models bundled with the OCR package are used.
 - `DOKJA_OCR_REC_MODEL`
   Optional file name, inside `DOKJA_OCR_MODEL_DIR`, of another text recognizer. See "OCR
   recognizer" below.
-- `MEME_HASHTAG_MIN_SCORE`
-  Default `0.6`, provisional. See "Hashtag suggestion" below.
 - `MEME_ATTACHMENT_FETCH=off`
   Disables `meme.attachment.fetch` (default `on`). See "Attachment fetch" below.
 - `MEME_ATTACHMENT_MAX_BYTES` (default `20000000`), `MEME_ATTACHMENT_TIMEOUT`
@@ -127,13 +119,16 @@ Environment variables:
 
 ## Hashtag suggestion
 
-The operator tags a meme's OCR text with a hashtag (`meme.hashtag.tag`); a new meme's
-OCR text is compared to every tagged example by cosine similarity over `bge-m3`
-embeddings, and the closest one's hashtag is suggested (`meme.hashtag.suggest`) only if
-the score is at or above `MEME_HASHTAG_MIN_SCORE` (`relevant: true`). Below that, the
-closest hashtag is still reported for visibility, but `relevant` is `false` and callers
-must not present it as a match — the same absolute-relevance posture `dokja_knowledge`
-uses for its search results.
+The public `meme.hashtag.*` events are orchestrator workflows, not meme-service events.
+The meme service supplies only OCR through `meme.text.read`. The orchestrator stores an
+operator's label as `kind=meme_hashtag` in the shared knowledge base, retrieves similar
+labelled examples through `knowledge.search`, and records a suggestion that was actually
+used through the Prediction/Experience memory loop. This keeps media integration,
+knowledge and learned outcomes in their respective layers.
+
+`MEME_HASHTAG_MIN_SCORE` is now an orchestrator setting (default `0.6`). The knowledge
+service owns embeddings, keyword fallback and reindexing. If embeddings are unavailable,
+the explicit label remains stored and retrieval degrades to Knowledge's keyword search.
 
 The signal is the image's own printed text (read by the same OCR reader the NSFW filter
 uses), not the scraper's title or tags: those are often meaningless (random keymashes,
@@ -149,10 +144,6 @@ OCR downloads use the same browser-compatible `curl_cffi` client as attachment
 delivery, including for images. OCR keeps its own 8 MB / 15 second download limits
 and remains available when attachment fetching is disabled. Restart the meme
 service after updating its code (rebuild its image when code is not bind-mounted).
-
-Without an embedder (`DOKJA_EMBED=off`, or Ollama unreachable), tagging still stores
-the text so nothing is lost, and `suggest` reports `degraded` with a `reason` instead
-of guessing.
 
 ### OCR recognizer
 
@@ -171,19 +162,21 @@ the text it was tagged with: run `meme.hashtag.tag` again on its `url` without `
 read it again and replace the example. Contexts in the experience memory are immutable and
 stay as they were recorded.
 
-`MEME_HASHTAG_MIN_SCORE` (default `0.6`) is provisional. The small evaluation corpus
-in `dokja_lab/tests/test_hashtags_live.py` is skipped without a reachable embedding
-server; validate the threshold against representative tagged memes before relying on it.
-
-Each suggestion embeds up to 32 pending examples (missing vectors or a different
-model) alongside the query in one request. Subsequent suggestions recover the rest
-after the configured model becomes available. Failed requests leave examples pending.
 Tagging the same URL again corrects its label instead of adding a duplicate. Automatic
 suggestions are never saved as training examples.
 
 Manual and scheduled delivery append only relevant suggestions. Suggestion failures
 leave the original message unchanged. Automatic OCR requires the text reader used
 by the screening component; explicit `--text` input works without that reader.
+
+Legacy `ningo_hashtags.db` files are no longer read at runtime. With the orchestrator
+running, migrate one through the interface contract:
+
+```bash
+python3 scripts/migrate_meme_hashtags.py ningo_hashtags.db --apply
+```
+
+The source file is opened read-only and remains available for rollback.
 
 ## Attachment fetch
 

@@ -16,8 +16,8 @@ meaning and by keyword, with a citable source.
 | event | payload | result |
 | --- | --- | --- |
 | `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
-| `knowledge.search` | `query`, `k?` (1-20), `min_score?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
-| `knowledge.list` | `limit?`, `offset?` | `documents[]`, `total` |
+| `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
+| `knowledge.list` | `limit?`, `offset?`, `kind?`, `include_text?` | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
 | `knowledge.status` | none | counts, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |
@@ -41,6 +41,10 @@ stored address polled on a schedule) is deliberately not built in: that is your 
 integration.
 
 Sending the same file or address again does nothing, and every feed entry has a stable id.
+
+The orchestrator also stores explicit, feature-owned facts here under distinct `kind`
+values. Meme hashtag labels use `kind=meme_hashtag`; filtered search prevents ordinary
+research documents from becoming hashtag candidates.
 
 ### Address fetching (`KNOWLEDGE_FETCH`, default `on`)
 
