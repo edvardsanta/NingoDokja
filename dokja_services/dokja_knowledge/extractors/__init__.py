@@ -49,17 +49,33 @@ CONTENT_TYPES = {
 
 
 class Registry:
-    """Extractors by file extension and fetchers by reference scheme."""
+    """Extractors by file extension and fetchers by reference scheme.
+
+    It also records who registered each one (`source`, set by the plugin loader) and
+    which registration replaced an earlier one. That is the legacy adapter of ADR 0002:
+    the call signatures and the later-wins behavior are unchanged.
+    """
 
     def __init__(self) -> None:
         self._extractors: dict[str, Extractor] = {}
         self._fetchers: dict[str, Fetcher] = {}
+        self._owners: dict[str, str] = {}
+        self._replaced: list[dict[str, str]] = []
+        self.source = "builtin"
+
+    def _own(self, key: str) -> None:
+        previous = self._owners.get(key)
+        if previous is not None and previous != self.source:
+            self._replaced.append({"key": key, "previous": previous, "by": self.source})
+        self._owners[key] = self.source
 
     def add_extractor(self, extensions, extractor: Extractor) -> None:
         names = [extensions] if isinstance(extensions, str) else list(extensions)
         for extension in names:
             extension = extension.lower()
-            self._extractors[extension if extension.startswith(".") else "." + extension] = extractor
+            extension = extension if extension.startswith(".") else "." + extension
+            self._extractors[extension] = extractor
+            self._own(extension)
 
     def add_fetcher(self, scheme: str, fetcher: Fetcher) -> None:
         scheme = scheme.strip().lower()
@@ -68,6 +84,15 @@ class Registry:
         if not re.fullmatch(r"[a-z][a-z0-9+.-]{0,31}", scheme):
             raise ValueError(f"invalid scheme {scheme!r}")
         self._fetchers[scheme] = fetcher
+        self._own(f"{scheme}:")
+
+    def provenance(self) -> dict:
+        """Who registered each extension and scheme, and what was replaced."""
+        return {
+            "extractors": {key: self._owners[key] for key in self.extensions},
+            "fetchers": {scheme: self._owners[f"{scheme}:"] for scheme in self.schemes},
+            "replaced": list(self._replaced),
+        }
 
     def fetcher(self, scheme: str) -> Fetcher | None:
         return self._fetchers.get(scheme.lower())

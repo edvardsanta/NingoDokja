@@ -45,6 +45,9 @@ func (r ExecRunner) Run(parent context.Context, plugin Plugin, env []string) ([]
 	if limit <= 0 {
 		limit = maxOutput
 	}
+	if plugin.OutputBytes > 0 && plugin.OutputBytes < limit {
+		limit = plugin.OutputBytes
+	}
 	ctx, cancel := context.WithTimeout(parent, plugin.Timeout)
 	defer cancel()
 

@@ -99,7 +99,7 @@ func New(config Config, options Options) *Service {
 func (s *Service) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, e := range s.entries {
-		if e.plugin == nil || !e.plugin.Enabled {
+		if e.plugin == nil || !e.plugin.Enabled || !e.plugin.Collects() {
 			continue
 		}
 		wg.Add(1)
@@ -192,9 +192,20 @@ func (s *Service) status() map[string]any {
 	defer s.mu.RUnlock()
 
 	plugins := make([]map[string]any, 0, len(s.entries))
+	extractors := make([]map[string]any, 0)
 	counts := map[string]int{}
 	total := 0
 	for _, e := range s.entries {
+		// A versioned plugin that only extracts documents is not a feed source: it is
+		// listed apart, so the digest's source states keep their meaning.
+		if e.plugin != nil && !e.plugin.Collects() {
+			extractors = append(extractors, map[string]any{
+				"id": e.plugin.ID, "name": e.plugin.Name, "enabled": e.plugin.Enabled,
+				"plugin_api": e.plugin.APIVersion, "version": e.plugin.Version,
+				"provides": e.plugin.Provides, "formats": e.plugin.Formats,
+			})
+			continue
+		}
 		state := e.state()
 		counts[state]++
 		total += len(e.items)
@@ -228,6 +239,7 @@ func (s *Service) status() map[string]any {
 		"disabled":        counts["disabled"],
 		"invalid":         counts["invalid"],
 		"items":           total,
+		"extractors":      extractors,
 	}
 }
 

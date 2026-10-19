@@ -318,25 +318,52 @@
     {
       "id": "05",
       "title": "Introduce plugin lifecycle metadata and legacy adapters",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "04"
       ],
       "deliverables": [
-        "Versioned lifecycle contract",
-        "Feeds and Knowledge compatibility adapters",
-        "Plugin contract tests"
+        "dokja_services/dokja_feeds/feeds/manifest.go (versioned loader and legacy adapter)",
+        "dokja_services/dokja_feeds/feeds/binding.go",
+        "dokja_services/dokja_feeds/feeds/lifecycle_test.go",
+        "Knowledge registry provenance (extractors/__init__.py, plugins.py)"
       ],
       "acceptance_criteria": [
         "Identity, API version, activation, capability selection, limits, and health have explicit semantics.",
         "Existing Feeds manifests and Knowledge registration plugins remain supported.",
         "Unknown or incompatible versions fail with deterministic diagnostic results.",
         "New capability bindings are configured explicitly and do not bypass domain actions.",
-        "Knowledge fetchers, extractors and plugins are served by the reading host through a legacy adapter and emit Knowledge's Extracted document contract (ADR 0006); Knowledge keeps chunking, embedding, storage and retrieval."
+        "Knowledge extractor plugins keep their register(registry) contract with recorded provenance; serving them from the reading host needs its on-demand mode and moves to step 07 (scope change, ADR 0006)."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "Feeds manifests without plugin_api take the legacy loader unchanged (all existing manifest, runner and service tests pass) and are described as providing source.collect.v1.",
+        "plugin_api 1 selects a strict versioned loader: id, version, runtime subprocess, provides (source.collect.v1, document.extract.v1), formats for extraction, interval/max_items for collection, and required timeout and output limits; new plugins stay disabled unless enabled.",
+        "Unsupported lifecycle versions, runtimes and capabilities fail with errors wrapping ErrIncompatible and starting with 'incompatible:'; malformed plugin_api values are invalid, never read as legacy.",
+        "Only enabled collectors run on the schedule; extract-only plugins are listed under an additive feeds.status 'extractors' key and leave the source states and counts the desktop reads unchanged.",
+        "The runner applies a versioned plugin's own output limit.",
+        "Select resolves a capability key deterministically: explicit binding to an enabled provider, a single eligible provider, ambiguity when several exist, and only an explicit ordered fallback, failing closed on ineligible entries.",
+        "Knowledge Registry records which source (builtin or plugin file) registered each extension and scheme and which registration replaced another, keeping later-wins semantics; a plugin that fails halfway keeps its partial registration (pinned baseline).",
+        "The versioned in-process Knowledge registry of ADR 0002 is not built: under ADR 0006 versioned extractors are reading-host subprocess plugins."
+      ],
+      "checks": [
+        {
+          "name": "feeds_tests",
+          "status": "passed",
+          "detail": "go vet and go test -race ./... in dokja_services/dokja_feeds; mutation sending plugin_api 1 to the legacy loader failed three lifecycle tests."
+        },
+        {
+          "name": "knowledge_tests",
+          "status": "passed",
+          "detail": "The two new provenance tests pass, and a mutation removing ownership tracking fails both. pytest tests: 117 passed, 5 failed, 8 skipped in the dokja-lab-ci env; the same 5 PDF tests fail on the unchanged code because the env lacks pypdf."
+        },
+        {
+          "name": "compatibility",
+          "status": "passed",
+          "detail": "feeds.status gains only the additive extractors key; the desktop reads named fields and a fixed state set that are unchanged. No env var, port, compose or route change."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-18"
     },
     {
       "id": "06",
@@ -381,7 +408,8 @@
         "One document extractor runs as a reading-host plugin, emits Knowledge's Extracted contract, and its output is stored through knowledge.ingest with source and format provenance.",
         "A local extractor is added or replaced without changing router or workflow business logic.",
         "Crash, hang, malformed output, and version mismatch produce defined host behavior.",
-        "Runtime choice and operating-system permission assumptions are recorded."
+        "Runtime choice and operating-system permission assumptions are recorded.",
+        "Knowledge's existing extractors and plugins are served through a reading-host adapter that emits the Extracted contract (moved from step 05)."
       ],
       "evidence": [],
       "checks": [],

@@ -43,8 +43,11 @@ def load_plugins(registry: Registry, directory: str) -> list[str]:
             if register is None:
                 logger.warning("plugin %s has no register(registry); skipped", path.name)
                 continue
+            registry.source = f"plugin:{path.stem}"
             register(registry)
             loaded.append(path.stem)
         except Exception as err:  # a broken plugin must not keep the service from starting
             logger.error("plugin %s failed to load: %s: %s", path.name, type(err).__name__, err)
+        finally:
+            registry.source = "builtin"
     return loaded
