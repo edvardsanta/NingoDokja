@@ -98,3 +98,26 @@ func TestFeedsClientStatusAsksForFeedsStatus(t *testing.T) {
 		t.Fatalf("unexpected result %#v for request %s", result, requester.request)
 	}
 }
+
+func TestFeedsClientExtractSendsTheFileAsFeedsExtract(t *testing.T) {
+	requester := &fakeFeedsRequester{response: `{"status":"ok","result":{"count":1,"plugin":"reader"}}`}
+
+	result, err := feedsClient(requester).Extract(context.Background(), "a.pdf", "eA==")
+	if err != nil || result["plugin"] != "reader" {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+	for _, part := range []string{`"type":"feeds.extract"`, `"filename":"a.pdf"`, `"content_b64":"eA=="`} {
+		if !strings.Contains(requester.request, part) {
+			t.Fatalf("request %q lacks %s", requester.request, part)
+		}
+	}
+}
+
+func TestFeedsClientExtractReturnsTheHostReason(t *testing.T) {
+	requester := &fakeFeedsRequester{response: `{"status":"error","message":"unavailable: no enabled provider"}`}
+
+	if _, err := feedsClient(requester).Extract(context.Background(), "a.pdf", "eA=="); err == nil ||
+		!strings.HasPrefix(err.Error(), "unavailable:") {
+		t.Fatalf("the reason prefix must reach the caller: %v", err)
+	}
+}

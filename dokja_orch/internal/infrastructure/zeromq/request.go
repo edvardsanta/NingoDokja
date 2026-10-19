@@ -14,6 +14,12 @@ type Requester struct {
 var _ repreq.RequesterReply = (*Requester)(nil)
 
 func NewRequester(endpoint string) (*Requester, error) {
+	return NewRequesterWithTimeout(endpoint, 5*time.Second)
+}
+
+// NewRequesterWithTimeout is NewRequester for a request that may take longer than the
+// default 5 s to send or answer, such as an on-demand reading.
+func NewRequesterWithTimeout(endpoint string, timeout time.Duration) (*Requester, error) {
 	socket, err := zmq4.NewSocket(zmq4.REQ)
 	if err != nil {
 		return nil, err
@@ -24,8 +30,8 @@ func NewRequester(endpoint string) (*Requester, error) {
 		return nil, err
 	}
 
-	socket.SetRcvtimeo(5 * time.Second)
-	socket.SetSndtimeo(5 * time.Second)
+	socket.SetRcvtimeo(timeout)
+	socket.SetSndtimeo(timeout)
 
 	return &Requester{socket: socket}, nil
 }

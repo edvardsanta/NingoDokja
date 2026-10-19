@@ -14,6 +14,7 @@ func TestAdminEventsAreRoutedAndPlanned(t *testing.T) {
 	}{
 		{"discord.send", "discord-send", DomainSystem, "send-discord-message"},
 		{"knowledge.ingest", "knowledge", DomainKnowledge, "ingest-knowledge"},
+		{"knowledge.read", "knowledge", DomainKnowledge, "read-knowledge"},
 		{"knowledge.search", "knowledge", DomainKnowledge, "search-knowledge"},
 		{"knowledge.list", "knowledge", DomainKnowledge, "list-knowledge"},
 		{"knowledge.delete", "knowledge", DomainKnowledge, "delete-knowledge"},

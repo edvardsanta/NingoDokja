@@ -111,7 +111,9 @@ func main() {
 			}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
-		handlers.NewKnowledgeDomainHandler(knowledgeClient),
+		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithReading(handlers.NewReadingTask(
+			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
+		)),
 		handlers.NewDigestDomainHandler(feedsClient),
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")).WithKnowledge(
 			knowledgeClient,
