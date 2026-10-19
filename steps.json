@@ -216,13 +216,26 @@
         "Meme service events, CLI/Discord meme commands and scheduler triggers, and digest.* responses are recorded as the baseline for the ADR 0007 facades."
       ],
       "evidence": [
-        "Hashtag suggestion baseline pinned in dokja_orch/internal/handlers/meme_hashtag_baseline_test.go: relevant hit, below-threshold abstention (nearest label still returned with relevant=false and no reason), no examples, degraded Knowledge reason, Knowledge error, missing text/OCR failure/empty OCR without a Knowledge call, explicit text skipping OCR, min_score override and fallback, and the 5s search budget. Memory/prediction failure, missing evidence and insufficient prediction were already covered by hashtag_experience_test.go."
+        "Hashtag suggestion baseline pinned in dokja_orch/internal/handlers/meme_hashtag_baseline_test.go: relevant hit, below-threshold abstention (nearest label still returned with relevant=false and no reason), no examples, degraded Knowledge reason, Knowledge error, missing text/OCR failure/empty OCR without a Knowledge call, explicit text skipping OCR, min_score override and fallback, and the 5s search budget. Memory/prediction failure, missing evidence and insufficient prediction were already covered by hashtag_experience_test.go.",
+        "Feature facade baseline: dokja_orch/internal/core/feature_routes_baseline_test.go pins every public book.*, meme.*, digest.* and knowledge.* event (and meme.dispatch.scheduled) to its workflow, domain and action.",
+        "Book contract baseline: test_book_summary_service.py pins the classify and summarize response fields, the pt-BR/study defaults and the refusal without content; client, domain and handler contracts were already covered by existing Go tests.",
+        "Meme pool baseline: dokja_services/dokja_meme/tests/test_pool_baseline.py pins that meme.fetch marks memes sent before delivery is confirmed, meme.list does not consume, screening labels without filtering, an unavailable screen fails closed without blocking, mark_sent touches only pooled URLs, and unknown events are refused."
       ],
       "checks": [
         {
           "name": "hashtag_baseline_tests",
           "status": "passed",
           "detail": "go vet and go test ./internal/handlers -count=1 passed in dokja_orch."
+        },
+        {
+          "name": "feature_facade_baseline_tests",
+          "status": "passed",
+          "detail": "go test ./internal/core in dokja_orch; pytest dokja_services/dokja_meme/tests (12 passed) in the dokja-lab-ci conda env."
+        },
+        {
+          "name": "book_contract_tests",
+          "status": "passed",
+          "detail": "7 passed in dokja-lab-ci with a stub transformers module injected for the run only: the env lacks transformers and the tests inject a fake classifier. The real zero-shot model was not exercised."
         }
       ],
       "blockers": []

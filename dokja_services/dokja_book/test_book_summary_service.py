@@ -99,6 +99,48 @@ class BookSummaryServiceTest(unittest.TestCase):
 
         self.assertEqual(result["summary"]["overview"], "custom overview")
 
+    def test_baseline_response_shapes_kept_by_the_book_facade(self):
+        # Step 03 baseline (steps.json, ADR 0006): the fields a book.* facade must keep.
+        service = BookSummaryService(classifier=FakeClassifier())
+        payload = {
+            "title": "Programming APIs",
+            "filename": "guide.pdf",
+            "content": "Programming is about tradeoffs. APIs need consistency.\n\nExamples matter.",
+        }
+
+        classified = service.classify(payload)
+        summarized = service.summarize(payload)
+
+        self.assertEqual(
+            set(classified),
+            {
+                "status",
+                "format",
+                "book_type",
+                "language",
+                "goal",
+                "resource_strategy",
+                "context_strategy",
+                "agent_route",
+            },
+        )
+        self.assertEqual((classified["language"], classified["goal"]), ("pt-BR", "study"))
+        self.assertEqual(set(summarized), {"status", "title", "classification", "summary"})
+        self.assertEqual(
+            set(summarized["summary"]),
+            {"overview", "key_points", "recommended_focus", "compression"},
+        )
+        self.assertEqual(
+            set(summarized["summary"]["compression"]),
+            {"input_chars", "normalized_chars", "paragraphs", "sentences"},
+        )
+
+    def test_baseline_summarize_without_content_or_resource_is_refused(self):
+        service = BookSummaryService(classifier=FakeClassifier())
+        with patch("book_summary_service.extract_resource_content", return_value=""):
+            with self.assertRaises(ValueError):
+                service.summarize({"title": "Nothing here"})
+
 
 if __name__ == "__main__":
     unittest.main()
