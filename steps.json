@@ -145,7 +145,7 @@
         "ADR 0004 defines a 30-day explicit hashtag-feedback target, original baseline and frozen snapshots, unscored/unknown/ambiguous outcomes, controlled single-attempt attribution, scope/estimator limitations, and shadow-only evaluation.",
         "The documentation index and capability map now link to the decision records and identify baseline capture as the next step.",
         "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources.",
-        "ADR 0006 records the owner's decision that reading is one macro-component grown from Feeds, Knowledge stores content with provenance, Experience records the reading episode, and Book is not a service; its extraction-ownership question remains open."
+        "ADR 0006 records the owner's decision that reading is one macro-component grown from Feeds, Knowledge stores content with provenance, Experience records the reading episode, and Book is not a service Extraction is the middle ground: Reading acquires and extracts into Knowledge's Extracted contract, Knowledge owns that contract plus chunking, embedding, storage and retrieval."
       ],
       "checks": [
         {
@@ -262,7 +262,7 @@
         "Existing Feeds manifests and Knowledge registration plugins remain supported.",
         "Unknown or incompatible versions fail with deterministic diagnostic results.",
         "New capability bindings are configured explicitly and do not bypass domain actions.",
-        "Knowledge extractor plugins are served by the reading host through a legacy adapter if ADR 0006's extraction-ownership question is resolved that way."
+        "Knowledge fetchers, extractors and plugins are served by the reading host through a legacy adapter and emit Knowledge's Extracted document contract (ADR 0006); Knowledge keeps chunking, embedding, storage and retrieval."
       ],
       "evidence": [],
       "checks": [],
@@ -306,7 +306,7 @@
       ],
       "acceptance_criteria": [
         "The Feeds-derived reading host accepts an on-demand request with input and returns a result, while existing scheduled manifests keep working.",
-        "One document extractor runs as a reading-host plugin and its output is stored through knowledge.ingest with source and format provenance.",
+        "One document extractor runs as a reading-host plugin, emits Knowledge's Extracted contract, and its output is stored through knowledge.ingest with source and format provenance.",
         "A local extractor is added or replaced without changing router or workflow business logic.",
         "Crash, hang, malformed output, and version mismatch produce defined host behavior.",
         "Runtime choice and operating-system permission assumptions are recorded."

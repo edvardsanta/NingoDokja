@@ -53,10 +53,20 @@ the experience. The orchestrator sequences it; the domains own the decisions.
 
 ## Consequences
 
-1. **Reading moves out of Knowledge too.** If Knowledge only stores, its own
-   reading code (`fetch.py`, the `extractors/` registry including `feedfmt`,
-   and `plugins.py`) belongs to the reading host. Otherwise the duplication
-   only moves. This is the open question below.
+1. **Extraction sits between Reading and Knowledge.** The boundary is the
+   document contract Knowledge already defines,
+   [`Extracted`](../../dokja_services/dokja_knowledge/extractors/__init__.py)
+   (`title`, `text`, `source_ref`, `key`):
+   - Reading owns getting the bytes (fetching URLs, polling feeds, receiving
+     uploads) and turning a format into text. Knowledge's `fetch.py`,
+     `extractors/` (including `feedfmt`, which overlaps Feeds) and `plugins.py`
+     move to the reading host as plugins that emit that contract.
+   - Knowledge owns the contract itself and everything after it: chunking,
+     embedding, storing, and retrieval. It keeps accepting already-extracted
+     text, as it does today through `body`.
+
+   A new format therefore changes only Reading; a change to what a document is
+   goes through Knowledge.
 2. **The reading host needs an on-demand mode.** Feeds today is schedule-only:
    its manifest has `command`, `interval`, `timeout` and `max_items`, and
    `feeds.items` returns cached results. Reading a file someone sends needs a
@@ -101,8 +111,5 @@ part of it.
 
 ## Open questions
 
-- Does all extraction (Knowledge `fetch.py`, `extractors/`, `plugins.py`) move to
-  the reading host, leaving Knowledge with store, index and retrieve only?
-  This changes the scope of steps `05` and `07`.
 - Which Book outputs survive as product behavior: the summary shape, the
   book-type label, or neither?
