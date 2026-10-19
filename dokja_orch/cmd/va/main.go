@@ -49,10 +49,8 @@ func main() {
 	memoryClient := clients.NewMemoryServiceClient("")
 	feedsClient := clients.NewFeedsServiceClient("")
 	bookClient := clients.NewBookServiceClient("")
-	hashtagExperience := handlers.NewHashtagExperience(
-		memoryClient,
-		func() bool { return controls == nil || controls.ServiceEnabled("memory") },
-	)
+	memoryEnabled := func() bool { return controls == nil || controls.ServiceEnabled("memory") }
+	hashtagExperience := handlers.NewHashtagExperience(memoryClient, memoryEnabled)
 	hashtagMinScore := 0.6
 	if configured, parseErr := strconv.ParseFloat(os.Getenv("MEME_HASHTAG_MIN_SCORE"), 64); parseErr == nil && configured >= 0 && configured <= 1 {
 		hashtagMinScore = configured
@@ -101,12 +99,16 @@ func main() {
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(hashtagWorkflow).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).WithServiceProbes(map[string]handlers.ServiceProbe{
-			"book":      handlers.HealthProbe(bookClient),
-			"knowledge": handlers.StatusProbe(knowledgeClient),
-			"memory":    handlers.StatusProbe(memoryClient),
-			"feeds":     handlers.FeedsProbe(feedsClient),
-		}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
+		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(hashtagWorkflow).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).
+			// Step 06: suggestions run as a typed task with a frozen shadow prediction. Removing
+			// this line returns to the earlier path above.
+			WithHashtagTask(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience).
+			WithServiceProbes(map[string]handlers.ServiceProbe{
+				"book":      handlers.HealthProbe(bookClient),
+				"knowledge": handlers.StatusProbe(knowledgeClient),
+				"memory":    handlers.StatusProbe(memoryClient),
+				"feeds":     handlers.FeedsProbe(feedsClient),
+			}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient),
