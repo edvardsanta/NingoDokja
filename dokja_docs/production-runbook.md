@@ -275,15 +275,18 @@ env file only.
 ## Hashtag Suggestion for Memes
 
 The operator tags a meme's own text (read by OCR, not the scraper's title or tags) with a hashtag; a new
-meme's text is compared to every tagged example and, if the closest one is similar enough, its hashtag is
-suggested. `dokja-cli meme hashtag tag|suggest|list|untag`; see `dokja_services/dokja_meme/README.md`.
+meme's text is retrieved against labelled examples in the shared Knowledge service and, if the closest one is
+similar enough, its hashtag is suggested. `dokja-cli meme hashtag tag|suggest|list|untag`; see
+`dokja_services/dokja_meme/README.md`.
 
-Embeddings use the same configured server and model as the knowledge service. If the model is
-missing, provision it once (see "Research Knowledge Base" above): the meme service works without it too, it just
-stores tagged text without a vector and `meme.hashtag.suggest` reports `degraded` instead of guessing.
-`MEME_HASHTAG_MIN_SCORE` (default `0.6`) decides which suggestion counts as relevant; like the knowledge
-base's threshold, it needs validation on representative examples, so retune it once there is a real set of tagged
-memes. Its SQLite file is `MEME_HASHTAG_DB_FILE`, separate from `MEME_SERVICE_DB_FILE`.
+The orchestrator coordinates the flow: the meme service supplies OCR, Knowledge stores and retrieves
+`kind=meme_hashtag` documents, and Prediction/Experience records whether suggestions that were actually used
+were accepted or replaced. The meme service no longer owns a classifier or a hashtag database.
+
+Embeddings and keyword fallback therefore use the Knowledge configuration. If the model is missing, explicit
+labels are still stored and retrieval reports its degraded keyword-only state. `MEME_HASHTAG_MIN_SCORE`
+(default `0.6`) is now read by the orchestrator and passed to Knowledge for hashtag searches; it remains
+provisional and should be calibrated against representative labelled memes.
 
 The orchestrator appends relevant suggestions to manual and scheduled deliveries, and notes each one in the
 experience memory (see "Experience Memory" above).
@@ -295,12 +298,17 @@ The TUI supports learning (`h`), suggestion (`g`), tagged examples (`l`) and rem
 selected meme's panel shows why: the closeness of the closest tagged meme, the text read from this meme and
 the text of that one. `dokja-cli meme hashtag suggest` prints the same fields (`score`, `query_text`,
 `matched_text`).
-Each suggestion recovers up to 32 examples without embeddings or from another model.
-After the embedding model becomes available, subsequent suggestions progressively
-recover the backlog. Corrections replace the example for the same URL; automatic
-suggestions are not saved as training examples.
-Back up the hashtag database alongside the meme pool. Rebuild the meme service and
-orchestrator and update the operator interfaces to enable the feature; no new ports.
+Corrections replace the Knowledge document for the same URL; automatic suggestions are not saved as labels.
+Back up `/data/dokja_knowledge.db` with the other persistent databases. Existing
+`ningo_hashtags.db` files are retained for rollback but are no longer read at runtime. With the orchestrator
+running, import one before retiring it:
+
+```bash
+python3 scripts/migrate_meme_hashtags.py ningo_hashtags.db --apply
+```
+
+The migration reads the legacy file without modifying it and sends each label through `meme.hashtag.tag`.
+Rebuild the meme, knowledge and orchestrator images for this change; no new ports are introduced.
 
 For manual TUI sends only, the channel picker exposes `--force`. It bypasses screening
 for selected safe-only channels and requires a highlighted confirmation. The orchestrator

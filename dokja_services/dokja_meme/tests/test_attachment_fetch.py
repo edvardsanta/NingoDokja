@@ -23,6 +23,15 @@ class FakeAttachments:
         return self.content, self.content_type
 
 
+class FakeScreen:
+    def __init__(self):
+        self.urls = []
+
+    def read_text(self, url):
+        self.urls.append(url)
+        return "words printed on the meme"
+
+
 @pytest.fixture
 def storage(tmp_path):
     store = SQLiteStorage(str(tmp_path / "memes.db"), Meme)
@@ -70,3 +79,13 @@ def test_fetch_attachment_surfaces_a_download_failure(storage):
 
     with pytest.raises(ValueError, match="403"):
         service.fetch_attachment(VIDEO_URL)
+
+
+def test_text_read_exposes_ocr_without_hashtag_storage(storage):
+    screen = FakeScreen()
+    service = MemeService(storage=storage, scrapers=[], worker=None, screen=screen)
+
+    result = service.dispatch({"type": "meme.text.read", "payload": {"url": VIDEO_URL}})
+
+    assert result == {"url": VIDEO_URL, "text": "words printed on the meme"}
+    assert screen.urls == [VIDEO_URL]

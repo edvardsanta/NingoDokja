@@ -239,3 +239,17 @@ def test_list_documents_pages_newest_first(service):
     second = service.list_documents({"limit": 2, "offset": 2})
     assert first["total"] == 5 and len(first["documents"]) == 2
     assert not {d["source_id"] for d in first["documents"]} & {d["source_id"] for d in second["documents"]}
+
+
+def test_search_and_list_can_be_scoped_to_one_kind(service):
+    add(service, CAKE, source_id="note:cake", kind="note")
+    add(service, ("#Cake", CAKE[1]), source_id="meme-hashtag:cake", kind="meme_hashtag")
+
+    result = service.search({"query": "carrot cake chocolate", "kind": "meme_hashtag"})
+    assert result["hits"]
+    assert {hit["kind"] for hit in result["hits"]} == {"meme_hashtag"}
+
+    listed = service.list_documents({"kind": "meme_hashtag", "include_text": True})
+    assert listed["total"] == 1
+    assert listed["documents"][0]["source_id"] == "meme-hashtag:cake"
+    assert "carrot cake" in listed["documents"][0]["text"].lower()

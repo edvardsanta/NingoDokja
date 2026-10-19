@@ -16,6 +16,7 @@ services:
       CHAT_AI_SERVICE_ENDPOINT: ${CHAT_AI_SERVICE_ENDPOINT}
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
+      MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
@@ -63,11 +64,6 @@ services:
       # Optional: a recognizer file inside that folder (a Latin one keeps pt-BR accents).
       DOKJA_OCR_REC_MODEL: ${DOKJA_OCR_REC_MODEL:-}
       MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
-      # Optional hashtag suggestion; stores examples without vectors if unavailable.
-      MEME_HASHTAG_DB_FILE: /data/ningo_hashtags.db
-      DOKJA_EMBED_ENDPOINT: http://dokja-ollama:11434
-      DOKJA_EMBED_MODEL: ${DOKJA_EMBED_MODEL:-bge-m3}
-      MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
       # meme.attachment.fetch: lets the meme service download attachments the Discord
       # interface cannot reach directly (Cloudflare and similar bot checks).
       MEME_ATTACHMENT_FETCH: ${MEME_ATTACHMENT_FETCH:-on}

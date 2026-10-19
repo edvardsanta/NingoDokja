@@ -108,6 +108,10 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 - **Go:** `gofmt`. Exported names in `PascalCase`, internal ones in `camelCase`, files in `snake_case.go`. Tests sit next to the code as `*_test.go`.
 - **Python:** black and isort (profile black) at 88 columns, flake8 (max complexity 10), mypy. Config lives in `dokja_lab/pyproject.toml`, `dokja_lab/.flake8` and `.pre-commit-config.yaml`.
 - **TypeScript:** `camelCase`, files in `snake_case.ts`, ESM (`"type": "module"`), run with `tsx`.
+- **Strings:** use native multiline literals (`"""..."""` in Python and raw
+  backtick literals in Go) instead of concatenating string literals. Use
+  interpolation or formatting for composed values. Always bind SQL values as
+  parameters; never concatenate or interpolate data into SQL queries.
 - **Services:** each one has `server.py`/`main.py`, a `service.yaml` and `Dockerfile`/`Dockerfile.dev`. Compose service names are `dokja-<name>`.
 - **Public repo:** never commit:
   - credentials;

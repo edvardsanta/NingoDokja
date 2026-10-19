@@ -62,12 +62,14 @@ Administrative commands:
   because an absent limit means "the whole pool" to the orchestrator.
 - `meme screen <url>` downloads an image and prints the NSFW verdict, every detection
   with its score, and the active thresholds. Nothing is sent or marked.
-- `meme hashtag tag <url> <hashtag> [--text]` trains the hashtag classifier: this meme's
+- `meme hashtag tag <url> <hashtag> [--text]` stores explicit hashtag knowledge: this meme's
   text (read from the image itself, or `--text` to give it directly) means this hashtag.
   `meme hashtag suggest [url] [--text] [--min-score]` finds the closest tagged example
   and reports its hashtag; check the `relevant` field, a hit below the threshold is
   still shown but is not a match. `meme hashtag list` and `meme hashtag untag <url>`
-  browse and remove tagged examples. See `dokja_services/dokja_meme/README.md`.
+  browse and remove tagged examples. Knowledge retrieves candidates; experience memory
+  predicts and records whether used suggestions are accepted. See
+  `dokja_services/dokja_meme/README.md`.
 - `memory ...` works with the experience memory, where an experience is "in this context the bot
   took this action, and this was the outcome". `memory predict --action <name> <context...>`
   estimates how likely the action is to be accepted from the similar earlier experiences, against
