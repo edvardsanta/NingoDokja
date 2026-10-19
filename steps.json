@@ -127,7 +127,8 @@
         "dokja_docs/decisions/0003-state-ownership.md",
         "dokja_docs/decisions/0004-shadow-prediction.md",
         "dokja_docs/decisions/0005-knowledge-experience-content.md",
-        "dokja_docs/knowledge-prediction-experience-research.md"
+        "dokja_docs/knowledge-prediction-experience-research.md",
+        "dokja_docs/decisions/0006-reading-macro-component.md"
       ],
       "acceptance_criteria": [
         "Task scope, workspace ownership, lifecycle, limits, and persistence are explicit.",
@@ -143,7 +144,8 @@
         "ADR 0003 preserves current repositories/caches and the canonical stateless-service rule; the volatile prototype adds no persistence, and any broader rule/storage change remains an explicit later decision.",
         "ADR 0004 defines a 30-day explicit hashtag-feedback target, original baseline and frozen snapshots, unscored/unknown/ambiguous outcomes, controlled single-attempt attribution, scope/estimator limitations, and shadow-only evaluation.",
         "The documentation index and capability map now link to the decision records and identify baseline capture as the next step.",
-        "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources."
+        "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources.",
+        "ADR 0006 records the owner's decision that reading is one macro-component grown from Feeds, Knowledge stores content with provenance, Experience records the reading episode, and Book is not a service; its extraction-ownership question remains open."
       ],
       "checks": [
         {
@@ -206,7 +208,8 @@
         "Prediction evaluation uses later observed outcomes and a frozen baseline; data limits and skipped checks are explicit.",
         "Compare candidate orchestrator-supervised and domain-internal reference loops with deterministic fake capabilities; do not integrate a production topology before resolving ADR 0005.",
         "Cover cold start, missing premises, contradictory evidence, stagnation/oscillation, scope/version changes, and simulated-versus-observed outcomes.",
-        "Use comparison evidence to resolve or explicitly revise ADR 0005 before cognitive-loop contract integration or content/cognitive ownership migration."
+        "Use comparison evidence to resolve or explicitly revise ADR 0005 before cognitive-loop contract integration or content/cognitive ownership migration.",
+        "Book request/response contracts (book.resource.classify, book.summary.requested), the CLI book command and the status probe entry are recorded as the baseline for the ADR 0006 facade."
       ],
       "evidence": [
         "Hashtag suggestion baseline pinned in dokja_orch/internal/handlers/meme_hashtag_baseline_test.go: relevant hit, below-threshold abstention (nearest label still returned with relevant=false and no reason), no examples, degraded Knowledge reason, Knowledge error, missing text/OCR failure/empty OCR without a Knowledge call, explicit text skipping OCR, min_score override and fallback, and the 5s search budget. Memory/prediction failure, missing evidence and insufficient prediction were already covered by hashtag_experience_test.go."
@@ -258,7 +261,8 @@
         "Identity, API version, activation, capability selection, limits, and health have explicit semantics.",
         "Existing Feeds manifests and Knowledge registration plugins remain supported.",
         "Unknown or incompatible versions fail with deterministic diagnostic results.",
-        "New capability bindings are configured explicitly and do not bypass domain actions."
+        "New capability bindings are configured explicitly and do not bypass domain actions.",
+        "Knowledge extractor plugins are served by the reading host through a legacy adapter if ADR 0006's extraction-ownership question is resolved that way."
       ],
       "evidence": [],
       "checks": [],
@@ -289,19 +293,21 @@
     },
     {
       "id": "07",
-      "title": "Run the document extractor plugin experiment",
+      "title": "Run the on-demand reading experiment",
       "status": "pending",
       "depends_on": [
         "06"
       ],
       "deliverables": [
-        "One generic local extractor plugin",
+        "On-demand request mode for the reading host",
+        "One document extractor as a reading-host plugin feeding knowledge.ingest",
         "Isolation and compatibility tests",
         "Extension-cost record"
       ],
       "acceptance_criteria": [
+        "The Feeds-derived reading host accepts an on-demand request with input and returns a result, while existing scheduled manifests keep working.",
+        "One document extractor runs as a reading-host plugin and its output is stored through knowledge.ingest with source and format provenance.",
         "A local extractor is added or replaced without changing router or workflow business logic.",
-        "Plugin input/output preserves the document extraction contract.",
         "Crash, hang, malformed output, and version mismatch produce defined host behavior.",
         "Runtime choice and operating-system permission assumptions are recorded."
       ],
@@ -339,13 +345,15 @@
       ],
       "deliverables": [
         "Chat domain ownership migration",
-        "Focused delivery and administration workflows"
+        "Focused delivery and administration workflows",
+        "Book retired behind a book.* compatibility facade (ADR 0006)"
       ],
       "acceptance_criteria": [
         "Conversation policy has one authoritative domain implementation.",
         "System-handler responsibilities have explicit owners and focused adapters.",
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
-        "Existing interface commands and successful responses have regression coverage and rollback instructions."
+        "Existing interface commands and successful responses have regression coverage and rollback instructions.",
+        "book.* routes and the CLI book command are served by reading -> Knowledge -> generation; removing the facade, Book domain and Book service waits for the owner's approval."
       ],
       "evidence": [],
       "checks": [],

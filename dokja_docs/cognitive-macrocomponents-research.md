@@ -1,10 +1,10 @@
 # Research: cognitive macro-components and plugins
 
 Follow-up: [Knowledge–Prediction–Experience feedback graph](./knowledge-prediction-experience-research.md).
-The Book/source classification and general-knowledge/contextual-experience
-allocation are under further research in ADR 0005. They are not accepted
-production ownership boundaries; the follow-up examines reciprocal dependencies
-and bounded cycles that the initial macro map did not resolve.
+Book/source ownership is decided in ADR 0006: reading is one macro-component,
+and Book is not a service. The general-knowledge/contextual-experience allocation
+remains under research in ADR 0005, which examines reciprocal dependencies and
+bounded cycles that the initial macro map did not resolve.
 
 Date: 2026-10-18. Status: research proposal, not an accepted architecture decision.
 
@@ -78,7 +78,7 @@ justify that. The conceptual map does not prescribe one container per row.
 
 | Functional responsibility | Starting point in Dokja | Extensions | Owner of decisions |
 | --- | --- | --- | --- |
-| Acquisition and perception | Feeds, Knowledge extraction, meme OCR, voice input | Source, extractor, OCR, transcription providers | Relevant domains decide what observations mean and when to use them. |
+| Reading (acquisition and perception) | Feeds host; Book and Knowledge extraction migrate into it; meme OCR and voice input later | Source, format, OCR, transcription adapters, run on a schedule or on demand | Relevant domains decide what observations mean and when to use them. |
 | Semantic knowledge | Knowledge | Fetchers, formats, retrieval and indexing implementations | Knowledge domain and consuming domains own admissibility and use. |
 | Episodic memory | Memory | Storage, embedding, recall implementations | Memory domain owns experience and outcome semantics. |
 | Prediction and evaluation | Memory prediction/scoring | Predictors with explicit targets and evaluators | Domain owns the target, evidence requirements, and permitted use. |
@@ -86,13 +86,17 @@ justify that. The conceptual map does not prescribe one container per row.
 | Action and communication | Communications, media delivery, voice output | Platform and output adapters | Communications and feature domains authorize and interpret actions. |
 | Coordination and working memory | Orchestrator core | Registered workflows and capability bindings | Orchestrator sequences work; domains supply business decisions. |
 
-Book, meme, and digest remain useful product domains. They compose these reusable
-capabilities. For example, “summarize this book” can use extraction, knowledge,
-generation, and delivery while book-specific rules remain in the Book domain.
+Meme and digest remain product domains that compose these capabilities. Book does
+not ([ADR 0006](./decisions/0006-reading-macro-component.md)): reading a book is a
+reading, Knowledge stores the result with provenance, and Experience records that
+it was a book and how it was used. “Summarize this book” is a workflow over
+reading, knowledge, generation, delivery, and experience.
 
-Keep acquisition modality-specific initially. Extract a common perception host
-only when two real consumers need the same contract and lifecycle. The functional
-map is useful before any folder moves or service mergers.
+This research first proposed keeping acquisition modality-specific until two real
+consumers needed the same contract and lifecycle. That condition is met: Feeds
+and Book/Knowledge file reading are separate reading paths with two plugin
+protocols. The functional map is still useful before any folder moves or service
+mergers.
 
 ### Relationship to the mandatory layers
 
@@ -328,7 +332,7 @@ access scope.
 | B. Architecture decisions | Workspace ownership, plugin lifecycle/versioning, prediction target, meaning of service state | Decisions distinguish engineering choices from neuroscience hypotheses and resolve rule conflicts explicitly. |
 | C. Contract prototypes | Typed workspace/results and adapters for existing plugin contracts | Old requests, responses, and plugins remain supported by contract tests. |
 | D. Two experiments | Hashtag composition and one plugin adapter, with the measurements above | Results justify extending the design or identify a boundary to revise. |
-| E. Incremental adoption | Apply demonstrated contracts to chat, book, digest, and further providers | Each migration has a rollback path and does not require unrelated domains to change. |
+| E. Incremental adoption | Apply demonstrated contracts to chat, digest, and further providers; retire Book behind a compatibility facade | Each migration has a rollback path and does not require unrelated domains to change. |
 
 The event envelope remains unchanged during the prototype. New fields belong to
 internal records first. New public actions, manifest versions, schemas, and HTTP

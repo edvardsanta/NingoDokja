@@ -32,19 +32,20 @@ The table distinguishes current implementation owners from target cognitive
 responsibilities. [ADR 0005](./decisions/0005-knowledge-experience-content.md)
 investigates the hypothesis that Knowledge defines general models/methods and
 Experience grounds their concrete application, with Prediction participating in
-a feedback graph. Book/source specialization and the graph's execution topology
-remain under research. A current domain or deployed service is not automatically
+a feedback graph. The graph's execution topology remains under research;
+[ADR 0006](./decisions/0006-reading-macro-component.md) decides that reading is
+one macro-component and Book is not a service. A current domain or deployed service is not automatically
 a cognitive macro-component.
 
 | Capability | Domain/policy owner | Mechanism or service | Existing consumer and operation | Candidate macro responsibility |
 | --- | --- | --- | --- | --- |
-| Source acquisition | Digest owns item selection; Feeds owns collection mechanics | `dokja_services/dokja_feeds` | Digest handler calls `feeds.items` and `feeds.status` | Extensible source acquisition; keep product ranking in Digest |
+| Reading | Digest owns item selection; Feeds owns collection mechanics | `dokja_services/dokja_feeds` | Digest handler calls `feeds.items` and `feeds.status` | One reading host, scheduled and on demand, absorbing Book and Knowledge extraction (ADR 0006); keep product ranking in Digest |
 | Semantic knowledge | `dokja_domain/dokja_knowledge`; consuming feature domains/handlers decide its use | `dokja_services/dokja_knowledge` | Chat retrieves context; hashtag workflow ingests explicit labels and searches them; Knowledge commands manage documents | General facts, models and methods with provenance; current document retrieval is the starting mechanism |
 | Experience | `dokja_domain/dokja_memory` currently interprets episodes and outcomes | `dokja_services/dokja_memory` | Hashtag experience records suggestions and resolves explicit feedback; Memory commands inspect experiences | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; current episodic storage does not implement the complete target |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_chat_ai` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
 | Media perception and meme pool | `dokja_domain/dokja_meme`; orchestration handlers currently also enforce delivery decisions | `dokja_services/dokja_meme`, wrapping legacy Lab components | Meme fetch/screen/list, hashtag OCR, scheduled delivery | Media capabilities, preserving meme-specific domain policy |
-| Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | `dokja_services/dokja_book` | `book.resource.classify`, `book.summary.requested` | Content extraction specialization and compatible product-operation facade; general methods belong to Knowledge and contextual application to Experience/domain selection |
+| Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | `dokja_services/dokja_book` | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
 | Communications and delivery | Communications domain owns read eligibility; System handler currently owns much sending/linking behavior | Communications HTTP service; Discord and WhatsApp interface clients | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and action adapters behind explicit eligibility and delivery policy |
 | Voice/audio | Provider selection currently in Voice service; no Voice domain binding found in inspected orchestrator entry point | `dokja_services/dokja_voice` | Service exposes synthesis, transcription, wakeword, and streaming APIs; full runtime consumer wiring is not established by this review | Audio perception/output providers, pending orchestration integration review |
 | Scheduling | Orchestrator controls decide whether a scheduled operation runs | `dokja_services/dokja_scheduler` emits events | Meme refresh and dispatch schedules | Trigger acquisition; workflow execution remains orchestrated |
@@ -141,10 +142,10 @@ Sources: [Digest handler](../dokja_orch/internal/handlers/digest_domain_handler.
 The domain selects the service operation and merges event context/payload. Python
 implements classification, processing strategy, and summary preparation. The
 policy/mechanism split must be reviewed before reusing extraction or generation
-as broader capabilities. Under the proposed model, book format/structure determines
-acquisition mechanics; a general method plus applicable experience determines
-how the knowledge is used. The current Book boundary is preserved for compatibility
-during that review. Current local classifier/server edits belong to another
+as broader capabilities. ADR 0006 retires this boundary: format/structure becomes
+reading provenance, a general method plus applicable experience determines how
+the knowledge is used, and the `book.*` routes stay as a compatibility facade
+until the owner approves their removal. Current local classifier/server edits belong to another
 track and were only read during this inventory.
 
 Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),

@@ -63,25 +63,11 @@ procedure. Observing the result can create a new experience for later use.
 
 ## Book and Feeds in this model
 
-Book input belongs to content acquisition/representation alongside other source
-specializations. Its adapters can produce text, pages, chapters, structure,
-format metadata, and provenance for Knowledge ingestion. Feeds has a different
-lifecycle: it polls sources and caches observations. Preserve those differences
-behind capability-specific contracts rather than forcing one universal extractor.
-
-“Summarize a book” remains a product operation, composing general knowledge,
-contextual experience, acquisition, generation, and delivery. Book-specific
-extraction mechanics stay in adapters; reusable reasoning about summarization
-belongs to the general method/application boundary. Classify each current Book
-rule before moving it so format mechanics, general methods, and user-facing
-compatibility are not conflated.
-
-Retain existing Book routes, domain facade, service endpoints, and deployment
-while the target boundaries are prototyped. An existing Book domain can adapt
-the product operation without becoming another cognitive layer. Future changes
-must migrate callers through the mandatory architecture flow and preserve
-public compatibility. This decision does not authorize deleting or directly
-merging Book, Feeds, or Knowledge services.
+Decided in [ADR 0006](./0006-reading-macro-component.md): reading is one
+macro-component grown from the Feeds host, Knowledge stores what was read with
+its provenance, and Experience records the reading episode. Book is not a
+separate service. This record keeps only the Knowledge–Prediction–Experience
+cycle question.
 
 ## Example
 
@@ -131,12 +117,10 @@ review; current stores are not migrated implicitly.
 
 Resolve the first task/prediction target, typed edge meanings, temporal update
 schedule, cycle owner, readiness/stopping rules, and separation of observed
-experience from simulated branches. Book/source ownership also remains a
-hypothesis pending review of existing Book rules.
+experience from simulated branches. Book/source ownership is decided in ADR 0006.
 
 The research and synthetic experiment design can be recorded while this proposal
 remains unaccepted. Step `03` may capture existing behavior and evaluate pure,
 fake-capability reference loops without adopting a production topology. Results
-feed this record before step `04` integrates cognitive-loop contracts or any
-Book/Knowledge/Experience ownership migration proceeds. This avoids requiring
+feed this record before step `04` integrates cognitive-loop contracts. This avoids requiring
 a final decision before collecting the evidence needed to make it.

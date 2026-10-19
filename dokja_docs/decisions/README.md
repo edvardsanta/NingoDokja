@@ -13,7 +13,8 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0002](./0002-plugin-lifecycle.md) | Versioned lifecycle metadata with capability-specific contracts and legacy adapters | Accepted for prototype |
 | [0003](./0003-state-ownership.md) | Preserve current stores; add no durable prototype state; isolate the unresolved service-policy question | Accepted for prototype scope; broader rule change deferred |
 | [0004](./0004-shadow-prediction.md) | Hashtag acceptance prediction with explicit feedback, frozen probabilities, and shadow evaluation | Accepted for prototype |
-| [0005](./0005-knowledge-experience-content.md) | Investigate Knowledge–Prediction–Experience graph, feedback cycles, and Book/source specialization | Proposed; research and decision required |
+| [0005](./0005-knowledge-experience-content.md) | Investigate Knowledge–Prediction–Experience graph and feedback cycles | Proposed; research and decision required |
+| [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 remains a research proposal: the Knowledge–Prediction–Experience cycle
