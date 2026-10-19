@@ -29,7 +29,7 @@ identified separately.
 | Knowledge | [Plugin loader](../dokja_services/dokja_knowledge/plugins.py), [extractor registry](../dokja_services/dokja_knowledge/extractors/__init__.py), and [service](../dokja_services/dokja_knowledge/service.py) | Generic ingestion and retrieval mechanisms are extended by source and format plugins. Knowledge already serves research documents and explicitly labelled meme examples. |
 | Experience memory | [Memory service](../dokja_services/dokja_memory/memory/service.go) and [store](../dokja_services/dokja_memory/memory/store.go) | Experiences, outcomes, and similarity have their own storage boundary. This is distinct from document knowledge. |
 | Prediction and evaluation | [Memory domain](../dokja_domain/dokja_memory/domain.go) and [prediction/scoring](../dokja_domain/dokja_memory/predict.go) | Acceptance estimates, insufficient-evidence behavior, and Brier comparison with a baseline already exist as domain rules. |
-| Selection policy | [Digest domain](../dokja_domain/dokja_digest/domain.go) | The domain chooses and orders items; Feeds supplies observations. This is a useful existing separation between acquisition and attention-like selection, and the seed of the evaluation and selection faculty (ADR 0007). |
+| Selection policy | [Digest domain](../dokja_domain/dokja_digest/domain.go) | The domain chooses and orders items; Feeds supplies observations. This is a useful existing separation between acquisition and attention-like selection, and the seed of the Attention faculty (ADR 0007). |
 | Composed behavior | [Hashtag workflow](../dokja_orch/internal/handlers/meme_hashtag_workflow.go) and [experience integration](../dokja_orch/internal/handlers/hashtag_experience.go) | OCR, labelled knowledge, suggestions, prediction, and later feedback already participate in one feature. |
 | Task context | [Chat sessions](../dokja_orch/internal/handlers/chat_session_manager.go) and [dispatcher](../dokja_orch/internal/core/dispatcher.go) | Conversation history exists, but there is no general typed task workspace in these paths. The dispatcher executes steps without using successful result values to select the next step. |
 
@@ -83,10 +83,11 @@ justify that. The conceptual map does not prescribe one container per row.
 | Semantic knowledge | Knowledge | Retrieval and indexing implementations; fetchers and formats move to Reading (ADR 0006) | Knowledge domain owns the document contract and retrieval semantics. |
 | Episodic memory | Memory | Storage, embedding, recall implementations | Memory domain owns experience and outcome semantics. |
 | Prediction | Memory prediction/scoring | Predictors with explicit targets and evaluators | Domain owns the target, evidence requirements, and permitted use. |
-| Evaluation and selection | Moderation, Digest ranking, meme screening | Classifiers and ranking strategies | The faculty decides admissibility and attention, parameterized by the workflow. |
+| Moderation | Moderation domain, meme screening | Safety and content classifiers, platform rules | Decides admissibility: allow, reject, review, or constraints. |
+| Attention | Digest ranking, hashtag relevance threshold | Ranking and scoring strategies | Decides priority: score, rank, select; never overrides moderation. |
 | Language generation | Chat domain/handler and Chat AI | Model providers and structured-output adapters | Chat owns conversation and response policy. |
 | Action and communication | Communications, media delivery, voice output | Platform and output adapters | Communications authorizes and executes actions; receipts go to Experience. |
-| Coordination and working memory | Orchestrator core | Registered workflows and capability bindings | Orchestrator sequences work; domains supply business decisions. |
+| Coordination and working memory | Orchestrator core | Typed Go workflows, later versioned recipes (ADR 0007) | Orchestrator sequences work; domains supply business decisions. |
 
 Product features are not macro-components
 ([ADR 0007](./decisions/0007-faculties-not-features.md)). Book, Meme and Digest

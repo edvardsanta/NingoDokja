@@ -147,7 +147,8 @@
         "The documentation index and capability map now link to the decision records and identify baseline capture as the next step.",
         "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources.",
         "ADR 0006 records the owner's decision that reading is one macro-component grown from Feeds, Knowledge stores content with provenance, Experience records the reading episode, and Book is not a service Extraction is the middle ground: Reading acquires and extracts into Knowledge's Extracted contract, Knowledge owns that contract plus chunking, embedding, storage and retrieval.",
-        "ADR 0007 records the owner's confirmation that macro-components are faculties (Reading, Knowledge, Experience, Prediction, Evaluation and selection, Language, Action, Coordination) and that Book, Meme and Digest are workflows over them; workflow recipes sequence and configure, faculty domains decide."
+        "ADR 0007 records the owner's confirmation that macro-components are faculties (Reading, Knowledge, Experience, Prediction, Moderation, Attention, Language, Action, Coordination) and that Book, Meme and Digest are workflows over them; workflow recipes sequence and configure, faculty domains decide.",
+        "ADR 0007 resolves its questions with the owner: Moderation (admissibility) and Attention (priority) are separate faculties; the meme pool is a reading cache; workflows go from feature handlers to typed Go workflows to versioned recipes, with recipes as an outcome of migration."
       ],
       "checks": [
         {
@@ -358,7 +359,8 @@
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
         "book.* routes and the CLI book command are served by reading -> Knowledge -> generation; removing the facade, Book domain and Book service waits for the owner's approval.",
-        "Meme scrapers/pool/OCR run as reading plugins, screening and digest ranking sit under evaluation and selection, and sent receipts are experience, with existing commands and triggers passing their baseline tests."
+        "Meme scrapers and OCR run as reading plugins with the pool as a reading cache, screening sits under Moderation, digest ordering and the hashtag relevance threshold under Attention, and sent receipts are experience, with existing commands and triggers passing their baseline tests.",
+        "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that."
       ],
       "evidence": [],
       "checks": [],

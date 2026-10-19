@@ -42,17 +42,18 @@ runs the cycle across faculties, plus the policy parameters for that case.
 | Knowledge | The document contract, chunking, embedding, storage, retrieval, general methods | Knowledge domain and service |
 | Experience | Episodes: what was done, in which context, with what outcome, including delivery receipts | Memory domain and service |
 | Prediction | Estimating a named outcome before acting and scoring it afterwards | Memory domain prediction (ADR 0004) |
-| Evaluation and selection | Judging admissibility and choosing what deserves attention | Moderation domain; Digest ranking; meme screening |
+| Moderation | Is this admissible? Allow, reject, review, or allow with constraints, under safety, content and platform rules | Moderation domain; meme NSFW screening |
+| Attention | What deserves priority? Score, rank and select by relevance, freshness, diversity and novelty | Digest ordering; meme hashtag relevance threshold |
 | Language | Generating text | Chat domain and generation providers |
 | Action | Sending, posting, replying on a platform | Communications domain and service |
 | Coordination | The task workspace and the cycle; sequencing only | Orchestrator core (ADR 0001) |
 
 Under this model:
 
-- **Meme** = scheduled reading of meme sources → evaluation (screening) →
-  knowledge (hashtag labels) → prediction (shadow) → action (delivery) →
+- **Meme** = scheduled reading of meme sources (the pool is a reading cache) →
+  moderation (screening) → knowledge (hashtag labels) → attention (relevance) → prediction (shadow) → action (delivery) →
   experience (sent receipts, feedback).
-- **Digest** = reading (feeds) → selection policy → language or direct
+- **Digest** = reading (feeds) → attention (ordering) → language or direct
   rendering → action.
 - **Book** = on-demand reading → knowledge → general method + experience →
   language → action → experience (ADR 0006).
@@ -69,11 +70,32 @@ What changes is what a domain is: domains become faculties.
   kind of decision, parameterized by the recipe. For example, the hashtag
   `min_score` becomes a selection parameter of the meme recipe, not a constant
   in a meme handler.
+- Moderation and attention are separate faculties even while they share
+  infrastructure (classifiers, scoring helpers): one answers whether something
+  may be used, the other how much priority it gets. An item moderation rejects
+  never reaches attention; attention never overrides a moderation verdict.
 - Feature-specific code that is genuinely unique (a source format, a platform
   quirk) is a plugin of the relevant faculty, not a feature domain.
 
 This keeps the rule that the orchestrator holds no business rules: recipes
 sequence and configure; faculties decide.
+
+## Workflow recipes
+
+Declarative recipes are the target, but replacing Go handlers is an outcome of
+the migration, not its prerequisite. Three stages:
+
+1. **Current:** feature-specific Go handlers. Each knows its own sequence and
+   calls the existing domains.
+2. **Transitional:** typed workflows defined in Go. Book, Meme and Digest are
+   composed from reusable faculty steps with typed inputs, outputs and policy
+   parameters, and the orchestrator executes them.
+3. **Target:** versioned recipes interpreted by the orchestrator. The same steps
+   and parameters are data; Go implements the faculty operations, adapters and
+   workflow engine, not each product's business sequence.
+
+A feature moves to stage 3 only after it has run on stage 2 behind its baseline
+tests.
 
 ## Migration and compatibility
 
@@ -81,11 +103,11 @@ No code moves in this record. Existing feature domains and services stay as
 compatibility facades until each migration is proven:
 
 1. Book first, through ADR 0006 (steps `07` and `09`).
-2. Meme: its scrapers and pool become reading-host plugins; screening moves
-   behind evaluation; sent receipts become experience. Existing meme events,
+2. Meme: its scrapers become reading-host plugins and its pool a reading cache,
+   like the Feeds cache; screening moves behind moderation; sent receipts become experience. Existing meme events,
    CLI and Discord commands and the scheduler triggers keep working through a
    facade.
-3. Digest: its policy moves under evaluation and selection; `digest.*` stays.
+3. Digest: its ordering policy moves under attention; `digest.*` stays.
 4. Chat: follows the chat plan, which already treats it as a loop faculty.
 
 Each step reviews the event envelope, routes and actions, service contracts,
@@ -93,11 +115,10 @@ interface commands, SQLite schemas, environment variables and compose files
 before it starts. Removing a facade needs the owner's approval. `AGENTS.md`
 keeps describing the current layout until code actually moves.
 
-## Open questions
+## Resolved questions
 
-- Is evaluation and selection one faculty, or are moderation (admissibility)
-  and attention (ranking) separate?
-- Where does the meme pool live: a reading cache like Feeds, or stored
-  knowledge?
-- Does a recipe format (data interpreted by the orchestrator) replace Go
-  handlers per feature, and when?
+- Moderation and attention are two faculties (decided above).
+- The meme pool is a reading cache, like the Feeds cache, not stored knowledge.
+  Items enter Knowledge only through an explicit workflow step such as tagging.
+- Workflow recipes become data in stage 3, after typed Go workflows prove the
+  steps (see Workflow recipes).
