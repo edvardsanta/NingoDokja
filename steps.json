@@ -5,7 +5,7 @@
   "status": "in_progress",
   "updated_on": "2026-10-18",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
-  "current_step": null,
+  "current_step": "03",
   "status_values": [
     "pending",
     "in_progress",
@@ -191,7 +191,7 @@
     {
       "id": "03",
       "title": "Capture behavior and measurement baselines for the experiments",
-      "status": "pending",
+      "status": "in_progress",
       "depends_on": [
         "02"
       ],
@@ -208,8 +208,16 @@
         "Cover cold start, missing premises, contradictory evidence, stagnation/oscillation, scope/version changes, and simulated-versus-observed outcomes.",
         "Use comparison evidence to resolve or explicitly revise ADR 0005 before cognitive-loop contract integration or content/cognitive ownership migration."
       ],
-      "evidence": [],
-      "checks": [],
+      "evidence": [
+        "Hashtag suggestion baseline pinned in dokja_orch/internal/handlers/meme_hashtag_baseline_test.go: relevant hit, below-threshold abstention (nearest label still returned with relevant=false and no reason), no examples, degraded Knowledge reason, Knowledge error, missing text/OCR failure/empty OCR without a Knowledge call, explicit text skipping OCR, min_score override and fallback, and the 5s search budget. Memory/prediction failure, missing evidence and insufficient prediction were already covered by hashtag_experience_test.go."
+      ],
+      "checks": [
+        {
+          "name": "hashtag_baseline_tests",
+          "status": "passed",
+          "detail": "go vet and go test ./internal/handlers -count=1 passed in dokja_orch."
+        }
+      ],
       "blockers": []
     },
     {

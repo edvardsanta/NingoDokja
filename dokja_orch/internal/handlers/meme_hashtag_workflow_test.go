@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 type fakeMemeTextReader struct {
@@ -19,15 +20,21 @@ func (f *fakeMemeTextReader) ReadText(_ context.Context, url string) (map[string
 type knowledgeCall struct {
 	eventType string
 	payload   map[string]any
+	deadline  time.Time
 }
 
 type fakeHashtagKnowledge struct {
 	calls   []knowledgeCall
 	answers map[string]map[string]any
+	err     error
 }
 
-func (f *fakeHashtagKnowledge) Dispatch(_ context.Context, eventType string, payload map[string]any) (map[string]any, error) {
-	f.calls = append(f.calls, knowledgeCall{eventType: eventType, payload: payload})
+func (f *fakeHashtagKnowledge) Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
+	deadline, _ := ctx.Deadline()
+	f.calls = append(f.calls, knowledgeCall{eventType: eventType, payload: payload, deadline: deadline})
+	if f.err != nil {
+		return nil, f.err
+	}
 	return f.answers[eventType], nil
 }
 
