@@ -202,7 +202,9 @@
       ],
       "deliverables": [
         "Representative synthetic fixtures",
-        "Baseline report and evaluation protocol"
+        "Baseline report and evaluation protocol",
+        "dokja_docs/step-03-baseline.md",
+        "dokja_orch/internal/experiments/cognitiveloop"
       ],
       "acceptance_criteria": [
         "Existing hashtag behavior is covered for success, abstention, missing evidence, and dependency failure.",
@@ -219,7 +221,11 @@
         "Hashtag suggestion baseline pinned in dokja_orch/internal/handlers/meme_hashtag_baseline_test.go: relevant hit, below-threshold abstention (nearest label still returned with relevant=false and no reason), no examples, degraded Knowledge reason, Knowledge error, missing text/OCR failure/empty OCR without a Knowledge call, explicit text skipping OCR, min_score override and fallback, and the 5s search budget. Memory/prediction failure, missing evidence and insufficient prediction were already covered by hashtag_experience_test.go.",
         "Feature facade baseline: dokja_orch/internal/core/feature_routes_baseline_test.go pins every public book.*, meme.*, digest.* and knowledge.* event (and meme.dispatch.scheduled) to its workflow, domain and action.",
         "Book contract baseline: test_book_summary_service.py pins the classify and summarize response fields, the pt-BR/study defaults and the refusal without content; client, domain and handler contracts were already covered by existing Go tests.",
-        "Meme pool baseline: dokja_services/dokja_meme/tests/test_pool_baseline.py pins that meme.fetch marks memes sent before delivery is confirmed, meme.list does not consume, screening labels without filtering, an unavailable screen fails closed without blocking, mark_sent touches only pooled URLs, and unknown events are refused."
+        "Meme pool baseline: dokja_services/dokja_meme/tests/test_pool_baseline.py pins that meme.fetch marks memes sent before delivery is confirmed, meme.list does not consume, screening labels without filtering, an unavailable screen fails closed without blocking, mark_sent touches only pooled URLs, and unknown events are refused.",
+        "Plugin compatibility and failure behavior recorded from existing Feeds manifest/runner/service tests and Knowledge extractor/fetch/source/plugin tests in dokja_docs/step-03-baseline.md section 2.",
+        "Measurement protocol for latency, invocation count, output size and scope isolation recorded in dokja_docs/step-03-baseline.md section 3; prediction evaluation follows ADR 0004.",
+        "Reference loops in dokja_orch/internal/experiments/cognitiveloop: one pure policy under Supervised (A, snapshot reuse), SupervisedRereading and DomainInternal (B) over deterministic fakes; 15 scenarios plus equivalent-source, concurrent-scope and observed-only-experience tests. All topologies agree on outcome and candidate; with snapshot reuse A matches B's operation count everywhere.",
+        "ADR 0005 has an 'Evidence from step 03' section recommending the orchestrator-supervised loop with snapshot reuse; it remains proposed pending the owner's decision."
       ],
       "checks": [
         {
@@ -236,9 +242,31 @@
           "name": "book_contract_tests",
           "status": "passed",
           "detail": "7 passed in dokja-lab-ci with a stub transformers module injected for the run only: the env lacks transformers and the tests inject a fake classifier. The real zero-shot model was not exercised."
+        },
+        {
+          "name": "reference_loop_tests",
+          "status": "passed",
+          "detail": "go vet and go test -race ./internal/experiments/... in dokja_orch; mutation check (disabling the low-prediction rule) failed the revision scenario under every topology."
+        },
+        {
+          "name": "orchestrator_suite",
+          "status": "passed",
+          "detail": "go vet ./... and go test ./... -count=1 in dokja_orch."
+        },
+        {
+          "name": "latency_and_coupling",
+          "status": "skipped",
+          "detail": "Fakes answer instantly and coupling was not measured; the protocol defines live measurements for later steps."
+        },
+        {
+          "name": "adr_0005_resolution",
+          "status": "blocked",
+          "detail": "Awaiting the owner's decision on the recommendation; step 03 stays in progress until ADR 0005 is resolved or explicitly revised."
         }
       ],
-      "blockers": []
+      "blockers": [
+        "Owner decision on ADR 0005 (cycle owner) using the step 03 evidence."
+      ]
     },
     {
       "id": "04",

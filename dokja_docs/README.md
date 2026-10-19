@@ -7,6 +7,7 @@ Available docs:
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)
+- [Step 03 baseline and evaluation protocol](./step-03-baseline.md)
 - [cognitive-macrocomponents-research.md](./cognitive-macrocomponents-research.md)
 - [Knowledge–Prediction–Experience graph research](./knowledge-prediction-experience-research.md)
 - [experience-memory-plan.md](./experience-memory-plan.md)

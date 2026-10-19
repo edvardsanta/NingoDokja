@@ -113,6 +113,23 @@ environment variables, compose files, or runtime policies change in this decisio
 batch. Storage changes for procedure references require their own compatibility
 review; current stores are not migrated implicitly.
 
+## Evidence from step 03
+
+The [reference experiment](../step-03-baseline.md#4-adr-0005-reference-experiment)
+ran one pure policy under an orchestrator-supervised loop (A, with and without
+snapshot reuse) and a domain-internal loop (B) over deterministic fakes. All
+reached the same outcome and candidate in 15 scenarios. With snapshot reuse, A
+matched B's operation count everywhere; the only difference came from re-reading
+Knowledge and Experience without new evidence.
+
+Limits: B shared A's supervision code, so its trace, cancellation and budget
+behavior were equal by construction; latency and code coupling were not
+measured.
+
+Recommendation, pending the owner's decision: the orchestrator-supervised loop
+with snapshot reuse owns the cycle; a domain may revise over a supplied snapshot
+within one step if it returns its trace and spend.
+
 ## Open questions and decision gate
 
 Resolve the first task/prediction target, typed edge meanings, temporal update
