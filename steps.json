@@ -437,9 +437,9 @@
         "Knowledge's existing extractors and plugins are served through a reading-host adapter that emits the Extracted contract (moved from step 05)."
       ],
       "evidence": [
-        "feeds.extract reads a file on demand: the single enabled document.extract.v1 plugin for the extension gets a JSON request on stdin; its output is checked against the Extracted contract before the reply. Scheduled collectors still run with no stdin and all existing Feeds tests pass unchanged.",
+        "feeds.extract reads a file on demand: the single enabled document.extract.v1 plugin for the extension gets a JSON request on stdin; its output is checked against the Extracted contract before the reply. Scheduled collectors still run with no stdin; existing Feeds assertions pass, with Runner call sites given a nil input and the shipped-example test expecting two examples.",
         "knowledge.read (new, additive) runs a typed task: read through the host, then the Knowledge domain ingests each document through knowledge.ingest with source file:<name>, source_ref and format:/reader: tags. knowledge.ingest with a file is unchanged.",
-        "The knowledge-extractors plugin serves Knowledge's registry (and the owner's register(registry) plugins via KNOWLEDGE_PLUGINS_DIR) through the host; tested with real python3 and run inside the built production image.",
+        "The knowledge-extractors plugin serves Knowledge's registry and the owner's register(registry) plugins (KNOWLEDGE_PLUGINS_DIR) through the host; tested with real python3, and inside the built production image it read HTML and a text PDF. URL and scheme fetchers still run inside Knowledge.",
         "Replacing a reader is two manifest edits; router, workflow and domain code are unchanged (TestReplacingAnExtractorNeedsNoCodeChange).",
         "Crash, hang, malformed output, oversized output, incompatible lifecycle or operation version, ambiguity and unreadable files each give a defined reason; a failed read stores nothing.",
         "The serial REP server would stall feeds.status behind a reading; it now uses ROUTER with one goroutine per request (REQ clients unchanged).",
@@ -460,7 +460,7 @@
         {
           "name": "image_and_live_run",
           "status": "passed",
-          "detail": "Built the production Feeds image with podman; the adapter read HTML inside it and pypdf 3.4.1 imports. Ran the Feeds binary locally and answered feeds.extract over ZeroMQ (HTML read, .odt unavailable, PDF unreadable without host pypdf), with status reporting the last result."
+          "detail": "Built the production Feeds image with podman; the adapter read HTML and a one-page text PDF inside it with Debian pypdf 3.4.1. Ran the Feeds binary locally and answered feeds.extract over ZeroMQ (HTML read, .odt unavailable, PDF unreadable without host pypdf), with status reporting the last result."
         },
         {
           "name": "secret_scan",

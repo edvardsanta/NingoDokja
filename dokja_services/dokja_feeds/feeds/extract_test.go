@@ -354,3 +354,48 @@ func TestTheKnowledgeExtractorsExampleServesKnowledgeFormats(t *testing.T) {
 		t.Fatalf("Knowledge's own extract error must come back as unreadable: %v", err)
 	}
 }
+
+// The owner's register(registry) Knowledge plugins are served through the same adapter once
+// their extensions are listed in the manifest.
+func TestTheKnowledgeExtractorsExampleServesTheOwnersKnowledgePlugins(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is not installed")
+	}
+	knowledge, err := filepath.Abs("../../dokja_knowledge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(knowledge, "plugins.py")); err != nil {
+		t.Skip("the Knowledge sources are not next to this module")
+	}
+	root, owned := t.TempDir(), t.TempDir()
+	if err := os.CopyFS(filepath.Join(root, "knowledge-extractors"), os.DirFS("../plugins.example/knowledge-extractors")); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(root, "knowledge-extractors", "plugin.json")
+	raw, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(raw), `"enabled": false`, `"enabled": true`, 1)
+	edited = strings.Replace(edited, `"formats": [`, `"formats": [".foo", `, 1)
+	writeFile(t, manifest, edited, 0o644)
+	writeFile(t, filepath.Join(owned, "foo.py"), `from extractors import Extracted
+
+
+def register(registry):
+    registry.add_extractor(".foo", lambda data, name: [Extracted(title="Foo", text=data.decode().upper())])
+`, 0o644)
+	env := map[string]string{"PATH": os.Getenv("PATH"), "KNOWLEDGE_EXTRACTORS_DIR": knowledge, "KNOWLEDGE_PLUGINS_DIR": owned}
+	service := New(Config{PluginsDir: root, Limits: DefaultLimits()}, Options{
+		Lookup: func(name string) (string, bool) { value, ok := env[name]; return value, ok },
+	})
+
+	result, err := service.Dispatch(context.Background(), "feeds.extract", extractPayload("notes.foo", "owner format"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if documents := result["documents"].([]Document); len(documents) != 1 || documents[0].Text != "OWNER FORMAT" {
+		t.Fatalf("the owner's plugin must read its format: %#v", result)
+	}
+}

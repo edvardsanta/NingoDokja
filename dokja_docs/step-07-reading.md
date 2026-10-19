@@ -32,12 +32,12 @@ Decisions: [ADR 0006](./decisions/0006-reading-macro-component.md) (reading host
 
 | Criterion | Evidence |
 | --- | --- |
-| On-demand request with input and result; scheduled manifests keep working | `TestExtractHandsTheFileToTheBoundPluginAndReturnsItsDocuments`; every existing manifest, runner, service and lifecycle test passes unchanged; `TestACollectorReadsNoInputAndAnExtractorReadsItsRequest` |
+| On-demand request with input and result; scheduled manifests keep working | `TestExtractHandsTheFileToTheBoundPluginAndReturnsItsDocuments`; `TestACollectorReadsNoInputAndAnExtractorReadsItsRequest`; the existing manifest, runner, service and lifecycle assertions pass. Two test edits were needed: the `Runner` call sites gained the `nil` input argument, and the shipped-example test now expects two disabled examples instead of one |
 | One extractor as a plugin, Extracted contract, stored through `knowledge.ingest` with source and format provenance | `TestTheKnowledgeExtractorsExampleServesKnowledgeFormats` (real `python3` and Knowledge registry); `TestKnowledgeReadStoresWhatTheReadingHostRead`; `TestStoreReadingKeepsSourceFormatAndReaderProvenance` |
 | Add or replace an extractor without router or workflow changes | `TestReplacingAnExtractorNeedsNoCodeChange`: disabling one manifest and enabling another switches the reader |
 | Crash, hang, malformed output, version mismatch | `TestExtractGivesEveryPluginFailureADefinedReason`, `TestExtractNeverRunsADisabledAmbiguousOrIncompatibleProvider`, `TestExtractStopsAHungPluginAtTheCallersDeadline`, `TestKnowledgeReadGivesEachHostFailureAReasonAndStoresNothing` |
 | Runtime and OS permission assumptions | Recorded below |
-| Knowledge's extractors and plugins served through a reading-host adapter | `knowledge-extractors` plugin; built and run inside the production Feeds image (HTML read; `pypdf` 3.4.1 present) |
+| Knowledge's extractors and plugins served through a reading-host adapter | `knowledge-extractors` plugin; `TestTheKnowledgeExtractorsExampleServesTheOwnersKnowledgePlugins` reads an owner `register(registry)` format through it; inside the built production Feeds image it read HTML and a one-page text PDF (Knowledge's `make_pdf` sample) |
 
 ### Defined host behavior
 
@@ -106,6 +106,10 @@ The extractor's last result (`last_run`, `last_ok`, `last_error`) is listed in
 
   The container is the isolation boundary, and the plugins directory is mounted
   read-only. At most 2 readings and 16 requests run at once.
+- **Time.** A reading ends at the plugin's `timeout_ms` (90 s for the example),
+  the host's 2-minute request limit, or the task's 3-minute deadline. The
+  orchestrator's ingress sets no server-side timeout, so the caller's own client
+  timeout is the remaining bound.
 - **Size.** A file is at most 20 MB, as Knowledge's upload limit. The task
   workspace (64 KiB) never holds the file or its text: the steps keep them
   outside, and the workspace records a hashed reference
@@ -118,6 +122,13 @@ The extractor's last result (`last_run`, `last_ok`, `last_error`) is listed in
   the client after it was stored. The task then reports
   `knowledge_ingest_failed`, and reading again answers `changed: false`. This
   limit predates this step and affects `knowledge.ingest` with a file too.
+- The Feeds image has Debian's `pypdf` 3.4.1 and the Knowledge image a newer,
+  unpinned pip `pypdf`. The same PDF can therefore give slightly different text
+  through `knowledge.read` and through `knowledge.ingest` with a file. The
+  extractor uses only APIs both versions have.
+- Only extraction moved to the host. Knowledge's `fetch.py` (http and https
+  sources) and plugin fetchers (`add_fetcher` schemes) still run inside
+  Knowledge (`knowledge.ingest` with `source`).
 - No interface sends `knowledge.read` yet; the `book.*` facade (step `09`) is its
   first planned consumer.
 - Bindings are still implicit: a single enabled provider is chosen and none is
