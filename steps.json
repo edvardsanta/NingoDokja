@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-18",
+  "updated_on": "2026-10-19",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": null,
   "status_values": [
@@ -417,15 +417,16 @@
     {
       "id": "07",
       "title": "Run the on-demand reading experiment",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "06"
       ],
       "deliverables": [
-        "On-demand request mode for the reading host",
-        "One document extractor as a reading-host plugin feeding knowledge.ingest",
-        "Isolation and compatibility tests",
-        "Extension-cost record"
+        "dokja_services/dokja_feeds/feeds/extract.go (feeds.extract) and a concurrent ROUTER server",
+        "dokja_services/dokja_feeds/plugins.example/knowledge-extractors (Knowledge's extractors as a document.extract.v1 plugin)",
+        "knowledge.read: dokja_domain/dokja_knowledge/reading.go and dokja_orch/internal/handlers/knowledge_reading.go",
+        "Isolation and compatibility tests (feeds extract_test.go, server_test.go; domain reading_test.go; knowledge_reading_test.go)",
+        "dokja_docs/step-07-reading.md (extension-cost, runtime and permission record)"
       ],
       "acceptance_criteria": [
         "The Feeds-derived reading host accepts an on-demand request with input and returns a result, while existing scheduled manifests keep working.",
@@ -435,9 +436,45 @@
         "Runtime choice and operating-system permission assumptions are recorded.",
         "Knowledge's existing extractors and plugins are served through a reading-host adapter that emits the Extracted contract (moved from step 05)."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "feeds.extract reads a file on demand: the single enabled document.extract.v1 plugin for the extension gets a JSON request on stdin; its output is checked against the Extracted contract before the reply. Scheduled collectors still run with no stdin and all existing Feeds tests pass unchanged.",
+        "knowledge.read (new, additive) runs a typed task: read through the host, then the Knowledge domain ingests each document through knowledge.ingest with source file:<name>, source_ref and format:/reader: tags. knowledge.ingest with a file is unchanged.",
+        "The knowledge-extractors plugin serves Knowledge's registry (and the owner's register(registry) plugins via KNOWLEDGE_PLUGINS_DIR) through the host; tested with real python3 and run inside the built production image.",
+        "Replacing a reader is two manifest edits; router, workflow and domain code are unchanged (TestReplacingAnExtractorNeedsNoCodeChange).",
+        "Crash, hang, malformed output, oversized output, incompatible lifecycle or operation version, ambiguity and unreadable files each give a defined reason; a failed read stores nothing.",
+        "The serial REP server would stall feeds.status behind a reading; it now uses ROUTER with one goroutine per request (REQ clients unchanged).",
+        "The file and text stay outside the 64 KiB workspace; evidence is a hashed file ref plus reader@version.",
+        "Runtime: subprocess with Debian python3 and python3-pypdf in the Feeds images; no sandbox, the container is the isolation boundary (step-07-reading.md)."
+      ],
+      "checks": [
+        {
+          "name": "feeds_tests",
+          "status": "passed",
+          "detail": "go vet and go test -race ./... in dokja_services/dokja_feeds. Mutation: a serial server loop fails TestServeAnswersStatusWhileAReadingIsStillRunning."
+        },
+        {
+          "name": "orchestrator_tests",
+          "status": "passed",
+          "detail": "go vet and go test ./... in dokja_orch; go test ./... in dokja_domain/dokja_knowledge. Mutation: keeping the file in the task payload stops the task with size_limit and fails the success test."
+        },
+        {
+          "name": "image_and_live_run",
+          "status": "passed",
+          "detail": "Built the production Feeds image with podman; the adapter read HTML inside it and pypdf 3.4.1 imports. Ran the Feeds binary locally and answered feeds.extract over ZeroMQ (HTML read, .odt unavailable, PDF unreadable without host pypdf), with status reporting the last result."
+        },
+        {
+          "name": "secret_scan",
+          "status": "skipped",
+          "detail": "gitleaks is not installed locally; the PR check runs it."
+        },
+        {
+          "name": "end_to_end_stack",
+          "status": "skipped",
+          "detail": "knowledge.read was not run against a live Knowledge service or the compose stack; the orchestrator path is covered with fakes."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-19"
     },
     {
       "id": "08",
@@ -532,5 +569,5 @@
       "blockers": []
     }
   ],
-  "next_step": "03"
+  "next_step": "08"
 }

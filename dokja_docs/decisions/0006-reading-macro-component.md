@@ -1,6 +1,7 @@
 # ADR 0006: reading is one macro-component; Book is not a service
 
-Date: 2026-10-18. Status: accepted as the target direction. Migration: pending.
+Date: 2026-10-18. Status: accepted as the target direction. Migration: stage 2 done
+(step `07`, [record](../step-07-reading.md)); stages 3 and 4 pending.
 Supersedes the Book/source half of [ADR 0005](./0005-knowledge-experience-content.md).
 Generalized by [ADR 0007](./0007-faculties-not-features.md): features are workflows over faculties.
 Related: [decision index](./README.md), [plugin lifecycle](./0002-plugin-lifecycle.md),
@@ -100,7 +101,9 @@ Stage it:
 1. Record the current Book request/response contract and CLI behavior as a
    baseline (step `03`).
 2. Prove on-demand reading with one extractor running as a reading-host plugin
-   whose output goes through `knowledge.ingest` (step `07`).
+   whose output goes through `knowledge.ingest` (step `07`). Done: `feeds.extract`
+   and `knowledge.read`, with Knowledge's extractors served by the
+   `knowledge-extractors` adapter plugin.
 3. Keep `book.*` as a compatibility facade over reading → Knowledge →
    generation (step `09`).
 4. Deprecate and remove the facade, the Book domain and the Book service only

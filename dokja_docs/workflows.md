@@ -99,6 +99,45 @@ Current files:
 - [domain.go](../dokja_domain/dokja_book/domain.go)
 - [book_service_client.go](../dokja_orch/internal/clients/book_service_client.go)
 
+## Knowledge Reading Workflow
+
+Used for:
+
+- `knowledge.read`
+
+Route:
+
+- workflow: `knowledge`
+- domains:
+  - `knowledge`
+
+Actions:
+
+- `knowledge.read` -> `read-knowledge`
+
+Purpose:
+
+- read a file on demand through the reading host (`feeds.extract`, the enabled
+  `document.extract.v1` plugin for its extension)
+- store each document it yields through `knowledge.ingest`, with `file:<name>` as the
+  source and `format:<ext>` and `reader:<plugin>` tags as provenance
+- run as a typed task (`read`, then `ingest`); the file and its text stay outside the
+  workspace, which records a hashed reference and the reader's version
+
+The payload is `filename` and `content_b64`, plus the optional `title`, `kind`, `tags`,
+`source_id` and `source_ref` that `knowledge.ingest` takes. A failure names its step
+reason: `reading_unavailable`, `reading_ambiguous`, `reading_timeout`, `reading_failed`,
+`reading_unreadable`, `reading_invalid`, `reading_unsupported`,
+`reading_host_unavailable` or `knowledge_ingest_failed`. It is refused while `feeds` is
+switched off. `knowledge.ingest` with a file still extracts inside Knowledge, unchanged.
+
+Current files:
+
+- [knowledge_reading.go](../dokja_orch/internal/handlers/knowledge_reading.go)
+- [reading.go](../dokja_domain/dokja_knowledge/reading.go)
+- [feeds_service_client.go](../dokja_orch/internal/clients/feeds_service_client.go)
+- [extract.go](../dokja_services/dokja_feeds/feeds/extract.go)
+
 ## Scheduled Meme Dispatch Workflow
 
 Used for:
