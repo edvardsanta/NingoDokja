@@ -2,6 +2,7 @@
 
 Date: 2026-10-18. Status: accepted as the target direction. Migration: pending.
 Supersedes the Book/source half of [ADR 0005](./0005-knowledge-experience-content.md).
+Generalized by [ADR 0007](./0007-faculties-not-features.md): features are workflows over faculties.
 Related: [decision index](./README.md), [plugin lifecycle](./0002-plugin-lifecycle.md),
 [capability map](../capability-map.md).
 
@@ -75,9 +76,9 @@ the experience. The orchestrator sequences it; the domains own the decisions.
    manifests.
 3. **Feeds output can reach Knowledge.** Digest keeps item selection; storing
    selected feed items in Knowledge becomes an explicit, optional workflow step.
-4. **Other perception is also reading, migrated later.** Meme OCR and voice
-   transcription fit the same responsibility. They are out of scope for this
-   migration and keep their current services until a separate decision.
+4. **Other perception is also reading, migrated later.** Meme scrapers, OCR
+   and attachments and voice transcription fit the same responsibility. ADR 0007
+   plans their migration; they keep their current services until then.
 
 ## Migration and compatibility
 

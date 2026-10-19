@@ -2,7 +2,8 @@
 
 Follow-up: [Knowledge–Prediction–Experience feedback graph](./knowledge-prediction-experience-research.md).
 Book/source ownership is decided in ADR 0006: reading is one macro-component,
-and Book is not a service. The general-knowledge/contextual-experience allocation
+and Book is not a service. ADR 0007 generalizes it: macro-components are
+faculties, and product features (Book, Meme, Digest) are workflows over them. The general-knowledge/contextual-experience allocation
 remains under research in ADR 0005, which examines reciprocal dependencies and
 bounded cycles that the initial macro map did not resolve.
 
@@ -28,7 +29,7 @@ identified separately.
 | Knowledge | [Plugin loader](../dokja_services/dokja_knowledge/plugins.py), [extractor registry](../dokja_services/dokja_knowledge/extractors/__init__.py), and [service](../dokja_services/dokja_knowledge/service.py) | Generic ingestion and retrieval mechanisms are extended by source and format plugins. Knowledge already serves research documents and explicitly labelled meme examples. |
 | Experience memory | [Memory service](../dokja_services/dokja_memory/memory/service.go) and [store](../dokja_services/dokja_memory/memory/store.go) | Experiences, outcomes, and similarity have their own storage boundary. This is distinct from document knowledge. |
 | Prediction and evaluation | [Memory domain](../dokja_domain/dokja_memory/domain.go) and [prediction/scoring](../dokja_domain/dokja_memory/predict.go) | Acceptance estimates, insufficient-evidence behavior, and Brier comparison with a baseline already exist as domain rules. |
-| Selection policy | [Digest domain](../dokja_domain/dokja_digest/domain.go) | The domain chooses and orders items; Feeds supplies observations. This is a useful existing separation between acquisition and attention-like selection. |
+| Selection policy | [Digest domain](../dokja_domain/dokja_digest/domain.go) | The domain chooses and orders items; Feeds supplies observations. This is a useful existing separation between acquisition and attention-like selection, and the seed of the evaluation and selection faculty (ADR 0007). |
 | Composed behavior | [Hashtag workflow](../dokja_orch/internal/handlers/meme_hashtag_workflow.go) and [experience integration](../dokja_orch/internal/handlers/hashtag_experience.go) | OCR, labelled knowledge, suggestions, prediction, and later feedback already participate in one feature. |
 | Task context | [Chat sessions](../dokja_orch/internal/handlers/chat_session_manager.go) and [dispatcher](../dokja_orch/internal/core/dispatcher.go) | Conversation history exists, but there is no general typed task workspace in these paths. The dispatcher executes steps without using successful result values to select the next step. |
 
@@ -78,19 +79,23 @@ justify that. The conceptual map does not prescribe one container per row.
 
 | Functional responsibility | Starting point in Dokja | Extensions | Owner of decisions |
 | --- | --- | --- | --- |
-| Reading (acquisition and perception) | Feeds host; Book and Knowledge extraction migrate into it; meme OCR and voice input later | Source, format, OCR, transcription adapters, run on a schedule or on demand | Relevant domains decide what observations mean and when to use them. |
-| Semantic knowledge | Knowledge | Fetchers, formats, retrieval and indexing implementations | Knowledge domain and consuming domains own admissibility and use. |
+| Reading (acquisition and perception) | Feeds host; Book and Knowledge extraction, meme scrapers/OCR/attachments and voice input migrate into it | Source, format, OCR, transcription adapters, run on a schedule or on demand | Relevant domains decide what observations mean and when to use them. |
+| Semantic knowledge | Knowledge | Retrieval and indexing implementations; fetchers and formats move to Reading (ADR 0006) | Knowledge domain owns the document contract and retrieval semantics. |
 | Episodic memory | Memory | Storage, embedding, recall implementations | Memory domain owns experience and outcome semantics. |
-| Prediction and evaluation | Memory prediction/scoring | Predictors with explicit targets and evaluators | Domain owns the target, evidence requirements, and permitted use. |
+| Prediction | Memory prediction/scoring | Predictors with explicit targets and evaluators | Domain owns the target, evidence requirements, and permitted use. |
+| Evaluation and selection | Moderation, Digest ranking, meme screening | Classifiers and ranking strategies | The faculty decides admissibility and attention, parameterized by the workflow. |
 | Language generation | Chat domain/handler and Chat AI | Model providers and structured-output adapters | Chat owns conversation and response policy. |
-| Action and communication | Communications, media delivery, voice output | Platform and output adapters | Communications and feature domains authorize and interpret actions. |
+| Action and communication | Communications, media delivery, voice output | Platform and output adapters | Communications authorizes and executes actions; receipts go to Experience. |
 | Coordination and working memory | Orchestrator core | Registered workflows and capability bindings | Orchestrator sequences work; domains supply business decisions. |
 
-Meme and digest remain product domains that compose these capabilities. Book does
-not ([ADR 0006](./decisions/0006-reading-macro-component.md)): reading a book is a
-reading, Knowledge stores the result with provenance, and Experience records that
-it was a book and how it was used. “Summarize this book” is a workflow over
-reading, knowledge, generation, delivery, and experience.
+Product features are not macro-components
+([ADR 0007](./decisions/0007-faculties-not-features.md)). Book, Meme and Digest
+are workflows that run the cycle across these faculties, plus the policy
+parameters for their case. Reading a book is a reading, Knowledge stores the
+result with provenance, and Experience records that it was a book and how it was
+used ([ADR 0006](./decisions/0006-reading-macro-component.md)). Meme is scheduled
+reading, screening, labelled knowledge, delivery and feedback; Digest is a
+selection policy over what Feeds read.
 
 This research first proposed keeping acquisition modality-specific until two real
 consumers needed the same contract and lifecycle. That condition is met: Feeds
