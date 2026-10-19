@@ -5,7 +5,7 @@
   "status": "in_progress",
   "updated_on": "2026-10-18",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
-  "current_step": "03",
+  "current_step": null,
   "status_values": [
     "pending",
     "in_progress",
@@ -196,7 +196,7 @@
     {
       "id": "03",
       "title": "Capture behavior and measurement baselines for the experiments",
-      "status": "in_progress",
+      "status": "completed",
       "depends_on": [
         "02"
       ],
@@ -225,7 +225,7 @@
         "Plugin compatibility and failure behavior recorded from existing Feeds manifest/runner/service tests and Knowledge extractor/fetch/source/plugin tests in dokja_docs/step-03-baseline.md section 2.",
         "Measurement protocol for latency, invocation count, output size and scope isolation recorded in dokja_docs/step-03-baseline.md section 3; prediction evaluation follows ADR 0004.",
         "Reference loops in dokja_orch/internal/experiments/cognitiveloop: one pure policy under Supervised (A, snapshot reuse), SupervisedRereading and DomainInternal (B) over deterministic fakes; 15 scenarios plus equivalent-source, concurrent-scope and observed-only-experience tests. All topologies agree on outcome and candidate; with snapshot reuse A matches B's operation count everywhere.",
-        "ADR 0005 has an 'Evidence from step 03' section recommending the orchestrator-supervised loop with snapshot reuse; it remains proposed pending the owner's decision."
+        "ADR 0005 is accepted for prototype: the owner chose the orchestrator-supervised loop with snapshot reuse, and the record resolves update schedule, stopping outcomes, observed-versus-simulated handling and domain-internal revision."
       ],
       "checks": [
         {
@@ -260,13 +260,12 @@
         },
         {
           "name": "adr_0005_resolution",
-          "status": "blocked",
-          "detail": "Awaiting the owner's decision on the recommendation; step 03 stays in progress until ADR 0005 is resolved or explicitly revised."
+          "status": "passed",
+          "detail": "The owner accepted topology A (orchestrator-supervised loop with snapshot reuse); ADR 0005 is accepted for prototype."
         }
       ],
-      "blockers": [
-        "Owner decision on ADR 0005 (cycle owner) using the step 03 evidence."
-      ]
+      "blockers": [],
+      "completed_on": "2026-10-18"
     },
     {
       "id": "04",

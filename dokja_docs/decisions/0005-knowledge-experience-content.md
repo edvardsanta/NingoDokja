@@ -1,7 +1,7 @@
 # ADR 0005: Knowledge defines the general strategy; Experience grounds its use
 
-Date: 2026-10-18. Status: proposed; research and decision required.
-Implementation: not authorized by this record. Candidate refinement of ADRs 0001 and 0003.
+Date: 2026-10-18. Status: accepted for prototype (owner decision after step 03).
+Implementation: step `04`. Refines ADRs 0001 and 0003.
 Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 [state ownership](./0003-state-ownership.md), [capability map](../capability-map.md).
 
@@ -126,11 +126,28 @@ Limits: B shared A's supervision code, so its trace, cancellation and budget
 behavior were equal by construction; latency and code coupling were not
 measured.
 
-Recommendation, pending the owner's decision: the orchestrator-supervised loop
-with snapshot reuse owns the cycle; a domain may revise over a supplied snapshot
-within one step if it returns its trace and spend.
+Recommendation: the orchestrator-supervised loop with snapshot reuse owns the
+cycle; a domain may revise over a supplied snapshot within one step if it
+returns its trace and spend. The owner accepted it.
 
-## Open questions and decision gate
+## Decision
+
+The owner chose topology A. The decision gate is resolved as follows:
+
+| Question | Resolution |
+| --- | --- |
+| Cycle owner | The orchestrator supervises the cycle: each retrieval, prediction and evidence acquisition is an orchestrated step, and the faculty domain decides the next step from typed results. |
+| Update schedule | Knowledge and Experience are read into a snapshot and re-read only after new evidence arrives. Every result names the versions it consumed. |
+| Readiness and stopping | Non-terminal steps: `need_evidence`, `revise`. Terminal outcomes: `ready`, `abstain`, `failed`, `budget_exhausted`, `stagnated` (state signature repeated), `oscillated` (an older signature returned). Unavailable evidence is reported apart from contrary or foreign-scope evidence. |
+| Observed versus simulated | Predictions are always hypothetical. Only an observed outcome of a ready, executed proposal becomes experience; an unknown outcome stays an unresolved attempt. |
+| Domain-internal revision | Allowed within one step over the snapshot it was given, as an optimization, if the domain returns its trace and spend. It is not a second cycle owner. |
+| First prediction target | Hashtag acceptance, as defined in [ADR 0004](./0004-shadow-prediction.md). |
+| Typed edges | Prototype evidence kinds are knowledge (general method), experience (observed procedure) and observation (premise). Richer edge types wait for a consumer that needs them. |
+
+These are internal prototype contracts. The public envelope, routes and service
+contracts do not change in step `04`.
+
+## Decision gate (history)
 
 Resolve the first task/prediction target, typed edge meanings, temporal update
 schedule, cycle owner, readiness/stopping rules, and separation of observed

@@ -3,9 +3,9 @@
 Follow-up: [Knowledge–Prediction–Experience feedback graph](./knowledge-prediction-experience-research.md).
 Book/source ownership is decided in ADR 0006: reading is one macro-component,
 and Book is not a service. ADR 0007 generalizes it: macro-components are
-faculties, and product features (Book, Meme, Digest) are workflows over them. The general-knowledge/contextual-experience allocation
-remains under research in ADR 0005, which examines reciprocal dependencies and
-bounded cycles that the initial macro map did not resolve.
+faculties, and product features (Book, Meme, Digest) are workflows over them.
+ADR 0005 settles the reciprocal dependencies the initial macro map left open:
+the orchestrator supervises the Knowledge–Prediction–Experience cycle.
 
 Date: 2026-10-18. Status: research proposal, not an accepted architecture decision.
 

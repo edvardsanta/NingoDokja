@@ -119,7 +119,7 @@ than reimplementing them in each faculty domain. A domain may still revise over 
 snapshot it was given within one step, as an optimization, provided it returns
 its trace and spend. That is not a separate cycle owner.
 
-This is a recommendation; ADR 0005 stays proposed until the owner decides.
+The owner accepted this recommendation; ADR 0005 records the decision.
 
 ## 5. Checks
 

@@ -13,15 +13,15 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0002](./0002-plugin-lifecycle.md) | Versioned lifecycle metadata with capability-specific contracts and legacy adapters | Accepted for prototype |
 | [0003](./0003-state-ownership.md) | Preserve current stores; add no durable prototype state; isolate the unresolved service-policy question | Accepted for prototype scope; broader rule change deferred |
 | [0004](./0004-shadow-prediction.md) | Hashtag acceptance prediction with explicit feedback, frozen probabilities, and shadow evaluation | Accepted for prototype |
-| [0005](./0005-knowledge-experience-content.md) | Investigate Knowledge–Prediction–Experience graph and feedback cycles | Proposed; research and decision required |
+| [0005](./0005-knowledge-experience-content.md) | Orchestrator-supervised Knowledge–Prediction–Experience cycle with snapshot reuse and explicit stopping outcomes | Accepted for prototype |
 | [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 | [0007](./0007-faculties-not-features.md) | Macro-components are faculties; Book, Meme and Digest are workflows over them | Accepted as target direction; migration pending |
 
 The design keeps large capabilities modular and gives them explicit contracts.
-ADR 0005 remains a research proposal: the Knowledge–Prediction–Experience cycle
-and Book/source classification have not been accepted as implementation contracts.
-Its [research report](../knowledge-prediction-experience-research.md) identifies
-the topology comparison and the evidence required before adoption.
+ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):
+the orchestrator supervises the Knowledge–Prediction–Experience cycle. Its
+[research report](../knowledge-prediction-experience-research.md) holds the
+background; Book/source ownership is decided in ADR 0006.
 Neuroscience supplies hypotheses about coordination and memory roles; engineering
 measurements determine whether those hypotheses improve Dokja.
 

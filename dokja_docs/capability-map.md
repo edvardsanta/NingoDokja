@@ -30,9 +30,9 @@ For a new cross-layer operation:
 
 The table distinguishes current implementation owners from target cognitive
 responsibilities. [ADR 0005](./decisions/0005-knowledge-experience-content.md)
-investigates the hypothesis that Knowledge defines general models/methods and
-Experience grounds their concrete application, with Prediction participating in
-a feedback graph. The graph's execution topology remains under research;
+records that Knowledge defines general models/methods and Experience grounds
+their concrete application, with Prediction in a feedback cycle the orchestrator
+supervises;
 [ADR 0006](./decisions/0006-reading-macro-component.md) decides that reading is
 one macro-component and Book is not a service;
 [ADR 0007](./decisions/0007-faculties-not-features.md) makes every row below a
