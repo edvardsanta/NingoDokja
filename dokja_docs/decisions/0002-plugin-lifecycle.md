@@ -1,6 +1,6 @@
 # ADR 0002: common lifecycle and capability-specific plugin contracts
 
-Date: 2026-10-18. Status: accepted for prototype. Implementation: step `05`.
+Date: 2026-10-18. Status: adopted for the reading host (step `08`, [evaluation](../step-08-evaluation.md)). Implementation: step `05`.
 The Feeds host reads `plugin_api: 1` manifests next to the unchanged legacy shape and
 resolves bindings deterministically ([manifest.go](../../dokja_services/dokja_feeds/feeds/manifest.go),
 [binding.go](../../dokja_services/dokja_feeds/feeds/binding.go)); the Knowledge registry

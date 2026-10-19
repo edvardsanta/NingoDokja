@@ -226,3 +226,24 @@ No claim about prediction skill can be made.
   - feedback for predictions has no channel that produced data.
 - **Step 11:** Feeds is now the reading host with Python and pypdf. Review its
   image, permissions and the pypdf version split with Knowledge.
+
+## 8. Owner decisions (2026-10-19)
+
+| Prototype | Decision |
+| --- | --- |
+| Task workspace (ADR 0001) | Adopted for multi-faculty workflows; trace storage is decided in step `10` |
+| Plugin lifecycle and reading host (ADR 0002, 0006) | Adopted as the reading path |
+| Shadow prediction (ADR 0004) | Kept. Direction: call a local agent CLI (Claude Code or Codex) before Ollama, since it is easier to set up |
+| Latency budgets | Accepted as proposed in section 6 |
+
+The local agent CLI direction is recorded, not designed. Before building it,
+check two constraints:
+
+- **Embeddings.** Neither CLI produces embeddings, which `memory.recall` needs
+  to find similar experiences. Ollama, or another embedder, stays for recall. A
+  CLI fits judgment work: estimating acceptance from the recalled cases, or
+  reading feedback.
+- **Latency.** A CLI call takes seconds. On a delivery path that is beyond the
+  accepted 1 s cap, so a CLI-backed prediction would run off the delivery path
+  or be recorded unscored. Using a CLI also sends meme text to that tool's
+  provider, so it needs the same review as any external call.

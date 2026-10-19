@@ -9,10 +9,10 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | Record | Decision | Status |
 | --- | --- | --- |
-| [0001](./0001-task-workspace.md) | Orchestrator-owned, scoped, volatile task workspace with explicit outcomes and budgets | Accepted for prototype |
-| [0002](./0002-plugin-lifecycle.md) | Versioned lifecycle metadata with capability-specific contracts and legacy adapters | Accepted for prototype |
+| [0001](./0001-task-workspace.md) | Orchestrator-owned, scoped, volatile task workspace with explicit outcomes and budgets | Adopted (step 08) |
+| [0002](./0002-plugin-lifecycle.md) | Versioned lifecycle metadata with capability-specific contracts and legacy adapters | Adopted for reading (step 08) |
 | [0003](./0003-state-ownership.md) | Preserve current stores; add no durable prototype state; isolate the unresolved service-policy question | Accepted for prototype scope; broader rule change deferred |
-| [0004](./0004-shadow-prediction.md) | Hashtag acceptance prediction with explicit feedback, frozen probabilities, and shadow evaluation | Accepted for prototype |
+| [0004](./0004-shadow-prediction.md) | Hashtag acceptance prediction with explicit feedback, frozen probabilities, and shadow evaluation | Kept in shadow (step 08) |
 | [0005](./0005-knowledge-experience-content.md) | Orchestrator-supervised Knowledge–Prediction–Experience cycle with snapshot reuse and explicit stopping outcomes | Accepted for prototype |
 | [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 | [0007](./0007-faculties-not-features.md) | Macro-components are faculties; Book, Meme and Digest are workflows over them | Accepted as target direction; migration pending |

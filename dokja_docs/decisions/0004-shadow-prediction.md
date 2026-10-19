@@ -1,6 +1,6 @@
 # ADR 0004: explicit hashtag feedback and shadow prediction
 
-Date: 2026-10-18. Status: accepted for prototype. Implementation: step `06`
+Date: 2026-10-18. Status: kept in shadow; no resolved outcomes yet (step `08`, [evaluation](../step-08-evaluation.md)). Implementation: step `06`
 ([hashtag_task.go](../../dokja_orch/internal/handlers/hashtag_task.go)). Scheduled and
 manual meme sends run the suggestion as a typed task whose shadow prediction is frozen
 before delivery under a 1 s budget chosen by the owner; a miss or a Memory failure leaves
