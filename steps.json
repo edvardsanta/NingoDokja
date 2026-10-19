@@ -270,13 +270,14 @@
     {
       "id": "04",
       "title": "Implement internal typed task workspace and step outcomes",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "03"
       ],
       "deliverables": [
-        "Internal workspace and result contracts",
-        "Workflow transition and isolation tests"
+        "dokja_orch/internal/core/task.go",
+        "dokja_orch/internal/core/task_runner.go",
+        "dokja_orch/internal/core/task_runner_test.go"
       ],
       "acceptance_criteria": [
         "The orchestrator owns task state and accepts typed domain results.",
@@ -285,9 +286,34 @@
         "The existing external envelope and response contracts remain compatible.",
         "Resolve ADR 0005 from reference-loop evidence before integrating its transition semantics; distinguish general workspace infrastructure from still-proposed cognitive ownership."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "RunTask executes one attempt of a TypedWorkflow over an orchestrator-owned volatile workspace: task, attempt and event IDs, scope copied from the event, goal, effective deadline (earlier of workflow and caller), evidence with provenance, proposals, receipts, per-step records and a bounded terminal summary.",
+        "Step dispositions continue/stop/abstain/fail with workflow-declared Optional and ContinueOnAbstain; errors and unknown dispositions fail; a proposal for a domain the workflow does not run is refused.",
+        "Limits from ADR 0001 (16 steps, 32 evidence, 8 proposals, 64 KiB including the payload) stop the task without applying the offending result; invalid workflows or limits and repeated step names fail before any step runs.",
+        "Evidence from another explicit scope is dropped and counted; evidence with no scope (Knowledge, Memory) is kept and counted as unscoped, never stamped with the task scope.",
+        "Deadline and cancellation reach the active step; a step cut off is recorded as outcome_unknown (unconfirmed), not failed; a terminal workspace rejects changes.",
+        "Not wired into Service: existing workflows keep their path, and the public envelope, routes and responses are unchanged.",
+        "Deferred to step 06: the optional ADR 0004 prediction snapshot and the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated), introduced when the hashtag workflow first needs them."
+      ],
+      "checks": [
+        {
+          "name": "task_contract_tests",
+          "status": "passed",
+          "detail": "go vet and go test -race ./internal/core in dokja_orch: identity/scope, every disposition, moderation block before side effects, copies, foreign and unscoped evidence, concurrent isolation, deadline, caller deadline, cancellation, count/size/payload limits, invalid workflows, terminal immutability, bounded summaries."
+        },
+        {
+          "name": "mutation_checks",
+          "status": "passed",
+          "detail": "Disabling deep copies failed the copy test; disabling the scope filter failed the foreign-scope test."
+        },
+        {
+          "name": "compatibility",
+          "status": "passed",
+          "detail": "go test ./... in dokja_orch, including existing ingress response fixtures; event.go, routes and Service untouched."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-18"
     },
     {
       "id": "05",
@@ -329,7 +355,9 @@
         "A prediction snapshot precedes the action when the experiment requires that ordering.",
         "Predictions remain in shadow mode and do not alter delivery policy.",
         "Optional-memory failure has a defined result, and feedback links to the intended action attempt.",
-        "Success, abstention, timeout, and rejected-action paths are observable and tested."
+        "Success, abstention, timeout, and rejected-action paths are observable and tested.",
+        "The runner gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment rather than reimplemented.",
+        "The optional ADR 0004 prediction snapshot is part of the workspace, frozen before the action."
       ],
       "evidence": [],
       "checks": [],
