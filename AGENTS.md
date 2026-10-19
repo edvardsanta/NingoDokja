@@ -51,7 +51,7 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 2. **The orchestrator owns routing and workflows** (`dokja_orch/internal/core/`: `router.go`, `context_builder.go`, `workflow_engine.go`, `dispatcher.go`). It holds no domain business rules.
 3. **Domains hold the business rules** and talk only to the orchestrator.
 4. **Services are stateless integrations** (LLM, voice, fetching, external APIs).
-5. A change that crosses layers follows "Where to Add New Code" in `.planning/codebase/STRUCTURE.md`: action in the domain → route in `dokja_orch/internal/core/router.go` → step in `workflow_engine.go` → handler in `dokja_orch/internal/handlers/` → client in `dokja_orch/internal/clients/`.
+5. A change that crosses layers follows "Layer responsibilities and extension path" in `dokja_docs/capability-map.md`: action in the domain → route in `dokja_orch/internal/core/router.go` → step in `workflow_engine.go` → handler in `dokja_orch/internal/handlers/` → client in `dokja_orch/internal/clients/`.
 - **Events** (async, fire-and-forget) use ZeroMQ pub/sub (`dokja_orch/internal/ingress/zmq_ingress.go`). **Requests** (sync) use the HTTP bridge (`http_bridge_ingress.go`) or `zmq_request_ingress.go`.
 - Events and requests share one envelope: `event_id`, `timestamp`, `source`, `type`, `user`, `channel`, `payload`, `context`. Changing it is a breaking change.
 - For the reasons behind these rules, see `dokja_docs/` (`domain-responsibilities.md`, `events-vs-requests.md`, `workflows.md`).
@@ -70,7 +70,7 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 - `dokja_legacy/`: the old monolithic Go bot. Use it only as a reference when migrating logic; never build features there.
 - `dokja_docs/`: architecture docs, per-interface docs, `production-runbook.md`, `secret-scanning.md`.
 - `scripts/`: `test_all.sh` and `scan-secrets.sh`.
-- `.planning/codebase/`: code map (STRUCTURE, ARCHITECTURE, CONVENTIONS, TESTING…). Read it for context only, and run GSD (`gsd-*`) workflows only when the user asks.
+- `dokja_docs/capability-map.md`: current capability ownership, contracts, state, plugin points and representative flows. `steps.json` tracks the cognitive architecture refactoring; update its status and evidence as work progresses. Run GSD (`gsd-*`) workflows only when the user asks.
 
 ## Environment and commands
 
@@ -150,7 +150,7 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 
 ## Pitfalls
 
-- The working tree usually holds many unrelated untracked files: `.planning/`, `.codex/`, `.gemini/`, `.github/get-shit-done/`, `memory.md`, `dokja_lab/` scratch files. Leave them alone.
+- The working tree usually holds many unrelated untracked files: `.codex/`, `.gemini/`, `.github/get-shit-done/`, `memory.md`, `dokja_lab/` scratch files. Leave them alone.
 - Runtime artifacts are git-ignored; don't commit them:
   - `*.db`, `*.db-wal`, `*.db-shm` (e.g. `ningo_memory.db` at the root and in `dokja_orch/`);
   - `test_reports/`, `.dokja/`, `feeds_plugins/`, `scraper.yaml`, `node_modules/`, `.pnpm-store/`.

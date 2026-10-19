@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "id": "cognitive-macrocomponents",
+  "title": "Cognitive macro-components and plugin architecture",
+  "status": "in_progress",
+  "updated_on": "2026-10-18",
+  "research": "dokja_docs/cognitive-macrocomponents-research.md",
+  "current_step": null,
+  "status_values": [
+    "pending",
+    "in_progress",
+    "completed",
+    "blocked",
+    "skipped"
+  ],
+  "tracking_rules": [
+    "Update this file when a step starts, completes, changes scope, or encounters a concrete blocker.",
+    "Complete a step only when its acceptance criteria have evidence; document blocked or skipped checks.",
+    "Keep at most one step in progress and point current_step to it; use null between steps.",
+    "Treat research proposals as hypotheses until a decision or experiment supports them.",
+    "Review public-contract, schema, configuration, and deployment compatibility before implementation."
+  ],
+  "constraints": [
+    "Preserve Interface -> Event/Request -> Orchestrator -> Domain -> Service.",
+    "Keep domain business policy outside orchestrator infrastructure and provider plugins.",
+    "Keep the existing public event envelope compatible.",
+    "Extend macro capabilities through versioned local plugin contracts.",
+    "Preserve existing plugin formats through adapters before adding new manifest fields.",
+    "Use explicit prediction targets and observed outcomes; keep similarity and factual reliability distinct.",
+    "Leave unrelated working-tree changes and experimental code untouched.",
+    "Require user approval for merging, tags, and production deployment."
+  ],
+  "steps": [
+    {
+      "id": "00",
+      "title": "Remove obsolete planning and establish this tracker",
+      "status": "completed",
+      "depends_on": [],
+      "deliverables": [
+        "steps.json",
+        "Removal of .planning"
+      ],
+      "acceptance_criteria": [
+        "The obsolete .planning directory is removed at the user's request.",
+        "A JSON roadmap records dependencies, deliverables, acceptance criteria, and evidence."
+      ],
+      "evidence": [
+        "Removed .planning, including its tracked code map and untracked planning files.",
+        "Created steps.json from the research stages."
+      ],
+      "checks": [
+        {
+          "name": "planning_removed",
+          "status": "passed",
+          "detail": "Confirmed .planning does not exist."
+        },
+        {
+          "name": "roadmap_structure",
+          "status": "passed",
+          "detail": "Parsed JSON and validated 12 unique ordered steps, dependencies, acceptance criteria, and progress consistency."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-18"
+    },
+    {
+      "id": "01",
+      "title": "Map the current macro capabilities and compatibility boundaries",
+      "status": "completed",
+      "depends_on": [
+        "00"
+      ],
+      "deliverables": [
+        "dokja_docs/capability-map.md",
+        "Updated canonical documentation references"
+      ],
+      "acceptance_criteria": [
+        "Each candidate macro capability identifies its domain, service, consumers, contracts, state, and extension points.",
+        "Representative conversation, digest, book, and hashtag flows are traced from current code.",
+        "Implemented behavior and experimental scaffolds are clearly distinguished.",
+        "Compatibility-sensitive boundaries and current gaps have source references.",
+        "Active agent instructions no longer depend on deleted planning files."
+      ],
+      "evidence": [
+        "dokja_docs/capability-map.md maps policy owners, mechanisms, consumers, contracts, state, extension points, source anchors, and compatibility-sensitive gaps.",
+        "Traced conversation, digest, book, and hashtag/action/feedback flows from implementation.",
+        "Separated existing runtime wiring from the untracked Rust prediction scaffold and unverified Voice integration.",
+        "AGENTS.md now references the capability map and steps.json instead of deleted planning documents; managed blocks were preserved.",
+        "dokja_docs/README.md indexes the tracker, capability map, and research."
+      ],
+      "checks": [
+        {
+          "name": "documentation_validation",
+          "status": "passed",
+          "detail": "Validated 70 local links across the capability map and research, code fences, whitespace, absence of external URLs/personal paths, and documentation index entries."
+        },
+        {
+          "name": "canonical_references",
+          "status": "passed",
+          "detail": "Confirmed active AGENTS.md contains no .planning references."
+        },
+        {
+          "name": "diff_whitespace",
+          "status": "passed",
+          "detail": "git diff --check passed."
+        },
+        {
+          "name": "runtime_tests",
+          "status": "skipped",
+          "detail": "Documentation and planning inventory only; no executable implementation changed. Runtime availability remains unverified."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-18"
+    },
+    {
+      "id": "02",
+      "title": "Record the prototype architecture decisions",
+      "status": "completed",
+      "depends_on": [
+        "01"
+      ],
+      "deliverables": [
+        "dokja_docs/decisions/README.md",
+        "dokja_docs/decisions/0001-task-workspace.md",
+        "dokja_docs/decisions/0002-plugin-lifecycle.md",
+        "dokja_docs/decisions/0003-state-ownership.md",
+        "dokja_docs/decisions/0004-shadow-prediction.md",
+        "dokja_docs/decisions/0005-knowledge-experience-content.md",
+        "dokja_docs/knowledge-prediction-experience-research.md"
+      ],
+      "acceptance_criteria": [
+        "Task scope, workspace ownership, lifecycle, limits, and persistence are explicit.",
+        "Provider, domain-policy, and workflow extension responsibilities remain distinct.",
+        "Plugin compatibility and deterministic capability-selection rules are specified.",
+        "Existing stateful service behavior and the stateless-service rule are explicitly addressed without silently changing project policy.",
+        "The first prediction target, baseline, feedback semantics, and prototype non-goals are recorded.",
+        "Research semantic relationships, runtime dependencies, feedback cycles, and orchestrator ownership before accepting ADR 0005; proposed choices must remain explicitly unresolved."
+      ],
+      "evidence": [
+        "ADR 0001 specifies attempt identity, actor/channel scope, sole orchestration writer, copied boundaries, lifecycle/outcomes, initial resource limits, cancellation, volatile state, and compatibility/rollback requirements.",
+        "ADR 0002 separates provider, domain-policy, and workflow responsibilities and specifies lifecycle/API versions, legacy Feeds/Knowledge adapters, preserved legacy overrides, atomic versioned registration, deterministic bindings, and explicit fallback.",
+        "ADR 0003 preserves current repositories/caches and the canonical stateless-service rule; the volatile prototype adds no persistence, and any broader rule/storage change remains an explicit later decision.",
+        "ADR 0004 defines a 30-day explicit hashtag-feedback target, original baseline and frozen snapshots, unscored/unknown/ambiguous outcomes, controlled single-attempt attribution, scope/estimator limitations, and shadow-only evaluation.",
+        "The documentation index and capability map now link to the decision records and identify baseline capture as the next step.",
+        "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources."
+      ],
+      "checks": [
+        {
+          "name": "decision_documentation",
+          "status": "passed",
+          "detail": "Validated five decision/index documents, 97 local links across new and affected documentation, formatting, and absence of external URLs or personal paths."
+        },
+        {
+          "name": "compatibility_review",
+          "status": "passed",
+          "detail": "Decisions only: no public envelope, action/route, service contract, command, SQLite schema, environment, compose, or runtime implementation changed."
+        },
+        {
+          "name": "diff_whitespace",
+          "status": "passed",
+          "detail": "git diff --check passed."
+        },
+        {
+          "name": "runtime_tests",
+          "status": "skipped",
+          "detail": "No executable code changed. All implementation tests listed in the decisions remain requirements for later steps."
+        },
+        {
+          "name": "feedback_graph_research_revision",
+          "status": "passed",
+          "detail": "Validated 95 local links, six source references, formatting, proposed ADR 0005 status, explicit decision deferral, and acyclic step dependencies. No runtime experiment was run."
+        }
+      ],
+      "blockers": [],
+      "started_on": "2026-10-18",
+      "revision_reason": "User requested research before deciding ADR 0005: Knowledge, Prediction, and Experience form a potentially cyclic graph whose execution and orchestrator boundary must be investigated.",
+      "deferred_decisions": [
+        {
+          "record": "dokja_docs/decisions/0005-knowledge-experience-content.md",
+          "status": "proposed",
+          "question": "Knowledge–Prediction–Experience cycle ownership, update semantics, and Book/source boundaries",
+          "evidence_step": "03",
+          "implementation_gate": "Resolve before step 04 integrates cognitive-loop transition contracts or any Book/Knowledge/Experience ownership migration.",
+          "allowed_before_resolution": "Capture current behavior and compare pure reference loops using synthetic fixtures and fake capabilities; no production topology is adopted."
+        }
+      ],
+      "completed_on": "2026-10-18",
+      "completion_note": "Decision/research package completed with ADR 0005 explicitly proposed and deferred to synthetic reference-loop evidence in step 03; no production topology or Book ownership change is accepted."
+    },
+    {
+      "id": "03",
+      "title": "Capture behavior and measurement baselines for the experiments",
+      "status": "pending",
+      "depends_on": [
+        "02"
+      ],
+      "deliverables": [
+        "Representative synthetic fixtures",
+        "Baseline report and evaluation protocol"
+      ],
+      "acceptance_criteria": [
+        "Existing hashtag behavior is covered for success, abstention, missing evidence, and dependency failure.",
+        "Existing plugin compatibility and failure behavior are recorded.",
+        "Latency, invocation count, output size, and scope isolation have a reproducible measurement method.",
+        "Prediction evaluation uses later observed outcomes and a frozen baseline; data limits and skipped checks are explicit.",
+        "Compare candidate orchestrator-supervised and domain-internal reference loops with deterministic fake capabilities; do not integrate a production topology before resolving ADR 0005.",
+        "Cover cold start, missing premises, contradictory evidence, stagnation/oscillation, scope/version changes, and simulated-versus-observed outcomes.",
+        "Use comparison evidence to resolve or explicitly revise ADR 0005 before cognitive-loop contract integration or content/cognitive ownership migration."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "04",
+      "title": "Implement internal typed task workspace and step outcomes",
+      "status": "pending",
+      "depends_on": [
+        "03"
+      ],
+      "deliverables": [
+        "Internal workspace and result contracts",
+        "Workflow transition and isolation tests"
+      ],
+      "acceptance_criteria": [
+        "The orchestrator owns task state and accepts typed domain results.",
+        "Evidence provenance, action proposals, execution results, and stopping reasons are represented.",
+        "Scope isolation, cancellation, bounded execution, and policy stop outcomes are tested.",
+        "The existing external envelope and response contracts remain compatible.",
+        "Resolve ADR 0005 from reference-loop evidence before integrating its transition semantics; distinguish general workspace infrastructure from still-proposed cognitive ownership."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "05",
+      "title": "Introduce plugin lifecycle metadata and legacy adapters",
+      "status": "pending",
+      "depends_on": [
+        "04"
+      ],
+      "deliverables": [
+        "Versioned lifecycle contract",
+        "Feeds and Knowledge compatibility adapters",
+        "Plugin contract tests"
+      ],
+      "acceptance_criteria": [
+        "Identity, API version, activation, capability selection, limits, and health have explicit semantics.",
+        "Existing Feeds manifests and Knowledge registration plugins remain supported.",
+        "Unknown or incompatible versions fail with deterministic diagnostic results.",
+        "New capability bindings are configured explicitly and do not bypass domain actions."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "06",
+      "title": "Run the hashtag composition experiment through the workspace",
+      "status": "pending",
+      "depends_on": [
+        "05"
+      ],
+      "deliverables": [
+        "Workspace-backed hashtag workflow",
+        "Shadow prediction traces",
+        "Behavior and failure tests"
+      ],
+      "acceptance_criteria": [
+        "OCR, labelled retrieval, domain selection, and execution receipts are linked to one scoped task.",
+        "A prediction snapshot precedes the action when the experiment requires that ordering.",
+        "Predictions remain in shadow mode and do not alter delivery policy.",
+        "Optional-memory failure has a defined result, and feedback links to the intended action attempt.",
+        "Success, abstention, timeout, and rejected-action paths are observable and tested."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "07",
+      "title": "Run the document extractor plugin experiment",
+      "status": "pending",
+      "depends_on": [
+        "06"
+      ],
+      "deliverables": [
+        "One generic local extractor plugin",
+        "Isolation and compatibility tests",
+        "Extension-cost record"
+      ],
+      "acceptance_criteria": [
+        "A local extractor is added or replaced without changing router or workflow business logic.",
+        "Plugin input/output preserves the document extraction contract.",
+        "Crash, hang, malformed output, and version mismatch produce defined host behavior.",
+        "Runtime choice and operating-system permission assumptions are recorded."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "08",
+      "title": "Evaluate the architecture and select the next migrations",
+      "status": "pending",
+      "depends_on": [
+        "07"
+      ],
+      "deliverables": [
+        "Experiment comparison",
+        "Decision to adopt, revise, or stop each prototype"
+      ],
+      "acceptance_criteria": [
+        "Existing behavior, workspace-only behavior, and shadow prediction are compared on fixed cases.",
+        "Coupling, fault containment, latency, resource use, and trace usefulness are assessed.",
+        "Prediction skill, support, and feedback coverage are reported without claiming evidence from insufficient data.",
+        "The remaining roadmap is revised from measured results before broad adoption."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "09",
+      "title": "Adopt proven boundaries in conversation and delivery",
+      "status": "pending",
+      "depends_on": [
+        "08"
+      ],
+      "deliverables": [
+        "Chat domain ownership migration",
+        "Focused delivery and administration workflows"
+      ],
+      "acceptance_criteria": [
+        "Conversation policy has one authoritative domain implementation.",
+        "System-handler responsibilities have explicit owners and focused adapters.",
+        "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
+        "Existing interface commands and successful responses have regression coverage and rollback instructions."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "10",
+      "title": "Define and implement required durable execution and state ownership",
+      "status": "pending",
+      "depends_on": [
+        "09"
+      ],
+      "deliverables": [
+        "State ownership and migration decisions",
+        "Durable acceptance and recovery for selected workflows"
+      ],
+      "acceptance_criteria": [
+        "Each durable state kind has an owner, migration path, and rollback strategy.",
+        "Required jobs persist acceptance before acknowledgment and recover from restart.",
+        "Retries and execution receipts handle duplicates and partial failures under explicit delivery guarantees.",
+        "Any change to canonical service responsibilities is agreed before its implementation.",
+        "Affected compose files and production documentation accompany configuration or storage changes."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    },
+    {
+      "id": "11",
+      "title": "Review deployment boundaries and complete the migration",
+      "status": "pending",
+      "depends_on": [
+        "10"
+      ],
+      "deliverables": [
+        "Measured deployment recommendations",
+        "Updated architecture and operations documentation",
+        "Final verification report"
+      ],
+      "acceptance_criteria": [
+        "Process boundaries follow measured dependencies, resource needs, and failure-isolation requirements.",
+        "All affected module and integration checks are recorded accurately.",
+        "Architecture references, capability map, plugin documentation, and this tracker reflect delivered behavior.",
+        "Production rollout remains a separate action requiring user approval."
+      ],
+      "evidence": [],
+      "checks": [],
+      "blockers": []
+    }
+  ],
+  "next_step": "03"
+}
