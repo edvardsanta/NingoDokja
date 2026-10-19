@@ -26,26 +26,32 @@ const (
 )
 
 // Runner runs a plugin once and returns what it printed. It is an interface so the service
-// can be tested without starting processes.
+// can be tested without starting processes. input is what the plugin reads on stdin; nil
+// means none, which is how every scheduled collection runs.
 type Runner interface {
-	Run(ctx context.Context, plugin Plugin, env []string) ([]byte, error)
+	Run(ctx context.Context, plugin Plugin, env []string, input []byte) ([]byte, error)
 }
 
 // ExecRunner runs a plugin as a child process of its own. A plugin is code the owner wrote
 // and may be slow, wrong or hung, so the run is bounded in time and in output, gets the
-// environment it declared and nothing else, has no input, and is killed with everything it
-// started. What it writes to stderr goes to the log and never into an error that is shown.
+// environment it declared and nothing else, reads only the input it is handed, and is killed
+// with everything it started. What it writes to stderr goes to the log and never into an
+// error that is shown. The run ends at the plugin's timeout or the caller's deadline,
+// whichever comes first.
 type ExecRunner struct {
 	MaxOutput int64
 	Logger    *log.Logger
 }
 
-func (r ExecRunner) Run(parent context.Context, plugin Plugin, env []string) ([]byte, error) {
+func (r ExecRunner) Run(parent context.Context, plugin Plugin, env []string, input []byte) ([]byte, error) {
+	// A versioned plugin states its own limit, which the loader has bounded.
 	limit := r.MaxOutput
-	if limit <= 0 {
+	switch {
+	case limit <= 0 && plugin.OutputBytes > 0:
+		limit = plugin.OutputBytes
+	case limit <= 0:
 		limit = maxOutput
-	}
-	if plugin.OutputBytes > 0 && plugin.OutputBytes < limit {
+	case plugin.OutputBytes > 0 && plugin.OutputBytes < limit:
 		limit = plugin.OutputBytes
 	}
 	ctx, cancel := context.WithTimeout(parent, plugin.Timeout)
@@ -58,6 +64,9 @@ func (r ExecRunner) Run(parent context.Context, plugin Plugin, env []string) ([]
 	cmd.Env = env
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	if input != nil {
+		cmd.Stdin = bytes.NewReader(input)
+	}
 	// The child leads its own process group, so one signal reaches what it started too.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
@@ -75,6 +84,8 @@ func (r ExecRunner) Run(parent context.Context, plugin Plugin, env []string) ([]
 	switch {
 	case stdout.isFull():
 		return nil, fmt.Errorf("%w: more than %d KiB", ErrOutputTooLarge, limit>>10)
+	case errors.Is(parent.Err(), context.DeadlineExceeded):
+		return nil, fmt.Errorf("%w: the caller's deadline passed", ErrTimeout)
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		return nil, fmt.Errorf("%w after %s", ErrTimeout, plugin.Timeout)
 	case parent.Err() != nil:

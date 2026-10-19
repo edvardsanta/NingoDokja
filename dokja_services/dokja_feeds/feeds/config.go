@@ -11,6 +11,16 @@ const (
 	// maxOutput bounds what one run of a plugin may print.
 	maxOutput = 1 << 20
 
+	// maxExtractOutput bounds what an extractor may print: a whole book read as text. It
+	// applies to plugins that only extract; a plugin that also collects keeps maxOutput.
+	maxExtractOutput = 16 << 20
+
+	// MaxExtractInput bounds the file of one on-demand reading, as Knowledge bounds uploads.
+	MaxExtractInput = 20_000_000
+
+	// maxExtractions is how many on-demand readings may run at once.
+	maxExtractions = 2
+
 	// MaxItemsReturned bounds one feeds.items reply, however many plugins there are.
 	MaxItemsReturned = 1000
 )

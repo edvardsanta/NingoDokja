@@ -129,6 +129,8 @@ services:
     environment:
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
       FEEDS_PLUGINS_DIR: /plugins
+      # Knowledge's extractors, copied into the image, for the knowledge-extractors reading plugin.
+      KNOWLEDGE_EXTRACTORS_DIR: /opt/dokja_knowledge
     volumes:
       # Plugins are the owner's and stay out of git; an empty directory means no plugins.
       - ${FEEDS_PLUGINS_HOST_DIR:-./feeds_plugins}:/plugins:ro

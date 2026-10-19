@@ -13,15 +13,18 @@ What to follow is a plugin, kept outside the repository.
   the others.
 - Nothing starts by itself: a plugin runs only if its manifest says `"enabled": true`.
 
-## Events (ZeroMQ REQ/REP, port 5563)
+## Events (ZeroMQ, REQ clients, port 5563)
 
 The envelope is the one the memory and knowledge services use: `{"type", "payload"}` in,
-`{"status", "result" | "message"}` out. Both events read memory and take no payload.
+`{"status", "result" | "message"}` out. `feeds.status` and `feeds.items` read memory and take no
+payload. Requests are answered concurrently, so a reading that waits on its plugin never delays
+them; at most 16 requests are in flight, past that a request is refused as busy.
 
 | event | result |
 | --- | --- |
 | `feeds.status` | `configured`, `directory_error`, `plugins[]`, `extractors[]`, and the counts `enabled`, `ok`, `failed`, `pending`, `disabled`, `invalid`, `items` |
 | `feeds.items` | `items[]` (at most 1000), `total`, `updated` |
+| `feeds.extract` | payload `filename`, `content_b64` (at most 20 MB); result `documents[]` (`title`, `text`, `source_ref`, `key`), `count`, `format`, `plugin`, `version` |
 
 A `plugins[]` row has `id`, `name`, `state` (`ok`, `failed`, `pending`, `disabled` or `invalid`),
 `running`, `enabled`, `interval_seconds`, `items`, `skipped`, `last_run`, `last_ok` and
@@ -32,8 +35,9 @@ service cannot run shows as `invalid`, and one that asks for a version, runtime 
 does not support has a `last_error` starting with `incompatible:`.
 
 `extractors[]` lists versioned plugins that only provide `document.extract.v1` (see below):
-`id`, `name`, `enabled`, `plugin_api`, `version`, `provides` and `formats`. They are not feed
-sources, never run on a schedule and do not change the counts.
+`id`, `name`, `enabled`, `plugin_api`, `version`, `provides`, `formats`, and the last reading's
+`last_run`, `last_ok` and `last_error`. They are not feed sources, never run on a schedule and do
+not change the counts.
 
 ## Writing a plugin
 
@@ -89,7 +93,8 @@ Plugin output comes from the outside, so it is bounded and cleaned before it is 
 A plugin is code you wrote, but it may still be slow, wrong or hung, so each run is a child
 process that:
 
-- starts in its own directory with no input and only `PATH` plus the variables named in `env`
+- starts in its own directory with no input (an on-demand reading gets its request) and only
+  `PATH` plus the variables named in `env`
   (a secret reaches a plugin only by being listed there, by name; keep tokens in the service
   environment, never in a manifest);
 - is stopped when `timeout` ends or the output passes the limit, together with everything it
@@ -99,16 +104,16 @@ process that:
 ### Where plugins run
 
 The plugin runs inside the service's container, so **its program must exist in that image**. The
-image is `debian:bookworm-slim` plus the libraries the service needs: it has a POSIX shell (`sh`)
-and the usual command-line tools, and no Python or other interpreter. For anything else, extend
+image is `debian:bookworm-slim` plus the libraries the service needs: it has a POSIX shell (`sh`),
+the usual command-line tools, and `python3` with `pypdf` for the reading example. For anything else, extend
 the image, or ship a static binary in the plugin directory. A manifest whose program is not
 installed shows as `invalid` with the program's name.
 
 Mount the plugins directory read-only and keep it out of git. Changes to it are read when the
 service starts.
 
-A plugin that uses no network is in `plugins.example/`; it prints the items of a local JSON file.
-It ships disabled.
+`plugins.example/` holds two plugins that use no network: `local-file` prints the items of a
+local JSON file, and `knowledge-extractors` reads documents on demand. Both ship disabled.
 
 ### Versioned manifests (`plugin_api: 1`)
 
@@ -130,12 +135,54 @@ here too.
 | `formats` | only with `document.extract.v1`: the extensions it reads, such as `[".pdf"]` |
 | `limits.timeout_ms`, `limits.output_bytes` | required: one run's time (1 s to 5 min) and output (at most 1 MiB) |
 
+A plugin that only extracts may print up to 16 MiB; one that also collects keeps 1 MiB.
+
 When more than one enabled plugin extracts the same format, none is chosen until one is bound
-explicitly; the order of directories never decides. On-demand extraction is not served yet.
+explicitly; the order of directories never decides.
+
+### Reading on demand (`feeds.extract`)
+
+`feeds.extract` reads one file now and keeps nothing: the orchestrator's `knowledge.read` hands
+the result to Knowledge. The enabled plugin that provides `document.extract.v1` for the file's
+extension (case-insensitive) runs once and reads one JSON object on **stdin**:
+
+```json
+{"operation": "document.extract.v1", "filename": "notes.pdf", "format": ".pdf", "content_b64": "..."}
+```
+
+It prints one JSON object on stdout, Knowledge's `Extracted` contract, or the reason the file
+cannot be read:
+
+```json
+{"documents": [{"title": "Chapter 1", "text": "...", "source_ref": "chapter-1", "key": "c1"}]}
+{"error": "the PDF is password protected"}
+```
+
+Unknown fields are refused. Text keeps its line breaks but must be valid UTF-8; titles, refs and
+keys are cleaned like item text; documents without text are dropped. A run ends at the manifest's
+`timeout_ms` or the request's 2-minute limit, whichever comes first, and at most 2 readings run at
+once. A failure answers an error whose message starts with its reason:
+
+| reason | meaning |
+| --- | --- |
+| `invalid` | no filename, no or bad `content_b64`, an empty or too large file |
+| `unsupported` | the file name has no extension a plugin could serve |
+| `unavailable` | no enabled, compatible plugin serves the format; plugins not loaded because of their version are named |
+| `ambiguous` | several enabled plugins serve it and none is bound |
+| `timeout` | the plugin did not finish in time, or no reading slot freed up |
+| `failed` | the plugin crashed, printed too much or printed something that is not the contract |
+| `unreadable` | the plugin answered `error`, or every document was empty |
+
+`plugins.example/knowledge-extractors` serves Knowledge's own extractors this way (PDF, EPUB, DOCX,
+HTML, text and feed files). It needs `python3`, which the image has, and
+`KNOWLEDGE_EXTRACTORS_DIR`, set in the compose files. Replacing it with another reader for a
+format means disabling one manifest and enabling another; no code changes.
 
 ## Variables
 
 `FEEDS_SERVICE_ENDPOINT` (default `tcp://*:5563`), `FEEDS_PLUGINS_DIR` (empty means no plugins).
+Variables a plugin lists in `env` come from the same environment, such as
+`KNOWLEDGE_EXTRACTORS_DIR` for the `knowledge-extractors` example.
 
 ## Tests
 

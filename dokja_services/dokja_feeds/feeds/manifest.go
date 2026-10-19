@@ -345,8 +345,12 @@ func loadV1(dir, name string, raw []byte, limits Limits) (*Plugin, error) {
 	if timeout < limits.MinTimeout || timeout > limits.MaxTimeout {
 		return nil, fmt.Errorf("limits.timeout_ms must be between %d and %d", limits.MinTimeout.Milliseconds(), limits.MaxTimeout.Milliseconds())
 	}
-	if m.Limits.OutputBytes <= 0 || m.Limits.OutputBytes > maxOutput {
-		return nil, fmt.Errorf("limits.output_bytes must be between 1 and %d", maxOutput)
+	outputCeiling := maxOutput
+	if !seen[CapabilitySourceCollect] {
+		outputCeiling = maxExtractOutput
+	}
+	if m.Limits.OutputBytes <= 0 || m.Limits.OutputBytes > outputCeiling {
+		return nil, fmt.Errorf("limits.output_bytes must be between 1 and %d", outputCeiling)
 	}
 	plugin.Timeout, plugin.OutputBytes = timeout, int64(m.Limits.OutputBytes)
 	if err := checkEnv(m.Env); err != nil {

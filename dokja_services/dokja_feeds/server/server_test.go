@@ -136,3 +136,81 @@ func TestServeAnswersARealRequesterAndStopsWithItsContext(t *testing.T) {
 		t.Fatal("Serve must stop when its context ends")
 	}
 }
+
+// blockingHandler holds feeds.extract until released and answers anything else at once.
+type blockingHandler struct {
+	release chan struct{}
+}
+
+func (b *blockingHandler) Dispatch(ctx context.Context, eventType string, _ map[string]any) (map[string]any, error) {
+	if eventType == "feeds.extract" {
+		select {
+		case <-b.release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		return map[string]any{"read": true}, nil
+	}
+	return map[string]any{"type": eventType}, nil
+}
+
+func connect(t *testing.T, endpoint string) *zmq4.Socket {
+	t.Helper()
+	requester, err := zmq4.NewSocket(zmq4.REQ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { requester.Close() })
+	requester.SetRcvtimeo(5 * time.Second)
+	requester.SetSndtimeo(5 * time.Second)
+	requester.SetLinger(0)
+	if err := requester.Connect(endpoint); err != nil {
+		t.Fatal(err)
+	}
+	return requester
+}
+
+func ask(t *testing.T, requester *zmq4.Socket, eventType string) map[string]any {
+	t.Helper()
+	if _, err := requester.Send(fmt.Sprintf(`{"type":%q,"payload":{}}`, eventType), 0); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := requester.Recv(0)
+	if err != nil {
+		t.Fatalf("no reply to %s: %v", eventType, err)
+	}
+	return decode(t, []byte(raw))
+}
+
+func TestServeAnswersStatusWhileAReadingIsStillRunning(t *testing.T) {
+	endpoint := freeEndpoint(t)
+	handler := &blockingHandler{release: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go Serve(ctx, endpoint, handler, log.New(&bytes.Buffer{}, "", 0))
+
+	reader := connect(t, endpoint)
+	if _, err := reader.Send(`{"type":"feeds.extract","payload":{}}`, 0); err != nil {
+		t.Fatal(err)
+	}
+	// The reading holds its plugin; another client's status must still be answered.
+	status := ask(t, connect(t, endpoint), "feeds.status")
+	if status["status"] != "ok" || status["result"].(map[string]any)["type"] != "feeds.status" {
+		t.Fatalf("status=%v", status)
+	}
+
+	close(handler.release)
+	raw, err := reader.Recv(0)
+	if err != nil {
+		t.Fatalf("the reading must get its own reply: %v", err)
+	}
+	if reply := decode(t, []byte(raw)); reply["result"].(map[string]any)["read"] != true {
+		t.Fatalf("reply=%v", reply)
+	}
+}
+
+func TestExtractRequestsGetALongerTimeout(t *testing.T) {
+	if timeoutFor("feeds.extract") <= timeoutFor("feeds.status") || timeoutFor("feeds.items") != requestTimeout {
+		t.Fatal("only an on-demand reading may wait longer than the cached requests")
+	}
+}

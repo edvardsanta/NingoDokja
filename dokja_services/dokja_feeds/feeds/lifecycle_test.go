@@ -150,7 +150,7 @@ func TestAVersionedPluginOutputLimitIsEnforced(t *testing.T) {
 	plugin := scriptPlugin(t, "printf '%0100d' 0", 5*time.Second)
 	plugin.OutputBytes = 10
 
-	if _, err := (ExecRunner{}).Run(context.Background(), plugin, []string{testPath}); !errors.Is(err, ErrOutputTooLarge) {
+	if _, err := (ExecRunner{}).Run(context.Background(), plugin, []string{testPath}, nil); !errors.Is(err, ErrOutputTooLarge) {
 		t.Fatalf("expected the plugin's own output limit to apply, got %v", err)
 	}
 }
