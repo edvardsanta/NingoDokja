@@ -256,4 +256,40 @@ describe("the knowledge card", () => {
     await screen.findByText("Nenhuma correspondência relevante. Estes são os trechos mais próximos.");
     screen.getByText("correspondência fraca, pontuação 0,61, note, a, b, ref-1");
   });
+
+  describe("a file dragged over the view", () => {
+    const files = (list: File[]) => ({ dataTransfer: { types: ["Files"], files: list } });
+
+    it("lights the view while it is over it, and drops it into the form wherever it lands", async () => {
+      const { transport, calls } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.ingest": ok({ created: 1, updated: 0, skipped: 0, chunks: 2 }) });
+      renderCard(transport);
+      const counts = await screen.findByText("6 documents in 52 passages");
+      const zone = counts.closest(".drop-zone") as HTMLElement;
+
+      fireEvent.dragEnter(counts, files([]));
+      expect(zone.hasAttribute("data-dragging")).toBe(true);
+      screen.getByText("Drop the file to add it to the research base.");
+      // crossing into a child and out again keeps it lit until the drag leaves the view
+      fireEvent.dragEnter(zone, files([]));
+      fireEvent.dragLeave(counts, files([]));
+      expect(zone.hasAttribute("data-dragging")).toBe(true);
+
+      fireEvent.drop(counts, files([new File(["hello"], "far.md")]));
+      expect(zone.hasAttribute("data-dragging")).toBe(false);
+      await screen.findByText("far.md, 1 KB");
+      expect(screen.getByRole("button", { name: "File" }).getAttribute("aria-pressed")).toBe("true");
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+      await waitFor(() => expect(calls.find((call) => call.type === "knowledge.ingest")?.payload?.filename).toBe("far.md"));
+    });
+
+    it("leaves a drag that carries no file to the fields", async () => {
+      const { transport } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+      renderCard(transport);
+      const counts = await screen.findByText("6 documents in 52 passages");
+
+      fireEvent.dragEnter(counts, { dataTransfer: { types: ["text/plain"], files: [] } });
+      expect(document.querySelector(".drop-zone[data-dragging]")).toBeNull();
+    });
+  });
 });
+

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { INGEST_LIMITS, INGEST_MODES, type IngestMode } from "../../shared/ingest.js";
 import type { IngestResult, Off } from "../../shared/replies.js";
@@ -47,7 +47,11 @@ const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "",
 
 // A note, an address or a file, added to the research base. The form is off while a request is on
 // its way and never sends again by itself.
-export function AddToBase({ transport, onAdded }: { transport: Transport; onAdded?: () => void }) {
+// A file dropped on the view around the form, and how many have been: a second drop of the same file
+// is still a new drop.
+export type Dropped = { file: File; count: number };
+
+export function AddToBase({ transport, onAdded, dropped }: { transport: Transport; onAdded?: () => void; dropped?: Dropped }) {
   const t = useTranslate();
   const ids = useId();
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -82,6 +86,15 @@ export function AddToBase({ transport, onAdded }: { transport: Transport; onAdde
       },
     );
   };
+
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (!dropped || sending) return;
+    set("mode", "file");
+    choose(dropped.file);
+    form.current?.scrollIntoView?.({ block: "nearest" });
+    // a new drop is a new count; the rest is read at that moment
+  }, [dropped?.count]);
 
   const onDrop = (event: DragEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -131,6 +144,7 @@ export function AddToBase({ transport, onAdded }: { transport: Transport; onAdde
         ))}
       </div>
       <form
+        ref={form}
         className="add-form"
         onSubmit={(event) => {
           event.preventDefault();

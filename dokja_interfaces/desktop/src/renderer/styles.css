@@ -733,6 +733,29 @@ button[aria-pressed="true"] {
   outline-offset: 2px;
 }
 
+/* Knowledge takes a file dropped anywhere on it: while one is dragged over, the view is outlined and
+   says where it goes. */
+.drop-zone {
+  position: relative;
+}
+
+.drop-zone[data-dragging] {
+  outline: 1px dashed var(--cyan);
+  outline-offset: 0.5rem;
+}
+
+.drop-hint {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--static);
+  color: var(--cyan);
+  border-left: 3px solid var(--cyan);
+  pointer-events: none;
+}
+
 /* Adding to the research base: the same plain fields as the search, one under another. */
 .add {
   margin-top: 1.75rem;
