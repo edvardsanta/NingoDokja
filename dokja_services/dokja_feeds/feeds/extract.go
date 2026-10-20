@@ -69,7 +69,7 @@ func (s *Service) extract(ctx context.Context, payload map[string]any) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	e, err := s.extractor(format)
+	e, err := s.provider(CapabilityDocumentExtract, format)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +137,11 @@ func extractInput(payload map[string]any) (filename, format, encoded string, err
 	return filename, format, encoded, nil
 }
 
-// extractor resolves the plugin bound to a format (ADR 0002). Without an explicit binding
-// a single enabled provider is chosen; several make the format ambiguous. When none is
-// available, plugins this host cannot run because of their version are named, so the owner
-// knows why.
-func (s *Service) extractor(format string) (*entry, error) {
+// provider resolves the plugin bound to a capability key, such as a format for extraction
+// (ADR 0002). Without an explicit binding a single enabled provider is chosen; several make
+// the key ambiguous. When none is available, plugins this host cannot run because of their
+// version are named, so the owner knows why.
+func (s *Service) provider(capability, key string) (*entry, error) {
 	found := make([]Found, 0, len(s.entries))
 	byID := map[string]*entry{}
 	var incompatible []string
@@ -153,7 +153,7 @@ func (s *Service) extractor(format string) (*entry, error) {
 			incompatible = append(incompatible, cleanText(e.dir, 64)+" ("+e.invalid+")")
 		}
 	}
-	selection := Select(found, Binding{Capability: CapabilityDocumentExtract, Key: format})
+	selection := Select(found, Binding{Capability: capability, Key: key})
 	if selection.Primary == nil {
 		reason := selection.Reason
 		if len(incompatible) > 0 && strings.HasPrefix(reason, ReasonUnavailable+":") {

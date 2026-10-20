@@ -30,11 +30,12 @@ const (
 // Lifecycle (ADR 0002). A manifest without plugin_api is the original feed shape and goes
 // through the legacy loader unchanged; plugin_api 1 selects the versioned loader.
 const (
-	pluginAPIVersion          = 1
-	runtimeSubprocess         = "subprocess"
-	CapabilitySourceCollect   = "source.collect.v1"
-	CapabilityDocumentExtract = "document.extract.v1"
-	maxFormats                = 20
+	pluginAPIVersion           = 1
+	runtimeSubprocess          = "subprocess"
+	CapabilitySourceCollect    = "source.collect.v1"
+	CapabilityDocumentExtract  = "document.extract.v1"
+	CapabilityDocumentClassify = "document.classify.v1"
+	maxFormats                 = 20
 )
 
 // ErrIncompatible marks a manifest that names a lifecycle version, runtime or capability
@@ -46,7 +47,7 @@ var (
 	envPattern     = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 	versionPattern = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$`)
 	formatPattern  = regexp.MustCompile(`^\.[a-z0-9]{1,10}$`)
-	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true}
+	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true}
 )
 
 // manifest is plugin.json. It is read without running the plugin, so a plugin that is
