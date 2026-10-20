@@ -368,27 +368,51 @@
     {
       "id": "06",
       "title": "Run the hashtag composition experiment through the workspace",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "05"
       ],
       "deliverables": [
-        "Workspace-backed hashtag workflow",
-        "Shadow prediction traces",
-        "Behavior and failure tests"
+        "dokja_orch/internal/handlers/hashtag_task.go",
+        "HashtagExperience.Executed and SystemDomainHandler.WithHashtagTask",
+        "dokja_orch/internal/handlers/hashtag_task_test.go"
       ],
       "acceptance_criteria": [
-        "OCR, labelled retrieval, domain selection, and execution receipts are linked to one scoped task.",
+        "OCR, labelled retrieval and domain selection are steps of one scoped task; the delivery stays in the system handler and its outcome is linked to the task by attempt ID (delivery as a task step belongs to step 09).",
         "A prediction snapshot precedes the action when the experiment requires that ordering.",
         "Predictions remain in shadow mode and do not alter delivery policy.",
         "Optional-memory failure has a defined result, and feedback links to the intended action attempt.",
         "Success, abstention, timeout, and rejected-action paths are observable and tested.",
-        "The runner gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment rather than reimplemented.",
         "The optional ADR 0004 prediction snapshot is part of the workspace, frozen before the action."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "HashtagTask runs read (meme text), retrieve (Knowledge search), select (attention on the relevance flag) and an optional predict step through core.RunTask with a 20 s deadline covering today's OCR and search timeouts.",
+        "The shadow prediction runs before delivery under a 1 s budget (owner decision); it is frozen in the workspace and copied into the attempt. A missed budget or Memory failure degrades the optional step and leaves the attempt unscored; delivery and its text are unchanged.",
+        "Scheduled and manual sends record an attempt through HashtagExperience.Executed only after at least one channel received the meme; a failed or fully skipped delivery records nothing (intended ADR 0004 change from recording before delivery). Recording uses the frozen snapshot and never predicts again.",
+        "Memory rows keep today's ref and payload; repeated media keeps the media-derived ref. Evidence uses hashed refs, never addresses or text; Knowledge evidence stays unscoped.",
+        "The meme, Knowledge and Memory switches still decide what runs. Rollback is composition: removing WithHashtagTask in cmd/va/main.go returns to the earlier path, which keeps its tests.",
+        "Feedback still resolves by media ref, not attempt ID: live attribution across repeated media needs the later receipt/feedback contract review named in ADR 0004.",
+        "The ADR 0005 loop transitions are not built here: this workflow never iterates. The criterion moved to step 09, the first workflow that does."
+      ],
+      "checks": [
+        {
+          "name": "hashtag_task_tests",
+          "status": "passed",
+          "detail": "go vet and go test -race ./internal/handlers: faculty steps and evidence, abstention without prediction, missed budget, Memory failure, switches, unreadable media, prediction before delivery and record after it, failed delivery, repeated media, manual send text, frozen snapshot, unscored attempt."
+        },
+        {
+          "name": "mutation_checks",
+          "status": "passed",
+          "detail": "Recording before delivery failed two tests; predicting again when recording failed the unscored test."
+        },
+        {
+          "name": "existing_behavior",
+          "status": "passed",
+          "detail": "Existing manual/scheduled hashtag tests and the step 03 hashtag baselines pass unchanged; delivered text is identical on the task path."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-18"
     },
     {
       "id": "07",
@@ -456,7 +480,8 @@
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
         "book.* routes and the CLI book command are served by reading -> Knowledge -> generation; removing the facade, Book domain and Book service waits for the owner's approval.",
         "Meme scrapers and OCR run as reading plugins with the pool as a reading cache, screening sits under Moderation, digest ordering and the hashtag relevance threshold under Attention, and sent receipts are experience, with existing commands and triggers passing their baseline tests.",
-        "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that."
+        "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that.",
+        "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06)."
       ],
       "evidence": [],
       "checks": [],

@@ -77,6 +77,29 @@ func (e *HashtagExperience) Suggested(url, text, hashtag string, match HashtagMa
 	e.spawn(func() { e.recordSuggestion(experienceRef(url), text, hashtag, match) })
 }
 
+// Executed records an attempt of the hashtag task once its delivery reached at least one
+// channel. It uses the attempt's frozen prediction and never predicts again: an attempt
+// without one is recorded unscored.
+func (e *HashtagExperience) Executed(url string, attempt HashtagAttempt) {
+	text, hashtag := truncateRunes(strings.TrimSpace(attempt.QueryText), maxExperienceText), strings.TrimSpace(attempt.Hashtag)
+	if !e.active() || url == "" || text == "" || hashtag == "" {
+		return
+	}
+	snapshot := attempt.Prediction
+	if snapshot != nil {
+		frozen := *snapshot
+		snapshot = &frozen
+	}
+	e.spawn(func() {
+		e.recordWith(experienceRef(url), text, hashtag, attempt.Match, func(context.Context) (map[string]any, bool) {
+			if snapshot == nil {
+				return nil, false
+			}
+			return map[string]any{"predicted_p": snapshot.PredictedP, "baseline_p": snapshot.BaselineP}, true
+		})
+	})
+}
+
 func (e *HashtagExperience) Tagged(url, hashtag string) {
 	hashtag = strings.TrimSpace(hashtag)
 	if !e.active() || url == "" || hashtag == "" {
@@ -86,6 +109,21 @@ func (e *HashtagExperience) Tagged(url, hashtag string) {
 }
 
 func (e *HashtagExperience) recordSuggestion(ref, text, hashtag string, match HashtagMatch) {
+	// The prediction is made before the experience exists, so it only uses what came earlier. If
+	// it cannot be made the experience is still worth keeping: it just has nothing to score.
+	e.recordWith(ref, text, hashtag, match, func(ctx context.Context) (map[string]any, bool) {
+		prediction, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionPredictExperience, map[string]any{
+			"action": hashtagSuggestAction, "context": text,
+		}))
+		if err != nil {
+			logger.Info(fmt.Sprintf("hashtag experience could not predict, recording without a score: %v", err))
+			return nil, false
+		}
+		return prediction, true
+	})
+}
+
+func (e *HashtagExperience) recordWith(ref, text, hashtag string, match HashtagMatch, predict func(context.Context) (map[string]any, bool)) {
 	ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
 	defer cancel()
 
@@ -96,16 +134,9 @@ func (e *HashtagExperience) recordSuggestion(ref, text, hashtag string, match Ha
 	if matched := truncateRunes(strings.TrimSpace(match.Text), maxMatchedText); matched != "" {
 		record["matched_context"] = matched
 	}
-	// The prediction is made before the experience exists, so it only uses what came earlier. If
-	// it cannot be made the experience is still worth keeping: it just has nothing to score.
-	prediction, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionPredictExperience, map[string]any{
-		"action": hashtagSuggestAction, "context": text,
-	}))
-	scored := err == nil
+	prediction, scored := predict(ctx)
 	if scored {
 		record["predicted_p"], record["baseline_p"] = prediction["predicted_p"], prediction["baseline_p"]
-	} else {
-		logger.Info(fmt.Sprintf("hashtag experience could not predict, recording without a score: %v", err))
 	}
 
 	answer, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionRecordExperience, record))

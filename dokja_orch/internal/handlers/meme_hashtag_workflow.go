@@ -109,6 +109,12 @@ func (w *MemeHashtagWorkflow) SuggestHashtag(ctx context.Context, url, text stri
 	if err != nil {
 		return nil, err
 	}
+	return w.search(ctx, text, minScore)
+}
+
+// search finds the labelled example closest to text. SuggestHashtag and the hashtag task
+// share it, so both read the same result shape.
+func (w *MemeHashtagWorkflow) search(ctx context.Context, text string, minScore *float64) (map[string]any, error) {
 	payload := map[string]any{"query": text, "k": 1, "kind": memeHashtagKnowledgeKind}
 	payload["min_score"] = w.minScore
 	if minScore != nil && *minScore >= 0 && *minScore <= 1 {
@@ -142,6 +148,10 @@ func (w *MemeHashtagWorkflow) SuggestHashtag(ctx context.Context, url, text stri
 	result["matched_text"] = hit["text"]
 	result["matched_source_url"] = hit["source_ref"]
 	return result, nil
+}
+
+func (w *MemeHashtagWorkflow) knowledgeEnabled() bool {
+	return w != nil && (w.enabled == nil || w.enabled())
 }
 
 func (w *MemeHashtagWorkflow) ListHashtags(ctx context.Context, limit, offset int) (map[string]any, error) {

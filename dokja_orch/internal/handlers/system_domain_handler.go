@@ -76,6 +76,8 @@ type SystemDomainHandler struct {
 	controls         *core.Controls
 	profiles         ChatProfiles
 	hashtagNotes     HashtagExperienceNotes
+	hashtagTask      HashtagSuggestionTask
+	hashtagAttempts  HashtagAttemptNotes
 	probes           map[string]ServiceProbe
 	interfaceProbes  map[string]InterfaceProbe
 	links            map[string]InterfaceLinker
@@ -145,6 +147,20 @@ func (h *SystemDomainHandler) WithHashtagSuggestions(suggester MemeHashtagSugges
 // memory can later score how often the operator keeps it.
 func (h *SystemDomainHandler) WithHashtagExperience(notes HashtagExperienceNotes) *SystemDomainHandler {
 	h.hashtagNotes = notes
+	return h
+}
+
+// HashtagAttemptNotes records a hashtag task attempt whose delivery reached a channel.
+type HashtagAttemptNotes interface {
+	Executed(url string, attempt HashtagAttempt)
+}
+
+// WithHashtagTask runs suggestions through the typed hashtag task (step 06) instead of
+// WithHashtagSuggestions/WithHashtagExperience: the shadow prediction is frozen before
+// delivery, and an attempt is recorded only once a channel received the meme. Leaving it
+// out keeps the earlier path.
+func (h *SystemDomainHandler) WithHashtagTask(task HashtagSuggestionTask, notes HashtagAttemptNotes) *SystemDomainHandler {
+	h.hashtagTask, h.hashtagAttempts = task, notes
 	return h
 }
 
@@ -310,7 +326,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 		if content == "" {
 			continue
 		}
-		content = h.appendLearnedHashtag(ctx, content, attachmentURL)
+		content, attempt := h.appendLearnedHashtag(ctx, event, content, attachmentURL)
 		safe, reason := memeSafety(meme)
 		sent := false
 		for _, channelID := range h.deliveryChannels {
@@ -345,6 +361,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 		}
 		if sent {
 			delivered++
+			h.noteHashtagAttempt(attachmentURL, attempt)
 		}
 	}
 
@@ -381,19 +398,31 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 	return response, nil
 }
 
-func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content, url string) string {
-	if h.memeHashtags == nil || url == "" || !h.serviceEnabled("meme") {
-		return content
+// appendLearnedHashtag adds a relevant learned hashtag to content. With the hashtag task it
+// also returns the attempt, to be recorded only after a delivery succeeds.
+func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, event core.Event, content, url string) (string, *HashtagAttempt) {
+	if url == "" || !h.serviceEnabled("meme") {
+		return content, nil
+	}
+	if h.hashtagTask != nil {
+		attempt := h.hashtagTask.Suggest(ctx, event, url)
+		if attempt.Hashtag == "" {
+			return content, nil
+		}
+		return withHashtag(content, attempt.Hashtag), &attempt
+	}
+	if h.memeHashtags == nil {
+		return content, nil
 	}
 	result, err := h.memeHashtags.SuggestHashtag(ctx, url, "", nil)
 	if err != nil {
 		logger.Info(fmt.Sprintf("system handler hashtag suggestion unavailable url=%s error=%v", url, err))
-		return content
+		return content, nil
 	}
 	relevant, _ := result["relevant"].(bool)
 	hashtag := strings.TrimSpace(resultString(result, "hashtag"))
 	if !relevant || hashtag == "" {
-		return content
+		return content, nil
 	}
 	if h.hashtagNotes != nil {
 		score, _ := result["score"].(float64)
@@ -401,10 +430,22 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, content,
 			Score: score, Text: resultString(result, "matched_text"),
 		})
 	}
+	return withHashtag(content, hashtag), nil
+}
+
+func withHashtag(content, hashtag string) string {
 	if content == "" {
 		return hashtag
 	}
-	return content + "\n" + hashtag
+	return fmt.Sprintf("%s\n%s", content, hashtag)
+}
+
+// noteHashtagAttempt records a task attempt after its meme reached at least one channel. A
+// failed or skipped delivery is not an example of the suggestion being used (ADR 0004).
+func (h *SystemDomainHandler) noteHashtagAttempt(url string, attempt *HashtagAttempt) {
+	if attempt != nil && h.hashtagAttempts != nil {
+		h.hashtagAttempts.Executed(url, *attempt)
+	}
 }
 
 // deliverAttachment posts content to a channel. When the meme service's own download is
@@ -484,7 +525,7 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		return nil, fmt.Errorf("nothing sent: %s is switched off", strings.Join(switchedOff, ","))
 	}
 	targets = live
-	content = h.appendLearnedHashtag(ctx, content, attachmentURL)
+	content, attempt := h.appendLearnedHashtag(ctx, event, content, attachmentURL)
 
 	// The safe-only rule applies here too. Only an explicit TUI --force bypasses it;
 	// otherwise a failed server-side screen counts as unsafe.
@@ -520,6 +561,9 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 			continue
 		}
 		sent = append(sent, channelID)
+	}
+	if len(sent) > 0 {
+		h.noteHashtagAttempt(attachmentURL, attempt)
 	}
 	logger.Info(fmt.Sprintf(
 		"system handler discord send event_id=%s sent=%s skipped_unsafe=%s failed=%d has_attachment=%t nsfw_bypassed=%t",
