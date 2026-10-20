@@ -439,7 +439,9 @@ services that are off.
 
 ## Workspace replan (2026-10-19)
 
-Status: proposed, plan only. Nothing here is built.
+Status: proposed. Phase A's shell is built on branch `feat/desktop-workspace`: the sidebar, System at
+its foot with the problem count, the dots and the new keys. The view-level changes below (Messages as
+a messenger, the drop zone over Knowledge) and Phases B and C are not built.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
