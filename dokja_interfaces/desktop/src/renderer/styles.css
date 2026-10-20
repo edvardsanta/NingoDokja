@@ -733,6 +733,73 @@ button[aria-pressed="true"] {
   outline-offset: 2px;
 }
 
+/* Documents open in tabs on top of Knowledge, after the base's own. The open one is lit like the open
+   workspace; each document tab has its close button beside it. */
+.view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.view-tab-pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+.view-tabs button.view-tab,
+.view-tabs button.view-tab:hover:not(:disabled) {
+  max-width: 18rem;
+  margin-bottom: -1px;
+  padding: 0.4rem 0.2rem;
+  overflow: hidden;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-tabs button.view-tab:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.view-tabs button.view-tab[aria-current="true"] {
+  border-bottom-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.view-tabs button.view-tab-close,
+.view-tabs button.view-tab-close:hover:not(:disabled) {
+  padding: 0 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+.view-tabs button.view-tab-close:hover:not(:disabled) {
+  color: var(--magenta-text);
+}
+
+/* A document's text: as stored, line breaks kept, long lines wrapped. */
+.document-text {
+  max-height: 60vh;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  border-left: 2px solid var(--edge);
+  background: var(--static);
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.document-view h3 {
+  margin-top: 0;
+}
+
 /* Knowledge takes a file dropped anywhere on it: while one is dragged over, the view is outlined and
    says where it goes. */
 .drop-zone {

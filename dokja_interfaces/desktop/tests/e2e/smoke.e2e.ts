@@ -269,6 +269,12 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.equal(documents.ok, true);
     assert.deepEqual(Object.keys(documents.result?.documents[0] ?? {}).sort(), ["chunks", "embedded", "id", "kind", "reference", "tags", "title", "updatedAt"]);
     assert.doesNotMatch(JSON.stringify(documents), /hash-1|private\/path-1/, "no hash and no path");
+
+    // a document's text is asked for one document at a time, never with a page of them
+    await ask("knowledge.list", { limit: 20, include_text: true });
+    await ask("knowledge.list", { limit: 1, offset: 0, include_text: true });
+    const lists = orchestrator.seen.filter((event) => event.type === "knowledge.list").slice(-2).map((event) => event.payload);
+    assert.deepEqual(lists, [{ limit: 20, offset: 0 }, { limit: 1, offset: 0, include_text: true }]);
   });
 
   it("fetches a picture only at an address the orchestrator listed", async () => {

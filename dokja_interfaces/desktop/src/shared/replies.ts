@@ -196,6 +196,9 @@ export type KnowledgeDocument = {
   chunks: number;
   embedded: number;
   updatedAt: string;
+  // Only when one document was asked for with its text: rebuilt from its passages, and cut when long.
+  text?: string;
+  truncated?: boolean;
 };
 
 export type KnowledgeDocuments = {

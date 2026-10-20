@@ -115,6 +115,11 @@ function searchFor(query: string): KnowledgeSearch {
   };
 }
 
+// What a document's tab shows in the browser preview.
+const FAKE_TEXT = `What we call reason is a habit that learned to speak well of itself.
+
+The second passage, stored apart from the first, joined back here as the base rebuilds it.`;
+
 const MEME_STATUS: MemeStatus = { status: "ok", unsent: 30, sent: 8 };
 
 function memes(scope: "unsent" | "sent"): MemeItem[] {
@@ -306,8 +311,11 @@ export function createFakeTransport(delayMs = 400): Transport {
         case "knowledge.list": {
           const limit = Math.min(Math.max(Number(payload?.limit) || 20, 1), 100);
           const offset = Math.max(Number(payload?.offset) || 0, 0);
+          const withText = payload?.include_text === true && limit === 1;
           const page: KnowledgeDocuments = {
-            documents: documents.slice(offset, offset + limit),
+            documents: documents
+              .slice(offset, offset + limit)
+              .map((document) => (withText ? { ...document, text: FAKE_TEXT, truncated: false } : document)),
             total: documents.length,
             offset,
           };

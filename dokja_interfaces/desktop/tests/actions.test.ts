@@ -337,6 +337,31 @@ test("digest.items cuts long texts", () => {
   assert.ok(item!.id.length <= 120 && item!.title.length <= 300 && item!.summary.length <= 600 && item!.source.length <= 80);
 });
 
+test("knowledge.list asks for a document's text only one document at a time", () => {
+  const payload = ACTIONS["knowledge.list"].payload;
+  assert.deepEqual(payload({ limit: 1, offset: 7, include_text: true }), { limit: 1, offset: 7, include_text: true });
+  // a page of documents never carries their texts, and only a real true asks for one
+  assert.deepEqual(payload({ limit: 20, offset: 0, include_text: true }), { limit: 20, offset: 0 });
+  assert.deepEqual(payload({ limit: 1, offset: 0, include_text: "yes" }), { limit: 1, offset: 0 });
+  assert.deepEqual(payload({ limit: 1, offset: 0, include_text: true, kind: "meme_hashtag", extra: "x" }), { limit: 1, offset: 0, include_text: true });
+});
+
+test("knowledge.list keeps a document's text, cut when it is too long, and leaves out what it does not show", () => {
+  const project = ACTIONS["knowledge.list"].project;
+  const row = { source_id: "note:a-1", title: "A", kind: "note", source_ref: "", tags: [], chunks: 2, embedded: 2, updated_at: "2026-10-02T10:00:00", content_sha: "hash-1" };
+  const listed = project(compactOf("knowledge", { documents: [row], total: 1, offset: 0 })) as { documents: Array<Record<string, unknown>> };
+  assert.equal("text" in (listed.documents[0] ?? {}), false);
+  assert.equal("content_sha" in (listed.documents[0] ?? {}), false);
+
+  const short = project(compactOf("knowledge", { documents: [{ ...row, text: "Two passages." }], total: 1, offset: 0 })) as { documents: Array<Record<string, unknown>> };
+  assert.equal(short.documents[0]?.text, "Two passages.");
+  assert.equal(short.documents[0]?.truncated, false);
+
+  const long = project(compactOf("knowledge", { documents: [{ ...row, text: "x".repeat(250_000) }], total: 1, offset: 0 })) as { documents: Array<{ text: string; truncated: boolean }> };
+  assert.equal(long.documents[0]?.text.length, 200_000);
+  assert.equal(long.documents[0]?.truncated, true);
+});
+
 test("knowledge.ingest says what a single document did, in the same counts as many", () => {
   const project = ACTIONS["knowledge.ingest"].project;
   assert.deepEqual(

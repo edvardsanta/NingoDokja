@@ -1,9 +1,10 @@
 import { useCallback, useId, useState, type DragEvent } from "react";
 
-import type { KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
+import type { KnowledgeDocument, KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
+import { DocumentView } from "./document_view.js";
 import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
 import { AddToBase, type Dropped } from "./knowledge_add.js";
 import {
@@ -64,6 +65,11 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
   );
 }
 
+// The base's own view, always the first tab.
+const BASE = "";
+const MAX_OPEN_DOCUMENTS = 8;
+type OpenDocument = { id: string; title: string; at: number };
+
 // Lights the view while files are dragged over it and hands over the first file dropped. Entering and
 // leaving fire for every child crossed, so they are counted rather than trusted one by one. Only a
 // drag that carries files counts: dragged text is left to the fields.
@@ -106,9 +112,30 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
     });
   }, [transport]);
 
-  // A file dropped anywhere on the view goes to the form, as if it had been dropped on the form.
+  // Documents opened from the list, each in a tab after the base's own. Opening one already open goes
+  // back to its tab; the oldest goes first past the limit.
+  const [documents, setDocuments] = useState<OpenDocument[]>([]);
+  const [current, setCurrent] = useState(BASE);
+  const open = useCallback((document: KnowledgeDocument, at: number) => {
+    setDocuments((previous) =>
+      previous.some((each) => each.id === document.id)
+        ? previous
+        : [...previous, { id: document.id, title: document.title || document.id, at }].slice(-MAX_OPEN_DOCUMENTS),
+    );
+    setCurrent(document.id);
+  }, []);
+  const close = (id: string) => {
+    setDocuments((previous) => previous.filter((each) => each.id !== id));
+    setCurrent((shown) => (shown === id ? BASE : shown));
+  };
+
+  // A file dropped anywhere on the view goes to the form, as if it had been dropped on the form; the
+  // base's tab comes to the front so the form can be seen.
   const [dropped, setDropped] = useState<Dropped>();
-  const drop = useFileDrop((file) => setDropped((previous) => ({ file, count: (previous?.count ?? 0) + 1 })));
+  const drop = useFileDrop((file) => {
+    setCurrent(BASE);
+    setDropped((previous) => ({ file, count: (previous?.count ?? 0) + 1 }));
+  });
 
   return (
     <div className="drop-zone" data-dragging={drop.dragging ? "" : undefined} {...drop.handlers}>
@@ -117,11 +144,45 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
           {t("add_drop_hint")}
         </p>
       )}
-      <KnowledgeStatusLines status={status} />
-      <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
-      <SearchBox transport={transport} />
-      <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />
-      <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} />
+      {documents.length > 0 && (
+        <div className="view-tabs" role="group" aria-label={t("documents_tabs_label")}>
+          <button type="button" className="view-tab" aria-current={current === BASE ? "true" : undefined} onClick={() => setCurrent(BASE)}>
+            {t("view_base")}
+          </button>
+          {documents.map((document) => (
+            <span key={document.id} className="view-tab-pair">
+              <button
+                type="button"
+                className="view-tab"
+                aria-current={current === document.id ? "true" : undefined}
+                onClick={() => setCurrent(document.id)}
+              >
+                {document.title}
+              </button>
+              <button
+                type="button"
+                className="view-tab-close"
+                aria-label={t("view_close_named", { title: document.title })}
+                onClick={() => close(document.id)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div hidden={current !== BASE}>
+        <KnowledgeStatusLines status={status} />
+        <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
+        <SearchBox transport={transport} />
+        <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />
+        <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} onOpen={open} />
+      </div>
+      {documents.map((document) => (
+        <div key={document.id} hidden={current !== document.id}>
+          <DocumentView transport={transport} id={document.id} at={document.at} />
+        </div>
+      ))}
     </div>
   );
 }

@@ -21,12 +21,15 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
     id: text(item.id), title: text(item.title), kind: text(item.kind), reference: text(item.reference),
     tags: Array.isArray(item.tags) ? item.tags.map(text) : [], chunks: count(item.chunks),
     embedded: count(item.embedded), updatedAt: text(item.updatedAt),
+    ...(typeof item.text === "string" ? { text: item.text, truncated: item.truncated === true } : {}),
   })).filter((item) => item.id !== "");
   return { documents, total: count(value.total), offset: count(value.offset) };
 }
 
-export function KnowledgeDocumentsPanel({ transport, revision, onChanged }: {
-  transport: Transport; revision: number; onChanged: () => void;
+// `onOpen` opens a document in a tab of its own, given where it sits in the list: its text is asked
+// for there, one document at a time.
+export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen }: {
+  transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number) => void;
 }) {
   const t = useTranslate();
   const [opened, setOpened] = useState(false);
@@ -77,10 +80,12 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged }: {
         <p>{t("documents_total", { count: page.total })}</p>
         {page.documents.length === 0 && <p>{t("documents_empty")}</p>}
         <ul className="hits">
-          {page.documents.map((document) => <li key={document.id}>
+          {page.documents.map((document, index) => <li key={document.id}>
             <p><strong>{document.title || document.id}</strong></p>
             <p className="detail">{[document.id, document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}</p>
             <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
+            {onOpen && <button type="button" aria-label={t("documents_open_named", { title: document.title || document.id })}
+              onClick={() => onOpen(document, page.offset + index)}>{t("documents_open")}</button>}{" "}
             <button type="button" disabled={removing} aria-label={t("documents_delete_named", { title: document.title || document.id })}
               onClick={() => { if (!removing) deletion.start(document.id); }}>{t("documents_delete")}</button>
           </li>)}

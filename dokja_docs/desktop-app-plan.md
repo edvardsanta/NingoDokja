@@ -443,8 +443,8 @@ Status: Phase A is built, on stacked branches: `feat/desktop-workspace` (the sid
 foot with the problem count, the dots, the new keys, and the memes picked in Messages instead of a
 workspace of their own), `feat/desktop-messages` (Messages as a messenger), `feat/desktop-knowledge-drop`
 (a file dropped anywhere on Knowledge) and `feat/desktop-names` (panels named after their workspaces,
-and an empty research base that says where a file goes). Phase B waits for the chat plan; Phase C is
-reshaped in three steps below.
+and an empty research base that says where a file goes). Phase B waits for the chat plan. Phase C is
+reshaped in three steps below; C1 is built on `feat/desktop-document-view`.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
@@ -539,17 +539,24 @@ C. **Document view, in tabs of the work area.** Reshaped on 2026-10-19 with the 
      a refresh), caps the text and says when it cut it, and the screen renders it as text, never as
      markup. The tab says plainly that the text is rebuilt from the stored passages and is not a
      faithful copy of the original file.
-   - **C2, after `feat/knowledge-metadata` merges.** Listed documents then carry `metadata` and a
-     `classification` with `status`, `missing_axes` and `questions`. The tab shows the defining
-     metadata (form, content kind, topics, entities, date anchor) with where each value came from, and
-     the pending questions with their allowed values, read-only. The shell's projection adds both,
-     bounded like every other field.
-   - **C3, needs a contract from the knowledge track.** Answering a question from the desktop needs a
-     request that sets explicit metadata on a stored document by its id, without its content: today
-     metadata travels only with an ingest or a reading, and the desktop does not hold the original
-     file. Once that exists, the tab answers the questions, and a context menu on a row that needs
-     input ("Classify…", beside Delete) earns its place. Designing that request belongs to the
-     knowledge work, not to this plan.
+   - **C2, desktop only, on main since PR #54.** `knowledge.classify` with `{source_id}` returns a stored
+     document's metadata, its classification questions with their allowed values, and the `revision`
+     an answer must carry. The tab asks for it on demand and shows the defining metadata (form, content
+     kind, topics, entities, date anchor) with where each value came from, and the pending questions.
+     The shell adds the action to its allow-list with a payload of the id alone and a bounded
+     projection.
+   - **C3, desktop only, on the same action.** The tab answers the questions: `knowledge.classify` with
+     `{source_id, revision, answers: {form?, content_kind?}}`. Only the axes the owner chose are sent,
+     a blank stays pending, and a stale revision (`classification_conflict`) is reported and the
+     questions read again, never retried on the screen's own. An answer is a change, so it needs a real
+     press like every other. A context menu with "Classify…" beside Delete earns its place on a row
+     that has pending questions.
+
+   The acceptance criteria the knowledge work recorded for the desktop are in
+   [step-09-consolidation.md](./step-09-consolidation.md#desktop-implications-and-acceptance-criteria).
+   C1 meets them for now by asking for one document's text through `knowledge.list` at the row's
+   offset; a per-document detail contract (source identity, declared representation, provenance) is
+   still pending on the knowledge side and would replace that.
 
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
 this shell. They are not cards in a briefing.
@@ -563,9 +570,8 @@ this shell. They are not cards in a briefing.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
 - Phase C1: no backend change. The shell's `knowledge.list` payload may now carry `include_text`
   (only with `limit: 1`) and its projection a capped `text`.
-- Phase C2: no backend change on top of `feat/knowledge-metadata`; the projection adds `metadata` and
-  `classification`.
-- Phase C3: a new knowledge request, owned by the knowledge track.
+- Phases C2 and C3: no backend change; `knowledge.classify` (on main since PR #54) joins the shell's
+  allow-list, as a change when it carries answers.
 
 ### Owner decisions
 
