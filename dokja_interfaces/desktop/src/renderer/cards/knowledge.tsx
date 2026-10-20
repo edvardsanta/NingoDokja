@@ -1,11 +1,11 @@
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId, useState, type DragEvent } from "react";
 
 import type { KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
 import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
-import { AddToBase } from "./knowledge_add.js";
+import { AddToBase, type Dropped } from "./knowledge_add.js";
 import {
   parseKnowledgeSearch,
   parseKnowledgeStatus,
@@ -64,9 +64,39 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
   );
 }
 
+// Lights the view while files are dragged over it and hands over the first file dropped. Entering and
+// leaving fire for every child crossed, so they are counted rather than trusted one by one. Only a
+// drag that carries files counts: dragged text is left to the fields.
+function useFileDrop(onFile: (file: File) => void) {
+  const [depth, setDepth] = useState(0);
+  const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes("Files");
+  const handlers = {
+    onDragEnter: (event: DragEvent) => {
+      if (carriesFiles(event)) setDepth((value) => value + 1);
+    },
+    onDragLeave: (event: DragEvent) => {
+      if (carriesFiles(event)) setDepth((value) => Math.max(0, value - 1));
+    },
+    onDragOver: (event: DragEvent) => {
+      if (carriesFiles(event)) event.preventDefault();
+    },
+    onDrop: (event: DragEvent) => {
+      setDepth(0);
+      // the form took it already
+      if (event.defaultPrevented) return;
+      const file = event.dataTransfer.files[0];
+      if (!file) return;
+      event.preventDefault();
+      onFile(file);
+    },
+  };
+  return { dragging: depth > 0, handlers };
+}
+
 // The counts are read once when the card opens; adding a document reads them again, quietly, so
 // they do not stay behind what the search now finds.
 function KnowledgeBody({ transport, initial }: { transport: Transport; initial: KnowledgeStatus }) {
+  const t = useTranslate();
   const [status, setStatus] = useState(initial);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => {
@@ -76,14 +106,23 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
     });
   }, [transport]);
 
+  // A file dropped anywhere on the view goes to the form, as if it had been dropped on the form.
+  const [dropped, setDropped] = useState<Dropped>();
+  const drop = useFileDrop((file) => setDropped((previous) => ({ file, count: (previous?.count ?? 0) + 1 })));
+
   return (
-    <>
+    <div className="drop-zone" data-dragging={drop.dragging ? "" : undefined} {...drop.handlers}>
+      {drop.dragging && (
+        <p className="drop-hint" aria-hidden="true">
+          {t("add_drop_hint")}
+        </p>
+      )}
       <KnowledgeStatusLines status={status} />
       <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
       <SearchBox transport={transport} />
-      <AddToBase transport={transport} onAdded={refresh} />
+      <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />
       <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} />
-    </>
+    </div>
   );
 }
 
