@@ -156,7 +156,7 @@
   "communications_title": "Conversations",
   "communications_no_channels": "No delivery channels are configured.",
   "communications_identity": "Messages are sent as Ningo. Only configured channels appear here.",
-  "communications_channel": "Channel",
+  "communications_channel": "Channels and conversations",
   "communications_latest": "Latest messages",
   "communications_older": "Older messages",
   "communications_auto": "Refresh every 15 seconds",

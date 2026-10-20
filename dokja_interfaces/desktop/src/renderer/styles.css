@@ -809,6 +809,58 @@ button[aria-pressed="true"] {
   margin: 0;
 }
 
+/* Messages: the conversations on the left, the chosen one on the right. The chosen one is lit like the
+   open workspace in the sidebar. */
+.messenger {
+  display: grid;
+  grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.channels ul {
+  margin: 0;
+  padding: 0;
+  border-right: 1px solid var(--edge);
+  list-style: none;
+}
+
+.channels button,
+.channels button:hover:not(:disabled) {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.channels button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.channels button[aria-current="true"] {
+  border-left-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.thread > .note:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 48rem) {
+  .messenger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .channels ul {
+    border-right: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+}
+
 .conversation {
   list-style: none;
   padding: 0;

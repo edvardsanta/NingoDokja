@@ -36,7 +36,7 @@ const page = (channelId: string) =>
     ],
   });
 
-describe("a WhatsApp conversation in the communications tab", () => {
+describe("a WhatsApp conversation in Messages", () => {
   it("is listed by its alias, shows who wrote in words, and says how long the text is kept", async () => {
     const { transport, calls } = routedTransport({
       "communications.channels": channels,
@@ -46,7 +46,7 @@ describe("a WhatsApp conversation in the communications tab", () => {
 
     await screen.findByText("are you coming?");
 
-    expect(screen.getByRole("option", { name: "WhatsApp · friend" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "WhatsApp · friend" }).getAttribute("aria-current")).toBe("true");
     expect(screen.getByText(/kept on this machine for 30 days/)).toBeTruthy();
     const messages = screen.getByRole("list", { name: "Conversation history" });
     expect(within(messages).getByText("Contact")).toBeTruthy();
@@ -110,6 +110,6 @@ describe("a WhatsApp conversation in the communications tab", () => {
 
     await waitFor(() => expect(screen.getByRole("textbox")).toBeTruthy());
     expect(screen.queryByText(/kept on this machine/)).toBeNull();
-    expect(screen.getByRole("option", { name: "#reading-room · 123456789012345678" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "#reading-room · 123456789012345678" })).toBeTruthy();
   });
 });

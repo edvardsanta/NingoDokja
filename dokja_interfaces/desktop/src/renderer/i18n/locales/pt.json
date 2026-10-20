@@ -156,7 +156,7 @@
   "communications_title": "Conversas",
   "communications_no_channels": "Nenhum canal de entrega configurado.",
   "communications_identity": "As mensagens são enviadas pelo Ningo. Somente canais configurados aparecem aqui.",
-  "communications_channel": "Canal",
+  "communications_channel": "Canais e conversas",
   "communications_latest": "Mensagens recentes",
   "communications_older": "Mensagens anteriores",
   "communications_auto": "Atualizar a cada 15 segundos",

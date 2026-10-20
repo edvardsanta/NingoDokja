@@ -30,23 +30,32 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
 const WHATSAPP = "whatsapp:";
 const isWhatsApp = (id: string) => id.startsWith(WHATSAPP);
 
+// Laid out like a messenger: the conversations on the left, the one chosen on the right with its
+// history and its composer. While a message is on its way the list waits, so a send cannot cross
+// to another conversation.
 function ChannelList({ channels, transport, active }: { channels: CommunicationChannel[]; transport: Transport; active: boolean }) {
   const t = useTranslate();
-  const id = useId();
   const [selected, setSelected] = useState(channels[0]?.id ?? "");
   const [sending, setSending] = useState(false);
   const chosen = channels.find((channel) => channel.id === selected);
-  return <>
-    <p className="note">{chosen && isWhatsApp(chosen.id) ? t("communications_whatsapp_identity") : t("communications_identity")}</p>
-    <label htmlFor={id}>{t("communications_channel")}</label>{" "}
-    <select id={id} value={selected} disabled={sending} onChange={(event) => setSelected(event.target.value)}>
-      {channels.map((channel) => <option key={channel.id} value={channel.id}>{isWhatsApp(channel.id)
-        ? t("communications_whatsapp_label", { name: channel.name })
-        : channel.name === channel.id ? channel.id : `#${channel.name} · ${channel.id}`}</option>)}
-    </select>
-    {chosen && isWhatsApp(chosen.id) && chosen.retentionDays !== undefined && <p className="note">{t("communications_retention", { days: chosen.retentionDays })}</p>}
-    <Conversation key={selected} channel={selected} transport={transport} active={active} onSending={setSending} />
-  </>;
+  return <div className="messenger">
+    <nav className="channels" aria-label={t("communications_channel")}>
+      <ul>
+        {channels.map((channel) => <li key={channel.id}>
+          <button type="button" aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
+            {isWhatsApp(channel.id)
+              ? t("communications_whatsapp_label", { name: channel.name })
+              : channel.name === channel.id ? channel.id : `#${channel.name} · ${channel.id}`}
+          </button>
+        </li>)}
+      </ul>
+    </nav>
+    <section className="thread">
+      <p className="note">{chosen && isWhatsApp(chosen.id) ? t("communications_whatsapp_identity") : t("communications_identity")}</p>
+      {chosen && isWhatsApp(chosen.id) && chosen.retentionDays !== undefined && <p className="note">{t("communications_retention", { days: chosen.retentionDays })}</p>}
+      <Conversation key={selected} channel={selected} transport={transport} active={active} onSending={setSending} />
+    </section>
+  </div>;
 }
 
 // Who wrote a message of a WhatsApp conversation: the interface sends a fixed label, said here in the
