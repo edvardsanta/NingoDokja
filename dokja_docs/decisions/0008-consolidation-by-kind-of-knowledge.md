@@ -1,6 +1,6 @@
 # ADR 0008: consolidate knowledge by its kind, tagged at reading time
 
-Date: 2026-10-19. Status: proposed (owner discussion; open questions below).
+Date: 2026-10-19. Status: proposed; owner answers recorded, kinds and classifier under discussion.
 Refines [ADR 0005](./0005-knowledge-experience-content.md) and
 [ADR 0006](./0006-reading-macro-component.md). Replaces the `book.*` facade
 planned for step `09`.
@@ -68,25 +68,82 @@ outcome. A summary is generated on request and not stored.
 - Feeds collection (news) and on-demand reading (books) feed the same
   consolidation, distinguished by the `kind:` tag, not by their source.
 
-## Open questions
+## Owner answers (2026-10-19)
 
-1. **Which kinds to start with.** Proposed: `news` and `book`, the two
-   contrasting cases.
-2. **The classifier contract.** A `document.classify.v1` reading-host plugin
-   next to `document.extract.v1`, or part of the extractor's output. It must
-   be deterministic, or record its version, because tags are part of
-   Knowledge's content hash.
-3. **What consolidation keeps per kind.** For example:
-   - news: a date, entities and the claim with its source, and an expiry;
-   - book: structure per chapter and its main topic tags, kept durably.
-4. **The outcome of a reading experience.** Without a feedback signal,
-   experience learns nothing; step 08 measured this as the bottleneck.
-   Candidates:
-   - a follow-up question;
-   - searching for it again;
-   - an explicit rating;
-   - reuse in a conversation.
-5. **`book.*` and the CLI `book` command.** Keep them as aliases of read →
-   consolidate → (summarize on request), or remove them (breaking).
-6. **Tag budget.** Knowledge allows 20 tags. Provenance (`format:`, `reader:`),
-   the kind and topic tags all share it with the request's own tags.
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | Which kinds | Think beyond news and book; see the proposed set below |
+| 2 | Classifier contract | Still being discussed; see the proposal below |
+| 3 | What consolidation keeps | News does not expire. It is specific entities in a context anchored to a day, month and year. |
+| 4 | Outcome of a reading experience | Experience is knowing **how to talk about** each piece of retained knowledge: the way to express and discuss it depends on its kind |
+| 5 | `book.*` and the CLI | Remove the CLI `book` command |
+| 6 | Tag budget | As many tags as are needed to define the knowledge |
+
+### Consequences of the answers
+
+- **News is temporal, not perishable.** It is consolidated with:
+  - a date anchor (day, month and year it refers to);
+  - the entities involved;
+  - the context that links them.
+
+  It stays retrievable by date and entity; nothing expires.
+- **Experience is about expression.** What experience learns is how to speak
+  about a kind of knowledge: register, depth, structure, what to cite. This
+  moves the feedback signal into conversation: whether the way Ningo talked
+  about something worked. It links this record to the chat plan (chat as a
+  faculty) and to the hashtag finding of step 08 that an explicit tag alone
+  produced no feedback.
+- **Tags are not capped at a small number.** Knowledge allows 20 tags per
+  document today. Either that limit is raised, or the defining tags (`kind:`,
+  topics, entities, date) become their own structured fields, apart from
+  free-form request tags. This needs a schema review, which ADR 0003 requires
+  for a new store field.
+- **Removing the CLI `book` command** is a breaking change to an interface
+  command and is approved for that command. Retiring the `book.*` routes, the
+  Book domain and the Book service follows the same direction (ADR 0006), and
+  is done in the same change only if the owner confirms.
+
+## Proposal for question 1: kinds of knowledge
+
+Each kind says what consolidation keeps and how Ningo talks about it. The
+second column is what experience refines.
+
+| Kind | Consolidation keeps | How to talk about it | Typical sources |
+| --- | --- | --- | --- |
+| `news` | Entities, a date anchor (day, month and year), context, the claim and its source | Situate it in time, name who and what, separate fact from claim | Feeds, pages |
+| `book` | Structure (chapters), concepts and terms, the main argument or arc | By chapter or concept, with depth on request | EPUB, PDF |
+| `article` | Thesis, arguments, objections, conclusion | Argue with it: agree, object, compare | Pages, PDFs |
+| `reference` | Definitions, procedures, parameters, versions | Precise and literal, quote the exact term or step | Documentation, manuals |
+| `research` | Question, method, evidence, findings, limits | Cite the evidence and its limits; do not overstate | Papers |
+| `narrative` | Characters, events, setting, themes | Retell and interpret, without spoiling unless asked | Fiction, stories |
+| `note` | The owner's own words, kept as written | As the owner's view, never as an outside fact | The owner's notes |
+| `conversation` | Who said what, when, and what was agreed | Attribute to the speaker; do not merge voices | Chat history (WhatsApp, Discord) |
+| `meme` | The text, the labelled hashtag, the humor's reference | Play along; never explain it as fact | The meme pool (labelled examples today) |
+
+`book` and `article` describe form, while `narrative`, `research` and
+`reference` describe content. A book can be narrative or reference. The kinds
+may need two tags (form and content) instead of one; that is part of
+question 2.
+
+## Proposal for question 2: the classifier
+
+- **Where:** a reading-host plugin with its own capability,
+  `document.classify.v1`, next to `document.extract.v1`.
+  - Input: the extracted documents and the source's provenance.
+  - Output: `kind:` tags, defining tags (topics, entities, a date anchor for
+    news) and its own `id@version`.
+  - It is selected and replaced like an extractor: manifests, no code.
+- **Precedence:**
+  1. the user's explicit kind;
+  2. the classifier;
+  3. the source's default (a feed item is `news`, an EPUB is `book`);
+  4. `general`.
+
+  The stored tags record which of these decided (`kind-by:user`, and so on).
+- **Determinism:** tags are part of Knowledge's content hash, so the same
+  input must give the same tags, or the document is re-chunked and
+  re-embedded on every read. A model-based classifier records its version, and
+  a new version re-tags explicitly.
+- **First implementation:** source defaults plus deterministic rules (format,
+  feed origin, simple structure cues). A model, or the local agent CLI, can
+  replace it later through the same capability, judged by experience.
