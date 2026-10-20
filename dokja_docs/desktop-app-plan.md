@@ -18,8 +18,8 @@ owner works in; see "Workspace replan (2026-10-19)" at the end.
 ## Identity: a pattern, not a look
 
 The briefing patterns in this section are superseded by "Workspace replan (2026-10-19)". The rule that
-a reference gives patterns and never identity still holds, and the visual direction is open (see the
-replan's open questions).
+a reference gives patterns and never identity still holds, and so does the visual direction below
+(the owner kept it on 2026-10-19).
 
 The reference is only a source of interaction patterns. Ningo is the arrogant philosopher described in
 the [README](../README.md): talkative, well read, opinionated. It is not a hero.
@@ -61,7 +61,7 @@ Principles that stay:
 | Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. |
 | Voice | Visual only in v1. Voice comes after the digest works (Phase 4). |
 | Cards | Knowledge and books, memes, memory and health, plus the personal cards (weather, agenda, mail). Feeds are the first new card. |
-| Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. Reopened on 2026-10-19 by the workspace replan: it becomes a theme over the new layout, and whether to keep, tone down or replace it is an open question. |
+| Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. Kept by the owner on 2026-10-19: the workspace replan changes the layout, not the look. |
 
 ## Where it fits
 
@@ -463,7 +463,8 @@ code is taken.
   replacing it.
 
 Not taken: email, calendar, model management and side-by-side model comparison, and the reference's
-visual style.
+visual style. The look stays the dead-channel cyberpunk under Identity, applied to the new layout: the
+sidebar and the work area are the same chamfered panels, and neon still only means a state.
 
 ### Layout
 
@@ -535,9 +536,9 @@ this shell. They are not cards in a briefing.
 
 ### Open questions for the owner
 
-1. Look: keep cyberpunk as the theme over the new layout, tone it down to a quiet dark workspace, or
-   replace it?
-2. Morning briefing: drop it, or keep it as an optional "Today" workspace?
-3. Composer before chat: ship B0, a command line over existing actions, or wait for chat-plan?
-4. Tool panels: inside the one window only, or real OS windows? The second option reopens the
+Answered on 2026-10-19: the look stays cyberpunk.
+
+1. Morning briefing: drop it, or keep it as an optional "Today" workspace?
+2. Composer before chat: ship B0, a command line over existing actions, or wait for chat-plan?
+3. Tool panels: inside the one window only, or real OS windows? The second option reopens the
    "normal window" decision.
