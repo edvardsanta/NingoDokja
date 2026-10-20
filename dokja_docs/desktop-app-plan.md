@@ -443,8 +443,8 @@ Status: Phase A is built, on stacked branches: `feat/desktop-workspace` (the sid
 foot with the problem count, the dots, the new keys, and the memes picked in Messages instead of a
 workspace of their own), `feat/desktop-messages` (Messages as a messenger), `feat/desktop-knowledge-drop`
 (a file dropped anywhere on Knowledge) and `feat/desktop-names` (panels named after their workspaces,
-and an empty research base that says where a file goes). Phase B waits for the chat plan; Phase C is
-reshaped in three steps below.
+and an empty research base that says where a file goes). Phase B waits for the chat plan. Phase C is
+reshaped in three steps below; C1 is built on `feat/desktop-document-view`.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
