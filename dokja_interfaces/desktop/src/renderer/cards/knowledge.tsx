@@ -131,7 +131,13 @@ function KnowledgeStatusLines({ status }: { status: KnowledgeStatus }) {
   const similarity = similarityOf(status);
   return (
     <>
-      <p>{t("knowledge_counts", { documents: status.documents, chunks: status.chunks })}</p>
+      {status.documents === 0 ? (
+        <p className="note" data-tone="off">
+          {t("knowledge_empty")}
+        </p>
+      ) : (
+        <p>{t("knowledge_counts", { documents: status.documents, chunks: status.chunks })}</p>
+      )}
       <p className="note" data-tone={similarity === "on" ? "ok" : "unchecked"}>
         {similarity === "on" && t("knowledge_similarity_on", { model: status.embedModel })}
         {similarity === "off" && t("knowledge_similarity_off")}

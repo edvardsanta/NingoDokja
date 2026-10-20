@@ -21,7 +21,7 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
     return { ok: true, data: answer.result.channels.filter((row): row is CommunicationChannel => isRecord(row) && typeof row.id === "string" && typeof row.name === "string") };
   }, [transport]);
   const { state, reload } = useCard(load);
-  return <CardFrame kindLabel={t("kind_communications")} title={t("communications_title")} state={state} onReload={reload}>
+  return <CardFrame kindLabel={t("nav_messages")} title={t("communications_title")} state={state} onReload={reload}>
     {(channels) => channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={channels} transport={transport} active={active} />}
   </CardFrame>;
 }

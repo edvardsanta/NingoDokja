@@ -110,7 +110,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
   const link = useLink(transport, reload);
 
   return (
-    <CardFrame kindLabel={t("kind_health")} title={t("health_title")} state={state} onReload={refresh}>
+    <CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
       {(health) => (
         <HealthBody
           health={health}
