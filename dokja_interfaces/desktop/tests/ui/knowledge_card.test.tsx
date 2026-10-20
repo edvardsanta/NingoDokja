@@ -43,6 +43,14 @@ describe("the knowledge card", () => {
     expect(calls).toEqual([{ type: "knowledge.status", payload: {}, options: { timeoutMs: 15_000 } }]);
   });
 
+  it("says an empty base is empty and where a file goes, instead of counting nothing", async () => {
+    const { transport } = routedTransport({ "knowledge.status": ok({ ...KNOWLEDGE_STATUS, documents: 0, chunks: 0 }) });
+    renderCard(transport);
+
+    await screen.findByText("The research base is empty: drop a file anywhere here, or add a note or a web address below.");
+    expect(screen.queryByText(/documents in/)).toBeNull();
+  });
+
   it("says when similarity is off or down and when passages wait for an embedding", async () => {
     const off = routedTransport({ "knowledge.status": ok({ ...KNOWLEDGE_STATUS, embedderReachable: null }) });
     const view = renderCard(off.transport);

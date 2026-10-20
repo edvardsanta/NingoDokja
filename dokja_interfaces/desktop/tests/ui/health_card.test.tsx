@@ -145,7 +145,7 @@ describe("the health card", () => {
 
     await screen.findByText("1 no ar, 2 com problemas, 1 desligados, 1 sem verificação");
     screen.getByRole("heading", { name: "Serviços" });
-    screen.getByText("saúde");
+    screen.getByText("sistema");
     within(row("scheduler")).getByText("parado");
     screen.getByRole("button", { name: "Atualizar" });
   });

@@ -28,7 +28,7 @@ function entries(mounted: string[]): CardEntry[] {
       );
     };
   return [
-    { kind: "a", labelId: "kind_health", Card: card("a") },
+    { kind: "a", labelId: "kind_digest", Card: card("a") },
     { kind: "b", labelId: "kind_memory", Card: card("b") },
     { kind: "c", labelId: "kind_knowledge", Card: card("c") },
   ];
@@ -58,8 +58,8 @@ describe("the sidebar", () => {
 
     const list = screen.getByRole("tablist", { name: "Workspaces" });
     expect(list.getAttribute("aria-orientation")).toBe("vertical");
-    expect(screen.getAllByRole("tab").map((each) => each.textContent)).toEqual(["health", "memory", "knowledge"]);
-    expect(selected()).toEqual(["health"]);
+    expect(screen.getAllByRole("tab").map((each) => each.textContent)).toEqual(["digest", "memory", "knowledge"]);
+    expect(selected()).toEqual(["digest"]);
     screen.getByText("card a");
     expect(screen.queryByText("card b")).toBeNull();
     expect(new Set(mounted)).toEqual(new Set(["a"]));
@@ -78,7 +78,7 @@ describe("the sidebar", () => {
     renderTabs();
     fireEvent.click(screen.getByRole("button", { name: "count a: 0" }));
     fireEvent.click(tab("memory"));
-    fireEvent.click(tab("health"));
+    fireEvent.click(tab("digest"));
 
     screen.getByRole("button", { name: "count a: 1" });
     // every tab has its panel; the open one is the only one exposed, and the card of a tab that was
@@ -88,7 +88,7 @@ describe("the sidebar", () => {
     expect(document.body.textContent).toContain("card b");
     fireEvent.click(tab("memory"));
     fireEvent.click(screen.getByRole("button", { name: "count b: 0" }));
-    fireEvent.click(tab("health"));
+    fireEvent.click(tab("digest"));
     fireEvent.click(tab("memory"));
     screen.getByRole("button", { name: "count b: 1" });
   });
@@ -124,14 +124,14 @@ describe("the sidebar", () => {
 
     it("moves with the up and down arrows, wrapping at both ends, and focuses the entry they open", () => {
       renderTabs();
-      tab("health").focus();
+      tab("digest").focus();
 
       press("ArrowDown");
       expect(selected()).toEqual(["memory"]);
       expect(document.activeElement).toBe(tab("memory"));
       press("ArrowDown");
       press("ArrowDown");
-      expect(selected()).toEqual(["health"]);
+      expect(selected()).toEqual(["digest"]);
       press("ArrowUp");
       expect(selected()).toEqual(["knowledge"]);
       expect(document.activeElement).toBe(tab("knowledge"));
@@ -139,17 +139,17 @@ describe("the sidebar", () => {
 
     it("jumps to the first and last entry with Home and End", () => {
       renderTabs();
-      tab("health").focus();
+      tab("digest").focus();
 
       press("End");
       expect(selected()).toEqual(["knowledge"]);
       press("Home");
-      expect(selected()).toEqual(["health"]);
+      expect(selected()).toEqual(["digest"]);
     });
 
     it("keeps the page from scrolling on the keys it uses, and leaves the other keys alone", () => {
       renderTabs();
-      tab("health").focus();
+      tab("digest").focus();
 
       // fireEvent answers false when the event was cancelled
       for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
@@ -171,7 +171,7 @@ describe("the sidebar", () => {
       fireEvent.keyDown(document.body, { key: "3", ctrlKey: true });
       expect(selected()).toEqual(["knowledge"]);
       fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
-      expect(selected()).toEqual(["health"]);
+      expect(selected()).toEqual(["digest"]);
     });
 
     it("leaves alone a bare digit, a digit with no workspace, a zero, and other modifiers", () => {
@@ -201,7 +201,7 @@ describe("the sidebar", () => {
         dialog.remove();
       }
       fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
-      expect(selected()).toEqual(["health"]);
+      expect(selected()).toEqual(["digest"]);
     });
 
     it("types a bare digit into a field, and still opens a workspace on Ctrl and a digit from it", () => {
