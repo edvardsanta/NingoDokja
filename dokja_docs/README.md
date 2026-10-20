@@ -4,6 +4,7 @@ Project-level architecture and behavior notes.
 
 Available docs:
 
+- [Cognitive storage research and comparison](./cognitive-storage-research.md)
 - [Step 09 consolidation progress](./step-09-consolidation.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)

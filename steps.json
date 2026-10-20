@@ -680,7 +680,8 @@
       ],
       "deliverables": [
         "State ownership and migration decisions",
-        "Durable acceptance and recovery for selected workflows"
+        "Durable acceptance and recovery for selected workflows",
+        "Workload-driven cognitive storage comparison and evidence-backed engine decision (ADR 0009)"
       ],
       "acceptance_criteria": [
         "Each durable state kind has an owner, migration path, and rollback strategy.",
@@ -691,11 +692,23 @@
         "Decide where task traces and attempts are kept; today they are lost after the reply (step 08).",
         "Experience recording no longer depends on undurable background work, or its loss is defined (step 08).",
         "The Knowledge client's 5 s timeout no longer reports a stored document as failed (step 07).",
-        "Prediction feedback has a channel that produces resolved outcomes; evaluate a local agent CLI (Claude Code or Codex) before Ollama for judgment work, off the delivery path, keeping an embedder for recall (owner direction, step 08)."
+        "Prediction feedback has a channel that produces resolved outcomes; evaluate a local agent CLI (Claude Code or Codex) before Ollama for judgment work, off the delivery path, keeping an embedder for recall (owner direction, step 08).",
+        "Compare SQLite, PostgreSQL+pgvector and Neo4j on the cognitive graph workloads before selecting an engine; document correctness, filtered recall, bounded traversal, ownership, concurrency and recovery. Research alone does not authorize migration."
       ],
-      "evidence": [],
+      "evidence": [
+        "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet."
+      ],
       "checks": [],
-      "blockers": []
+      "blockers": [],
+      "research": {
+        "status": "completed",
+        "completed_on": "2026-10-19",
+        "document": "dokja_docs/cognitive-storage-research.md",
+        "decision": "dokja_docs/decisions/0009-cognitive-storage-evaluation.md",
+        "recommendation_status": "proposed",
+        "benchmarks": "not_run",
+        "next_action": "Define the first graph consumer and scope/durability requirements, then run an isolated correctness-first comparison. Step 10 implementation remains pending."
+      }
     },
     {
       "id": "11",

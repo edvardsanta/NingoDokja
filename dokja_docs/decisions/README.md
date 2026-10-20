@@ -17,6 +17,7 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 | [0007](./0007-faculties-not-features.md) | Macro-components are faculties; Book, Meme and Digest are workflows over them | Accepted as target direction; migration pending |
 | [0008](./0008-consolidation-by-kind-of-knowledge.md) | Separate form/content kinds with structured metadata; shared consolidation and summary methods | Representation accepted; Book retirement and provider/migration details open |
+| [0009](./0009-cognitive-storage-evaluation.md) | Compare explicit cognitive graph workloads on SQLite, PostgreSQL+pgvector and Neo4j before engine selection | Proposed; research complete, benchmark and adoption pending |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):

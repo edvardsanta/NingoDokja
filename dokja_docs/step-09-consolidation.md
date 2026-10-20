@@ -121,3 +121,9 @@ SQLite is the current incremental persistence mechanism under ADR 0003. This
 slice does not establish it as the long-term store for the cognitive graph.
 Evaluate graph traversals, provenance queries, temporal history, vector retrieval
 and operational requirements before choosing the target storage architecture.
+
+The follow-up [storage research](./cognitive-storage-research.md) and
+[ADR 0009 proposal](./decisions/0009-cognitive-storage-evaluation.md) now map the
+cognitive graph's target queries and compare database candidates. They recommend
+an isolated PostgreSQL+pgvector versus Neo4j spike with SQLite as baseline, not
+an immediate migration. Step 09.2 provider/classification work remains open.
