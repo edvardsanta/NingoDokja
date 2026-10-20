@@ -3,7 +3,8 @@
 import json
 from datetime import date
 
-FORMS = {"book", "article", "note", "conversation", "meme"}
+FORMS = {"book", "article", "note", "conversation", "meme", "paper", "list", "song", "report",
+         "letter", "manual", "liturgy", "law"}
 KINDS = {"news", "reference", "research", "narrative"}
 ORIGINS = {"user", "classifier", "source_default", "user_required"}
 FIELDS = {"form", "content_kind", "form_choice", "kind_choice", "topics", "entities",

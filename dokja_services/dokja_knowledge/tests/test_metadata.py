@@ -186,3 +186,9 @@ def test_pending_axes_survive_rereads_until_user_supplies_them(service):
     assert answered["metadata"]["kind_choice"]["origin"] == "user"
     assert answered["metadata_changed"] and not answered["changed"]
     assert chunks(service) == before
+
+
+@pytest.mark.parametrize("form", ["paper", "list", "song", "report", "letter", "manual", "liturgy", "law"])
+def test_the_new_forms_are_stored(service, form):
+    ingest(service, metadata=metadata(form=form))
+    assert service.list_documents({})["documents"][0]["metadata"]["form"] == form

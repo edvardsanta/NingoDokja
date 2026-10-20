@@ -119,13 +119,17 @@ func readingDefaults(format string) ClassificationValues {
 // classificationQuestions describes unresolved axes without assigning a type. A
 // persisted user_required choice survives rereads; only explicit user values patch it.
 func classificationQuestions(metadata map[string]any) map[string]any {
+	forms := make([]string, len(Forms))
+	for i, form := range Forms {
+		forms[i] = string(form)
+	}
 	missing := []string{}
 	questions := []map[string]any{}
 	for _, axis := range []struct {
 		field, question string
 		values          []string
 	}{
-		{"form", "What is the form of this document?", []string{"book", "article", "note", "conversation", "meme"}},
+		{"form", "What is the form of this document?", forms},
 		{"content_kind", "What type of content does this document contain?", []string{"news", "reference", "research", "narrative"}},
 	} {
 		value, _ := metadata[axis.field].(string)

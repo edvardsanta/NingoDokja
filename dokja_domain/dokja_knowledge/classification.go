@@ -15,7 +15,19 @@ const (
 	FormNote         Form = "note"
 	FormConversation Form = "conversation"
 	FormMeme         Form = "meme"
+	FormPaper        Form = "paper"
+	FormList         Form = "list"
+	FormSong         Form = "song"
+	FormReport       Form = "report"
+	FormLetter       Form = "letter"
+	FormManual       Form = "manual"
+	FormLiturgy      Form = "liturgy"
+	FormLaw          Form = "law"
 )
+
+// Forms is the form vocabulary, in the order questions offer it.
+var Forms = []Form{FormBook, FormArticle, FormNote, FormConversation, FormMeme, FormPaper, FormList,
+	FormSong, FormReport, FormLetter, FormManual, FormLiturgy, FormLaw}
 
 // ContentKind describes how knowledge is discussed, independently of its source format.
 type ContentKind string
@@ -158,9 +170,10 @@ func proposalAxis(proposal *ClassifierProposal, form bool) string {
 }
 
 func validForm(value string) bool {
-	switch Form(value) {
-	case FormBook, FormArticle, FormNote, FormConversation, FormMeme:
-		return true
+	for _, form := range Forms {
+		if Form(value) == form {
+			return true
+		}
 	}
 	return false
 }

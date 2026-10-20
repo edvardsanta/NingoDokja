@@ -30,7 +30,23 @@ import urllib.request
 from datetime import date
 
 OPERATION = "document.classify.v1"
-FORMS = ["book", "article", "note", "conversation", "meme"]
+# Form describes structure, not subject; the same order and meaning as Knowledge's vocabulary.
+FORM_MEANINGS = {
+    "book": "a book or a chapter of one",
+    "article": "a news piece, blog post or magazine article",
+    "note": "the owner's own notes or a short memo",
+    "conversation": "a chat or message exchange between people",
+    "meme": "a meme caption",
+    "paper": "academic work: thesis, monograph, final course paper, scientific article",
+    "list": "a list or table as the main content, such as a catalog or price list",
+    "song": "lyrics, a chord chart or sheet music with words",
+    "report": "a technical or progress report, test or simulation results",
+    "letter": "correspondence: a letter, official letter, request or reply",
+    "manual": "a manual, handout, guide or course notes",
+    "liturgy": "a liturgy sheet or office: readings, prayers and chants in order",
+    "law": "a legal text: statute, decree, ordinance",
+}
+FORMS = list(FORM_MEANINGS)
 KINDS = ["news", "reference", "research", "narrative"]
 # The whole batch a model reads; each document gets an equal share, at least MIN_SAMPLE.
 BATCH_CHARS = 48_000
@@ -43,10 +59,12 @@ TOTAL_BUDGET = 160
 CODEX_DISABLED = ["shell_tool", "unified_exec", "apps", "browser_use", "computer_use",
                   "in_app_browser"]
 
+FORM_LINES = "\n".join(f"  - {name}: {meaning}" for name, meaning in FORM_MEANINGS.items())
 INSTRUCTIONS = f"""You classify documents for a personal knowledge base.
 
 For each document, in the same order, answer:
-- form, the document's structure: one of {", ".join(FORMS)}.
+- form, the document's structure, one of:
+{FORM_LINES}
 - content_kind, how its knowledge is discussed: one of {", ".join(KINDS)}.
 - uncertain_form and uncertain_content_kind: true when the text does not make that axis
   clear. Then set the value to null. Prefer uncertain over a guess.

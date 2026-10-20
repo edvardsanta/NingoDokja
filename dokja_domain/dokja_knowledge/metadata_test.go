@@ -149,3 +149,20 @@ func TestPendingQuestionsUseTheEffectiveMetadataForEachDocument(t *testing.T) {
 		t.Fatalf("result=%#v", result)
 	}
 }
+
+func TestEveryFormIsAcceptedAndOfferedToTheUser(t *testing.T) {
+	want := []string{"book", "article", "note", "conversation", "meme", "paper", "list", "song", "report",
+		"letter", "manual", "liturgy", "law"}
+	for _, form := range want {
+		if _, err := ResolveClassification(ClassificationInput{Explicit: ClassificationValues{Form: Form(form)}}); err != nil {
+			t.Errorf("form %q: %v", form, err)
+		}
+	}
+	questions := classificationQuestions(map[string]any{})["questions"].([]map[string]any)
+	if !reflect.DeepEqual(questions[0]["allowed_values"], want) {
+		t.Fatalf("the form question must offer the whole vocabulary: %v", questions[0]["allowed_values"])
+	}
+	if _, err := ResolveClassification(ClassificationInput{Explicit: ClassificationValues{Form: "pdf"}}); err == nil {
+		t.Fatal("a file format is still not a form")
+	}
+}

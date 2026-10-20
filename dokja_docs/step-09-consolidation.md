@@ -17,7 +17,7 @@ separate from free-form tags during this step.
 
 | Responsibility | Behavior |
 | --- | --- |
-| Form | `book`, `article`, `note`, `conversation`, or `meme` |
+| Form | `book`, `article`, `note`, `conversation`, `meme`, `paper`, `list`, `song`, `report`, `letter`, `manual`, `liturgy` or `law` |
 | Content kind | `news`, `reference`, `research`, or `narrative` |
 | Precedence per axis | Explicit user value; automatic proposals/defaults only absent uncertainty; otherwise ask the user |
 | Unspecified value | Makes no claim; lower-priority sources may supply that axis |
@@ -360,3 +360,13 @@ classifier has seen its current content, and changed content clears that record.
 After the fix, rereading the four classified each one in about 5 s without
 storing them again. Regression tests cover a failed classification followed by
 a reread, and no further call once classified.
+
+### More forms
+
+The owner then added `paper`, `list`, `song`, `report`, `letter`, `manual`,
+`liturgy` and `law` to the form vocabulary (ADR 0008). The Knowledge domain keeps
+one ordered list that both validation and the user's question use; the storage
+service and the `agent-kinds` prompt follow, and the prompt now says what each
+form means. On four made-up documents Claude Code answered `song`, `law`, `list`
+and `letter`. Content kinds are unchanged. Stored documents keep their labels; a
+form question still pending now offers the new values.

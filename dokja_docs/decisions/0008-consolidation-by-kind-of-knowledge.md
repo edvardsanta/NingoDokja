@@ -29,7 +29,7 @@ Treat these axes separately:
 | Axis | Examples | Decides | Owner |
 | --- | --- | --- | --- |
 | Source and format | PDF, EPUB, feed item, page | How to read | Reading host (step 07) |
-| Form | book, article, note, conversation, meme | The document's structure and attribution | Knowledge |
+| Form | book, article, note, conversation, meme, paper, list, song, report, letter, manual, liturgy, law | The document's structure and attribution | Knowledge |
 | Content kind | news, reference, research, narrative | How to consolidate, and which summary method applies | Knowledge (methods are data) |
 | Goal | study, stay informed, quick reference | Which part of the method matters | The request |
 | Experience | "a technical book read to study: per-chapter concepts worked" | Which way of applying the method to choose | Experience (Memory) |
@@ -226,6 +226,11 @@ way twice. So:
   settings and hooks (the owner's hooks would otherwise capture the text), and
   Codex disables its shell, which reads files even in its read-only sandbox.
 
+- **More forms:** after the live check left lists, monographs, songs and liturgy
+  sheets as questions, the owner added `paper`, `list`, `song`, `report`,
+  `letter`, `manual`, `liturgy` and `law` to the form vocabulary. Form still
+  describes structure, not subject; content kinds are unchanged.
+
 ## Owner decisions on representation (2026-10-19)
 
 The owner selected **structured metadata separate from free-form tags** and,
@@ -237,7 +242,7 @@ Initial domain vocabulary:
 
 | Axis | Values |
 | --- | --- |
-| Form | `book`, `article`, `note`, `conversation`, `meme` |
+| Form | `book`, `article`, `note`, `conversation`, `meme`, `paper`, `list`, `song`, `report`, `letter`, `manual`, `liturgy`, `law` |
 | Content kind | `news`, `reference`, `research`, `narrative` |
 
 File formats such as PDF and EPUB remain source/reader provenance. Topics such

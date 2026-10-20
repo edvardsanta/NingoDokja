@@ -625,7 +625,8 @@
             "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier.",
             "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54).",
             "Owner chose an agent classifier (2026-10-20): Claude Code, then Codex, then Ollama; every form may be sent; Feeds runs on the owner's machine. plugins.example/agent-kinds implements the chain with CLI isolation verified by canary files; the host names the answering provider in the version. See dokja_docs/step-09-consolidation.md#agent-classifier.",
-            "Live check 2026-10-20 (host Feeds over a unix socket, isolated lite stack): 8 of 9 owner files classified by claude.haiku-5-5 in 4.8-6.3 s, no label judged wrong, 5 axes left as questions (form vocabulary gaps); a reread made no call. It found that a document stored past the Knowledge client's 5 s timeout was never classified; the stored classifier record is now the cache, verified live. See dokja_docs/step-09-consolidation.md#live-check."
+            "Live check 2026-10-20 (host Feeds over a unix socket, isolated lite stack): 8 of 9 owner files classified by claude.haiku-5-5 in 4.8-6.3 s, no label judged wrong, 5 axes left as questions (form vocabulary gaps); a reread made no call. It found that a document stored past the Knowledge client's 5 s timeout was never classified; the stored classifier record is now the cache, verified live. See dokja_docs/step-09-consolidation.md#live-check.",
+            "Owner added the forms paper, list, song, report, letter, manual, liturgy and law (ADR 0008); domain, storage service and agent-kinds prompt updated with tests."
           ],
           "checks": [
             {
@@ -673,7 +674,6 @@
           "worktree": ".worktrees/agent-classifier",
           "branch": "feat/agent-classifier",
           "remaining": [
-            "Decide whether the form vocabulary needs more values (lists, monographs, songs, liturgy sheets were left as questions in the live check).",
             "Pick an Ollama chat model for the last fallback.",
             "Add explicit provider reclassification of stored documents for a new classifier version.",
             "Wire classification questions/answers into desktop and chat interfaces; CLI and API continuation are implemented.",
