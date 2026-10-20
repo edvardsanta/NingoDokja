@@ -45,7 +45,7 @@ func (r *ingestRecorder) Dispatch(_ context.Context, eventType string, payload m
 	if r.failAt == len(r.payloads) {
 		return nil, errors.New("body is larger than 2000000 characters")
 	}
-	return map[string]any{"source_id": payload["source_id"], "changed": r.changed}, nil
+	return map[string]any{"source_id": payload["source_id"], "changed": r.changed, "metadata": payload["metadata"]}, nil
 }
 
 func readAnswer(texts ...string) map[string]any {
@@ -89,7 +89,7 @@ func TestKnowledgeReadStoresWhatTheReadingHostRead(t *testing.T) {
 		t.Fatalf("payloads=%#v", knowledge.payloads)
 	}
 	metadata := knowledge.payloads[0]["metadata"].(map[string]any)
-	if metadata["form"] != "general" || metadata["content_kind"] != "general" {
+	if metadata["form"] != nil || metadata["content_kind"] != nil {
 		t.Fatalf("metadata=%#v", metadata)
 	}
 	delete(knowledge.payloads[0], "metadata")
@@ -99,6 +99,12 @@ func TestKnowledgeReadStoresWhatTheReadingHostRead(t *testing.T) {
 	}
 
 	answer := result.Result["knowledge"].(map[string]any)
+	documents := answer["documents"].([]map[string]any)
+	classification := documents[0]["classification"].(map[string]any)
+	if classification["status"] != "pending" || classification["needs_user_input"] != true || len(classification["questions"].([]map[string]any)) != 2 {
+		t.Fatalf("reading must return unresolved questions to the user: %#v", classification)
+	}
+
 	task := answer["task"].(core.TaskResult)
 	if answer["count"] != 1 || answer["reader"] != "knowledge-extractors" || answer["format"] != ".pdf" ||
 		task.Status != core.TaskCompleted || len(task.Steps) != 2 || task.Steps[0].Name != "read" || task.Steps[1].Name != "ingest" {

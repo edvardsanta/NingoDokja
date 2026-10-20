@@ -3,9 +3,9 @@
 import json
 from datetime import date
 
-FORMS = {"general", "book", "article", "note", "conversation", "meme"}
-KINDS = {"general", "news", "reference", "research", "narrative"}
-ORIGINS = {"user", "classifier", "source_default", "general"}
+FORMS = {"book", "article", "note", "conversation", "meme"}
+KINDS = {"news", "reference", "research", "narrative"}
+ORIGINS = {"user", "classifier", "source_default", "user_required"}
 FIELDS = {"form", "content_kind", "form_choice", "kind_choice", "topics", "entities",
           "date_anchor", "reading"}
 
@@ -15,7 +15,7 @@ def encode_metadata(value):
     if not isinstance(value, dict) or set(value) - FIELDS:
         raise ValueError("metadata must be an object with supported fields")
     for key, allowed in (("form", FORMS), ("content_kind", KINDS)):
-        if key in value and (not isinstance(value[key], str) or value[key] not in allowed):
+        if key in value and value[key] is not None and (not isinstance(value[key], str) or value[key] not in allowed):
             raise ValueError(f"metadata {key} is unsupported")
     for key in ("form_choice", "kind_choice"):
         if key not in value:
@@ -33,6 +33,11 @@ def encode_metadata(value):
             choice.get(k, "").strip() for k in ("classifier_id", "classifier_version")
         ):
             raise ValueError("metadata classifier identity and version are required")
+    for axis, key in (("form", "form_choice"), ("content_kind", "kind_choice")):
+        if axis in value and key in value:
+            pending = value[key]["origin"] == "user_required"
+            if pending != (value[axis] is None):
+                raise ValueError("metadata axis and classification provenance disagree")
     if "topics" in value and (not isinstance(value["topics"], list) or any(
         not isinstance(t, str) or not t.strip() for t in value["topics"]
     )):

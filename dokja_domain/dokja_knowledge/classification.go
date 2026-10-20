@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -9,7 +10,6 @@ import (
 type Form string
 
 const (
-	FormGeneral      Form = "general"
 	FormBook         Form = "book"
 	FormArticle      Form = "article"
 	FormNote         Form = "note"
@@ -21,7 +21,6 @@ const (
 type ContentKind string
 
 const (
-	ContentGeneral   ContentKind = "general"
 	ContentNews      ContentKind = "news"
 	ContentReference ContentKind = "reference"
 	ContentResearch  ContentKind = "research"
@@ -31,10 +30,10 @@ const (
 type ClassificationOrigin string
 
 const (
-	OriginUser       ClassificationOrigin = "user"
-	OriginClassifier ClassificationOrigin = "classifier"
-	OriginSource     ClassificationOrigin = "source_default"
-	OriginGeneral    ClassificationOrigin = "general"
+	OriginUser         ClassificationOrigin = "user"
+	OriginClassifier   ClassificationOrigin = "classifier"
+	OriginSource       ClassificationOrigin = "source_default"
+	OriginUserRequired ClassificationOrigin = "user_required"
 )
 
 // ClassificationValues may name either axis or both. Empty values make no claim.
@@ -48,15 +47,20 @@ type ClassificationValues struct {
 // before either axis can be attributed to it. Validation happens per axis, so an
 // invalid content kind does not discard a valid form (or vice versa).
 type ClassifierProposal struct {
-	Values  ClassificationValues
-	ID      string
-	Version string
+	Values               ClassificationValues
+	ID                   string
+	Version              string
+	UncertainForm        bool
+	UncertainContentKind bool
+	Unavailable          bool
 }
 
 type ClassificationInput struct {
-	Explicit      ClassificationValues
-	Classifier    *ClassifierProposal
-	SourceDefault ClassificationValues
+	Explicit                ClassificationValues
+	Classifier              *ClassifierProposal
+	SourceDefault           ClassificationValues
+	AwaitingUserForm        bool
+	AwaitingUserContentKind bool
 }
 
 // ClassificationChoice keeps provenance separate from both the selected value and
@@ -78,17 +82,17 @@ type Classification struct {
 	KindChoice  ClassificationChoice `json:"kind_choice"`
 }
 
-// ResolveClassification applies user > classifier > source default > general per
-// axis. Invalid explicit values and source configuration are errors; invalid provider
-// values fall back. It does not call a model, infer labels from text, or write storage.
+// ResolveClassification applies explicit user input first. Missing or uncertain axes
+// remain unresolved and require the user; a default cannot resolve uncertainty.
+// It does not call a model, infer labels from text, or write storage.
 func ResolveClassification(input ClassificationInput) (Classification, error) {
 	form, err := resolveAxis(string(input.Explicit.Form), string(input.SourceDefault.Form),
-		proposalAxis(input.Classifier, true), input.Classifier, validForm, "form")
+		proposalAxis(input.Classifier, true), input.Classifier, validForm, "form", input.AwaitingUserForm || (input.Classifier != nil && (input.Classifier.UncertainForm || input.Classifier.Unavailable)))
 	if err != nil {
 		return Classification{}, err
 	}
 	kind, err := resolveAxis(string(input.Explicit.ContentKind), string(input.SourceDefault.ContentKind),
-		proposalAxis(input.Classifier, false), input.Classifier, validContentKind, "content kind")
+		proposalAxis(input.Classifier, false), input.Classifier, validContentKind, "content kind", input.AwaitingUserContentKind || (input.Classifier != nil && (input.Classifier.UncertainContentKind || input.Classifier.Unavailable)))
 	if err != nil {
 		return Classification{}, err
 	}
@@ -103,7 +107,7 @@ type axisResolution struct {
 	choice ClassificationChoice
 }
 
-func resolveAxis(explicit, source, proposed string, classifier *ClassifierProposal, valid func(string) bool, axis string) (axisResolution, error) {
+func resolveAxis(explicit, source, proposed string, classifier *ClassifierProposal, valid func(string) bool, axis string, awaitingUser bool) (axisResolution, error) {
 	explicit, source, proposed = normalizeLabel(explicit), normalizeLabel(source), normalizeLabel(proposed)
 	if explicit != "" {
 		if !valid(explicit) {
@@ -112,6 +116,9 @@ func resolveAxis(explicit, source, proposed string, classifier *ClassifierPropos
 		return axisResolution{value: explicit, choice: ClassificationChoice{Origin: OriginUser}}, nil
 	}
 
+	if awaitingUser {
+		return unresolvedAxis("user_clarification_required"), nil
+	}
 	reason := ""
 	if proposed != "" {
 		switch {
@@ -126,13 +133,16 @@ func resolveAxis(explicit, source, proposed string, classifier *ClassifierPropos
 			}}, nil
 		}
 	}
+	if reason != "" {
+		return unresolvedAxis(reason), nil
+	}
 	if source != "" {
 		if !valid(source) {
 			return axisResolution{}, fmt.Errorf("unsupported source-default %s", axis)
 		}
 		return axisResolution{value: source, choice: ClassificationChoice{Origin: OriginSource, FallbackReason: reason}}, nil
 	}
-	return axisResolution{value: "general", choice: ClassificationChoice{Origin: OriginGeneral, FallbackReason: reason}}, nil
+	return unresolvedAxis("classification_missing"), nil
 }
 
 func normalizeLabel(value string) string { return strings.ToLower(strings.TrimSpace(value)) }
@@ -149,7 +159,7 @@ func proposalAxis(proposal *ClassifierProposal, form bool) string {
 
 func validForm(value string) bool {
 	switch Form(value) {
-	case FormGeneral, FormBook, FormArticle, FormNote, FormConversation, FormMeme:
+	case FormBook, FormArticle, FormNote, FormConversation, FormMeme:
 		return true
 	}
 	return false
@@ -157,8 +167,25 @@ func validForm(value string) bool {
 
 func validContentKind(value string) bool {
 	switch ContentKind(value) {
-	case ContentGeneral, ContentNews, ContentReference, ContentResearch, ContentNarrative:
+	case ContentNews, ContentReference, ContentResearch, ContentNarrative:
 		return true
 	}
 	return false
+}
+
+// Empty axes serialize as null, never as an invented knowledge category.
+func (f Form) MarshalJSON() ([]byte, error) {
+	if f == "" {
+		return []byte("null"), nil
+	}
+	return json.Marshal(string(f))
+}
+func (k ContentKind) MarshalJSON() ([]byte, error) {
+	if k == "" {
+		return []byte("null"), nil
+	}
+	return json.Marshal(string(k))
+}
+func unresolvedAxis(reason string) axisResolution {
+	return axisResolution{choice: ClassificationChoice{Origin: OriginUserRequired, FallbackReason: reason}}
 }

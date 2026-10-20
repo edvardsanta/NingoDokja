@@ -129,5 +129,9 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 			return nil, fmt.Errorf("%s is required", field)
 		}
 	}
-	return d.service.Dispatch(ctx, eventType, payload)
+	result, err := d.service.Dispatch(ctx, eventType, payload)
+	if err == nil {
+		annotateClassification(result)
+	}
+	return result, err
 }

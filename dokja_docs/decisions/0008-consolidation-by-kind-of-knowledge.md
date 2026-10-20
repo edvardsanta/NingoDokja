@@ -45,8 +45,13 @@ Order of precedence, independently for each classification axis:
 
 1. the user's explicit value;
 2. the source's classifier;
-3. the source's default (for example, a feed can propose article/news, an EPUB book/general);
-4. `general`.
+3. the source's default, only when that axis has no uncertainty (for example,
+   EPUB can identify the book form without identifying the content kind);
+4. leave the axis unresolved and ask the user.
+
+**Owner correction:** `general` is not a form or content kind. Once an axis is
+uncertain, only explicit user input may resolve it; no classifier retry or source
+default answers that question. Other classified axes are retained.
 
 Each axis records which of these decided it, so experience can later judge the
 classifier. Choosing the form explicitly must not make the content kind appear
@@ -140,8 +145,12 @@ question 2.
 - **Precedence (per axis):**
   1. the user's explicit kind;
   2. the classifier;
-  3. the source's default (a feed item is `news`, an EPUB is `book`);
-  4. `general`.
+  3. an unambiguous source default (EPUB form can be `book`; feed origin does
+     not establish a content kind);
+  4. an unresolved axis with a question for the user.
+
+  Uncertainty takes precedence over automatic fallback: only the user's answer
+  resolves that axis.
 
   The structured provenance records which of these decided each value.
 - **Determinism:** tags are part of Knowledge's content hash, so the same
@@ -195,8 +204,8 @@ way twice. So:
   - output validated against the contract (allowed kinds, tag syntax and
     count).
 
-  If the agent fails, the rule-based default (source default, then `general`)
-  is used and recorded.
+  If the agent fails, classification remains pending for the user, with a
+  recorded reason and no automatic fallback.
 
 ## Owner decisions on representation (2026-10-19)
 
@@ -209,29 +218,33 @@ Initial domain vocabulary:
 
 | Axis | Values |
 | --- | --- |
-| Form | `book`, `article`, `note`, `conversation`, `meme`, `general` |
-| Content kind | `news`, `reference`, `research`, `narrative`, `general` |
+| Form | `book`, `article`, `note`, `conversation`, `meme` |
+| Content kind | `news`, `reference`, `research`, `narrative` |
 
 File formats such as PDF and EPUB remain source/reader provenance. Topics such
 as physics remain defining metadata, not additional form/content kinds. Each
-axis supports an unspecified proposal and an explicit `general` value; those
-have different precedence semantics.
+axis may remain unspecified (`null`). Unspecified is a classification state,
+not a taxonomy value. The owner rejected the earlier `general` category.
 
 The first implementation is the internal
 [Knowledge classification contract](../../dokja_domain/dokja_knowledge/classification.go):
-user values win, then valid versioned classifier proposals, then source defaults,
-then `general`, evaluated independently per axis. Invalid explicit values or
-selected source defaults are rejected. An invalid classifier axis falls back
-without discarding the other valid axis; a proposal needs provider ID/version
+user values win. Valid versioned classifier proposals and unambiguous source
+defaults can supply an axis that is not awaiting clarification. Missing, uncertain
+or invalid classifier output leaves that axis pending for the user, without
+discarding the other valid axis. Invalid explicit values or selected source
+defaults are rejected; a proposal needs provider ID/version
 before it can be attributed. Diagnostics use fixed reason codes.
 
-This contract does not classify text, invoke a provider, select a summary method,
-or persist metadata yet. It also does not redefine existing public `kind` values
-such as `meme_hashtag`, whose isolation semantics remain in force.
+The resolver does not classify text or invoke a provider. Step 09.2 now persists
+nullable axes and provenance and returns domain-owned classification questions
+alongside the effective stored metadata. Pending state is not a knowledge kind.
+Existing public `kind` values such as `meme_hashtag` retain their isolation
+semantics.
 
-Persistence follows in step `09.2`, including additive schema and rollback review,
-legacy-document behavior, classification reuse by content/classifier version,
-and metadata updates that avoid unnecessary re-embedding. Earlier sections that
+The step `09.2` foundation implements persistence, legacy-document projection,
+schema/rollback review and metadata updates without unnecessary re-embedding.
+Provider-backed classification, versioned inference reuse and conversational
+continuation remain pending. Earlier sections that
 describe tags participating in the content hash characterize the current service
 and original proposal; they do not require re-embedding content on every metadata
 change. Reading-host integration and provider failure behavior are separate work.

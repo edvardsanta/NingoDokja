@@ -199,6 +199,7 @@ class KnowledgeService:
                                 if metadata is not None else False)
             return {"source_id": source_id, "created": False, "changed": False,
                     "metadata_changed": metadata_changed,
+                    "metadata": json.loads(self.store.get_metadata(existing["id"])),
                     "pending_embeddings": len(self.store.chunks_needing_embedding(self.model))}
         chunks = chunk_text(body)
         if not chunks:
@@ -207,7 +208,8 @@ class KnowledgeService:
             source_id, title, kind, source_ref, ",".join(tags), digest, chunks, metadata or "{}"
         )
         return {"source_id": source_id, "document_id": document_id, "created": created,
-                "changed": True, "chunks": len(chunks)}
+                "changed": True, "chunks": len(chunks),
+                "metadata": json.loads(self.store.get_metadata(document_id))}
 
     # ---- where the text comes from --------------------------------------------------
 

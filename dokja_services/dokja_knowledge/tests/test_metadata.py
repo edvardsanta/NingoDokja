@@ -72,8 +72,8 @@ def test_reading_reread_preserves_user_choices_and_patches_only_supplied_axes(se
     first = metadata(reading={"format": "pdf", "reader": "test", "reader_version": "1"})
     ingest(service, metadata=first)
     before = chunks(service)
-    defaults = {"form": "general", "content_kind": "general", "form_choice": {"origin": "general"},
-                "kind_choice": {"origin": "general"}, "reading": first["reading"]}
+    defaults = {"form": None, "content_kind": None, "form_choice": {"origin": "user_required"},
+                "kind_choice": {"origin": "user_required"}, "reading": first["reading"]}
     result = ingest(service, metadata=defaults, metadata_if_unchanged={"reading": first["reading"]})
     assert result["metadata_changed"] is False
     assert service.list_documents({})["documents"][0]["metadata"] == first
@@ -88,7 +88,9 @@ def test_reading_reread_preserves_user_choices_and_patches_only_supplied_axes(se
     assert service.list_documents({})["documents"][0]["metadata"] == defaults
 
 
-@pytest.mark.parametrize("bad", [None, [], "research", {"form": "pdf"}, {"content_kind": []},
+@pytest.mark.parametrize("bad", [None, [], "research", {"form":"general"}, {"content_kind":"general"}, {"form": "pdf"}, {"content_kind": []},
+    {"form":"book", "form_choice":{"origin":"user_required"}},
+    {"content_kind":None, "kind_choice":{"origin":"user"}},
     {"topics": [3]}, {"entities": [{"type": "person"}]}, {"date_anchor": "2026-02-30"},
     {"date_anchor": "20261019"}, {"form_choice": {"origin": "classifier"}},
     {"reading": {"format": "pdf"}}, {"unknown": True}, {"topics": ["x" * 65537]},
@@ -162,3 +164,23 @@ def test_older_build_refuses_newer_schema(tmp_path, monkeypatch):
     monkeypatch.setattr("store.MIGRATIONS", [MIGRATIONS[0]])
     with pytest.raises(RuntimeError, match="newer than this build understands"):
         Store(path)
+
+
+def test_pending_axes_survive_rereads_until_user_supplies_them(service):
+    reading = {"format": "pdf", "reader": "test", "reader_version": "1"}
+    pending = {"form": "book", "content_kind": None, "form_choice": {"origin": "user"},
+               "kind_choice": {"origin": "user_required"}, "reading": reading}
+    first = ingest(service, metadata=pending)
+    assert first["metadata"] == pending
+    before = chunks(service)
+    # Even a new source default must not answer a question pending for the user.
+    defaults = metadata(reading=reading)
+    defaults.pop("topics")
+    again = ingest(service, metadata=defaults, metadata_if_unchanged={"reading": reading})
+    assert again["metadata"] == pending
+    answered = ingest(service, metadata=defaults, metadata_if_unchanged={
+        "content_kind": "research", "kind_choice": {"origin": "user"}})
+    assert answered["metadata"]["content_kind"] == "research"
+    assert answered["metadata"]["kind_choice"]["origin"] == "user"
+    assert answered["metadata_changed"] and not answered["changed"]
+    assert chunks(service) == before

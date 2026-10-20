@@ -147,6 +147,7 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 		if err != nil {
 			return stored, err
 		}
+		annotateClassification(result)
 		stored = append(stored, result)
 	}
 	return stored, nil

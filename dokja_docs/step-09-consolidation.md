@@ -17,13 +17,13 @@ separate from free-form tags during this step.
 
 | Responsibility | Behavior |
 | --- | --- |
-| Form | `book`, `article`, `note`, `conversation`, `meme`, or `general` |
-| Content kind | `news`, `reference`, `research`, `narrative`, or `general` |
-| Precedence per axis | Explicit user value, valid versioned classifier proposal, source default, `general` |
+| Form | `book`, `article`, `note`, `conversation`, or `meme` |
+| Content kind | `news`, `reference`, `research`, or `narrative` |
+| Precedence per axis | Explicit user value; automatic proposals/defaults only absent uncertainty; otherwise ask the user |
 | Unspecified value | Makes no claim; lower-priority sources may supply that axis |
-| Explicit `general` | An actual user choice; providers cannot overwrite it |
+| Missing or uncertain axis | `null`, with `user_required` provenance; only the user resolves uncertainty |
 | Invalid user/default value | Refused when selected; never silently treated as a valid kind |
-| Invalid provider value | That axis falls back with a fixed reason code; the other valid axis can still be used |
+| Invalid provider value | That axis stays pending with a fixed reason code; the other valid axis can still be used |
 | Provider provenance | Provider ID and version required before attributing a value to the classifier |
 | File format | Kept outside form/content classification; PDF is not a content kind or form |
 
@@ -46,8 +46,8 @@ metadata. This is an internal domain contract, not a new API payload.
 ### Verification
 
 [Classification tests](../dokja_domain/dokja_knowledge/classification_test.go)
-cover independent axes, mixed provenance, user precedence, normalization, explicit
-`general`, cold start, partial proposals, invalid provider output/identity, invalid
+cover independent axes, mixed provenance, user precedence, normalization, rejected
+`general` labels, nullable cold start, partial proposals, invalid provider output/identity, invalid
 user/source values, and subject-kind preservation across forms.
 
 - Knowledge module: `go test -race ./...` and `go vet ./...` passed.
@@ -90,7 +90,8 @@ there are no envelope, route, command, configuration or compose changes.
 The substep remains in progress: a provider-backed reading-time classifier,
 content/model-version cache and explicit reclassification are not connected.
 The existing resolver can validate classifier proposals, but the integration in
-this slice uses explicit user assertions, source defaults and general fallback.
+this slice uses explicit user assertions and unambiguous source defaults. Missing
+axes stay pending for the user; no general fallback is used.
 The stable reread tests establish preservation behavior, not model quality.
 
 The remainder of step `09` also includes generic summary/consolidation methods,
@@ -127,3 +128,35 @@ The follow-up [storage research](./cognitive-storage-research.md) and
 cognitive graph's target queries and compare database candidates. They recommend
 an isolated PostgreSQL+pgvector versus Neo4j spike with SQLite as baseline, not
 an immediate migration. Step 09.2 provider/classification work remains open.
+
+## Owner correction: uncertainty belongs to the user
+
+The owner rejected `general` and confirmed that only the user answers uncertain
+classification. The form/content vocabularies no longer contain that label.
+Unresolved axes serialize as `null` with `user_required` provenance. The domain
+returns a `classification` result with `status: pending`, `needs_user_input`,
+`missing_axes` and questions for the missing axes. Fully specified metadata yields
+`status: classified` and no questions. These status fields are derived from the
+effective stored metadata, not persisted as independently mutable labels.
+
+A provider can mark an axis uncertain or the provider unavailable; an existing
+user-required flag also prevents automatic resolution. Explicit user input wins.
+Invalid proposals do not fall through to source defaults. Unchanged rereads keep
+pending nulls and earlier valid axes; an explicit answer patches that axis and
+its provenance without replacing embeddings. This does not add a model provider
+or an interactive conversation-resumption mechanism: questions are returned in
+the existing API result for the interface/caller to present. Provider and
+interface continuation work remains in 09.2.
+
+Compatibility: this intentionally revises the new draft metadata contract on
+PR #53, as directed by the owner; legacy public `kind` values are unchanged. No
+new route, SQL migration, environment variable or compose change is introduced.
+Older experimental `general` metadata must be replaced by explicit user labels
+or null axes through reingestion; no owner database is rewritten here.
+
+Verification for the owner correction: Knowledge service **148 passed, 8 skipped**
+(live Ollama); Knowledge domain `go test -race ./...` and `go vet ./...` passed;
+orchestrator `go test ./... -count=1` passed. Coverage includes rejection of
+`general`, null serialization, invalid/uncertain/unavailable provider output,
+user-only resolution, per-document questions, preserved resolved axes and
+unchanged embeddings after a user answer.

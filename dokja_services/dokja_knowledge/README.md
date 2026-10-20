@@ -43,9 +43,18 @@ The Go Knowledge domain resolves classification and adds `form_choice` and
 `kind_choice` provenance. Callers cannot supply provenance. `knowledge.read` also
 records `reading` (`format`, `reader`, `reader_version`). EPUB/MOBI default to book;
 HTML/RSS/Atom default to article; PDF supplies no form default. Formats never
-imply a content kind. No model classifier is connected in this slice.
+imply a content kind. Missing or uncertain axes are `null`; `general` is not a
+classification value. Only explicit user input resolves an uncertain axis. No model classifier is connected in this slice.
 
-The storage service validates structure and persists the resolved object. Search
+The storage service validates structure and persists the resolved object.
+Unresolved axes use `user_required` provenance. Domain responses add
+`classification: {status, needs_user_input, missing_axes, questions}` from the
+effective metadata, with status `pending` or `classified`. These are questions
+for the user, not instructions for an autonomous retry or another default.
+The service's ingest response now includes its effective stored `metadata`, so
+rereads do not ask about axes that were already answered. An interface must
+present the questions and submit the user's explicit `metadata` on the existing
+reading request; automatic conversation continuation is not implemented here. Search
 hits and listed documents add `metadata`; legacy documents return `{}`. Existing
 `kind` filtering, including `meme_hashtag`, retains its meaning. Metadata is limited
 to 64 KiB of JSON independently of the existing tag limit. Dates are calendar-valid

@@ -22,7 +22,7 @@ func (s *ingestService) Dispatch(_ context.Context, eventType string, payload ma
 	if s.failAt == len(s.payloads) {
 		return nil, errors.New("body is larger than 2000000 characters")
 	}
-	return map[string]any{"source_id": payload["source_id"], "changed": true}, nil
+	return map[string]any{"source_id": payload["source_id"], "changed": true, "metadata": payload["metadata"]}, nil
 }
 
 func reading(payload map[string]any, documents ...ReadDocument) Reading {

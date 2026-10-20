@@ -586,8 +586,8 @@
           "status": "completed",
           "evidence": [
             "Owner confirmed separate form and content-kind labels and defining metadata separate from free-form tags.",
-            "ResolveClassification applies user > classifier > source default > general independently per axis, retaining origin and provider ID/version.",
-            "Invalid user/configured defaults are refused; invalid provider axes fall back independently with fixed diagnostics. The contract is internal and not wired into reading or storage."
+            "Owner correction: general is not a taxonomy value. Explicit user input wins; missing or uncertain axes remain null and require user clarification. A valid proposal/default never overrides an axis awaiting the user.",
+            "Invalid user/configured defaults are refused; uncertain, invalid or unavailable provider output keeps the affected axis pending with fixed diagnostics while retaining valid axes."
           ],
           "checks": [
             {
@@ -618,13 +618,14 @@
             "Metadata-only updates preserve chunks, embeddings and embedding-cache revision; unchanged rereads patch only explicit assertions and reader provenance.",
             "Disposable migration tests cover schema-1 preservation, transactional failure rollback, old-build refusal, offline metadata downgrade and re-upgrade.",
             "dokja_docs/step-09-consolidation.md",
-            "dokja_docs/production-runbook.md#knowledge-metadata-schema-upgrade"
+            "dokja_docs/production-runbook.md#knowledge-metadata-schema-upgrade",
+            "Owner rejected general and confirmed that only the user resolves uncertainty: nullable axes, user_required provenance and domain-owned per-document questions are implemented and regression-tested."
           ],
           "checks": [
             {
               "name": "knowledge_service",
               "status": "passed",
-              "detail": "143 passed, 8 skipped (live Ollama unavailable); declared pypdf installed in temporary test directory."
+              "detail": "148 passed, 8 skipped (live Ollama unavailable); includes nullable classification, reread preservation and user-answer metadata updates."
             },
             {
               "name": "knowledge_domain",
@@ -652,7 +653,8 @@
           "branch": "feat/knowledge-metadata",
           "remaining": [
             "Connect a versioned reading-time classifier capability and provider failure behavior.",
-            "Add content/provider-version classification caching and explicit reclassification with no repeat inference on unchanged reads."
+            "Add content/provider-version classification caching and explicit reclassification with no repeat inference on unchanged reads.",
+            "Present classification questions in interfaces and resume the existing read request using explicit user answers; automatic conversational continuation is not implemented yet."
           ]
         },
         {

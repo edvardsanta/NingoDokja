@@ -47,8 +47,8 @@ func decodeMetadata(raw any) (MetadataInput, error) {
 	if json.Unmarshal(data, &object) != nil || object == nil {
 		return input, fmt.Errorf("metadata must be an object")
 	}
-	for _, value := range object {
-		if bytes.Equal(value, []byte("null")) {
+	for key, value := range object {
+		if bytes.Equal(value, []byte("null")) && key != "form" && key != "content_kind" {
 			return input, fmt.Errorf("metadata fields cannot be null")
 		}
 	}
@@ -114,4 +114,56 @@ func readingDefaults(format string) ClassificationValues {
 		return ClassificationValues{Form: FormArticle}
 	}
 	return ClassificationValues{}
+}
+
+// classificationQuestions describes unresolved axes without assigning a type. A
+// persisted user_required choice survives rereads; only explicit user values patch it.
+func classificationQuestions(metadata map[string]any) map[string]any {
+	missing := []string{}
+	questions := []map[string]any{}
+	for _, axis := range []struct {
+		field, question string
+		values          []string
+	}{
+		{"form", "What is the form of this document?", []string{"book", "article", "note", "conversation", "meme"}},
+		{"content_kind", "What type of content does this document contain?", []string{"news", "reference", "research", "narrative"}},
+	} {
+		value, _ := metadata[axis.field].(string)
+		valid := validForm(value)
+		if axis.field == "content_kind" {
+			valid = validContentKind(value)
+		}
+		if valid {
+			continue
+		}
+		missing = append(missing, axis.field)
+		questions = append(questions, map[string]any{"field": axis.field, "question": axis.question, "allowed_values": axis.values})
+	}
+	status := "classified"
+	if len(missing) > 0 {
+		status = "pending"
+	}
+	return map[string]any{"status": status, "needs_user_input": len(missing) > 0, "missing_axes": missing, "questions": questions}
+}
+
+// annotateClassification uses effective persisted metadata, never a default from
+// the latest request, since unchanged rereads may preserve earlier user assertions.
+func annotateClassification(result map[string]any) {
+	if metadata, ok := result["metadata"].(map[string]any); ok {
+		result["classification"] = classificationQuestions(metadata)
+	}
+	for _, key := range []string{"documents", "hits"} {
+		switch entries := result[key].(type) {
+		case []any:
+			for _, raw := range entries {
+				if entry, ok := raw.(map[string]any); ok {
+					annotateClassification(entry)
+				}
+			}
+		case []map[string]any:
+			for _, entry := range entries {
+				annotateClassification(entry)
+			}
+		}
+	}
 }
