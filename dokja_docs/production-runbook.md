@@ -139,6 +139,42 @@ next request.
 
 ## Research Knowledge Base
 
+### Knowledge metadata schema upgrade
+
+The Knowledge build for step 09.2 upgrades its own database from schema 1 to 2 on
+startup. Migration and `user_version` advancement are transactional. Version 2
+adds `document_metadata`; existing documents, content hashes, FTS entries, chunk
+IDs and embeddings are preserved. Old documents expose empty metadata until
+explicitly updated or reread. No compose, environment, port or volume change is
+needed. Deploy the storage service before the metadata-producing domain build.
+
+Before upgrading, stop the Knowledge service and all writers and take a consistent
+SQLite backup using the existing backup procedure. Preserve the backup with the
+previous build identifier. Do not copy an active WAL database's main file alone.
+Validate the upgrade on a backup copy before applying it to the production file.
+
+An older build refuses schema 2. For an exact rollback, stop writers, restore the
+pre-upgrade consistent backup, and restart the previous build; writes since that
+backup will be lost. Alternatively, to retain documents and embeddings written
+after the upgrade, back up the current database while stopped and perform this
+**offline downgrade** against the chosen Knowledge file using SQLite:
+
+```sql
+BEGIN IMMEDIATE;
+DROP TABLE document_metadata;
+PRAGMA user_version = 1;
+COMMIT;
+```
+
+This deliberately discards **all defining metadata**, retaining documents, tags,
+legacy kinds, chunks, FTS and embeddings. Run it only on schema 2 from this build;
+check `PRAGMA user_version` first and verify `PRAGMA integrity_check` afterward.
+Restart the previous service build and roll back the metadata-producing domain
+build together. A subsequent upgrade recreates empty metadata. Migration,
+metadata-only updates and this downgrade are covered using disposable test
+files; no owner database was migrated during development.
+
+
 `dokja-knowledge` stores the documents the operator feeds in and finds them by meaning and by keyword. Its
 SQLite file is `/data/dokja_knowledge.db` on the `dokja-data` volume (separate from `dokja.db`). Embeddings
 come from `bge-m3` on `dokja-ollama`, which keeps its models in the `dokja-ollama` volume. After the first

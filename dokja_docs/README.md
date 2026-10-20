@@ -4,6 +4,7 @@ Project-level architecture and behavior notes.
 
 Available docs:
 
+- [Step 09 consolidation progress](./step-09-consolidation.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)

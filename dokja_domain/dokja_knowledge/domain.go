@@ -102,8 +102,26 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 	}
 	payload := request.Event.Payload
 	if request.Action == ActionIngestKnowledge {
+		if _, exists := payload["metadata_if_unchanged"]; exists {
+			return nil, fmt.Errorf("metadata_if_unchanged is reserved for reading storage")
+		}
 		if err := validateIngest(payload); err != nil {
 			return nil, err
+		}
+		if raw, exists := payload["metadata"]; exists {
+			if _, err := decodeMetadata(raw); err != nil {
+				return nil, err
+			}
+			metadata, err := resolvedMetadata(raw, ClassificationValues{}, nil)
+			if err != nil {
+				return nil, err
+			}
+			copy := make(map[string]any, len(payload))
+			for key, value := range payload {
+				copy[key] = value
+			}
+			copy["metadata"] = metadata
+			payload = copy
 		}
 	}
 	for _, field := range requiredFields[request.Action] {

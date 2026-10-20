@@ -16,7 +16,7 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0005](./0005-knowledge-experience-content.md) | Orchestrator-supervised Knowledge–Prediction–Experience cycle with snapshot reuse and explicit stopping outcomes | Accepted for prototype |
 | [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 | [0007](./0007-faculties-not-features.md) | Macro-components are faculties; Book, Meme and Digest are workflows over them | Accepted as target direction; migration pending |
-| [0008](./0008-consolidation-by-kind-of-knowledge.md) | Knowledge is consolidated by its kind, classified at reading time and stored as a tag; one summary capability with methods per kind | Proposed; open questions |
+| [0008](./0008-consolidation-by-kind-of-knowledge.md) | Separate form/content kinds with structured metadata; shared consolidation and summary methods | Representation accepted; Book retirement and provider/migration details open |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):

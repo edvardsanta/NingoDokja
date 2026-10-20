@@ -89,7 +89,7 @@ a cognitive macro-component.
 | --- | --- | --- | --- |
 | Orchestrator ingress | Envelope: `event_id`, `timestamp`, `source`, `type`, `user`, `channel`, `payload`, `context`; HTTP bridge or ZeroMQ request/reply; PUB/SUB events | Controls state; handler-owned sessions; per-request context maps | Preserve envelope and compact/debug responses; normalize typed internal contracts behind ingress |
 | Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached) and `feeds.extract` (on demand, step `07`); status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract |
-| Knowledge | ZeroMQ `knowledge.*`; typed-by-operation payload represented as dictionaries/maps | Own SQLite documents, chunks, keyword index, and model-tagged embeddings | Python `register(registry)` adds extractors/fetchers; plugins execute inside the host |
+| Knowledge | ZeroMQ `knowledge.*`; typed-by-operation payload represented as dictionaries/maps | Own SQLite documents, schema-2 structured metadata, chunks, keyword index, and model-tagged embeddings | Python `register(registry)` adds extractors/fetchers; plugins execute inside the host |
 | Memory | ZeroMQ service requests for record, resolve, recall, listing and status; prediction/stats handled by the domain | Own SQLite experiences, original probabilities, outcomes, and embeddings | Injected embedder; no general runtime predictor plugin protocol in inspected code |
 | Chat AI | HTTP `POST /chat`, `GET /health` | Provider/client cache; reads selected profile from shared SQLite; conversation history supplied by caller | Provider abstraction/configuration; not the Feeds manifest protocol |
 | Book | HTTP `POST /books/classify`, `POST /books/summarize`, `GET /health` | Per-request processing; no durable book repository established in inspected request path | Classifier/overview/extraction implementations; preserve request fields and response envelopes |
@@ -161,7 +161,15 @@ Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),
 
 The orchestrator sequences reading and storage; Feeds never calls Knowledge. The
 Knowledge domain owns the provenance it stores (`file:<name>` source, format and
-reader tags). The `knowledge-extractors` example plugin serves Knowledge's own
+reader tags). Step 09.2 adds structured form/content classification with per-axis
+provenance, topics, entities, date anchors and reader version. The domain resolves
+explicit assertions and source defaults; no model classifier is connected yet.
+Knowledge persists metadata separately from chunks and projects it in search/list.
+Metadata-only updates preserve embeddings; unchanged rereads preserve unspecified
+assertions through a domain-defined patch. Legacy `kind` filtering is unchanged.
+See the [storage contract](../dokja_services/dokja_knowledge/README.md#structured-metadata)
+and [migration/rollback](./production-runbook.md#knowledge-metadata-schema-upgrade).
+The `knowledge-extractors` example plugin serves Knowledge's own
 extractors through the host, so the same formats are read on both paths while
 `knowledge.ingest` with a file stays unchanged. Results and costs are in the
 [step 07 record](./step-07-reading.md).

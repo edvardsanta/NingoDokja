@@ -64,6 +64,11 @@ func TestStoreReadingKeepsSourceFormatAndReaderProvenance(t *testing.T) {
 		"title": "Deep Work", "body": "Focus is a skill.", "kind": "book", "source_id": "file:Deep-Work.pdf",
 		"source_ref": "page-1", "tags": []string{"study", "format:pdf", "reader:knowledge-extractors"},
 	}
+	if service.payloads[0]["metadata"] == nil || service.payloads[0]["metadata_if_unchanged"] == nil {
+		t.Fatal("missing defining metadata")
+	}
+	delete(service.payloads[0], "metadata")
+	delete(service.payloads[0], "metadata_if_unchanged")
 	if !reflect.DeepEqual(service.payloads[0], want) {
 		t.Fatalf("payload=%#v\nwant   %#v", service.payloads[0], want)
 	}

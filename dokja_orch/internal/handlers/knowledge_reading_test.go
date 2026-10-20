@@ -85,7 +85,16 @@ func TestKnowledgeReadStoresWhatTheReadingHostRead(t *testing.T) {
 		"title": "Deep Work", "body": "Focus is a skill.", "kind": "book", "source_id": "file:Deep-Work.pdf",
 		"tags": []string{"format:pdf", "reader:knowledge-extractors"},
 	}
-	if len(knowledge.payloads) != 1 || !reflect.DeepEqual(knowledge.payloads[0], want) {
+	if len(knowledge.payloads) != 1 {
+		t.Fatalf("payloads=%#v", knowledge.payloads)
+	}
+	metadata := knowledge.payloads[0]["metadata"].(map[string]any)
+	if metadata["form"] != "general" || metadata["content_kind"] != "general" {
+		t.Fatalf("metadata=%#v", metadata)
+	}
+	delete(knowledge.payloads[0], "metadata")
+	delete(knowledge.payloads[0], "metadata_if_unchanged")
+	if !reflect.DeepEqual(knowledge.payloads[0], want) {
 		t.Fatalf("ingest payloads=%#v", knowledge.payloads)
 	}
 

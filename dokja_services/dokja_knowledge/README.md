@@ -15,12 +15,62 @@ meaning and by keyword, with a citable source.
 
 | event | payload | result |
 | --- | --- | --- |
-| `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
+| `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?`, `metadata?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
 | `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?`, `kind?`, `include_text?` | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
 | `knowledge.status` | none | counts, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |
+
+## Structured metadata
+
+Knowledge accepts optional defining `metadata`, separate from legacy `kind` and
+free-form `tags`. Domain requests (`knowledge.ingest` and `knowledge.read`) accept:
+
+```json
+{
+  "metadata": {
+    "form": "book",
+    "content_kind": "research",
+    "topics": ["physics"],
+    "entities": [{"name": "Example Lab", "type": "organization"}],
+    "date_anchor": "2026-10-19"
+  }
+}
+```
+
+The Go Knowledge domain resolves classification and adds `form_choice` and
+`kind_choice` provenance. Callers cannot supply provenance. `knowledge.read` also
+records `reading` (`format`, `reader`, `reader_version`). EPUB/MOBI default to book;
+HTML/RSS/Atom default to article; PDF supplies no form default. Formats never
+imply a content kind. No model classifier is connected in this slice.
+
+The storage service validates structure and persists the resolved object. Search
+hits and listed documents add `metadata`; legacy documents return `{}`. Existing
+`kind` filtering, including `meme_hashtag`, retains its meaning. Metadata is limited
+to 64 KiB of JSON independently of the existing tag limit. Dates are calendar-valid
+`YYYY-MM-DD` anchors; entities require `name` and may have `type`.
+
+For direct ingestion, supplying metadata replaces that document's metadata. An
+unchanged document with omitted metadata preserves its previous metadata. Changed
+content with omitted metadata clears it to avoid stale assertions. A metadata-only
+update returns `changed: false, metadata_changed: true`; `changed` continues to mean
+the legacy content digest changed. Chunks, embedding bytes and the embedding matrix
+revision remain intact. Existing digest inputs (including tags) are unchanged.
+
+The Reading domain additionally sends the storage-only `metadata_if_unchanged`
+patch. On the same digest, storage overlays defaults, previous metadata, then this
+patch. The domain includes only explicit user assertions and current reader
+provenance in the patch. Rereading without labels therefore preserves prior user
+choices, topics and date anchors. Empty topic/entity arrays clear those fields.
+For changed content the patch is ignored and the full newly resolved metadata is
+stored. Ordinary domain ingest refuses this reserved field. Multi-document reads
+retain their existing per-document commit and partial-result behavior.
+
+Schema version 2 adds `document_metadata` with a cascading document foreign key.
+It does not backfill labels, replace chunks or re-embed existing documents. See
+[upgrade and rollback](../../dokja_docs/production-runbook.md#knowledge-metadata-schema-upgrade)
+before starting this build with an existing database.
 
 ## Formats and sources
 

@@ -1,6 +1,7 @@
-# ADR 0008: consolidate knowledge by its kind, tagged at reading time
+# ADR 0008: consolidate knowledge by form and content kind
 
-Date: 2026-10-19. Status: proposed; kinds accepted, agent CLI allowed; form/content tags, tag storage and Book retirement scope open.
+Date: 2026-10-19. Status: form/content axes and structured metadata accepted;
+kinds accepted, agent CLI allowed; Book retirement scope and remaining provider/migration details open.
 Refines [ADR 0005](./0005-knowledge-experience-content.md) and
 [ADR 0006](./0006-reading-macro-component.md). Replaces the `book.*` facade
 planned for step `09`.
@@ -23,30 +24,33 @@ ADR 0005 already separates source type (how to read) from the general method
 
 ## Decision
 
-Treat four axes separately:
+Treat these axes separately:
 
 | Axis | Examples | Decides | Owner |
 | --- | --- | --- | --- |
 | Source and format | PDF, EPUB, feed item, page | How to read | Reading host (step 07) |
-| Kind of knowledge | news, book; later argument, technical reference, narrative | How to consolidate, and which summary method applies | Knowledge (methods are data) |
+| Form | book, article, note, conversation, meme | The document's structure and attribution | Knowledge |
+| Content kind | news, reference, research, narrative | How to consolidate, and which summary method applies | Knowledge (methods are data) |
 | Goal | study, stay informed, quick reference | Which part of the method matters | The request |
 | Experience | "a technical book read to study: per-chapter concepts worked" | Which way of applying the method to choose | Experience (Memory) |
 
-**The kind is classified at reading time and stored as a tag.** A source can
-carry a classifier, as a reading-host plugin next to its extractor. Its output
-is a `kind:<name>` tag on the stored knowledge. Consolidation, retrieval and
-summary methods select on that tag. The source alone never fixes the method; it
-only proposes the kind.
+**Form and content kind are classified at reading time and retained as structured
+metadata.** A source can carry a classifier as a reading-host plugin next to its
+extractor. The classification, entities, topics, dates, and classifier provenance
+are separate from free-form request tags. Consolidation, retrieval, and summary
+methods can select on these fields. The source proposes defaults; it does not
+dictate the content kind. This supersedes the initial `kind:<name>` tag encoding.
 
-Proposed order of precedence for the kind:
+Order of precedence, independently for each classification axis:
 
-1. the user's explicit kind;
+1. the user's explicit value;
 2. the source's classifier;
-3. the source's default (a feed item is news, an EPUB is a book);
+3. the source's default (for example, a feed can propose article/news, an EPUB book/general);
 4. `general`.
 
-The tag records which of these decided it, so experience can later judge the
-classifier.
+Each axis records which of these decided it, so experience can later judge the
+classifier. Choosing the form explicitly must not make the content kind appear
+user supplied if that axis came from a classifier.
 
 **Summary is one capability with methods per kind.** One generator (the
 language faculty, still open as chat-plan decision #1) applies a method chosen
@@ -130,16 +134,16 @@ question 2.
 - **Where:** a reading-host plugin with its own capability,
   `document.classify.v1`, next to `document.extract.v1`.
   - Input: the extracted documents and the source's provenance.
-  - Output: `kind:` tags, defining tags (topics, entities, a date anchor for
-    news) and its own `id@version`.
+  - Output: structured form/content proposals and defining metadata (topics,
+    entities, a date anchor for news), with its own `id@version`.
   - It is selected and replaced like an extractor: manifests, no code.
-- **Precedence:**
+- **Precedence (per axis):**
   1. the user's explicit kind;
   2. the classifier;
   3. the source's default (a feed item is `news`, an EPUB is `book`);
   4. `general`.
 
-  The stored tags record which of these decided (`kind-by:user`, and so on).
+  The structured provenance records which of these decided each value.
 - **Determinism:** tags are part of Knowledge's content hash, so the same
   input must give the same tags, or the document is re-chunked and
   re-embedded on every read. A model-based classifier records its version, and
@@ -151,7 +155,8 @@ question 2.
 ## Owner direction on agents and kinds (2026-10-19)
 
 - **The proposed kinds are accepted** as the starting set. Whether a document
-  carries one kind or a form tag plus a content tag is still open.
+  carries one kind or separate form/content values was subsequently resolved:
+  keep both, as recorded below.
 - **Local agent CLIs may do the judgment work.** Claude Code and Codex, run
   locally, may classify kinds, extract defining tags (topics, entities, the
   date anchor of news), and generate summaries and other text. They are
@@ -177,9 +182,12 @@ way twice. So:
 - **Latency.** A call takes seconds, so it runs off delivery paths. Reading on
   demand and summaries on request can wait; a scheduled meme delivery cannot
   (the 1 s shadow-prediction cap accepted in step 08 stays).
-- **Provider.** The text read is sent to the CLI's provider. Owner documents and
-  chat history (`note`, `conversation`) are the owner's private material. A
-  setting decides which kinds may be sent, and the default excludes those two.
+- **Provider.** The text read is sent to the CLI's provider. Owner notes and
+  chat history (`form=note`, `form=conversation`) are the owner's private material.
+  A setting decides which inputs may be sent, and the default excludes those
+  forms even when their content kind is research, reference, or another value.
+  Evaluate that restriction before sending material to a classifier; its own
+  output cannot establish permission to send its input.
 - **Bounds.** The call runs under the reading host's subprocess limits:
   - its timeout;
   - an output limit;
@@ -189,3 +197,41 @@ way twice. So:
 
   If the agent fails, the rule-based default (source default, then `general`)
   is used and recorded.
+
+## Owner decisions on representation (2026-10-19)
+
+The owner selected **structured metadata separate from free-form tags** and,
+after reviewing examples, **both form and content kind**. A book can contain
+research, reference material, or narrative; a research method should not depend
+on whether its input is a book, article, or supplied note.
+
+Initial domain vocabulary:
+
+| Axis | Values |
+| --- | --- |
+| Form | `book`, `article`, `note`, `conversation`, `meme`, `general` |
+| Content kind | `news`, `reference`, `research`, `narrative`, `general` |
+
+File formats such as PDF and EPUB remain source/reader provenance. Topics such
+as physics remain defining metadata, not additional form/content kinds. Each
+axis supports an unspecified proposal and an explicit `general` value; those
+have different precedence semantics.
+
+The first implementation is the internal
+[Knowledge classification contract](../../dokja_domain/dokja_knowledge/classification.go):
+user values win, then valid versioned classifier proposals, then source defaults,
+then `general`, evaluated independently per axis. Invalid explicit values or
+selected source defaults are rejected. An invalid classifier axis falls back
+without discarding the other valid axis; a proposal needs provider ID/version
+before it can be attributed. Diagnostics use fixed reason codes.
+
+This contract does not classify text, invoke a provider, select a summary method,
+or persist metadata yet. It also does not redefine existing public `kind` values
+such as `meme_hashtag`, whose isolation semantics remain in force.
+
+Persistence follows in step `09.2`, including additive schema and rollback review,
+legacy-document behavior, classification reuse by content/classifier version,
+and metadata updates that avoid unnecessary re-embedding. Earlier sections that
+describe tags participating in the content hash characterize the current service
+and original proposal; they do not require re-embedding content on every metadata
+change. Reading-host integration and provider failure behavior are separate work.
