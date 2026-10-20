@@ -20,8 +20,8 @@ const defaultFeedsServiceEndpoint = "tcp://127.0.0.1:5563"
 // the service's answer, even a timeout, arrives before the socket gives up.
 const feedsExtractTimeout = 2*time.Minute + 10*time.Second
 
-// feedsClassifyTimeout is a little over the service's 1-minute limit for a classification.
-const feedsClassifyTimeout = time.Minute + 10*time.Second
+// feedsClassifyTimeout is a little over the service's 3-minute limit for a classification.
+const feedsClassifyTimeout = 3*time.Minute + 10*time.Second
 
 type FeedsServiceRequesterFactory func() (repreq.RequesterReply, error)
 

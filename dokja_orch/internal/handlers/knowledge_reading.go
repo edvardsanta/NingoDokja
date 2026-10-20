@@ -14,9 +14,9 @@ import (
 
 const (
 	readingTaskVersion = "2"
-	// readingTaskDeadline covers the reading host's 2-minute reading, its 1-minute
+	// readingTaskDeadline covers the reading host's 2-minute reading, its 3-minute
 	// classification and the Knowledge calls.
-	readingTaskDeadline = 4 * time.Minute
+	readingTaskDeadline = 6 * time.Minute
 	readingCapability   = "document.extract.v1"
 )
 

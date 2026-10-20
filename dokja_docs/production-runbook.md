@@ -301,9 +301,11 @@ variables, at most 2 readings run at once, and each stops at its manifest timeou
 limit. With no enabled extractor, `knowledge.read` fails with `unavailable` and `knowledge.ingest` with a
 file keeps working as before.
 
-An enabled `document.classify.v1` plugin (at most one) classifies what `knowledge.read` stored; none ships.
+An enabled `document.classify.v1` plugin (at most one) classifies what `knowledge.read` stored. The
+`agent-kinds` example (disabled) asks Claude Code, then Codex, then Ollama; it needs Feeds running where
+those CLIs are logged in, which is not the image. See its variables in the Feeds README.
 It sees a 16,000-character sample of each new document, shares the 2 reading slots and stops at its
-manifest timeout or 1 minute. A classifier that calls a remote model sends that text to its provider, so
+manifest timeout or 3 minutes. A classifier that calls a remote model sends that text to its provider, so
 enable one only for documents you are willing to send. Without one, or when it fails, documents are stored
 with their form and content kind pending for the user.
 

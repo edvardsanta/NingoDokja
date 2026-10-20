@@ -1,0 +1,20 @@
+{
+  "plugin_api": 1,
+  "id": "agent-kinds",
+  "version": "0.1.0",
+  "name": "Agent classifier",
+  "provides": ["document.classify.v1"],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": ["python3", "-I", "-B", "run.py"],
+  "env": [
+    "HOME",
+    "AGENT_KINDS_PROVIDERS",
+    "AGENT_KINDS_TIMEOUT",
+    "AGENT_KINDS_CLAUDE_MODEL",
+    "AGENT_KINDS_CODEX_MODEL",
+    "AGENT_KINDS_OLLAMA_URL",
+    "AGENT_KINDS_OLLAMA_MODEL"
+  ],
+  "limits": {"timeout_ms": 175000, "output_bytes": 1048576}
+}

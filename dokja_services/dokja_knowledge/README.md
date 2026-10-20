@@ -50,8 +50,8 @@ classification value. Only explicit user input resolves an uncertain axis.
 
 When the reading host has an enabled `document.classify.v1` plugin, `knowledge.read`
 sends it the documents whose content was stored just now and whose form or content
-kind nobody decided (the user, the source, or an earlier question). A known `note` or
-`conversation` form is never sent. The domain resolves each proposal and patches the
+kind nobody decided (the user, the source, or an earlier question), whatever its
+form: enabling a classifier is the owner's permission to send it. The domain resolves each proposal and patches the
 undecided axes with `classifier` provenance, and fills `topics`, `entities` and
 `date_anchor` only when the request gave none. The patch is bound to the snapshot
 revision, so a user answer given meanwhile wins. The stored `classifier`
