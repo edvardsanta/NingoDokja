@@ -622,7 +622,8 @@
             "Owner rejected general and confirmed that only the user resolves uncertainty: nullable axes, user_required provenance and domain-owned per-document questions are implemented and regression-tested.",
             "API/CLI continuation implemented: knowledge.classify retrieves current questions by source_id and applies explicit answers with an atomic revision-checked metadata patch. No re-upload, extraction or re-embedding; tests cover stale answers and concurrent writers.",
             "Desktop conceptual review recorded in dokja_docs/step-09-consolidation.md: include_text exists upstream but is dropped by desktop projections; per-document detail and classification presentation remain pending, and conversation tabs must not duplicate Messages.",
-            "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier."
+            "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier.",
+            "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54)."
           ],
           "checks": [
             {
@@ -662,8 +663,8 @@
             }
           ],
           "started_on": "2026-10-19",
-          "worktree": ".worktrees/knowledge-metadata",
-          "branch": "feat/knowledge-metadata",
+          "worktree": ".worktrees/knowledge-classifier",
+          "branch": "feat/knowledge-classifier",
           "remaining": [
             "Ship a classifier plugin (deterministic rules first, then a local agent CLI) and decide the setting for which inputs may be sent to a remote provider.",
             "Add explicit provider reclassification of stored documents for a new classifier version.",

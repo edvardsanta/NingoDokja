@@ -251,7 +251,9 @@ stored with their questions pending, and the reply's `classification.reason`
 says why (`classifier_unavailable`, `classifier_timeout`, `classifier_failed`,
 `classifier_host_unavailable`, `classifier_invalid_result`,
 `knowledge_classify_failed`). The task deadline is now 4 minutes: a 2-minute
-reading, a 1-minute classification and the Knowledge calls.
+reading, a 1-minute classification and the Knowledge calls. No interface sends
+`knowledge.read` today (desktop and the CLI use `knowledge.ingest`); an API
+caller with a shorter timeout stops waiting, but the task still completes.
 
 Compatibility: one additive service event (`feeds.classify`), one additive
 capability, one additive metadata field (`classifier`) in the existing JSON

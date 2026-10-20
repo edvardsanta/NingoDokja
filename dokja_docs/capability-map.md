@@ -88,7 +88,7 @@ a cognitive macro-component.
 | Boundary | Current contract | Current state | Extension point and compatibility concern |
 | --- | --- | --- | --- |
 | Orchestrator ingress | Envelope: `event_id`, `timestamp`, `source`, `type`, `user`, `channel`, `payload`, `context`; HTTP bridge or ZeroMQ request/reply; PUB/SUB events | Controls state; handler-owned sessions; per-request context maps | Preserve envelope and compact/debug responses; normalize typed internal contracts behind ingress |
-| Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached) and `feeds.extract` (on demand, step `07`); status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract |
+| Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached), `feeds.extract` (on demand, step `07`) and `feeds.classify` (on demand, step `09`); status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract; a `document.classify.v1` classifier reads documents and prints one proposal per document |
 | Knowledge | ZeroMQ `knowledge.*`; typed-by-operation payload represented as dictionaries/maps | Own SQLite documents, schema-2 structured metadata, chunks, keyword index, and model-tagged embeddings | Python `register(registry)` adds extractors/fetchers; plugins execute inside the host |
 | Memory | ZeroMQ service requests for record, resolve, recall, listing and status; prediction/stats handled by the domain | Own SQLite experiences, original probabilities, outcomes, and embeddings | Injected embedder; no general runtime predictor plugin protocol in inspected code |
 | Chat AI | HTTP `POST /chat`, `GET /health` | Provider/client cache; reads selected profile from shared SQLite; conversation history supplied by caller | Provider abstraction/configuration; not the Feeds manifest protocol |
@@ -157,13 +157,16 @@ Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),
 
 ### On-demand reading
 
-`knowledge.read -> reading task: read (feeds.extract -> document.extract.v1 plugin) -> ingest (Knowledge domain -> knowledge.ingest per document)`
+`knowledge.read -> reading task: read (feeds.extract -> document.extract.v1 plugin) -> ingest (Knowledge domain -> knowledge.ingest per document) -> classify (feeds.classify -> document.classify.v1 plugin -> Knowledge domain -> knowledge.metadata.get/patch per new document)`
 
 The orchestrator sequences reading and storage; Feeds never calls Knowledge. The
 Knowledge domain owns the provenance it stores (`file:<name>` source, format and
 reader tags). Step 09.2 adds structured form/content classification with per-axis
 provenance, topics, entities, date anchors and reader version. The domain resolves
-explicit assertions and source defaults; no model classifier is connected yet.
+explicit assertions and source defaults, then proposals from an enabled
+`document.classify.v1` plugin for new content whose axes nobody decided (none
+ships). Classifier failures leave the questions pending; they never fail the
+reading. See the [reading-time classifier](./step-09-consolidation.md#reading-time-classifier).
 Knowledge persists metadata separately from chunks and projects it in search/list.
 Metadata-only updates preserve embeddings; unchanged rereads preserve unspecified
 assertions through a domain-defined patch. Legacy `kind` filtering is unchanged.
@@ -177,6 +180,8 @@ extractors through the host, so the same formats are read on both paths while
 Sources: [reading task](../dokja_orch/internal/handlers/knowledge_reading.go),
 [domain](../dokja_domain/dokja_knowledge/reading.go),
 [host](../dokja_services/dokja_feeds/feeds/extract.go),
+[classification](../dokja_domain/dokja_knowledge/reading_classification.go),
+[classifier host](../dokja_services/dokja_feeds/feeds/classify.go),
 [adapter](../dokja_services/dokja_feeds/plugins.example/knowledge-extractors/run.py).
 
 ### User classification answers
