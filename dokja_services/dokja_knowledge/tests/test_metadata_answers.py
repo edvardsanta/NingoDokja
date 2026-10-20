@@ -109,3 +109,18 @@ def test_metadata_operations_validate_input_and_keep_existing_data(service):
     assert snapshot(service) == before
     with pytest.raises(ValueError, match="source_id"):
         service.metadata_get({})
+
+
+def test_classifier_proposals_patch_pending_axes_and_record_the_classifier(service):
+    add(service)
+    before = chunks(service)
+    old = snapshot(service)
+    result = service.dispatch({"type": "knowledge.metadata.patch", "payload": {
+        "source_id": "study", "revision": old["revision"], "patch": {
+            "content_kind": "research",
+            "kind_choice": {"origin": "classifier", "classifier_id": "kinds", "classifier_version": "1"},
+            "classifier": {"id": "kinds", "version": "1"},
+        }}})
+    assert result["metadata"]["classifier"] == {"id": "kinds", "version": "1"}
+    assert result["metadata"]["form_choice"] == {"origin": "user"}
+    assert chunks(service) == before

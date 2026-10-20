@@ -213,4 +213,7 @@ func TestExtractRequestsGetALongerTimeout(t *testing.T) {
 	if timeoutFor("feeds.extract") <= timeoutFor("feeds.status") || timeoutFor("feeds.items") != requestTimeout {
 		t.Fatal("only an on-demand reading may wait longer than the cached requests")
 	}
+	if timeoutFor("feeds.classify") <= requestTimeout || timeoutFor("feeds.classify") >= timeoutFor("feeds.extract") {
+		t.Fatal("a classification waits longer than a cached request and less than a reading")
+	}
 }

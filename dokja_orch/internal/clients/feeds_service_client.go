@@ -20,6 +20,9 @@ const defaultFeedsServiceEndpoint = "tcp://127.0.0.1:5563"
 // the service's answer, even a timeout, arrives before the socket gives up.
 const feedsExtractTimeout = 2*time.Minute + 10*time.Second
 
+// feedsClassifyTimeout is a little over the service's 1-minute limit for a classification.
+const feedsClassifyTimeout = time.Minute + 10*time.Second
+
 type FeedsServiceRequesterFactory func() (repreq.RequesterReply, error)
 
 // FeedsServiceClient talks to the feeds service over ZeroMQ. Requests are logged by type only.
@@ -27,6 +30,7 @@ type FeedsServiceRequesterFactory func() (repreq.RequesterReply, error)
 type FeedsServiceClient struct {
 	requesterFactory FeedsServiceRequesterFactory
 	extractFactory   FeedsServiceRequesterFactory
+	classifyFactory  FeedsServiceRequesterFactory
 }
 
 type feedsServiceResponse struct {
@@ -50,11 +54,17 @@ func NewFeedsServiceClient(endpoint string) *FeedsServiceClient {
 			}
 			return zeromq.NewRequesterWithTimeout(resolved, feedsExtractTimeout)
 		},
+		classifyFactory: func() (repreq.RequesterReply, error) {
+			if err := validateFeedsServiceEndpoint(resolved); err != nil {
+				return nil, err
+			}
+			return zeromq.NewRequesterWithTimeout(resolved, feedsClassifyTimeout)
+		},
 	}
 }
 
 func NewFeedsServiceClientWithFactory(factory FeedsServiceRequesterFactory) *FeedsServiceClient {
-	return &FeedsServiceClient{requesterFactory: factory, extractFactory: factory}
+	return &FeedsServiceClient{requesterFactory: factory, extractFactory: factory, classifyFactory: factory}
 }
 
 // Dispatch sends one feeds.* event and returns the service's result.
@@ -72,6 +82,19 @@ func (c *FeedsServiceClient) Extract(ctx context.Context, filename, contentB64 s
 		return nil, fmt.Errorf("feeds service requester factory is not configured")
 	}
 	return c.send(ctx, c.extractFactory, "feeds.extract", map[string]any{"filename": filename, "content_b64": contentB64})
+}
+
+// Classify asks the reading host's classifier about documents already read (feeds.classify).
+// Their text goes to the plugin; only the request's presence is logged.
+func (c *FeedsServiceClient) Classify(ctx context.Context, format string, documents []map[string]any) (map[string]any, error) {
+	if c == nil {
+		return nil, fmt.Errorf("feeds service requester factory is not configured")
+	}
+	list := make([]any, len(documents))
+	for i, document := range documents {
+		list[i] = document
+	}
+	return c.send(ctx, c.classifyFactory, "feeds.classify", map[string]any{"format": format, "documents": list})
 }
 
 func (c *FeedsServiceClient) send(ctx context.Context, factory FeedsServiceRequesterFactory, eventType string, payload map[string]any) (map[string]any, error) {

@@ -94,6 +94,8 @@ def test_reading_reread_preserves_user_choices_and_patches_only_supplied_axes(se
     {"topics": [3]}, {"entities": [{"type": "person"}]}, {"date_anchor": "2026-02-30"},
     {"date_anchor": "20261019"}, {"form_choice": {"origin": "classifier"}},
     {"reading": {"format": "pdf"}}, {"unknown": True}, {"topics": ["x" * 65537]},
+    {"classifier": {"id": "kinds"}}, {"classifier": {"id": " ", "version": "1"}},
+    {"classifier": {"id": "kinds", "version": "1", "model": "x"}},
 ])
 def test_invalid_metadata_does_not_replace_existing_document(service, bad):
     ingest(service, metadata=metadata())

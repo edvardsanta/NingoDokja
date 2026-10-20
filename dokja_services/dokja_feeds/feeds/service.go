@@ -182,7 +182,8 @@ func (s *Service) environment(plugin Plugin) []string {
 }
 
 // Dispatch answers the events of the service. feeds.status and feeds.items come from
-// memory; feeds.extract reads the document it carries, on demand.
+// memory; feeds.extract reads the document it carries, on demand, and feeds.classify
+// proposes what kind of documents a reading produced.
 func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
 	switch eventType {
 	case "feeds.status":
@@ -191,6 +192,8 @@ func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[st
 		return s.itemsReply(), nil
 	case "feeds.extract":
 		return s.extract(ctx, payload)
+	case "feeds.classify":
+		return s.classify(ctx, payload)
 	}
 	return nil, fmt.Errorf("unsupported feeds event type %q", cleanText(eventType, 64))
 }
@@ -204,8 +207,8 @@ func (s *Service) status() map[string]any {
 	counts := map[string]int{}
 	total := 0
 	for _, e := range s.entries {
-		// A versioned plugin that only extracts documents is not a feed source: it is
-		// listed apart, so the digest's source states keep their meaning.
+		// A versioned plugin that only extracts or classifies documents is not a feed
+		// source: it is listed apart, so the digest's source states keep their meaning.
 		if e.plugin != nil && !e.plugin.Collects() {
 			extractors = append(extractors, map[string]any{
 				"id": e.plugin.ID, "name": e.plugin.Name, "enabled": e.plugin.Enabled,

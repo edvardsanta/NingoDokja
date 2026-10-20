@@ -121,8 +121,11 @@ Purpose:
   `document.extract.v1` plugin for its extension)
 - store each document it yields through `knowledge.ingest`, with `file:<name>` as the
   source and `format:<ext>` and `reader:<plugin>` tags as provenance
-- run as a typed task (`read`, then `ingest`); the file and its text stay outside the
-  workspace, which records a hashed reference and the reader's version
+- run as a typed task (`read`, `ingest`, then `classify`); the file and its text stay
+  outside the workspace, which records a hashed reference and the reader's version
+- classify the documents stored just now whose form or content kind nobody decided
+  through the enabled `document.classify.v1` plugin (`feeds.classify`), never a known
+  note or conversation; an unchanged reread is not sent again
 
 The payload is `filename` and `content_b64`, plus the optional `title`, `kind`, `tags`,
 `source_id` and `source_ref` that `knowledge.ingest` takes. A failure names its step
@@ -130,6 +133,11 @@ reason: `reading_unavailable`, `reading_ambiguous`, `reading_timeout`, `reading_
 `reading_unreadable`, `reading_invalid`, `reading_unsupported`,
 `reading_host_unavailable` or `knowledge_ingest_failed`. It is refused while `feeds` is
 switched off. `knowledge.ingest` with a file still extracts inside Knowledge, unchanged.
+Classification never fails the reading: its outcome is the reply's `classification`
+(`candidates`, `classified`, `classifier`, and a `reason` such as
+`classifier_not_configured`, `classifier_unavailable`, `classifier_timeout`,
+`classifier_failed`, `classifier_invalid_result` or `knowledge_classify_failed`), and
+undecided axes stay questions for the user.
 
 Current files:
 
@@ -137,6 +145,8 @@ Current files:
 - [reading.go](../dokja_domain/dokja_knowledge/reading.go)
 - [feeds_service_client.go](../dokja_orch/internal/clients/feeds_service_client.go)
 - [extract.go](../dokja_services/dokja_feeds/feeds/extract.go)
+- [reading_classification.go](../dokja_domain/dokja_knowledge/reading_classification.go)
+- [classify.go](../dokja_services/dokja_feeds/feeds/classify.go)
 
 ## Scheduled Meme Dispatch Workflow
 

@@ -107,7 +107,8 @@ func TestKnowledgeReadStoresWhatTheReadingHostRead(t *testing.T) {
 
 	task := answer["task"].(core.TaskResult)
 	if answer["count"] != 1 || answer["reader"] != "knowledge-extractors" || answer["format"] != ".pdf" ||
-		task.Status != core.TaskCompleted || len(task.Steps) != 2 || task.Steps[0].Name != "read" || task.Steps[1].Name != "ingest" {
+		task.Status != core.TaskCompleted || len(task.Steps) != 3 || task.Steps[0].Name != "read" || task.Steps[1].Name != "ingest" ||
+		task.Steps[2].Name != "classify" || answer["classification"].(map[string]any)["reason"] != "classifier_not_configured" {
 		t.Fatalf("unexpected answer %#v", answer)
 	}
 	if len(task.Evidence) != 1 || !strings.HasPrefix(task.Evidence[0].Ref, "file:sha256:") ||

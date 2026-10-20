@@ -174,6 +174,12 @@ build together. A subsequent upgrade recreates empty metadata. Migration,
 metadata-only updates and this downgrade are covered using disposable test
 files; no owner database was migrated during development.
 
+The reading-time classifier (step 09.2) adds a document-level `classifier`
+field to that metadata, with no SQL migration. A Knowledge build without it
+refuses the field in a metadata patch, so deploy the Knowledge service before
+the orchestrator that sends it, and roll them back together. Until a
+`document.classify.v1` plugin is enabled, the orchestrator never sends it.
+
 
 `dokja-knowledge` stores the documents the operator feeds in and finds them by meaning and by keyword. Its
 SQLite file is `/data/dokja_knowledge.db` on the `dokja-data` volume (separate from `dokja.db`). Embeddings
@@ -294,6 +300,12 @@ well. A reading runs with the service's permissions and no sandbox: the plugin g
 variables, at most 2 readings run at once, and each stops at its manifest timeout or the 2-minute request
 limit. With no enabled extractor, `knowledge.read` fails with `unavailable` and `knowledge.ingest` with a
 file keeps working as before.
+
+An enabled `document.classify.v1` plugin (at most one) classifies what `knowledge.read` stored; none ships.
+It sees a 16,000-character sample of each new document, shares the 2 reading slots and stops at its
+manifest timeout or 1 minute. A classifier that calls a remote model sends that text to its provider, so
+enable one only for documents you are willing to send. Without one, or when it fails, documents are stored
+with their form and content kind pending for the user.
 
 A token a plugin needs belongs to the service's environment, not to the manifest: the manifest lists only the
 variable names, and only those variables reach the plugin. A failed run keeps the previous items and the

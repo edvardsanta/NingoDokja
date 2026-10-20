@@ -25,6 +25,7 @@ them; at most 16 requests are in flight, past that a request is refused as busy.
 | `feeds.status` | `configured`, `directory_error`, `plugins[]`, `extractors[]`, and the counts `enabled`, `ok`, `failed`, `pending`, `disabled`, `invalid`, `items` |
 | `feeds.items` | `items[]` (at most 1000), `total`, `updated` |
 | `feeds.extract` | payload `filename`, `content_b64` (at most 20 MB); result `documents[]` (`title`, `text`, `source_ref`, `key`), `count`, `format`, `plugin`, `version` |
+| `feeds.classify` | payload `documents[]` (`title`, `text`, `key`) and an optional `format`; result `classifications[]` (one per document), `count`, `plugin`, `version` |
 
 A `plugins[]` row has `id`, `name`, `state` (`ok`, `failed`, `pending`, `disabled` or `invalid`),
 `running`, `enabled`, `interval_seconds`, `items`, `skipped`, `last_run`, `last_ok` and
@@ -34,7 +35,8 @@ UTC, or empty) and `source`. `last_error` is a short fixed phrase such as `exit 
 service cannot run shows as `invalid`, and one that asks for a version, runtime or capability it
 does not support has a `last_error` starting with `incompatible:`.
 
-`extractors[]` lists versioned plugins that only provide `document.extract.v1` (see below):
+`extractors[]` lists versioned plugins that do not collect, such as those that only provide
+`document.extract.v1` or `document.classify.v1` (see below):
 `id`, `name`, `enabled`, `plugin_api`, `version`, `provides`, `formats`, and the last reading's
 `last_run`, `last_ok` and `last_error`. They are not feed sources, never run on a schedule and do
 not change the counts.
@@ -130,7 +132,7 @@ here too.
 | `id`, `name`, `enabled`, `command`, `env` | as above; `enabled` still defaults to `false` |
 | `version` | the plugin's own version, for diagnostics only; it never decides which plugin is used |
 | `runtime` | `"subprocess"` |
-| `provides` | `source.collect.v1` (a scheduled feed source) and/or `document.extract.v1` |
+| `provides` | `source.collect.v1` (a scheduled feed source), `document.extract.v1` and/or `document.classify.v1` |
 | `interval`, `max_items` | only with `source.collect.v1`, as above |
 | `formats` | only with `document.extract.v1`: the extensions it reads, such as `[".pdf"]` |
 | `limits.timeout_ms`, `limits.output_bytes` | required: one run's time (1 s to 5 min) and output (at most 1 MiB) |
@@ -177,6 +179,37 @@ once. A failure answers an error whose message starts with its reason:
 HTML, text and feed files). It needs `python3`, which the image has, and
 `KNOWLEDGE_EXTRACTORS_DIR`, set in the compose files. Replacing it with another reader for a
 format means disabling one manifest and enabling another; no code changes.
+
+### Classifying what was read (`feeds.classify`)
+
+`feeds.classify` proposes the form and content kind of documents already read, with defining
+metadata (ADR 0008). It keeps nothing and decides nothing: Knowledge resolves each proposal against
+the user's answers, and an axis the plugin is unsure of stays the user's to answer. The single
+enabled plugin that provides `document.classify.v1` runs once (it takes no `formats`; two enabled
+classifiers are `ambiguous`). It reads one JSON object on **stdin**, with at most the first 16,000
+characters of each document's text:
+
+```json
+{"operation": "document.classify.v1", "format": ".pdf", "documents": [{"title": "Chapter 1", "text": "...", "key": "c1"}]}
+```
+
+It prints exactly one proposal per document, in order, or why it cannot classify them:
+
+```json
+{"classifications": [{"form": "article", "content_kind": "news", "topics": ["elections"],
+  "entities": [{"name": "City Council", "type": "organization"}], "date_anchor": "2026-10-19"}]}
+{"classifications": [{"form": "book", "uncertain_content_kind": true}]}
+{"error": "the classifier is not configured"}
+```
+
+Every field is optional. `form` and `content_kind` must look like labels (lowercase letters and
+`_`); which labels exist is Knowledge's rule, not the host's. At most 20 topics and 50 entities,
+and `date_anchor` is `YYYY-MM-DD`. Output outside this contract fails the whole run with `failed`;
+`error` answers `unreadable`. A run ends at the manifest's `timeout_ms` or the request's 1-minute
+limit, and shares the 2 reading slots. The reasons are those of `feeds.extract`.
+
+A classifier that sends text to a remote model sends the owner's documents with it; enable one only
+for documents you are willing to send.
 
 ## Variables
 

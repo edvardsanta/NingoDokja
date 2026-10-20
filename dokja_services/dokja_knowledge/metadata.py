@@ -7,7 +7,7 @@ FORMS = {"book", "article", "note", "conversation", "meme"}
 KINDS = {"news", "reference", "research", "narrative"}
 ORIGINS = {"user", "classifier", "source_default", "user_required"}
 FIELDS = {"form", "content_kind", "form_choice", "kind_choice", "topics", "entities",
-          "date_anchor", "reading"}
+          "date_anchor", "reading", "classifier"}
 
 
 def encode_metadata(value):
@@ -63,6 +63,11 @@ def encode_metadata(value):
         if (not isinstance(reading, dict) or set(reading) != {"format", "reader", "reader_version"}
                 or any(not isinstance(v, str) for v in reading.values())):
             raise ValueError("metadata reading provenance is invalid")
+    if "classifier" in value:
+        classifier = value["classifier"]
+        if (not isinstance(classifier, dict) or set(classifier) != {"id", "version"}
+                or any(not isinstance(v, str) or not v.strip() for v in classifier.values())):
+            raise ValueError("metadata classifier provenance is invalid")
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     if len(encoded.encode()) > 65536:
         raise ValueError("metadata exceeds 65536 bytes")
