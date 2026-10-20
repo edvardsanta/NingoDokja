@@ -16,6 +16,8 @@ meaning and by keyword, with a citable source.
 | event | payload | result |
 | --- | --- | --- |
 | `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?`, `metadata?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
+| `knowledge.metadata.get` (internal) | `source_id` | stored `metadata`, title and revision |
+| `knowledge.metadata.patch` (internal) | `source_id`, `revision`, validated `patch` | effective metadata, new revision, `metadata_changed`; content `changed: false` |
 | `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?`, `kind?`, `include_text?` | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
@@ -52,9 +54,9 @@ Unresolved axes use `user_required` provenance. Domain responses add
 effective metadata, with status `pending` or `classified`. These are questions
 for the user, not instructions for an autonomous retry or another default.
 The service's ingest response now includes its effective stored `metadata`, so
-rereads do not ask about axes that were already answered. An interface must
-present the questions and submit the user's explicit `metadata` on the existing
-reading request; automatic conversation continuation is not implemented here. Search
+rereads do not ask about axes that were already answered. The public `knowledge.classify` orchestrator action now retrieves those questions
+by `source_id` and applies explicit user `answers` with the snapshot `revision`.
+The CLI presents the questions; other interfaces still need presentation wiring. Search
 hits and listed documents add `metadata`; legacy documents return `{}`. Existing
 `kind` filtering, including `meme_hashtag`, retains its meaning. Metadata is limited
 to 64 KiB of JSON independently of the existing tag limit. Dates are calendar-valid
@@ -172,3 +174,29 @@ Changing `DOKJA_EMBED_MODEL` invalidates the old vectors (they are tagged by mod
 pip install numpy pyzmq pypdf pytest
 python -m pytest dokja_services/dokja_knowledge/tests
 ```
+
+## Classification continuation contract
+
+`knowledge.classify` is an additive orchestrator action, not a service-side
+classifier. With `{source_id}` it returns metadata and domain-owned questions.
+With `{source_id, revision, answers: {form?, content_kind?}}` the domain validates
+nonempty user answers and constructs a patch containing only the selected axes
+and user provenance. Answers cannot supply producer provenance or arbitrary
+metadata. Missing axes remain untouched. Existing labels may be corrected only
+by this explicit user input. No autonomous inference runs on this path.
+
+The generic service client carries `knowledge.metadata.get` and
+`knowledge.metadata.patch` through its existing request/reply port. The service
+owns structural validation and transaction mechanics. The revision fingerprints
+the source ID, legacy content identity and canonical metadata snapshot; it is a
+concurrency token, not an authorization grant. A patch acquires a SQLite write
+lock, compares the revision, merges and validates metadata, and commits atomically.
+A stale revision returns `classification_conflict`; a missing document returns
+not-found. Neither case changes existing state. Successful patches preserve
+chunks, vector bytes and the embedding matrix revision. An identical patch with
+a current revision is a no-op. A timed-out write may have committed; retrieve the
+current questions before deciding whether another answer is needed.
+
+This adds no schema version or durable workflow ledger. Restarting the CLI can
+retrieve pending state from the existing metadata store. It resumes the
+classification decision, not an interrupted summary or external side effect.

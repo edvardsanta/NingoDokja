@@ -7,12 +7,15 @@ dokja.db, whose schema version is managed by the Go side.
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 import sqlite3
 from datetime import datetime, timezone
 
 import numpy as np
 
 from chunker import Chunk
+from metadata import encode_metadata
 
 MIGRATIONS = [
     """
@@ -163,6 +166,44 @@ class Store:
             self._write_metadata(document_id, metadata)
             self.conn.execute("UPDATE documents SET updated_at = ? WHERE id = ?", (_now(), document_id))
         return True
+
+    def metadata_snapshot(self, source_id: str) -> dict:
+        """One read binds metadata to the content identity the user is answering for."""
+        row = self.conn.execute(
+            """SELECT d.source_id, d.title, d.content_hash,
+                      COALESCE(m.metadata, '{}') AS metadata
+               FROM documents d LEFT JOIN document_metadata m ON m.document_id = d.id
+               WHERE d.source_id = ?""", (source_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("knowledge document not found")
+        metadata = json.loads(row["metadata"])
+        identity = json.dumps([row["source_id"], row["content_hash"], metadata],
+                              ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return {"source_id": row["source_id"], "title": row["title"], "metadata": metadata,
+                "revision": hashlib.sha256(identity.encode()).hexdigest()}
+
+    def patch_metadata(self, source_id: str, patch: dict, revision: str) -> dict:
+        """Compare and patch under a write lock, leaving content and vectors intact."""
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            snapshot = self.metadata_snapshot(source_id)
+            if snapshot["revision"] != revision:
+                raise ValueError("classification_conflict: document changed; reload the questions")
+            merged = {**snapshot["metadata"], **patch}
+            encoded = encode_metadata(merged)
+            changed = merged != snapshot["metadata"]
+            if changed:
+                document = self.get_document(source_id)
+                self._write_metadata(document["id"], encoded)
+                self.conn.execute("UPDATE documents SET updated_at = ? WHERE id = ?",
+                                  (_now(), document["id"]))
+            result = self.metadata_snapshot(source_id)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return {**result, "metadata_changed": changed, "changed": False}
 
     def delete_document(self, source_id: str) -> bool:
         with self.conn:
