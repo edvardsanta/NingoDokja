@@ -319,3 +319,44 @@ check.
 Still pending: running Feeds on the host for the stack (bind address and an
 overridable `FEEDS_SERVICE_ENDPOINT` for the orchestrator), the live check on
 the owner's documents, an Ollama chat model, and explicit reclassification.
+
+### Live check
+
+Run 2026-10-20 on the owner's machine: Feeds on the host through
+`scripts/run-host-feeds.sh`, and an isolated lite stack (orchestrator, Knowledge
+and Ollama only, project `dokja-classify`, a new Knowledge database in the
+worktree) with the `docker-compose.host-feeds.yml` overlay. Nine files from the
+owner's downloads went through `knowledge.read`; their text went to Claude Code,
+as decided. Every classification came from `claude.haiku-5-5`, in 4.8–6.3 s;
+Codex was never needed.
+
+| Document | Form | Content kind |
+| --- | --- | --- |
+| short psalm (`.txt`) | question | question |
+| liturgy sheet (`.docx`) | question | reference |
+| load-test report (`.html`) | article (source default) | research |
+| public-information request (`.pdf`) | conversation | reference |
+| essential medicines list (`.pdf`) | question | reference |
+| course monograph (`.pdf`) | question | research |
+| programming handout (`.pdf`) | book | reference |
+| thesis manual (`.pdf`) | book | reference |
+| scanned book (`.pdf`) | not read: no text layer, and OCR is not configured | |
+
+No label looked wrong. The request as `conversation` is debatable: it is an
+exchange of a request and an answer. Five axes became questions. The form
+vocabulary has no value for a list, a monograph, a song or a liturgy sheet; that
+is a question for the owner, not a classifier fault. Topics and entities were
+filled for every document. A reread of the psalm took 0.0 s and did not call the
+classifier.
+
+The check found a gap. Ingesting the medicines list (248 chunks) outlasted the
+Knowledge client's 5-second timeout, the known step 10 issue. The orchestrator
+reported the ingest as failed although the document was stored, so the classify
+step never ran. The next three files failed the same way while Knowledge was
+still embedding. With the rule "classify only content stored just now", a reread
+would see unchanged content and never classify them. The candidates now use
+the stored `classifier` record as the cache: a document qualifies until a
+classifier has seen its current content, and changed content clears that record.
+After the fix, rereading the four classified each one in about 5 s without
+storing them again. Regression tests cover a failed classification followed by
+a reread, and no further call once classified.
