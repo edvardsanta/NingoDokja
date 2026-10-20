@@ -53,6 +53,14 @@ func ValidateRead(payload map[string]any) error {
 	if tags := readingTags(payload["tags"], Reading{}); len(tags) > maxUserTags {
 		return fmt.Errorf("at most %d tags; two are kept for the reading's provenance", maxUserTags)
 	}
+	if raw, exists := payload["metadata"]; exists {
+		if _, err := decodeMetadata(raw); err != nil {
+			return err
+		}
+		if _, err := resolvedMetadata(raw, ClassificationValues{}, nil); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -68,19 +76,55 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 		return nil, fmt.Errorf("the reading has no documents")
 	}
 	request := reading.Payload
+	if raw, exists := request["metadata"]; exists {
+		if _, err := decodeMetadata(raw); err != nil {
+			return nil, err
+		}
+	}
+	metadata, err := resolvedMetadata(request["metadata"], readingDefaults(reading.Format), &ReadingProvenance{
+		Format: strings.TrimPrefix(reading.Format, "."), Reader: reading.Reader, ReaderVersion: reading.ReaderVersion,
+	})
+	if err != nil {
+		return nil, err
+	}
 	base, _ := request["source_id"].(string)
 	base = strings.TrimSpace(base)
 	if base == "" {
 		base = "file:" + safeID(path.Base(reading.Filename))
+	}
+	// On unchanged text, patch only assertions actually supplied in this request.
+	// The store performs a mechanical merge; precedence remains domain policy.
+	patch := map[string]any{"reading": metadata["reading"]}
+	if raw, exists := request["metadata"]; exists {
+		input, _ := decodeMetadata(raw)
+		if input.Form != "" {
+			patch["form"] = metadata["form"]
+			patch["form_choice"] = metadata["form_choice"]
+		}
+		if input.ContentKind != "" {
+			patch["content_kind"] = metadata["content_kind"]
+			patch["kind_choice"] = metadata["kind_choice"]
+		}
+		if input.Topics != nil {
+			patch["topics"] = input.Topics
+		}
+		if input.Entities != nil {
+			patch["entities"] = input.Entities
+		}
+		if input.DateAnchor != "" {
+			patch["date_anchor"] = input.DateAnchor
+		}
 	}
 	tags := readingTags(request["tags"], reading)
 
 	stored := make([]map[string]any, 0, len(reading.Documents))
 	for _, document := range reading.Documents {
 		payload := map[string]any{
-			"title": documentTitle(request, reading, document),
-			"body":  document.Text,
-			"tags":  tags,
+			"title":                 documentTitle(request, reading, document),
+			"body":                  document.Text,
+			"tags":                  tags,
+			"metadata":              metadata,
+			"metadata_if_unchanged": patch,
 		}
 		payload["source_id"] = base
 		if len(reading.Documents) > 1 {
@@ -103,6 +147,7 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 		if err != nil {
 			return stored, err
 		}
+		annotateClassification(result)
 		stored = append(stored, result)
 	}
 	return stored, nil

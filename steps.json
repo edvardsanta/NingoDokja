@@ -5,7 +5,7 @@
   "status": "in_progress",
   "updated_on": "2026-10-19",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
-  "current_step": null,
+  "current_step": "09",
   "status_values": [
     "pending",
     "in_progress",
@@ -479,13 +479,13 @@
     {
       "id": "08",
       "title": "Evaluate the architecture and select the next migrations",
-      "status": "pending",
+      "status": "completed",
       "depends_on": [
         "07"
       ],
       "deliverables": [
-        "Experiment comparison",
-        "Decision to adopt, revise, or stop each prototype"
+        "dokja_docs/step-08-evaluation.md (comparison and owner decisions)",
+        "dokja_orch/internal/handlers/step08_comparison_test.go (three modes on 8 fixed cases)"
       ],
       "acceptance_criteria": [
         "Existing behavior, workspace-only behavior, and shadow prediction are compared on fixed cases.",
@@ -493,36 +493,185 @@
         "Prediction skill, support, and feedback coverage are reported without claiming evidence from insufficient data.",
         "The remaining roadmap is revised from measured results before broad adoption."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "Existing, workspace-only and shadow modes deliver identical text on 8 fixed cases; task modes give a stable reason for abstention, unreadable media, Knowledge outage and degraded prediction where the existing path only logs or swallows it.",
+        "Workspace overhead with instant fakes: about 5-140 us per delivery; trace 0.5-2.0 KB per attempt. Shadow waits for Memory up to the 1 s budget (100 ms, 400 ms, 1.000 s at a 2 s delay); the other modes do not wait.",
+        "Live memory.recall on the owner's running Memory service (read-only, 31 requests): warm p50 26 ms, p95 32 ms; cold 1305 ms, which misses the 1 s budget.",
+        "Coupling per experiment commit and fault containment recorded; no envelope, schema, existing route or interface command changed; rollback is one composition line per orchestrator experiment.",
+        "Real prediction data: 7 hashtag.suggest attempts scored (5 legacy path, 2 task path), 0 resolved over 5 days; Brier and skill not computable; feedback coverage 0/7.",
+        "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets."
+      ],
+      "checks": [
+        {
+          "name": "comparison_invariants",
+          "status": "passed",
+          "detail": "go test -race ./... in dokja_orch, including TestStep08ModesDeliverTheSameTextOnEveryFixedCase."
+        },
+        {
+          "name": "latency_measurement",
+          "status": "passed",
+          "detail": "DOKJA_MEASURE=1 TestStep08DeliveryLatencyByMode: 50 runs per case and mode with instant fakes; 5 runs per Memory delay."
+        },
+        {
+          "name": "live_end_to_end",
+          "status": "skipped",
+          "detail": "The owner's stack runs the scheduler and Discord bot; only a read-only memory.recall was timed against it. OCR, Knowledge and delivery latency were not measured live."
+        },
+        {
+          "name": "prediction_skill",
+          "status": "blocked",
+          "detail": "0 resolved outcomes; ADR 0004 forbids claims without eligible outcomes."
+        }
+      ],
+      "blockers": [],
+      "completed_on": "2026-10-19"
     },
     {
       "id": "09",
       "title": "Adopt faculty boundaries in conversation, delivery and feature workflows",
-      "status": "pending",
+      "status": "in_progress",
       "depends_on": [
         "08"
       ],
       "deliverables": [
+        "Typed form/content classification with structured per-axis provenance in Knowledge (ADR 0008)",
         "Chat domain ownership migration",
         "Focused delivery and administration workflows",
-        "Book retired behind a book.* compatibility facade (ADR 0006)",
-        "Meme and Digest expressed as workflows over faculties behind meme.* and digest.* facades (ADR 0007)"
+        "Generic knowledge consolidation and summary flow; Book runtime retirement scope still to resolve",
+        "Meme and Digest expressed as workflows over faculties behind meme.* and digest.* facades (ADR 0007)",
+        "dokja_domain/dokja_knowledge/classification.go",
+        "dokja_domain/dokja_knowledge/classification_test.go",
+        "dokja_docs/step-09-consolidation.md"
       ],
       "acceptance_criteria": [
+        "Order: generic classification and knowledge consolidation (ADR 0008), then Meme and Digest faculty workflows, then chat ownership; preserve Book runtime contracts until retirement scope is resolved.",
         "Conversation policy has one authoritative domain implementation.",
         "System-handler responsibilities have explicit owners and focused adapters.",
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
-        "book.* routes and the CLI book command are served by reading -> Knowledge -> generation; removing the facade, Book domain and Book service waits for the owner's approval.",
+        "The generic flow covers existing Book uses before the approved CLI book removal; remaining book.* route/domain/service retirement scope is resolved explicitly under ADR 0008.",
         "Meme scrapers and OCR run as reading plugins with the pool as a reading cache, screening sits under Moderation, digest ordering and the hashtag relevance threshold under Attention, and sent receipts are experience, with existing commands and triggers passing their baseline tests.",
         "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that.",
-        "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06)."
+        "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06).",
+        "New workflows meet the step 08 budgets: workspace overhead at most 1 ms p95 per task; shadow prediction at most 1 s on a delivery path; on-demand reading within the plugin's manifest timeout, at most 2 minutes."
       ],
-      "evidence": [],
-      "checks": [],
-      "blockers": []
+      "evidence": [
+        "Step 09.1 complete: typed classification/provenance foundation with regression tests; see dokja_docs/step-09-consolidation.md. Representation decisions recorded in ADR 0008.",
+        "Step 09.2 storage foundation and deterministic Reading integration implemented in .worktrees/knowledge-metadata; provider classification/cache and explicit reclassification remain pending. Generic consolidation, remaining Book retirement scope and other faculty migrations remain pending."
+      ],
+      "checks": [
+        {
+          "name": "knowledge_module",
+          "status": "passed",
+          "detail": "go test -race ./... and go vet ./... in dokja_domain/dokja_knowledge."
+        },
+        {
+          "name": "orchestrator_compatibility",
+          "status": "passed",
+          "detail": "go test ./... -count=1 in dokja_orch."
+        },
+        {
+          "name": "sandbox_rerun",
+          "status": "passed",
+          "detail": "Initial sandboxed checks hit read-only Go cache and denied local test sockets; required checks passed on the escalated rerun."
+        }
+      ],
+      "blockers": [],
+      "started_on": "2026-10-19",
+      "revision_reason": "ADR 0008 supersedes the planned Book-specific facade with generic knowledge consolidation. Owner confirmed separate form/content labels and defining metadata separate from free-form tags.",
+      "substeps": [
+        {
+          "id": "09.1",
+          "title": "Define Knowledge classification contract and provenance-aware precedence",
+          "status": "completed",
+          "evidence": [
+            "Owner confirmed separate form and content-kind labels and defining metadata separate from free-form tags.",
+            "Owner correction: general is not a taxonomy value. Explicit user input wins; missing or uncertain axes remain null and require user clarification. A valid proposal/default never overrides an axis awaiting the user.",
+            "Invalid user/configured defaults are refused; uncertain, invalid or unavailable provider output keeps the affected axis pending with fixed diagnostics while retaining valid axes."
+          ],
+          "checks": [
+            {
+              "name": "knowledge_module",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./... in dokja_domain/dokja_knowledge."
+            },
+            {
+              "name": "orchestrator_compatibility",
+              "status": "passed",
+              "detail": "go test ./... -count=1 in dokja_orch."
+            },
+            {
+              "name": "sandbox_rerun",
+              "status": "passed",
+              "detail": "Initial sandboxed checks hit read-only Go cache and denied local test sockets; required checks passed on the escalated rerun."
+            }
+          ],
+          "completed_on": "2026-10-19"
+        },
+        {
+          "id": "09.2",
+          "title": "Integrate structured metadata persistence and reading-time classification with migration review",
+          "status": "in_progress",
+          "evidence": [
+            "Structured metadata accepted/resolved by the Knowledge domain and attached to Reading ingests; reader version and per-axis provenance are stored separately from tags.",
+            "Knowledge schema 2 adds document_metadata. Search/list expose metadata; legacy kinds and tag limits remain unchanged.",
+            "Metadata-only updates preserve chunks, embeddings and embedding-cache revision; unchanged rereads patch only explicit assertions and reader provenance.",
+            "Disposable migration tests cover schema-1 preservation, transactional failure rollback, old-build refusal, offline metadata downgrade and re-upgrade.",
+            "dokja_docs/step-09-consolidation.md",
+            "dokja_docs/production-runbook.md#knowledge-metadata-schema-upgrade",
+            "Owner rejected general and confirmed that only the user resolves uncertainty: nullable axes, user_required provenance and domain-owned per-document questions are implemented and regression-tested."
+          ],
+          "checks": [
+            {
+              "name": "knowledge_service",
+              "status": "passed",
+              "detail": "148 passed, 8 skipped (live Ollama unavailable); includes nullable classification, reread preservation and user-answer metadata updates."
+            },
+            {
+              "name": "knowledge_domain",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./..."
+            },
+            {
+              "name": "orchestrator",
+              "status": "passed",
+              "detail": "go test ./... -count=1"
+            },
+            {
+              "name": "diff_check",
+              "status": "passed",
+              "detail": "git diff --check"
+            },
+            {
+              "name": "secret_policy_scan",
+              "status": "passed",
+              "detail": "Repository-pinned gitleaks v8.28.0: staged credential and project-policy scans passed during PR preparation."
+            }
+          ],
+          "started_on": "2026-10-19",
+          "worktree": ".worktrees/knowledge-metadata",
+          "branch": "feat/knowledge-metadata",
+          "remaining": [
+            "Connect a versioned reading-time classifier capability and provider failure behavior.",
+            "Add content/provider-version classification caching and explicit reclassification with no repeat inference on unchanged reads.",
+            "Present classification questions in interfaces and resume the existing read request using explicit user answers; automatic conversational continuation is not implemented yet."
+          ]
+        },
+        {
+          "id": "09.3",
+          "title": "Implement generic consolidation and summary methods; resolve remaining Book retirement scope",
+          "status": "pending",
+          "evidence": [],
+          "checks": []
+        },
+        {
+          "id": "09.4",
+          "title": "Migrate Meme, Digest, delivery and conversation responsibilities to faculties",
+          "status": "pending",
+          "evidence": [],
+          "checks": []
+        }
+      ]
     },
     {
       "id": "10",
@@ -533,18 +682,35 @@
       ],
       "deliverables": [
         "State ownership and migration decisions",
-        "Durable acceptance and recovery for selected workflows"
+        "Durable acceptance and recovery for selected workflows",
+        "Workload-driven cognitive storage comparison and evidence-backed engine decision (ADR 0009)"
       ],
       "acceptance_criteria": [
         "Each durable state kind has an owner, migration path, and rollback strategy.",
         "Required jobs persist acceptance before acknowledgment and recover from restart.",
         "Retries and execution receipts handle duplicates and partial failures under explicit delivery guarantees.",
         "Any change to canonical service responsibilities is agreed before its implementation.",
-        "Affected compose files and production documentation accompany configuration or storage changes."
+        "Affected compose files and production documentation accompany configuration or storage changes.",
+        "Decide where task traces and attempts are kept; today they are lost after the reply (step 08).",
+        "Experience recording no longer depends on undurable background work, or its loss is defined (step 08).",
+        "The Knowledge client's 5 s timeout no longer reports a stored document as failed (step 07).",
+        "Prediction feedback has a channel that produces resolved outcomes; evaluate a local agent CLI (Claude Code or Codex) before Ollama for judgment work, off the delivery path, keeping an embedder for recall (owner direction, step 08).",
+        "Compare SQLite, PostgreSQL+pgvector and Neo4j on the cognitive graph workloads before selecting an engine; document correctness, filtered recall, bounded traversal, ownership, concurrency and recovery. Research alone does not authorize migration."
       ],
-      "evidence": [],
+      "evidence": [
+        "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet."
+      ],
       "checks": [],
-      "blockers": []
+      "blockers": [],
+      "research": {
+        "status": "completed",
+        "completed_on": "2026-10-19",
+        "document": "dokja_docs/cognitive-storage-research.md",
+        "decision": "dokja_docs/decisions/0009-cognitive-storage-evaluation.md",
+        "recommendation_status": "proposed",
+        "benchmarks": "not_run",
+        "next_action": "Define the first graph consumer and scope/durability requirements, then run an isolated correctness-first comparison. Step 10 implementation remains pending."
+      }
     },
     {
       "id": "11",
@@ -562,12 +728,13 @@
         "Process boundaries follow measured dependencies, resource needs, and failure-isolation requirements.",
         "All affected module and integration checks are recorded accurately.",
         "Architecture references, capability map, plugin documentation, and this tracker reflect delivered behavior.",
-        "Production rollout remains a separate action requiring user approval."
+        "Production rollout remains a separate action requiring user approval.",
+        "Review the Feeds reading host's image (Python, pypdf version split with Knowledge), plugin permissions and the absence of a sandbox (step 07)."
       ],
       "evidence": [],
       "checks": [],
       "blockers": []
     }
   ],
-  "next_step": "08"
+  "next_step": null
 }

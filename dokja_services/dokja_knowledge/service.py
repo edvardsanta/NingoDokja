@@ -27,6 +27,7 @@ from chunker import chunk_text
 from embedder import EmbedUnavailable
 from extractors import ExtractError, Registry, default_registry
 from store import Store
+from metadata import encode_metadata
 
 logger = logging.getLogger("dokja_knowledge.service")
 
@@ -130,6 +131,10 @@ class KnowledgeService:
         if not KIND.match(kind):
             raise ValueError("kind must be a short lowercase word such as note, article or book")
         tags = self._tags(payload.get("tags"))
+        metadata = encode_metadata(payload["metadata"]) if "metadata" in payload else None
+        patch = encode_metadata(payload["metadata_if_unchanged"]) if "metadata_if_unchanged" in payload else None
+        if patch is not None and metadata is None:
+            raise ValueError("metadata_if_unchanged requires metadata")
         explicit_id = str(payload.get("source_id") or "").strip()
         if explicit_id and not SOURCE_ID.match(explicit_id):
             raise ValueError("source_id may only use letters, digits and . _ : / # @ -")
@@ -146,7 +151,7 @@ class KnowledgeService:
                 source_id = f"{base}#{hashlib.sha1(document.key.encode()).hexdigest()[:10]}"
             if not SOURCE_ID.match(source_id):
                 raise ValueError("source_id may only use letters, digits and . _ : / # @ -")
-            results.append(self._store(document, kind, override_ref or document.source_ref, source_id, tags))
+            results.append(self._store(document, kind, override_ref or document.source_ref, source_id, tags, metadata, patch))
 
         embedded, degraded, reason = 0, False, ""
         if any(result["changed"] for result in results):
@@ -161,7 +166,7 @@ class KnowledgeService:
         summary = {
             "documents": results, "count": len(results),
             "created": sum(1 for r in results if r["created"]),
-            "unchanged": sum(1 for r in results if not r["changed"]),
+            "unchanged": sum(1 for r in results if not r["changed"] and not r.get("metadata_changed")),
             "chunks": sum(r.get("chunks", 0) for r in results),
             "embedded": embedded, "degraded": degraded,
         }
@@ -169,7 +174,7 @@ class KnowledgeService:
             summary["reason"] = reason
         return summary
 
-    def _store(self, document: "_Document", kind: str, source_ref: str, source_id: str, tags: list[str]) -> dict:
+    def _store(self, document: "_Document", kind: str, source_ref: str, source_id: str, tags: list[str], metadata: str | None = None, patch: str | None = None) -> dict:
         title = document.title.strip()[:MAX_TITLE_CHARS]
         body = document.body
         if not title:
@@ -183,16 +188,28 @@ class KnowledgeService:
         ).hexdigest()
         existing = self.store.get_document(source_id)
         if existing is not None and existing["content_hash"] == digest:
+            if patch is not None:
+                previous = json.loads(self.store.get_metadata(existing["id"]))
+                # Backfill defaults once for legacy rows, then preserve unspecified fields.
+                merged = json.loads(metadata)
+                merged.update(previous)
+                merged.update(json.loads(patch))
+                metadata = encode_metadata(merged)
+            metadata_changed = (self.store.update_metadata(existing["id"], metadata)
+                                if metadata is not None else False)
             return {"source_id": source_id, "created": False, "changed": False,
+                    "metadata_changed": metadata_changed,
+                    "metadata": json.loads(self.store.get_metadata(existing["id"])),
                     "pending_embeddings": len(self.store.chunks_needing_embedding(self.model))}
         chunks = chunk_text(body)
         if not chunks:
             raise ValueError("the document has no text to store")
         document_id, created = self.store.replace_document(
-            source_id, title, kind, source_ref, ",".join(tags), digest, chunks
+            source_id, title, kind, source_ref, ",".join(tags), digest, chunks, metadata or "{}"
         )
         return {"source_id": source_id, "document_id": document_id, "created": created,
-                "changed": True, "chunks": len(chunks)}
+                "changed": True, "chunks": len(chunks),
+                "metadata": json.loads(self.store.get_metadata(document_id))}
 
     # ---- where the text comes from --------------------------------------------------
 
@@ -344,6 +361,7 @@ class KnowledgeService:
                 "rank": position + 1,
                 "source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
                 "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
+                "metadata": json.loads(row["metadata"]),
                 "position": row["position"], "heading": row["heading"], "text": row["text"],
                 "score": round(score, 4) if score is not None else None,
                 "coverage": round(coverage, 3), "relevant": bool(relevant),
@@ -398,6 +416,7 @@ class KnowledgeService:
             document = {
                 "source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
                 "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
+                "metadata": json.loads(row["metadata"]),
                 "chunks": row["chunks"], "embedded": row["embedded"] or 0, "updated_at": row["updated_at"],
             }
             if include_text:

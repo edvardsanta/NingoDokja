@@ -1,6 +1,6 @@
 # ADR 0001: scoped task workspace owned by orchestration
 
-Date: 2026-10-18. Status: accepted for prototype. Implementation: step `04`,
+Date: 2026-10-18. Status: adopted for multi-faculty workflows (step `08`, [evaluation](../step-08-evaluation.md)). Implementation: step `04`,
 [task.go](../../dokja_orch/internal/core/task.go) and
 [task_runner.go](../../dokja_orch/internal/core/task_runner.go); not yet wired into
 any workflow. Evidence from a store without a scope model (Knowledge, Memory) is

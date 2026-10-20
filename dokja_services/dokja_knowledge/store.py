@@ -54,6 +54,12 @@ MIGRATIONS = [
         INSERT INTO chunks_fts(rowid, text, heading) VALUES (new.id, new.text, new.heading);
     END;
     """,
+    """
+    CREATE TABLE document_metadata (
+        document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+        metadata TEXT NOT NULL
+    );
+    """,
 ]
 
 
@@ -87,9 +93,16 @@ class Store:
                 f"knowledge database is version {current}, newer than this build understands"
             )
         for index in range(current, len(MIGRATIONS)):
-            with self.conn:
-                self.conn.executescript(MIGRATIONS[index])
-                self.conn.execute(f"PRAGMA user_version = {index + 1}")
+            try:
+                self.conn.executescript(f"""
+                    BEGIN IMMEDIATE;
+                    {MIGRATIONS[index]}
+                    PRAGMA user_version = {index + 1};
+                    COMMIT;
+                """)
+            except Exception:
+                self.conn.rollback()
+                raise
 
     # ---- documents ------------------------------------------------------------------
 
@@ -97,7 +110,7 @@ class Store:
         return self.conn.execute("SELECT * FROM documents WHERE source_id = ?", (source_id,)).fetchone()
 
     def replace_document(self, source_id: str, title: str, kind: str, source_ref: str, tags: str,
-                         content_hash: str, chunks: list[Chunk]) -> tuple[int, bool]:
+                         content_hash: str, chunks: list[Chunk], metadata: str = "{}") -> tuple[int, bool]:
         """Create or fully replace a document and its chunks, atomically.
 
         Returns (document id, created). Old chunks are removed first, so an edited
@@ -125,8 +138,31 @@ class Store:
                 "INSERT INTO chunks(document_id, position, heading, text) VALUES (?, ?, ?, ?)",
                 [(document_id, c.position, c.heading, c.text) for c in chunks],
             )
+            self._write_metadata(document_id, metadata)
         self.version += 1
         return document_id, created
+
+    def get_metadata(self, document_id: int) -> str:
+        row = self.conn.execute(
+            "SELECT metadata FROM document_metadata WHERE document_id = ?", (document_id,)
+        ).fetchone()
+        return row["metadata"] if row is not None else "{}"
+
+    def _write_metadata(self, document_id: int, metadata: str) -> None:
+        self.conn.execute(
+            """INSERT INTO document_metadata(document_id, metadata) VALUES (?, ?)
+               ON CONFLICT(document_id) DO UPDATE SET metadata = excluded.metadata""",
+            (document_id, metadata),
+        )
+
+    def update_metadata(self, document_id: int, metadata: str) -> bool:
+        """Update defining metadata without replacing chunks or invalidating embeddings."""
+        if self.get_metadata(document_id) == metadata:
+            return False
+        with self.conn:
+            self._write_metadata(document_id, metadata)
+            self.conn.execute("UPDATE documents SET updated_at = ? WHERE id = ?", (_now(), document_id))
+        return True
 
     def delete_document(self, source_id: str) -> bool:
         with self.conn:
@@ -142,10 +178,11 @@ class Store:
     def list_documents(self, limit: int, offset: int, kind: str = "") -> list[sqlite3.Row]:
         return self.conn.execute(
             """
-            SELECT d.*, COUNT(c.id) AS chunks,
+            SELECT d.*, COALESCE(m.metadata, '{}') AS metadata, COUNT(c.id) AS chunks,
                    SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) AS embedded
             FROM documents d
             LEFT JOIN chunks c ON c.document_id = d.id
+            LEFT JOIN document_metadata m ON m.document_id = d.id
             WHERE (? = '' OR d.kind = ?)
             GROUP BY d.id
             ORDER BY d.updated_at DESC, d.id DESC
@@ -249,8 +286,12 @@ class Store:
             return {}
         marks = ",".join("?" for _ in ids)
         rows = self.conn.execute(
-            f"SELECT c.id, c.position, c.heading, c.text, d.source_id, d.title, d.kind, d.source_ref, d.tags"
-            f" FROM chunks c JOIN documents d ON d.id = c.document_id WHERE c.id IN ({marks})",
+            f"""SELECT c.id, c.position, c.heading, c.text,
+                       d.source_id, d.title, d.kind, d.source_ref, d.tags,
+                       COALESCE(m.metadata, '{{}}') AS metadata
+                FROM chunks c JOIN documents d ON d.id = c.document_id
+                LEFT JOIN document_metadata m ON m.document_id = d.id
+                WHERE c.id IN ({marks})""",
             ids,
         ).fetchall()
         return {row["id"]: row for row in rows}
