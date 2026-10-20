@@ -58,7 +58,7 @@ Principles that stay:
 | Topic | Decision |
 |---|---|
 | Naming | Neutral in code, docs and UI: feeds, digest, reading. No source, provider or URL is committed; sources are runtime inputs supplied by the owner. |
-| Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. |
+| Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. The workspace replan keeps it: a document or a conversation opens in a tab inside the work area, not in a second window (the owner, 2026-10-19). |
 | Voice | Visual only in v1. Voice comes after the digest works (Phase 4). |
 | Cards | Knowledge and books, memes, memory and health, plus the personal cards (weather, agenda, mail). Feeds are the first new card. |
 | Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. Kept by the owner on 2026-10-19: the workspace replan changes the layout, not the look. |
@@ -462,8 +462,8 @@ code is taken.
   the actions that row already has (open, delete, send), instead of buttons on every row.
 - **Empty states that say what to do next**, not a greeting: "no source is followed; add a plugin to
   the feeds service", "the research base is empty; drop a file here".
-- **Later, tool panels.** A secondary view (a meme, a document) can sit beside the work area instead of
-  replacing it.
+- **Later, tabs in the work area.** A document or a conversation opens in a tab of its own on top of
+  the work area, like a browser tab, so several stay open and the owner moves between them.
 
 Not taken: email, calendar, model management and side-by-side model comparison, and the reference's
 visual style. The look stays the dead-channel cyberpunk under Identity, applied to the new layout: the
@@ -504,7 +504,7 @@ workspace nobody opened must still not ask its service.
   projection of each reply.
 - A change needs a real click or key press; destructive ones keep their native confirmation.
 - A workspace is mounted the first time it opens and then kept, as the tabs are today.
-- One normal window. Tool panels live inside it; no second OS window.
+- One normal window. Several open views are tabs inside it (Phase C), never a second window.
 
 ### Phases
 
@@ -513,17 +513,19 @@ A. **Shell restructure (desktop only, no backend change).** The sidebar replaces
    i18n labels follow, and the README's tab table is rewritten. One PR. Tests: sidebar keyboard and
    ARIA with Vitest, the existing end-to-end smoke updated.
 B. **Composer.**
-   - B0, optional: before chat exists, the composer runs actions already on the allow-list. Plain text
-     searches the research base (`knowledge.search`), and the result opens in Knowledge. No backend
-     change.
+   - B0 (dropped by the owner on 2026-10-19): a command line over existing actions before chat
+     exists. The composer waits for the chat plan instead.
    - B1: a text conversation with Ningo. It is gated on the chat plan (`dokja_docs/chat-plan.md` on the
      unmerged branch `docs/chat-plan`), whose decisions are still open. It needs `desktop` in the chat handler's source
      list (`dokja_orch/internal/handlers/chat_domain_handler.go`, additive), a request action for one
      chat turn that the shell can allow-list, and the session and history ownership that chat-plan
      decides. The cross-layer path (domain, route, workflow step, handler) is designed there, not here.
-C. **Context menus and tool panels.** Context menus on documents and conversations, then a
-   document view as a panel beside the work area. Panels open at once share
-   the one request queue, so each kind has at most one panel.
+C. **Context menus and tabs in the work area.** Context menus on documents and conversations, then
+   a tab strip on top of the work area: opening a document or a conversation adds a tab, the
+   workspace's own view stays the first tab, and a tab closes with its button or Ctrl+W. Everything
+   stays in the one window, so the sandbox, the press check and the confirmations do not change. Each
+   tab asks the orchestrator only when it opens, and the requests wait in the one line in the main
+   process like any other. The owner chose tabs over separate windows on 2026-10-19.
 
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
 this shell. They are not cards in a briefing.
@@ -535,12 +537,13 @@ this shell. They are not cards in a briefing.
   `Ctrl+5` and up and down arrows in the sidebar. A composer that always takes text cannot also take
   bare digits.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
+- Phase C: no backend change and no shell change; it is all in the screen.
 
-### Open questions for the owner
+### Owner decisions
 
-Answered on 2026-10-19: the look stays cyberpunk.
+Answered on 2026-10-19: the look stays cyberpunk; memes have no workspace and are picked in Messages;
+the composer waits for the chat plan (no B0); open views are tabs in the work
+area, not separate windows; the morning briefing is dropped, with no "Today" workspace. The owner
+will plan a replacement later, separately from this replan.
 
-1. Morning briefing: drop it, or keep it as an optional "Today" workspace?
-2. Composer before chat: ship B0, a command line over existing actions, or wait for chat-plan?
-3. Tool panels: inside the one window only, or real OS windows? The second option reopens the
-   "normal window" decision.
+No question is open.
