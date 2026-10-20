@@ -439,10 +439,12 @@ services that are off.
 
 ## Workspace replan (2026-10-19)
 
-Status: proposed. Phase A's shell is built on branch `feat/desktop-workspace`: the sidebar, System at
-its foot with the problem count, the dots, the new keys, and the memes picked in
-Messages instead of a workspace of their own. The view-level changes below (Messages as
-a messenger, the drop zone over Knowledge) and Phases B and C are not built.
+Status: Phase A is built, on stacked branches: `feat/desktop-workspace` (the sidebar, System at its
+foot with the problem count, the dots, the new keys, and the memes picked in Messages instead of a
+workspace of their own), `feat/desktop-messages` (Messages as a messenger), `feat/desktop-knowledge-drop`
+(a file dropped anywhere on Knowledge) and `feat/desktop-names` (panels named after their workspaces,
+and an empty research base that says where a file goes). Phase B waits for the chat plan; Phase C
+waits for the owner (see its gap below).
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
@@ -509,8 +511,7 @@ workspace nobody opened must still not ask its service.
 ### Phases
 
 A. **Shell restructure (desktop only, no backend change).** The sidebar replaces `Tabs`, health
-   splits into System and the sidebar's foot, the cards lose their frame and become views, keys and
-   i18n labels follow, and the README's tab table is rewritten. One PR. Tests: sidebar keyboard and
+   splits into System and the sidebar's foot, keys and i18n labels follow, and the README's tab table is rewritten. One PR. Tests: sidebar keyboard and
    ARIA with Vitest, the existing end-to-end smoke updated.
 B. **Composer.**
    - B0 (dropped by the owner on 2026-10-19): a command line over existing actions before chat
@@ -527,6 +528,18 @@ C. **Context menus and tabs in the work area.** Context menus on documents and c
    tab asks the orchestrator only when it opens, and the requests wait in the one line in the main
    process like any other. The owner chose tabs over separate windows on 2026-10-19.
 
+   The cards kept their chamfered panel instead of losing their frame: it is the cyberpunk look the
+   owner kept, and the panel's legend now names the workspace.
+
+   **Gap found while building Phase A.** A document tab has nothing to show: the orchestrator has no
+   action that returns one document's text (`knowledge.read` reads a file into the base, and
+   `knowledge.search` takes only a query, with no filter by document), so a tab could only repeat the
+   row of the list. A conversation tab would repeat the messenger list. Without them, Phase C is only a
+   context menu offering what the rows already offer. Showing a document needs a new action through
+   the domain, the orchestrator and the knowledge service, which is a separate track from this
+   desktop-only work. Also: the window keeps Electron's default menu, where Ctrl+W closes the window,
+   so a tab strip needs another key or the menu replaced.
+
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
 this shell. They are not cards in a briefing.
 
@@ -537,7 +550,8 @@ this shell. They are not cards in a briefing.
   `Ctrl+5` and up and down arrows in the sidebar. A composer that always takes text cannot also take
   bare digits.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
-- Phase C: no backend change and no shell change; it is all in the screen.
+- Phase C: as planned, no backend or shell change; a document tab with content needs a new backend
+  action (see the gap above).
 
 ### Owner decisions
 
