@@ -48,10 +48,11 @@ func storedDocument(id string, changed bool, metadata map[string]any) map[string
 	return map[string]any{"source_id": id, "changed": changed, "metadata": metadata}
 }
 
-func TestClassificationCandidatesAreNewContentWithUndecidedAxes(t *testing.T) {
+func TestClassificationCandidatesAreContentNoClassifierSawWithUndecidedAxes(t *testing.T) {
 	stored := []map[string]any{
 		storedDocument("new", true, map[string]any{"form": nil, "form_choice": pending(), "content_kind": nil, "kind_choice": pending()}),
-		storedDocument("unchanged", false, map[string]any{"form": nil, "form_choice": pending(), "content_kind": nil, "kind_choice": pending()}),
+		storedDocument("seen", false, map[string]any{"form": nil, "form_choice": pending(), "content_kind": nil, "kind_choice": pending(),
+			"classifier": map[string]any{"id": "kinds", "version": "1"}}),
 		storedDocument("decided", true, map[string]any{"form": "book", "form_choice": map[string]any{"origin": "source_default"},
 			"content_kind": "research", "kind_choice": map[string]any{"origin": "user"}}),
 		storedDocument("epub", true, map[string]any{"form": "book", "form_choice": map[string]any{"origin": "source_default"},
@@ -61,9 +62,10 @@ func TestClassificationCandidatesAreNewContentWithUndecidedAxes(t *testing.T) {
 		storedDocument("note", true, map[string]any{"form": "note", "form_choice": map[string]any{"origin": "user"}, "content_kind": nil, "kind_choice": pending()}),
 		storedDocument("chat", true, map[string]any{"form": "conversation", "form_choice": map[string]any{"origin": "user"}, "content_kind": nil, "kind_choice": pending()}),
 		{"source_id": "no metadata", "changed": true},
+		storedDocument("stored before, never classified", false, map[string]any{"form": nil, "form_choice": pending(), "content_kind": nil, "kind_choice": pending()}),
 	}
-	if got := ClassificationCandidates(stored); !reflect.DeepEqual(got, []int{0, 3, 5, 6}) {
-		t.Fatalf("candidates=%v, want new content with an undecided axis, notes and conversations included", got)
+	if got := ClassificationCandidates(stored); !reflect.DeepEqual(got, []int{0, 3, 5, 6, 8}) {
+		t.Fatalf("candidates=%v, want content no classifier has seen with an undecided axis, notes and conversations included", got)
 	}
 }
 

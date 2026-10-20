@@ -49,14 +49,16 @@ imply a content kind. Missing or uncertain axes are `null`; `general` is not a
 classification value. Only explicit user input resolves an uncertain axis.
 
 When the reading host has an enabled `document.classify.v1` plugin, `knowledge.read`
-sends it the documents whose content was stored just now and whose form or content
+sends it the documents read whose form or content
 kind nobody decided (the user, the source, or an earlier question), whatever its
 form: enabling a classifier is the owner's permission to send it. The domain resolves each proposal and patches the
 undecided axes with `classifier` provenance, and fills `topics`, `entities` and
 `date_anchor` only when the request gave none. The patch is bound to the snapshot
 revision, so a user answer given meanwhile wins. The stored `classifier`
 (`{id, version}`) records which classifier saw the current content. An unchanged
-reread is not sent again; a new classifier version does not reclassify stored
+reread of a document a classifier already saw is not sent again; one stored without
+a classification (the classifier failed or timed out, or was enabled later) is sent
+the next time it is read. A new classifier version does not reclassify stored
 documents by itself. A missing, failing or invalid classifier leaves the documents
 stored with their questions pending, and the reply's `classification.reason` says why.
 

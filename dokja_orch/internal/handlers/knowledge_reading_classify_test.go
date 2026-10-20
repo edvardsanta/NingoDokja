@@ -189,3 +189,26 @@ func TestKnowledgeReadKeepsTheDocumentsWhenClassificationFails(t *testing.T) {
 		}
 	}
 }
+
+func TestKnowledgeReadClassifiesOnRereadWhatAFailedClassificationLeftPending(t *testing.T) {
+	reader := &classifyingReader{fakeReader: fakeReader{answer: readAnswer("Focus is a skill.")},
+		err: errors.New("timeout: timed out after 3m0s")}
+	knowledge := newKnowledgeStore()
+	service := classifyOrchestrator(reader, knowledge)
+
+	readFile(t, service, nil)
+	if knowledge.metadata["file:Deep-Work.pdf"]["classifier"] != nil {
+		t.Fatal("a failed classification records no classifier")
+	}
+	reader.err = nil
+	reader.proposals = []any{map[string]any{"form": "book", "content_kind": "research"}}
+	answer := readFile(t, service, nil)
+	metadata := knowledge.metadata["file:Deep-Work.pdf"]
+	if len(reader.sent) != 2 || metadata["content_kind"] != "research" || answer["classification"].(map[string]any)["classified"] != 1 {
+		t.Fatalf("an unchanged reread classifies what no classifier has seen: sent=%d metadata=%v", len(reader.sent), metadata)
+	}
+	readFile(t, service, nil)
+	if len(reader.sent) != 2 {
+		t.Fatal("once classified, an unchanged reread does not ask again")
+	}
+}

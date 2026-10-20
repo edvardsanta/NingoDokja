@@ -7,6 +7,7 @@
 # a directory only this user can open, and reads plugins from FEEDS_PLUGINS_DIR (default
 # FEEDS_PLUGINS_HOST_DIR, then ./feeds_plugins). Plugins get only the variables their manifest
 # lists, from this shell: export AGENT_KINDS_* here to configure the agent-kinds classifier.
+# Plugins run the programs on this shell's PATH; knowledge-extractors needs python3 with pypdf.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

@@ -21,18 +21,21 @@ type ReadingProposal struct {
 }
 
 // ClassificationCandidates names the stored documents of a reading that a classifier may
-// see (ADR 0008). Only content stored just now qualifies: an unchanged reread keeps what was
-// decided before and never asks again. A document is skipped when nothing is left to
-// propose for its axes. Every form may be sent, notes and conversations included: enabling
-// a classifier is the owner's permission to send it what was read (ADR 0008).
+// see (ADR 0008). A document qualifies until a classifier has seen its current content: the
+// stored classifier record is the cache, and changed content clears it. So an unchanged
+// reread never asks again, while a document stored without a classification (a classifier
+// that failed or timed out, or one read before a classifier was enabled) is classified the
+// next time it is read. A document is skipped when nothing is left to propose for its axes.
+// Every form may be sent, notes and conversations included: enabling a classifier is the
+// owner's permission to send it what was read (ADR 0008).
 func ClassificationCandidates(stored []map[string]any) []int {
 	var candidates []int
 	for i, result := range stored {
-		if changed, _ := result["changed"].(bool); !changed {
-			continue
-		}
 		metadata, _ := result["metadata"].(map[string]any)
 		if metadata == nil {
+			continue
+		}
+		if _, seen := metadata["classifier"]; seen {
 			continue
 		}
 		if awaitingClassifier(metadata, "form_choice") || awaitingClassifier(metadata, "kind_choice") {

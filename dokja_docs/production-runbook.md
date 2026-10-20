@@ -322,7 +322,8 @@ one on a LAN address would expose an unauthenticated service that spends the own
 overlay keeps the `dokja-feeds` container from starting (profile `container-feeds`). The script reads
 plugins from `FEEDS_PLUGINS_DIR`, then `FEEDS_PLUGINS_HOST_DIR`, then `./feeds_plugins`, and points
 `KNOWLEDGE_EXTRACTORS_DIR` at this checkout. Plugins get only the variables their manifest lists, from
-the shell that runs the script. To go back, stop the script and start the stack without the overlay.
+the shell that runs the script, and run the programs found on its `PATH`: `knowledge-extractors` needs a
+`python3` with `pypdf` there to read PDFs (the image has it; a host may not). To go back, stop the script and start the stack without the overlay.
 It sees a 16,000-character sample of each new document, shares the 2 reading slots and stops at its
 manifest timeout or 3 minutes. A classifier that calls a remote model sends that text to its provider, so
 enable one only for documents you are willing to send. Without one, or when it fails, documents are stored

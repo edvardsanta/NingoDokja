@@ -123,9 +123,10 @@ Purpose:
   source and `format:<ext>` and `reader:<plugin>` tags as provenance
 - run as a typed task (`read`, `ingest`, then `classify`); the file and its text stay
   outside the workspace, which records a hashed reference and the reader's version
-- classify the documents stored just now whose form or content kind nobody decided
+- classify the documents read whose form or content kind nobody decided
   through the enabled `document.classify.v1` plugin (`feeds.classify`), whatever their
-  form; an unchanged reread is not sent again
+  form, until a classifier has seen their current content; a failed or timed-out
+  classification is retried on the next reread
 
 The payload is `filename` and `content_b64`, plus the optional `title`, `kind`, `tags`,
 `source_id` and `source_ref` that `knowledge.ingest` takes. A failure names its step
