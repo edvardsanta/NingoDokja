@@ -304,6 +304,25 @@ file keeps working as before.
 An enabled `document.classify.v1` plugin (at most one) classifies what `knowledge.read` stored. The
 `agent-kinds` example (disabled) asks Claude Code, then Codex, then Ollama; it needs Feeds running where
 those CLIs are logged in, which is not the image. See its variables in the Feeds README.
+
+To run Feeds on the host, start `scripts/run-host-feeds.sh` and add the `docker-compose.host-feeds.yml`
+overlay to the stack, with `DOKJA_FEEDS_SOCKET_DIR` set to the same directory (the script's default is
+`$XDG_RUNTIME_DIR/dokja-feeds`):
+
+```sh
+scripts/run-host-feeds.sh
+DOKJA_FEEDS_SOCKET_DIR=$XDG_RUNTIME_DIR/dokja-feeds \
+  podman-compose -f docker-compose.lite.yml -f docker-compose.host-feeds.yml up -d
+```
+
+Feeds then listens on a ZeroMQ unix socket (`ipc://`), not a TCP port: the directory is mode 700, so only
+the owner's user can connect, and nothing is reachable from the network. A rootless container reaches it
+through the mount; a listener on the host's `127.0.0.1` would not be reachable from the containers, and
+one on a LAN address would expose an unauthenticated service that spends the owner's CLI logins. The
+overlay keeps the `dokja-feeds` container from starting (profile `container-feeds`). The script reads
+plugins from `FEEDS_PLUGINS_DIR`, then `FEEDS_PLUGINS_HOST_DIR`, then `./feeds_plugins`, and points
+`KNOWLEDGE_EXTRACTORS_DIR` at this checkout. Plugins get only the variables their manifest lists, from
+the shell that runs the script. To go back, stop the script and start the stack without the overlay.
 It sees a 16,000-character sample of each new document, shares the 2 reading slots and stops at its
 manifest timeout or 3 minutes. A classifier that calls a remote model sends that text to its provider, so
 enable one only for documents you are willing to send. Without one, or when it fails, documents are stored

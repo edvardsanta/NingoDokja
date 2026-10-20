@@ -1,0 +1,17 @@
+# Overlay: the reading host (Feeds) runs on the owner's machine instead of in a container,
+# so its plugins can use what is installed and logged in there, such as the agent CLIs of
+# the agent-kinds classifier (ADR 0008). Start it with scripts/run-host-feeds.sh, then:
+#
+#   DOKJA_FEEDS_SOCKET_DIR=$XDG_RUNTIME_DIR/dokja-feeds \
+#     podman-compose -f docker-compose.lite.yml -f docker-compose.host-feeds.yml up -d
+#
+# The orchestrator reaches Feeds through a unix socket in that directory: no TCP port is
+# opened, and only the owner's user can connect. The dokja-feeds container does not start.
+services:
+  dokja-orchestrator:
+    environment:
+      FEEDS_SERVICE_ENDPOINT: ipc:///run/dokja-feeds/feeds.sock
+    volumes:
+      - ${DOKJA_FEEDS_SOCKET_DIR:?set DOKJA_FEEDS_SOCKET_DIR to the directory scripts/run-host-feeds.sh uses}:/run/dokja-feeds
+  dokja-feeds:
+    profiles: ["container-feeds"]
