@@ -440,7 +440,8 @@ services that are off.
 ## Workspace replan (2026-10-19)
 
 Status: proposed. Phase A's shell is built on branch `feat/desktop-workspace`: the sidebar, System at
-its foot with the problem count, the dots and the new keys. The view-level changes below (Messages as
+its foot with the problem count, the dots, the new keys, and the memes picked in
+Messages instead of a workspace of their own. The view-level changes below (Messages as
 a messenger, the drop zone over Knowledge) and Phases B and C are not built.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
@@ -478,7 +479,6 @@ sidebar and the work area are the same chamfered panels, and neon still only mea
 | Knowledge  • |                                              |
 | Memory     • |                                              |
 | Messages   • |                                              |
-| Memes      • |                                              |
 |              |                                              |
 |              | +------------------------------------------+ |
 | System  2 ⚠  | | Ask Ningo...                          ↵  | |
@@ -492,7 +492,7 @@ sidebar and the work area are the same chamfered panels, and neon still only mea
 | knowledge | Knowledge | The add form becomes a drop zone over the whole view plus a button; document rows get the context menu. |
 | memory | Memory | Unchanged view. |
 | communications | Messages | Conversation list on the left of the view, history and composer of that conversation on the right, like any messenger. |
-| memes | Memes | Grid; the opened meme becomes a tool panel in Phase C, a dialog until then. |
+| memes | none, picked in Messages | Memes are something Ningo sends, not a place to work in (the owner, 2026-10-19). The queue becomes a picker of previews in the Messages composer; the meme service's state and switch stay on System. Built with Phase A. |
 
 The dots on the sidebar come only from the one `ningo.status` the System view already reads, never
 from each workspace's own status request: the orchestrator answers one request at a time, and a
@@ -521,8 +521,8 @@ B. **Composer.**
      list (`dokja_orch/internal/handlers/chat_domain_handler.go`, additive), a request action for one
      chat turn that the shell can allow-list, and the session and history ownership that chat-plan
      decides. The cross-layer path (domain, route, workflow step, handler) is designed there, not here.
-C. **Context menus and tool panels.** Context menus on documents, memes and conversations, then the
-   meme viewer and a document view as panels beside the work area. Several panels open at once share
+C. **Context menus and tool panels.** Context menus on documents and conversations, then a
+   document view as a panel beside the work area. Panels open at once share
    the one request queue, so each kind has at most one panel.
 
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
@@ -532,7 +532,7 @@ this shell. They are not cards in a briefing.
 
 - Phase A: no route, envelope, environment, compose or schema change. The documented keys change: the
   bare digits `1` to `6` and the left and right arrows over the tab strip are replaced by `Ctrl+1` to
-  `Ctrl+6` and up and down arrows in the sidebar. A composer that always takes text cannot also take
+  `Ctrl+5` and up and down arrows in the sidebar. A composer that always takes text cannot also take
   bare digits.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
 
