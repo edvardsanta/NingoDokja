@@ -443,8 +443,8 @@ Status: Phase A is built, on stacked branches: `feat/desktop-workspace` (the sid
 foot with the problem count, the dots, the new keys, and the memes picked in Messages instead of a
 workspace of their own), `feat/desktop-messages` (Messages as a messenger), `feat/desktop-knowledge-drop`
 (a file dropped anywhere on Knowledge) and `feat/desktop-names` (panels named after their workspaces,
-and an empty research base that says where a file goes). Phase B waits for the chat plan; Phase C
-waits for the owner (see its gap below).
+and an empty research base that says where a file goes). Phase B waits for the chat plan; Phase C is
+reshaped in three steps below.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
@@ -521,24 +521,35 @@ B. **Composer.**
      list (`dokja_orch/internal/handlers/chat_domain_handler.go`, additive), a request action for one
      chat turn that the shell can allow-list, and the session and history ownership that chat-plan
      decides. The cross-layer path (domain, route, workflow step, handler) is designed there, not here.
-C. **Context menus and tabs in the work area.** Context menus on documents and conversations, then
-   a tab strip on top of the work area: opening a document or a conversation adds a tab, the
-   workspace's own view stays the first tab, and a tab closes with its button or Ctrl+W. Everything
-   stays in the one window, so the sandbox, the press check and the confirmations do not change. Each
-   tab asks the orchestrator only when it opens, and the requests wait in the one line in the main
-   process like any other. The owner chose tabs over separate windows on 2026-10-19.
+C. **Document view, in tabs of the work area.** Reshaped on 2026-10-19 with the criteria of the
+   knowledge work. Conversations get no tabs: Messages already shows them, and a discussion about a
+   document uses the existing conversation model, not a thread of the desktop's own. A context menu
+   with only Delete adds little, so none is built until it has a real action (C3).
 
-   The cards kept their chamfered panel instead of losing their frame: it is the cyberpunk look the
-   owner kept, and the panel's legend now names the workspace.
+   The cards keep their chamfered panel instead of losing their frame: it is the cyberpunk look the
+   owner kept, and the panel's legend names the workspace.
 
-   **Gap found while building Phase A.** A document tab has nothing to show: the orchestrator has no
-   action that returns one document's text (`knowledge.read` reads a file into the base, and
-   `knowledge.search` takes only a query, with no filter by document), so a tab could only repeat the
-   row of the list. A conversation tab would repeat the messenger list. Without them, Phase C is only a
-   context menu offering what the rows already offer. Showing a document needs a new action through
-   the domain, the orchestrator and the knowledge service, which is a separate track from this
-   desktop-only work. Also: the window keeps Electron's default menu, where Ctrl+W closes the window,
-   so a tab strip needs another key or the menu replaced.
+   - **C1, desktop only, buildable on main.** "Open" on a document of the Knowledge list adds a tab to
+     the work area, beside the list, which stays the first tab; a tab closes with its button (Ctrl+W
+     already closes the window through Electron's default menu, so no key is taken). The tab shows the
+     title, kind, source reference, tags, passages and the retained text. `knowledge.list` already
+     accepts `include_text`, and the desktop's contract changes in the shell only: the payload passes
+     `include_text: true` only with `limit: 1`, at the row's own offset; the shell checks the document
+     that comes back is the one asked for (the list may have changed: then the tab says so and asks for
+     a refresh), caps the text and says when it cut it, and the screen renders it as text, never as
+     markup. The tab says plainly that the text is rebuilt from the stored passages and is not a
+     faithful copy of the original file.
+   - **C2, after `feat/knowledge-metadata` merges.** Listed documents then carry `metadata` and a
+     `classification` with `status`, `missing_axes` and `questions`. The tab shows the defining
+     metadata (form, content kind, topics, entities, date anchor) with where each value came from, and
+     the pending questions with their allowed values, read-only. The shell's projection adds both,
+     bounded like every other field.
+   - **C3, needs a contract from the knowledge track.** Answering a question from the desktop needs a
+     request that sets explicit metadata on a stored document by its id, without its content: today
+     metadata travels only with an ingest or a reading, and the desktop does not hold the original
+     file. Once that exists, the tab answers the questions, and a context menu on a row that needs
+     input ("Classify…", beside Delete) earns its place. Designing that request belongs to the
+     knowledge work, not to this plan.
 
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
 this shell. They are not cards in a briefing.
@@ -550,14 +561,17 @@ this shell. They are not cards in a briefing.
   `Ctrl+5` and up and down arrows in the sidebar. A composer that always takes text cannot also take
   bare digits.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
-- Phase C: as planned, no backend or shell change; a document tab with content needs a new backend
-  action (see the gap above).
+- Phase C1: no backend change. The shell's `knowledge.list` payload may now carry `include_text`
+  (only with `limit: 1`) and its projection a capped `text`.
+- Phase C2: no backend change on top of `feat/knowledge-metadata`; the projection adds `metadata` and
+  `classification`.
+- Phase C3: a new knowledge request, owned by the knowledge track.
 
 ### Owner decisions
 
 Answered on 2026-10-19: the look stays cyberpunk; memes have no workspace and are picked in Messages;
 the composer waits for the chat plan (no B0); open views are tabs in the work
-area, not separate windows; the morning briefing is dropped, with no "Today" workspace. The owner
+area, not separate windows, and only documents get them (Phase C, with the knowledge work's criteria); the morning briefing is dropped, with no "Today" workspace. The owner
 will plan a replacement later, separately from this replan.
 
 No question is open.
