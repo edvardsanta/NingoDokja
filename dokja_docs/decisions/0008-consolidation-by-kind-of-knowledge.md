@@ -1,6 +1,6 @@
 # ADR 0008: consolidate knowledge by its kind, tagged at reading time
 
-Date: 2026-10-19. Status: proposed; owner answers recorded, kinds and classifier under discussion.
+Date: 2026-10-19. Status: proposed; kinds accepted, agent CLI allowed; form/content tags, tag storage and Book retirement scope open.
 Refines [ADR 0005](./0005-knowledge-experience-content.md) and
 [ADR 0006](./0006-reading-macro-component.md). Replaces the `book.*` facade
 planned for step `09`.
@@ -147,3 +147,45 @@ question 2.
 - **First implementation:** source defaults plus deterministic rules (format,
   feed origin, simple structure cues). A model, or the local agent CLI, can
   replace it later through the same capability, judged by experience.
+
+## Owner direction on agents and kinds (2026-10-19)
+
+- **The proposed kinds are accepted** as the starting set. Whether a document
+  carries one kind or a form tag plus a content tag is still open.
+- **Local agent CLIs may do the judgment work.** Claude Code and Codex, run
+  locally, may classify kinds, extract defining tags (topics, entities, the
+  date anchor of news), and generate summaries and other text. They are
+  providers behind the existing capabilities (`document.classify.v1` for
+  classification, the summary capability for generation), not new routes, so
+  they are replaced like any plugin.
+
+### How an agent classifier stays deterministic
+
+Tags are part of Knowledge's content hash, and a model does not answer the same
+way twice. So:
+
+- Classification runs once per content and classifier version. The result is
+  kept, keyed by the content hash and `classifier@version`. Reading the same
+  file again reuses it instead of asking the agent again.
+- A new classifier version re-tags only when asked explicitly, never as a side
+  effect of a re-read.
+- The stored tags record the classifier and its version (`kind-by:`), so
+  experience can compare classifiers later.
+
+### Constraints that come with an agent CLI
+
+- **Latency.** A call takes seconds, so it runs off delivery paths. Reading on
+  demand and summaries on request can wait; a scheduled meme delivery cannot
+  (the 1 s shadow-prediction cap accepted in step 08 stays).
+- **Provider.** The text read is sent to the CLI's provider. Owner documents and
+  chat history (`note`, `conversation`) are the owner's private material. A
+  setting decides which kinds may be sent, and the default excludes those two.
+- **Bounds.** The call runs under the reading host's subprocess limits:
+  - its timeout;
+  - an output limit;
+  - only declared variables;
+  - output validated against the contract (allowed kinds, tag syntax and
+    count).
+
+  If the agent fails, the rule-based default (source default, then `general`)
+  is used and recorded.
