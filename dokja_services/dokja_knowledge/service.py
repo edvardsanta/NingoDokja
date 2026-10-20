@@ -108,6 +108,8 @@ class KnowledgeService:
         payload = event.get("payload") or {}
         handlers = {
             "knowledge.ingest": self.ingest,
+            "knowledge.metadata.get": self.metadata_get,
+            "knowledge.metadata.patch": self.metadata_patch,
             "knowledge.search": self.search,
             "knowledge.list": self.list_documents,
             "knowledge.delete": self.delete,
@@ -118,6 +120,25 @@ class KnowledgeService:
         if handler is None:
             raise ValueError(f"unsupported knowledge event type: {event_type}")
         return handler(payload)
+
+    def metadata_get(self, payload: dict) -> dict:
+        source_id = payload.get("source_id")
+        if not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
+            raise ValueError("source_id is required and must be valid")
+        return self.store.metadata_snapshot(source_id)
+
+    def metadata_patch(self, payload: dict) -> dict:
+        source_id = payload.get("source_id")
+        if not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
+            raise ValueError("source_id is required and must be valid")
+        revision = payload.get("revision")
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{64}", revision):
+            raise ValueError("revision is required")
+        patch = payload.get("patch")
+        encode_metadata(patch)
+        if not patch:
+            raise ValueError("metadata patch must not be empty")
+        return self.store.patch_metadata(source_id, patch, revision)
 
     # ---- ingest ---------------------------------------------------------------------
 

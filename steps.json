@@ -619,13 +619,15 @@
             "Disposable migration tests cover schema-1 preservation, transactional failure rollback, old-build refusal, offline metadata downgrade and re-upgrade.",
             "dokja_docs/step-09-consolidation.md",
             "dokja_docs/production-runbook.md#knowledge-metadata-schema-upgrade",
-            "Owner rejected general and confirmed that only the user resolves uncertainty: nullable axes, user_required provenance and domain-owned per-document questions are implemented and regression-tested."
+            "Owner rejected general and confirmed that only the user resolves uncertainty: nullable axes, user_required provenance and domain-owned per-document questions are implemented and regression-tested.",
+            "API/CLI continuation implemented: knowledge.classify retrieves current questions by source_id and applies explicit answers with an atomic revision-checked metadata patch. No re-upload, extraction or re-embedding; tests cover stale answers and concurrent writers.",
+            "Desktop conceptual review recorded in dokja_docs/step-09-consolidation.md: include_text exists upstream but is dropped by desktop projections; per-document detail and classification presentation remain pending, and conversation tabs must not duplicate Messages."
           ],
           "checks": [
             {
               "name": "knowledge_service",
               "status": "passed",
-              "detail": "148 passed, 8 skipped (live Ollama unavailable); includes nullable classification, reread preservation and user-answer metadata updates."
+              "detail": "154 passed, 8 skipped (live Ollama unavailable); includes atomic answer updates, stale content/metadata/deletion conflicts, and concurrent writers."
             },
             {
               "name": "knowledge_domain",
@@ -646,6 +648,11 @@
               "name": "secret_policy_scan",
               "status": "passed",
               "detail": "Repository-pinned gitleaks v8.28.0: staged credential and project-policy scans passed during PR preparation."
+            },
+            {
+              "name": "cli_classification",
+              "status": "passed",
+              "detail": "go test ./... -count=1; interactive questions, flags, blank answers, EOF and no automatic conflict retry."
             }
           ],
           "started_on": "2026-10-19",
@@ -653,8 +660,9 @@
           "branch": "feat/knowledge-metadata",
           "remaining": [
             "Connect a versioned reading-time classifier capability and provider failure behavior.",
-            "Add content/provider-version classification caching and explicit reclassification with no repeat inference on unchanged reads.",
-            "Present classification questions in interfaces and resume the existing read request using explicit user answers; automatic conversational continuation is not implemented yet."
+            "Add content/provider-version classification caching and explicit provider reclassification with no repeat inference on unchanged reads.",
+            "Wire classification questions/answers into desktop and chat interfaces; CLI and API continuation are implemented.",
+            "Define the bounded desktop document-detail contract and content representation; retain the existing conversation model and expose useful open/classification actions only when implemented."
           ]
         },
         {

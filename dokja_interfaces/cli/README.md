@@ -112,3 +112,31 @@ Chat provider profiles:
   uses it from its next request, no restart.
 
 The database is `--db`, else `DOKJA_DB_FILE`, else the repository's `.dokja/dokja.db`.
+
+## Answering Knowledge classification questions
+
+A document may have a known form and an unresolved content kind. The CLI prints
+`knowledge classify <source-id>` for pending documents in ingest/list output.
+This is separate from the legacy `--kind` storage label.
+
+```sh
+dokja-cli knowledge list
+dokja-cli knowledge classify file:study.pdf
+# Or supply explicit answers without interactive prompts:
+dokja-cli knowledge classify file:study.pdf --form book --content-kind research
+```
+
+The command gets the current questions through the orchestrator and asks only
+for unresolved axes. Enter leaves an axis pending; EOF cancels submission.
+No default is selected. With flags it submits only the named axes and never
+prompts for the others. The Knowledge domain validates and attributes every
+answer to the user. The command can also explicitly correct an existing label.
+
+Answers patch the stored document's metadata: no file upload, source fetch,
+extraction, chunk replacement or embedding call. A revision from the question
+snapshot guards the update. If content or metadata changes while the user is
+answering, the command reports `classification_conflict`; run it again to read
+the new questions and decide. It never retries an answer against a newer
+revision automatically. No persistence, transport or credential setting changes
+are needed. Desktop and chat presentation of this interaction remain separate
+interface work.

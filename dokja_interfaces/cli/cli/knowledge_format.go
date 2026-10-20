@@ -6,8 +6,12 @@ import (
 	"unicode/utf8"
 )
 
-// FormatIngest is the one-line report for an added file.
+// FormatIngest reports storage and points unresolved classification to user input.
 func FormatIngest(name string, answer map[string]any) string {
+	return formatIngest(name, answer) + classificationHint(answer)
+}
+
+func formatIngest(name string, answer map[string]any) string {
 	if _, ok := answer["documents"].([]any); ok {
 		line := fmt.Sprintf("added  %s: %v entries (%v new, %v unchanged), %v chunks",
 			name, answer["count"], answer["created"], answer["unchanged"], answer["chunks"])
@@ -84,6 +88,9 @@ func FormatList(answer map[string]any) string {
 			note = fmt.Sprintf("  (%d/%d embedded)", int(embedded), int(chunks))
 		}
 		fmt.Fprintf(&out, "%-40s %-8v %3v chunks  %s%s\n", document["source_id"], document["kind"], document["chunks"], document["title"], note)
+		if hint := classificationHint(document); hint != "" {
+			out.WriteString(strings.TrimPrefix(hint, "\n") + "\n")
+		}
 	}
 	fmt.Fprintf(&out, "%v documents in total\n", answer["total"])
 	return out.String()

@@ -179,6 +179,19 @@ Sources: [reading task](../dokja_orch/internal/handlers/knowledge_reading.go),
 [host](../dokja_services/dokja_feeds/feeds/extract.go),
 [adapter](../dokja_services/dokja_feeds/plugins.example/knowledge-extractors/run.py).
 
+### User classification answers
+
+`CLI knowledge classify <source-id> -> knowledge.classify -> Knowledge domain ->
+knowledge.metadata.get / knowledge.metadata.patch`
+
+The existing Knowledge route prefix and generic service client are reused; the
+workflow maps `knowledge.classify` to `classify-knowledge`. The domain owns the
+questions, allowed taxonomy values and user provenance. Storage applies a
+revision-checked metadata patch, never extraction or re-embedding. The CLI asks
+only unresolved questions or accepts explicit flags, leaves blank answers
+pending and reports conflicts without automatic retry. Other interfaces can use
+the same action after adding their own explicit presentation contract.
+
 ### Hashtag, action, and feedback
 
 `meme.hashtag.suggest -> orchestrated OCR -> Knowledge search restricted to explicit labels -> candidate`

@@ -143,10 +143,9 @@ A provider can mark an axis uncertain or the provider unavailable; an existing
 user-required flag also prevents automatic resolution. Explicit user input wins.
 Invalid proposals do not fall through to source defaults. Unchanged rereads keep
 pending nulls and earlier valid axes; an explicit answer patches that axis and
-its provenance without replacing embeddings. This does not add a model provider
-or an interactive conversation-resumption mechanism: questions are returned in
-the existing API result for the interface/caller to present. Provider and
-interface continuation work remains in 09.2.
+its provenance without replacing embeddings. This does not add a model provider or chat conversation resumption. The API
+returns questions for the caller to present; the CLI continuation implemented
+below is the first interface integration. Other interfaces remain pending.
 
 Compatibility: this intentionally revises the new draft metadata contract on
 PR #53, as directed by the owner; legacy public `kind` values are unchanged. No
@@ -160,3 +159,62 @@ orchestrator `go test ./... -count=1` passed. Coverage includes rejection of
 `general`, null serialization, invalid/uncertain/unavailable provider output,
 user-only resolution, per-document questions, preserved resolved axes and
 unchanged embeddings after a user answer.
+
+## Classification continuation: API and CLI
+
+The additive `knowledge.classify` action completes the first user-facing answer
+path. Query with a source ID to get current questions and a revision; submit
+explicit `answers` and that revision to patch only selected axes. Existing
+metadata supplies the other axes. CLI `knowledge classify <source-id>` asks the
+questions; `--form` and `--content-kind` submit only explicit flags. Ingest/list
+output points pending documents to the command. Empty answers remain pending;
+EOF cancels submission and conflicts are not retried automatically.
+
+The service's internal metadata get/patch operations run through the existing
+Knowledge client. A compare-and-patch transaction rejects stale content or
+metadata revisions, including competing answers from two writers. Successful
+answers preserve chunks, embedding bytes and the embedding cache revision. No
+source file is needed and no provider/extractor is invoked.
+
+Compatibility: one additive public event/action and CLI command, two internal
+service operations, no removed commands or changed envelope, SQLite schema,
+environment, ports or compose. The existing handler and generic client port are
+reused; policy stays in the Knowledge domain. This resumes classification only;
+it does not claim summary/workflow recovery or conversational resumption in every
+interface. Desktop integration has its own acceptance criteria below.
+
+Validation: Knowledge service **154 passed, 8 skipped** (live Ollama). Knowledge
+`go test -race ./...`, orchestrator `go test ./... -count=1`, and CLI
+`go test ./... -count=1` passed. Tests cover interactive input, explicit flags,
+blank answers, EOF, invalid values, no automatic conflict retry, route-to-domain
+composition, content/metadata/deletion conflicts, and concurrent writers. No
+live provider or owner database was used.
+
+## Desktop implications and acceptance criteria
+
+The owner reported empty Document/Conversation tab proposals and a context menu
+left with only Delete. The cognitive changes supply domain meaning and an answer
+contract, not a desktop detail UI.
+
+- The current Knowledge service already accepts `knowledge.list` with
+  `include_text: true`, and the domain forwards it. Desktop's main-process action
+  currently forwards only limit/offset and projects summary fields, discarding
+  text, structured metadata and classification questions. Its shared type and
+  renderer likewise describe rows. Existing text reconstruction joins stored
+  chunks and may repeat overlap/headings; it is not the original source body.
+- A useful Document view needs a bounded, per-document detail contract with
+  source identity, a declared content representation, provenance, metadata,
+  classification questions and the revision needed to answer them. Fetch detail
+  on demand; do not load every document's full text in a listing or present a
+  chunk reconstruction as an untouched original. This contract is still pending.
+- A document discussion references the same knowledge ID/version and the existing
+  conversation model. A Conversation tab needs a navigation/use case beyond the
+  Messages pane; these changes do not justify duplicating that pane or its state.
+- Open and classification actions should appear when the desktop implements those
+  capabilities. A Delete-only context menu adds no required behavior beyond the
+  existing row button. Tabs and menus follow useful operations, not faculty names.
+
+No desktop runtime or tab behavior was changed in this slice. Extend its
+allowlisted input, typed main-process projections, renderer and interface tests
+together when implementing these criteria. The new classify action alone does
+not make those capabilities available to desktop automatically.
