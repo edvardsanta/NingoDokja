@@ -138,15 +138,20 @@ func TestKnowledgeReadClassifiesNewContentOnceAndKeepsItOnRereads(t *testing.T) 
 	}
 }
 
-func TestKnowledgeReadSendsNothingTheUserAlreadyDecidedOrKeptPrivate(t *testing.T) {
-	reader := &classifyingReader{fakeReader: fakeReader{answer: readAnswer("Shopping list.")}}
+func TestKnowledgeReadSendsNotesButNothingTheUserAlreadyDecided(t *testing.T) {
+	reader := &classifyingReader{fakeReader: fakeReader{answer: readAnswer("Shopping list.")},
+		proposals: []any{map[string]any{"content_kind": "reference"}}}
 	knowledge := newKnowledgeStore()
 	service := classifyOrchestrator(reader, knowledge)
 
-	readFile(t, service, map[string]any{"metadata": map[string]any{"form": "note"}})
 	readFile(t, service, map[string]any{"filename": "b.pdf", "metadata": map[string]any{"form": "book", "content_kind": "narrative"}})
 	if len(reader.sent) != 0 {
-		t.Fatalf("notes and fully decided documents never reach the classifier: %#v", reader.sent)
+		t.Fatalf("a fully decided document never reaches the classifier: %#v", reader.sent)
+	}
+	readFile(t, service, map[string]any{"metadata": map[string]any{"form": "note"}})
+	metadata := knowledge.metadata["file:Deep-Work.pdf"]
+	if len(reader.sent) != 1 || metadata["form"] != "note" || metadata["content_kind"] != "reference" {
+		t.Fatalf("a note is classified like any document, keeping the user's form: sent=%d metadata=%v", len(reader.sent), metadata)
 	}
 }
 

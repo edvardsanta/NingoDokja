@@ -193,12 +193,9 @@ way twice. So:
 - **Latency.** A call takes seconds, so it runs off delivery paths. Reading on
   demand and summaries on request can wait; a scheduled meme delivery cannot
   (the 1 s shadow-prediction cap accepted in step 08 stays).
-- **Provider.** The text read is sent to the CLI's provider. Owner notes and
-  chat history (`form=note`, `form=conversation`) are the owner's private material.
-  A setting decides which inputs may be sent, and the default excludes those
-  forms even when their content kind is research, reference, or another value.
-  Evaluate that restriction before sending material to a classifier; its own
-  output cannot establish permission to send its input.
+- **Provider.** The text read is sent to the CLI's provider. Notes and
+  conversations included: see the owner decisions below, which replace the
+  default exclusion first proposed here.
 - **Bounds.** The call runs under the reading host's subprocess limits:
   - its timeout;
   - an output limit;
@@ -208,6 +205,26 @@ way twice. So:
 
   If the agent fails, classification remains pending for the user, with a
   recorded reason and no automatic fallback.
+
+## Owner decisions on the agent classifier (2026-10-20)
+
+- **Provider chain:** Claude Code first, Codex as fallback, Ollama last. One
+  plugin tries them in that order and moves on only when a provider fails
+  (missing, not logged in, timed out, or output outside the contract); a valid
+  "uncertain" answer is a result, not a failure. The provider and model that
+  answered are part of the classifier version, so the cache and provenance tell
+  them apart.
+- **What may be sent:** everything the reading stored, notes and conversations
+  included. Enabling a classifier plugin is the owner's permission to send it
+  what was read; there is no per-form setting.
+- **Where it runs:** the reading host (Feeds) runs on the owner's machine, outside
+  the container, so the plugin uses the CLI logins already there. The
+  orchestrator keeps talking to Feeds over `FEEDS_SERVICE_ENDPOINT`; it does not
+  call a CLI itself.
+- **Isolation, verified with canary files before adoption:** both CLIs run
+  without tools from an empty working directory. Claude Code also skips user
+  settings and hooks (the owner's hooks would otherwise capture the text), and
+  Codex disables its shell, which reads files even in its read-only sandbox.
 
 ## Owner decisions on representation (2026-10-19)
 

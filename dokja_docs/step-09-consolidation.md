@@ -239,11 +239,9 @@ unknown label becomes a user question (`user_clarification_required` or
 only when the request gave none. A document-level `classifier: {id, version}`
 records who saw the current content. Content and embeddings are untouched.
 
-Privacy: a known `note` or `conversation` form (explicit or default) is never
-sent. A document whose form is still unknown can be sent; there is no setting
-yet for which inputs may leave the host. That matters only for a classifier that
-sends text to a remote provider, and none ships. The setting is the owner's
-decision before such a plugin is enabled.
+Privacy: every form may be sent, notes and conversations included. The owner
+decided (2026-10-20, ADR 0008) that enabling a classifier is the permission to
+send it what was read, with no per-form setting.
 
 Failures never fail the reading: no classifier, timeout, broken plugin, host
 down, wrong proposal count or a conflicting answer all leave the documents

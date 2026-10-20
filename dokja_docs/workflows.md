@@ -124,8 +124,8 @@ Purpose:
 - run as a typed task (`read`, `ingest`, then `classify`); the file and its text stay
   outside the workspace, which records a hashed reference and the reader's version
 - classify the documents stored just now whose form or content kind nobody decided
-  through the enabled `document.classify.v1` plugin (`feeds.classify`), never a known
-  note or conversation; an unchanged reread is not sent again
+  through the enabled `document.classify.v1` plugin (`feeds.classify`), whatever their
+  form; an unchanged reread is not sent again
 
 The payload is `filename` and `content_b64`, plus the optional `title`, `kind`, `tags`,
 `source_id` and `source_ref` that `knowledge.ingest` takes. A failure names its step

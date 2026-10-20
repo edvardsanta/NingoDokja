@@ -62,8 +62,8 @@ func TestClassificationCandidatesAreNewContentWithUndecidedAxes(t *testing.T) {
 		storedDocument("chat", true, map[string]any{"form": "conversation", "form_choice": map[string]any{"origin": "user"}, "content_kind": nil, "kind_choice": pending()}),
 		{"source_id": "no metadata", "changed": true},
 	}
-	if got := ClassificationCandidates(stored); !reflect.DeepEqual(got, []int{0, 3}) {
-		t.Fatalf("candidates=%v, want new content with an undecided axis and no private form", got)
+	if got := ClassificationCandidates(stored); !reflect.DeepEqual(got, []int{0, 3, 5, 6}) {
+		t.Fatalf("candidates=%v, want new content with an undecided axis, notes and conversations included", got)
 	}
 }
 

@@ -23,8 +23,8 @@ type ReadingProposal struct {
 // ClassificationCandidates names the stored documents of a reading that a classifier may
 // see (ADR 0008). Only content stored just now qualifies: an unchanged reread keeps what was
 // decided before and never asks again. A document is skipped when nothing is left to
-// propose for its axes, or when its known form is the owner's private material (notes and
-// conversations are never sent by default).
+// propose for its axes. Every form may be sent, notes and conversations included: enabling
+// a classifier is the owner's permission to send it what was read (ADR 0008).
 func ClassificationCandidates(stored []map[string]any) []int {
 	var candidates []int
 	for i, result := range stored {
@@ -33,10 +33,6 @@ func ClassificationCandidates(stored []map[string]any) []int {
 		}
 		metadata, _ := result["metadata"].(map[string]any)
 		if metadata == nil {
-			continue
-		}
-		switch form, _ := metadata["form"].(string); Form(form) {
-		case FormNote, FormConversation:
 			continue
 		}
 		if awaitingClassifier(metadata, "form_choice") || awaitingClassifier(metadata, "kind_choice") {
