@@ -243,9 +243,21 @@ digest is empty.
 
 A plugin runs only when its manifest says `"enabled": true`, and changes to the directory are read when the
 service starts. Its program runs inside the `dokja-feeds` container, so it must exist in the image: the image
-has a POSIX shell and the usual command-line tools, and no Python. For anything else, extend the image or put
-a static binary in the plugin directory. A manifest whose program is missing shows as `invalid` with the
-program's name in the status.
+has a POSIX shell, the usual command-line tools, and `python3` with `pypdf` (Debian packages). For anything
+else, extend the image or put a static binary in the plugin directory. A manifest whose program is missing
+shows as `invalid` with the program's name in the status.
+
+Feeds is also the reading host: `feeds.extract` reads one file on demand through the enabled
+`document.extract.v1` plugin that serves its extension, and the orchestrator's `knowledge.read` stores the
+result in Knowledge. The `knowledge-extractors` example serves Knowledge's own formats (PDF, EPUB, DOCX, HTML,
+text, feeds): copy `dokja_services/dokja_feeds/plugins.example/knowledge-extractors` into the plugins directory
+and set `"enabled": true`. It finds Knowledge's extractors through `KNOWLEDGE_EXTRACTORS_DIR`, set in every
+compose file (the production image copies them to `/opt/dokja_knowledge`). Set `KNOWLEDGE_PLUGINS_DIR` on
+`dokja-feeds` and mount that directory too only if your own Knowledge format plugins should be read here as
+well. A reading runs with the service's permissions and no sandbox: the plugin gets only its declared
+variables, at most 2 readings run at once, and each stops at its manifest timeout or the 2-minute request
+limit. With no enabled extractor, `knowledge.read` fails with `unavailable` and `knowledge.ingest` with a
+file keeps working as before.
 
 A token a plugin needs belongs to the service's environment, not to the manifest: the manifest lists only the
 variable names, and only those variables reach the plugin. A failed run keeps the previous items and the

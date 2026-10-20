@@ -1,5 +1,6 @@
-// Package server exposes the feeds service over ZeroMQ REQ/REP, with the same JSON envelope
-// as the knowledge service: {"type", "payload"} in, {"status", "result" | "message"} out.
+// Package server exposes the feeds service over ZeroMQ to REQ clients, with the same JSON
+// envelope as the knowledge service: {"type", "payload"} in, {"status", "result" |
+// "message"} out.
 package server
 
 import (
@@ -14,9 +15,22 @@ import (
 )
 
 const (
-	pollInterval   = 500 * time.Millisecond
+	// pollInterval is also the longest a finished reply waits to be sent.
+	pollInterval   = 10 * time.Millisecond
 	requestTimeout = 30 * time.Second
+	// extractTimeout bounds an on-demand reading, which runs a plugin while the caller waits.
+	extractTimeout = 2 * time.Minute
+	// maxInFlight bounds the requests being answered at once; past it a request is refused.
+	maxInFlight = 16
 )
+
+// timeoutFor is how long one request may take.
+func timeoutFor(eventType string) time.Duration {
+	if eventType == "feeds.extract" {
+		return extractTimeout
+	}
+	return requestTimeout
+}
 
 // Handler is the service behind the socket.
 type Handler interface {
@@ -61,7 +75,7 @@ func HandleRequest(ctx context.Context, raw string, handler Handler, logger *log
 	}
 	logger.Printf("handling type=%s payload_keys=%d", parsed.Type, len(parsed.Payload))
 
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeoutFor(parsed.Type))
 	defer cancel()
 	result, err := handler.Dispatch(ctx, parsed.Type, parsed.Payload)
 	if err != nil {
@@ -83,7 +97,10 @@ func failure(message string) []byte {
 	return body
 }
 
-// Serve binds a REP socket at endpoint and answers requests one at a time until ctx ends.
+// Serve binds a ROUTER socket at endpoint and answers requests until ctx ends. Each request
+// is answered on its own goroutine, so an on-demand reading that waits on a plugin never
+// delays feeds.status or feeds.items. The socket stays with this loop: replies come back
+// over a channel and are sent from here.
 func Serve(ctx context.Context, endpoint string, handler Handler, logger *log.Logger) error {
 	zctx, err := zmq4.NewContext()
 	if err != nil {
@@ -91,34 +108,102 @@ func Serve(ctx context.Context, endpoint string, handler Handler, logger *log.Lo
 	}
 	defer zctx.Term()
 
-	socket, err := zctx.NewSocket(zmq4.REP)
+	socket, err := zctx.NewSocket(zmq4.ROUTER)
 	if err != nil {
 		return fmt.Errorf("create zmq socket: %w", err)
 	}
 	defer socket.Close()
-
-	// A receive timeout lets the loop notice that ctx has ended.
-	if err := socket.SetRcvtimeo(pollInterval); err != nil {
-		return fmt.Errorf("set receive timeout: %w", err)
+	// Replies to a client that went away are dropped instead of kept at shutdown.
+	if err := socket.SetLinger(0); err != nil {
+		return fmt.Errorf("set linger: %w", err)
 	}
 	if err := socket.Bind(endpoint); err != nil {
 		return fmt.Errorf("bind %s: %w", endpoint, err)
 	}
 	logger.Printf("listening endpoint=%s", endpoint)
 
+	poller := zmq4.NewPoller()
+	poller.Add(socket, zmq4.POLLIN)
+	replies := make(chan [][]byte, maxInFlight)
+	slots := make(chan struct{}, maxInFlight)
+
 	for {
+		if err := sendReplies(socket, replies); err != nil {
+			return err
+		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		raw, err := socket.Recv(0)
+		polled, err := poller.Poll(pollInterval)
 		if err != nil {
-			if zmq4.AsErrno(err) == zmq4.Errno(syscall.EAGAIN) {
+			if zmq4.AsErrno(err) == zmq4.Errno(syscall.EINTR) {
 				continue
 			}
+			return fmt.Errorf("poll: %w", err)
+		}
+		if len(polled) == 0 {
+			continue
+		}
+		frames, err := socket.RecvMessageBytes(0)
+		if err != nil {
 			return fmt.Errorf("receive: %w", err)
 		}
-		if _, err := socket.SendBytes(HandleRequest(ctx, raw, handler, logger), 0); err != nil {
-			return fmt.Errorf("send: %w", err)
+		envelope, body, ok := split(frames)
+		if !ok {
+			logger.Printf("dropped a message that is not a REQ request")
+			continue
+		}
+		select {
+		case slots <- struct{}{}:
+		default:
+			if err := send(socket, append(envelope, failure("the feeds service is busy"))); err != nil {
+				return err
+			}
+			continue
+		}
+		go func() {
+			defer func() { <-slots }()
+			reply := HandleRequest(ctx, string(body), handler, logger)
+			select {
+			case replies <- append(envelope, reply):
+			case <-ctx.Done():
+			}
+		}()
+	}
+}
+
+// split separates a REQ client's routing envelope (identities and the empty delimiter) from
+// the request body.
+func split(frames [][]byte) ([][]byte, []byte, bool) {
+	last := len(frames) - 1
+	if last < 2 || len(frames[last-1]) != 0 {
+		return nil, nil, false
+	}
+	envelope := make([][]byte, last)
+	copy(envelope, frames[:last])
+	return envelope, frames[last], true
+}
+
+func sendReplies(socket *zmq4.Socket, replies chan [][]byte) error {
+	for {
+		select {
+		case reply := <-replies:
+			if err := send(socket, reply); err != nil {
+				return err
+			}
+		default:
+			return nil
 		}
 	}
+}
+
+func send(socket *zmq4.Socket, frames [][]byte) error {
+	parts := make([]any, len(frames))
+	for i, frame := range frames {
+		parts[i] = frame
+	}
+	if _, err := socket.SendMessage(parts...); err != nil {
+		return fmt.Errorf("send: %w", err)
+	}
+	return nil
 }

@@ -118,6 +118,8 @@ func actionFor(domain Domain, eventType string) string {
 		switch eventType {
 		case "knowledge.ingest":
 			return "ingest-knowledge"
+		case "knowledge.read":
+			return "read-knowledge"
 		case "knowledge.search":
 			return "search-knowledge"
 		case "knowledge.list":

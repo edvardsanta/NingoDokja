@@ -68,7 +68,7 @@ func readPID(t *testing.T, path string) int {
 
 func TestRunReturnsWhatThePluginPrinted(t *testing.T) {
 	plugin := scriptPlugin(t, `echo '{"items":[]}'`, 5*time.Second)
-	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath})
+	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if err != nil || strings.TrimSpace(string(out)) != `{"items":[]}` {
 		t.Fatalf("out=%q err=%v", out, err)
 	}
@@ -76,7 +76,7 @@ func TestRunReturnsWhatThePluginPrinted(t *testing.T) {
 
 func TestRunStartsThePluginInItsOwnDirectory(t *testing.T) {
 	plugin := scriptPlugin(t, `pwd`, 5*time.Second)
-	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath})
+	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath}, nil)
 	want, _ := filepath.EvalSymlinks(plugin.Dir)
 	if err != nil || strings.TrimSpace(string(out)) != want {
 		t.Fatalf("out=%q want=%q err=%v", out, want, err)
@@ -86,7 +86,7 @@ func TestRunStartsThePluginInItsOwnDirectory(t *testing.T) {
 func TestRunReportsAFailureWithoutPuttingStderrInTheError(t *testing.T) {
 	plugin := scriptPlugin(t, `echo "token=SECRET-VALUE" >&2; exit 3`, 5*time.Second)
 	var logs bytes.Buffer
-	_, err := ExecRunner{Logger: log.New(&logs, "", 0)}.Run(context.Background(), plugin, []string{testPath})
+	_, err := ExecRunner{Logger: log.New(&logs, "", 0)}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if err == nil || !strings.Contains(err.Error(), "exit status 3") {
 		t.Fatalf("err=%v", err)
 	}
@@ -101,7 +101,7 @@ func TestRunReportsAFailureWithoutPuttingStderrInTheError(t *testing.T) {
 func TestRunStopsAPluginThatTakesTooLong(t *testing.T) {
 	plugin := scriptPlugin(t, `sleep 30`, 300*time.Millisecond)
 	started := time.Now()
-	_, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath})
+	_, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if !errors.Is(err, ErrTimeout) {
 		t.Fatalf("err=%v", err)
 	}
@@ -114,7 +114,7 @@ func TestRunKillsEverythingThePluginStarted(t *testing.T) {
 	pidFile := filepath.Join(t.TempDir(), "pid")
 	plugin := scriptPlugin(t, "sleep 60 &\necho $! > "+pidFile+"\nwait", time.Second)
 
-	_, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath})
+	_, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if !errors.Is(err, ErrTimeout) {
 		t.Fatalf("err=%v", err)
 	}
@@ -128,7 +128,7 @@ func TestRunDoesNotWaitForAChildThatKeepsThePipeOpen(t *testing.T) {
 	plugin := scriptPlugin(t, "sleep 60 &\necho $! > "+pidFile+"\necho '{\"items\":[]}'", 20*time.Second)
 
 	started := time.Now()
-	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath})
+	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if err != nil || !strings.Contains(string(out), `"items"`) {
 		t.Fatalf("out=%q err=%v", out, err)
 	}
@@ -143,7 +143,7 @@ func TestRunDoesNotWaitForAChildThatKeepsThePipeOpen(t *testing.T) {
 func TestRunStopsAPluginThatPrintsTooMuch(t *testing.T) {
 	plugin := scriptPlugin(t, `yes x`, 20*time.Second)
 	started := time.Now()
-	_, err := ExecRunner{MaxOutput: 2048}.Run(context.Background(), plugin, []string{testPath})
+	_, err := ExecRunner{MaxOutput: 2048}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if !errors.Is(err, ErrOutputTooLarge) {
 		t.Fatalf("err=%v", err)
 	}
@@ -154,7 +154,7 @@ func TestRunStopsAPluginThatPrintsTooMuch(t *testing.T) {
 
 func TestRunAcceptsOutputExactlyAtTheLimit(t *testing.T) {
 	plugin := scriptPlugin(t, `printf '%0100d' 0`, 5*time.Second)
-	out, err := ExecRunner{MaxOutput: 100}.Run(context.Background(), plugin, []string{testPath})
+	out, err := ExecRunner{MaxOutput: 100}.Run(context.Background(), plugin, []string{testPath}, nil)
 	if err != nil || len(out) != 100 {
 		t.Fatalf("len=%d err=%v", len(out), err)
 	}
@@ -163,7 +163,7 @@ func TestRunAcceptsOutputExactlyAtTheLimit(t *testing.T) {
 func TestRunGivesThePluginOnlyTheEnvironmentItIsHanded(t *testing.T) {
 	t.Setenv("FEEDS_TEST_SECRET", "must-not-leak")
 	plugin := scriptPlugin(t, `printf '%s|%s' "${FEEDS_TEST_SECRET-unset}" "${DECLARED-unset}"`, 5*time.Second)
-	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath, "DECLARED=yes"})
+	out, err := ExecRunner{}.Run(context.Background(), plugin, []string{testPath, "DECLARED=yes"}, nil)
 	if err != nil || string(out) != "unset|yes" {
 		t.Fatalf("out=%q err=%v", out, err)
 	}
@@ -175,7 +175,7 @@ func TestRunStopsWhenTheServiceStops(t *testing.T) {
 	time.AfterFunc(200*time.Millisecond, cancel)
 
 	started := time.Now()
-	_, err := ExecRunner{}.Run(ctx, plugin, []string{testPath})
+	_, err := ExecRunner{}.Run(ctx, plugin, []string{testPath}, nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err=%v", err)
 	}

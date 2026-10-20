@@ -9,11 +9,19 @@ import (
 )
 
 type KnowledgeDomainHandler struct {
-	domain *knowledgedomain.Domain
+	domain  *knowledgedomain.Domain
+	reading *ReadingTask
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
 	return &KnowledgeDomainHandler{domain: knowledgedomain.New(service)}
+}
+
+// WithReading serves knowledge.read through the reading host. Without it, knowledge.read is
+// refused and every other knowledge event is unchanged.
+func (h *KnowledgeDomainHandler) WithReading(task *ReadingTask) *KnowledgeDomainHandler {
+	h.reading = task
+	return h
 }
 
 func (h *KnowledgeDomainHandler) Domain() core.Domain {
@@ -30,6 +38,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionReadKnowledge && h.reading != nil {
+		return h.reading.Read(ctx, event)
+	}
 	return h.domain.Handle(ctx, knowledgedomain.Request{
 		Action: workflow.Action,
 		Event: knowledgedomain.Event{

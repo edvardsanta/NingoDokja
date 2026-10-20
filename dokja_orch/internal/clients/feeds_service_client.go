@@ -11,15 +11,22 @@ import (
 	"read_books/internal/infrastructure/zeromq"
 	"read_books/internal/logger"
 	"strings"
+	"time"
 )
 
 const defaultFeedsServiceEndpoint = "tcp://127.0.0.1:5563"
 
+// feedsExtractTimeout is a little over the service's own 2-minute limit for a reading, so
+// the service's answer, even a timeout, arrives before the socket gives up.
+const feedsExtractTimeout = 2*time.Minute + 10*time.Second
+
 type FeedsServiceRequesterFactory func() (repreq.RequesterReply, error)
 
 // FeedsServiceClient talks to the feeds service over ZeroMQ. Requests are logged by type only.
+// An on-demand reading uses its own requester, which waits longer than the cached reads.
 type FeedsServiceClient struct {
 	requesterFactory FeedsServiceRequesterFactory
+	extractFactory   FeedsServiceRequesterFactory
 }
 
 type feedsServiceResponse struct {
@@ -37,16 +44,38 @@ func NewFeedsServiceClient(endpoint string) *FeedsServiceClient {
 			}
 			return zeromq.NewRequester(resolved)
 		},
+		extractFactory: func() (repreq.RequesterReply, error) {
+			if err := validateFeedsServiceEndpoint(resolved); err != nil {
+				return nil, err
+			}
+			return zeromq.NewRequesterWithTimeout(resolved, feedsExtractTimeout)
+		},
 	}
 }
 
 func NewFeedsServiceClientWithFactory(factory FeedsServiceRequesterFactory) *FeedsServiceClient {
-	return &FeedsServiceClient{requesterFactory: factory}
+	return &FeedsServiceClient{requesterFactory: factory, extractFactory: factory}
 }
 
 // Dispatch sends one feeds.* event and returns the service's result.
 func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
-	if c == nil || c.requesterFactory == nil {
+	if c == nil {
+		return nil, fmt.Errorf("feeds service requester factory is not configured")
+	}
+	return c.send(ctx, c.requesterFactory, eventType, payload)
+}
+
+// Extract reads one file through the reading host (feeds.extract). The file is the user's:
+// only its presence is logged.
+func (c *FeedsServiceClient) Extract(ctx context.Context, filename, contentB64 string) (map[string]any, error) {
+	if c == nil {
+		return nil, fmt.Errorf("feeds service requester factory is not configured")
+	}
+	return c.send(ctx, c.extractFactory, "feeds.extract", map[string]any{"filename": filename, "content_b64": contentB64})
+}
+
+func (c *FeedsServiceClient) send(ctx context.Context, factory FeedsServiceRequesterFactory, eventType string, payload map[string]any) (map[string]any, error) {
+	if factory == nil {
 		return nil, fmt.Errorf("feeds service requester factory is not configured")
 	}
 	if payload == nil {
@@ -59,7 +88,7 @@ func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, pay
 		return nil, fmt.Errorf("marshal feeds event: %w", err)
 	}
 
-	requester, err := c.requesterFactory()
+	requester, err := factory()
 	if err != nil {
 		return nil, fmt.Errorf("create feeds requester: %w", err)
 	}

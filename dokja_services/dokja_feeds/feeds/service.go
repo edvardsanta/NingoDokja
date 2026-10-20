@@ -4,6 +4,7 @@ package feeds
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,9 +23,10 @@ type Options struct {
 
 // entry is one directory of the plugins directory and what the service knows about it.
 type entry struct {
-	dir     string
-	plugin  *Plugin // nil when the manifest is not usable
-	invalid string  // why, when plugin is nil
+	dir          string
+	plugin       *Plugin // nil when the manifest is not usable
+	invalid      string  // why, when plugin is nil
+	incompatible bool    // the manifest asks for a version this host does not support
 
 	running bool
 	ran     bool
@@ -61,11 +63,14 @@ type Service struct {
 	dirErr  string
 	mu      sync.RWMutex
 	entries []*entry
+	// extractions holds one token per on-demand reading that is running.
+	extractions chan struct{}
 }
 
 // New reads the plugins directory. Nothing runs until Run is called.
 func New(config Config, options Options) *Service {
-	s := &Service{config: config, runner: options.Runner, lookup: options.Lookup, now: options.Now, logger: options.Logger}
+	s := &Service{config: config, runner: options.Runner, lookup: options.Lookup, now: options.Now, logger: options.Logger,
+		extractions: make(chan struct{}, maxExtractions)}
 	if s.logger == nil {
 		s.logger = log.New(io.Discard, "", 0)
 	}
@@ -85,7 +90,7 @@ func New(config Config, options Options) *Service {
 		s.logger.Printf("plugins directory unusable: %s", s.dirErr)
 	}
 	for _, f := range found {
-		e := &entry{dir: f.Dir, plugin: f.Plugin}
+		e := &entry{dir: f.Dir, plugin: f.Plugin, incompatible: errors.Is(f.Err, ErrIncompatible)}
 		if f.Err != nil {
 			e.invalid = cleanText(f.Err.Error(), 300)
 			s.logger.Printf("plugin %s is not usable: %s", cleanText(f.Dir, 64), e.invalid)
@@ -153,7 +158,7 @@ func (s *Service) refresh(ctx context.Context, e *entry) {
 }
 
 func (s *Service) collect(ctx context.Context, plugin Plugin) ([]Item, int, error) {
-	output, err := s.runner.Run(ctx, plugin, s.environment(plugin))
+	output, err := s.runner.Run(ctx, plugin, s.environment(plugin), nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -176,13 +181,16 @@ func (s *Service) environment(plugin Plugin) []string {
 	return env
 }
 
-// Dispatch answers the two events of the service, both from memory.
-func (s *Service) Dispatch(_ context.Context, eventType string, _ map[string]any) (map[string]any, error) {
+// Dispatch answers the events of the service. feeds.status and feeds.items come from
+// memory; feeds.extract reads the document it carries, on demand.
+func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
 	switch eventType {
 	case "feeds.status":
 		return s.status(), nil
 	case "feeds.items":
 		return s.itemsReply(), nil
+	case "feeds.extract":
+		return s.extract(ctx, payload)
 	}
 	return nil, fmt.Errorf("unsupported feeds event type %q", cleanText(eventType, 64))
 }
@@ -203,6 +211,8 @@ func (s *Service) status() map[string]any {
 				"id": e.plugin.ID, "name": e.plugin.Name, "enabled": e.plugin.Enabled,
 				"plugin_api": e.plugin.APIVersion, "version": e.plugin.Version,
 				"provides": e.plugin.Provides, "formats": e.plugin.Formats,
+				"last_run": stamp(e.lastRun), "last_ok": stamp(e.lastOK),
+				"last_error": e.lastErr,
 			})
 			continue
 		}

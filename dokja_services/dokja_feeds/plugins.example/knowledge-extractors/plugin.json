@@ -1,0 +1,13 @@
+{
+  "plugin_api": 1,
+  "id": "knowledge-extractors",
+  "version": "0.1.0",
+  "name": "Knowledge extractors",
+  "provides": ["document.extract.v1"],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": ["python3", "-I", "-B", "run.py"],
+  "env": ["KNOWLEDGE_EXTRACTORS_DIR", "KNOWLEDGE_PLUGINS_DIR"],
+  "formats": [".txt", ".md", ".markdown", ".rst", ".html", ".htm", ".xhtml", ".docx", ".epub", ".pdf", ".xml", ".rss", ".atom"],
+  "limits": {"timeout_ms": 90000, "output_bytes": 16777216}
+}

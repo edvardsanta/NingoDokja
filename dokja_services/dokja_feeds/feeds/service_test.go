@@ -28,7 +28,7 @@ func newFakeRunner(run func(ctx context.Context, plugin Plugin) ([]byte, error))
 	return &fakeRunner{calls: map[string]int{}, run: run}
 }
 
-func (f *fakeRunner) Run(ctx context.Context, plugin Plugin, _ []string) ([]byte, error) {
+func (f *fakeRunner) Run(ctx context.Context, plugin Plugin, _ []string, _ []byte) ([]byte, error) {
 	f.mu.Lock()
 	f.calls[plugin.ID]++
 	f.mu.Unlock()
@@ -496,12 +496,14 @@ func TestTheShippedExamplePluginWorksThroughARealProcess(t *testing.T) {
 	}
 }
 
-func TestTheShippedExampleIsDisabledUntilTheOwnerEnablesIt(t *testing.T) {
+func TestTheShippedExamplesAreDisabledUntilTheOwnerEnablesThem(t *testing.T) {
 	found, err := Discover(filepath.Join("..", "plugins.example"), DefaultLimits())
-	if err != nil || len(found) != 1 || found[0].Err != nil {
+	if err != nil || len(found) != 2 {
 		t.Fatalf("found=%+v err=%v", found, err)
 	}
-	if found[0].Plugin.Enabled {
-		t.Fatal("the example plugin ships enabled")
+	for _, f := range found {
+		if f.Err != nil || f.Plugin.Enabled {
+			t.Fatalf("every example must be valid and ship disabled: %+v", f)
+		}
 	}
 }

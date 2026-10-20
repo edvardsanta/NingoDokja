@@ -164,6 +164,8 @@ services:
     environment:
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
       FEEDS_PLUGINS_DIR: /plugins
+      # Knowledge's extractors, for the knowledge-extractors reading plugin.
+      KNOWLEDGE_EXTRACTORS_DIR: /workspace/dokja_services/dokja_knowledge
       GOCACHE: /tmp/go-build
     # The items of the owner's own sources and no authentication: reachable from this host only.
     ports:
