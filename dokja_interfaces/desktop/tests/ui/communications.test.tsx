@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
@@ -61,7 +61,8 @@ describe("communications", () => {
     fireEvent.change(field, { target: { value: "hello" } });
     const button = screen.getByRole("button", { name: "Send as Ningo" });
     fireEvent.click(button); fireEvent.click(button);
-    expect((screen.getByLabelText("Channel") as HTMLSelectElement).disabled).toBe(true);
+    const list = screen.getByRole("navigation", { name: "Channels and conversations" });
+    for (const entry of within(list).getAllByRole("button")) expect((entry as HTMLButtonElement).disabled).toBe(true);
     pending.resolve(ok({ sent: true, skipped: false }));
     await screen.findByText("Message sent.");
     expect(field.value).toBe("");
@@ -72,7 +73,7 @@ describe("communications", () => {
     const pending = deferred<TransportResult>();
     const { transport } = routedTransport({ "communications.channels": ok(channels), "communications.history": [() => pending.promise, ok({ ...history("456"), messages: [message("20", "second channel")] })] });
     render(view(transport));
-    fireEvent.change(await screen.findByLabelText("Channel"), { target: { value: "456" } });
+    fireEvent.click(await screen.findByRole("button", { name: "#memes · 456" }));
     await screen.findByText("second channel");
     await act(async () => pending.resolve(ok(history())));
     expect(screen.queryByText("<script>text</script>")).toBeNull();
@@ -124,5 +125,19 @@ describe("communications", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
     await screen.findByText("Message sent.");
     expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png" });
+  });
+  it("lists the conversations beside the chosen one, and marks which one is open", async () => {
+    const { transport, calls } = routedTransport({ "communications.channels": ok(channels), "communications.history": [ok(history()), ok({ ...history("456"), messages: [message("20", "second channel")] })] });
+    render(view(transport));
+    await screen.findByText("<script>text</script>");
+    const list = screen.getByRole("navigation", { name: "Channels and conversations" });
+    expect(within(list).getAllByRole("button").map((entry) => entry.textContent)).toEqual(["#reading · 123", "#memes · 456"]);
+    expect(within(list).getByRole("button", { name: "#reading · 123" }).getAttribute("aria-current")).toBe("true");
+
+    fireEvent.click(within(list).getByRole("button", { name: "#memes · 456" }));
+    await screen.findByText("second channel");
+    expect(within(list).getByRole("button", { name: "#memes · 456" }).getAttribute("aria-current")).toBe("true");
+    expect(within(list).getByRole("button", { name: "#reading · 123" }).hasAttribute("aria-current")).toBe(false);
+    expect(calls.filter((call) => call.type === "communications.history").map((call) => call.payload?.channel_id)).toEqual(["123", "456"]);
   });
 });
