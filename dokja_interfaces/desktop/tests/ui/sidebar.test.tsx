@@ -1,16 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { CardEntry } from "../../src/renderer/cards/registry.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { Tabs } from "../../src/renderer/tabs.js";
+import { PulseProvider, usePulse, type Tones } from "../../src/renderer/pulse.js";
+import { Sidebar } from "../../src/renderer/sidebar.js";
 import type { Transport } from "../../src/shared/transport.js";
 
 const NO_TRANSPORT = {} as Transport;
 
-// Three stand-in cards, so the tabs are tested on their own. Each records when it is mounted and
-// keeps a count of its own, which shows whether a card survives while another tab is open.
+// Three stand-in cards, so the sidebar is tested on its own. Each records when it is mounted and
+// keeps a count of its own, which shows whether a card survives while another workspace is open.
 function entries(mounted: string[]): CardEntry[] {
   const card = (name: string) =>
     function Stand() {
@@ -33,10 +34,12 @@ function entries(mounted: string[]): CardEntry[] {
   ];
 }
 
-function renderTabs(mounted: string[] = []) {
+function renderTabs(mounted: string[] = [], start?: string) {
   render(
     <I18nProvider locale="en">
-      <Tabs entries={entries(mounted)} transport={NO_TRANSPORT} />
+      <PulseProvider>
+        <Sidebar entries={entries(mounted)} transport={NO_TRANSPORT} start={start} />
+      </PulseProvider>
     </I18nProvider>,
   );
   return mounted;
@@ -49,11 +52,12 @@ const selected = () =>
     .filter((each) => each.getAttribute("aria-selected") === "true")
     .map((each) => each.textContent);
 
-describe("the tabs", () => {
-  it("open the first tab and mount only its card", () => {
+describe("the sidebar", () => {
+  it("opens the first workspace and mounts only its card", () => {
     const mounted = renderTabs();
 
-    expect(screen.getByRole("tablist", { name: "Sections" })).toBeTruthy();
+    const list = screen.getByRole("tablist", { name: "Workspaces" });
+    expect(list.getAttribute("aria-orientation")).toBe("vertical");
     expect(screen.getAllByRole("tab").map((each) => each.textContent)).toEqual(["health", "memory", "knowledge"]);
     expect(selected()).toEqual(["health"]);
     screen.getByText("card a");
@@ -61,7 +65,7 @@ describe("the tabs", () => {
     expect(new Set(mounted)).toEqual(new Set(["a"]));
   });
 
-  it("mount a card the first time its tab is chosen", () => {
+  it("mounts a card the first time its workspace is chosen", () => {
     const mounted = renderTabs();
     fireEvent.click(tab("memory"));
 
@@ -70,7 +74,7 @@ describe("the tabs", () => {
     expect(new Set(mounted)).toEqual(new Set(["a", "b"]));
   });
 
-  it("keep a card, with what it showed, while another tab is open", () => {
+  it("keeps a card, with what it showed, while another workspace is open", () => {
     renderTabs();
     fireEvent.click(screen.getByRole("button", { name: "count a: 0" }));
     fireEvent.click(tab("memory"));
@@ -89,7 +93,7 @@ describe("the tabs", () => {
     screen.getByRole("button", { name: "count b: 1" });
   });
 
-  it("hide the card of a tab that is not open from the page and from screen readers", () => {
+  it("hides the card of a workspace that is not open from the page and from screen readers", () => {
     renderTabs();
     fireEvent.click(tab("memory"));
 
@@ -98,7 +102,7 @@ describe("the tabs", () => {
     expect(second?.hasAttribute("hidden")).toBe(false);
   });
 
-  it("tie each tab to its panel", () => {
+  it("ties each entry to its panel", () => {
     renderTabs();
     fireEvent.click(tab("memory"));
 
@@ -107,7 +111,7 @@ describe("the tabs", () => {
     expect(panel.getAttribute("aria-labelledby")).toBe(tab("memory").id);
   });
 
-  it("let only the open tab take the Tab key", () => {
+  it("lets only the open entry take the Tab key", () => {
     renderTabs();
 
     expect(screen.getAllByRole("tab").map((each) => each.tabIndex)).toEqual([0, -1, -1]);
@@ -118,22 +122,22 @@ describe("the tabs", () => {
   describe("with the keyboard", () => {
     const press = (key: string) => fireEvent.keyDown(document.activeElement ?? document.body, { key });
 
-    it("move with the arrows, wrapping at both ends, and focus the tab they open", () => {
+    it("moves with the up and down arrows, wrapping at both ends, and focuses the entry they open", () => {
       renderTabs();
       tab("health").focus();
 
-      press("ArrowRight");
+      press("ArrowDown");
       expect(selected()).toEqual(["memory"]);
       expect(document.activeElement).toBe(tab("memory"));
-      press("ArrowRight");
-      press("ArrowRight");
+      press("ArrowDown");
+      press("ArrowDown");
       expect(selected()).toEqual(["health"]);
-      press("ArrowLeft");
+      press("ArrowUp");
       expect(selected()).toEqual(["knowledge"]);
       expect(document.activeElement).toBe(tab("knowledge"));
     });
 
-    it("jump to the first and last tab with Home and End", () => {
+    it("jumps to the first and last entry with Home and End", () => {
       renderTabs();
       tab("health").focus();
 
@@ -143,46 +147,47 @@ describe("the tabs", () => {
       expect(selected()).toEqual(["health"]);
     });
 
-    it("keep the page from scrolling on the keys they use, and leave the other keys alone", () => {
+    it("keeps the page from scrolling on the keys it uses, and leaves the other keys alone", () => {
       renderTabs();
       tab("health").focus();
 
       // fireEvent answers false when the event was cancelled
-      for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) {
+      for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
         expect(fireEvent.keyDown(document.activeElement ?? document.body, { key }), key).toBe(false);
       }
       fireEvent.click(tab("memory"));
-      for (const key of ["Tab", "Enter", "a", "ArrowDown", "constructor"]) {
+      for (const key of ["Tab", "Enter", "a", "ArrowRight", "constructor"]) {
         expect(fireEvent.keyDown(tab("memory"), { key }), key).toBe(true);
       }
       expect(selected()).toEqual(["memory"]);
     });
 
-    it("open the tabs with the digits, in order", () => {
+    it("opens the workspaces with Ctrl and a digit, in order", () => {
       renderTabs();
 
-      fireEvent.keyDown(document.body, { key: "2" });
+      fireEvent.keyDown(document.body, { key: "2", ctrlKey: true });
       expect(selected()).toEqual(["memory"]);
       expect(document.activeElement).toBe(tab("memory"));
-      fireEvent.keyDown(document.body, { key: "3" });
+      fireEvent.keyDown(document.body, { key: "3", ctrlKey: true });
       expect(selected()).toEqual(["knowledge"]);
-      fireEvent.keyDown(document.body, { key: "1" });
+      fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
       expect(selected()).toEqual(["health"]);
     });
 
-    it("leave alone a digit with no tab, a zero, and a digit with a modifier", () => {
+    it("leaves alone a bare digit, a digit with no workspace, a zero, and other modifiers", () => {
       renderTabs();
       fireEvent.click(tab("memory"));
 
-      fireEvent.keyDown(document.body, { key: "9" });
-      fireEvent.keyDown(document.body, { key: "0" });
-      fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
-      fireEvent.keyDown(document.body, { key: "1", altKey: true });
+      fireEvent.keyDown(document.body, { key: "1" });
+      fireEvent.keyDown(document.body, { key: "9", ctrlKey: true });
+      fireEvent.keyDown(document.body, { key: "0", ctrlKey: true });
+      fireEvent.keyDown(document.body, { key: "1", ctrlKey: true, altKey: true });
+      fireEvent.keyDown(document.body, { key: "1", ctrlKey: true, shiftKey: true });
       fireEvent.keyDown(document.body, { key: "1", metaKey: true });
       expect(selected()).toEqual(["memory"]);
     });
 
-    it("leave the tabs alone while a dialog is open over them", () => {
+    it("leaves the workspaces alone while a dialog is open over them", () => {
       renderTabs();
       fireEvent.click(tab("memory"));
       const dialog = document.createElement("div");
@@ -190,21 +195,82 @@ describe("the tabs", () => {
       dialog.setAttribute("aria-modal", "true");
       document.body.append(dialog);
       try {
-        fireEvent.keyDown(document.body, { key: "1" });
+        fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
         expect(selected()).toEqual(["memory"]);
       } finally {
         dialog.remove();
       }
-      fireEvent.keyDown(document.body, { key: "1" });
+      fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
       expect(selected()).toEqual(["health"]);
     });
 
-    it("type a digit into a field instead of changing tabs", () => {
+    it("types a bare digit into a field, and still opens a workspace on Ctrl and a digit from it", () => {
       renderTabs();
       fireEvent.click(tab("memory"));
 
       fireEvent.keyDown(screen.getByLabelText("field b"), { key: "3" });
       expect(selected()).toEqual(["memory"]);
+      expect(fireEvent.keyDown(screen.getByLabelText("field b"), { key: "3", ctrlKey: true })).toBe(false);
+      expect(selected()).toEqual(["knowledge"]);
+    });
+  });
+
+  it("opens on the workspace it is told to start on, and mounts only that one", () => {
+    const mounted = renderTabs([], "c");
+
+    expect(selected()).toEqual(["knowledge"]);
+    expect(new Set(mounted)).toEqual(new Set(["c"]));
+  });
+
+  describe("the state of each workspace", () => {
+    // Stands in for the health card: it reports the tones the status gave, as that card does.
+    function Reporter({ tones }: { tones: Tones }) {
+      const { reportTones } = usePulse();
+      useEffect(() => reportTones(tones), [tones, reportTones]);
+      return null;
+    }
+
+    const stand = () => <p>stand-in</p>;
+    const withServices: CardEntry[] = [
+      { kind: "a", labelId: "kind_knowledge", Card: stand, services: ["knowledge"] },
+      { kind: "b", labelId: "nav_messages", Card: stand, services: ["discord", "whatsapp"] },
+      { kind: "c", labelId: "kind_digest", Card: stand },
+      { kind: "d", labelId: "nav_system", Card: stand, foot: true },
+    ];
+
+    const renderWith = (tones: Tones) =>
+      render(
+        <I18nProvider locale="en">
+          <PulseProvider>
+            <Reporter tones={tones} />
+            <Sidebar entries={withServices} transport={NO_TRANSPORT} />
+          </PulseProvider>
+        </I18nProvider>,
+      );
+
+    const dotOf = (name: string) => tab(name).querySelector(".tab-dot")?.getAttribute("data-tone");
+
+    it("shows the worst tone among the services behind each workspace, and no dot for one it does not know", () => {
+      renderWith({ knowledge: "ok", discord: "ok", whatsapp: "problem", meme: "off" });
+
+      expect(dotOf("knowledge")).toBe("ok");
+      expect(dotOf("messages")).toBe("problem");
+      expect(dotOf("digest")).toBeUndefined();
+      expect(dotOf("system")).toBeUndefined();
+    });
+
+    it("shows no dot before any status arrives", () => {
+      renderWith({});
+
+      expect(document.querySelectorAll(".tab-dot")).toHaveLength(0);
+      expect(document.querySelectorAll(".tab-count")).toHaveLength(0);
+    });
+
+    it("counts the services with a problem at the foot, and keeps the count out of the entry's name", () => {
+      renderWith({ knowledge: "problem", whatsapp: "problem", meme: "unchecked" });
+
+      expect(tab("system").querySelector(".tab-count")?.textContent).toBe("2");
+      expect(tab("system").hasAttribute("data-foot")).toBe(true);
     });
   });
 });

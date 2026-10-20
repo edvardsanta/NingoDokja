@@ -11,18 +11,26 @@ import { MemoryCard } from "./memory.js";
 
 export type CardEntry = {
   kind: string;
-  // The tab's name: the same word as the card's kind.
+  // The workspace's name in the sidebar.
   labelId: MessageId;
   Card: ComponentType<{ transport: Transport; active?: boolean }>;
+  // The services and interfaces behind the workspace, by the names the status reports. The sidebar
+  // shows the worst of their tones as a dot; a workspace with none known shows no dot.
+  services?: readonly string[];
+  // Kept apart at the foot of the sidebar.
+  foot?: boolean;
 };
 
-// Every card the screen knows, one tab each, in the order of the tabs. Adding a card is adding a
-// line here (and its action to the allow-list in src/shared/actions.ts).
+// Every workspace the screen knows, in the order of the sidebar. Adding one is adding a line here
+// (and its action to the allow-list in src/shared/actions.ts). System holds the switches and is the
+// one that reads the status, so the screen opens on it.
 export const CARDS: readonly CardEntry[] = [
-  { kind: "health", labelId: "kind_health", Card: HealthCard },
   { kind: "digest", labelId: "kind_digest", Card: DigestCard },
-  { kind: "memory", labelId: "kind_memory", Card: MemoryCard },
-  { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard },
-  { kind: "memes", labelId: "kind_memes", Card: MemesCard },
-  { kind: "communications", labelId: "kind_communications", Card: CommunicationsCard },
+  { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard, services: ["knowledge"] },
+  { kind: "memory", labelId: "kind_memory", Card: MemoryCard, services: ["memory"] },
+  { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
+  { kind: "memes", labelId: "kind_memes", Card: MemesCard, services: ["meme"] },
+  { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },
 ];
+
+export const START = "health";

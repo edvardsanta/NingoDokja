@@ -28,19 +28,19 @@ const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Ro
   routedTransport({ ...QUIET, "ningo.status": health, ...overrides });
 
 describe("the screen", () => {
-  it("shows the name and the tabs, with the health card open, in the language it was given", async () => {
+  it("shows the name and the workspaces, with System open, in the language it was given", async () => {
     const { transport } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="pt" />);
 
     expect(wordmark().textContent).toBe("Ningo");
-    expect(screen.getByRole("tablist", { name: "Seções" })).toBeTruthy();
+    expect(screen.getByRole("tablist", { name: "Áreas de trabalho" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "saúde",
       "leituras",
-      "memória",
       "conhecimento",
+      "memória",
+      "mensagens",
       "memes",
-      "comunicações",
+      "sistema",
     ]);
     await screen.findByRole("heading", { name: "Serviços" });
     expect(document.documentElement.lang).toBe("pt");
@@ -55,7 +55,7 @@ describe("the screen", () => {
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
   });
 
-  it("opens each card from its tab", async () => {
+  it("opens each workspace from the sidebar", async () => {
     const { transport, calls } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="en" />);
 
@@ -90,7 +90,7 @@ describe("the screen", () => {
 
     fireEvent.click(tabNamed("knowledge"));
     await screen.findByText("Switched off.");
-    fireEvent.click(tabNamed("health"));
+    fireEvent.click(tabNamed("system"));
     expect(screen.getByRole("tabpanel").textContent).toContain("2 up, 0 with problems, 0 switched off");
   });
 
@@ -136,7 +136,7 @@ describe("the screen", () => {
       const { transport } = screenTransport(statusReply(SERVICES));
       render(<App transport={transport} locale={locale} />);
       await screen.findByText("meme");
-      // every card, not only the open one: a closed tab keeps its text in the page
+      // every card, not only the open one: a closed workspace keeps its text in the page
       for (const tab of screen.getAllByRole("tab")) fireEvent.click(tab);
       await waitFor(() => expect(screen.queryAllByRole("status", { hidden: true })).toHaveLength(0));
       return document.body.textContent ?? "";

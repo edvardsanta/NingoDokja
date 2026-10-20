@@ -154,3 +154,10 @@ export function pulseOf(state: CardState<Health>): Pulse {
       return state.data.counts.problem > 0 ? "unwell" : "calm";
   }
 }
+
+// The tone of every service and interface by name, for the sidebar's dots. A status that has not
+// arrived, or did not arrive, has no tones: the sidebar then shows no dot rather than a guess.
+export function tonesOf(state: CardState<Health>): Record<string, Tone> {
+  if (state.phase !== "ready") return {};
+  return Object.fromEntries([...state.data.rows, ...state.data.interfaces].map((row) => [row.name, row.tone]));
+}

@@ -14,7 +14,7 @@ describe("built communications tab", { skip: hasDisplay ? false : "no display" }
   });
   after(async () => { page?.close(); await app?.stop(); await orchestrator?.stop(); });
   it("reads messages through the authenticated shell and renders them as text", async () => {
-    await page.evaluate("document.querySelectorAll('[role=tab]')[5].click()");
+    await page.evaluate("document.querySelectorAll('[role=tab]')[3].click()");
     await page.waitFor("document.querySelectorAll('.conversation li').length === 2");
     assert.equal(await page.evaluate("document.querySelector('.message-content').textContent"), HOSTILE_TITLE);
     assert.equal(await page.evaluate("document.querySelectorAll('.conversation img, .conversation script').length"), 0);

@@ -2,10 +2,10 @@ import { useEffect } from "react";
 
 import type { Locale } from "../shared/locale.js";
 import type { Transport } from "../shared/transport.js";
-import { CARDS } from "./cards/registry.js";
+import { CARDS, START } from "./cards/registry.js";
 import { I18nProvider } from "./i18n/context.js";
 import { PulseProvider, usePulse } from "./pulse.js";
-import { Tabs } from "./tabs.js";
+import { Sidebar } from "./sidebar.js";
 
 function Wordmark() {
   const { pulse } = usePulse();
@@ -25,8 +25,7 @@ export function App({ transport, locale }: { transport: Transport; locale: Local
     <I18nProvider locale={locale}>
       <PulseProvider>
         <main>
-          <Wordmark />
-          <Tabs entries={CARDS} transport={transport} />
+          <Sidebar entries={CARDS} transport={transport} start={START} header={<Wordmark />} />
         </main>
       </PulseProvider>
     </I18nProvider>
