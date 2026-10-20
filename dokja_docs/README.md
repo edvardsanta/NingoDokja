@@ -6,6 +6,7 @@ Available docs:
 
 - [Cognitive storage research and comparison](./cognitive-storage-research.md)
 - [Step 09 consolidation progress](./step-09-consolidation.md)
+- [Step 10 storage spike: W1](./step-10-storage-spike.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)

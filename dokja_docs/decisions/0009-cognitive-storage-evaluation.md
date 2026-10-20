@@ -48,6 +48,23 @@ budgets. It does not claim PostgreSQL or Neo4j is faster than SQLite for Dokja.
 - Any migration names owners, public-contract impact, backup, reconciliation,
   cutover and rollback, including writes accepted after cutover.
 
+## Owner direction and first result (2026-10-20)
+
+The owner accepted W1 (evidence about an entity, filtered by form, content kind
+and date, ranked by vector similarity) as the graph's first consumer and the
+start of the spike. Scope/durability and ADR 0003's hosting rule were not
+decided; the spike models two scopes as fixture data.
+
+The [W1 spike](../step-10-storage-spike.md) ran SQLite, PostgreSQL+pgvector and
+Neo4j on the same generated fixture up to 108k chunks at 1024 dimensions. All
+three answered exactly when scanning, and none leaked across scope, version or
+deletion. PostgreSQL stayed exact with its HNSW index because its planner
+filtered first where filters were selective; Neo4j's index-first approximate
+search lost most results to the filters (recall@10 0.23–0.52), and its exact
+traversal reached 850 ms p95 at the largest size. W1 is a one-hop filtered
+search: it does not measure the graph workloads (W2, W4), which still need a
+consumer. The status of this record stays proposed; no engine is adopted.
+
 ## Compatibility
 
 Documentation and tracker only. No envelope, route, HTTP/ZeroMQ contract,

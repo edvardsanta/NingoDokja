@@ -1,0 +1,409 @@
+{
+  "started": "2026-10-20T03:47:08Z",
+  "config": {
+    "Seed": 1,
+    "Chunks": 10000,
+    "ChunksPerDoc": 10,
+    "Dim": 1024,
+    "Entities": 500,
+    "Queries": 200
+  },
+  "host": {
+    "cpus": "16",
+    "go": "go1.25.0",
+    "os": "linux/amd64"
+  },
+  "fixture": {
+    "chunks": 10800,
+    "deleted_docs": 62,
+    "docs": 1080,
+    "queries": 200,
+    "superseded_docs": 39,
+    "twin_docs": 41
+  },
+  "engines": [
+    {
+      "engine": "sqlite",
+      "describe": {
+        "disk_bytes": "50393088",
+        "engine": "SQLite 3.53.4 (modernc.org/sqlite, in process)",
+        "vector_search": "exact scan in Go over SQL-filtered chunks"
+      },
+      "load_ms": 208.836,
+      "delete_ms": 9.642,
+      "index_ms": 0,
+      "modes": [
+        {
+          "mode": "exact",
+          "queries": 200,
+          "exact_match": 200,
+          "mean_recall_at_k": 1,
+          "underfilled": 0,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 0.218,
+          "p95_ms": 10.856,
+          "p99_ms": 11.165,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 10.286
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.237
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 10.991
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 2.421
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 1.374
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.231
+            }
+          }
+        }
+      ],
+      "docs": 1080,
+      "chunks": 10800,
+      "dimension": 1024
+    },
+    {
+      "engine": "postgres",
+      "describe": {
+        "disk_bytes": "156123663",
+        "engine": "PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2) + pgvector 0.8.7",
+        "vector_index": "hnsw vector_cosine_ops m=16 ef_construction=64; ef_search=100"
+      },
+      "load_ms": 5889.136,
+      "delete_ms": 21.815,
+      "index_ms": 6385.261,
+      "modes": [
+        {
+          "mode": "exact",
+          "queries": 200,
+          "exact_match": 200,
+          "mean_recall_at_k": 1,
+          "underfilled": 0,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 0.822,
+          "p95_ms": 8.61,
+          "p99_ms": 9.001,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 8.553,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=371.41..371.43 rows=10 width=43)\n  -\u003e  Sort  (cost=371.41..376.54 rows=2055 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=45.94..327.00 rows=2055 width=43)\n              -\u003e  Hash Semi Join  (cost=45.66..87.69 rows=212 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..31.50 rows=805 width=18)\n                          Filter: (current AND (scope = 'owner'::text))\n                    -\u003e  Hash  (cost=41.67..41.67 rows=266 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=10.34..41.67 rows=266 width=12)\n                                Recheck Cond: (entity = 'e0000'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..10.27 rows=266 width=0)\n                                      Index Cond: (entity = 'e0000'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..1.01 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.662,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=52.41..52.43 rows=8 width=43)\n  -\u003e  Sort  (cost=52.41..52.43 rows=8 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=16.41..52.29 rows=8 width=43)\n              -\u003e  Nested Loop  (cost=16.12..49.42 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0438'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0438'::text)\n                    -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.30 rows=1 width=18)\n                          Index Cond: ((id = m.doc_id) AND (version = m.version))\n                          Filter: (current AND (scope = 'owner'::text) AND (form = 'article'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.77 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 8.79,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=252.33..252.35 rows=10 width=43)\n  -\u003e  Sort  (cost=252.33..253.84 rows=603 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=45.94..239.30 rows=603 width=43)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Hash Semi Join  (cost=45.66..80.24 rows=62 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..31.50 rows=236 width=18)\n                          Filter: (current AND (scope = 'guest'::text))\n                    -\u003e  Hash  (cost=41.67..41.67 rows=266 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=10.34..41.67 rows=266 width=12)\n                                Recheck Cond: (entity = 'e0000'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..10.27 rows=266 width=0)\n                                      Index Cond: (entity = 'e0000'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.42 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 2.682,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=60.58..60.60 rows=10 width=43)\n  -\u003e  Sort  (cost=60.58..60.61 rows=13 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=22.31..60.34 rows=13 width=43)\n              -\u003e  Hash Semi Join  (cost=22.03..57.30 rows=1 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=200 width=18)\n                          Filter: (current AND (scope = 'owner'::text) AND (kind = 'reference'::text))\n                    -\u003e  Hash  (cost=21.92..21.92 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0195'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0195'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.88 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 3.268,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=61.04..61.04 rows=1 width=43)\n  -\u003e  Sort  (cost=61.04..61.04 rows=1 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=16.42..61.03 rows=1 width=43)\n              -\u003e  Nested Loop  (cost=16.13..49.21 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0193'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0193'::text)\n                    -\u003e  Memoize  (cost=0.29..8.32 rows=1 width=18)\n                          Cache Key: m.doc_id, m.version\n                          Cache Mode: logical\n                          -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.31 rows=1 width=18)\n                                Index Cond: ((id = m.doc_id) AND (version = m.version))\n                                Filter: (current AND (date_anchor \u003e= '2025-01-01'::date) AND (date_anchor \u003c= '2025-12-31'::date) AND (scope = 'owner'::text) AND (kind = 'news'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..11.76 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.609,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=71.58..71.58 rows=1 width=43)\n  -\u003e  Sort  (cost=71.58..71.58 rows=1 width=43)\n        Sort Key: (((c.vec \u003c=\u003e '$vec'::vector) + '0'::double precision)), c.id\n        -\u003e  Nested Loop  (cost=4.62..71.57 rows=1 width=43)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Nested Loop Semi Join  (cost=4.33..56.38 rows=1 width=30)\n                    Join Filter: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=2 width=18)\n                          Filter: (current AND (scope = 'guest'::text) AND (form = 'law'::text))\n                    -\u003e  Materialize  (cost=4.33..21.96 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0141'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0141'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..15.10 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            }
+          }
+        },
+        {
+          "mode": "approx",
+          "queries": 200,
+          "exact_match": 200,
+          "mean_recall_at_k": 1,
+          "underfilled": 0,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 0.844,
+          "p95_ms": 5.21,
+          "p99_ms": 5.508,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 5.062,
+              "uses_vector_index": "true",
+              "plan": "Limit  (cost=109.79..331.95 rows=10 width=35)\n  -\u003e  Nested Loop Semi Join  (cost=109.79..45762.79 rows=2055 width=35)\n        Join Filter: ((d.id = m.doc_id) AND (d.version = m.version))\n        -\u003e  Nested Loop  (cost=109.51..43139.02 rows=7807 width=57)\n              -\u003e  Index Scan using chunks_vec on chunks c  (cost=109.22..42551.58 rows=10490 width=39)\n                    Order By: (vec \u003c=\u003e '$vec'::vector)\n              -\u003e  Memoize  (cost=0.29..0.32 rows=1 width=18)\n                    Cache Key: c.doc_id, c.version\n                    Cache Mode: logical\n                    -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..0.31 rows=1 width=18)\n                          Index Cond: ((id = c.doc_id) AND (version = c.version))\n                          Filter: (current AND (scope = 'owner'::text))\n        -\u003e  Index Only Scan using mentions_entity on mentions m  (cost=0.28..0.32 rows=1 width=12)\n              Index Cond: ((entity = 'e0000'::text) AND (doc_id = c.doc_id) AND (version = c.version))"
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.714,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=52.37..52.39 rows=8 width=35)\n  -\u003e  Sort  (cost=52.37..52.39 rows=8 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=16.41..52.25 rows=8 width=35)\n              -\u003e  Nested Loop  (cost=16.12..49.42 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0438'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0438'::text)\n                    -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.30 rows=1 width=18)\n                          Index Cond: ((id = m.doc_id) AND (version = m.version))\n                          Filter: (current AND (scope = 'owner'::text) AND (form = 'article'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.77 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 5.452,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=249.31..249.34 rows=10 width=35)\n  -\u003e  Sort  (cost=249.31..250.82 rows=603 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=45.94..236.28 rows=603 width=35)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Hash Semi Join  (cost=45.66..80.24 rows=62 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..31.50 rows=236 width=18)\n                          Filter: (current AND (scope = 'guest'::text))\n                    -\u003e  Hash  (cost=41.67..41.67 rows=266 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=10.34..41.67 rows=266 width=12)\n                                Recheck Cond: (entity = 'e0000'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..10.27 rows=266 width=0)\n                                      Index Cond: (entity = 'e0000'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.42 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 1.743,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=60.51..60.54 rows=10 width=35)\n  -\u003e  Sort  (cost=60.51..60.54 rows=13 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=22.31..60.27 rows=13 width=35)\n              -\u003e  Hash Semi Join  (cost=22.03..57.30 rows=1 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=200 width=18)\n                          Filter: (current AND (scope = 'owner'::text) AND (kind = 'reference'::text))\n                    -\u003e  Hash  (cost=21.92..21.92 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0195'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0195'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.88 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 2.915,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=61.03..61.04 rows=1 width=35)\n  -\u003e  Sort  (cost=61.03..61.04 rows=1 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=16.42..61.02 rows=1 width=35)\n              -\u003e  Nested Loop  (cost=16.13..49.21 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0193'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0193'::text)\n                    -\u003e  Memoize  (cost=0.29..8.32 rows=1 width=18)\n                          Cache Key: m.doc_id, m.version\n                          Cache Mode: logical\n                          -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.31 rows=1 width=18)\n                                Index Cond: ((id = m.doc_id) AND (version = m.version))\n                                Filter: (current AND (date_anchor \u003e= '2025-01-01'::date) AND (date_anchor \u003c= '2025-12-31'::date) AND (scope = 'owner'::text) AND (kind = 'news'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..11.76 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.567,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=71.57..71.58 rows=1 width=35)\n  -\u003e  Sort  (cost=71.57..71.58 rows=1 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=4.62..71.56 rows=1 width=35)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Nested Loop Semi Join  (cost=4.33..56.38 rows=1 width=30)\n                    Join Filter: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=2 width=18)\n                          Filter: (current AND (scope = 'guest'::text) AND (form = 'law'::text))\n                    -\u003e  Materialize  (cost=4.33..21.96 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0141'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0141'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..15.10 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            }
+          }
+        },
+        {
+          "mode": "approx_iterative",
+          "queries": 200,
+          "exact_match": 200,
+          "mean_recall_at_k": 1,
+          "underfilled": 0,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 0.758,
+          "p95_ms": 5.142,
+          "p99_ms": 6.119,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 5.232,
+              "uses_vector_index": "true",
+              "plan": "Limit  (cost=109.79..331.95 rows=10 width=35)\n  -\u003e  Nested Loop Semi Join  (cost=109.79..45762.79 rows=2055 width=35)\n        Join Filter: ((d.id = m.doc_id) AND (d.version = m.version))\n        -\u003e  Nested Loop  (cost=109.51..43139.02 rows=7807 width=57)\n              -\u003e  Index Scan using chunks_vec on chunks c  (cost=109.22..42551.58 rows=10490 width=39)\n                    Order By: (vec \u003c=\u003e '$vec'::vector)\n              -\u003e  Memoize  (cost=0.29..0.32 rows=1 width=18)\n                    Cache Key: c.doc_id, c.version\n                    Cache Mode: logical\n                    -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..0.31 rows=1 width=18)\n                          Index Cond: ((id = c.doc_id) AND (version = c.version))\n                          Filter: (current AND (scope = 'owner'::text))\n        -\u003e  Index Only Scan using mentions_entity on mentions m  (cost=0.28..0.32 rows=1 width=12)\n              Index Cond: ((entity = 'e0000'::text) AND (doc_id = c.doc_id) AND (version = c.version))"
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.6,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=52.37..52.39 rows=8 width=35)\n  -\u003e  Sort  (cost=52.37..52.39 rows=8 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=16.41..52.25 rows=8 width=35)\n              -\u003e  Nested Loop  (cost=16.12..49.42 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0438'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0438'::text)\n                    -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.30 rows=1 width=18)\n                          Index Cond: ((id = m.doc_id) AND (version = m.version))\n                          Filter: (current AND (scope = 'owner'::text) AND (form = 'article'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.77 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 5.238,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=249.31..249.34 rows=10 width=35)\n  -\u003e  Sort  (cost=249.31..250.82 rows=603 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=45.94..236.28 rows=603 width=35)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Hash Semi Join  (cost=45.66..80.24 rows=62 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..31.50 rows=236 width=18)\n                          Filter: (current AND (scope = 'guest'::text))\n                    -\u003e  Hash  (cost=41.67..41.67 rows=266 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=10.34..41.67 rows=266 width=12)\n                                Recheck Cond: (entity = 'e0000'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..10.27 rows=266 width=0)\n                                      Index Cond: (entity = 'e0000'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.42 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 1.576,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=60.51..60.54 rows=10 width=35)\n  -\u003e  Sort  (cost=60.51..60.54 rows=13 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=22.31..60.27 rows=13 width=35)\n              -\u003e  Hash Semi Join  (cost=22.03..57.30 rows=1 width=30)\n                    Hash Cond: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=200 width=18)\n                          Filter: (current AND (scope = 'owner'::text) AND (kind = 'reference'::text))\n                    -\u003e  Hash  (cost=21.92..21.92 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0195'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0195'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..2.88 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 2.835,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=61.03..61.04 rows=1 width=35)\n  -\u003e  Sort  (cost=61.03..61.04 rows=1 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=16.42..61.02 rows=1 width=35)\n              -\u003e  Nested Loop  (cost=16.13..49.21 rows=1 width=30)\n                    -\u003e  HashAggregate  (cost=15.85..15.89 rows=4 width=12)\n                          Group Key: m.doc_id, m.version\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.31..15.83 rows=4 width=12)\n                                Recheck Cond: (entity = 'e0193'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.31 rows=4 width=0)\n                                      Index Cond: (entity = 'e0193'::text)\n                    -\u003e  Memoize  (cost=0.29..8.32 rows=1 width=18)\n                          Cache Key: m.doc_id, m.version\n                          Cache Mode: logical\n                          -\u003e  Index Scan using docs_pkey on docs d  (cost=0.28..8.31 rows=1 width=18)\n                                Index Cond: ((id = m.doc_id) AND (version = m.version))\n                                Filter: (current AND (date_anchor \u003e= '2025-01-01'::date) AND (date_anchor \u003c= '2025-12-31'::date) AND (scope = 'owner'::text) AND (kind = 'news'::text))\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..11.76 rows=5 width=39)\n                    Index Cond: ((doc_id = d.id) AND (version = d.version))"
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 0.647,
+              "uses_vector_index": "false",
+              "plan": "Limit  (cost=71.57..71.58 rows=1 width=35)\n  -\u003e  Sort  (cost=71.57..71.58 rows=1 width=35)\n        Sort Key: ((c.vec \u003c=\u003e '$vec'::vector))\n        -\u003e  Nested Loop  (cost=4.62..71.56 rows=1 width=35)\n              Join Filter: ((c.doc_id = d.id) AND (c.version = d.version))\n              -\u003e  Nested Loop Semi Join  (cost=4.33..56.38 rows=1 width=30)\n                    Join Filter: ((d.id = m.doc_id) AND (d.version = m.version))\n                    -\u003e  Seq Scan on docs d  (cost=0.00..34.20 rows=2 width=18)\n                          Filter: (current AND (scope = 'guest'::text) AND (form = 'law'::text))\n                    -\u003e  Materialize  (cost=4.33..21.96 rows=7 width=12)\n                          -\u003e  Bitmap Heap Scan on mentions m  (cost=4.33..21.92 rows=7 width=12)\n                                Recheck Cond: (entity = 'e0141'::text)\n                                -\u003e  Bitmap Index Scan on mentions_entity  (cost=0.00..4.33 rows=7 width=0)\n                                      Index Cond: (entity = 'e0141'::text)\n              -\u003e  Index Scan using chunks_doc on chunks c  (cost=0.29..15.10 rows=5 width=39)\n                    Index Cond: ((doc_id = m.doc_id) AND (version = m.version))"
+            }
+          }
+        }
+      ],
+      "docs": 1080,
+      "chunks": 10800,
+      "dimension": 1024
+    },
+    {
+      "engine": "neo4j",
+      "describe": {
+        "engine": "Neo4j Kernel 2026.09.0 (community)",
+        "vector_index": "vector index, cosine; queryNodes candidates=100"
+      },
+      "load_ms": 1120.518,
+      "delete_ms": 65.102,
+      "index_ms": 2716.349,
+      "modes": [
+        {
+          "mode": "exact",
+          "queries": 200,
+          "exact_match": 200,
+          "mean_recall_at_k": 1,
+          "underfilled": 0,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 1.886,
+          "p95_ms": 88.374,
+          "p99_ms": 91.585,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 86.07
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 2.622
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 91.373
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 21.002
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 11.478
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 1,
+              "underfilled": 0,
+              "p95_ms": 1.33
+            }
+          }
+        },
+        {
+          "mode": "approx",
+          "queries": 200,
+          "exact_match": 52,
+          "mean_recall_at_k": 0.5249999999999999,
+          "underfilled": 95,
+          "foreign_scope_rows": 0,
+          "ineligible_rows": 0,
+          "p50_ms": 2.541,
+          "p95_ms": 3.268,
+          "p99_ms": 3.85,
+          "by_query": {
+            "entity": {
+              "queries": 23,
+              "mean_recall_at_k": 0.2695652173913043,
+              "underfilled": 19,
+              "p95_ms": 3.85
+            },
+            "form": {
+              "queries": 25,
+              "mean_recall_at_k": 0.14400000000000004,
+              "underfilled": 24,
+              "p95_ms": 3.422
+            },
+            "high_degree": {
+              "queries": 65,
+              "mean_recall_at_k": 0.6569230769230769,
+              "underfilled": 13,
+              "p95_ms": 3.263
+            },
+            "kind": {
+              "queries": 27,
+              "mean_recall_at_k": 0.2111111111111111,
+              "underfilled": 25,
+              "p95_ms": 3.07
+            },
+            "news_dates": {
+              "queries": 30,
+              "mean_recall_at_k": 0.69,
+              "underfilled": 10,
+              "p95_ms": 3.27
+            },
+            "rare_form": {
+              "queries": 30,
+              "mean_recall_at_k": 0.87,
+              "underfilled": 4,
+              "p95_ms": 2.985
+            }
+          }
+        }
+      ],
+      "docs": 1080,
+      "chunks": 10800,
+      "dimension": 1024
+    }
+  ]
+}
