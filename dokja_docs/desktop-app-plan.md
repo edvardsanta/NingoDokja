@@ -6,14 +6,20 @@ what was agreed with the owner; everything else is a recommendation to review.
 
 ## Goal
 
-A desktop interface for Ningo: a window that greets the owner, shows what Ningo has read and learned,
-and later talks. It is one more interface next to Discord, the CLI and the TUI, so it adds no business
-logic: it renders what the orchestrator returns and relays the owner's input.
+A desktop workspace for Ningo: the screen where the owner works with Ningo and runs it. It shows what
+Ningo has read and learned, holds the research base, the conversations and the switches, and later
+talks. It is one more interface next to Discord, the CLI and the TUI, so it adds no business logic: it
+renders what the orchestrator returns and relays the owner's input.
 
-The starting reference is a morning briefing: a greeting opens it, cards of different kinds arrive one
-at a time, and the assistant offers the rest instead of dumping everything.
+Superseded on 2026-10-19: the first goal was a window that greets the owner with a morning briefing
+(cards arriving one at a time, the rest offered on request). That reads as a presenter, not a tool the
+owner works in; see "Workspace replan (2026-10-19)" at the end.
 
 ## Identity: a pattern, not a look
+
+The briefing patterns in this section are superseded by "Workspace replan (2026-10-19)". The rule that
+a reference gives patterns and never identity still holds, and so does the visual direction below
+(the owner kept it on 2026-10-19).
 
 The reference is only a source of interaction patterns. Ningo is the arrogant philosopher described in
 the [README](../README.md): talkative, well read, opinionated. It is not a hero.
@@ -55,7 +61,7 @@ Principles that stay:
 | Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. |
 | Voice | Visual only in v1. Voice comes after the digest works (Phase 4). |
 | Cards | Knowledge and books, memes, memory and health, plus the personal cards (weather, agenda, mail). Feeds are the first new card. |
-| Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. |
+| Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. Kept by the owner on 2026-10-19: the workspace replan changes the layout, not the look. |
 
 ## Where it fits
 
@@ -430,3 +436,109 @@ status reply and in the switchable names, and an optional platform prefix on the
 communications requests. The event envelope, the existing ports, the Discord text commands and the HTTP
 contracts of the services do not change. Existing `VA_STATE_FILE` files stay valid: they list only the
 services that are off.
+
+## Workspace replan (2026-10-19)
+
+Status: proposed, plan only. Nothing here is built.
+
+The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
+a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
+pointed to a self-hosted AI workspace as the new reference. As before, a reference gives interaction
+patterns only: Ningo stays the arrogant philosopher, and neither its look, its feature set nor its
+code is taken.
+
+### Patterns taken
+
+- **A sidebar of workspaces instead of a tab strip.** It is always visible, lists every workspace by
+  name, and carries a short state on each entry (a dot and a word such as `off` or `idle`).
+- **One work area.** The selected workspace fills the rest of the window at full size, with no card
+  frame around it. The current cards become these views.
+- **A composer docked at the bottom.** A single input where the owner asks Ningo something. It is the
+  main way in once a text conversation exists (Phase B below).
+- **Context menus on rows.** Right-click or the menu key on a document, a meme or a conversation gives
+  the actions that row already has (open, delete, send), instead of buttons on every row.
+- **Empty states that say what to do next**, not a greeting: "no source is followed; add a plugin to
+  the feeds service", "the research base is empty; drop a file here".
+- **Later, tool panels.** A secondary view (a meme, a document) can sit beside the work area instead of
+  replacing it.
+
+Not taken: email, calendar, model management and side-by-side model comparison, and the reference's
+visual style. The look stays the dead-channel cyberpunk under Identity, applied to the new layout: the
+sidebar and the work area are the same chamfered panels, and neon still only means a state.
+
+### Layout
+
+```
++--------------+----------------------------------------------+
+| Ningo        |                                              |
+|              |   selected workspace, full size              |
+| Digest     • |                                              |
+| Knowledge  • |                                              |
+| Memory     • |                                              |
+| Messages   • |                                              |
+| Memes      • |                                              |
+|              |                                              |
+|              | +------------------------------------------+ |
+| System  2 ⚠  | | Ask Ningo...                          ↵  | |
++--------------+-+------------------------------------------+-+
+```
+
+| Tab today | Workspace | Change |
+|---|---|---|
+| health | System, plus the sidebar's foot | The switches, jobs and WhatsApp linking move to System unchanged. The sidebar's foot shows how many services are down; a click opens System. The name's ghost keeps following the health pulse. |
+| digest | Digest | Unchanged view; the empty state says why nothing is followed. |
+| knowledge | Knowledge | The add form becomes a drop zone over the whole view plus a button; document rows get the context menu. |
+| memory | Memory | Unchanged view. |
+| communications | Messages | Conversation list on the left of the view, history and composer of that conversation on the right, like any messenger. |
+| memes | Memes | Grid; the opened meme becomes a tool panel in Phase C, a dialog until then. |
+
+The dots on the sidebar come only from the one `ningo.status` the System view already reads, never
+from each workspace's own status request: the orchestrator answers one request at a time, and a
+workspace nobody opened must still not ask its service.
+
+### What does not change
+
+- The flow, the `Transport` port, the main-process allow-list, the per-action payloads and the
+  projection of each reply.
+- A change needs a real click or key press; destructive ones keep their native confirmation.
+- A workspace is mounted the first time it opens and then kept, as the tabs are today.
+- One normal window. Tool panels live inside it; no second OS window.
+
+### Phases
+
+A. **Shell restructure (desktop only, no backend change).** The sidebar replaces `Tabs`, health
+   splits into System and the sidebar's foot, the cards lose their frame and become views, keys and
+   i18n labels follow, and the README's tab table is rewritten. One PR. Tests: sidebar keyboard and
+   ARIA with Vitest, the existing end-to-end smoke updated.
+B. **Composer.**
+   - B0, optional: before chat exists, the composer runs actions already on the allow-list. Plain text
+     searches the research base (`knowledge.search`), and the result opens in Knowledge. No backend
+     change.
+   - B1: a text conversation with Ningo. It is gated on the chat plan (`dokja_docs/chat-plan.md` on the
+     unmerged branch `docs/chat-plan`), whose decisions are still open. It needs `desktop` in the chat handler's source
+     list (`dokja_orch/internal/handlers/chat_domain_handler.go`, additive), a request action for one
+     chat turn that the shell can allow-list, and the session and history ownership that chat-plan
+     decides. The cross-layer path (domain, route, workflow step, handler) is designed there, not here.
+C. **Context menus and tool panels.** Context menus on documents, memes and conversations, then the
+   meme viewer and a document view as panels beside the work area. Several panels open at once share
+   the one request queue, so each kind has at most one panel.
+
+Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
+this shell. They are not cards in a briefing.
+
+### Compatibility
+
+- Phase A: no route, envelope, environment, compose or schema change. The documented keys change: the
+  bare digits `1` to `6` and the left and right arrows over the tab strip are replaced by `Ctrl+1` to
+  `Ctrl+6` and up and down arrows in the sidebar. A composer that always takes text cannot also take
+  bare digits.
+- Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
+
+### Open questions for the owner
+
+Answered on 2026-10-19: the look stays cyberpunk.
+
+1. Morning briefing: drop it, or keep it as an optional "Today" workspace?
+2. Composer before chat: ship B0, a command line over existing actions, or wait for chat-plan?
+3. Tool panels: inside the one window only, or real OS windows? The second option reopens the
+   "normal window" decision.
