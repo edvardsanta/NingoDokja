@@ -20,14 +20,20 @@ The envelope is the one the memory and knowledge services use: `{"type", "payloa
 
 | event | result |
 | --- | --- |
-| `feeds.status` | `configured`, `directory_error`, `plugins[]`, and the counts `enabled`, `ok`, `failed`, `pending`, `disabled`, `invalid`, `items` |
+| `feeds.status` | `configured`, `directory_error`, `plugins[]`, `extractors[]`, and the counts `enabled`, `ok`, `failed`, `pending`, `disabled`, `invalid`, `items` |
 | `feeds.items` | `items[]` (at most 1000), `total`, `updated` |
 
 A `plugins[]` row has `id`, `name`, `state` (`ok`, `failed`, `pending`, `disabled` or `invalid`),
 `running`, `enabled`, `interval_seconds`, `items`, `skipped`, `last_run`, `last_ok` and
 `last_error`. An `items[]` entry has `id`, `plugin`, `title`, `summary`, `url`, `published` (RFC 3339
 UTC, or empty) and `source`. `last_error` is a short fixed phrase such as `exit status 2` or
-`timed out after 30s`; what a plugin writes to stderr never appears in a reply.
+`timed out after 30s`; what a plugin writes to stderr never appears in a reply. A manifest this
+service cannot run shows as `invalid`, and one that asks for a version, runtime or capability it
+does not support has a `last_error` starting with `incompatible:`.
+
+`extractors[]` lists versioned plugins that only provide `document.extract.v1` (see below):
+`id`, `name`, `enabled`, `plugin_api`, `version`, `provides` and `formats`. They are not feed
+sources, never run on a schedule and do not change the counts.
 
 ## Writing a plugin
 
@@ -103,6 +109,29 @@ service starts.
 
 A plugin that uses no network is in `plugins.example/`; it prints the items of a local JSON file.
 It ships disabled.
+
+### Versioned manifests (`plugin_api: 1`)
+
+This service is growing into the reading host of
+[ADR 0006](../../dokja_docs/decisions/0006-reading-macro-component.md). A manifest without
+`plugin_api` is the shape above and keeps working unchanged. A manifest with `"plugin_api": 1`
+follows the lifecycle of [ADR 0002](../../dokja_docs/decisions/0002-plugin-lifecycle.md); any
+other value is reported as incompatible, never read as the old shape. Unknown fields are refused
+here too.
+
+| field | meaning |
+| --- | --- |
+| `plugin_api` | `1` |
+| `id`, `name`, `enabled`, `command`, `env` | as above; `enabled` still defaults to `false` |
+| `version` | the plugin's own version, for diagnostics only; it never decides which plugin is used |
+| `runtime` | `"subprocess"` |
+| `provides` | `source.collect.v1` (a scheduled feed source) and/or `document.extract.v1` |
+| `interval`, `max_items` | only with `source.collect.v1`, as above |
+| `formats` | only with `document.extract.v1`: the extensions it reads, such as `[".pdf"]` |
+| `limits.timeout_ms`, `limits.output_bytes` | required: one run's time (1 s to 5 min) and output (at most 1 MiB) |
+
+When more than one enabled plugin extracts the same format, none is chosen until one is bound
+explicitly; the order of directories never decides. On-demand extraction is not served yet.
 
 ## Variables
 

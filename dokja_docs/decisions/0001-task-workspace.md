@@ -1,6 +1,10 @@
 # ADR 0001: scoped task workspace owned by orchestration
 
-Date: 2026-10-18. Status: accepted for prototype. Implementation: pending.
+Date: 2026-10-18. Status: accepted for prototype. Implementation: step `04`,
+[task.go](../../dokja_orch/internal/core/task.go) and
+[task_runner.go](../../dokja_orch/internal/core/task_runner.go); not yet wired into
+any workflow. Evidence from a store without a scope model (Knowledge, Memory) is
+kept with a zero scope and counted as unscoped, never stamped with the task's scope.
 Related: [decision index](./README.md), [plugin lifecycle](./0002-plugin-lifecycle.md),
 [state ownership](./0003-state-ownership.md), [shadow prediction](./0004-shadow-prediction.md).
 

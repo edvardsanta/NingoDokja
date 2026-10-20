@@ -207,6 +207,46 @@ def test_plugins_are_loaded_from_a_directory_and_bad_ones_are_skipped(tmp_path, 
     assert load_plugins(Registry(), str(tmp_path / "missing")) == []
 
 
+def test_plugin_registrations_keep_their_provenance_and_later_ones_still_win(tmp_path):
+    (tmp_path / "a_first.py").write_text(textwrap.dedent('''
+        def register(registry):
+            registry.add_extractor(".csv", lambda data, name: [])
+    '''))
+    (tmp_path / "b_second.py").write_text(textwrap.dedent('''
+        def register(registry):
+            registry.add_extractor([".csv", ".pdf"], lambda data, name: [])
+            registry.add_fetcher("mine", lambda ref: (b"x", "x.txt"))
+    '''))
+    registry = default_registry()
+
+    load_plugins(registry, str(tmp_path))
+    provenance = registry.provenance()
+
+    assert provenance["extractors"][".csv"] == "plugin:b_second"
+    assert provenance["extractors"][".pdf"] == "plugin:b_second"
+    assert provenance["extractors"][".epub"] == "builtin"
+    assert provenance["fetchers"] == {"mine": "plugin:b_second"}
+    assert {"key": ".csv", "previous": "plugin:a_first", "by": "plugin:b_second"} in provenance["replaced"]
+    assert {"key": ".pdf", "previous": "builtin", "by": "plugin:b_second"} in provenance["replaced"]
+    assert registry.source == "builtin"
+
+
+def test_a_plugin_that_fails_halfway_keeps_what_it_registered(tmp_path):
+    # Baseline (ADR 0002): legacy registration is not rolled back.
+    (tmp_path / "half.py").write_text(textwrap.dedent('''
+        def register(registry):
+            registry.add_extractor(".csv", lambda data, name: [])
+            raise RuntimeError("stopped halfway")
+    '''))
+    registry = Registry()
+
+    loaded = load_plugins(registry, str(tmp_path))
+
+    assert loaded == []
+    assert registry.provenance()["extractors"] == {".csv": "plugin:half"}
+    assert registry.source == "builtin"
+
+
 def test_status_lists_formats_and_whether_fetching_is_on(service):
     status = service.status()
     assert {".pdf", ".docx", ".epub", ".md", ".html", ".xml"} <= set(status["formats"])
