@@ -52,6 +52,8 @@ const INTERFACE_STATE = /^[a-z][a-z_]{0,31}$/;
 // The only interface the desktop links. The name is fixed here and never taken from the screen.
 const LINKABLE_INTERFACE = "whatsapp";
 const MAX_QUERY_CHARS = 500;
+// The most of one document's text a tab shows: about a hundred pages.
+const MAX_DOCUMENT_CHARS = 200_000;
 
 // The states the feeds service reports for a source; anything else is shown as unknown.
 const SOURCE_STATES = new Set(["ok", "failed", "pending", "disabled", "invalid"]);
@@ -300,6 +302,15 @@ function ingestResult(body: Record<string, unknown>): IngestResult {
   };
 }
 
+// The text the service rebuilt from a document's passages, when it was asked for, cut at a size the
+// screen can show; `truncated` says it was cut.
+function documentText(value: unknown): { text?: string; truncated?: boolean } {
+  if (typeof value !== "string") return {};
+  return value.length > MAX_DOCUMENT_CHARS
+    ? { text: value.slice(0, MAX_DOCUMENT_CHARS), truncated: true }
+    : { text: value, truncated: false };
+}
+
 function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
   return {
     documents: records(body.documents, (document) => ({
@@ -311,6 +322,7 @@ function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
       chunks: count(document.chunks),
       embedded: count(document.embedded),
       updatedAt: text(document.updated_at),
+      ...documentText(document.text),
     })),
     total: count(body.total),
     offset: count(body.offset),
@@ -470,10 +482,16 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     project: (result) => inDomain(result, "knowledge", ingestResult),
   },
   "knowledge.list": {
-    payload: (raw) => ({
-      limit: clampInt(raw.limit, 1, 100, 20),
-      offset: clampInt(raw.offset, 0, 100_000, 0),
-    }),
+    // The text of a document comes only one document at a time: it is what a document's tab shows,
+    // and a page of twenty texts would be large for nothing.
+    payload: (raw) => {
+      const limit = clampInt(raw.limit, 1, 100, 20);
+      return {
+        limit,
+        offset: clampInt(raw.offset, 0, 100_000, 0),
+        ...(raw.include_text === true && limit === 1 ? { include_text: true } : {}),
+      };
+    },
     project: (result) => inDomain(result, "knowledge", knowledgeDocuments),
   },
   "knowledge.delete": {
