@@ -21,7 +21,6 @@ const QUIET: Partial<Record<ActionType, Route>> = {
   "digest.status": ok(OFF),
   "memory.status": ok(OFF),
   "knowledge.status": ok(OFF),
-  "meme.status": ok(OFF),
 };
 
 const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route>> = {}) =>
@@ -39,7 +38,6 @@ describe("the screen", () => {
       "conhecimento",
       "memória",
       "mensagens",
-      "memes",
       "sistema",
     ]);
     await screen.findByRole("heading", { name: "Serviços" });
@@ -65,8 +63,6 @@ describe("the screen", () => {
     await screen.findByRole("heading", { name: "Experience memory" });
     fireEvent.click(tabNamed("knowledge"));
     await screen.findByRole("heading", { name: "Research base" });
-    fireEvent.click(tabNamed("memes"));
-    await screen.findByRole("heading", { name: "Meme queue" });
 
     await waitFor(() =>
       expect(calls.map((call) => call.type)).toEqual([
@@ -74,7 +70,6 @@ describe("the screen", () => {
         "digest.status",
         "memory.status",
         "knowledge.status",
-        "meme.status",
       ]),
     );
   });

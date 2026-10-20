@@ -6,7 +6,6 @@ import { CommunicationsCard } from "./communications.js";
 import { DigestCard } from "./digest.js";
 import { HealthCard } from "./health.js";
 import { KnowledgeCard } from "./knowledge.js";
-import { MemesCard } from "./memes.js";
 import { MemoryCard } from "./memory.js";
 
 export type CardEntry = {
@@ -23,13 +22,13 @@ export type CardEntry = {
 
 // Every workspace the screen knows, in the order of the sidebar. Adding one is adding a line here
 // (and its action to the allow-list in src/shared/actions.ts). System holds the switches and is the
-// one that reads the status, so the screen opens on it.
+// one that reads the status, so the screen opens on it. Memes have no workspace: they are picked in
+// Messages, where they are sent.
 export const CARDS: readonly CardEntry[] = [
   { kind: "digest", labelId: "kind_digest", Card: DigestCard },
   { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard, services: ["knowledge"] },
   { kind: "memory", labelId: "kind_memory", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
-  { kind: "memes", labelId: "kind_memes", Card: MemesCard, services: ["meme"] },
   { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },
 ];
 

@@ -124,7 +124,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     const ingested = () => orchestrator.seen.filter((event) => event.type === "knowledge.ingest");
 
     it("is refused when nothing real was pressed, even if a script clicks", async () => {
-      await page.evaluate("document.querySelectorAll('[role=tab]')[5].click()");
+      await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
       const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string; message: string } };
       assert.equal(answer.ok, false);
       assert.equal(answer.error?.code, "denied");
@@ -213,7 +213,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
     it("goes through from the card's own switch right after a real press, with the flag alone", async () => {
       // other tests have opened other workspaces; the switch is on System
-      await page.evaluate("document.querySelectorAll('[role=tab]')[5].click()");
+      await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
       const button = "document.querySelector('button[role=switch][aria-label=\"meme switch\"]')";
       await page.waitFor(`${button} !== null`);
       // The press is what the shell counts. The button itself is pressed by the script here: in the

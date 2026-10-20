@@ -703,8 +703,8 @@ button[aria-pressed="true"] {
   outline-offset: 3px;
 }
 
-/* A meme in the grid is a button that opens it. The global button look is turned off for it, and
-   what is inside does not take the click away from the button. */
+/* A meme in the grid is a button that attaches it. The global button look is turned off for it, and
+   what is inside does not take the click away from the button. The attached one is lit. */
 .preview.preview-open,
 .preview.preview-open:hover:not(:disabled) {
   width: 100%;
@@ -712,7 +712,12 @@ button[aria-pressed="true"] {
   border: 1px solid var(--edge);
   background: var(--static);
   color: inherit;
-  cursor: zoom-in;
+  cursor: pointer;
+}
+
+.preview.preview-open[aria-pressed="true"] {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 0.8rem color-mix(in srgb, var(--cyan) 45%, transparent);
 }
 
 .preview.preview-open:hover:not(:disabled) {
@@ -726,59 +731,6 @@ button[aria-pressed="true"] {
 .preview.preview-open:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
-}
-
-/* The opened meme: over the page, centred, as large as the window allows. */
-.viewer {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(4px);
-}
-
-.viewer-panel {
-  display: grid;
-  gap: 0.5rem;
-  max-width: min(100%, 56rem);
-  max-height: 100%;
-  padding: 1rem 1.25rem;
-  overflow: auto;
-  border: 1px solid var(--edge);
-  background: var(--panel);
-}
-
-.viewer-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.viewer-media {
-  display: grid;
-  min-height: 8rem;
-  place-items: center;
-  background: var(--static);
-}
-
-.viewer-media img,
-.viewer-media video {
-  max-width: 100%;
-  max-height: 66vh;
-  object-fit: contain;
-}
-
-.viewer .pager {
-  justify-content: center;
-}
-
-.viewer p {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 /* Adding to the research base: the same plain fields as the search, one under another. */

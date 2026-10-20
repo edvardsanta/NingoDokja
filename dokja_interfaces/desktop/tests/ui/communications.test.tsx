@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Transport, TransportResult } from "../../src/shared/transport.js";
-import { deferred, failure, ok, routedTransport } from "./support.js";
+import { deferred, failure, ok, previewer, routedTransport } from "./support.js";
 
 const channels = { channels: [{ id: "123", name: "reading" }, { id: "456", name: "memes" }] };
 const message = (id = "10", content = "<script>text</script>") => ({ id, author: "Reader", bot: false, content, timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: ["clip.mp4"] });
@@ -96,5 +96,33 @@ describe("communications", () => {
     render(view(transport));
     await screen.findByText("No delivery channels are configured.");
     expect(calls).toHaveLength(1);
+  });
+  it("attaches a meme picked from the queue's previews, and takes it off on a second click", async () => {
+    const memePage = { total: 2, offset: 0, memes: [
+      { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },
+      { url: "", title: "No address", tags: "", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const { asked, preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": ok(memePage),
+      "communications.send": ok({ sent: true }),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Load memes" }));
+    const tile = await screen.findByRole("button", { name: "Attach First" });
+    expect(screen.getByRole("list", { name: "Memes to attach" }).querySelectorAll("li")).toHaveLength(1);
+    await waitFor(() => expect(tile.querySelector("img")).not.toBeNull());
+    expect(asked).toEqual(["https://images.example/a.png"]);
+
+    fireEvent.click(tile);
+    expect(tile.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(tile);
+    expect(tile.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(tile);
+    fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
+    await screen.findByText("Message sent.");
+    expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png" });
   });
 });

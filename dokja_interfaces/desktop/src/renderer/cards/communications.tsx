@@ -5,6 +5,7 @@ import type { CommunicationChannel, CommunicationHistory, CommunicationSend, Mem
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
+import { MemePicker } from "./memes.js";
 import { parseMemePage } from "./memes_model.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
@@ -159,12 +160,9 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
     <textarea id={id} value={content} maxLength={2000} rows={4} disabled={sending} onChange={(event) => setContent(event.target.value)} />
     <div className="pager">
       {!textOnly && <button type="button" disabled={sending || memes.state.phase === "loading"} onClick={() => memes.start(undefined)}>{t("communications_memes")}</button>}
-      {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <select aria-label={t("communications_meme")} value={attachment} disabled={sending} onChange={(event) => setAttachment(event.target.value)}>
-        <option value="">{t("communications_no_meme")}</option>
-        {memes.state.data.memes.map((meme) => <option key={meme.url} value={meme.url}>{meme.title || meme.url}</option>)}
-      </select>}
       <button type="submit" disabled={sending || (!content.trim() && !(attachment && !textOnly))}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</button>
     </div>
+    {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <MemePicker transport={transport} memes={memes.state.data.memes} selected={attachment} disabled={sending} onSelect={setAttachment} />}
     {memes.state.phase === "error" && <Problem error={memes.state.error} />}
     {memes.state.phase === "ready" && memes.state.data.off && <OffNotice reason={memes.state.data.reason} />}
     <div aria-live="polite">
