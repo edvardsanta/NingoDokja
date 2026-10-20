@@ -87,12 +87,12 @@ there are no envelope, route, command, configuration or compose changes.
 
 ### Remaining 09.2 work
 
-The substep remains in progress: a provider-backed reading-time classifier,
-content/model-version cache and explicit reclassification are not connected.
-The existing resolver can validate classifier proposals, but the integration in
-this slice uses explicit user assertions and unambiguous source defaults. Missing
-axes stay pending for the user; no general fallback is used.
-The stable reread tests establish preservation behavior, not model quality.
+The substep remains in progress. The reading-time classifier capability is now
+connected (see [Reading-time classifier](#reading-time-classifier) below), but no
+classifier plugin ships, explicit reclassification is not implemented and the
+desktop and chat interfaces do not present the questions yet. Missing axes stay
+pending for the user; no general fallback is used. The stable reread tests
+establish preservation behavior, not model quality.
 
 The remainder of step `09` also includes generic summary/consolidation methods,
 the unresolved Book runtime retirement scope, and the faculty migrations in
@@ -218,3 +218,55 @@ No desktop runtime or tab behavior was changed in this slice. Extend its
 allowlisted input, typed main-process projections, renderer and interface tests
 together when implementing these criteria. The new classify action alone does
 not make those capabilities available to desktop automatically.
+
+## Reading-time classifier
+
+Branch `feat/knowledge-classifier`. The reading host gains `document.classify.v1`
+(ADR 0008): `feeds.classify` hands a 16,000-character sample of each document to
+the single enabled classifier plugin and checks its output, one bounded proposal
+per document (form, content kind, uncertainty flags, topics, entities, date
+anchor). The host checks shape; Knowledge decides which labels exist.
+
+`knowledge.read` (reading task version 2) runs `read → ingest → classify`.
+Classification happens after storage and only for documents whose content was
+stored just now and whose form or content kind nobody decided. That is the
+cache: an unchanged reread never asks again, and a new classifier version does
+not reclassify stored documents by itself. The domain resolves each proposal
+and applies a revision-checked metadata patch, so an answer the user gives
+meanwhile wins. Undecided axes get `classifier` provenance; an uncertain axis or
+unknown label becomes a user question (`user_clarification_required` or
+`classifier_value_invalid`). Topics, entities and the date anchor are filled
+only when the request gave none. A document-level `classifier: {id, version}`
+records who saw the current content. Content and embeddings are untouched.
+
+Privacy: a known `note` or `conversation` form (explicit or default) is never
+sent. A document whose form is still unknown can be sent; there is no setting
+yet for which inputs may leave the host. That matters only for a classifier that
+sends text to a remote provider, and none ships. The setting is the owner's
+decision before such a plugin is enabled.
+
+Failures never fail the reading: no classifier, timeout, broken plugin, host
+down, wrong proposal count or a conflicting answer all leave the documents
+stored with their questions pending, and the reply's `classification.reason`
+says why (`classifier_unavailable`, `classifier_timeout`, `classifier_failed`,
+`classifier_host_unavailable`, `classifier_invalid_result`,
+`knowledge_classify_failed`). The task deadline is now 4 minutes: a 2-minute
+reading, a 1-minute classification and the Knowledge calls.
+
+Compatibility: one additive service event (`feeds.classify`), one additive
+capability, one additive metadata field (`classifier`) in the existing JSON
+column with no SQL migration, and an extra `classify` step and `classification`
+field in the `knowledge.read` reply. No envelope, route, command, environment
+variable or compose change. Older Knowledge builds refuse the `classifier` field
+in a patch; roll out the Knowledge service before the orchestrator, as for
+schema 2.
+
+### Verification
+
+- Feeds: `go vet ./...` and `go test -race ./...` passed.
+- Knowledge domain: `go vet ./...` and `go test -race ./...` passed.
+- Orchestrator: `go vet ./...` and `go test ./... -count=1` passed.
+- Knowledge service: `python -m pytest -q tests`: **158 passed, 8 skipped**
+  (live Ollama). `pypdf` was installed into a temporary directory for the run.
+
+No classifier plugin, live provider or owner database was exercised.

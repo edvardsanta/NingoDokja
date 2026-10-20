@@ -183,8 +183,10 @@ way twice. So:
   file again reuses it instead of asking the agent again.
 - A new classifier version re-tags only when asked explicitly, never as a side
   effect of a re-read.
-- The stored tags record the classifier and its version (`kind-by:`), so
-  experience can compare classifiers later.
+- The stored metadata records the classifier and its version (per-axis
+  `classifier_id`/`classifier_version` and a document-level `classifier`), so
+  experience can compare classifiers later. A `kind-by:` tag is not used: tags
+  are part of the content hash and would force re-embedding.
 
 ### Constraints that come with an agent CLI
 

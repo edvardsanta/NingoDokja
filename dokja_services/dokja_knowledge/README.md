@@ -46,7 +46,19 @@ The Go Knowledge domain resolves classification and adds `form_choice` and
 records `reading` (`format`, `reader`, `reader_version`). EPUB/MOBI default to book;
 HTML/RSS/Atom default to article; PDF supplies no form default. Formats never
 imply a content kind. Missing or uncertain axes are `null`; `general` is not a
-classification value. Only explicit user input resolves an uncertain axis. No model classifier is connected in this slice.
+classification value. Only explicit user input resolves an uncertain axis.
+
+When the reading host has an enabled `document.classify.v1` plugin, `knowledge.read`
+sends it the documents whose content was stored just now and whose form or content
+kind nobody decided (the user, the source, or an earlier question). A known `note` or
+`conversation` form is never sent. The domain resolves each proposal and patches the
+undecided axes with `classifier` provenance, and fills `topics`, `entities` and
+`date_anchor` only when the request gave none. The patch is bound to the snapshot
+revision, so a user answer given meanwhile wins. The stored `classifier`
+(`{id, version}`) records which classifier saw the current content. An unchanged
+reread is not sent again; a new classifier version does not reclassify stored
+documents by itself. A missing, failing or invalid classifier leaves the documents
+stored with their questions pending, and the reply's `classification.reason` says why.
 
 The storage service validates structure and persists the resolved object.
 Unresolved axes use `user_required` provenance. Domain responses add
