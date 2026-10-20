@@ -27,6 +27,10 @@ const (
 	classifyKey = "documents"
 )
 
+// providerPattern names what answered inside a plugin that chains several providers, such
+// as claude.haiku-5-5; it becomes part of the classifier version.
+var providerPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,23}$`)
+
 // labelPattern is the shape of a form or content kind. Which labels exist is Knowledge's
 // rule (ADR 0008); the host only refuses what cannot be a label.
 var labelPattern = regexp.MustCompile(`^[a-z][a-z_]{0,31}$`)
@@ -64,9 +68,11 @@ type classifyRequest struct {
 }
 
 // classifyOutput is what it prints: one proposal per document, in order, or why it cannot.
+// Provider names what answered when one plugin chains several models.
 type classifyOutput struct {
 	Classifications *[]Proposal `json:"classifications"`
 	Error           *string     `json:"error"`
+	Provider        *string     `json:"provider"`
 }
 
 // classify proposes form, content kind and defining metadata for documents already read
@@ -96,8 +102,16 @@ func (s *Service) classify(ctx context.Context, payload map[string]any) (map[str
 	}
 	output, runErr := s.runner.Run(ctx, plugin, s.environment(plugin), input)
 	var proposals []Proposal
+	version := plugin.Version
 	if runErr == nil {
-		proposals, err = parseProposals(output, len(documents))
+		var provider string
+		proposals, provider, err = parseProposals(output, len(documents))
+		if err == nil && provider != "" {
+			version += "+" + provider
+			if !versionPattern.MatchString(version) {
+				err = reasonError(ReasonFailed, "version %q with its provider is longer than 40 characters", version)
+			}
+		}
 	} else {
 		err = runFailure(runErr)
 	}
@@ -106,12 +120,12 @@ func (s *Service) classify(ctx context.Context, payload map[string]any) (map[str
 		s.logger.Printf("classifier %s documents=%d failed: %s", plugin.ID, len(documents), cleanText(err.Error(), maxReasonRunes))
 		return nil, err
 	}
-	s.logger.Printf("classifier %s documents=%d ok", plugin.ID, len(documents))
+	s.logger.Printf("classifier %s@%s documents=%d ok", plugin.ID, version, len(documents))
 	return map[string]any{
 		"classifications": proposals,
 		"count":           len(proposals),
 		"plugin":          plugin.ID,
-		"version":         plugin.Version,
+		"version":         version,
 	}, nil
 }
 
@@ -157,39 +171,45 @@ func sample(text string, limit int) string {
 // parseProposals checks what a classifier printed (ADR 0002): one JSON object with exactly
 // one bounded proposal per document. A proposal with a malformed field fails the whole run;
 // the user is asked instead of half-trusting a plugin that broke its contract.
-func parseProposals(data []byte, documents int) ([]Proposal, error) {
+func parseProposals(data []byte, documents int) ([]Proposal, string, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var output classifyOutput
 	if err := decoder.Decode(&output); err != nil {
-		return nil, reasonError(ReasonFailed, "output is not a classifications object: %s", cleanText(err.Error(), 120))
+		return nil, "", reasonError(ReasonFailed, "output is not a classifications object: %s", cleanText(err.Error(), 120))
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
-		return nil, reasonError(ReasonFailed, "output must hold one JSON object")
+		return nil, "", reasonError(ReasonFailed, "output must hold one JSON object")
 	}
 	switch {
 	case output.Error != nil && output.Classifications != nil:
-		return nil, reasonError(ReasonFailed, "output holds both classifications and an error")
+		return nil, "", reasonError(ReasonFailed, "output holds both classifications and an error")
 	case output.Error != nil:
 		message := cleanText(*output.Error, maxReasonRunes)
 		if message == "" {
 			message = "the documents cannot be classified"
 		}
-		return nil, reasonError(ReasonUnreadable, "%s", message)
+		return nil, "", reasonError(ReasonUnreadable, "%s", message)
 	case output.Classifications == nil:
-		return nil, reasonError(ReasonFailed, `output has no "classifications" list`)
+		return nil, "", reasonError(ReasonFailed, `output has no "classifications" list`)
 	case len(*output.Classifications) != documents:
-		return nil, reasonError(ReasonFailed, "output has %d classifications for %d documents", len(*output.Classifications), documents)
+		return nil, "", reasonError(ReasonFailed, "output has %d classifications for %d documents", len(*output.Classifications), documents)
+	}
+	provider := ""
+	if output.Provider != nil {
+		if provider = *output.Provider; !providerPattern.MatchString(provider) {
+			return nil, "", reasonError(ReasonFailed, "provider must be a short lowercase name")
+		}
 	}
 	proposals := make([]Proposal, 0, documents)
 	for i, proposal := range *output.Classifications {
 		checked, err := checkProposal(proposal)
 		if err != nil {
-			return nil, reasonError(ReasonFailed, "classification %d: %s", i+1, err)
+			return nil, "", reasonError(ReasonFailed, "classification %d: %s", i+1, err)
 		}
 		proposals = append(proposals, checked)
 	}
-	return proposals, nil
+	return proposals, provider, nil
 }
 
 func checkProposal(p Proposal) (Proposal, error) {

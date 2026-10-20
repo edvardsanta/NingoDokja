@@ -20,9 +20,9 @@ const (
 	requestTimeout = 30 * time.Second
 	// extractTimeout bounds an on-demand reading, which runs a plugin while the caller waits.
 	extractTimeout = 2 * time.Minute
-	// classifyTimeout bounds a classification of documents already read (ADR 0008). It is
-	// shorter than a reading: the caller waits for both before storing.
-	classifyTimeout = time.Minute
+	// classifyTimeout bounds a classification of documents already read (ADR 0008). A
+	// plugin may try several agent CLIs in turn, each taking seconds to answer.
+	classifyTimeout = 3 * time.Minute
 	// maxInFlight bounds the requests being answered at once; past it a request is refused.
 	maxInFlight = 16
 )

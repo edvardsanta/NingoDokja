@@ -205,8 +205,12 @@ It prints exactly one proposal per document, in order, or why it cannot classify
 Every field is optional. `form` and `content_kind` must look like labels (lowercase letters and
 `_`); which labels exist is Knowledge's rule, not the host's. At most 20 topics and 50 entities,
 and `date_anchor` is `YYYY-MM-DD`. Output outside this contract fails the whole run with `failed`;
-`error` answers `unreadable`. A run ends at the manifest's `timeout_ms` or the request's 1-minute
+`error` answers `unreadable`. A run ends at the manifest's `timeout_ms` or the request's 3-minute
 limit, and shares the 2 reading slots. The reasons are those of `feeds.extract`.
+
+A plugin that chains several models may add `"provider"`, a short lowercase name such as
+`claude.haiku-5-5` (letters, digits, `.`, `_`, `-`; at most 24). The result's `version` becomes
+`<manifest version>+<provider>`, so Knowledge keeps classifications by different models apart.
 
 A classifier that sends text to a remote model sends the owner's documents with it; enable one only
 for documents you are willing to send.

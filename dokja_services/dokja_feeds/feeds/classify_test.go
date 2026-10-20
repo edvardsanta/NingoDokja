@@ -190,3 +190,33 @@ func TestAClassifierManifestTakesNoFormats(t *testing.T) {
 		t.Fatalf("formats belong to extractors: %#v", f)
 	}
 }
+
+func TestClassifyNamesTheProviderThatAnsweredInTheVersion(t *testing.T) {
+	cases := map[string]struct {
+		output  string
+		version string
+		reason  string
+	}{
+		"no provider":   {`{"classifications":[{}]}`, "0.1.0", ""},
+		"provider":      {`{"classifications":[{}],"provider":"claude.haiku-5-5"}`, "0.1.0+claude.haiku-5-5", ""},
+		"bad provider":  {`{"classifications":[{}],"provider":"Claude Haiku"}`, "", ReasonFailed},
+		"too long":      {`{"classifications":[{}],"provider":"` + strings.Repeat("a", 25) + `"}`, "", ReasonFailed},
+		"declines only": {`{"error":"every provider failed","provider":"ollama"}`, "", ReasonUnreadable},
+	}
+	for name, tc := range cases {
+		root := t.TempDir()
+		newClassifier(t, root, "kinds", true)
+		output := tc.output
+		runner := &inputRunner{reply: func(Plugin) ([]byte, error) { return []byte(output), nil }}
+		result, err := extractService(root, runner).Dispatch(context.Background(), "feeds.classify", classifyPayload("x"))
+		if tc.reason != "" {
+			if reason := reasonOf(t, err); reason != tc.reason {
+				t.Errorf("%s: reason %q, want %q (%v)", name, reason, tc.reason, err)
+			}
+			continue
+		}
+		if err != nil || result["version"] != tc.version {
+			t.Errorf("%s: version %v, want %q (%v)", name, result["version"], tc.version, err)
+		}
+	}
+}
