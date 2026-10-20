@@ -58,7 +58,7 @@ Principles that stay:
 | Topic | Decision |
 |---|---|
 | Naming | Neutral in code, docs and UI: feeds, digest, reading. No source, provider or URL is committed; sources are runtime inputs supplied by the owner. |
-| Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. |
+| Window | A normal window. Compositor window rules can make it float or stay pinned. Fullscreen ambient and overlay modes are out of v1. The workspace replan keeps it: a document or a conversation opens in a tab inside the work area, not in a second window (the owner, 2026-10-19). |
 | Voice | Visual only in v1. Voice comes after the digest works (Phase 4). |
 | Cards | Knowledge and books, memes, memory and health, plus the personal cards (weather, agenda, mail). Feeds are the first new card. |
 | Look | Cyberpunk. The direction under Identity is a first pass to react to, not a final design. Kept by the owner on 2026-10-19: the workspace replan changes the layout, not the look. |
@@ -439,7 +439,10 @@ services that are off.
 
 ## Workspace replan (2026-10-19)
 
-Status: proposed, plan only. Nothing here is built.
+Status: proposed. Phase A's shell is built on branch `feat/desktop-workspace`: the sidebar, System at
+its foot with the problem count, the dots, the new keys, and the memes picked in
+Messages instead of a workspace of their own. The view-level changes below (Messages as
+a messenger, the drop zone over Knowledge) and Phases B and C are not built.
 
 The owner's feedback on the built app: it came out as a presenter (a greeting, a briefing, a big name,
 a strip of tabs) when the idea is a human-computer interface, a screen the owner works in. The owner
@@ -459,8 +462,8 @@ code is taken.
   the actions that row already has (open, delete, send), instead of buttons on every row.
 - **Empty states that say what to do next**, not a greeting: "no source is followed; add a plugin to
   the feeds service", "the research base is empty; drop a file here".
-- **Later, tool panels.** A secondary view (a meme, a document) can sit beside the work area instead of
-  replacing it.
+- **Later, tabs in the work area.** A document or a conversation opens in a tab of its own on top of
+  the work area, like a browser tab, so several stay open and the owner moves between them.
 
 Not taken: email, calendar, model management and side-by-side model comparison, and the reference's
 visual style. The look stays the dead-channel cyberpunk under Identity, applied to the new layout: the
@@ -476,7 +479,6 @@ sidebar and the work area are the same chamfered panels, and neon still only mea
 | Knowledge  • |                                              |
 | Memory     • |                                              |
 | Messages   • |                                              |
-| Memes      • |                                              |
 |              |                                              |
 |              | +------------------------------------------+ |
 | System  2 ⚠  | | Ask Ningo...                          ↵  | |
@@ -490,7 +492,7 @@ sidebar and the work area are the same chamfered panels, and neon still only mea
 | knowledge | Knowledge | The add form becomes a drop zone over the whole view plus a button; document rows get the context menu. |
 | memory | Memory | Unchanged view. |
 | communications | Messages | Conversation list on the left of the view, history and composer of that conversation on the right, like any messenger. |
-| memes | Memes | Grid; the opened meme becomes a tool panel in Phase C, a dialog until then. |
+| memes | none, picked in Messages | Memes are something Ningo sends, not a place to work in (the owner, 2026-10-19). The queue becomes a picker of previews in the Messages composer; the meme service's state and switch stay on System. Built with Phase A. |
 
 The dots on the sidebar come only from the one `ningo.status` the System view already reads, never
 from each workspace's own status request: the orchestrator answers one request at a time, and a
@@ -502,7 +504,7 @@ workspace nobody opened must still not ask its service.
   projection of each reply.
 - A change needs a real click or key press; destructive ones keep their native confirmation.
 - A workspace is mounted the first time it opens and then kept, as the tabs are today.
-- One normal window. Tool panels live inside it; no second OS window.
+- One normal window. Several open views are tabs inside it (Phase C), never a second window.
 
 ### Phases
 
@@ -511,17 +513,19 @@ A. **Shell restructure (desktop only, no backend change).** The sidebar replaces
    i18n labels follow, and the README's tab table is rewritten. One PR. Tests: sidebar keyboard and
    ARIA with Vitest, the existing end-to-end smoke updated.
 B. **Composer.**
-   - B0, optional: before chat exists, the composer runs actions already on the allow-list. Plain text
-     searches the research base (`knowledge.search`), and the result opens in Knowledge. No backend
-     change.
+   - B0 (dropped by the owner on 2026-10-19): a command line over existing actions before chat
+     exists. The composer waits for the chat plan instead.
    - B1: a text conversation with Ningo. It is gated on the chat plan (`dokja_docs/chat-plan.md` on the
      unmerged branch `docs/chat-plan`), whose decisions are still open. It needs `desktop` in the chat handler's source
      list (`dokja_orch/internal/handlers/chat_domain_handler.go`, additive), a request action for one
      chat turn that the shell can allow-list, and the session and history ownership that chat-plan
      decides. The cross-layer path (domain, route, workflow step, handler) is designed there, not here.
-C. **Context menus and tool panels.** Context menus on documents, memes and conversations, then the
-   meme viewer and a document view as panels beside the work area. Several panels open at once share
-   the one request queue, so each kind has at most one panel.
+C. **Context menus and tabs in the work area.** Context menus on documents and conversations, then
+   a tab strip on top of the work area: opening a document or a conversation adds a tab, the
+   workspace's own view stays the first tab, and a tab closes with its button or Ctrl+W. Everything
+   stays in the one window, so the sandbox, the press check and the confirmations do not change. Each
+   tab asks the orchestrator only when it opens, and the requests wait in the one line in the main
+   process like any other. The owner chose tabs over separate windows on 2026-10-19.
 
 Phases 3 to 5 above (personal cards, voice, later work) become new workspaces or composer abilities on
 this shell. They are not cards in a briefing.
@@ -530,15 +534,16 @@ this shell. They are not cards in a briefing.
 
 - Phase A: no route, envelope, environment, compose or schema change. The documented keys change: the
   bare digits `1` to `6` and the left and right arrows over the tab strip are replaced by `Ctrl+1` to
-  `Ctrl+6` and up and down arrows in the sidebar. A composer that always takes text cannot also take
+  `Ctrl+5` and up and down arrows in the sidebar. A composer that always takes text cannot also take
   bare digits.
 - Phase B1: `source: desktop` on chat requests (additive) and one new allow-listed action.
+- Phase C: no backend change and no shell change; it is all in the screen.
 
-### Open questions for the owner
+### Owner decisions
 
-Answered on 2026-10-19: the look stays cyberpunk.
+Answered on 2026-10-19: the look stays cyberpunk; memes have no workspace and are picked in Messages;
+the composer waits for the chat plan (no B0); open views are tabs in the work
+area, not separate windows; the morning briefing is dropped, with no "Today" workspace. The owner
+will plan a replacement later, separately from this replan.
 
-1. Morning briefing: drop it, or keep it as an optional "Today" workspace?
-2. Composer before chat: ship B0, a command line over existing actions, or wait for chat-plan?
-3. Tool panels: inside the one window only, or real OS windows? The second option reopens the
-   "normal window" decision.
+No question is open.

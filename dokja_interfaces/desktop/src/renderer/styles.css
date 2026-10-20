@@ -72,10 +72,38 @@ body {
   background-image: var(--scanlines), var(--noise);
 }
 
-main {
+/*
+ * A workspace: the sidebar on the left, always there, and the open workspace filling the rest.
+ * The sidebar is a strip of the same panel ink with a lit edge; it stays put while the work scrolls.
+ */
+.workspace {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 1.5rem 0 1rem;
+  border-right: 1px solid var(--edge);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+}
+
+.work-area {
+  padding: 2rem 2rem 4rem;
+}
+
+.work-area > [role="tabpanel"] {
   max-width: 64rem;
-  margin: 0 auto;
-  padding: 2.25rem 1.25rem 4rem;
+}
+
+.work-area .card {
+  margin-block: 0.75rem 2.25rem;
 }
 
 /*
@@ -84,8 +112,8 @@ main {
  */
 .wordmark {
   --ghost: 3;
-  margin: 0 0 2.5rem;
-  font: italic 700 clamp(3.5rem, 14vw, 6rem) / 1 var(--serif);
+  margin: 0 1.25rem 2rem;
+  font: italic 700 3rem / 1 var(--serif);
   letter-spacing: -0.01em;
   color: var(--ink);
   text-shadow:
@@ -525,22 +553,27 @@ button[aria-pressed="true"] {
   font-size: 0.875rem;
 }
 
-/* One tab per card. The open tab is cyan with a lit underline; the rest are dim. */
-.tabs {
+/*
+ * One entry per workspace. The open one is cyan with a lit bar on its left; the rest are dim. A dot
+ * on the right is the worst state among the services behind it; System sits apart at the foot.
+ */
+.workspaces {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1.75rem;
-  border-bottom: 1px solid var(--edge);
+  flex: 1;
+  flex-direction: column;
 }
 
 .tab {
-  margin-bottom: -1px;
-  padding: 0.6rem 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1.25rem;
   border: 0;
-  border-bottom: 3px solid transparent;
+  border-left: 3px solid transparent;
   background: transparent;
   color: var(--ink-dim);
   font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
@@ -549,9 +582,66 @@ button[aria-pressed="true"] {
 }
 
 .tab[aria-selected="true"] {
-  border-bottom-color: var(--cyan);
+  border-left-color: var(--cyan);
+  background: linear-gradient(to right, color-mix(in srgb, var(--cyan) 10%, transparent), transparent);
   color: var(--cyan);
   text-shadow: 0 0 0.6rem color-mix(in srgb, var(--cyan) 55%, transparent);
+}
+
+.tab[data-foot] {
+  margin-top: auto;
+  border-top: 1px solid var(--edge);
+  padding-top: 0.75rem;
+}
+
+.tab-label {
+  flex: 1;
+}
+
+.tab-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  background: var(--tone);
+  box-shadow: 0 0 0.4rem var(--tone);
+}
+
+.tab-count {
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  background: var(--tone);
+  color: var(--static);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Narrow: the sidebar becomes a strip on top and its entries wrap. */
+@media (max-width: 40rem) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .workspaces {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .tab[data-foot] {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0.5rem;
+  }
+
+  .work-area {
+    padding: 1.25rem 1rem 3rem;
+  }
 }
 
 /* The digest: one entry per row, the title first, a short summary cut after two lines. */
@@ -613,8 +703,8 @@ button[aria-pressed="true"] {
   outline-offset: 3px;
 }
 
-/* A meme in the grid is a button that opens it. The global button look is turned off for it, and
-   what is inside does not take the click away from the button. */
+/* A meme in the grid is a button that attaches it. The global button look is turned off for it, and
+   what is inside does not take the click away from the button. The attached one is lit. */
 .preview.preview-open,
 .preview.preview-open:hover:not(:disabled) {
   width: 100%;
@@ -622,7 +712,12 @@ button[aria-pressed="true"] {
   border: 1px solid var(--edge);
   background: var(--static);
   color: inherit;
-  cursor: zoom-in;
+  cursor: pointer;
+}
+
+.preview.preview-open[aria-pressed="true"] {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 0.8rem color-mix(in srgb, var(--cyan) 45%, transparent);
 }
 
 .preview.preview-open:hover:not(:disabled) {
@@ -636,59 +731,6 @@ button[aria-pressed="true"] {
 .preview.preview-open:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
-}
-
-/* The opened meme: over the page, centred, as large as the window allows. */
-.viewer {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(4px);
-}
-
-.viewer-panel {
-  display: grid;
-  gap: 0.5rem;
-  max-width: min(100%, 56rem);
-  max-height: 100%;
-  padding: 1rem 1.25rem;
-  overflow: auto;
-  border: 1px solid var(--edge);
-  background: var(--panel);
-}
-
-.viewer-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.viewer-media {
-  display: grid;
-  min-height: 8rem;
-  place-items: center;
-  background: var(--static);
-}
-
-.viewer-media img,
-.viewer-media video {
-  max-width: 100%;
-  max-height: 66vh;
-  object-fit: contain;
-}
-
-.viewer .pager {
-  justify-content: center;
-}
-
-.viewer p {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 /* Adding to the research base: the same plain fields as the search, one under another. */

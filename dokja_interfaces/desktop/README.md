@@ -4,29 +4,32 @@ Desktop interface for Ningo. It is an interface adapter like the CLI, the TUI an
 talks to the orchestrator over ZeroMQ request/reply and holds no business logic. The plan, the
 decisions and the Phase 0 results are in [`dokja_docs/desktop-app-plan.md`](../../dokja_docs/desktop-app-plan.md).
 
-Status: v1 without voice. Six tabs, each a card that asks its service only when the tab is first
-opened, and then keeps what it showed:
+Status: v1 without voice, laid out as a workspace (Phase A of the workspace replan in the plan). A
+sidebar on the left lists five workspaces; the open one fills the rest of the window. Each is a card
+that asks its service only when it is first opened, and then keeps what it showed. The screen opens
+on System, which reads the status: the dot next to a workspace is the worst state among the services
+behind it, and the number at the foot counts the services with a problem. The sidebar asks nothing
+itself.
 
-| Tab | Asks | Shows |
+| Workspace | Asks | Shows |
 |---|---|---|
-| health | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
+| system (health) | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete` | the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped on the form) |
-| communications | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord |
-| memes | `meme.status`, `meme.list` | the queue, with its pictures and short videos fetched by the shell; a click opens one large |
+| messages (communications) | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord; **Load memes** shows the waiting memes as a grid of previews fetched by the shell, and a click attaches one (a second click takes it off) |
 
-The keys `1` to `6` and the arrows (with Home and End) switch tabs; a digit typed into a field stays
-a digit. An opened meme is a dialog over the page: a video plays with its sound and controls, the left and
-right arrows move between the memes of the page, and Escape or a click outside closes it; while it is
-open the keys do not reach the tabs. Changes to the research base require a real click or key press in the window (see
-"How it is built"). The knowledge tab can list documents on demand, page through them, index one
+Ctrl+1 to Ctrl+5 open the workspaces in the sidebar's order (System is Ctrl+5), from anywhere, a field
+included; the up and down arrows (with Home and End) move through the sidebar when it has the focus. A
+bare digit is always typed, never taken as a shortcut. Memes have no workspace of their own: Ningo
+sends them, so they are picked in Messages. Changes to the research base require a real click or key press in the window (see
+"How it is built"). The knowledge workspace can list documents on demand, page through them, index one
 batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
-document list. The communications tab sends to Discord through its own confirmed action. Nothing opens an external link.
+document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link.
 
-The health tab is also where things are switched on and off. Each service the orchestrator can switch
+System is also where things are switched on and off. Each service the orchestrator can switch
 (`meme`, `chat_ai`, `book`, `knowledge`, `memory`, `scheduler`) has a switch, and each scheduled job has a
 switch and an interval (minutes or hours, between one minute and thirty days; "Back to default" drops a
 custom one). Switching `scheduler` off pauses every job. A switch needs a real click or key press just
@@ -43,14 +46,14 @@ pnpm start     # builds, then opens the window
 ```
 
 It needs a running orchestrator. By default it asks `tcp://127.0.0.1:5558`, the port the compose
-stacks publish. Without one the card says so after about three seconds. Each tab needs the service
-behind it: a service that is stopped or switched off is said so on its tab, and the others keep working.
+stacks publish. Without one the card says so after about three seconds. Each workspace needs the service
+behind it: a service that is stopped or switched off is said so on its workspace, and the others keep working.
 
-### The digest tab
+### The digest workspace
 
 The digest needs the feeds service (`dokja_services/dokja_feeds`) and, in the orchestrator, the
 `digest.*` route. The repository ships no source: a source is a plugin you keep outside it (see the
-service's README). With no plugin the tab says why there is nothing to read (no directory, no source,
+service's README). With no plugin the workspace says why there is nothing to read (no directory, no source,
 none enabled) instead of showing an empty list. A source that fails is listed with its reason, and the
 list opens by itself when one does.
 
@@ -60,7 +63,7 @@ Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127
 
 ## WhatsApp conversations
 
-The communications tab also lists the WhatsApp conversations the owner named on the interface
+The messages workspace also lists the WhatsApp conversations the owner named on the interface
 (`DOKJA_WHATSAPP_CONVERSATIONS`), as "WhatsApp · alias". Their text is what the interface recorded
 itself, shown with who wrote in words and a note on how long it stays on the machine. The composer of
 one sends text only, as the owner, from the linked account: the shell asks in a window of its own,
@@ -69,7 +72,7 @@ hour). The chat itself is never named: only its alias reaches the desktop.
 
 ## Linking WhatsApp
 
-On the health tab, the WhatsApp row has a **Link** button. It shows the code to scan while the
+On System, the WhatsApp row has a **Link** button. It shows the code to scan while the
 account waits for a link, and **New code** and **Unlink and start over**. It needs the
 communications credential in the environment of the desktop (`DOKJA_COMMUNICATIONS_TOKEN`, the same
 one the orchestrator has) and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` set on the orchestrator. The shell
@@ -79,18 +82,18 @@ session. See [`dokja_docs/whatsapp-interface.md`](../../dokja_docs/whatsapp-inte
 
 ## Communications
 
-The sixth tab centralizes the configured Discord channels. It lists 30 messages at a time,
+The messages workspace centralizes the configured Discord channels. It lists 30 messages at a time,
 including messages written before the desktop started, with author, bot marker, time, edits,
 reply ids and attachment filenames. Older pages are read on demand. The latest page refreshes
-every 15 seconds only while the tab and window document are visible; uncheck the refresh option
+every 15 seconds only while the workspace and window document are visible; uncheck the refresh option
 to stop. An error pauses polling until a manual retry succeeds.
 
-The composer sends text (up to 2000 characters) and optionally a meme selected from the existing
-queue. The main process confirms the exact channel id, text and attachment address in a native
+The composer sends text (up to 2000 characters) and optionally a meme picked from the waiting
+queue's previews. The main process confirms the exact channel id, text and attachment address in a native
 window. The renderer cannot request broadcast, force a safety bypass, mark a meme as sent, choose
 an unlisted attachment, or retry a delivery automatically. On cancellation or failure the draft
 stays in the form. On timeout, check the latest messages before retrying because delivery may
-have succeeded. Changing channels clears that channel's current draft; switching tabs preserves it.
+have succeeded. Changing channels clears that channel's current draft; switching workspaces preserves it.
 
 Setup:
 
@@ -107,7 +110,7 @@ Setup:
    the same operator input the delivery interface uses; it has no built-in value.
 
 No channel history is stored locally. The ordinary bot and configured delivery webhooks retain
- their current behavior. This tab does not log in as the operator's personal Discord account.
+ their current behavior. This workspace does not log in as the operator's personal Discord account.
 
 ## Language
 
@@ -201,10 +204,11 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
    `src/main/actions.ts`, with tests that show what it leaves out. Only add an action the orchestrator
    really routes: it sends an event it does not know to the chat domain.
 2. Write the card in `src/renderer/cards/` with `useCard` and `CardFrame`, and its strings in both
-   catalogs, the name of its tab included.
-3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`: its kind, the id of its tab's name and the
-   component. The order of the lines is the order of the tabs; keep health first, because its answer
-   drives the name's pulse and it is the one card mounted at start.
+   catalogs, the name of its workspace included.
+3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`: its kind, the id of its name in the
+   sidebar, the component and, for its dot, the names of the services behind it as the status reports
+   them. The order of the lines is the order of the sidebar; keep health last, at the foot, and the one
+   the screen starts on (`START`), because its answer drives the name's pulse and the dots.
 
 ## Look
 

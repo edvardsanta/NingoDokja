@@ -10,11 +10,11 @@ describe("built communications tab", { skip: hasDisplay ? false : "no display" }
     orchestrator = await startFakeOrchestrator();
     app = await launchApp(orchestrator.endpoint, COMMUNICATIONS_TOKEN);
     page = await Page.connect(app.cdpPort);
-    await page.waitFor("document.querySelectorAll('[role=tab]').length === 6");
+    await page.waitFor("document.querySelectorAll('[role=tab]').length === 5");
   });
   after(async () => { page?.close(); await app?.stop(); await orchestrator?.stop(); });
   it("reads messages through the authenticated shell and renders them as text", async () => {
-    await page.evaluate("document.querySelectorAll('[role=tab]')[5].click()");
+    await page.evaluate("document.querySelectorAll('[role=tab]')[3].click()");
     await page.waitFor("document.querySelectorAll('.conversation li').length === 2");
     assert.equal(await page.evaluate("document.querySelector('.message-content').textContent"), HOSTILE_TITLE);
     assert.equal(await page.evaluate("document.querySelectorAll('.conversation img, .conversation script').length"), 0);

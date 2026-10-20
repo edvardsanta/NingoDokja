@@ -13,6 +13,7 @@ import {
   parseHealth,
   parseLink,
   pulseOf,
+  tonesOf,
   type Health,
   type LinkView,
   type IntervalUnit,
@@ -76,7 +77,7 @@ const LINK_RESET_TIMEOUT_MS = 45_000;
 
 export function HealthCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
-  const { report } = usePulse();
+  const { report, reportTones } = usePulse();
   const load = useCallback(() => loadHealth(transport), [transport]);
   const { state, reload } = useCard(load);
   const run = useCallback((change: Change) => applyChange(transport, change), [transport]);
@@ -85,7 +86,9 @@ export function HealthCard({ transport }: { transport: Transport }) {
 
   useEffect(() => {
     report(pulseOf(state));
-  }, [state, report]);
+    // while a reload runs, the sidebar keeps the tones it has instead of blinking them away
+    if (state.phase !== "loading") reportTones(tonesOf(state));
+  }, [state, report, reportTones]);
 
   // The orchestrator's own state is read again after every change, whether or not it went through
   // (a timeout does not say what happened), so the screen never shows what it only hoped for. The
