@@ -271,3 +271,51 @@ schema 2.
   (live Ollama). `pypdf` was installed into a temporary directory for the run.
 
 No classifier plugin, live provider or owner database was exercised.
+
+## Agent classifier
+
+Branch `feat/agent-classifier`, stacked on `feat/knowledge-classifier`. The owner
+chose an agent CLI over deterministic rules and decided (ADR 0008, 2026-10-20):
+Claude Code first, then Codex, then Ollama; every form may be sent, notes and
+conversations included; Feeds runs on the owner's machine, where the CLIs are
+logged in, and the orchestrator does not call a CLI itself.
+
+- The privacy gate that skipped known notes and conversations is removed.
+- A classifier output may name its `provider`; the host returns
+  `<manifest version>+<provider>`, such as `0.1.0+claude.haiku-5-5`, so the
+  cache and provenance keep models apart. Classification may take 3 minutes,
+  and the reading task deadline is 6 minutes. Classification is not a reading,
+  so it sits outside the step 08 cap of 2 minutes for on-demand reading, and it
+  holds one of the 2 reading slots while it runs.
+- `plugins.example/agent-kinds` (disabled) tries the providers in order and moves
+  on only when one fails; an unsure answer is a result. Labels outside the
+  vocabulary and missing values become user questions; the date anchor is kept
+  for news only.
+
+Isolation was checked with canary files before writing the plugin:
+
+- Codex in its read-only sandbox **read** a file it was asked to read. With
+  `shell_tool` and `unified_exec` off (and apps, browser and computer use) it
+  could not, and said so.
+- Claude Code with `--tools ""` could not read the file either.
+- The owner's ai-memory hooks live in the user settings; Claude Code runs with
+  `--setting-sources ""` and `disableAllHooks`, and a canary sent through it did
+  not appear in the hook spool or session files.
+
+A real run on a made-up two-document request answered correctly with Claude
+Code (Haiku, 6 s) and Codex (9 s). Codex anchored the news on the weekday
+mentioned in the text rather than the dateline, a quality point for the live
+check.
+
+### Verification
+
+- Feeds: `go vet ./...` and `go test -race ./...` passed, including the plugin
+  run against fake `claude` and `codex` programs and a fake Ollama: isolation
+  flags, fallback on each failure, no fallback on an unsure answer, provider
+  naming and the error when nothing answers.
+- Knowledge domain: `go test ./...` passed. Orchestrator: `go test ./... -count=1`
+  passed.
+
+Still pending: running Feeds on the host for the stack (bind address and an
+overridable `FEEDS_SERVICE_ENDPOINT` for the orchestrator), the live check on
+the owner's documents, an Ollama chat model, and explicit reclassification.

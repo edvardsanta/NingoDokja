@@ -623,7 +623,8 @@
             "API/CLI continuation implemented: knowledge.classify retrieves current questions by source_id and applies explicit answers with an atomic revision-checked metadata patch. No re-upload, extraction or re-embedding; tests cover stale answers and concurrent writers.",
             "Desktop conceptual review recorded in dokja_docs/step-09-consolidation.md: include_text exists upstream but is dropped by desktop projections; per-document detail and classification presentation remain pending, and conversation tabs must not duplicate Messages.",
             "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier.",
-            "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54)."
+            "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54).",
+            "Owner chose an agent classifier (2026-10-20): Claude Code, then Codex, then Ollama; every form may be sent; Feeds runs on the owner's machine. plugins.example/agent-kinds implements the chain with CLI isolation verified by canary files; the host names the answering provider in the version. See dokja_docs/step-09-consolidation.md#agent-classifier."
           ],
           "checks": [
             {
@@ -660,13 +661,19 @@
               "name": "knowledge_classifier",
               "status": "passed",
               "detail": "Feeds go test -race ./...; Knowledge domain go test -race ./...; orchestrator go test ./... -count=1; Knowledge service 158 passed, 8 skipped (live Ollama), pypdf installed in a temporary directory."
+            },
+            {
+              "name": "agent_classifier",
+              "status": "passed",
+              "detail": "Feeds go test -race ./... with fake claude/codex/Ollama; Knowledge domain and orchestrator go test ./...; real two-document run with Claude Code and Codex; canary checks for file reads and hook capture."
             }
           ],
           "started_on": "2026-10-19",
-          "worktree": ".worktrees/knowledge-classifier",
-          "branch": "feat/knowledge-classifier",
+          "worktree": ".worktrees/agent-classifier",
+          "branch": "feat/agent-classifier",
           "remaining": [
-            "Ship a classifier plugin (deterministic rules first, then a local agent CLI) and decide the setting for which inputs may be sent to a remote provider.",
+            "Run Feeds on the owner's machine for the stack (loopback/bridge bind, overridable FEEDS_SERVICE_ENDPOINT) and do the live check on the owner's documents.",
+            "Pick an Ollama chat model for the last fallback.",
             "Add explicit provider reclassification of stored documents for a new classifier version.",
             "Wire classification questions/answers into desktop and chat interfaces; CLI and API continuation are implemented.",
             "Define the bounded desktop document-detail contract and content representation; retain the existing conversation model and expose useful open/classification actions only when implemented."

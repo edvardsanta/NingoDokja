@@ -114,8 +114,10 @@ installed shows as `invalid` with the program's name.
 Mount the plugins directory read-only and keep it out of git. Changes to it are read when the
 service starts.
 
-`plugins.example/` holds two plugins that use no network: `local-file` prints the items of a
-local JSON file, and `knowledge-extractors` reads documents on demand. Both ship disabled.
+`plugins.example/` holds three plugins. `local-file` prints the items of a local JSON file and
+`knowledge-extractors` reads documents on demand; neither uses the network. `agent-kinds` classifies
+documents with an agent CLI, which sends them to that CLI's provider (see below). All three ship
+disabled.
 
 ### Versioned manifests (`plugin_api: 1`)
 
@@ -214,6 +216,32 @@ A plugin that chains several models may add `"provider"`, a short lowercase name
 
 A classifier that sends text to a remote model sends the owner's documents with it; enable one only
 for documents you are willing to send.
+
+#### The `agent-kinds` example
+
+`plugins.example/agent-kinds` asks Claude Code, then Codex, then Ollama, moving on only when one
+fails (missing, not logged in, an error, too slow, or the wrong number of answers). An answer that
+is unsure of an axis is kept, not retried elsewhere. Its `provider` names the model that answered,
+such as `claude.haiku-5-5` or `codex.gpt-6.1-sol`. It needs `python3` and the CLIs logged in for the
+user that runs Feeds, so it is meant for Feeds running on the owner's machine, not in the image.
+
+| variable | meaning |
+| --- | --- |
+| `HOME` | where the CLIs keep their login |
+| `AGENT_KINDS_PROVIDERS` | order to try, default `claude,codex,ollama` |
+| `AGENT_KINDS_TIMEOUT` | seconds per provider, default 50; no provider starts after 160 s |
+| `AGENT_KINDS_CLAUDE_MODEL` | Claude Code model, default `haiku` |
+| `AGENT_KINDS_CODEX_MODEL` | Codex model; empty uses Codex's default |
+| `AGENT_KINDS_OLLAMA_URL`, `AGENT_KINDS_OLLAMA_MODEL` | an Ollama `/api/chat` endpoint and a chat model; Ollama is skipped unless both are set |
+
+The model sees up to 48,000 characters per call, shared among the documents (at least 500 each);
+past 96 documents the rest are left to the user. Both CLIs run without tools, from an empty
+directory. Claude Code runs with `--tools ""`, without user settings or hooks
+(`--setting-sources ""`, `disableAllHooks`) or MCP servers, and keeps no session. Codex runs with
+`--sandbox read-only --ignore-user-config --ephemeral` and its shell, apps, browser and computer use
+turned off. Its read-only sandbox alone still reads files. Canary files confirmed that, with these
+flags, neither CLI reads a file it is asked to read and the documents do not reach the user's
+hooks.
 
 ## Variables
 
