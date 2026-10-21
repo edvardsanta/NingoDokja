@@ -208,6 +208,34 @@ func TestProfileGatedModulesAreVisibleToEveryComposeCommand(t *testing.T) {
 	}
 }
 
+func TestDiscordAndSchedulerReadiness(t *testing.T) {
+	for _, tc := range []struct {
+		name, service string
+		want          []string
+	}{
+		{"discord", "dokja-discord", []string{"exec", "-T", "dokja-discord", "node", "--input-type=module", "-e", discordHealth}},
+		{"scheduler", "dokja-scheduler", []string{"ps", "--all", "--quiet"}},
+	} {
+		var calls [][]string
+		c := &Compose{Wait: time.Second, Run: func(_ context.Context, args ...string) ([]byte, error) {
+			calls = append(calls, args)
+			if args[0] == "ps" {
+				return []byte("aaaaaaaaaaaa"), nil
+			}
+			return nil, nil
+		}, Inspect: func(context.Context, ...string) ([]byte, error) {
+			return []byte(`[{"Config":{"Labels":{"com.docker.compose.service":"` + tc.service + `"}},"State":{"Status":"running","Running":true}}]`), nil
+		}}
+		m, _ := domain.Lookup(tc.name)
+		if err := c.Ready(context.Background(), m); err != nil {
+			t.Fatal(tc.name, err)
+		}
+		if !reflect.DeepEqual(calls[len(calls)-1], tc.want) {
+			t.Fatal(tc.name, calls)
+		}
+	}
+}
+
 func TestKnownRemoteEngineTargetsAreRejected(t *testing.T) {
 	for _, env := range [][]string{{"DOCKER_HOST=tcp://host.example:1234"}, {"CONTAINER_HOST=ssh://host.example"}, {"DOCKER_CONTEXT=production"}} {
 		if localEngine(env) == nil {
