@@ -15,6 +15,7 @@ import type {
   MemeStatus,
   MemoryScore,
   MemoryStatus,
+  MemoryExperience,
   StatusReply,
 } from "../shared/replies.js";
 import type { PreviewResult, Transport, TransportResult } from "../shared/transport.js";
@@ -40,27 +41,35 @@ const STATUS: StatusReply = {
 };
 
 const MEMORY_STATUS: MemoryStatus = {
-  experiences: 48,
-  pending: 14,
-  resolved: 31,
-  expired: 3,
-  embedded: 46,
-  needsReindex: 2,
+  experiences: 7,
+  pending: 7,
+  resolved: 0,
+  expired: 0,
+  embedded: 7,
+  needsReindex: 0,
   embedModel: "model-1",
   embeddings: true,
   embedderReachable: true,
 };
 
 const MEMORY_SCORE: MemoryScore = {
-  scored: 31,
-  unscored: 4,
+  scored: 0,
+  unscored: 0,
   minScored: 30,
   brierPrediction: 0.081,
   brierBaseline: 0.27,
   skill: 0.7,
   beatsBaseline: true,
-  enoughData: true,
+  enoughData: false,
 };
+
+const EXPERIENCES: MemoryExperience[] = Array.from({ length: 7 }, (_, i) => ({
+  ref: `fixture:experience-${i + 1}`, action: "hashtag.suggest", detail: "#Reading", outcome: "",
+  predictedP: i === 0 ? null : 0.6, baselineP: i === 0 ? null : 0.5, matchedScore: 0.8,
+  createdAt: "2026-10-21T10:00:00Z", resolvedAt: "", contextSnippet: `Example ${i + 1}: a joke about reading.`, matchedSnippet: "An earlier reading joke.",
+  context: `Example ${i + 1}: a joke about reading.\nThis is hand-built demo content.`, contextTruncated: false,
+  feedback: { code: "hashtag_tag", message: "" },
+}));
 
 const KNOWLEDGE_STATUS: KnowledgeStatus = {
   documents: 6,
@@ -275,6 +284,17 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok(MEMORY_STATUS);
         case "memory.stats":
           return ok(MEMORY_SCORE);
+        case "memory.list": {
+          const state = payload?.state ?? "all";
+          const rows = EXPERIENCES.filter((entry) => state === "all" || (state === "pending" ? !entry.outcome : !!entry.outcome));
+          const offset = Number(payload?.offset) || 0;
+          const limit = Number(payload?.limit) || 20;
+          return ok({ experiences: rows.slice(offset, offset + limit).map(({ context, ...entry }) => entry), total: rows.length, offset, limit });
+        }
+        case "memory.get": {
+          const entry = EXPERIENCES.find((entry) => entry.ref === payload?.ref);
+          return ok(entry ? { found: true, experience: structuredClone(entry) } : { found: false });
+        }
         case "knowledge.status":
           return ok({
             ...KNOWLEDGE_STATUS,

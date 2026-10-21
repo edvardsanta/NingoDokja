@@ -210,15 +210,17 @@ func (s *Store) Resolve(ref, outcome string) (found, resolved bool, current stri
 	return true, err == nil, outcome, err
 }
 
-// Stored is one experience as it can be read back. The context is left out on purpose: it is
-// the user's own text and nothing that reads an experience back needs it.
+// Stored is one experience as it can be read back. Context is private: Get leaves
+// it empty and GetWithContext opts in explicitly.
 type Stored struct {
-	Ref       string
-	Action    string
-	Detail    string
-	Outcome   string
-	Predicted *float64
-	Baseline  *float64
+	Context          string
+	ContextTruncated bool
+	Ref              string
+	Action           string
+	Detail           string
+	Outcome          string
+	Predicted        *float64
+	Baseline         *float64
 	// MatchedScore is how close the earlier example the bot's choice rested on was, when it was
 	// recorded. Its text is not part of this: see MatchedSnippets.
 	MatchedScore *float64
@@ -228,17 +230,29 @@ type Stored struct {
 
 // Get reads one experience. Outcome is empty while it is pending and "expired" once it has
 // waited past the expiry window with no verdict. ok is false for an unknown ref.
-func (s *Store) Get(ref string) (stored Stored, ok bool, err error) {
+func (s *Store) Get(ref string) (Stored, bool, error) { return s.get(ref, false) }
+
+// GetWithContext reads the explicit detail view. The default Get stays text-free.
+func (s *Store) GetWithContext(ref string) (Stored, bool, error) { return s.get(ref, true) }
+
+func (s *Store) get(ref string, includeContext bool) (stored Stored, ok bool, err error) {
+	contextExpr := "''"
+	if includeContext {
+		contextExpr = "substr(context, 1, 4001)"
+	}
 	var predicted, baseline, matched sql.NullFloat64
 	var outcome, resolvedAt sql.NullString
 	err = s.db.QueryRow(
-		"SELECT ref, action, detail, "+verdictSQL+", predicted_p, baseline_p, matched_score, created_at, resolved_at FROM experiences WHERE ref = ?",
-		s.cutoff(), ref).Scan(&stored.Ref, &stored.Action, &stored.Detail, &outcome, &predicted, &baseline, &matched, &stored.CreatedAt, &resolvedAt)
+		"SELECT ref, action, detail, "+verdictSQL+", predicted_p, baseline_p, matched_score, created_at, resolved_at, "+contextExpr+" FROM experiences WHERE ref = ?",
+		s.cutoff(), ref).Scan(&stored.Ref, &stored.Action, &stored.Detail, &outcome, &predicted, &baseline, &matched, &stored.CreatedAt, &resolvedAt, &stored.Context)
 	if err == sql.ErrNoRows {
 		return Stored{}, false, nil
 	}
 	if err != nil {
 		return Stored{}, false, err
+	}
+	if chars := []rune(stored.Context); len(chars) > 4000 {
+		stored.Context, stored.ContextTruncated = string(chars[:4000]), true
 	}
 	stored.Outcome, stored.ResolvedAt = outcome.String, resolvedAt.String
 	if predicted.Valid {

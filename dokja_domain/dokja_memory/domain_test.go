@@ -390,3 +390,31 @@ func TestPredictAsksForSnippetsOnlyWhenToldAndTheEvidenceSaysWhatEachExperienceW
 		t.Fatalf("snippets are opt-in: %v", plain.sent[0].payload)
 	}
 }
+
+func TestExperienceReadsExplainExistingFeedbackWithoutResolving(t *testing.T) {
+	cases := []struct{ action, outcome, detail, code string }{
+		{"hashtag.suggest", "", "#Reading", "hashtag_tag"},
+		{"other.action", "", "", "explicit_outcome"},
+		{"hashtag.suggest", "accepted", "#Reading", "recorded"},
+		{"hashtag.suggest", "expired", "#Reading", "expired"},
+	}
+	for _, tc := range cases {
+		row := map[string]any{"found": true, "ref": "fixture", "action": tc.action, "outcome": tc.outcome, "detail": tc.detail}
+		service := &fakeService{answers: map[string]map[string]any{"memory.get": row}}
+		result, err := handle(New(service), ActionGetExperience, map[string]any{"ref": "fixture", "include_context": true, "outcome": "accepted"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result["feedback"].(map[string]any)["code"] != tc.code || result["outcome"] != tc.outcome {
+			t.Fatalf("%#v", result)
+		}
+		if len(service.sent) != 1 || service.sent[0].eventType != "memory.get" || len(service.sent[0].payload) != 2 || service.sent[0].payload["include_context"] != true {
+			t.Fatalf("%#v", service.sent)
+		}
+	}
+	service := &fakeService{answers: map[string]map[string]any{"memory.list": {"experiences": []any{map[string]any{"action": "hashtag.suggest", "detail": "#Reading", "outcome": ""}}}}}
+	result, err := handle(New(service), ActionListExperience, map[string]any{})
+	if err != nil || result["experiences"].([]any)[0].(map[string]any)["feedback"].(map[string]any)["code"] != "hashtag_tag" {
+		t.Fatalf("%v %v", result, err)
+	}
+}

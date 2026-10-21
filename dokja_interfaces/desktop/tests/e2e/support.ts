@@ -27,7 +27,7 @@ export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 export const COMMUNICATIONS_TOKEN = "test-communications-token-0000000000";
 export const HOSTILE_TITLE = '<img src="x" onerror="window.__owned = 1">';
 
-function replyFor(type: string): Record<string, unknown> {
+function replyFor(type: string, payload: Record<string, unknown> = {}): Record<string, unknown> {
   const wrap = (domain: string, body: Record<string, unknown>) => ({
     status: "ok",
     result: { event_id: "event-1", workflow: domain, domain, result: body },
@@ -57,6 +57,14 @@ function replyFor(type: string): Record<string, unknown> {
         source_id: "note:a-thought-0123456789",
         created: true, changed: true, chunks: 2, embedded: 0, degraded: true, reason: "no embedding server is configured",
       });
+    case "memory.status":
+      return wrap("memory", { experiences: 7, pending: 7, resolved: 0, expired: 0, embedded: 7, needs_reindex: 0, embeddings: true, embedder_reachable: true, embed_model: "fixture" });
+    case "memory.stats":
+      return wrap("memory", { scored: 0, unscored: 0, min_scored: 30 });
+    case "memory.list":
+      return wrap("memory", { experiences: Array.from({length: 7}, (_, i) => ({ ref: `fixture:${i+1}`, action: "hashtag.suggest", detail: "#Reading", outcome: "", predicted_p: 0, baseline_p: 0.5, matched_score: 0.9, context_snippet: "A short context", created_at: "2026-10-21T00:00:00Z", feedback: { code: "hashtag_tag", message: "" } })), total: 7, offset: 0, limit: 20 });
+    case "memory.get":
+      return wrap("memory", { found: true, ref: payload.ref, action: "hashtag.suggest", detail: "#Reading", outcome: "", predicted_p: 0, baseline_p: 0.5, matched_score: 0.9, context: HOSTILE_TITLE + " full experience context", context_truncated: false, feedback: { code: "hashtag_tag", message: "" } });
     case "knowledge.classify":
       return wrap("knowledge", {
         source_id: "note:a-1", revision: "a".repeat(64),
@@ -106,7 +114,7 @@ export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
       const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown>; context?: Record<string, unknown> };
       seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
       const answer = String(event.type).startsWith("communications.") && event.context?.communications_token !== COMMUNICATIONS_TOKEN
-        ? { status: "error", error: "communications access denied" } : replyFor(String(event.type));
+        ? { status: "error", error: "communications access denied" } : replyFor(String(event.type), event.payload as Record<string, unknown>);
       await socket.send(JSON.stringify(answer));
     }
   })().catch(() => undefined);

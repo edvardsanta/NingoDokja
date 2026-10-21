@@ -311,4 +311,23 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.equal(await page.evaluate("window.__owned === undefined"), true);
     assert.ok(orchestrator.seen.some((event) => event.type === "digest.status"));
   });
+
+  it("browses experience context and feedback as text without writing", async () => {
+    await page.evaluate("document.querySelectorAll('[role=tab]')[2].click()");
+    await page.waitFor("[...document.querySelectorAll('button')].find(b=>b.textContent==='Load experiences') ? true : null");
+    await page.evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Load experiences').click()");
+    await page.waitFor("document.querySelectorAll('button[aria-label^=\"Inspect fixture:\"]').length === 7 ? true : null");
+    await page.evaluate("document.querySelector('button[aria-label=\"Inspect fixture:1\"]').click()");
+    const context = await page.waitFor<string>("document.querySelector('.experience-detail pre')?.textContent || null");
+    assert.equal(context, HOSTILE_TITLE + " full experience context");
+    assert.equal(await page.evaluate("document.querySelectorAll('.experience-detail img').length"), 0);
+    assert.equal(await page.evaluate("window.__owned === undefined"), true);
+    const detail = await page.evaluate<string>("document.querySelector('.experience-detail').textContent");
+    assert.match(detail, /Keeping the suggested hashtag means accepted/);
+    const reads = orchestrator.seen.filter(event => event.type === "memory.list" || event.type === "memory.get");
+    assert.equal(reads.length, 2);
+    assert.deepEqual(reads[1]?.payload, {ref: "fixture:1", include_context: true});
+    assert.equal(orchestrator.seen.some(event => event.type === "memory.resolve"), false);
+  });
+
 });

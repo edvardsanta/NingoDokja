@@ -10,6 +10,7 @@ import {
   type MemoryView,
   type ScoreView,
 } from "./memory_model.js";
+import { MemoryExperiencesPanel } from "./memory_experiences.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
 // A stopped memory service takes about five seconds to fail, so wait longer than that.
@@ -36,7 +37,7 @@ export function MemoryCard({ transport }: { transport: Transport }) {
 
   return (
     <CardFrame kindLabel={t("kind_memory")} title={t("memory_title")} state={state} onReload={reload}>
-      {(view) => <MemoryBody view={view} />}
+      {(view) => <><MemoryBody view={view} />{!view.off && <MemoryExperiencesPanel transport={transport} />}</>}
     </CardFrame>
   );
 }

@@ -397,3 +397,36 @@ partial answers, blank defaults, stale revisions without retry, disabled service
 late replies, payload validation/projection, and the real shell's refusal of
 scripted answers. Native tooling and local sockets required an unsandboxed run.
 No live stack, provider or owner database was exercised.
+
+## Inspectable experience memory
+
+`feat/desktop-experiences` adds a paginated Memory list and individual inspection:
+context, action/detail, frozen prediction/baseline, example similarity and observed
+outcome. The existing `memory.list`/`memory.get` routes are reused. The domain adds
+bounded feedback guidance for pending hashtag suggestions and other actions,
+recorded outcomes and expired records. Missing feedback stays unknown, and the
+one-reference/repeated-attempt attribution limitation is stated explicitly.
+
+An additive `include_context` flag on `memory.get` returns at most 4,000 Unicode
+characters of context. The default get remains text-free; listing/recall excerpts
+stay bounded to 160 characters. The service projects the context prefix in the
+same query as the record. No verdict, prediction, embedding or database schema is
+changed by inspection. The desktop rejects mismatched detail references and
+renders all text literally, with explicit missing/truncated/deleted states.
+
+Compatibility: service, Memory domain and desktop changes over existing routes;
+no event envelope, route, command, SQL schema, setting or compose changes. Older
+service builds keep working with an explicit excerpt fallback. Roll out service
+and orchestrator, then rebuild/restart desktop. Rollback retains all data. Manual
+feedback controls and durable attribution remain separate work.
+
+
+Validation: Memory domain and service `go test -race ./...` and `go vet ./...`
+passed; orchestrator `go test ./...` passed. Desktop `pnpm test` passed **203 Node
+and 190 UI tests**; `pnpm typecheck` passed; `pnpm test:e2e` built the app and
+passed **26 headless Electron tests**. Coverage includes seven-row inspection,
+pagination/filter changes, null versus zero prediction, recorded outcomes,
+deleted records, late replies, bounded opt-in Unicode context, literal rendering
+and absence of feedback writes. All content is synthetic; no owner experience
+was modified. Desktop native tooling and local test sockets required unsandboxed
+runs. No service rollout was performed.
