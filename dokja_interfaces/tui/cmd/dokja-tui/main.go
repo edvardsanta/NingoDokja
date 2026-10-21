@@ -20,6 +20,7 @@ func main() {
 	images := flag.String("images", envOrDefault("DOKJA_TUI_IMAGES", "auto"), "Meme previews: auto, kitty, blocks or off")
 	startTab := flag.String("tab", "panel", "Tab to open: panel, memes, discord or history (the Portuguese names painel and historico also work)")
 	lang := flag.String("lang", "", "Interface language: en or pt (default: DOKJA_LANG, then the system locale, then en)")
+	runtimeRoot := flag.String("runtime-root", "", "Checkout that holds docker-compose.lite.yml, for module controls (default: found from the current directory)")
 	dbPath := flag.String("db", "", "Shared database (default: DOKJA_DB_FILE or the repo .dokja/dokja.db); enables creating profiles here")
 	flag.Parse()
 
@@ -32,6 +33,11 @@ func main() {
 	output := tui.NewSafeOutput(os.Stdout)
 	model := tui.NewModel(tui.NewOrchestratorClient(*endpoint), *refresh, *timeout)
 	model.OpenTab(*startTab)
+	if runtime, err := cli.LocalRuntimeClient(*runtimeRoot, "tui", os.Getenv); err != nil {
+		model.SetRuntime(nil, err.Error())
+	} else {
+		model.SetRuntime(runtime, "")
+	}
 	if db := openProfileStore(*dbPath); db != nil {
 		defer db.Close()
 		model.SetProfileStore(db)

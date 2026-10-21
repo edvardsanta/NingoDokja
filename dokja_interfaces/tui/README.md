@@ -79,6 +79,12 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 
 ## Switches and jobs
 
+- The panel starts with **Modules**: the lite stack's containers, from the local runtime controller the
+  desktop and CLI also use. Space starts or stops the selected one (with the dependencies it needs) and
+  changes no switch or job, so nothing is posted. They show even when the orchestrator is down. Run the TUI
+  on the host for this; in the `dokja-tui` container the panel says module control is unavailable.
+  `--runtime-root` names the checkout when the TUI is started outside it.
+
 - A service switch is **logical**: while a service is off the orchestrator refuses its events and says so
   (the Memes tab shows "recusado pelo orquestrador"); the container keeps running. It also refuses to use
   the meme service's NSFW filter, so an image can never reach a safe-only channel unchecked.

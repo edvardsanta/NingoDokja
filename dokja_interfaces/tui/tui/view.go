@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"dokja_interfaces/cli/cli"
 )
 
 var (
@@ -133,23 +135,24 @@ func (m *Model) channelLabel(id string) string {
 }
 
 func (m *Model) viewPanel() string {
+	var b strings.Builder
+	first := m.viewModules(&b)
 	if m.status == nil {
 		if m.statusErr != "" {
-			return styleBad.Render(tr("no_answer_from_the_orchestrator") + m.statusErr)
+			return b.String() + styleBad.Render(tr("no_answer_from_the_orchestrator")+m.statusErr)
 		}
-		return styleDim.Render(tr("loading"))
+		return b.String() + styleDim.Render(tr("loading"))
 	}
 	s := m.status
-	var b strings.Builder
 
 	b.WriteString(styleTitle.Render(tr("services")) + styleDim.Render(tr("service_toggle_help")) + "\n")
 	for i, service := range s.Services {
-		b.WriteString(m.panelLine(i, checkbox(service.Enabled), fmt.Sprintf("%-9s %s", service.Name, m.serviceState(service))))
+		b.WriteString(m.panelLine(first+i, checkbox(service.Enabled), fmt.Sprintf("%-9s %s", service.Name, m.serviceState(service))))
 	}
 
 	b.WriteString("\n" + styleTitle.Render("Jobs") + styleDim.Render(tr("space_pauses_resumes_x_runs_now_i_interval")) + "\n")
 	for i, job := range s.Jobs {
-		b.WriteString(m.panelLine(len(s.Services)+i, checkbox(job.Enabled), fmt.Sprintf("%-25s %s", job.Name, m.jobState(job))))
+		b.WriteString(m.panelLine(first+len(s.Services)+i, checkbox(job.Enabled), fmt.Sprintf("%-25s %s", job.Name, m.jobState(job))))
 	}
 	if hint := schedulerHint(s); hint != "" {
 		b.WriteString(styleWarn.Render("  "+hint) + "\n")
@@ -170,6 +173,50 @@ func (m *Model) viewPanel() string {
 		b.WriteString("\n" + styleBad.Render(tr("last_refresh_failed")+m.statusErr))
 	}
 	return b.String()
+}
+
+// viewModules writes the local modules and returns how many panel rows they take.
+func (m *Model) viewModules(b *strings.Builder) int {
+	if m.modules == nil {
+		if m.modulesErr != "" {
+			b.WriteString(styleTitle.Render(tr("modules")) + "\n  " + styleDim.Render(tr("modules_unavailable")+trunc(m.modulesErr, 90)) + "\n\n")
+		}
+		return 0
+	}
+	b.WriteString(styleTitle.Render(tr("modules")) + styleDim.Render(tr("module_toggle_help")) + "\n")
+	for i, module := range m.modules.Modules {
+		b.WriteString(m.panelLine(i, checkbox(!module.Stopped()), fmt.Sprintf("%-14s %s", module.Name, moduleState(module))))
+	}
+	if m.modulesErr != "" {
+		b.WriteString(styleBad.Render("  "+tr("last_refresh_failed")+m.modulesErr) + "\n")
+	}
+	b.WriteString("\n")
+	return len(m.modules.Modules)
+}
+
+func moduleState(module cli.RuntimeModule) string {
+	var label string
+	switch module.State {
+	case "ready":
+		label = styleOK.Render(tr("module_ready"))
+	case "running":
+		label = styleOK.Render(tr("module_running"))
+	case "starting":
+		label = styleWarn.Render(tr("module_starting"))
+	case "stopping":
+		label = styleWarn.Render(tr("module_stopping"))
+	case "failed":
+		label = styleBad.Render(tr("module_failed"))
+	case "stopped":
+		label = styleDim.Render(tr("module_stopped"))
+	default:
+		// A state from a newer controller is shown as it came.
+		label = module.State
+	}
+	if module.Error != "" {
+		label += styleDim.Render("  " + trunc(module.Error, 60))
+	}
+	return label
 }
 
 func checkbox(on bool) string {

@@ -234,5 +234,18 @@
   "memory_feedback_missing": "Experience no longer exists; nothing was resolved.",
   "memory_feedback_conflict": "An outcome already exists: %s. It was retained.",
   "memory_feedback_saved": "Feedback saved: %s.",
-  "memory_feedback_check": "If the request timed out, its outcome is unknown. Reload the list before retrying."
+  "memory_feedback_check": "If the request timed out, its outcome is unknown. Reload the list before retrying.",
+  "modules": "Modules",
+  "module_toggle_help": "   space starts/stops the containers (no switch or job changes, so nothing is posted)",
+  "modules_unavailable": "local module control unavailable: ",
+  "modules_busy": "wait: a module operation is running",
+  "start_module": "start module %s",
+  "stop_module": "stop module %s",
+  "module_accepted": "accepted; the panel follows its progress",
+  "module_ready": "ready",
+  "module_running": "running",
+  "module_starting": "starting",
+  "module_stopping": "stopping",
+  "module_failed": "failed",
+  "module_stopped": "off"
 }
