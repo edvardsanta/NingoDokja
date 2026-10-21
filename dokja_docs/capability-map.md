@@ -276,3 +276,27 @@ comparison and the service retains the first verdict. Concurrent receipts report
 the stored outcome. Feedback does not alter Knowledge hashtag examples. See
 [experience feedback](experience-feedback.md) for semantics, receipts and the
 existing media-reference/attempt limitation.
+### Local module lifecycle bootstrap
+
+Desktop's local container controls use a host bootstrap orchestrator in
+`dokja_orch/runtime` because the main orchestrator may itself be stopped. The flow
+remains Interface → Request → Orchestrator → Domain → Service:
+`runtime.modules`/`runtime.set` are routed locally to
+`dokja_domain/dokja_runtime` and the stateless `dokja_services/dokja_runtime`
+adapter. Conversational/domain events remain on the existing application router.
+The local control envelope has the existing fields and a separate versioned,
+project-bound response; no existing route or envelope is changed.
+
+The domain owns the fixed lite-stack dependency graph, ownership and lifecycle
+state. The adapter provides bounded Compose start/stop/inspect operations and
+application readiness probes. The Electron main process alone owns private
+socket access and detached daemon bootstrap; the renderer can request only known
+module actions, with a real input gesture for writes. No arbitrary event dispatch,
+command execution, database access or container socket reaches the renderer.
+
+Opening desktop never starts the stack. Explicit On starts a module and its
+required dependencies; Off preserves data, shared/borrowed dependencies and
+recognized external consumers. Runtime lifecycle and `services.set` routing
+controls remain separate. The first backend is the local lite stack on Unix;
+production, remote hosts and Windows are outside this initial implementation.
+See [runtime controller](../dokja_orch/runtime/README.md).
