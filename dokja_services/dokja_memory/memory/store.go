@@ -194,20 +194,26 @@ func (s *Store) Insert(e NewExperience, vector []float32, model string) (created
 // Resolve records the outcome of an experience. The first verdict wins: resolving again
 // reports what is already there and changes nothing. found is false for an unknown ref.
 func (s *Store) Resolve(ref, outcome string) (found, resolved bool, current string, err error) {
-	var existing sql.NullString
-	err = s.db.QueryRow("SELECT outcome FROM experiences WHERE ref = ?", ref).Scan(&existing)
+	// Let the conditional write decide the winner. A read before the write can
+	// race with feedback from another interface and report a verdict it never saved.
+	result, err := s.db.Exec("UPDATE experiences SET outcome = ?, resolved_at = ? WHERE ref = ? AND outcome IS NULL",
+		outcome, s.stamp(), ref)
+	if err != nil {
+		return false, false, "", err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, false, "", err
+	}
+	var currentOutcome string
+	err = s.db.QueryRow("SELECT outcome FROM experiences WHERE ref = ?", ref).Scan(&currentOutcome)
 	if err == sql.ErrNoRows {
 		return false, false, "", nil
 	}
 	if err != nil {
 		return false, false, "", err
 	}
-	if existing.Valid {
-		return true, false, existing.String, nil
-	}
-	_, err = s.db.Exec("UPDATE experiences SET outcome = ?, resolved_at = ? WHERE ref = ? AND outcome IS NULL",
-		outcome, s.stamp(), ref)
-	return true, err == nil, outcome, err
+	return true, affected > 0, currentOutcome, nil
 }
 
 // Stored is one experience as it can be read back. Context is private: Get leaves

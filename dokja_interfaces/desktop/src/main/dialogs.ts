@@ -76,6 +76,16 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       cancel: pt ? "Cancelar" : "Cancel",
     };
   }
+  if (type === "memory.resolve") {
+    const pt = locale === "pt";
+    return {
+      message: pt ? "Registrar este feedback?" : "Record this feedback?",
+      detail: `${String(wire.ref)}\n\n${String(wire.observed ?? wire.outcome)}\n\n${pt
+        ? "O primeiro resultado registrado é mantido. Confira a experiência e o que aconteceu antes de confirmar."
+        : "The first recorded outcome is retained. Check the experience and what happened before confirming."}`,
+      accept: pt ? "Registrar" : "Record", cancel: pt ? "Cancelar" : "Cancel",
+    };
+  }
   if (type !== "knowledge.delete") return undefined;
   const texts = TEXTS[locale] ?? TEXTS.en;
   return {

@@ -418,7 +418,8 @@ Compatibility: service, Memory domain and desktop changes over existing routes;
 no event envelope, route, command, SQL schema, setting or compose changes. Older
 service builds keep working with an explicit excerpt fallback. Roll out service
 and orchestrator, then rebuild/restart desktop. Rollback retains all data. Manual
-feedback controls and durable attribution remain separate work.
+feedback controls are delivered by the follow-up below; durable attempt attribution
+remains separate work.
 
 
 Validation: Memory domain and service `go test -race ./...` and `go vet ./...`
@@ -430,3 +431,43 @@ deleted records, late replies, bounded opt-in Unicode context, literal rendering
 and absence of feedback writes. All content is synthetic; no owner experience
 was modified. Desktop native tooling and local test sockets required unsandboxed
 runs. No service rollout was performed.
+
+
+## Desktop-first explicit experience feedback
+
+Desktop is the primary entry point. After inspection, accept the result, enter
+what actually happened, or explicitly state that it was not used. A real gesture
+and native confirmation protect the existing `memory.resolve` write. The domain
+compares observed text with the stored detail; the UI never computes a verdict.
+A successful receipt shows the outcome and offers a memory refresh. Missing
+records, disabled modules, previous/concurrent verdicts and uncertain writes are
+not presented as new successful feedback. No automatic retry or bulk resolution
+is introduced. Late explicit feedback can resolve policy-expired records with no
+saved verdict.
+
+The TUI provides secondary `a`/`c`/`i` actions on the selected experience, freezes
+its ref/value for confirmation and reloads the list after a receipt. A coding
+agent can mediate the user's explicit feedback through the existing local request
+adapter; there is no new MCP server or automatic chat interception. These paths
+and their limits are documented in [experience-feedback.md](experience-feedback.md).
+
+The store previously read before its conditional update and could report a
+losing concurrent verdict as newly saved. It now uses affected-row count and
+returns the stored verdict. A regression test races twelve submissions across
+twenty experiences and requires exactly one winner and consistent receipts.
+
+No envelope, route, service HTTP contract, schema, configuration or compose
+changes. Historical media-based refs still do not distinguish repeated attempts.
+Observed labels are compared but not persisted as replacement details or
+Knowledge training examples. Roll out Memory and rebuild interfaces separately;
+no rollout, data backfill or modification of the owner's seven pending records
+was performed.
+
+Validation: Memory service and TUI `go test -race ./...` and `go vet ./...`
+passed. Desktop `pnpm test` passed 205 Node and 196 UI tests;
+`pnpm typecheck` passed; `pnpm test:e2e` built the app and passed 29 headless
+Electron tests. Native tests establish that inspection does not write and feedback
+waits for native confirmation; positive confirmed dispatch and cancellation are
+covered at the IPC boundary. Tests use synthetic records and fake orchestrator
+replies, not the live stack or owner database. Native tooling and Go caches
+required unsandboxed test execution.

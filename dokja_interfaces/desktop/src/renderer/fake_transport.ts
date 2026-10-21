@@ -230,6 +230,7 @@ const ok = (result: unknown): TransportResult => ({ ok: true, result });
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createFakeTransport(delayMs = 400): Transport {
+  const experiences = structuredClone(EXPERIENCES);
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   let documents = knowledgeDocuments();
   const classifications = new Map<string, KnowledgeClassification>();
@@ -281,19 +282,29 @@ export function createFakeTransport(delayMs = 400): Transport {
         case "ningo.status":
           return ok(status);
         case "memory.status":
-          return ok(MEMORY_STATUS);
+          return ok({ ...MEMORY_STATUS, pending: experiences.filter((entry) => !entry.outcome).length, resolved: experiences.filter((entry) => !!entry.outcome).length });
         case "memory.stats":
           return ok(MEMORY_SCORE);
         case "memory.list": {
           const state = payload?.state ?? "all";
-          const rows = EXPERIENCES.filter((entry) => state === "all" || (state === "pending" ? !entry.outcome : !!entry.outcome));
+          const rows = experiences.filter((entry) => state === "all" || (state === "pending" ? !entry.outcome : !!entry.outcome));
           const offset = Number(payload?.offset) || 0;
           const limit = Number(payload?.limit) || 20;
           return ok({ experiences: rows.slice(offset, offset + limit).map(({ context, ...entry }) => entry), total: rows.length, offset, limit });
         }
         case "memory.get": {
-          const entry = EXPERIENCES.find((entry) => entry.ref === payload?.ref);
+          const entry = experiences.find((entry) => entry.ref === payload?.ref);
           return ok(entry ? { found: true, experience: structuredClone(entry) } : { found: false });
+        }
+        case "memory.resolve": {
+          const entry = experiences.find((entry) => entry.ref === payload?.ref);
+          if (!entry) return ok({ found: false, resolved: false, outcome: "" });
+          if (entry.outcome) return ok({ found: true, resolved: false, outcome: entry.outcome });
+          entry.outcome = typeof payload?.observed === "string"
+            ? (entry.detail.toLowerCase() === payload.observed.trim().toLowerCase() ? "accepted" : "replaced") : String(payload?.outcome);
+          entry.resolvedAt = new Date().toISOString();
+          entry.feedback = { code: "recorded", message: "" };
+          return ok({ found: true, resolved: true, outcome: entry.outcome });
         }
         case "knowledge.status":
           return ok({

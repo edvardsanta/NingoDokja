@@ -2,6 +2,7 @@ package memory
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -409,5 +410,47 @@ func TestOpenStoreUpgradesADatabaseCreatedBeforeTheMatchedColumns(t *testing.T) 
 	}
 	if snippets, _ := store.MatchedSnippets([]string{"before", "after"}, SnippetRunes); snippets["after"] != "the earlier example" || len(snippets) != 1 {
 		t.Fatalf("a snippet is one tidy line, only for what has one: %v", snippets)
+	}
+}
+
+func TestConcurrentFeedbackReportsOnlyTheStoredVerdict(t *testing.T) {
+	store, _ := newTestStore(t, 0)
+	for round := 0; round < 20; round++ {
+		ref := fmt.Sprintf("concurrent:%d", round)
+		if _, err := store.Insert(NewExperience{Ref: ref, Action: "tag.suggest", Context: "example"}, nil, "m"); err != nil {
+			t.Fatal(err)
+		}
+		type answer struct {
+			found, resolved bool
+			outcome         string
+			err             error
+		}
+		answers := make(chan answer, 12)
+		start := make(chan struct{})
+		for i := 0; i < 12; i++ {
+			outcome := []string{"accepted", "replaced", "ignored"}[i%3]
+			go func() { <-start; f, r, o, err := store.Resolve(ref, outcome); answers <- answer{f, r, o, err} }()
+		}
+		close(start)
+		var results []answer
+		for i := 0; i < 12; i++ {
+			results = append(results, <-answers)
+		}
+		stored, _, err := store.Get(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		winners := 0
+		for _, result := range results {
+			if result.err != nil || !result.found || result.outcome != stored.Outcome {
+				t.Fatalf("stored=%q result=%+v", stored.Outcome, result)
+			}
+			if result.resolved {
+				winners++
+			}
+		}
+		if winners != 1 {
+			t.Fatalf("expected one winner, got %d", winners)
+		}
 	}
 }

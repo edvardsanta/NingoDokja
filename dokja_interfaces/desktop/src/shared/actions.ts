@@ -7,7 +7,7 @@
 // scheduler.jobs.set) are changes too, but the operator can switch them back at once, so they ask
 // for no window. Linking WhatsApp is the same: reading the code (communications.link.status) is
 // only a read, asking for a new one is a change, and starting over also unlinks the device and
-// erases the saved session, so it is asked in a window. What else changes something (forget, record, discord.send, the scheduler's own
+// erases the saved session, so it is asked in a window. Experience feedback (memory.resolve) also requires a gesture and confirmation because the first verdict is retained. What else changes something (forget, record, discord.send, the scheduler's own
 // heartbeat) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
   "communications.channels",
@@ -23,6 +23,7 @@ export const ACTION_TYPES = [
   "memory.stats",
   "memory.list",
   "memory.get",
+  "memory.resolve",
   "knowledge.status",
   "knowledge.search",
   "meme.status",
@@ -39,6 +40,7 @@ export const ACTION_TYPES = [
 export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
+  "memory.resolve",
   "communications.send",
   "communications.link.start",
   "communications.link.reset",
@@ -51,6 +53,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
 
 // The ones that cannot be undone: the shell asks the person first, in a window of its own.
 export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
+  "memory.resolve",
   "communications.send",
   "communications.link.reset",
   "knowledge.delete",

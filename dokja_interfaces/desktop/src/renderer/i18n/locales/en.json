@@ -264,5 +264,15 @@
   "experience_feedback_expired": "This experience expired without an observed verdict. Expiry does not mean rejection.",
   "experience_feedback_recorded": "The outcome is already recorded. The first verdict is retained.",
   "experience_feedback_unknown": "Feedback requirements were not returned. Identify this action and its reference before recording an observed outcome.",
-  "experience_readonly": "Inspection only: opening this experience does not record feedback or resolve it."
+  "experience_feedback_scope": "Feedback records the outcome of this experience. It does not add or change a hashtag training example.",
+  "experience_feedback_record": "Record feedback",
+  "experience_feedback_confirm_scope": "Confirm that you recognize this experience and know what happened. The first recorded outcome is retained.",
+  "experience_feedback_accept": "Accept result",
+  "experience_feedback_ignore": "Not used",
+  "experience_feedback_observed": "Actual result",
+  "experience_feedback_correct": "Save actual result",
+  "experience_feedback_saved": "Feedback saved: {outcome}.",
+  "experience_feedback_conflict": "An outcome was already recorded: {outcome}. Your submission did not replace it.",
+  "experience_feedback_refresh": "Refresh memory",
+  "experience_feedback_check": "If the request timed out, the outcome is unknown. Refresh memory before trying again."
 }

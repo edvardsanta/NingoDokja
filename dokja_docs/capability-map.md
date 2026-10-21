@@ -263,3 +263,16 @@ a revision from one read transaction. The patch uses that pre-inference revision
 User answers and questions remain authoritative; chunks and embeddings are kept.
 See [reclassification domain](../dokja_domain/dokja_knowledge/reclassification.go)
 and [task](../dokja_orch/internal/handlers/knowledge_reclassification.go).
+
+
+### Explicit experience feedback entry points
+
+Desktop is the primary feedback interface: inspect a record, accept its result,
+enter the actual result or explicitly mark it unused, then confirm. The TUI
+experience list provides `a`/`c`/`i` with confirmation. Coding agents can mediate
+an explicit user statement through the existing request adapter. Each uses
+`memory.resolve` through the orchestrator; the Memory domain owns observed/detail
+comparison and the service retains the first verdict. Concurrent receipts report
+the stored outcome. Feedback does not alter Knowledge hashtag examples. See
+[experience feedback](experience-feedback.md) for semantics, receipts and the
+existing media-reference/attempt limitation.

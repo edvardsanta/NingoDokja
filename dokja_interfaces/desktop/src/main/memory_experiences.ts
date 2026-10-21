@@ -1,6 +1,6 @@
 import type { ActionDefinition } from "./actions.js";
 import { isRecord, text } from "../shared/records.js";
-import type { MemoryExperience, MemoryExperiences, MemoryExperienceDetail } from "../shared/replies.js";
+import type { MemoryExperience, MemoryExperiences, MemoryExperienceDetail, MemoryResolution } from "../shared/replies.js";
 
 const cut = (value: unknown, limit: number) => text(value).slice(0, limit);
 const integer = (value: unknown, max: number, fallback: number) =>
@@ -45,4 +45,22 @@ export function memoryDetail(body: Record<string, unknown>): MemoryExperienceDet
   if (body.found === false) return { found: false };
   if (body.found !== true || typeof body.ref !== "string" || !body.ref) throw new Error("invalid experience detail");
   return { found: true, experience: experience(body) };
+}
+
+// Explicit feedback only. Expiry is a storage policy, never a user rejection.
+export const memoryResolvePayload: ActionDefinition["payload"] = (raw) => {
+  const ref = typeof raw.ref === "string" ? raw.ref.trim() : "";
+  if (!ref || Buffer.byteLength(ref) > 512 || /[\x00-\x1f\x7f]/.test(ref)) return undefined;
+  const observed = typeof raw.observed === "string" ? raw.observed.trim() : "";
+  if (raw.outcome !== undefined && raw.observed !== undefined) return undefined;
+  if (raw.observed !== undefined) {
+    return observed && Array.from(observed).length <= 200 && !/[\p{Cc}]/u.test(observed) ? { ref, observed } : undefined;
+  }
+  return ["accepted", "replaced", "ignored"].includes(String(raw.outcome)) ? { ref, outcome: raw.outcome } : undefined;
+};
+export function memoryResolution(body: Record<string, unknown>): MemoryResolution {
+  if (typeof body.found !== "boolean" || typeof body.resolved !== "boolean" || (body.resolved && !body.found)) throw new Error("invalid experience feedback reply");
+  const outcome = cut(body.outcome, 32);
+  if (body.found && !["accepted", "replaced", "ignored", "expired"].includes(outcome)) throw new Error("invalid experience outcome");
+  return { found: body.found, resolved: body.resolved, outcome };
 }

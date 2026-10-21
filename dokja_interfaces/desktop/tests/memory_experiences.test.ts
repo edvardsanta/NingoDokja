@@ -26,7 +26,7 @@ test("experience reads are allowlisted, bounded and need no write gesture", asyn
   const detail=await handleRequest({type:"memory.get",payload:{ref:"fixture:1",include_context:false,outcome:"accepted"}},client,limits);
   assert.ok(detail.ok);
   assert.deepEqual(calls[1],{type:"memory.get",payload:{ref:"fixture:1",include_context:true}});
-  assert.equal(isAllowedAction("memory.resolve"),false);
+  assert.equal(isAllowedAction("memory.resolve"),true);
   assert.equal(ACTIONS["memory.list"].payload({state:"expired"}),undefined);
   for(const ref of ["","\u0000","x".repeat(513)]) assert.equal(ACTIONS["memory.get"].payload({ref}),undefined);
 });
@@ -40,4 +40,25 @@ test("experience detail preserves null probabilities and bounds context without 
   assert.equal(result.experience.contextTruncated,true);
   assert.deepEqual(project({found:false}),{found:false});
   assert.deepEqual(ACTIONS["memory.list"].project(wrap({skipped:true,reason:"paused"})),{off:true,reason:"paused"});
+});
+
+test("feedback requires real input and shell confirmation, and forwards only explicit fields", async () => {
+ const calls:unknown[]=[];
+ const client={async request(type:string,payload:Record<string,unknown>){calls.push({type,payload});return {status:"ok",result:wrap({found:true,resolved:true,outcome:"accepted",private:"drop"})};}};
+ const request={type:"memory.resolve",payload:{ref:"fixture:1",outcome:"accepted",context:"drop",force:true}};
+ assert.equal((await handleRequest(request,client,limits)).ok,false);
+ assert.equal((await handleRequest(request,client,limits,undefined,{recent:()=>true})).ok,false);
+ assert.equal((await handleRequest(request,client,limits,undefined,{recent:()=>true},async()=>false)).ok,false);
+ assert.deepEqual(calls,[]);
+ const result=await handleRequest(request,client,limits,undefined,{recent:()=>true},async(type,wire)=>{
+  assert.equal(type,"memory.resolve");assert.deepEqual(wire,{ref:"fixture:1",outcome:"accepted"});return true;
+ });
+ assert.deepEqual(calls,[{type:"memory.resolve",payload:{ref:"fixture:1",outcome:"accepted"}}]);
+ assert.deepEqual(result,{ok:true,result:{found:true,resolved:true,outcome:"accepted"}});
+ const build=ACTIONS["memory.resolve"].payload;
+ for(const payload of [{ref:""},{ref:"fixture:1",outcome:"expired"},{ref:"fixture:1",observed:""},{ref:"fixture:1",outcome:"accepted",observed:"#Reading"},{ref:"fixture:1",observed:"x".repeat(201)},{ref:"fixture:1",observed:"line\nbreak"}]) assert.equal(build(payload),undefined);
+ assert.deepEqual(build({ref:"fixture:1",observed:" #Other ",extra:true}),{ref:"fixture:1",observed:"#Other"});
+ assert.deepEqual(ACTIONS["memory.resolve"].project(wrap({found:true,resolved:false,outcome:"ignored"})),{found:true,resolved:false,outcome:"ignored"});
+ assert.deepEqual(ACTIONS["memory.resolve"].project(wrap({found:false,resolved:false})),{found:false,resolved:false,outcome:""});
+ assert.throws(()=>ACTIONS["memory.resolve"].project(wrap({found:true,resolved:true,outcome:""})));
 });
