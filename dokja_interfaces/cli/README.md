@@ -91,7 +91,11 @@ Administrative commands:
 
 Switches and jobs:
 
-- `services list|enable|disable <meme|chat_ai|book|memory|scheduler>`: a logical switch in the orchestrator. While a
+- `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
+  containers through the local runtime controller the desktop and TUI also use (launched when none is
+  running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a
+  job, so starting a module posts nothing by itself. Run it on the host; inside a container it is refused.
+- `services list|enable|disable <meme|chat_ai|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`: a logical switch in the orchestrator. While a
   service is off its events are refused (scheduled jobs included). The container is not touched.
 - `jobs list`: state, interval, last and next run of every scheduler job.
 - `jobs enable|disable <job>`: pauses or resumes the job's scheduled runs; persisted across restarts.

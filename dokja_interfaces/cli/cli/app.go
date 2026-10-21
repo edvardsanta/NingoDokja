@@ -19,6 +19,7 @@ type App struct {
 	newPublisher func(endpoint string) (*Publisher, error)
 	newRequester func(endpoint string) (*Requester, error)
 	emitOpts     emitCommandOptions
+	runtimeRoot  string
 }
 
 type emitCommandOptions struct {
@@ -92,6 +93,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(a.newDiscordCommand(ctx))
 	root.AddCommand(a.newServicesCommand(ctx))
 	root.AddCommand(a.newJobsCommand(ctx))
+	root.AddCommand(a.newModulesCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
 	root.AddCommand(a.newKnowledgeCommand(ctx))
 	root.AddCommand(a.newMemoryCommand(ctx))
