@@ -215,6 +215,14 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 				if err == nil {
 					return nil
 				}
+			} else if m.Name == "communications" {
+				// Its port is not published, so readiness is read inside the container.
+				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err := c.Run(probeContext, "exec", "-T", m.Service, "python", "-c", communicationsHealth)
+				cancel()
+				if err == nil {
+					return nil
+				}
 			} else if probe(ctx, m) == nil {
 				return nil
 			}
@@ -311,6 +319,8 @@ func engineEnvironment(env []string) []string {
 	}
 	return env
 }
+
+const communicationsHealth = `import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/health', timeout=2)`
 
 const whatsappHealth = `const r=await fetch('http://localhost:8094/status',{redirect:'error',signal:AbortSignal.timeout(2000)}); if(!r.ok)process.exit(1);const b=await r.json();if(typeof b.state!=='string')process.exit(1);`
 
