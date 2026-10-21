@@ -9,6 +9,8 @@ import {
   type PreviewResult,
   type TransportResult,
 } from "../shared/transport.js";
+import { RuntimeClient, runtimeRoot } from "./runtime_client.js";
+import { DEFAULT_ENDPOINT } from "./config.js";
 import { parseConfig } from "./config.js";
 import { isTrustedSender } from "./guards.js";
 import { fetchMedia } from "./media_fetch.js";
@@ -35,6 +37,11 @@ async function main(): Promise<void> {
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint, communicationsToken: process.env.DOKJA_COMMUNICATIONS_TOKEN });
+  const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
+  const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
+  const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
+  const client = { request:(type:string,payload:Record<string,unknown>,timeout:number) =>
+    type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout) };
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };
   const untrusted = { ok: false, error: { code: "denied", message: "this page is not the app" } } as const;
   const media = new MediaGate();
@@ -58,14 +65,14 @@ async function main(): Promise<void> {
   const preview = createPreviewer({ gate: media, fetchMedia: (url) => fetchMedia(url) });
 
   ipcMain.handle(CHANNELS.bootstrap, (event): Bootstrap | null =>
-    isTrustedSender(event.senderFrame?.url, page) ? { locale: config.locale } : null,
+    isTrustedSender(event.senderFrame?.url, page) ? { locale: config.locale, runtimeControls: runtimeEnabled } : null,
   );
 
   ipcMain.handle(CHANNELS.request, async (event, raw: unknown): Promise<TransportResult> => {
     if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
 
     const started = Date.now();
-    const result = await handleRequest(raw, orchestrator, limits, media, presence, confirm);
+    const result = await handleRequest(raw, client, limits, media, presence, confirm);
     // Only the action name and the outcome are logged, never a payload or a reply.
     const type = isRecord(raw) && isAllowedAction(raw.type) ? raw.type : "(refused)";
     console.log(

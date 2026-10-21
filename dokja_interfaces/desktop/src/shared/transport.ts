@@ -36,7 +36,7 @@ export type Transport = {
   preview(url: string): Promise<PreviewResult>;
 };
 
-export type Bootstrap = { locale: Locale };
+export type Bootstrap = { locale: Locale; runtimeControls?: boolean };
 
 export const CHANNELS = {
   bootstrap: "dokja:bootstrap",
