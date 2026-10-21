@@ -110,3 +110,18 @@ describe("a document opened from the research base", () => {
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 });
+
+it("loads classification for the opened document only when requested", async () => {
+  const { transport, calls } = routedTransport({
+    "knowledge.status": ok(KNOWLEDGE_STATUS),
+    "knowledge.list": [ok(PAGE), ok(withText("note:one", "the text"))],
+    "knowledge.classify": ok({ sourceId: "note:one", revision: "a".repeat(64), form: { value: "note", origin: "user" }, contentKind: { value: "reference", origin: "user" }, needsUserInput: false, questions: [] }),
+  });
+  renderCard(transport);
+  await openSecond();
+  await screen.findByText("the text");
+  expect(calls.some((call) => call.type === "knowledge.classify")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Classification" }));
+  await screen.findByText("Classification is complete.");
+  expect(calls.filter((call) => call.type === "knowledge.classify").map((call) => call.payload)).toEqual([{ source_id: "note:one" }]);
+});

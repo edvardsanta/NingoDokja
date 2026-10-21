@@ -625,7 +625,8 @@
             "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier.",
             "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54).",
             "Owner chose an agent classifier (2026-10-20): Claude Code, then Codex, then Ollama; every form may be sent; Feeds runs on the owner's machine. plugins.example/agent-kinds implements the chain with CLI isolation verified by canary files; the host names the answering provider in the version. See dokja_docs/step-09-consolidation.md#agent-classifier.",
-            "Explicit reclassification: knowledge.reclassify and CLI knowledge reclassify sample stored chunks under a snapshot revision, invoke the existing reading-host classifier, and patch automatic axes only. User answers, source defaults, pending clarification and defining metadata are preserved; no extraction, ingest or embedding. See dokja_docs/step-09-consolidation.md#explicit-reclassification."
+            "Explicit reclassification: knowledge.reclassify and CLI knowledge reclassify sample stored chunks under a snapshot revision, invoke the existing reading-host classifier, and patch automatic axes only. User answers, source defaults, pending clarification and defining metadata are preserved; no extraction, ingest or embedding. See dokja_docs/step-09-consolidation.md#explicit-reclassification.",
+            "Desktop continuation: document tabs expose current classification/provenance and domain-owned questions through the existing knowledge.classify action. Blank defaults, partial answers, revision-checked submissions, conflict reload and real-input write gating are regression-tested. No document text is added to classification replies."
           ],
           "checks": [
             {
@@ -672,15 +673,20 @@
               "name": "explicit_reclassification",
               "status": "passed",
               "detail": "Knowledge domain go test -race ./... and go vet ./...; orchestrator go test -race ./...; CLI go test ./...; Knowledge service 159 passed, 8 skipped (live Ollama). Route tests cover success, protected user questions, uncertainty, malformed output, provider failure and revision conflict. No live inference or owner database used. Staged credential and project-policy scans passed with repository-pinned gitleaks v8.28.0."
+            },
+            {
+              "name": "desktop_classification",
+              "status": "passed",
+              "detail": "pnpm typecheck and pnpm build passed; pnpm test: 200 Node tests and 186 UI tests passed; pnpm test:e2e: 25 passed using headless Electron. Includes real-shell refusal of scripted classification answers. No live stack or owner database exercised."
             }
           ],
           "started_on": "2026-10-19",
-          "worktree": ".worktrees/knowledge-reclassification",
-          "branch": "feat/knowledge-reclassification",
+          "worktree": ".worktrees/desktop-classification",
+          "branch": "feat/desktop-classification",
           "remaining": [
             "Run Feeds on the owner's machine for the stack (loopback/bridge bind, overridable FEEDS_SERVICE_ENDPOINT) and do the live check on the owner's documents.",
             "Pick an Ollama chat model for the last fallback.",
-            "Wire classification questions/answers into desktop and chat interfaces; CLI and API continuation are implemented.",
+            "Wire classification questions/answers into chat interfaces; desktop, CLI and API continuation are implemented.",
             "Define the bounded desktop document-detail contract and content representation; retain the existing conversation model and expose useful open/classification actions only when implemented."
           ]
         },

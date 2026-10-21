@@ -3,6 +3,7 @@ import type {
   DigestItem,
   IngestResult,
   KnowledgeDocument,
+  KnowledgeClassification,
   KnowledgeDocuments,
   ReindexResult,
   DigestPage,
@@ -222,6 +223,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createFakeTransport(delayMs = 400): Transport {
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   let documents = knowledgeDocuments();
+  const classifications = new Map<string, KnowledgeClassification>();
   // Switches stay where they were put, as the orchestrator keeps them.
   let status = structuredClone(STATUS);
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
@@ -320,6 +322,36 @@ export function createFakeTransport(delayMs = 400): Transport {
             offset,
           };
           return ok(page);
+        }
+        case "knowledge.classify": {
+          const id = String(payload?.source_id ?? "");
+          if (!documents.some((document) => document.id === id)) return { ok: false, error: { code: "orchestrator", message: "knowledge document not found" } };
+          let state = classifications.get(id) ?? {
+            sourceId: id, revision: "0".repeat(64),
+            form: { value: null, origin: "user_required", classifierId: "", classifierVersion: "", reason: "classification_missing" },
+            contentKind: { value: null, origin: "user_required", classifierId: "", classifierVersion: "", reason: "classification_missing" },
+            needsUserInput: true,
+            questions: [
+              { field: "form", question: "What is the form of this document?", allowedValues: ["book", "article", "note", "conversation", "meme"] },
+              { field: "content_kind", question: "What type of content does this document contain?", allowedValues: ["news", "reference", "research", "narrative"] },
+            ],
+          } satisfies KnowledgeClassification;
+          if (payload?.answers && typeof payload.answers === "object") {
+            if (payload.revision !== state.revision) return { ok: false, error: { code: "orchestrator", message: "classification_conflict: reload the questions" } };
+            state = structuredClone(state);
+            const answers = payload.answers as Record<string, string>;
+            for (const question of state.questions) {
+              const value = answers[question.field];
+              if (!value || !question.allowedValues.includes(value)) continue;
+              const axis = question.field === "form" ? "form" : "contentKind";
+              state[axis] = { value, origin: "user", classifierId: "", classifierVersion: "", reason: "" };
+            }
+            state.questions = state.questions.filter((question) => !(question.field === "form" ? state.form.value : state.contentKind.value));
+            state.needsUserInput = state.questions.length > 0;
+            state.revision = (BigInt(`0x${state.revision}`) + 1n).toString(16).padStart(64, "0");
+          }
+          classifications.set(id, state);
+          return ok(structuredClone(state));
         }
         case "knowledge.delete": {
           const before = documents.length;

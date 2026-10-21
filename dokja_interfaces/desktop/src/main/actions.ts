@@ -12,6 +12,8 @@ import type {
   JobState,
   JobSwitched,
   KnowledgeDocuments,
+  KnowledgeClassification,
+  ClassificationChoice,
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
@@ -29,6 +31,8 @@ export type ActionDefinition = {
   // The most the payload may weigh, in characters, before the builder sees it. Small unless the action
   // takes a file.
   maxPayloadChars?: number;
+  // Some actions read or write depending on their validated payload.
+  writes?(payload: Record<string, unknown>): boolean;
   // Builds the payload from what the screen asked for. The screen cannot add fields of its own:
   // anything it sends beyond these is dropped. Returns undefined when the request is not valid.
   payload(raw: Record<string, unknown>): Record<string, unknown> | undefined;
@@ -329,6 +333,51 @@ function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
   };
 }
 
+// Keep the taxonomy in the domain. The shell bounds labels without choosing them.
+function classificationPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const source = text(raw.source_id);
+  if (!INGEST_ID.test(source)) return undefined;
+  if (!("answers" in raw)) return "revision" in raw ? undefined : { source_id: source };
+  if (!isRecord(raw.answers) || !/^[a-f0-9]{64}$/.test(text(raw.revision))) return undefined;
+  const answers: Record<string, string> = {};
+  for (const [field, value] of Object.entries(raw.answers)) {
+    if (!["form", "content_kind"].includes(field) || typeof value !== "string" || !/^[a-z_]{1,40}$/.test(value)) return undefined;
+    answers[field] = value;
+  }
+  return Object.keys(answers).length ? { source_id: source, answers, revision: raw.revision } : undefined;
+}
+
+function classificationResult(body: Record<string, unknown>): KnowledgeClassification {
+  if (!INGEST_ID.test(text(body.source_id)) || !/^[a-f0-9]{64}$/.test(text(body.revision)) || !isRecord(body.classification)) {
+    throw new Error("invalid classification snapshot");
+  }
+  const metadata = isRecord(body.metadata) ? body.metadata : {};
+  const choice = (axis: string, field: string): ClassificationChoice => {
+    const info = isRecord(metadata[field]) ? metadata[field] : {};
+    return {
+      value: typeof metadata[axis] === "string" ? shorten(metadata[axis], 40) : null,
+      origin: shorten(text(info.origin), 40),
+      classifierId: shorten(text(info.classifier_id), 100),
+      classifierVersion: shorten(text(info.classifier_version), 100),
+      reason: shorten(text(info.fallback_reason), 100),
+    };
+  };
+  const questions: KnowledgeClassification["questions"] = [];
+  if (!Array.isArray(body.classification.questions)) throw new Error("missing classification questions");
+  for (const item of body.classification.questions) {
+    if (!isRecord(item) || (item.field !== "form" && item.field !== "content_kind") || questions.some((q) => q.field === item.field)) throw new Error("invalid classification question");
+    const values = words(item.allowed_values);
+    if (!values.length || values.length > 32 || values.some((v) => !/^[a-z_]{1,40}$/.test(v))) throw new Error("invalid classification labels");
+    questions.push({ field: item.field, question: shorten(text(item.question), 300), allowedValues: values });
+  }
+  if (body.classification.needs_user_input !== (questions.length > 0)) throw new Error("inconsistent classification state");
+  return {
+    sourceId: text(body.source_id), revision: text(body.revision),
+    form: choice("form", "form_choice"), contentKind: choice("content_kind", "kind_choice"),
+    needsUserInput: questions.length > 0, questions,
+  };
+}
+
 function reindexResult(body: Record<string, unknown>): ReindexResult {
   return {
     embedded: count(body.embedded),
@@ -493,6 +542,11 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       };
     },
     project: (result) => inDomain(result, "knowledge", knowledgeDocuments),
+  },
+  "knowledge.classify": {
+    payload: classificationPayload,
+    writes: (wire) => "answers" in wire,
+    project: (result) => inDomain(result, "knowledge", classificationResult),
   },
   "knowledge.delete": {
     // The id of one document, in the shape the service allows. It is what the question names.

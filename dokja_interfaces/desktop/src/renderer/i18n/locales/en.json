@@ -213,5 +213,20 @@
   "communications_who_contact": "Contact",
   "communications_who_member": "Member",
   "communications_whatsapp_identity": "Messages to a WhatsApp conversation go out from your own account, as you, as text only. A few a minute at most.",
-  "communications_send_whatsapp": "Send as you"
+  "communications_send_whatsapp": "Send as you",
+  "classification_title": "Classification",
+  "classification_form": "Form",
+  "classification_kind": "Content kind",
+  "classification_unresolved": "Awaiting your answer",
+  "classification_saved": "Classification updated.",
+  "classification_complete": "Classification is complete.",
+  "classification_explain": "Choose the answers you know. Unanswered questions stay pending.",
+  "classification_choose": "Choose an answer",
+  "classification_save": "Save answers",
+  "classification_saving": "Saving…",
+  "classification_reload": "Reload classification",
+  "classification_reload_explain": "Reload the current questions before submitting again. Your previous selections will be cleared.",
+  "classification_origin_user": "Your answer",
+  "classification_origin_classifier": "Classifier",
+  "classification_origin_source": "Source default"
 }

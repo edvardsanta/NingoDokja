@@ -29,6 +29,7 @@ export const ACTION_TYPES = [
   "digest.items",
   "knowledge.ingest",
   "knowledge.list",
+  "knowledge.classify",
   "knowledge.delete",
   "knowledge.reindex",
 ] as const;

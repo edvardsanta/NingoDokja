@@ -982,3 +982,27 @@ button[aria-pressed="true"] {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
+
+
+.classification-panel {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 2px solid var(--edge);
+  background: var(--static);
+}
+.classification-panel h4 { margin-top: 0; }
+.classification-panel dl > div,
+.classification-panel fieldset > div { display: grid; gap: 0.3rem; margin-bottom: 0.75rem; }
+.classification-panel dt,
+.classification-panel label { font-weight: 700; }
+.classification-panel dd { margin: 0; overflow-wrap: anywhere; }
+.classification-panel fieldset { border: 0; padding: 0; margin: 0 0 0.75rem; }
+.classification-panel select {
+  max-width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+.classification-panel select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }

@@ -57,6 +57,13 @@ function replyFor(type: string): Record<string, unknown> {
         source_id: "note:a-thought-0123456789",
         created: true, changed: true, chunks: 2, embedded: 0, degraded: true, reason: "no embedding server is configured",
       });
+    case "knowledge.classify":
+      return wrap("knowledge", {
+        source_id: "note:a-1", revision: "a".repeat(64),
+        metadata: { form: "note", form_choice: { origin: "user" }, content_kind: null },
+        classification: { needs_user_input: true, questions: [{ field: "content_kind", question: "What content?", allowed_values: ["reference", "research"] }] },
+        text: "private reconstruction",
+      });
     case "knowledge.list":
       return wrap("knowledge", {
         documents: [

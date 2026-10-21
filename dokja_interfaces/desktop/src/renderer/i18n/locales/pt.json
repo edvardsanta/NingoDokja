@@ -213,5 +213,20 @@
   "communications_who_contact": "Contato",
   "communications_who_member": "Membro",
   "communications_whatsapp_identity": "As mensagens para uma conversa do WhatsApp saem da sua própria conta, como você, só em texto. No máximo algumas por minuto.",
-  "communications_send_whatsapp": "Enviar como você"
+  "communications_send_whatsapp": "Enviar como você",
+  "classification_title": "Classificação",
+  "classification_form": "Forma",
+  "classification_kind": "Tipo de conteúdo",
+  "classification_unresolved": "Aguardando sua resposta",
+  "classification_saved": "Classificação atualizada.",
+  "classification_complete": "A classificação está completa.",
+  "classification_explain": "Escolha as respostas que você sabe. Perguntas sem resposta continuam pendentes.",
+  "classification_choose": "Escolha uma resposta",
+  "classification_save": "Salvar respostas",
+  "classification_saving": "Salvando…",
+  "classification_reload": "Recarregar classificação",
+  "classification_reload_explain": "Recarregue as perguntas atuais antes de enviar novamente. As seleções anteriores serão apagadas.",
+  "classification_origin_user": "Sua resposta",
+  "classification_origin_classifier": "Classificador",
+  "classification_origin_source": "Padrão da fonte"
 }

@@ -54,6 +54,18 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.ok(orchestrator.seen.every((event) => event.source === "desktop"));
   });
 
+  it("reads classification without input but refuses scripted answers", async () => {
+    const query = await ask("knowledge.classify", { source_id: "note:a-1" }) as { ok: boolean; result: Record<string, unknown> };
+    assert.equal(query.ok, true);
+    assert.equal(query.result.sourceId, "note:a-1");
+    assert.equal("text" in query.result, false);
+    const before = orchestrator.seen.length;
+    const answer = await ask("knowledge.classify", { source_id: "note:a-1", revision: "a".repeat(64), answers: { content_kind: "research" } }) as { ok: boolean; error: { code: string } };
+    assert.equal(answer.ok, false);
+    assert.equal(answer.error.code, "denied");
+    assert.equal(orchestrator.seen.length, before);
+  });
+
   it("gives the page no Node and no other door than three functions", async () => {
     assert.equal(
       await page.evaluate("[typeof require, typeof process, typeof module, typeof Buffer, typeof __dirname].join()"),
