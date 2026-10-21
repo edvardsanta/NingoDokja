@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { RuntimeCard } from "../../src/renderer/cards/runtime.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { failure, ok, routedTransport } from "./support.js";
+import { deferred, failure, ok, routedTransport, scriptedTransport } from "./support.js";
 const page=(state="stopped",busy=false,error="")=>ok({modules:[{name:"memory",state,error,dependencies:["orchestrator","embedding_init"]},{name:"book",state:"stopped",error:"",dependencies:["orchestrator"]}],busy,error:""});
 const show=(transport:Parameters<typeof RuntimeCard>[0]["transport"])=>render(<I18nProvider locale="en"><RuntimeCard transport={transport}/></I18nProvider>);
 describe("local runtime modules",()=>{
@@ -20,6 +20,16 @@ describe("local runtime modules",()=>{
   await screen.findByText("Ready",{}, {timeout:3000});
   expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"memory",enabled:true}]);
   expect(calls.some(c=>c.type==="services.set")).toBe(false);
+ });
+ it("keeps the module list on screen while polling a busy operation",async()=>{
+  const later=deferred<ReturnType<typeof page>>();
+  const {transport,calls}=scriptedTransport(page("starting",true),()=>later.promise);show(transport);
+  await screen.findByText("Starting");
+  await waitFor(()=>expect(calls).toHaveLength(2),{timeout:3000});
+  expect(screen.queryByText("Loading…")).toBeNull();
+  expect(screen.getByText("Starting")).toBeTruthy();
+  later.resolve(page("ready"));
+  await screen.findByText("Ready");
  });
  it("shows background readiness errors and permits an explicit retry",async()=>{
   const {transport,calls}=routedTransport({"runtime.modules":[page("failed",false,"Model initialization failed"),page("ready")],"runtime.set":page("starting",true)});show(transport);

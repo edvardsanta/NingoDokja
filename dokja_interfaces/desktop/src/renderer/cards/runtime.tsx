@@ -35,7 +35,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
     if (!isRecord(result.result) || !Array.isArray(result.result.modules)) return unexpected();
     return { ok: true, data: result.result as RuntimeSnapshot };
   }, [transport]);
-  const { state, reload } = useCard(load);
+  const { state, reload, poll } = useCard(load);
   const run = useCallback(async (choice: Change): Promise<LoadResult<RuntimeSnapshot>> => {
     const answer = await transport.request("runtime.set", choice, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
@@ -61,9 +61,9 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
   }, [action.state, refresh]);
   useEffect(() => {
     if (!snapshot?.busy) return;
-    const timer = setTimeout(reload, 1200);
+    const timer = setTimeout(poll, 1200);
     return () => clearTimeout(timer);
-  }, [snapshot, reload]);
+  }, [snapshot, poll]);
 
   return <CardFrame kindLabel={t("nav_system")} title={t("runtime_title")} state={state} onReload={refresh} supplement={renderActivity?.(state.phase !== "error")}>
     {(view) => <>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TransportError } from "../../shared/transport.js";
 
@@ -11,14 +11,17 @@ export type CardState<T> =
 
 // Loads a card's data when it appears and again on reload(). `load` must be stable (wrap it in
 // useCallback), or the card reloads on every render. An answer that arrives after the card went
-// away, or after a newer load started, is dropped.
+// away, or after a newer load started, is dropped. poll() reads again but keeps the data on screen
+// until the answer arrives, so a card that watches a slow operation does not blink "loading".
 export function useCard<T>(load: () => Promise<LoadResult<T>>) {
   const [state, setState] = useState<CardState<T>>({ phase: "loading" });
   const [round, setRound] = useState(0);
+  const quiet = useRef(false);
 
   useEffect(() => {
     let current = true;
-    setState({ phase: "loading" });
+    if (!quiet.current) setState({ phase: "loading" });
+    quiet.current = false;
     load().then(
       (result) => {
         if (!current) return;
@@ -39,5 +42,9 @@ export function useCard<T>(load: () => Promise<LoadResult<T>>) {
   }, [load, round]);
 
   const reload = useCallback(() => setRound((value) => value + 1), []);
-  return { state, reload };
+  const poll = useCallback(() => {
+    quiet.current = true;
+    setRound((value) => value + 1);
+  }, []);
+  return { state, reload, poll };
 }
