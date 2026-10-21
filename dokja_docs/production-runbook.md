@@ -622,10 +622,13 @@ stateless Compose adapter. Normal feature requests still use the main
 orchestrator. Existing `services.set` controls only routing and remains unchanged;
 container startup does not silently enable a capability the owner disabled.
 
-The first inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
-Communications and WhatsApp. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
+The inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
+Communications, WhatsApp, Discord and the scheduler. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
 Knowledge. Only an explicit WhatsApp selection starts its gateway. No module implicitly
-starts Discord or scheduled delivery.
+starts Discord or scheduled delivery: Discord (with Voice) and the scheduler start only when
+selected, and every interface first says what they will do with the switches and jobs already
+saved (which jobs post and when, whether the bot answers) and asks; nothing is changed on the
+way. `dokja-cli modules start` takes `--yes` to skip that question.
 Running external consumers are recognized when deciding whether dependencies may
 stop. Existing containers are reused rather than recreated; configuration/image
 deployment is separate from runtime Start/Stop.
