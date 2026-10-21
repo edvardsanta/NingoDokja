@@ -108,6 +108,10 @@ type Domain struct {
 	states  map[string]State
 	owned   map[string]bool
 	roots   map[string]bool
+	// stopped holds the services this controller stopped. A stopped process often leaves with a
+	// non-zero code (143 after SIGTERM, 137 when an ignored SIGTERM ends in SIGKILL); that exit is
+	// the stop the owner asked for, not a failure.
+	stopped map[string]bool
 	save    Save
 	busy    bool
 	timeout time.Duration
@@ -127,7 +131,7 @@ func New(backend Backend, journal Journal, save Save) *Domain {
 			roots[m.Name] = true
 		}
 	}
-	return &Domain{backend: backend, states: map[string]State{}, owned: owned, roots: roots, save: save, timeout: 10 * time.Minute}
+	return &Domain{backend: backend, states: map[string]State{}, owned: owned, roots: roots, stopped: map[string]bool{}, save: save, timeout: 10 * time.Minute}
 }
 func (d *Domain) snapshotLocked() Snapshot {
 	s := Snapshot{Modules: []State{}, Busy: d.busy}
@@ -159,7 +163,7 @@ func (d *Domain) List(ctx context.Context) Snapshot {
 			continue
 		}
 		state := "stopped"
-		if containers[m.Service].Failed {
+		if containers[m.Service].Failed && !d.stopped[m.Service] {
 			state = "failed"
 		} else if containers[m.Service].Running {
 			state = "running"
@@ -273,6 +277,9 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 				if err := d.remember(item.Service, true); err != nil {
 					return err
 				}
+				d.mu.Lock()
+				delete(d.stopped, item.Service)
+				d.mu.Unlock()
 				if err := d.backend.Start(ctx, item); err != nil {
 					return err
 				}
@@ -316,6 +323,9 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 		if err := d.backend.Stop(ctx, item); err != nil {
 			return err
 		}
+		d.mu.Lock()
+		d.stopped[item.Service] = true
+		d.mu.Unlock()
 		if item.Name == m.Name {
 			d.mu.Lock()
 			delete(d.roots, m.Name)
