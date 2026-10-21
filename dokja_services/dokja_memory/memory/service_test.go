@@ -421,3 +421,36 @@ func TestRecordKeepsWhatTheChoiceRestedOnAndShowsItsTextOnlyWhenAsked(t *testing
 		}
 	}
 }
+
+func TestGetContextIsExplicitBoundedAndDoesNotResolveExperience(t *testing.T) {
+	service, _, _ := newTestService(t, 0)
+	contextText := "First line\n" + strings.Repeat("📚", 300)
+	record(t, service, "detail-fixture", "hashtag.suggest", contextText, "")
+	basic := dispatch(t, service, "memory.get", map[string]any{"ref": "detail-fixture"})
+	if _, exists := basic["context"]; exists {
+		t.Fatal("default get disclosed context")
+	}
+	detail := dispatch(t, service, "memory.get", map[string]any{"ref": "detail-fixture", "include_context": true})
+	if detail["context"] != contextText || detail["context_truncated"] != false || detail["outcome"] != "" {
+		t.Fatalf("%#v", detail)
+	}
+	// Simulate an oversized legacy row without weakening input validation.
+	if _, err := service.store.db.Exec("UPDATE experiences SET context = ? WHERE ref = ?", strings.Repeat("📚", 4500), "detail-fixture"); err != nil {
+		t.Fatal(err)
+	}
+	detail = dispatch(t, service, "memory.get", map[string]any{"ref": "detail-fixture", "include_context": true})
+	if len([]rune(detail["context"].(string))) != 4000 || detail["context_truncated"] != true {
+		t.Fatal("detail context was not bounded")
+	}
+	page := dispatch(t, service, "memory.list", map[string]any{"include_context": true})
+	row := page["experiences"].([]any)[0].(map[string]any)
+	if _, exists := row["context"]; exists {
+		t.Fatal("listing disclosed full context")
+	}
+	if len([]rune(row["context_snippet"].(string))) > SnippetRunes {
+		t.Fatal("listing excerpt grew")
+	}
+	if missing := dispatch(t, service, "memory.get", map[string]any{"ref": "missing", "include_context": true}); missing["found"] != false {
+		t.Fatal(missing)
+	}
+}

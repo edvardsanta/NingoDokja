@@ -8,7 +8,7 @@
 //	memory.record    {ref, action, context, detail?, predicted_p?, baseline_p?, matched_score?, matched_context?}
 //	                                                                    -> {created, embedded, degraded}
 //	memory.resolve   {ref, outcome}                                     -> {found, resolved, outcome}
-//	memory.get       {ref}  -> {found, action, detail, outcome, predicted_p, baseline_p, matched_score,
+//	memory.get       {ref, include_context?}  -> {found, action, detail, outcome, predicted_p, baseline_p, matched_score,
 //	                     created_at, resolved_at}
 //	memory.recall    {context, action?, k?, include_context?}
 //	                 -> {neighbors[{ref, action, detail, outcome, similarity, context_snippet?}],
@@ -22,9 +22,9 @@
 //	memory.reindex   {limit?}                                           -> {embedded, remaining}
 //
 // detail is what exactly the bot did (the label it suggested, say), so a later observation can be
-// compared with it. A context is the user's own text: nothing here logs it, and it comes back in one
-// case only, as a short snippet when a caller sets include_context (a listing, or the evidence of a
-// prediction), so an operator can recognize an experience whose ref is a hash.
+// compared with it. A context is the user's own text: nothing here logs it. It is returned
+// as a short snippet when include_context is set for listing/recall, or as bounded
+// full context when explicitly requested for one experience with memory.get.
 //
 // matched_score and matched_context are what a choice rested on: how close the earlier example was
 // and the start of its text. The text follows the same rule as a context (matched_snippet, only
@@ -146,7 +146,11 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 	if err != nil {
 		return nil, err
 	}
-	return d.service.Dispatch(ctx, route.eventType, clean)
+	result, err := d.service.Dispatch(ctx, route.eventType, clean)
+	if err == nil && (request.Action == ActionGetExperience || request.Action == ActionListExperience) {
+		addFeedbackGuidance(result)
+	}
+	return result, err
 }
 
 // resolve gives an experience its outcome, either stated (outcome) or worked out from what
@@ -332,7 +336,11 @@ func buildGet(payload map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"ref": ref}, nil
+	result := map[string]any{"ref": ref}
+	if include, _ := payload["include_context"].(bool); include {
+		result["include_context"] = true
+	}
+	return result, nil
 }
 
 func buildRecall(payload map[string]any) (map[string]any, error) {

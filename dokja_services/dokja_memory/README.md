@@ -80,3 +80,18 @@ go test ./...
 The `server` package opens a real ZeroMQ socket, so it needs `libzmq` (`libzmq3-dev`). The
 embedding client is tested against a fake server that speaks Ollama's API; a live check
 against a real Ollama is not part of the suite.
+
+### Opt-in experience context
+
+`memory.get` accepts optional `include_context: true`. Its default response remains
+text-free. An explicit detail request adds `context` (at most 4,000 Unicode
+characters, preserving line breaks) and `context_truncated`. SQL reads a bounded
+prefix alongside the stored action, outcome and frozen prediction in one query.
+Listings/recall still return only 160-character excerpts when requested; no full
+context is added to them. No schema or embedding change is needed.
+
+The Memory domain adds `feedback: {code, message}` to list entries and found
+get responses. It explains existing resolution rules: explicit same-meme hashtag
+feedback, a generic observed outcome, an already recorded verdict, or expiry.
+These reads never resolve an experience. Absence of feedback remains unknown;
+expiry is not rejection and repeated attempts still require reliable attribution.

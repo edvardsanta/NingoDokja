@@ -1,5 +1,6 @@
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
+import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail } from "./memory_experiences.js";
 import { buildIngest } from "./ingest.js";
 import { linkImage } from "./link_image.js";
 import { INGEST_ID } from "../shared/ingest.js";
@@ -484,6 +485,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: () => ({ action: SCORED_ACTION }),
     project: (result) => inDomain(result, "memory", memoryScore),
   },
+  "memory.list": { payload: memoryListPayload, project: (result) => inDomain(result, "memory", memoryPage) },
+  "memory.get": { payload: memoryGetPayload, project: (result) => inDomain(result, "memory", memoryDetail) },
   "knowledge.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "knowledge", knowledgeStatus),

@@ -21,6 +21,8 @@ export const ACTION_TYPES = [
   "ningo.status",
   "memory.status",
   "memory.stats",
+  "memory.list",
+  "memory.get",
   "knowledge.status",
   "knowledge.search",
   "meme.status",

@@ -247,3 +247,22 @@ export type KnowledgeClassification = {
   needsUserInput: boolean;
   questions: { field: ClassificationAxis; question: string; allowedValues: string[] }[];
 };
+
+export type MemoryExperience = {
+  ref: string;
+  action: string;
+  detail: string;
+  outcome: string;
+  predictedP: number | null;
+  baselineP: number | null;
+  matchedScore: number | null;
+  createdAt: string;
+  resolvedAt: string;
+  contextSnippet: string;
+  matchedSnippet: string;
+  context?: string;
+  contextTruncated: boolean;
+  feedback: { code: string; message: string };
+};
+export type MemoryExperiences = { off?: false; experiences: MemoryExperience[]; total: number; offset: number; limit: number };
+export type MemoryExperienceDetail = { off?: false; found: false } | { off?: false; found: true; experience: MemoryExperience };

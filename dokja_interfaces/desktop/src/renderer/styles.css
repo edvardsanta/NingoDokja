@@ -1006,3 +1006,13 @@ button[aria-pressed="true"] {
   font: inherit;
 }
 .classification-panel select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.experience-detail {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 2px solid var(--edge);
+  background: var(--static);
+  overflow-wrap: anywhere;
+}
+.experience-detail dt { font-weight: 700; margin-top: 0.75rem; }
+.experience-detail dd { margin-left: 0; }

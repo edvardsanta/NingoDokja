@@ -244,3 +244,24 @@ variable or compose setting changes. It requires an orchestrator with the
 existing `knowledge.classify` action. Rolling back the desktop leaves stored
 metadata intact. The offset-based document text view and broader per-document
 detail contract remain separate follow-up work.
+
+### Browsing experience memory
+
+In **memory**, select **Load experiences** to browse saved records, newest first,
+in pages of 20. Filter by all, pending or resolved (the service includes expired
+records among resolved). **Inspect** opens one record's action/detail, frozen
+acceptance prediction and baseline, separate example-similarity score, observed
+outcome and timestamp, context, and domain-owned feedback guidance.
+
+Missing predictions remain “Not recorded”; a recorded zero remains 0%. Context
+and excerpts render as plain text. Listings carry short excerpts only; opening
+one record explicitly requests bounded full context. Older services that do not
+return full context show the list excerpt with a clear label. No feedback writes,
+manual verdict buttons or automatic resolution are introduced.
+
+The main process allowlists only `memory.list`/`memory.get`, bounds their payloads
+and projections, and drops unrelated service fields. The domain interprets
+feedback; the desktop translates its codes. The browser demo contains seven
+synthetic pending experiences. Roll out the Memory service and orchestrator before
+rebuilding/restarting desktop for full context and guidance. Rolling back leaves
+stored experiences untouched; no routes, schema, configuration or compose changes.

@@ -118,22 +118,31 @@ func (s *Service) get(payload map[string]any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	stored, ok, err := s.store.Get(ref)
+	include, _ := payload["include_context"].(bool)
+	get := s.store.Get
+	if include {
+		get = s.store.GetWithContext
+	}
+	stored, ok, err := get(ref)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return map[string]any{"found": false}, nil
 	}
-	return map[string]any{
+	result := map[string]any{
 		"found": true, "ref": stored.Ref, "action": stored.Action, "detail": stored.Detail, "outcome": stored.Outcome,
 		"predicted_p": nullable(stored.Predicted), "baseline_p": nullable(stored.Baseline),
 		"matched_score": nullable(stored.MatchedScore),
 		"created_at":    stored.CreatedAt, "resolved_at": stored.ResolvedAt,
-	}, nil
+	}
+	if include {
+		result["context"], result["context_truncated"] = stored.Context, stored.ContextTruncated
+	}
+	return result, nil
 }
 
-// list pages through the experiences, newest first. It is the one place besides recall that hands back
+// list pages through the experiences, newest first. Like recall, it hands back
 // any of a context, and only the start of it and only when include_context asks: a listing is how an
 // operator recognizes an experience, whose ref is a hash.
 func (s *Service) list(payload map[string]any) (map[string]any, error) {
