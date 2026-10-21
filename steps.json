@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-19",
+  "updated_on": "2026-10-21",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "09",
   "status_values": [
@@ -184,7 +184,7 @@
         {
           "record": "dokja_docs/decisions/0005-knowledge-experience-content.md",
           "status": "proposed",
-          "question": "Knowledge–Prediction–Experience cycle ownership, update semantics, and Book/source boundaries",
+          "question": "Knowledge\u2013Prediction\u2013Experience cycle ownership, update semantics, and Book/source boundaries",
           "evidence_step": "03",
           "implementation_gate": "Resolve before step 04 integrates cognitive-loop transition contracts or any Book/Knowledge/Experience ownership migration.",
           "allowed_before_resolution": "Capture current behavior and compare pure reference loops using synthetic fixtures and fake capabilities; no production topology is adopted."
@@ -557,7 +557,7 @@
       ],
       "evidence": [
         "Step 09.1 complete: typed classification/provenance foundation with regression tests; see dokja_docs/step-09-consolidation.md. Representation decisions recorded in ADR 0008.",
-        "Step 09.2 storage foundation and deterministic Reading integration implemented in .worktrees/knowledge-metadata; provider classification/cache and explicit reclassification remain pending. Generic consolidation, remaining Book retirement scope and other faculty migrations remain pending."
+        "Step 09.2 persistence, API/CLI answers, reading-time classifier and explicit stored-document reclassification are implemented. Desktop/chat continuation and other listed remaining items keep 09.2 in progress; generic consolidation and faculty migrations remain pending."
       ],
       "checks": [
         {
@@ -624,7 +624,8 @@
             "Desktop conceptual review recorded in dokja_docs/step-09-consolidation.md: include_text exists upstream but is dropped by desktop projections; per-document detail and classification presentation remain pending, and conversation tabs must not duplicate Messages.",
             "Reading-time classifier connected on feat/knowledge-classifier: feeds.classify serves document.classify.v1 with checked, bounded proposals; knowledge.read runs read -> ingest -> classify, classifying only content stored just now with undecided axes (the content/version cache), patching metadata under a revision check with classifier provenance; failures leave questions pending without failing the reading. See dokja_docs/step-09-consolidation.md#reading-time-classifier.",
             "Earlier 09.2 slices were delivered from .worktrees/knowledge-metadata on feat/knowledge-metadata (PRs #53, #54).",
-            "Owner chose an agent classifier (2026-10-20): Claude Code, then Codex, then Ollama; every form may be sent; Feeds runs on the owner's machine. plugins.example/agent-kinds implements the chain with CLI isolation verified by canary files; the host names the answering provider in the version. See dokja_docs/step-09-consolidation.md#agent-classifier."
+            "Owner chose an agent classifier (2026-10-20): Claude Code, then Codex, then Ollama; every form may be sent; Feeds runs on the owner's machine. plugins.example/agent-kinds implements the chain with CLI isolation verified by canary files; the host names the answering provider in the version. See dokja_docs/step-09-consolidation.md#agent-classifier.",
+            "Explicit reclassification: knowledge.reclassify and CLI knowledge reclassify sample stored chunks under a snapshot revision, invoke the existing reading-host classifier, and patch automatic axes only. User answers, source defaults, pending clarification and defining metadata are preserved; no extraction, ingest or embedding. See dokja_docs/step-09-consolidation.md#explicit-reclassification."
           ],
           "checks": [
             {
@@ -666,15 +667,19 @@
               "name": "agent_classifier",
               "status": "passed",
               "detail": "Feeds go test -race ./... with fake claude/codex/Ollama; Knowledge domain and orchestrator go test ./...; real two-document run with Claude Code and Codex; canary checks for file reads and hook capture."
+            },
+            {
+              "name": "explicit_reclassification",
+              "status": "passed",
+              "detail": "Knowledge domain go test -race ./... and go vet ./...; orchestrator go test -race ./...; CLI go test ./...; Knowledge service 159 passed, 8 skipped (live Ollama). Route tests cover success, protected user questions, uncertainty, malformed output, provider failure and revision conflict. No live inference or owner database used. Staged credential and project-policy scans passed with repository-pinned gitleaks v8.28.0."
             }
           ],
           "started_on": "2026-10-19",
-          "worktree": ".worktrees/agent-classifier",
-          "branch": "feat/agent-classifier",
+          "worktree": ".worktrees/knowledge-reclassification",
+          "branch": "feat/knowledge-reclassification",
           "remaining": [
             "Run Feeds on the owner's machine for the stack (loopback/bridge bind, overridable FEEDS_SERVICE_ENDPOINT) and do the live check on the owner's documents.",
             "Pick an Ollama chat model for the last fallback.",
-            "Add explicit provider reclassification of stored documents for a new classifier version.",
             "Wire classification questions/answers into desktop and chat interfaces; CLI and API continuation are implemented.",
             "Define the bounded desktop document-detail contract and content representation; retain the existing conversation model and expose useful open/classification actions only when implemented."
           ]

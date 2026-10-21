@@ -140,3 +140,11 @@ the new questions and decide. It never retries an answer against a newer
 revision automatically. No persistence, transport or credential setting changes
 are needed. Desktop and chat presentation of this interaction remain separate
 interface work.
+
+To ask the configured provider to revise an automatic classification on stored
+text, use `dokja-cli --timeout 7m knowledge reclassify <source-id>`. This sends a
+bounded reconstruction of stored chunks to the enabled reading-host classifier;
+it does not need the original file. Each explicit request runs inference again.
+User answers, source defaults and axes already awaiting user clarification stay
+unchanged. An uncertain new proposal becomes a question for `knowledge classify`.
+Conflicts are reported without automatic retries. No chunks or embeddings change.

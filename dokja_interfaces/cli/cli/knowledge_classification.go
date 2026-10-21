@@ -144,3 +144,30 @@ func classificationHint(answer map[string]any) string {
 	}
 	return out.String()
 }
+
+// Explicit inference is separate from answering the domain's questions.
+func newKnowledgeReclassifyCommand(ctx context.Context, call knowledgeCallFunc) *cobra.Command {
+	return &cobra.Command{
+		Use:   "reclassify <source-id>",
+		Short: "Ask the configured classifier to revise automatic document labels",
+		Long:  "Reclassify stored text without re-uploading or embedding it. User decisions remain unchanged. Use --timeout 7m for slow providers.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id := strings.TrimSpace(args[0])
+			if id == "" {
+				return fmt.Errorf("source-id is required")
+			}
+			result, err := call(ctx, "knowledge.reclassify", map[string]any{"source_id": id})
+			if err != nil {
+				return err
+			}
+			if result["reclassified"] == false {
+				fmt.Fprintln(cmd.OutOrStdout(), "User decisions preserved; no automatic labels to revise.")
+			} else {
+				fmt.Fprintln(cmd.OutOrStdout(), "Automatic classification updated.")
+				fmt.Fprintln(cmd.OutOrStdout(), classificationHint(result))
+			}
+			return nil
+		},
+	}
+}

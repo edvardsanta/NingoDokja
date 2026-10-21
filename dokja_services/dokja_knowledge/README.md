@@ -212,3 +212,22 @@ current questions before deciding whether another answer is needed.
 This adds no schema version or durable workflow ledger. Restarting the CLI can
 retrieve pending state from the existing metadata store. It resumes the
 classification decision, not an interrupted summary or external side effect.
+
+### Stored classification samples
+
+Internal `knowledge.classification.sample` accepts `source_id`. It returns the
+metadata snapshot and revision plus `text` (at most 16,000 Unicode characters)
+and `representation: chunk_reconstruction`. Metadata and chunks are read in one
+SQLite transaction. The sample joins stored chunk text in position order and may
+include overlap; it is not the original file. SQL projects only a bounded prefix
+of each chunk, and sampling stops when the character budget is reached.
+The existing metadata questions endpoint still returns no text.
+
+The orchestrator's additive `knowledge.reclassify` action uses this sample for an
+explicit provider call, then patches only eligible automatic axes under the
+original revision. Edits, user answers and deletion during inference reject the
+patch. Inference failures leave metadata untouched. Existing user assertions,
+source defaults, clarification questions and defining metadata are preserved.
+Roll out this service before the orchestrator; no SQL migration, embedding,
+configuration or compose change is needed. Rolling back both binaries leaves the
+stored metadata readable by the prior schema-2 builds.

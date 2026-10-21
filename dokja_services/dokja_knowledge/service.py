@@ -109,6 +109,7 @@ class KnowledgeService:
         handlers = {
             "knowledge.ingest": self.ingest,
             "knowledge.metadata.get": self.metadata_get,
+            "knowledge.classification.sample": self.classification_sample,
             "knowledge.metadata.patch": self.metadata_patch,
             "knowledge.search": self.search,
             "knowledge.list": self.list_documents,
@@ -126,6 +127,12 @@ class KnowledgeService:
         if not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
             raise ValueError("source_id is required and must be valid")
         return self.store.metadata_snapshot(source_id)
+
+    def classification_sample(self, payload: dict) -> dict:
+        source_id = payload.get("source_id")
+        if not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
+            raise ValueError("source_id is required and must be valid")
+        return self.store.classification_sample(source_id)
 
     def metadata_patch(self, payload: dict) -> dict:
         source_id = payload.get("source_id")

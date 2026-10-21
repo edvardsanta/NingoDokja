@@ -250,3 +250,16 @@ These are implementation decisions, not claims that the prototype is delivered.
 Step `03` captures behavior and measurement baselines before the internal contract
 implementation. The experiments remain hashtag composition plus one document
 extractor adapter.
+
+### Explicit Knowledge reclassification
+
+`CLI knowledge reclassify <source-id> -> knowledge.reclassify -> typed
+snapshot/classify/keep task -> Knowledge domain -> knowledge.classification.sample
+-> feeds.classify -> Knowledge domain -> knowledge.metadata.patch`
+
+The domain owns eligible axes and provenance; orchestration owns the provider
+call and task lifecycle. The service provides a bounded chunk reconstruction and
+a revision from one read transaction. The patch uses that pre-inference revision.
+User answers and questions remain authoritative; chunks and embeddings are kept.
+See [reclassification domain](../dokja_domain/dokja_knowledge/reclassification.go)
+and [task](../dokja_orch/internal/handlers/knowledge_reclassification.go).

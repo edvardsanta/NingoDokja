@@ -124,3 +124,25 @@ def test_classifier_proposals_patch_pending_axes_and_record_the_classifier(servi
     assert result["metadata"]["classifier"] == {"id": "kinds", "version": "1"}
     assert result["metadata"]["form_choice"] == {"origin": "user"}
     assert chunks(service) == before
+
+
+def test_classification_sample_is_bounded_and_bound_to_revision(service):
+    add(service)
+    before = chunks(service)
+    revision = snapshot(service)["revision"]
+    calls, version = len(service.embedder.calls), service.store.version
+    result = service.dispatch({"type": "knowledge.classification.sample", "payload": {"source_id": "study"}})
+    assert result["revision"] == revision
+    assert result["text"] == "Physics research evidence."
+    assert result["representation"] == "chunk_reconstruction"
+    assert chunks(service) == before
+    assert len(service.embedder.calls) == calls and service.store.version == version
+    # The original questions endpoint never returns content.
+    assert "text" not in snapshot(service)
+    service.store.conn.execute("UPDATE chunks SET text = ?", ("x" * 50000,))
+    service.store.conn.commit()
+    assert len(service.classification_sample({"source_id": "study"})["text"]) == 16000
+    with pytest.raises(ValueError, match="not found"):
+        service.classification_sample({"source_id": "missing"})
+    # Failed sampling rolls its transaction back.
+    assert snapshot(service)["revision"] == revision
