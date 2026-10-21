@@ -3,9 +3,12 @@ package clients
 import (
 	"context"
 	"errors"
+	"github.com/pebbe/zmq4"
 	"read_books/internal/infrastructure/repreq"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 type fakeKnowledgeRequester struct {
@@ -106,5 +109,87 @@ func TestKnowledgeClientStatusAsksForKnowledgeStatus(t *testing.T) {
 	}
 	if result["embedder_reachable"] != false || !strings.Contains(requester.request, `"type":"knowledge.status"`) {
 		t.Fatalf("unexpected result %#v for request %s", result, requester.request)
+	}
+}
+
+func TestKnowledgeLongWritesUseTheirOwnRequester(t *testing.T) {
+	for _, event := range []string{"knowledge.ingest", "knowledge.reindex", "knowledge.status", "knowledge.list", "knowledge.search", "knowledge.metadata.patch"} {
+		t.Run(event, func(t *testing.T) {
+			selected := ""
+			factory := func(name string) KnowledgeServiceRequesterFactory {
+				return func() (repreq.RequesterReply, error) {
+					selected = name
+					return &fakeKnowledgeRequester{response: `{"status":"ok","result":{}}`}, nil
+				}
+			}
+			c := &KnowledgeServiceClient{requesterFactory: factory("read"), writeFactory: factory("write")}
+			if _, err := c.Dispatch(context.Background(), event, nil); err != nil {
+				t.Fatal(err)
+			}
+			want := "read"
+			if event == "knowledge.ingest" || event == "knowledge.reindex" {
+				want = "write"
+			}
+			if selected != want {
+				t.Fatalf("%s used %s requester, want %s", event, selected, want)
+			}
+		})
+	}
+}
+
+func TestKnowledgeWriteTimeoutReportsAnUnknownOutcomeWithoutRetry(t *testing.T) {
+	for _, event := range []string{"knowledge.ingest", "knowledge.reindex", "knowledge.list"} {
+		calls := 0
+		timeout := zmq4.Errno(syscall.EAGAIN)
+		c := NewKnowledgeServiceClientWithFactory(func() (repreq.RequesterReply, error) {
+			calls++
+			return &fakeKnowledgeRequester{err: timeout}, nil
+		})
+		_, err := c.Dispatch(context.Background(), event, nil)
+		if err == nil || calls != 1 {
+			t.Fatalf("err=%v calls=%d", err, calls)
+		}
+		if unknown := strings.Contains(err.Error(), "knowledge_write_outcome_unknown:"); unknown != (event != "knowledge.list") {
+			t.Fatalf("%s: %v", event, err)
+		}
+	}
+}
+
+// Real ZeroMQ sockets reproduce the old five-second cutoff without contacting a
+// live Knowledge service or touching a database.
+func TestKnowledgeIngestKeepsAReplyThatTakesMoreThanFiveSeconds(t *testing.T) {
+	server, err := zmq4.NewSocket(zmq4.REP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	server.SetLinger(0)
+	server.SetRcvtimeo(10 * time.Second)
+	if err := server.Bind("tcp://127.0.0.1:*"); err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := server.GetLastEndpoint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		if _, err := server.Recv(0); err != nil {
+			done <- err
+			return
+		}
+		time.Sleep(5200 * time.Millisecond)
+		_, err := server.Send(`{"status":"ok","result":{"created":true,"chunks":2}}`, 0)
+		done <- err
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+	result, err := NewKnowledgeServiceClient(endpoint).Dispatch(ctx, "knowledge.ingest", map[string]any{"title": "Synthetic document", "body": "fixture text"})
+	serverErr := <-done
+	if serverErr != nil {
+		t.Fatal(serverErr)
+	}
+	if err != nil || result["created"] != true {
+		t.Fatalf("result=%v err=%v", result, err)
 	}
 }

@@ -78,6 +78,9 @@ export async function handleRequest(
   try {
     const reply = await orchestrator.request(type, wire, pickTimeout(raw.options, limits));
     if (reply.status !== "ok") {
+      if ((type === "knowledge.ingest" || type === "knowledge.reindex") && reply.error?.includes("knowledge_write_outcome_unknown:")) {
+        return fail("timeout", "Knowledge did not confirm the write in time; its outcome is unknown.");
+      }
       return fail("orchestrator", reply.error || "the orchestrator refused the request");
     }
     const projected = action.project(reply.result);

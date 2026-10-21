@@ -732,9 +732,16 @@
       ],
       "evidence": [
         "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet.",
-        "W1 storage spike (owner accepted W1 as first consumer, 2026-10-20): dokja_store/spikes/cognitive_storage compares SQLite, PostgreSQL 17 + pgvector 0.8.7 and Neo4j 2026.09 Community on a generated fixture up to 108k chunks x 1024 dims. All exact modes matched the gold; no engine leaked scope, superseded or deleted rows; PostgreSQL approximate stayed at recall 1.00, Neo4j approximate 0.23-0.52; exact p95 at the largest size 95 ms (PostgreSQL), 111 ms (SQLite), 850 ms (Neo4j). W1 does not measure graph workloads. See dokja_docs/step-10-storage-spike.md."
+        "W1 storage spike (owner accepted W1 as first consumer, 2026-10-20): dokja_store/spikes/cognitive_storage compares SQLite, PostgreSQL 17 + pgvector 0.8.7 and Neo4j 2026.09 Community on a generated fixture up to 108k chunks x 1024 dims. All exact modes matched the gold; no engine leaked scope, superseded or deleted rows; PostgreSQL approximate stayed at recall 1.00, Neo4j approximate 0.23-0.52; exact p95 at the largest size 95 ms (PostgreSQL), 111 ms (SQLite), 850 ms (Neo4j). W1 does not measure graph workloads. See dokja_docs/step-10-storage-spike.md.",
+        "Incremental timeout fix ahead of durable execution: Knowledge ingest/reindex use a dedicated 110-second socket timeout instead of the generic five-second budget. Socket timeout/cancellation after dispatch reports knowledge_write_outcome_unknown; desktop preserves the form and advises checking stored documents before retrying. No automatic resend or durable acceptance is claimed."
       ],
-      "checks": [],
+      "checks": [
+        {
+          "name": "knowledge_write_timeout_regression",
+          "status": "passed",
+          "detail": "Orchestrator go test -race ./... and go vet ./... passed, including a real ZeroMQ ingest reply delayed 5.2 seconds and error/factory selection coverage. Desktop pnpm test: 201 Node tests and 186 UI tests passed; pnpm typecheck and pnpm build passed. Live diagnosis used filtered logs and a read-only count; no owner document was ingested or changed by the fix."
+        }
+      ],
       "blockers": [],
       "research": {
         "status": "completed",
