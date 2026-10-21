@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -112,7 +113,7 @@ func (a *App) baseEvent(eventType string, payload map[string]any) EmitOptions {
 		UserName:  a.emitOpts.userName,
 		ChannelID: a.emitOpts.channelID,
 		Payload:   payload,
-		Context:   map[string]any{"interface": "cli"},
+		Context:   CommunicationsContext(eventType, map[string]any{"interface": "cli"}, os.Getenv),
 		Source:    "cli",
 	}
 }
