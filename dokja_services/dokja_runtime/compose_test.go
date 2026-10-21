@@ -200,6 +200,14 @@ func TestCommunicationsReadsItsUnpublishedHealthInsideTheContainer(t *testing.T)
 	}
 }
 
+func TestProfileGatedModulesAreVisibleToEveryComposeCommand(t *testing.T) {
+	got := composeArgs("/stack", []string{"up", "-d", "dokja-communications"})
+	want := []string{"compose", "-f", "/stack/docker-compose.lite.yml", "--profile", "communications", "--profile", "whatsapp", "up", "-d", "dokja-communications"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatal(got)
+	}
+}
+
 func TestKnownRemoteEngineTargetsAreRejected(t *testing.T) {
 	for _, env := range [][]string{{"DOCKER_HOST=tcp://host.example:1234"}, {"CONTAINER_HOST=ssh://host.example"}, {"DOCKER_CONTEXT=production"}} {
 		if localEngine(env) == nil {

@@ -59,11 +59,23 @@ func New(root string) *Compose {
 		return out.Bytes(), nil
 	}
 	return &Compose{Run: func(ctx context.Context, args ...string) ([]byte, error) {
-		all := append([]string{"compose", "-f", filepath.Join(root, "docker-compose.lite.yml")}, args...)
-		return execute(ctx, all...)
+		return execute(ctx, composeArgs(root, args)...)
 	}, Inspect: func(ctx context.Context, ids ...string) ([]byte, error) {
 		return execute(ctx, append([]string{"inspect"}, ids...)...)
 	}, Poll: time.Second, Wait: 2 * time.Minute}
+}
+
+// profiles are the opt-in Compose profiles of modules the controller may start. Podman Compose
+// does not activate a profile for a service named on the command line, so they are always
+// named; only the service passed to a command is started, so this starts nothing else.
+var profiles = []string{"communications", "whatsapp"}
+
+func composeArgs(root string, args []string) []string {
+	all := []string{"compose", "-f", filepath.Join(root, "docker-compose.lite.yml")}
+	for _, profile := range profiles {
+		all = append(all, "--profile", profile)
+	}
+	return append(all, args...)
 }
 
 type boundedBuffer struct {
