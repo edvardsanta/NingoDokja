@@ -319,3 +319,49 @@ check.
 Still pending: running Feeds on the host for the stack (bind address and an
 overridable `FEEDS_SERVICE_ENDPOINT` for the orchestrator), the live check on
 the owner's documents, an Ollama chat model, and explicit reclassification.
+
+
+## Explicit reclassification
+
+Implemented 2026-10-21 on `feat/knowledge-reclassification` in
+`.worktrees/knowledge-reclassification`. `knowledge.reclassify` accepts only
+`source_id`; CLI `dokja-cli --timeout 7m knowledge reclassify <source-id>` calls
+it. Each explicit request runs the configured classifier again, allowing an
+operator to apply a changed provider/version. Ordinary rereads retain their
+existing behavior and never trigger this action automatically.
+
+A typed snapshot/classify/keep task reuses `document.classify.v1`. Knowledge
+requests at most 16,000 Unicode characters reconstructed from stored chunks,
+with no claimed original format, and a metadata/content revision from the same
+read transaction. No source upload or extraction is needed. The sample stays
+outside the task workspace, response and trace. The provider ID/version is kept
+through the existing classifier provenance contract.
+
+The domain makes classifier-origin axes and undecided missing axes eligible.
+User answers, source defaults, axes already awaiting user clarification and
+existing defining metadata remain unchanged. If no axis is eligible, no provider
+is called. Uncertain proposals become user questions. Failed inference or invalid
+output leaves storage untouched. The metadata patch uses the revision captured
+**before** inference: a content edit, deletion or competing answer rejects the
+stale proposal without retrying. Chunks, embeddings and the embedding cache
+revision are unchanged.
+
+Compatibility: one additive public action and CLI command, one internal read
+operation (`knowledge.classification.sample`). The existing router prefix,
+client, classifier capability, metadata patch and schema are reused. No envelope,
+SQL migration, configuration, compose or deployment change. Roll out Knowledge
+service before the orchestrator; older services refuse the new internal read
+operation. Rollback restores the previous binaries; metadata remains schema-2
+compatible. CLI callers should allow seven minutes for the six-minute task;
+shorter client timeouts can stop waiting before the server finishes.
+
+Validation: Knowledge domain `go test -race ./...` and `go vet ./...` passed;
+orchestrator `go test -race ./...` passed; CLI `go test ./...` passed. Knowledge
+service: **159 passed, 8 skipped**, using a disposable Python environment; skipped
+tests require live Ollama. Sandbox socket restrictions required unsandboxed CLI
+and Python reruns. Regression tests cover the public route, user protection,
+provider failures, malformed responses, uncertainty, stale revisions, bounded
+sampling, retained vectors and CLI no-retry behavior. No live inference, owner
+file or owner database was used. Step 09.2 remains in progress for its other
+listed interface and operational items. Staged credential and project-policy
+scans passed with repository-pinned gitleaks v8.28.0.

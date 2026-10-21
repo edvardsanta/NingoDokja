@@ -97,6 +97,10 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return d.classify(ctx, request.Event.Payload)
 	}
 
+	if request.Action == ActionReclassifyKnowledge {
+		return nil, fmt.Errorf("knowledge.reclassify needs the reading host")
+	}
+
 	if request.Action == ActionReadKnowledge {
 		return nil, fmt.Errorf("knowledge.read needs the reading host, which is not configured")
 	}

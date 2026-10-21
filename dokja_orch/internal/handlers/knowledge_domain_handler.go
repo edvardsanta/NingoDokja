@@ -38,6 +38,12 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionReclassifyKnowledge {
+		if h.reading == nil {
+			return nil, fmt.Errorf("knowledge.reclassify needs the reading host")
+		}
+		return h.reading.Reclassify(ctx, event)
+	}
 	if workflow.Action == knowledgedomain.ActionReadKnowledge && h.reading != nil {
 		return h.reading.Read(ctx, event)
 	}

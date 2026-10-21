@@ -183,6 +183,32 @@ class Store:
         return {"source_id": row["source_id"], "title": row["title"], "metadata": metadata,
                 "revision": hashlib.sha256(identity.encode()).hexdigest()}
 
+    def classification_sample(self, source_id: str) -> dict:
+        """Bind a bounded chunk reconstruction to metadata in one read transaction."""
+        self.conn.execute("BEGIN")
+        try:
+            snapshot = self.metadata_snapshot(source_id)
+            document = self.get_document(source_id)
+            parts = []
+            remaining = 16000
+            rows = self.conn.execute(
+                "SELECT substr(text, 1, 16000) AS text FROM chunks "
+                "WHERE document_id = ? ORDER BY position", (document["id"],),
+            )
+            for row in rows:
+                part = row["text"][:remaining]
+                parts.append(part)
+                remaining -= len(part) + 2
+                if remaining <= 0:
+                    break
+            result = {**snapshot, "text": "\n\n".join(parts)[:16000],
+                      "representation": "chunk_reconstruction"}
+            self.conn.commit()
+            return result
+        except Exception:
+            self.conn.rollback()
+            raise
+
     def patch_metadata(self, source_id: str, patch: dict, revision: str) -> dict:
         """Compare and patch under a write lock, leaving content and vectors intact."""
         self.conn.execute("BEGIN IMMEDIATE")

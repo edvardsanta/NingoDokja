@@ -130,3 +130,25 @@ func TestKnowledgeOutputPointsPendingDocumentsToClassification(t *testing.T) {
 		t.Fatalf("output=%s", out)
 	}
 }
+
+func TestReclassifySendsOnlyTheDocumentIDAndNeverRetries(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		calls := 0
+		command := newKnowledgeReclassifyCommand(context.Background(), func(_ context.Context, event string, payload map[string]any) (map[string]any, error) {
+			calls++
+			if event != "knowledge.reclassify" || !reflect.DeepEqual(payload, map[string]any{"source_id": "study"}) {
+				t.Fatalf("%s %#v", event, payload)
+			}
+			if fail {
+				return nil, errors.New("classification_conflict")
+			}
+			return map[string]any{"reclassified": true}, nil
+		})
+		command.SetOut(&bytes.Buffer{})
+		command.SetArgs([]string{"study"})
+		err := command.Execute()
+		if (err != nil) != fail || calls != 1 {
+			t.Fatalf("calls=%d err=%v", calls, err)
+		}
+	}
+}

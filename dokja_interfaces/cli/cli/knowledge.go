@@ -426,6 +426,6 @@ func (a *App) newKnowledgeCommand(ctx context.Context) *cobra.Command {
 		},
 	}
 
-	command.AddCommand(add, search, list, remove, status, reindex, newKnowledgeClassifyCommand(ctx, a.knowledgeCall))
+	command.AddCommand(add, search, list, remove, status, reindex, newKnowledgeClassifyCommand(ctx, a.knowledgeCall), newKnowledgeReclassifyCommand(ctx, a.knowledgeCall))
 	return command
 }
