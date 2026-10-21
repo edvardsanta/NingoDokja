@@ -43,7 +43,7 @@ func (a *App) newModulesCommand(ctx context.Context) *cobra.Command {
 	}
 
 	change := func(use, short string, enabled bool) *cobra.Command {
-		var wait bool
+		var wait, yes bool
 		command := &cobra.Command{
 			Use:   use + " <module>",
 			Short: short,
@@ -52,6 +52,13 @@ func (a *App) newModulesCommand(ctx context.Context) *cobra.Command {
 				client, err := a.runtimeClient()
 				if err != nil {
 					return err
+				}
+				if enabled && DeliveryModules[args[0]] && !yes {
+					response, err := a.call(ctx, a.baseEvent("ningo.status", map[string]any{}))
+					notice := DeliveryNotice(args[0], response.Result, err)
+					if !Confirm(a.stdin, cmd.OutOrStdout(), "Start "+args[0]+"?", notice) {
+						return fmt.Errorf("%s not started", args[0])
+					}
 				}
 				snapshot, err := client.Request(ctx, "runtime.set", map[string]any{"module": args[0], "enabled": enabled})
 				if err != nil {
@@ -69,6 +76,9 @@ func (a *App) newModulesCommand(ctx context.Context) *cobra.Command {
 			},
 		}
 		command.Flags().BoolVar(&wait, "wait", false, "Wait until the operation finishes (it keeps running if this command is interrupted)")
+		if enabled {
+			command.Flags().BoolVar(&yes, "yes", false, "Start discord or the scheduler without asking (they answer or post with the switches and jobs already saved)")
+		}
 		return command
 	}
 
