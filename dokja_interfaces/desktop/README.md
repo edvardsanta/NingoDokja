@@ -307,7 +307,7 @@ desktop for this fix. Existing configured interfaces retain their link/unlink an
 QR controls. No credentials, environment defaults, ports, schema or routes change.
 ### Starting and stopping local containers
 
-With the default local orchestrator endpoint, **System → Local containers** uses
+With the default local orchestrator endpoint, **System → Modules** uses
 a host background controller even when the application orchestrator is stopped.
 Opening desktop starts only that small controller and reads status; it does not
 start containers. Choose **Start** for one module. The controller starts only its
@@ -323,8 +323,10 @@ as consumers so their required dependencies are preserved. One operation runs at
 a time; a repeated identical pending action is idempotent. Failures permit an
 explicit retry. A timeout triggers status refresh, never blind resubmission.
 
-Container lifecycle and the existing **routing switches** are separate: starting
-a process does not override a deliberately disabled application capability.
+Each module appears once, with one primary Start/Stop control. Its collapsed
+**Options** hold activity, request-handling pause/resume and WhatsApp linking
+where applicable. Automation and other interfaces follow in the same card.
+Starting a process does not override a deliberately paused capability.
 `running` means the container exists without a controller readiness check;
 `ready` means the application acknowledged its readiness probe. If the engine
 cannot be inspected, the UI shows unknown state and disables writes until refresh.

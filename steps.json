@@ -817,6 +817,7 @@
             "Implemented a host background bootstrap orchestrator, Runtime domain and stateless Compose adapter. Desktop starts only the daemon on a runtime read; explicit module actions start/stop only dependency closures. Readiness and background failures are visible even with the main orchestrator stopped.",
             "Initial selectable lite modules: orchestrator, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice and WhatsApp. Shared and borrowed dependencies, recognized external consumers, data, auth and history volumes are preserved. One operation runs at a time; ownership survives daemon restart; application acknowledgements gate ready state.",
             "Private Unix socket, OS instance lock, project-bound protocol responses and real-input IPC validation bound the local control surface. Existing routing switches stay separate. Windows, production and remote/custom orchestrator endpoints are outside the initial backend.",
+            "System UI consolidates lifecycle and activity into one module row. Optional request handling and WhatsApp setup stay under module options; automation remains in the same card. Regression coverage includes controller-unavailable fallback.",
             "Provider inspection found that the local Docker-compatible CLI ignores DOCKER_HOST under Podman. The adapter bridges an explicit local Unix socket into CONTAINER_HOST when no Podman override is present, so it addresses the configured engine rather than an unrelated container context."
           ],
           "checks": [
