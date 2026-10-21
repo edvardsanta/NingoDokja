@@ -274,5 +274,7 @@
   "experience_feedback_saved": "Feedback saved: {outcome}.",
   "experience_feedback_conflict": "An outcome was already recorded: {outcome}. Your submission did not replace it.",
   "experience_feedback_refresh": "Refresh memory",
-  "experience_feedback_check": "If the request timed out, the outcome is unknown. Refresh memory before trying again."
+  "experience_feedback_check": "If the request timed out, the outcome is unknown. Refresh memory before trying again.",
+  "state_not_configured": "not configured",
+  "whatsapp_setup_missing": "WhatsApp has not been set up. Configure the local WhatsApp gateway to link your account."
 }

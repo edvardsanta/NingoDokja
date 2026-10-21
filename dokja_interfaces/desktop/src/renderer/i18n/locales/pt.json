@@ -274,5 +274,7 @@
   "experience_feedback_saved": "Feedback salvo: {outcome}.",
   "experience_feedback_conflict": "Já havia um resultado registrado: {outcome}. Seu envio não o substituiu.",
   "experience_feedback_refresh": "Atualizar memória",
-  "experience_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Atualize a memória antes de tentar de novo."
+  "experience_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Atualize a memória antes de tentar de novo.",
+  "state_not_configured": "não configurado",
+  "whatsapp_setup_missing": "O WhatsApp ainda não foi configurado. Configure a conexão local do WhatsApp para vincular sua conta."
 }

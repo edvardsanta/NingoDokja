@@ -43,7 +43,7 @@ function replyFor(type: string, payload: Record<string, unknown> = {}): Record<s
     case "ningo.status":
       return wrap("system", {
         status: "ok",
-        services: { meme: { status: "ok", enabled: true }, feeds: { status: "ok", detail: "no plugins enabled" } },
+        services: { meme: { status: "ok", enabled: true }, feeds: { status: "ok", detail: "no plugins enabled" }, whatsapp: { kind:"interface", status:"unchecked", state:"not_configured", configured:false, enabled:true } },
         jobs: [{ name: "meme.refresh", enabled: true, interval: "6h0m0s", interval_override: false, next_at: "2026-10-03T12:00:00Z", last_at: "2026-10-03T06:00:00Z", last_outcome: "ran", last_error: "", announced_at: "announced-1" }],
         channels: { meme: ["channel-1"] },
         chat_profiles: { profiles: [{ name: "profile-1", base_url: "base-url-1", key_hint: "hint-1" }] },

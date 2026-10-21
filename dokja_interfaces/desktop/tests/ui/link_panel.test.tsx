@@ -179,3 +179,13 @@ describe("the link panel while it stays open", () => {
     expect(calls(seen, "communications.link.status")).toHaveLength(reads);
   });
 });
+
+it("keeps an unconfigured WhatsApp visible without pretending that it can link",async()=>{
+ const {transport,calls:seen}=routedTransport({"ningo.status":status("not_configured",{status:"unchecked",configured:false})});
+ renderCard(transport);
+ await screen.findByText("whatsapp");
+ screen.getByText("not configured");screen.getByText(/Configure the local WhatsApp gateway/);
+ expect(screen.queryByRole("button",{name:"Link"})).toBeNull();
+ expect((screen.getByRole("switch",{name:"whatsapp switch"}) as HTMLButtonElement).disabled).toBe(true);
+ expect(calls(seen,"communications.link.status")).toHaveLength(0);
+});

@@ -767,16 +767,13 @@ func (h *SystemDomainHandler) applySwitches(services map[string]any) {
 	if h.controls == nil {
 		return
 	}
-	// An interface is listed only when it can be read, and carries its kind so a screen can
-	// group it. A switched-off one is not read: it says only that it is off.
+	// Known interfaces remain in the catalog even before setup. Routing enablement
+	// remains separate from whether their connection endpoint is configured.
 	for _, name := range core.KnownInterfaces {
-		if h.interfaceProbes[name] == nil {
-			continue
-		}
 		enabled := h.controls.ServiceEnabled(name)
 		entry, _ := services[name].(map[string]any)
 		if entry == nil || !enabled {
-			entry = map[string]any{"kind": "interface"}
+			entry = map[string]any{"kind": "interface", "configured": h.interfaceProbes[name] != nil}
 		}
 		entry["enabled"] = enabled
 		if !enabled {

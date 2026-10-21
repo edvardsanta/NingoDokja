@@ -89,7 +89,7 @@ func (h *SystemDomainHandler) WithServiceProbes(probes map[string]ServiceProbe) 
 }
 
 // WithInterfaceProbes names the interfaces whose state the orchestrator can read (see
-// core.KnownInterfaces). An interface without a probe is not listed at all.
+// core.KnownInterfaces). Missing probes keep their catalog entry as unconfigured.
 func (h *SystemDomainHandler) WithInterfaceProbes(probes map[string]InterfaceProbe) *SystemDomainHandler {
 	h.interfaceProbes = probes
 	return h
@@ -101,6 +101,8 @@ func (h *SystemDomainHandler) WithInterfaceProbes(probes map[string]InterfacePro
 func (h *SystemDomainHandler) probeInterfaces(ctx context.Context, services map[string]any) (failed bool) {
 	names := make([]string, 0, len(h.interfaceProbes))
 	for _, name := range core.KnownInterfaces {
+		configured := h.interfaceProbes[name] != nil
+		services[name] = map[string]any{"kind": "interface", "status": "unchecked", "state": "not_configured", "configured": configured}
 		if probe := h.interfaceProbes[name]; probe != nil && h.serviceEnabled(name) {
 			names = append(names, name)
 		}
@@ -126,6 +128,7 @@ func (h *SystemDomainHandler) probeInterfaces(ctx context.Context, services map[
 
 	for i, name := range names {
 		entries[i]["kind"] = "interface"
+		entries[i]["configured"] = true
 		services[name] = entries[i]
 		if entries[i]["status"] == "error" {
 			failed = true

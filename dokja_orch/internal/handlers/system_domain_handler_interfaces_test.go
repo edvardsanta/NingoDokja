@@ -51,16 +51,25 @@ func TestStatusListsAnInterfaceWithItsStateAndKind(t *testing.T) {
 	}
 }
 
-func TestAnInterfaceWithoutAProbeIsNotListed(t *testing.T) {
+func TestAnInterfaceWithoutAProbeRemainsVisibleAsUnconfigured(t *testing.T) {
 	handler, _ := quietHandler(t)
 	handler.WithInterfaceProbes(map[string]InterfaceProbe{
 		"discord": interfaceProbe("ok", "connected", "", nil, nil),
 	})
 
-	_, services := statusServices(t, handler)
-
-	if _, listed := services["whatsapp"]; listed {
-		t.Fatalf("an interface without a probe must not be listed, got %#v", services["whatsapp"])
+	result, services := statusServices(t, handler)
+	entry, listed := services["whatsapp"].(map[string]any)
+	if !listed || entry["kind"] != "interface" || entry["configured"] != false || entry["state"] != "not_configured" || entry["status"] != "unchecked" {
+		t.Fatalf("missing setup must not hide the interface: %#v", entry)
+	}
+	if result["status"] != "ok" {
+		t.Fatal("an unconfigured optional interface must not degrade the platform")
+	}
+	handler.controls.SetService("whatsapp", false)
+	_, services = statusServices(t, handler)
+	off := services["whatsapp"].(map[string]any)
+	if off["configured"] != false || off["status"] != "disabled" {
+		t.Fatalf("off must retain the catalog and configuration flag: %#v", off)
 	}
 }
 

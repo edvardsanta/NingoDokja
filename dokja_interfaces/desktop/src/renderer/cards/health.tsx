@@ -47,6 +47,7 @@ const STATE_IDS: Record<string, MessageId> = {
   refused: "state_refused",
   unreachable: "state_unreachable",
   off: "state_off",
+  not_configured: "state_not_configured",
 };
 
 export async function loadHealth(transport: Transport): Promise<LoadResult<Health>> {
@@ -168,7 +169,7 @@ function HealthBody({ health, busy, failure, onChange, link }: BodyProps) {
                 busy={busy}
                 onChange={onChange}
                 extra={
-                  row.name === LINKABLE ? <LinkControl link={link} /> : undefined
+                  row.name === LINKABLE ? row.configured === false ? <p className="note">{t("whatsapp_setup_missing")}</p> : <LinkControl link={link} /> : undefined
                 }
               />
             ))}
@@ -214,7 +215,7 @@ function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
         <Switch
           label={t("switch_for", { name: row.name })}
           on={row.enabled}
-          busy={busy}
+          busy={busy || row.configured === false}
           onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
         />
       )}

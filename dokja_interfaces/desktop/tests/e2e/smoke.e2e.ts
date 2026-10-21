@@ -49,6 +49,13 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.ok(rows.some((row) => row.startsWith("feeds") && row.includes("no plugins enabled")), JSON.stringify(rows));
   });
 
+  it("keeps WhatsApp visible before configuration without requesting a link code",async()=>{
+    const text=await page.waitFor<string>("document.querySelector('.interfaces')?.textContent || null");
+    assert.match(text,/whatsapp/);assert.match(text,/not configured/);
+    assert.equal(await page.evaluate("[...document.querySelectorAll('.interfaces button')].some(b=>b.textContent==='Link')"),false);
+    assert.equal(orchestrator.seen.some(e=>e.type.startsWith('communications.link.')),false);
+  });
+
   it("asks the orchestrator as the desktop, and only for the workspace that is open", async () => {
     assert.deepEqual(orchestrator.seen.map((event) => event.type), ["ningo.status"]);
     assert.ok(orchestrator.seen.every((event) => event.source === "desktop"));

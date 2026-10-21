@@ -59,8 +59,8 @@ func main() {
 		WithMinScore(hashtagMinScore).
 		WithKnowledgeEnabled(func() bool { return controls == nil || controls.ServiceEnabled("knowledge") })
 
-	// An interface is listed (and switchable from the desktop) only when its status address is set:
-	// one that is not deployed has none, so it never shows up as a failure.
+	// Configure probes only when an endpoint exists. The handler still advertises
+	// known interfaces without one, so missing setup never hides their desktop row.
 	interfaceProbes := map[string]handlers.InterfaceProbe{}
 	for name, variable := range map[string]string{
 		"discord":  "DISCORD_INTERFACE_STATUS_ENDPOINT",
