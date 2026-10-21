@@ -257,5 +257,15 @@
   "delivery_job_every": "%s runs every %s",
   "delivery_job_next": ", next at %s",
   "delivery_job_posts_memes": ": posts memes to %d Discord channel(s)",
-  "delivery_job_refreshes": ": refreshes the meme pool and posts nothing"
+  "delivery_job_refreshes": ": refreshes the meme pool and posts nothing",
+  "link_select_whatsapp": "select the whatsapp row to link it (l)",
+  "link_reading": "reading the WhatsApp link",
+  "link_title": "Link WhatsApp",
+  "link_done": "Linked: Ningo answers on this account.",
+  "link_steps": "Scan with the phone: WhatsApp > Linked devices > Link a device",
+  "link_waiting": "No code yet; press n to ask for one.",
+  "link_state": "state: ",
+  "link_unlink_label": "unlink WhatsApp",
+  "link_unlink_warning": "The account is unlinked and its saved session erased; linking again needs a new scan.",
+  "link_help": "n new code · u unlink · esc close (refreshes every 2 s)"
 }

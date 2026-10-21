@@ -120,7 +120,7 @@ func pump(m *Model, cmd tea.Cmd) {
 		switch msg := next().(type) {
 		case tea.BatchMsg:
 			queue = append(queue, msg...)
-		case tickMsg, frameTickMsg:
+		case tickMsg, frameTickMsg, linkTickMsg:
 			// Timers re-arm themselves forever; tests deliver them by hand.
 		default:
 			_, follow := m.Update(msg)
