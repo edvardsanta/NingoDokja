@@ -95,3 +95,40 @@ func TestWithoutAControllerThePanelSaysWhy(t *testing.T) {
 		t.Fatal(m.View())
 	}
 }
+
+func runtimeSets(runtime *fakeRuntime) int {
+	n := 0
+	for _, c := range runtime.calls {
+		if c.eventType == "runtime.set" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestStartingTheSchedulerSaysWhatWillRunAndWaitsForAYes(t *testing.T) {
+	runtime := &fakeRuntime{snapshot: cli.RuntimeSnapshot{Modules: []cli.RuntimeModule{{Name: "scheduler", State: "stopped"}}}}
+	m := withModules(t, newFake(), runtime)
+	press(m, "space")
+	view := m.View()
+	if runtimeSets(runtime) != 0 || !strings.Contains(view, "meme.refresh") || strings.Contains(view, "meme.dispatch roda") {
+		t.Fatalf("the scheduler must not start before a yes, and the notice names only enabled jobs:\n%s", view)
+	}
+	press(m, "n")
+	if runtimeSets(runtime) != 0 {
+		t.Fatal("a no must not start it")
+	}
+	press(m, "space", "y")
+	if runtimeSets(runtime) != 1 {
+		t.Fatal("a yes starts it")
+	}
+}
+
+func TestStoppingDiscordNeedsNoConfirmation(t *testing.T) {
+	runtime := &fakeRuntime{snapshot: cli.RuntimeSnapshot{Modules: []cli.RuntimeModule{{Name: "discord", State: "ready"}}}}
+	m := withModules(t, newFake(), runtime)
+	press(m, "space")
+	if runtimeSets(runtime) != 1 {
+		t.Fatal("stopping posts nothing and is not confirmed")
+	}
+}
