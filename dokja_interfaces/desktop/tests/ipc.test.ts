@@ -661,3 +661,12 @@ test("the link actions are on the allow-list and no neighbour is", () => {
     assert.equal(isAllowedAction(type), false, type);
   }
 });
+
+
+test("Knowledge's inner write timeout is an unknown outcome, never a definite ingestion failure", async () => {
+  const { orchestrator, calls } = recorder({ status: "error", error: "dispatch workflow: dispatch knowledge: knowledge_write_outcome_unknown: deadline passed" });
+  const answer = await handleRequest({ type: "knowledge.ingest", payload: { mode: "note", title: "Fixture", body: "fixture text" } }, orchestrator, limits, undefined, { recent: () => true });
+  assert.equal(failure(answer).code, "timeout");
+  assert.match(failure(answer).message, /unknown/);
+  assert.equal(calls.length, 1, "a timed-out write must not be retried automatically");
+});

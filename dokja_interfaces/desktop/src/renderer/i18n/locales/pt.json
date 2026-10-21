@@ -124,7 +124,7 @@
   "add_nothing": "Não havia nada para adicionar.",
   "add_many": "{count} entradas: {created} adicionadas, {updated} atualizadas, {unchanged} já estavam lá.",
   "add_degraded": "Ainda não indexado por significado, então por enquanto é achado pelas palavras.",
-  "add_timeout": "Sem resposta a tempo. Pode ter sido adicionado; enviar de novo é seguro.",
+  "add_timeout": "Sem resposta a tempo. O documento pode já estar guardado. Recarregue a lista de documentos antes de tentar novamente.",
   "add_field_kind": "Tipo",
   "add_field_reference": "De onde veio (opcional)",
   "add_reference_placeholder": "como um endereço da web, ou um livro e a página",

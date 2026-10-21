@@ -124,7 +124,7 @@
   "add_nothing": "There was nothing to add.",
   "add_many": "{count} entries: {created} added, {updated} updated, {unchanged} already there.",
   "add_degraded": "Not indexed by meaning yet, so for now it is found by keywords.",
-  "add_timeout": "No answer in time. It may have been added; sending it again is safe.",
+  "add_timeout": "No answer in time. It may already be stored. Reload the document list before trying again.",
   "add_field_kind": "Kind",
   "add_field_reference": "Where it came from (optional)",
   "add_reference_placeholder": "such as a web address, or a book and page",

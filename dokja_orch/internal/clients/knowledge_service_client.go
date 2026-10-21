@@ -11,9 +11,18 @@ import (
 	"read_books/internal/infrastructure/zeromq"
 	"read_books/internal/logger"
 	"strings"
+	"syscall"
+	"time"
+
+	"github.com/pebbe/zmq4"
 )
 
 const defaultKnowledgeServiceEndpoint = "tcp://127.0.0.1:5561"
+
+// Leave ten seconds inside the desktop's two-minute ingest deadline to relay a
+// timeout as an unknown write outcome. Fetching and embedding exceed the generic
+// five-second request budget even when the service is healthy.
+const knowledgeWriteTimeout = 110 * time.Second
 
 type KnowledgeServiceRequesterFactory func() (repreq.RequesterReply, error)
 
@@ -21,6 +30,7 @@ type KnowledgeServiceRequesterFactory func() (repreq.RequesterReply, error)
 // logged by type only: their payload is the user's private notes and questions.
 type KnowledgeServiceClient struct {
 	requesterFactory KnowledgeServiceRequesterFactory
+	writeFactory     KnowledgeServiceRequesterFactory
 }
 
 type knowledgeServiceResponse struct {
@@ -31,24 +41,28 @@ type knowledgeServiceResponse struct {
 
 func NewKnowledgeServiceClient(endpoint string) *KnowledgeServiceClient {
 	resolved := resolveKnowledgeServiceEndpoint(endpoint)
-	return &KnowledgeServiceClient{
-		requesterFactory: func() (repreq.RequesterReply, error) {
+	factory := func(timeout time.Duration) KnowledgeServiceRequesterFactory {
+		return func() (repreq.RequesterReply, error) {
 			if err := validateKnowledgeServiceEndpoint(resolved); err != nil {
 				return nil, err
 			}
-			return zeromq.NewRequester(resolved)
-		},
+			return zeromq.NewRequesterWithTimeout(resolved, timeout)
+		}
 	}
+	return &KnowledgeServiceClient{requesterFactory: factory(5 * time.Second), writeFactory: factory(knowledgeWriteTimeout)}
 }
 
 func NewKnowledgeServiceClientWithFactory(factory KnowledgeServiceRequesterFactory) *KnowledgeServiceClient {
-	return &KnowledgeServiceClient{requesterFactory: factory}
+	return &KnowledgeServiceClient{requesterFactory: factory, writeFactory: factory}
 }
 
 // Dispatch sends one knowledge.* event and returns the service's result.
 func (c *KnowledgeServiceClient) Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
 	if c == nil || c.requesterFactory == nil {
 		return nil, fmt.Errorf("knowledge service requester factory is not configured")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if payload == nil {
 		payload = map[string]any{}
@@ -60,7 +74,15 @@ func (c *KnowledgeServiceClient) Dispatch(ctx context.Context, eventType string,
 		return nil, fmt.Errorf("marshal knowledge event: %w", err)
 	}
 
-	requester, err := c.requesterFactory()
+	factory := c.requesterFactory
+	slowWrite := eventType == "knowledge.ingest" || eventType == "knowledge.reindex"
+	if slowWrite {
+		factory = c.writeFactory
+	}
+	if factory == nil {
+		return nil, fmt.Errorf("knowledge service requester factory is not configured")
+	}
+	requester, err := factory()
 	if err != nil {
 		return nil, fmt.Errorf("create knowledge requester: %w", err)
 	}
@@ -91,8 +113,14 @@ func (c *KnowledgeServiceClient) Dispatch(ctx context.Context, eventType string,
 
 	select {
 	case <-ctx.Done():
+		if slowWrite {
+			return nil, unknownKnowledgeWrite(ctx.Err())
+		}
 		return nil, ctx.Err()
 	case err := <-errCh:
+		if slowWrite && zmq4.AsErrno(err) == zmq4.Errno(syscall.EAGAIN) {
+			return nil, unknownKnowledgeWrite(err)
+		}
 		return nil, err
 	case response := <-responseCh:
 		logger.Info(fmt.Sprintf("knowledge client received response type=%s result_keys=%d", eventType, len(response.Result)))
@@ -131,4 +159,8 @@ func validateKnowledgeServiceEndpoint(endpoint string) error {
 		)
 	}
 	return nil
+}
+
+func unknownKnowledgeWrite(err error) error {
+	return fmt.Errorf("knowledge_write_outcome_unknown: the reply deadline passed; the document may already be stored; reload the document list before retrying: %w", err)
 }

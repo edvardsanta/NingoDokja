@@ -258,7 +258,7 @@ describe("adding to the research base", () => {
     type("Text", "text");
 
     send();
-    await screen.findByText("No answer in time. It may have been added; sending it again is safe.");
+    await screen.findByText("No answer in time. It may already be stored. Reload the document list before trying again.");
     expect((screen.getByLabelText("Text") as HTMLTextAreaElement).value).toBe("text");
 
     send();

@@ -220,6 +220,26 @@ On every Discord message the orchestrator looks the question up and gives the ch
 hits, then ends the reply with the sources it consulted. Switching `knowledge` off (`dokja-cli services`)
 stops both that lookup and the `knowledge.*` events; chat keeps working either way.
 
+### Ingest and reindex timeouts
+
+Fetching, parsing and embedding may take longer than a health check. The
+orchestrator gives `knowledge.ingest` and `knowledge.reindex` a dedicated
+110-second ZeroMQ send/receive timeout; other Knowledge requests keep their
+five-second timeout. The desktop already requests a two-minute ingestion wait.
+A shorter caller deadline can still expire first, and the serial service may
+queue requests behind a long write.
+
+A timed-out write may already be stored. The orchestrator reports the fixed
+`knowledge_write_outcome_unknown` reason for write socket timeouts or cancellation
+after dispatch; the desktop treats that as a timeout and advises reloading the
+document list before retrying. It does not resend automatically. This does not
+add durable job acceptance, cancellation or a way to query an operation's outcome.
+Very long imports still require checking stored documents after a timeout.
+
+No service data, environment, port or compose changes are needed. Roll out the
+orchestrator and rebuild/restart the desktop for the updated timeout guidance;
+rolling back restores the earlier client timeout without a database migration.
+
 ## Experience Memory
 
 `dokja-memory` stores experiences, "in this context the bot took this action, and this was the outcome",
