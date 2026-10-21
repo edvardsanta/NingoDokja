@@ -720,7 +720,8 @@
         "Compare SQLite, PostgreSQL+pgvector and Neo4j on the cognitive graph workloads before selecting an engine; document correctness, filtered recall, bounded traversal, ownership, concurrency and recovery. Research alone does not authorize migration."
       ],
       "evidence": [
-        "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet."
+        "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet.",
+        "W1 storage spike (owner accepted W1 as first consumer, 2026-10-20): dokja_store/spikes/cognitive_storage compares SQLite, PostgreSQL 17 + pgvector 0.8.7 and Neo4j 2026.09 Community on a generated fixture up to 108k chunks x 1024 dims. All exact modes matched the gold; no engine leaked scope, superseded or deleted rows; PostgreSQL approximate stayed at recall 1.00, Neo4j approximate 0.23-0.52; exact p95 at the largest size 95 ms (PostgreSQL), 111 ms (SQLite), 850 ms (Neo4j). W1 does not measure graph workloads. See dokja_docs/step-10-storage-spike.md."
       ],
       "checks": [],
       "blockers": [],
