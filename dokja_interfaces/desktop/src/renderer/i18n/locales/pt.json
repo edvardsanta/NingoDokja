@@ -277,8 +277,8 @@
   "experience_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Atualize a memória antes de tentar de novo.",
   "state_not_configured": "não configurado",
   "whatsapp_setup_missing": "O WhatsApp ainda não foi configurado. Configure a conexão local do WhatsApp para vincular sua conta.",
-  "runtime_title": "Contêineres locais",
-  "runtime_intro": "Abrir o desktop não inicia contêineres. Ligue um módulo quando precisar; as dependências necessárias iniciam junto.",
+  "runtime_title": "Módulos",
+  "runtime_intro": "Ligue apenas o que precisar. As dependências necessárias iniciam junto com o módulo.",
   "runtime_start": "Ligar",
   "runtime_stop": "Desligar",
   "runtime_start_named": "Ligar {name}",
@@ -289,6 +289,12 @@
   "runtime_stopping": "Parando",
   "runtime_stopped": "Desligado",
   "runtime_failed": "Falhou",
-  "runtime_scope": "O controlador continua em segundo plano ao fechar o desktop. Desligar preserva os dados e as dependências compartilhadas. Os controles de roteamento abaixo são separados.",
-  "runtime_unknown": "Desconhecido (consulta de contêineres indisponível)"
+  "runtime_scope": "Os módulos continuam funcionando ao fechar o desktop. Desligar preserva os dados.",
+  "runtime_unknown": "Desconhecido (consulta de contêineres indisponível)",
+  "runtime_options": "Opções de {name}",
+  "runtime_activity": "Atividade",
+  "runtime_routing_named": "Processar solicitações de {name}",
+  "runtime_routing_hint": "Esta opção pausa as solicitações e mantém o módulo funcionando.",
+  "runtime_activity_unavailable": "Atividade e tarefas agendadas estarão disponíveis quando o orquestrador responder.",
+  "runtime_automation": "Automação"
 }

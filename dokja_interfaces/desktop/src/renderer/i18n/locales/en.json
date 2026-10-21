@@ -277,8 +277,8 @@
   "experience_feedback_check": "If the request timed out, the outcome is unknown. Refresh memory before trying again.",
   "state_not_configured": "not configured",
   "whatsapp_setup_missing": "WhatsApp has not been set up. Configure the local WhatsApp gateway to link your account.",
-  "runtime_title": "Local containers",
-  "runtime_intro": "Opening the desktop does not start containers. Start a module when needed; its required dependencies start with it.",
+  "runtime_title": "Modules",
+  "runtime_intro": "Start only what you need. Required dependencies start with the module.",
   "runtime_start": "Start",
   "runtime_stop": "Stop",
   "runtime_start_named": "Start {name}",
@@ -289,6 +289,12 @@
   "runtime_stopping": "Stopping",
   "runtime_stopped": "Stopped",
   "runtime_failed": "Failed",
-  "runtime_scope": "The background controller continues after the desktop closes. Stopping preserves data and shared dependencies. Routing switches below remain separate.",
-  "runtime_unknown": "Unknown (container inspection unavailable)"
+  "runtime_scope": "Modules continue running after you close the desktop. Stopping preserves their data.",
+  "runtime_unknown": "Unknown (container inspection unavailable)",
+  "runtime_options": "Options for {name}",
+  "runtime_activity": "Activity",
+  "runtime_routing_named": "Process requests for {name}",
+  "runtime_routing_hint": "This pauses request handling while keeping the module running.",
+  "runtime_activity_unavailable": "Activity and scheduled jobs will be available when the orchestrator responds.",
+  "runtime_automation": "Automation"
 }

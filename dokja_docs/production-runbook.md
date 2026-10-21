@@ -602,7 +602,7 @@ each interface, new names in the switchable set (listed apart from the services)
 The desktop can bootstrap the **local lite stack** with a host daemon, independent
 of the application orchestrator. This does not manage the production stack.
 Opening desktop starts only the daemon and queries container status; all optional
-application containers may remain stopped. In System → Local containers, Start
+application containers may remain stopped. In System → Modules, Start
 runs one selected module and its required dependencies, and Stop preserves
 persistent data and dependencies still in use.
 
