@@ -511,6 +511,11 @@ button:focus-visible {
   margin-top: 1rem;
 }
 
+/* The views of a workspace sit above its card. */
+.knowledge-views {
+  margin: 0 0 1rem;
+}
+
 button[aria-pressed="true"] {
   background: var(--cyan);
   color: var(--panel);

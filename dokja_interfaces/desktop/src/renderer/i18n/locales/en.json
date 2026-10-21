@@ -50,6 +50,8 @@
   "memory_beats_baseline": "Skill {skill}: beats the baseline.",
   "memory_does_not_beat": "Skill {skill}: does not beat the baseline.",
   "kind_knowledge": "knowledge",
+  "knowledge_view_documents": "documents",
+  "knowledge_view_sources": "sources",
   "knowledge_title": "Research base",
   "knowledge_counts": "{documents} documents in {chunks} passages",
   "knowledge_empty": "The research base is empty: drop a file anywhere here, or add a note or a web address below.",
