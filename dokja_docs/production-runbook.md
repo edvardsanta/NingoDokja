@@ -631,7 +631,15 @@ stop. Existing containers are reused rather than recreated; configuration/image
 deployment is separate from runtime Start/Stop.
 
 The daemon listens on a mode-0600 Unix socket in a mode-0700 per-checkout directory
-under the desktop user's data directory. An OS lock rejects duplicate instances
+under `$XDG_STATE_HOME/dokja/` (default `~/.local/state/dokja/`), shared by the
+desktop, the CLI (`dokja-cli modules`) and the TUI panel. Host-run CLI/TUI launch
+it from the optional `DOKJA_RUNTIME_BIN` (an absolute path), `dokja-runtime` on
+`PATH` or the desktop build; the `dokja-cli`/`dokja-tui` containers report module
+control as unavailable. After upgrading from a build that kept this state in the
+desktop data directory, open the new desktop first (only it adopts the old
+ownership journal into the new location), then stop the old daemon once with SIGTERM.
+A module that already shows failed from an earlier stop clears after its next Start and Stop. A stop the
+controller asked for shows as stopped even when the process exits non-zero. An OS lock rejects duplicate instances
 and permits safe stale-socket recovery. Private ownership state records which
 services the controller created and which modules were explicitly selected. Do
 not delete live socket/ownership files. When replacing the controller build or
