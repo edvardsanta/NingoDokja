@@ -587,9 +587,12 @@ heading, with their state and a switch each. See the interface docs for each sta
   `communications.send` only, one named conversation at a time, as text, under a fixed budget of 6 a
   minute and 40 an hour. The desktop asks in a window of its own first. Turning WhatsApp off in the
   health tab stops it as well.
-- **Linking WhatsApp from the desktop** uses `communications.link.status`, `.start` and `.reset`. They
-  need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and on the desktop process; the desktop
-  draws the code itself and never shows it as text. The orchestrator derives the link routes from
+- **Linking WhatsApp from the desktop, CLI or TUI** uses `communications.link.status`, `.start` and
+  `.reset`. They need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and in the environment of the
+  desktop process, `dokja-cli` or `dokja-tui`; each draws the code itself (the CLI and TUI with
+  terminal blocks) and never shows it as text. `dokja-cli interfaces link whatsapp [--new]` waits
+  for the scan; `interfaces unlink whatsapp` asks first. In the TUI, `l` on the whatsapp row opens
+  the link window. The orchestrator derives the link routes from
   `WHATSAPP_INTERFACE_STATUS_ENDPOINT`, so that is the only address to set. Starting over unlinks the
   device and erases the saved session; the session volume itself is not removed.
 
