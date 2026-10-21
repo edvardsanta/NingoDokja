@@ -257,5 +257,15 @@
   "delivery_job_every": "%s roda a cada %s",
   "delivery_job_next": ", próximo às %s",
   "delivery_job_posts_memes": ": posta memes em %d canal(is) do Discord",
-  "delivery_job_refreshes": ": atualiza o pool de memes e não posta nada"
+  "delivery_job_refreshes": ": atualiza o pool de memes e não posta nada",
+  "link_select_whatsapp": "selecione a linha whatsapp para vincular (l)",
+  "link_reading": "lendo o vínculo do WhatsApp",
+  "link_title": "Vincular WhatsApp",
+  "link_done": "Vinculado: o Ningo responde nesta conta.",
+  "link_steps": "Escaneie com o celular: WhatsApp > Aparelhos conectados > Conectar um aparelho",
+  "link_waiting": "Ainda sem código; aperte n para pedir um.",
+  "link_state": "estado: ",
+  "link_unlink_label": "desvincular WhatsApp",
+  "link_unlink_warning": "A conta é desvinculada e a sessão salva apagada; vincular de novo exige um novo escaneamento.",
+  "link_help": "n novo código · u desvincular · esc fechar (atualiza a cada 2 s)"
 }

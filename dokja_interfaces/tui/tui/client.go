@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"dokja_interfaces/cli/cli"
 )
@@ -35,7 +36,7 @@ func (c *OrchestratorClient) Request(ctx context.Context, eventType string, payl
 		UserName:  "tui",
 		ChannelID: "tui",
 		Payload:   payload,
-		Context:   map[string]any{"interface": "tui"},
+		Context:   cli.CommunicationsContext(eventType, map[string]any{"interface": "tui"}, os.Getenv),
 		Source:    "cli",
 	})
 	response, err := requester.Request(ctx, event)
