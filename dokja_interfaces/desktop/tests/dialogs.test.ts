@@ -109,3 +109,11 @@ test("a send to WhatsApp says it goes out from the owner's own account and names
   const discord = questionFor("en", "communications.send", { channel_ids: ["123"], content: "hi" });
   assert.equal(discord?.message, "Send to Discord as Ningo?");
 });
+
+test("feedback confirmation names the exact reference and observed result in either language",()=>{
+ const en=questionFor("en","memory.resolve",{ref:"fixture:1",observed:"#Other",message:"do not show"});
+ assert.equal(en?.message,"Record this feedback?");
+ assert.match(en?.detail??"",/^fixture:1\n\n#Other\n\nThe first recorded outcome/);
+ assert.doesNotMatch(en?.detail??"",/do not show/);
+ assert.equal(questionFor("pt","memory.resolve",{ref:"fixture:1",outcome:"ignored"})?.message,"Registrar este feedback?");
+});

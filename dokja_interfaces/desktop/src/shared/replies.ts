@@ -266,3 +266,5 @@ export type MemoryExperience = {
 };
 export type MemoryExperiences = { off?: false; experiences: MemoryExperience[]; total: number; offset: number; limit: number };
 export type MemoryExperienceDetail = { off?: false; found: false } | { off?: false; found: true; experience: MemoryExperience };
+
+export type MemoryResolution = { off?: false; found: boolean; resolved: boolean; outcome: string };

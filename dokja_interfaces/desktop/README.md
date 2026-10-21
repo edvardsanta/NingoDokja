@@ -256,12 +256,41 @@ outcome and timestamp, context, and domain-owned feedback guidance.
 Missing predictions remain “Not recorded”; a recorded zero remains 0%. Context
 and excerpts render as plain text. Listings carry short excerpts only; opening
 one record explicitly requests bounded full context. Older services that do not
-return full context show the list excerpt with a clear label. No feedback writes,
-manual verdict buttons or automatic resolution are introduced.
+return full context show the list excerpt with a clear label. Inspection never
+records feedback automatically.
 
-The main process allowlists only `memory.list`/`memory.get`, bounds their payloads
-and projections, and drops unrelated service fields. The domain interprets
+The main process allowlists `memory.list`/`memory.get` for reads and
+`memory.resolve` for explicit feedback, bounds their payloads and projections,
+and drops unrelated service fields. The domain interprets
 feedback; the desktop translates its codes. The browser demo contains seven
 synthetic pending experiences. Roll out the Memory service and orchestrator before
 rebuilding/restarting desktop for full context and guidance. Rolling back leaves
 stored experiences untouched; no routes, schema, configuration or compose changes.
+
+
+### Giving experience feedback (primary interface)
+
+Desktop is the primary interface for feedback. Open **memory → Load experiences
+→ Inspect** for the record you recognize, then choose:
+
+- **Accept result** when you actually kept the result.
+- **Save actual result** after entering what you used instead. Memory compares
+  it with the original detail; the desktop never invents the verdict.
+- **Not used** when you explicitly know the result was not used.
+
+Review the native confirmation before recording. The first verdict is retained;
+a concurrent or earlier verdict is displayed without being overwritten. A saved
+verdict shows a confirmation and **Refresh memory** reloads both the counts and
+list. A missing record, disabled service, cancellation and failure are separate
+from success. After a timeout, refresh before retrying because the write may
+already have completed. Pending and expired-without-verdict records may receive
+feedback; records with a saved verdict have no write controls.
+
+This records an experience outcome; it does not create or edit a Knowledge
+hashtag training example. Repeated suggestions currently share a media-derived
+reference. If you cannot identify the experience, leave it unknown rather than
+assigning an outcome to a guessed attempt. See
+[experience feedback](../../dokja_docs/experience-feedback.md) for the secondary
+TUI and coding-agent paths. Existing event contracts, SQLite schema, settings and
+compose files are unchanged. Rebuild Memory for authoritative concurrent-write
+receipts, then rebuild/restart desktop and TUI. No rollout runs automatically.

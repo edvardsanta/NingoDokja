@@ -43,6 +43,8 @@ func (m *Model) View() string {
 		body = m.viewMemory()
 	case overlayMemoryList:
 		body = m.viewMemoryList()
+	case overlayMemoryFeedback:
+		body = m.viewMemoryFeedback()
 	case overlayMemoryPredict:
 		body = m.viewMemoryPredict()
 	default:
@@ -107,6 +109,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("memory_overlay_help")
 	case overlayMemoryList:
 		hint = tr("memory_list_help")
+	case overlayMemoryFeedback:
+		hint = tr("enter_continue_esc_cancel")
 	case overlayMemoryPredict:
 		hint = tr("memory_predict_help")
 	}

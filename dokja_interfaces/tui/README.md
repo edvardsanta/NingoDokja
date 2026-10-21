@@ -125,7 +125,18 @@ remain) and `esc` closes.
 The memory is read on demand and never as part of the panel refresh: a stopped memory service takes about
 five seconds to fail, and the panel must not wait for it. The `memory` row in the service list switches the
 service off like any other. A snippet is the first 160 characters of a context, asked for by the TUI only;
-`dokja-cli memory` does the same and also resolves and records single experiences.
+Desktop is the primary feedback interface. In the TUI experience list, select a
+pending record and press `a` to accept, `c` to enter the actual result, or `i` to
+state that it was not used. Each action shows the ref, context excerpt and chosen
+value before confirmation; `n`/`esc` cancels without writing. The list reloads
+after a response. Earlier/concurrent verdicts remain authoritative. An expired
+record with no saved verdict can still receive explicit late feedback. After a
+timeout, press `r` to inspect the current state before retrying. These actions
+record experience outcomes and do not edit Knowledge hashtag examples.
+
+`dokja-cli memory` remains an adapter that coding agents can invoke on the user's
+behalf, rather than the expected human feedback interface. See
+[experience feedback](../../dokja_docs/experience-feedback.md).
 
 ## Chat profiles
 

@@ -55,7 +55,7 @@
   "if_the_filter_blocks_it_this_channel_is_skipped_and_the_rest_receive_it": "If the filter blocks it, this channel is skipped and the rest receive it.",
   "image_field": "Image",
   "image_summary_prefix": "Image: ",
-  "in_1m": "in \u003c1m",
+  "in_1m": "in <1m",
   "in_dh_02dm": "in %dh%02dm",
   "in_dm": "in %dm",
   "in_progress": " in progress",
@@ -224,5 +224,15 @@
   "wait_for_the_panel_to_load": "wait for the panel to load",
   "warning_service_s_is_switched_off_and_the_orchestrator_will_refuse_it": "Warning: service %s is switched off and the orchestrator will refuse it.",
   "write_a_message_and_or_provide_an_image": "write a message and/or provide an image",
-  "y_enter_confirm_n_esc_cancel": "y/enter confirm · n/esc cancel"
+  "y_enter_confirm_n_esc_cancel": "y/enter confirm · n/esc cancel",
+  "memory_feedback_help": "a accept · c correct · i not used (selected pending experience)",
+  "memory_feedback_record": "Record experience feedback",
+  "memory_feedback_confirmation": "Confirm what actually happened for this experience. The first recorded outcome is retained. This does not change hashtag training examples.",
+  "memory_feedback_actual": "Actual result:",
+  "memory_feedback_value_required": "Enter the actual result without control characters.",
+  "memory_feedback_no_detail": "This experience has no recorded detail to compare. Use an explicit outcome.",
+  "memory_feedback_missing": "Experience no longer exists; nothing was resolved.",
+  "memory_feedback_conflict": "An outcome already exists: %s. It was retained.",
+  "memory_feedback_saved": "Feedback saved: %s.",
+  "memory_feedback_check": "If the request timed out, its outcome is unknown. Reload the list before retrying."
 }

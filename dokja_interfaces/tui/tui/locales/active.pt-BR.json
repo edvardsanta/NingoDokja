@@ -55,7 +55,7 @@
   "if_the_filter_blocks_it_this_channel_is_skipped_and_the_rest_receive_it": "Se o filtro barrar, esse canal é pulado e o resto recebe.",
   "image_field": "Imagem",
   "image_summary_prefix": "Imagem: ",
-  "in_1m": "em \u003c1m",
+  "in_1m": "em <1m",
   "in_dh_02dm": "em %dh%02dm",
   "in_dm": "em %dm",
   "in_progress": " em andamento",
@@ -224,5 +224,15 @@
   "wait_for_the_panel_to_load": "aguarde o painel carregar",
   "warning_service_s_is_switched_off_and_the_orchestrator_will_refuse_it": "Atenção: o serviço %s está desligado e o orquestrador vai recusar.",
   "write_a_message_and_or_provide_an_image": "escreva uma mensagem e/ou informe uma imagem",
-  "y_enter_confirm_n_esc_cancel": "y/enter confirma · n/esc cancela"
+  "y_enter_confirm_n_esc_cancel": "y/enter confirma · n/esc cancela",
+  "memory_feedback_help": "a aceitar · c corrigir · i não usado (experiência pendente selecionada)",
+  "memory_feedback_record": "Registrar feedback da experiência",
+  "memory_feedback_confirmation": "Confirme o que aconteceu nesta experiência. O primeiro resultado registrado é mantido. Isso não altera exemplos de treinamento de hashtag.",
+  "memory_feedback_actual": "Resultado real:",
+  "memory_feedback_value_required": "Informe o resultado real sem caracteres de controle.",
+  "memory_feedback_no_detail": "Esta experiência não tem um detalhe registrado para comparar. Use um resultado explícito.",
+  "memory_feedback_missing": "A experiência não existe mais; nada foi resolvido.",
+  "memory_feedback_conflict": "Já existe um resultado: %s. Ele foi mantido.",
+  "memory_feedback_saved": "Feedback salvo: %s.",
+  "memory_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Recarregue a lista antes de tentar de novo."
 }

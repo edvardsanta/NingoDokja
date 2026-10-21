@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -266,6 +267,28 @@ func (m *Model) keyMemoryList(key string) (tea.Model, tea.Cmd) {
 		return m, m.cmdMemoryList(memoryStates[next], 0, 0)
 	case "r":
 		return m, m.cmdMemoryList(list.State, list.Offset, list.Cursor)
+	case "a", "i", "c":
+		if m.busy {
+			return m, nil
+		}
+		if item, ok := m.selectedMemoryExperience(); ok && (item.Outcome == "" || (item.Outcome == "expired" && item.ResolvedAt == "")) {
+			if key == "c" {
+				if item.Detail == "" {
+					m.setNotice(tr("memory_feedback_no_detail"), true)
+					return m, nil
+				}
+				m.memoryFeedbackTarget = item
+				m.memoryFeedbackInput.SetValue("")
+				m.memoryFeedbackInput.Focus()
+				m.overlay = overlayMemoryFeedback
+			} else {
+				outcome := "accepted"
+				if key == "i" {
+					outcome = "ignored"
+				}
+				m.confirmMemoryFeedback(item, map[string]any{"outcome": outcome}, outcomeLabel(outcome))
+			}
+		}
 	case "f":
 		if item, ok := m.selectedMemoryExperience(); ok {
 			m.askConfirm(&pendingAction{
@@ -357,6 +380,7 @@ func (m *Model) viewMemoryList() string {
 	var b strings.Builder
 	b.WriteString(styleTitle.Render(tr("memory_experiences_title")) +
 		styleDim.Render("  "+memoryFilterLabel(l.State)+" · "+strconv.Itoa(l.Total)) + "\n\n")
+	b.WriteString(styleDim.Render(tr("memory_feedback_help")) + "\n\n")
 	switch {
 	case !l.loaded:
 		b.WriteString(styleDim.Render(tr("loading")))
@@ -473,4 +497,57 @@ func viewMemoryPrediction(p memoryPrediction) string {
 		}
 	}
 	return b.String()
+}
+
+// confirmMemoryFeedback freezes the selected ref and value before asking. Returning to
+// the list, moving its cursor or a concurrent verdict cannot retarget this write.
+func (m *Model) confirmMemoryFeedback(item memoryExperience, choice map[string]any, value string) {
+	payload := map[string]any{"ref": item.Ref}
+	for key, value := range choice {
+		payload[key] = value
+	}
+	m.askConfirm(&pendingAction{
+		label: tr("memory_feedback_record"), eventType: "memory.resolve", payload: payload,
+		lines: []string{experienceTitle(item), "ref " + item.Ref, item.Snippet, value, "", tr("memory_feedback_confirmation")},
+		summarize: func(res map[string]any) string {
+			if found, _ := res["found"].(bool); !found {
+				return tr("memory_feedback_missing")
+			}
+			if resolved, _ := res["resolved"].(bool); !resolved {
+				return tr("memory_feedback_conflict", outcomeLabel(str(res, "outcome")))
+			}
+			return tr("memory_feedback_saved", outcomeLabel(str(res, "outcome")))
+		},
+		onSuccess: func(m *Model, _ map[string]any) tea.Cmd {
+			return m.cmdMemoryList(m.memoryList.State, m.memoryList.Offset, m.memoryList.Cursor)
+		}, back: overlayMemoryList,
+	})
+}
+
+func (m *Model) keyMemoryFeedback(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.memoryFeedbackInput.Blur()
+		m.overlay = overlayMemoryList
+		return m, nil
+	case "enter":
+		observed := strings.TrimSpace(m.memoryFeedbackInput.Value())
+		if observed == "" || strings.IndexFunc(observed, unicode.IsControl) >= 0 {
+			m.setNotice(tr("memory_feedback_value_required"), true)
+			return m, nil
+		}
+		m.memoryFeedbackInput.Blur()
+		m.confirmMemoryFeedback(m.memoryFeedbackTarget, map[string]any{"observed": observed}, observed)
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.memoryFeedbackInput, cmd = m.memoryFeedbackInput.Update(msg)
+	return m, cmd
+}
+
+func (m *Model) viewMemoryFeedback() string {
+	item := m.memoryFeedbackTarget
+	return styleBox.Render(styleTitle.Render(tr("memory_feedback_record")) + "\n\n" +
+		experienceTitle(item) + "\nref " + item.Ref + "\n" + item.Snippet + "\n\n" +
+		tr("memory_feedback_actual") + "\n" + m.memoryFeedbackInput.View())
 }

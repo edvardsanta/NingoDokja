@@ -264,5 +264,15 @@
   "experience_feedback_expired": "Esta experiência expirou sem resultado observado. Expiração não significa rejeição.",
   "experience_feedback_recorded": "O resultado já foi registrado. O primeiro resultado é preservado.",
   "experience_feedback_unknown": "Os requisitos de feedback não foram retornados. Identifique a ação e sua referência antes de registrar um resultado observado.",
-  "experience_readonly": "Somente consulta: abrir esta experiência não registra feedback nem a resolve."
+  "experience_feedback_scope": "O feedback registra o resultado desta experiência. Ele não adiciona nem altera exemplos de treinamento de hashtag.",
+  "experience_feedback_record": "Registrar feedback",
+  "experience_feedback_confirm_scope": "Confirme que reconhece esta experiência e sabe o que aconteceu. O primeiro resultado registrado é mantido.",
+  "experience_feedback_accept": "Aceitar resultado",
+  "experience_feedback_ignore": "Não foi usado",
+  "experience_feedback_observed": "Resultado real",
+  "experience_feedback_correct": "Salvar resultado real",
+  "experience_feedback_saved": "Feedback salvo: {outcome}.",
+  "experience_feedback_conflict": "Já havia um resultado registrado: {outcome}. Seu envio não o substituiu.",
+  "experience_feedback_refresh": "Atualizar memória",
+  "experience_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Atualize a memória antes de tentar de novo."
 }

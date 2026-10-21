@@ -63,3 +63,55 @@ describe("saved experiences",()=>{
   expect(screen.queryByText(/<b>Full/)).toBeNull();
  });
 });
+
+describe("explicit experience feedback",()=>{
+ async function open(routes:Parameters<typeof routedTransport>[0]) {
+  const test=routedTransport({"memory.list":page(),"memory.get":detail(),...routes});
+  show(test.transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
+  await screen.findByRole("button",{name:"Accept result"});return test;
+ }
+ it("sends acceptance for the inspected ref only after the operator clicks",async()=>{
+  const {calls}=await open({"memory.resolve":ok({found:true,resolved:true,outcome:"accepted"})});
+  expect(calls.some(c=>c.type==="memory.resolve")).toBe(false);
+  fireEvent.click(screen.getByRole("button",{name:"Accept result"}));
+  await screen.findByText("Feedback saved: accepted.");
+  expect(calls.at(-1)?.payload).toEqual({ref:"fixture:1",outcome:"accepted"});
+  expect(screen.queryByRole("button",{name:"Accept result"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Refresh memory"}));
+  await waitFor(()=>expect(calls.filter(c=>c.type==="memory.list")).toHaveLength(2));
+ });
+ it("submits an actual result without deciding acceptance or replacement in the interface",async()=>{
+  const {calls}=await open({"memory.resolve":ok({found:true,resolved:true,outcome:"replaced"})});
+  expect((screen.getByRole("button",{name:"Save actual result"}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Actual result"),{target:{value:" #Other "}});
+  fireEvent.click(screen.getByRole("button",{name:"Save actual result"}));
+  await screen.findByText("Feedback saved: replaced.");
+  expect(calls.at(-1)?.payload).toEqual({ref:"fixture:1",observed:"#Other"});
+ });
+ it("reports a concurrent verdict without claiming the new choice was saved",async()=>{
+  const {calls}=await open({"memory.resolve":ok({found:true,resolved:false,outcome:"accepted"})});
+  fireEvent.click(screen.getByRole("button",{name:"Not used"}));
+  await screen.findByText("An outcome was already recorded: accepted. Your submission did not replace it.");
+  expect(calls.at(-1)?.payload).toEqual({ref:"fixture:1",outcome:"ignored"});
+ });
+ it("leaves outcomes unknown on timeout and does not retry automatically",async()=>{
+  const {calls}=await open({"memory.resolve":failure("timeout")});
+  fireEvent.click(screen.getByRole("button",{name:"Accept result"}));
+  await screen.findByText(/Refresh memory before trying again/);
+  expect(calls.filter(c=>c.type==="memory.resolve")).toHaveLength(1);
+ });
+ it("shows a disabled service without claiming a saved result",async()=>{
+  await open({"memory.resolve":ok({off:true,reason:"paused"})});
+  fireEvent.click(screen.getByRole("button",{name:"Accept result"}));
+  await screen.findByText(/paused/);
+  expect(screen.queryByText(/Feedback saved:/)).toBeNull();
+ });
+ it("hides controls for a recorded verdict",async()=>{
+  const test=routedTransport({"memory.list":page(),"memory.get":detail({outcome:"accepted",resolvedAt:"2026-10-21T01:00:00Z"})});
+  show(test.transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
+  await screen.findByText("2026-10-21T01:00:00Z");
+  expect(screen.queryByRole("button",{name:"Accept result"})).toBeNull();
+ });
+});

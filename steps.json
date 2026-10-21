@@ -184,7 +184,7 @@
         {
           "record": "dokja_docs/decisions/0005-knowledge-experience-content.md",
           "status": "proposed",
-          "question": "Knowledge\u2013Prediction\u2013Experience cycle ownership, update semantics, and Book/source boundaries",
+          "question": "Knowledge–Prediction–Experience cycle ownership, update semantics, and Book/source boundaries",
           "evidence_step": "03",
           "implementation_gate": "Resolve before step 04 integrates cognitive-loop transition contracts or any Book/Knowledge/Experience ownership migration.",
           "allowed_before_resolution": "Capture current behavior and compare pure reference loops using synthetic fixtures and fake capabilities; no production topology is adopted."
@@ -558,7 +558,8 @@
       "evidence": [
         "Step 09.1 complete: typed classification/provenance foundation with regression tests; see dokja_docs/step-09-consolidation.md. Representation decisions recorded in ADR 0008.",
         "Step 09.2 persistence, API/CLI answers, reading-time classifier and explicit stored-document reclassification are implemented. Desktop/chat continuation and other listed remaining items keep 09.2 in progress; generic consolidation and faculty migrations remain pending.",
-        "Inspectable Memory desktop: paginated read-only memory.list and per-reference memory.get expose context, action/detail, frozen predictions, baseline, similarity and observed outcomes. Memory domain provides feedback guidance; the service adds opt-in bounded context to get without changing listing excerpts, default reads, verdicts or schema. See dokja_docs/step-09-consolidation.md#inspectable-experience-memory."
+        "Inspectable Memory desktop: paginated read-only memory.list and per-reference memory.get expose context, action/detail, frozen predictions, baseline, similarity and observed outcomes. Memory domain provides feedback guidance; the service adds opt-in bounded context to get without changing listing excerpts, default reads, verdicts or schema. See dokja_docs/step-09-consolidation.md#inspectable-experience-memory.",
+        "Desktop is the primary explicit experience feedback interface: inspected records offer acceptance, observed-result comparison and explicit non-use, protected by real input and native confirmation. TUI list keys a/c/i provide the secondary path; coding-agent mediation is documented using the existing synchronous request adapter. The Memory store now acknowledges only the winning verdict under concurrent writes. See dokja_docs/experience-feedback.md."
       ],
       "checks": [
         {
@@ -580,6 +581,11 @@
           "name": "inspectable_experience_memory",
           "status": "passed",
           "detail": "Memory domain and service go test -race ./... and go vet ./... passed; orchestrator go test ./... passed. Desktop pnpm test: 203 Node and 190 UI tests passed; pnpm typecheck passed; pnpm test:e2e built the app and passed 26 headless Electron tests, including seven-row browsing, literal context and no resolution writes. Tests use synthetic fixtures; no owner experience was modified."
+        },
+        {
+          "name": "explicit_experience_feedback",
+          "status": "passed",
+          "detail": "Desktop pnpm test: 205 Node + 196 UI; pnpm typecheck; pnpm test:e2e: build + 29 headless Electron tests. Memory service and TUI go test -race ./... and go vet ./... passed. Covers explicit writes, cancellation, missing/disabled service, uncertain timeout without retry, prior verdicts, exact reference targeting and concurrent first-verdict receipts. Synthetic tests only; no owner records changed or deployment performed."
         }
       ],
       "blockers": [],

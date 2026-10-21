@@ -42,6 +42,7 @@ const (
 	overlayMemory
 	overlayMemoryList
 	overlayMemoryPredict
+	overlayMemoryFeedback
 )
 
 const (
@@ -156,16 +157,18 @@ type Model struct {
 
 	// Chat provider profiles. Selecting goes through the orchestrator; creating and
 	// deleting write the local database directly, so a token never crosses the network.
-	profiles      ProfileStore
-	profileCursor int
-	profileForm   [4]textinput.Model
-	profileFocus  int
-	hashtagInput  textinput.Model
-	hashtagList   hashtagExamples
-	memory        memoryView
-	memoryList    memoryExperiences
-	memoryInput   textinput.Model
-	memoryResult  memoryPredictView
+	profiles             ProfileStore
+	profileCursor        int
+	profileForm          [4]textinput.Model
+	profileFocus         int
+	hashtagInput         textinput.Model
+	hashtagList          hashtagExamples
+	memory               memoryView
+	memoryList           memoryExperiences
+	memoryInput          textinput.Model
+	memoryResult         memoryPredictView
+	memoryFeedbackTarget memoryExperience
+	memoryFeedbackInput  textinput.Model
 
 	// chancePausedUntil is when the hashtag suggestion may ask the memory for a chance again, after
 	// a failure.
@@ -208,6 +211,10 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	hashtag.CharLimit = 100
 	hashtag.Width = 40
 
+	feedbackText := textinput.New()
+	feedbackText.CharLimit = 200
+	feedbackText.Width = 52
+
 	memoryText := textinput.New()
 	memoryText.CharLimit = 1000
 	memoryText.Width = 52
@@ -223,18 +230,19 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	form[3].EchoCharacter = '•'
 
 	return &Model{
-		profileForm:   form,
-		client:        client,
-		now:           time.Now,
-		timeout:       timeout,
-		refreshEvery:  refreshEvery,
-		memes:         memeList{scope: "unsent"},
-		form:          discordForm{text: text, image: image, selected: map[string]bool{}},
-		dispatchInput: dispatch,
-		intervalInput: interval,
-		hashtagInput:  hashtag,
-		memoryInput:   memoryText,
-		images:        newImageState(),
+		profileForm:         form,
+		client:              client,
+		now:                 time.Now,
+		timeout:             timeout,
+		refreshEvery:        refreshEvery,
+		memes:               memeList{scope: "unsent"},
+		form:                discordForm{text: text, image: image, selected: map[string]bool{}},
+		dispatchInput:       dispatch,
+		intervalInput:       interval,
+		hashtagInput:        hashtag,
+		memoryInput:         memoryText,
+		memoryFeedbackInput: feedbackText,
+		images:              newImageState(),
 	}
 }
 
@@ -512,7 +520,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.busy = false
 		if msg.err != nil {
 			m.addHistory(msg.action.label, msg.err.Error(), false)
-			m.setNotice(msg.action.label+tr("failed")+msg.err.Error(), true)
+			message := msg.action.label + tr("failed") + msg.err.Error()
+			if msg.action.eventType == "memory.resolve" {
+				message += " " + tr("memory_feedback_check")
+			}
+			m.setNotice(message, true)
 			return m, nil
 		}
 		summary := "ok"
@@ -572,6 +584,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemory(key)
 	case overlayMemoryList:
 		return m.keyMemoryList(key)
+	case overlayMemoryFeedback:
+		return m.keyMemoryFeedback(msg)
 	case overlayMemoryPredict:
 		return m.keyMemoryPredict(msg)
 	}
