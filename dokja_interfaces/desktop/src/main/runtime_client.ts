@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, realpathSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, realpathSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { createConnection } from "node:net";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { isRecord } from "../shared/records.js";
 import { OrchestratorError, type OrchestratorReply } from "./orchestrator_client.js";
 
@@ -25,7 +25,15 @@ function connected(socketPath: string): Promise<boolean> {
   });
 }
 
-export type RuntimeOptions = { root?: string; stateHome: string; binary: string; enabled: boolean };
+// Every local interface (desktop, cli, tui) finds the same controller here, one per checkout.
+export function runtimeStateHome(env: NodeJS.ProcessEnv, home: string): string {
+  const base = env.XDG_STATE_HOME && isAbsolute(env.XDG_STATE_HOME) ? env.XDG_STATE_HOME : join(home, ".local", "state");
+  return join(base, "dokja");
+}
+
+// legacyStateHome is where earlier desktop builds kept the controller's state; its ownership
+// journal is carried over once, so containers it started are still recognized as its own.
+export type RuntimeOptions = { root?: string; stateHome: string; legacyStateHome?: string; binary: string; enabled: boolean };
 
 // This client only talks to the bootstrap orchestrator. It never executes a
 // container command, accepts a command from the page or reaches a domain service.
@@ -51,6 +59,7 @@ export class RuntimeClient {
     if (process.platform === "win32") throw new OrchestratorError("unavailable", "Local runtime control currently requires a Unix host.");
     if (!existsSync(this.options.binary)) throw new OrchestratorError("unavailable", "The runtime controller is missing. Rebuild the desktop application.");
     mkdirSync(this.stateDir, { recursive: true, mode: 0o700 });
+    this.adoptLegacyJournal();
     const child = spawn(this.options.binary, ["--root",this.options.root!,"--state-dir",this.stateDir], { detached: true, stdio: "ignore" });
     let failure = false;
     child.once("error", () => { failure = true; }); child.unref();
@@ -60,6 +69,13 @@ export class RuntimeClient {
       await new Promise((resolve)=>setTimeout(resolve,50));
     }
     throw new OrchestratorError("unavailable", "The background runtime controller could not start. Check its binary and private state directory permissions.");
+  }
+  private adoptLegacyJournal(): void {
+    if (!this.options.legacyStateHome) return;
+    const journal = join(this.stateDir, "ownership.json");
+    const legacy = join(this.options.legacyStateHome, `runtime-${this.projectId}`, "ownership.json");
+    if (existsSync(journal) || !existsSync(legacy)) return;
+    try { copyFileSync(legacy, journal); } catch { /* the controller starts with an empty journal */ }
   }
   async request(type: string, payload: Record<string,unknown>, timeoutMs: number): Promise<OrchestratorReply> {
     if (type !== "runtime.modules" && type !== "runtime.set") throw new OrchestratorError("denied", "unsupported runtime action");
