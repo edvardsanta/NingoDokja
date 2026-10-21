@@ -247,5 +247,15 @@
   "module_starting": "iniciando",
   "module_stopping": "parando",
   "module_failed": "falhou",
-  "module_stopped": "desligado"
+  "module_stopped": "desligado",
+  "delivery_status_unknown": "Estado do orquestrador desconhecido: ligar segue os switches e jobs já salvos.",
+  "delivery_discord_voice": "A voz liga junto; o Discord precisa dela.",
+  "delivery_discord_answers": "O bot fica online, responde menções e comandos no Discord e recebe as entregas do Ningo.",
+  "delivery_discord_switch_off": "O switch discord está desligado: o bot fica online mas não responde nem recebe entregas.",
+  "delivery_scheduler_switch_off": "O switch scheduler está desligado: nenhum job agendado roda até ele ser ligado.",
+  "delivery_scheduler_all_paused": "Todos os jobs agendados estão pausados: nada roda até um ser retomado.",
+  "delivery_job_every": "%s roda a cada %s",
+  "delivery_job_next": ", próximo às %s",
+  "delivery_job_posts_memes": ": posta memes em %d canal(is) do Discord",
+  "delivery_job_refreshes": ": atualiza o pool de memes e não posta nada"
 }
