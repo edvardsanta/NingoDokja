@@ -30,11 +30,12 @@ var inventory = []Module{
 	{Name: "chat_ai", Service: "dokja-chat-ai", Dependencies: []string{"orchestrator"}, Port: 8080},
 	{Name: "feeds", Service: "dokja-feeds", Dependencies: []string{"orchestrator"}, Port: 5563},
 	{Name: "voice", Service: "dokja-voice", Dependencies: []string{"orchestrator"}, Port: 8081},
+	// Communications only reads channels and history for the desktop; it never sends.
+	{Name: "communications", Service: "dokja-communications", Dependencies: []string{"orchestrator"}},
 	// Recognize externally managed consumers without exposing launch controls for
 	// delivery, scheduling, authentication or other interfaces in this release.
 	{Name: "discord", Service: "dokja-discord", Dependencies: []string{"orchestrator", "voice"}, Internal: true},
 	{Name: "scheduler", Service: "dokja-scheduler", Dependencies: []string{"orchestrator"}, Internal: true},
-	{Name: "communications", Service: "dokja-communications", Dependencies: []string{"orchestrator"}, Internal: true},
 	{Name: "whatsapp", Service: "dokja-whatsapp", Dependencies: []string{"orchestrator"}},
 	{Name: "cli", Service: "dokja-cli", Dependencies: []string{"orchestrator"}, Internal: true},
 	{Name: "tui", Service: "dokja-tui", Dependencies: []string{"orchestrator"}, Internal: true},

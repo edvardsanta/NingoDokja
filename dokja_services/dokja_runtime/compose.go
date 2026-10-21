@@ -59,11 +59,23 @@ func New(root string) *Compose {
 		return out.Bytes(), nil
 	}
 	return &Compose{Run: func(ctx context.Context, args ...string) ([]byte, error) {
-		all := append([]string{"compose", "-f", filepath.Join(root, "docker-compose.lite.yml")}, args...)
-		return execute(ctx, all...)
+		return execute(ctx, composeArgs(root, args)...)
 	}, Inspect: func(ctx context.Context, ids ...string) ([]byte, error) {
 		return execute(ctx, append([]string{"inspect"}, ids...)...)
 	}, Poll: time.Second, Wait: 2 * time.Minute}
+}
+
+// profiles are the opt-in Compose profiles of modules the controller may start. Podman Compose
+// does not activate a profile for a service named on the command line, so they are always
+// named; only the service passed to a command is started, so this starts nothing else.
+var profiles = []string{"communications", "whatsapp"}
+
+func composeArgs(root string, args []string) []string {
+	all := []string{"compose", "-f", filepath.Join(root, "docker-compose.lite.yml")}
+	for _, profile := range profiles {
+		all = append(all, "--profile", profile)
+	}
+	return append(all, args...)
 }
 
 type boundedBuffer struct {
@@ -215,6 +227,14 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 				if err == nil {
 					return nil
 				}
+			} else if m.Name == "communications" {
+				// Its port is not published, so readiness is read inside the container.
+				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err := c.Run(probeContext, "exec", "-T", m.Service, "python", "-c", communicationsHealth)
+				cancel()
+				if err == nil {
+					return nil
+				}
 			} else if probe(ctx, m) == nil {
 				return nil
 			}
@@ -311,6 +331,8 @@ func engineEnvironment(env []string) []string {
 	}
 	return env
 }
+
+const communicationsHealth = `import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/health', timeout=2)`
 
 const whatsappHealth = `const r=await fetch('http://localhost:8094/status',{redirect:'error',signal:AbortSignal.timeout(2000)}); if(!r.ok)process.exit(1);const b=await r.json();if(typeof b.state!=='string')process.exit(1);`
 

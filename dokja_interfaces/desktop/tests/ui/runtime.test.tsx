@@ -31,6 +31,11 @@ describe("local runtime modules",()=>{
   later.resolve(page("ready"));
   await screen.findByText("Ready");
  });
+ it("offers the read-only communications module like any other",async()=>{
+  const {transport,calls}=routedTransport({"runtime.modules":ok({modules:[{name:"communications",state:"stopped",error:"",dependencies:["orchestrator"]}],busy:false,error:""}),"runtime.set":page("starting",true)});show(transport);
+  fireEvent.click(await screen.findByRole("button",{name:"Start communications"}));
+  await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"communications",enabled:true}]));
+ });
  it("shows background readiness errors and permits an explicit retry",async()=>{
   const {transport,calls}=routedTransport({"runtime.modules":[page("failed",false,"Model initialization failed"),page("ready")],"runtime.set":page("starting",true)});show(transport);
   await screen.findByText("Model initialization failed");

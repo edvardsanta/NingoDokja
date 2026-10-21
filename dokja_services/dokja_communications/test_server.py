@@ -1,6 +1,13 @@
 import io
 import json
+import os
+import signal
+import subprocess
+import sys
+import time
 import unittest
+from pathlib import Path
+from urllib.request import urlopen
 from urllib.error import HTTPError
 from unittest.mock import MagicMock, Mock
 
@@ -150,6 +157,24 @@ class HTTPAccessTests(unittest.TestCase):
             server.server_close()
             worker.join()
 
+
+class ShutdownTests(unittest.TestCase):
+    def test_a_stop_signal_ends_the_server_cleanly(self):
+        server = Path(__file__).with_name("server.py")
+        env = {**os.environ, "COMMUNICATIONS_BIND": "127.0.0.1"}
+        process = subprocess.Popen([sys.executable, str(server)], env=env)
+        try:
+            for _ in range(50):
+                try:
+                    urlopen("http://127.0.0.1:8084/health", timeout=1).close()
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            process.send_signal(signal.SIGTERM)
+            self.assertEqual(process.wait(timeout=5), 0)
+        finally:
+            process.kill()
+            process.wait()
 
 if __name__ == "__main__":
     unittest.main()

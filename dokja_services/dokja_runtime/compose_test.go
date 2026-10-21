@@ -179,6 +179,35 @@ func TestWhatsAppUsesItsPrivateStatusListenerForReadiness(t *testing.T) {
 	}
 }
 
+func TestCommunicationsReadsItsUnpublishedHealthInsideTheContainer(t *testing.T) {
+	var calls [][]string
+	c := &Compose{Wait: time.Second, Run: func(_ context.Context, args ...string) ([]byte, error) {
+		calls = append(calls, args)
+		if args[0] == "ps" {
+			return []byte("aaaaaaaaaaaa"), nil
+		}
+		return nil, nil
+	}, Inspect: func(context.Context, ...string) ([]byte, error) {
+		return []byte(`[{"Config":{"Labels":{"com.docker.compose.service":"dokja-communications"}},"State":{"Status":"running","Running":true}}]`), nil
+	}}
+	m, _ := domain.Lookup("communications")
+	if err := c.Ready(context.Background(), m); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"exec", "-T", "dokja-communications", "python", "-c", communicationsHealth}
+	if !reflect.DeepEqual(calls[len(calls)-1], want) {
+		t.Fatal(calls)
+	}
+}
+
+func TestProfileGatedModulesAreVisibleToEveryComposeCommand(t *testing.T) {
+	got := composeArgs("/stack", []string{"up", "-d", "dokja-communications"})
+	want := []string{"compose", "-f", "/stack/docker-compose.lite.yml", "--profile", "communications", "--profile", "whatsapp", "up", "-d", "dokja-communications"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatal(got)
+	}
+}
+
 func TestKnownRemoteEngineTargetsAreRejected(t *testing.T) {
 	for _, env := range [][]string{{"DOCKER_HOST=tcp://host.example:1234"}, {"CONTAINER_HOST=ssh://host.example"}, {"DOCKER_CONTEXT=production"}} {
 		if localEngine(env) == nil {

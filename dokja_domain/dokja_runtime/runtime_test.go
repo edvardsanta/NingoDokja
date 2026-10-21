@@ -244,3 +244,15 @@ func TestWhatsAppStartsOnlyItsGatewayAndCoreAndPreservesSessionContainers(t *tes
 		t.Fatal(f.trace())
 	}
 }
+
+func TestCommunicationsStartsOnlyItsReaderAndCoreNeverDelivery(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "communications", true)
+	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:communications"}) {
+		t.Fatal(f.trace())
+	}
+	change(t, d, "communications", false)
+	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:communications", "stop:communications", "stop:orchestrator"}) {
+		t.Fatal(f.trace())
+	}
+}
