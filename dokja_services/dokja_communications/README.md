@@ -7,8 +7,8 @@ store messages or send them. Sending reuses the orchestrator's existing delivery
 
 The service is optional. Start it from the desktop (**System → Modules**), or enable the
 `communications` Compose profile, and set the same
-`DOKJA_COMMUNICATIONS_TOKEN` (at least 32 characters, randomly generated) in the desktop shell,
-orchestrator and this service. Leave it unset to disable the new actions. Never commit its value.
+`DOKJA_COMMUNICATIONS_TOKEN` (at least 32 characters, randomly generated) in the desktop shell (and
+the CLI or TUI environment, to link WhatsApp from them), orchestrator and this service. Leave it unset to disable the new actions. Never commit its value.
 The service's port is not published by Compose.
 
 | Variable | Purpose |
