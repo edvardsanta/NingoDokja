@@ -47,10 +47,11 @@ type CardFrameProps<T> = {
   state: CardState<T>;
   onReload: () => void;
   children: (data: T) => ReactNode;
+  supplement?: ReactNode;
 };
 
 // The anatomy every card shares: what kind it is, its title, then its body or why there is none.
-export function CardFrame<T>({ kindLabel, title, state, onReload, children }: CardFrameProps<T>) {
+export function CardFrame<T>({ kindLabel, title, state, onReload, children, supplement }: CardFrameProps<T>) {
   const t = useTranslate();
   const titleId = useId();
   return (
@@ -60,6 +61,7 @@ export function CardFrame<T>({ kindLabel, title, state, onReload, children }: Ca
       {state.phase === "loading" && <Pending />}
       {state.phase === "error" && <Problem error={state.error} />}
       {state.phase === "ready" && children(state.data)}
+      {supplement}
       <footer>
         <button type="button" onClick={onReload} disabled={state.phase === "loading"}>
           {state.phase === "error" ? t("retry") : t("refresh")}

@@ -1016,3 +1016,12 @@ button[aria-pressed="true"] {
 }
 .experience-detail dt { font-weight: 700; margin-top: 0.75rem; }
 .experience-detail dd { margin-left: 0; }
+
+/* Module lifecycle and optional request handling share one row. */
+.runtime-modules .service-status { align-self: center; }
+.runtime-modules .service-name { align-self: center; }
+.module-options, .module-error { grid-column: 1 / -1; }
+.module-options { margin-top: 0.35rem; }
+.module-options summary { color: var(--ink-dim); cursor: pointer; font-size: 0.8125rem; }
+.module-options[open] { padding-bottom: 0.5rem; }
+.module-options .switch { margin-top: 0.35rem; }

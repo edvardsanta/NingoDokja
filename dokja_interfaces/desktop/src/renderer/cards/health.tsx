@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
+import { RUNTIME_MODULES } from "../../shared/runtime.js";
 import type { JobState } from "../../shared/replies.js";
 import type { Transport, TransportError, TransportResult } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
@@ -79,7 +80,7 @@ const LINK_POLL_MS = 2000;
 const LINK_RESET_TIMEOUT_MS = 45_000;
 
 export function HealthCard({ transport }: { transport: Transport }) {
-  const runtimeEnabled=useContext(RuntimeEnabled);
+  const runtimeEnabled = useContext(RuntimeEnabled);
   const t = useTranslate();
   const { report, reportTones } = usePulse();
   const load = useCallback(() => loadHealth(transport), [transport]);
@@ -113,8 +114,29 @@ export function HealthCard({ transport }: { transport: Transport }) {
   }, [reload]);
   const link = useLink(transport, reload);
 
+  if (runtimeEnabled) {
+    const health = state.phase === "ready" ? state.data : undefined;
+    return <RuntimeCard transport={transport} onChanged={refresh} moduleDetails={(name) => {
+      const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
+      return row ? <>
+        <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
+        {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name })}
+          on={row.enabled} busy={change.state.phase === "loading" || row.configured === false}
+          onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
+        {row.enabled !== undefined && <p className="detail">{t("runtime_routing_hint")}</p>}
+        {name === LINKABLE && (row.configured === false
+          ? <p className="note">{t("whatsapp_setup_missing")}</p> : <LinkControl link={link} />)}
+      </> : null;
+    }} renderActivity={(runtimeAvailable) => <>
+      {failure && <Problem error={failure} />}
+      {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
+      {health && <HealthBody health={health} busy={change.state.phase === "loading"}
+        failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
+    </>} />;
+  }
+
   return (
-    <>{runtimeEnabled && <RuntimeCard transport={transport}/>}<CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
+    <CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
       {(health) => (
         <HealthBody
           health={health}
@@ -124,7 +146,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
           link={link}
         />
       )}
-    </CardFrame></>
+    </CardFrame>
   );
 }
 
@@ -135,26 +157,33 @@ type BodyProps = {
   failure: TransportError | undefined;
   onChange: (change: Change) => void;
   link: Link;
+  unified?: boolean;
 };
 
-function HealthBody({ health, busy, failure, onChange, link }: BodyProps) {
+function HealthBody({ health: allHealth, busy, failure, onChange, link, unified = false }: BodyProps) {
   const t = useTranslate();
-  if (health.rows.length === 0 && health.interfaces.length === 0) return <p>{t("health_empty")}</p>;
+  const managed = new Set<string>(RUNTIME_MODULES);
+  const health = unified ? { ...allHealth,
+    rows: allHealth.rows.filter((row) => !managed.has(row.name)),
+    interfaces: allHealth.interfaces.filter((row) => !managed.has(row.name)),
+  } : allHealth;
+  if (health.rows.length === 0 && health.interfaces.length === 0 && health.jobs.length === 0) return unified ? null : <p>{t("health_empty")}</p>;
 
   const { ok, problem, off, unchecked } = health.counts;
   const summary = t("health_summary", { ok, problem, off });
   const switchableScheduler = health.rows.some((row) => row.name === "scheduler" && row.enabled !== undefined);
   return (
     <>
-      <div className="strip" aria-hidden="true">
+      {!unified && <><div className="strip" aria-hidden="true">
         {[...health.rows, ...health.interfaces].map((row) => (
           <span key={row.name} data-tone={row.tone} />
         ))}
       </div>
       <p className="summary">
         {unchecked > 0 ? `${summary}, ${t("health_unchecked", { count: unchecked })}` : summary}
-      </p>
+      </p></>}
       {failure && <Problem error={failure} />}
+      {unified && health.rows.length > 0 && <h3>{t("runtime_automation")}</h3>}
       <ul className="services">
         {health.rows.map((row, index) => (
           <ServiceRowItem key={row.name} row={row} index={index} busy={busy} onChange={onChange} />

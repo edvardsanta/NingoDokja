@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 
 import { isRecord } from "../../shared/records.js";
 import { RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../../shared/runtime.js";
@@ -20,7 +20,14 @@ const STATES: Record<RuntimeState, MessageId> = {
 
 type Change = { module: RuntimeModule; enabled: boolean };
 
-export function RuntimeCard({ transport }: { transport: Transport }) {
+type Props = {
+  transport: Transport;
+  moduleDetails?: (name: RuntimeModule) => ReactNode;
+  onChanged?: () => void;
+  renderActivity?: (runtimeAvailable: boolean) => ReactNode;
+};
+
+export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivity }: Props) {
   const t = useTranslate();
   const load = useCallback(async (): Promise<LoadResult<RuntimeSnapshot>> => {
     const result = await transport.request("runtime.modules", {}, { timeoutMs: 15_000 });
@@ -39,32 +46,51 @@ export function RuntimeCard({ transport }: { transport: Transport }) {
   const snapshot = state.phase === "ready" ? state.data : undefined;
   const busy = snapshot?.busy || action.state.phase === "loading";
 
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (!snapshot) return;
+    if (wasBusy.current && !snapshot.busy) onChanged?.();
+    wasBusy.current = snapshot.busy;
+  }, [snapshot, onChanged]);
+  const refresh = useCallback(() => { reload(); onChanged?.(); }, [reload, onChanged]);
+
   // An acknowledgement starts a background operation; it is not readiness. Read
   // the controller again after both success and failure, then poll while busy.
   useEffect(() => {
-    if (action.state.phase === "ready" || action.state.phase === "error") reload();
-  }, [action.state, reload]);
+    if (action.state.phase === "ready" || action.state.phase === "error") refresh();
+  }, [action.state, refresh]);
   useEffect(() => {
     if (!snapshot?.busy) return;
     const timer = setTimeout(reload, 1200);
     return () => clearTimeout(timer);
   }, [snapshot, reload]);
 
-  return <CardFrame kindLabel={t("nav_system")} title={t("runtime_title")} state={state} onReload={reload}>
+  return <CardFrame kindLabel={t("nav_system")} title={t("runtime_title")} state={state} onReload={refresh} supplement={renderActivity?.(state.phase !== "error")}>
     {(view) => <>
-      <p>{t("runtime_intro")}</p>
+      <p className="detail">{t("runtime_intro")}</p>
       {view.error && <p role="alert">{view.error}</p>}
       {action.state.phase === "error" && <Problem error={action.state.error} />}
-      <ul className="services">{view.modules.filter((module) => RUNTIME_MODULES.includes(module.name)).map((module) => <li key={module.name}>
-        <strong>{module.name}</strong> · <span>{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>{" "}
-        <button type="button" disabled={!!busy || !!view.error}
-          aria-label={t("runtime_start_named", { name: module.name })}
-          onClick={() => action.start({ module: module.name, enabled: true })}>{t("runtime_start")}</button>{" "}
-        <button type="button" disabled={!!busy || !!view.error || module.state === "stopped"}
-          aria-label={t("runtime_stop_named", { name: module.name })}
-          onClick={() => action.start({ module: module.name, enabled: false })}>{t("runtime_stop")}</button>
-        {module.error && <p role="alert">{module.error}</p>}
-      </li>)}</ul>
+      <ul className="services runtime-modules">{view.modules.filter((module) => RUNTIME_MODULES.includes(module.name)).map((module) => {
+        const start = module.state === "stopped" || module.state === "failed";
+        const details = moduleDetails?.(module.name);
+        return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : "ok"}>
+          <span className="service-name">{module.name}</span>
+          <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
+          <button type="button" className="switch" disabled={!!busy || !!view.error}
+            aria-label={t(start ? "runtime_start_named" : "runtime_stop_named", { name: module.name })}
+            onClick={() => action.start({ module: module.name, enabled: start })}>
+            {t(start ? "runtime_start" : "runtime_stop")}
+          </button>
+          {module.error && <p className="module-error" role="alert">{module.error}</p>}
+          {(details || module.state === "failed") && <details className="module-options">
+            <summary>{t("runtime_options", { name: module.name })}</summary>
+            {details}
+            {module.state === "failed" && <button type="button" disabled={!!busy || !!view.error}
+              aria-label={t("runtime_stop_named", { name: module.name })}
+              onClick={() => action.start({ module: module.name, enabled: false })}>{t("runtime_stop")}</button>}
+          </details>}
+        </li>;
+      })}</ul>
       <p className="detail">{t("runtime_scope")}</p>
     </>}
   </CardFrame>;
