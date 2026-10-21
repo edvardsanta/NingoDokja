@@ -4,6 +4,7 @@ import hmac
 import json
 import os
 import re
+import signal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -194,7 +195,14 @@ def handler_for(adapter, access_token):
     return Handler
 
 
+def stop(_signum, _frame):
+    # The container engine stops a module with SIGTERM. Leaving cleanly keeps exit
+    # code 0, so a deliberate stop is not mistaken for a crash.
+    raise SystemExit(0)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, stop)
     adapter = Adapter(
         os.getenv("DISCORD_BOT_TOKEN", ""),
         os.getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID", ""),
