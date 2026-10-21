@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
 import type { JobState } from "../../shared/replies.js";
 import type { Transport, TransportError, TransportResult } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
+import { RuntimeEnabled } from "../runtime_context.js";
+import { RuntimeCard } from "./runtime.js";
 import { usePulse } from "../pulse.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import {
@@ -77,6 +79,7 @@ const LINK_POLL_MS = 2000;
 const LINK_RESET_TIMEOUT_MS = 45_000;
 
 export function HealthCard({ transport }: { transport: Transport }) {
+  const runtimeEnabled=useContext(RuntimeEnabled);
   const t = useTranslate();
   const { report, reportTones } = usePulse();
   const load = useCallback(() => loadHealth(transport), [transport]);
@@ -111,7 +114,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
   const link = useLink(transport, reload);
 
   return (
-    <CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
+    <>{runtimeEnabled && <RuntimeCard transport={transport}/>}<CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
       {(health) => (
         <HealthBody
           health={health}
@@ -121,7 +124,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
           link={link}
         />
       )}
-    </CardFrame>
+    </CardFrame></>
   );
 }
 

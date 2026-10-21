@@ -1,7 +1,7 @@
 import { localeFromTag, type Locale } from "../shared/locale.js";
 import type { Transport } from "../shared/transport.js";
 
-export type Session = { transport: Transport; locale: Locale };
+export type Session = { transport: Transport; locale: Locale; runtimeControls?:boolean };
 
 const notInTheApp = {
   ok: false,
@@ -18,13 +18,13 @@ const noShell: Transport = {
 export async function loadSession(): Promise<Session> {
   if (window.dokja) {
     const bootstrap = await window.dokja.bootstrap();
-    return { transport: window.dokja, locale: bootstrap?.locale ?? "en" };
+    return { transport: window.dokja, locale: bootstrap?.locale ?? "en", ...(bootstrap?.runtimeControls ? {runtimeControls:true} : {}) };
   }
 
   const locale = localeFromTag(navigator.language);
   if (import.meta.env.DEV) {
     const { createFakeTransport } = await import("./fake_transport.js");
-    return { transport: createFakeTransport(), locale };
+    return { transport: createFakeTransport(), locale, runtimeControls:true };
   }
   return { transport: noShell, locale };
 }

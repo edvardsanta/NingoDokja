@@ -22,10 +22,10 @@ const fontsReady = Promise.race([
   new Promise((resolve) => setTimeout(resolve, 1500)),
 ]);
 
-void Promise.all([loadSession(), fontsReady]).then(([{ transport, locale }]) => {
+void Promise.all([loadSession(), fontsReady]).then(([{ transport, locale, runtimeControls }]) => {
   createRoot(container).render(
     <StrictMode>
-      <App transport={transport} locale={locale} />
+      <App transport={transport} locale={locale} runtimeControls={runtimeControls} />
     </StrictMode>,
   );
 });

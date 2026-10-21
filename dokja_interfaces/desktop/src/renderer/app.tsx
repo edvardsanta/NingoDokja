@@ -5,6 +5,7 @@ import type { Transport } from "../shared/transport.js";
 import { CARDS, START } from "./cards/registry.js";
 import { I18nProvider } from "./i18n/context.js";
 import { PulseProvider, usePulse } from "./pulse.js";
+import { RuntimeEnabled } from "./runtime_context.js";
 import { Sidebar } from "./sidebar.js";
 
 function Wordmark() {
@@ -16,18 +17,18 @@ function Wordmark() {
   );
 }
 
-export function App({ transport, locale }: { transport: Transport; locale: Locale }) {
+export function App({ transport, locale, runtimeControls=false }: { transport: Transport; locale: Locale; runtimeControls?:boolean }) {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
   return (
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <RuntimeEnabled.Provider value={runtimeControls}><PulseProvider>
         <main>
           <Sidebar entries={CARDS} transport={transport} start={START} header={<Wordmark />} />
         </main>
-      </PulseProvider>
+      </PulseProvider></RuntimeEnabled.Provider>
     </I18nProvider>
   );
 }
