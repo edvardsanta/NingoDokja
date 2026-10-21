@@ -228,3 +228,22 @@ export type CommunicationMessage = {
 };
 export type CommunicationHistory = { channelId: string; messages: CommunicationMessage[]; before: string };
 export type CommunicationSend = { off?: false; sent: boolean; skipped: boolean };
+
+
+export type ClassificationAxis = "form" | "content_kind";
+export type ClassificationChoice = {
+  value: string | null;
+  origin: string;
+  classifierId: string;
+  classifierVersion: string;
+  reason: string;
+};
+export type KnowledgeClassification = {
+  off?: false;
+  sourceId: string;
+  revision: string;
+  form: ClassificationChoice;
+  contentKind: ClassificationChoice;
+  needsUserInput: boolean;
+  questions: { field: ClassificationAxis; question: string; allowedValues: string[] }[];
+};

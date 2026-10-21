@@ -1,10 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import type { KnowledgeDocument, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { parseDocuments } from "./knowledge_documents.js";
+import { KnowledgeClassificationPanel } from "./knowledge_classification.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
 // The document that sits at `at` in the list, with its text, or word that another one sits there now
@@ -26,6 +27,7 @@ export async function loadDocument(transport: Transport, id: string, at: number)
 // original, not a faithful copy of it. It is shown as text, never as markup.
 export function DocumentView({ transport, id, at }: { transport: Transport; id: string; at: number }) {
   const t = useTranslate();
+  const [classificationOpen, setClassificationOpen] = useState(false);
   const { fixed } = useNumbers();
   const load = useCallback(() => loadDocument(transport, id, at), [transport, id, at]);
   const { state, reload } = useCard(load);
@@ -49,6 +51,8 @@ export function DocumentView({ transport, id, at }: { transport: Transport; id: 
               {[document.id, document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}
             </p>
             <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
+            <button type="button" aria-expanded={classificationOpen} onClick={() => setClassificationOpen((open) => !open)}>{t("classification_title")}</button>
+            {classificationOpen && <KnowledgeClassificationPanel key={document.id} transport={transport} id={document.id} />}
             <p className="note" data-tone="unchecked">
               {t("document_rebuilt")}
             </p>

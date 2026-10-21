@@ -221,3 +221,26 @@ system gets worse. Type is B612 Mono for everything and Bodoni Moda italic for t
 bundled under the SIL Open Font License. Motion is one terminal-style print of the rows and a
 blinking cursor, and both stop under `prefers-reduced-motion`. The tokens are at the top of
 `src/renderer/styles.css`.
+
+### Document classification
+
+Open a document from the research base, then expand **Classification** to load
+its current form/content labels, per-axis provenance and questions. The allowed
+answers come from Knowledge; the desktop has no independent taxonomy. Select
+only the answers you know and save them. Other axes stay pending. Nothing is
+chosen by default, and classification does not upload, read or embed content.
+
+`knowledge.classify` is allowlisted for both reads and explicit answers. Reads
+need no input gesture; a payload containing answers requires the same recent
+real click/key press as other desktop writes. The main process validates and
+projects a bounded snapshot, retaining the revision needed for submission and
+excluding document text and unrelated service fields. Updates use the existing
+revision-checked domain API. Errors require reloading current questions before
+another submission; earlier selections are cleared and never retried automatically.
+The browser demo includes a local classification fixture.
+
+This adds interface behavior only. No public event, service schema, environment
+variable or compose setting changes. It requires an orchestrator with the
+existing `knowledge.classify` action. Rolling back the desktop leaves stored
+metadata intact. The offset-based document text view and broader per-document
+detail contract remain separate follow-up work.

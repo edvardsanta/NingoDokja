@@ -365,3 +365,35 @@ sampling, retained vectors and CLI no-retry behavior. No live inference, owner
 file or owner database was used. Step 09.2 remains in progress for its other
 listed interface and operational items. Staged credential and project-policy
 scans passed with repository-pinned gitleaks v8.28.0.
+
+## Desktop classification continuation
+
+Implemented on `feat/desktop-classification`, stacked on
+`feat/knowledge-reclassification`. Document tabs gain an expandable classification
+panel. It loads `knowledge.classify` by source ID, displays current form/content
+labels with per-axis provenance, and offers the domain's current question choices.
+Answers start blank; partial answers submit only selected axes with the snapshot
+revision. Successful answers replace the panel's state from the domain response.
+Conflicts and other errors require a fresh snapshot, clearing previous choices;
+there is no automatic resubmission. Pending requests disable submission and late
+replies after closing the panel are ignored.
+
+The main process allowlists the existing action, validates answer shape and
+revision, bounds the reply, and preserves the real-input requirement for writes.
+Reading questions requires no gesture. The browser fake mirrors the continuation
+so the panel can be exercised without a running stack. English and Portuguese
+labels follow the current desktop locale. No conversation tab was introduced.
+
+Compatibility: desktop-only addition over the existing domain API; no event
+contract, schema, route, environment or compose changes. Rollback restores the
+previous desktop and retains stored answers. Chat continuation, the bounded
+per-document detail contract and other 09.2 operational items remain pending.
+
+
+Validation: desktop `pnpm typecheck` and `pnpm build` passed; `pnpm test`
+passed **200 Node tests and 186 UI tests**; `pnpm test:e2e` passed **25 tests**
+using headless Electron. Coverage includes on-demand document integration,
+partial answers, blank defaults, stale revisions without retry, disabled services,
+late replies, payload validation/projection, and the real shell's refusal of
+scripted answers. Native tooling and local sockets required an unsandboxed run.
+No live stack, provider or owner database was exercised.

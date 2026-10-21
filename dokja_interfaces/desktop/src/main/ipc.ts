@@ -61,6 +61,9 @@ export async function handleRequest(
 
   const wire = action.payload(payload);
   if (!wire) return fail("invalid", "the payload is not valid for this action");
+  if (action.writes?.(wire) && !presence?.recent()) {
+    return fail("denied", "a change needs a click or a key press just before it");
+  }
 
   if (type === "communications.send" && wire.attachment_url && !media?.has?.(String(wire.attachment_url))) {
     return fail("denied", "only a meme listed by the orchestrator can be attached");
