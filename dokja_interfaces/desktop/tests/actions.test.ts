@@ -540,3 +540,8 @@ test("a Discord send is built as before", () => {
   });
   assert.deepEqual(send.payload({ channel_id: "123456789", content: "hi" }), { channel_ids: ["123456789"], content: "hi" });
 });
+
+test("interface setup state survives projection without exposing its endpoint",()=>{
+ const result=ACTIONS["ningo.status"].project({domain:"system",result:{status:"ok",services:{whatsapp:{kind:"interface",status:"unchecked",state:"not_configured",configured:false,endpoint:"http://private.example/status",enabled:true}}}}) as {services:Record<string,unknown>};
+ assert.deepEqual(result.services.whatsapp,{kind:"interface",status:"unchecked",state:"not_configured",configured:false,enabled:true,detail:""});
+});

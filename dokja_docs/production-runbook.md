@@ -559,16 +559,21 @@ heading, with their state and a switch each. See the interface docs for each sta
 
 - Each interface runs an internal listener that answers `GET /status` (Discord `8092`, WhatsApp
   `8094`). Neither port is published; the orchestrator reads them over the Compose network. A reply carries a level, a state from a closed list and a short sentence, never an id.
-- The orchestrator lists an interface only when its address is set: `DISCORD_INTERFACE_STATUS_ENDPOINT`
-  is set in the stacks; set `WHATSAPP_INTERFACE_STATUS_ENDPOINT` (`http://dokja-whatsapp:8094/status`)
-  in the ignored environment file when you start its profile, then recreate the orchestrator. An interface that is not
-  deployed has no address and is never shown as a failure.
+- The orchestrator always lists known interfaces, including before setup. A missing
+  status endpoint is `unchecked` / `not_configured` with `configured:false`; it
+  does not degrade overall platform health. `DISCORD_INTERFACE_STATUS_ENDPOINT`
+  is set in the stacks. Set `WHATSAPP_INTERFACE_STATUS_ENDPOINT`
+  (`http://dokja-whatsapp:8094/status`) in the ignored environment file when
+  starting its profile, then recreate the orchestrator. Missing setup never
+  removes the WhatsApp row or falsely reports a connected account.
 - **Switching an interface off** makes it answer nothing at all in its chats (no "switched off"
   reply) and leaves its channels out of scheduled and manual deliveries, which are reported as
   `skipped_interfaces` and are not failures. Its connection and credentials are left alone, and the
   desktop and the CLI are never gated, so it can always be switched back on.
-- A listed interface that is not `connected` or `listening` makes `ningo.status` report `degraded`.
-  An interface that is switched off never does.
+- A configured interface that reports a connection failure makes `ningo.status`
+  report `degraded`. Unconfigured optional interfaces and interfaces switched off
+  do not. The desktop keeps them visible and explains missing setup; link and
+  routing controls wait for configuration.
 - `ningo.status` is not authenticated and the request port is published, so it carries only these
   states. Anything that would carry a link code, history or a send travels under the
   `communications.` event types, which need the communications credential.

@@ -142,6 +142,7 @@ function systemStatus(body: Record<string, unknown>): StatusReply {
         detail: shorten(text(entry.error) || text(entry.detail)),
         ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
         ...(entry.kind === "interface" ? { kind: "interface" as const } : {}),
+        ...(entry.kind === "interface" && typeof entry.configured === "boolean" ? { configured:entry.configured } : {}),
         ...(entry.kind === "interface" && INTERFACE_STATE.test(text(entry.state)) ? { state: text(entry.state) } : {}),
       };
     }

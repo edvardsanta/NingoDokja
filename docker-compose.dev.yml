@@ -23,8 +23,9 @@ services:
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
-      # Where each interface answers its state. The desktop lists an interface only when its
-      # address is set: set the WhatsApp one when you start its profile.
+      # Where each interface answers its state. The desktop probes it only when its
+      # address is set; otherwise its catalog row remains visible as unconfigured.
+      # Set the WhatsApp address when starting its profile.
       DISCORD_INTERFACE_STATUS_ENDPOINT: http://dokja-discord:8092/status
       WHATSAPP_INTERFACE_STATUS_ENDPOINT: ${WHATSAPP_INTERFACE_STATUS_ENDPOINT:-}
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}

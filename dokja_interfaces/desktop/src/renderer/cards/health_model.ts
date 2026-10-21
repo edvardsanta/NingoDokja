@@ -19,6 +19,7 @@ export type ServiceRow = {
   tone: Tone;
   enabled?: boolean;
   kind?: "interface";
+  configured?: boolean;
   state?: string;
 };
 
@@ -71,6 +72,7 @@ export function parseHealth(value: unknown): Health | undefined {
       tone,
       ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
       ...(entry.kind === "interface" ? { kind: "interface" as const } : {}),
+      ...(entry.kind === "interface" && typeof entry.configured === "boolean" ? { configured:entry.configured } : {}),
       ...(entry.kind === "interface" && text(entry.state) ? { state: text(entry.state) } : {}),
     };
   };

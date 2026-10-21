@@ -9,6 +9,7 @@ export type ServiceState = {
   // An interface (Discord, WhatsApp) is listed with the services but carries its kind and a
   // state from the interface's own closed list ("connected", "waiting_for_link", ...).
   kind?: "interface";
+  configured?: boolean;
   state?: string;
 };
 

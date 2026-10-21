@@ -17,8 +17,7 @@ import (
 var KnownServices = []string{"meme", "chat_ai", "book", "knowledge", "memory", "feeds", "scheduler"}
 
 // KnownInterfaces are the interfaces people talk to Ningo through. They are switched like
-// services, but they are not listed with them: an interface only shows up when the orchestrator
-// can read its state. Off means it neither answers nor receives deliveries, and says nothing about
+// services, but are shown in their own catalog, including before setup. Off means it neither answers nor receives deliveries, and says nothing about
 // being off in the chat; its connection and its credentials are left alone.
 var KnownInterfaces = []string{"discord", "whatsapp"}
 

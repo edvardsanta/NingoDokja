@@ -74,7 +74,10 @@ hour). The chat itself is never named: only its alias reaches the desktop.
 
 ## Linking WhatsApp
 
-On System, the WhatsApp row has a **Link** button. It shows the code to scan while the
+On System, known interfaces stay visible even before setup. An unconfigured
+WhatsApp shows **not configured** and setup guidance, without querying a link
+code or offering an unusable routing toggle. Once configured, the WhatsApp row
+has a **Link** button. It shows the code to scan while the
 account waits for a link, and **New code** and **Unlink and start over**. It needs the
 communications credential in the environment of the desktop (`DOKJA_COMMUNICATIONS_TOKEN`, the same
 one the orchestrator has) and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` set on the orchestrator. The shell
@@ -294,3 +297,11 @@ assigning an outcome to a guessed attempt. See
 TUI and coding-agent paths. Existing event contracts, SQLite schema, settings and
 compose files are unchanged. Rebuild Memory for authoritative concurrent-write
 receipts, then rebuild/restart desktop and TUI. No rollout runs automatically.
+
+
+WhatsApp visibility regression: a missing `WHATSAPP_INTERFACE_STATUS_ENDPOINT`
+previously removed the interface from the orchestrator's status reply. The
+orchestrator now emits the known interface catalog with an explicit configuration
+flag, independently of the routing switch. Rebuild/restart the orchestrator and
+desktop for this fix. Existing configured interfaces retain their link/unlink and
+QR controls. No credentials, environment defaults, ports, schema or routes change.

@@ -559,7 +559,8 @@
         "Step 09.1 complete: typed classification/provenance foundation with regression tests; see dokja_docs/step-09-consolidation.md. Representation decisions recorded in ADR 0008.",
         "Step 09.2 persistence, API/CLI answers, reading-time classifier and explicit stored-document reclassification are implemented. Desktop/chat continuation and other listed remaining items keep 09.2 in progress; generic consolidation and faculty migrations remain pending.",
         "Inspectable Memory desktop: paginated read-only memory.list and per-reference memory.get expose context, action/detail, frozen predictions, baseline, similarity and observed outcomes. Memory domain provides feedback guidance; the service adds opt-in bounded context to get without changing listing excerpts, default reads, verdicts or schema. See dokja_docs/step-09-consolidation.md#inspectable-experience-memory.",
-        "Desktop is the primary explicit experience feedback interface: inspected records offer acceptance, observed-result comparison and explicit non-use, protected by real input and native confirmation. TUI list keys a/c/i provide the secondary path; coding-agent mediation is documented using the existing synchronous request adapter. The Memory store now acknowledges only the winning verdict under concurrent writes. See dokja_docs/experience-feedback.md."
+        "Desktop is the primary explicit experience feedback interface: inspected records offer acceptance, observed-result comparison and explicit non-use, protected by real input and native confirmation. TUI list keys a/c/i provide the secondary path; coding-agent mediation is documented using the existing synchronous request adapter. The Memory store now acknowledges only the winning verdict under concurrent writes. See dokja_docs/experience-feedback.md.",
+        "WhatsApp visibility regression fixed: known interfaces remain in the orchestrator catalog without a status endpoint, with configured:false and not_configured/unchecked state. Desktop retains the row, explains setup, and waits to offer QR/routing controls until configured. Existing configured link/unlink flows are preserved."
       ],
       "checks": [
         {
@@ -586,6 +587,11 @@
           "name": "explicit_experience_feedback",
           "status": "passed",
           "detail": "Desktop pnpm test: 205 Node + 196 UI; pnpm typecheck; pnpm test:e2e: build + 29 headless Electron tests. Memory service and TUI go test -race ./... and go vet ./... passed. Covers explicit writes, cancellation, missing/disabled service, uncertain timeout without retry, prior verdicts, exact reference targeting and concurrent first-verdict receipts. Synthetic tests only; no owner records changed or deployment performed."
+        },
+        {
+          "name": "whatsapp_catalog_visibility",
+          "status": "passed",
+          "detail": "Orchestrator go test -race ./... and go vet ./...; desktop pnpm test (206 Node + 197 UI), pnpm typecheck, and pnpm test:e2e (build + 30 headless Electron tests). Missing optional configuration remains visible without degrading platform health; endpoint details are not exposed."
         }
       ],
       "blockers": [],

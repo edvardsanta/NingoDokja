@@ -30,7 +30,7 @@ type InterfaceStatusClient struct {
 }
 
 // NewInterfaceStatusClient returns nil when there is no http(s) address: an interface that is not
-// deployed has no endpoint, and is simply not listed.
+// configured has no endpoint; the interface catalog reports it as unconfigured.
 func NewInterfaceStatusClient(endpoint string) *InterfaceStatusClient {
 	endpoint = strings.TrimSpace(endpoint)
 	if !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
