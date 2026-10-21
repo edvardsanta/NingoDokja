@@ -94,7 +94,8 @@ Switches and jobs:
 - `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
   containers through the local runtime controller the desktop and TUI also use (launched when none is
   running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a
-  job, so starting a module posts nothing by itself. Run it on the host; inside a container it is refused.
+  job. Starting `discord` or `scheduler` first prints what they will do with the saved switches and jobs
+  (which jobs post and when, whether the bot answers) and asks; `--yes` skips the question. Run it on the host; inside a container it is refused.
 - `services list|enable|disable <meme|chat_ai|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`: a logical switch in the orchestrator. While a
   service is off its events are refused (scheduled jobs included). The container is not touched.
 - `jobs list`: state, interval, last and next run of every scheduler job.
