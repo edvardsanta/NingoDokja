@@ -1,3 +1,4 @@
+import { RUNTIME_MODULES } from "../shared/runtime.js";
 import type {
   DeleteResult,
   DigestItem,
@@ -232,6 +233,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createFakeTransport(delayMs = 400): Transport {
   const experiences = structuredClone(EXPERIENCES);
   // What was added, removed and indexed stays for the life of the page, so the list follows.
+  const modules=RUNTIME_MODULES.map(name=>({name,state:"stopped",error:"",dependencies:[]}));
   let documents = knowledgeDocuments();
   const classifications = new Map<string, KnowledgeClassification>();
   // Switches stay where they were put, as the orchestrator keeps them.
@@ -241,6 +243,12 @@ export function createFakeTransport(delayMs = 400): Transport {
     async request(type, payload) {
       await sleep(delayMs);
       switch (type) {
+        case "runtime.modules":return ok({modules:structuredClone(modules),busy:false,error:""});
+        case "runtime.set": {
+          const module=modules.find(m=>m.name===payload?.module);
+          if(module)module.state=payload?.enabled?"ready":"stopped";
+          return ok({modules:structuredClone(modules),busy:false,error:""});
+        }
         case "communications.channels": return ok({ channels: [{ id: "123", name: "reading-room" }] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
         case "communications.link.status":

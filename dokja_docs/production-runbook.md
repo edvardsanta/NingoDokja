@@ -596,3 +596,60 @@ heading, with their state and a switch each. See the interface docs for each sta
 Compatibility: additive. New optional environment variables on the orchestrator, one status route on
 each interface, new names in the switchable set (listed apart from the services) and extra fields
 (`kind`, `state`) on interface entries of `ningo.status`. Existing `VA_STATE_FILE` files stay valid.
+
+## Desktop local runtime controller
+
+The desktop can bootstrap the **local lite stack** with a host daemon, independent
+of the application orchestrator. This does not manage the production stack.
+Opening desktop starts only the daemon and queries container status; all optional
+application containers may remain stopped. In System → Local containers, Start
+runs one selected module and its required dependencies, and Stop preserves
+persistent data and dependencies still in use.
+
+Build prerequisites now include Go 1.25, native ZeroMQ development headers and
+pkg-config for the generated host binary. Runtime requires a running Docker or
+compatible Podman engine with `docker compose` available to the desktop user's
+PATH. The lite Compose project must be used from its local checkout; the shell
+accepts a trusted `--runtime-root` for launches outside the checkout. There is no
+new application environment variable, TCP port, Compose service or mounted engine socket.
+A local Unix `DOCKER_HOST` is bridged into `CONTAINER_HOST` for Podman compatibility
+when no Podman override is present. Known remote/custom engine targets are refused.
+Windows and remote/custom application endpoints do not expose these controls.
+
+The host bootstrap orchestrator routes a restricted `runtime.modules` or
+`runtime.set` envelope to the Runtime domain, which owns module policy, then to a
+stateless Compose adapter. Normal feature requests still use the main
+orchestrator. Existing `services.set` controls only routing and remains unchanged;
+container startup does not silently enable a capability the owner disabled.
+
+The first inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice
+and WhatsApp. Embeddings/model initialization start only when required by Memory or
+Knowledge. Only an explicit WhatsApp selection starts its gateway. No module implicitly
+starts Discord or scheduled delivery.
+Running external consumers are recognized when deciding whether dependencies may
+stop. Existing containers are reused rather than recreated; configuration/image
+deployment is separate from runtime Start/Stop.
+
+The daemon listens on a mode-0600 Unix socket in a mode-0700 per-checkout directory
+under the desktop user's data directory. An OS lock rejects duplicate instances
+and permits safe stale-socket recovery. Private ownership state records which
+services the controller created and which modules were explicitly selected. Do
+not delete live socket/ownership files. When replacing the controller build or
+changing the checkout's Compose project configuration, stop the old daemon with
+normal SIGTERM before reopening desktop. This leaves application containers
+running. No automatic OS boot/login service is installed.
+
+Operations continue after closing desktop. The UI polls actual status and reports
+starting, ready, running without a readiness check, stopping, stopped or failed.
+The application must acknowledge a ZeroMQ status or HTTP health probe before
+`ready`; Ollama must answer and model initialization must complete successfully.
+Ordinary readiness waits at most two minutes, initialization up to eight minutes,
+within a ten-minute operation limit. Errors do not trigger automatic retries.
+After a timeout, inspect current state before retrying. Start failure never
+rolls back by stopping unrelated containers. Stop never removes containers,
+volumes or data, and it refuses dependencies required by running consumers.
+
+The three new Go modules are tested explicitly in CI and `scripts/test_all.sh`;
+the nested bootstrap module is not traversed by the existing orchestrator test
+command. Rollback is the previous desktop build; stop the host daemon separately
+if no longer wanted. There are no application schema or deployment migrations.

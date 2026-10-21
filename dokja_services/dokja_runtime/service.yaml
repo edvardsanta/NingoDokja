@@ -1,0 +1,16 @@
+name: dokja-runtime-adapter
+description: Stateless host integration for fixed local Compose commands and module readiness
+
+type: service
+language: go
+
+exposes:
+  - in-process
+
+paths:
+  source: ./
+  tests: ./
+  docs: ./README.md
+
+runtime:
+  containerized: false

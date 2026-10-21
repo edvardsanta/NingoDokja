@@ -8,6 +8,7 @@ export const DEFAULT_MAX_TIMEOUT_MS = 120_000;
 
 export type DesktopConfig = {
   endpoint: string;
+  runtimeRoot?: string;
   locale: Locale;
   defaultTimeoutMs: number;
   maxTimeoutMs: number;
@@ -49,6 +50,7 @@ export function parseConfig(
     args,
     options: {
       "request-endpoint": { type: "string" },
+      "runtime-root": { type: "string" },
       lang: { type: "string" },
       timeout: { type: "string" },
     },
@@ -73,6 +75,7 @@ export function parseConfig(
   const devServerUrl = variable("DOKJA_DESKTOP_DEV_URL");
 
   return {
+    ...(flag("runtime-root") ? { runtimeRoot: flag("runtime-root") } : {}),
     endpoint: flag("request-endpoint") ?? variable("DOKJA_ORCH_REQUEST_ENDPOINT") ?? DEFAULT_ENDPOINT,
     locale: localeFromTag(localeTag),
     defaultTimeoutMs: Math.min(DEFAULT_REQUEST_TIMEOUT_MS, maxTimeoutMs),

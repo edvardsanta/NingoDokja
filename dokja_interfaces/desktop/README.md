@@ -305,3 +305,47 @@ orchestrator now emits the known interface catalog with an explicit configuratio
 flag, independently of the routing switch. Rebuild/restart the orchestrator and
 desktop for this fix. Existing configured interfaces retain their link/unlink and
 QR controls. No credentials, environment defaults, ports, schema or routes change.
+### Starting and stopping local containers
+
+With the default local orchestrator endpoint, **System → Local containers** uses
+a host background controller even when the application orchestrator is stopped.
+Opening desktop starts only that small controller and reads status; it does not
+start containers. Choose **Start** for one module. The controller starts only its
+required dependencies, waits for application readiness, and reports progress or
+an actionable failure. **Stop** retains data and shared dependencies. Closing
+desktop leaves accepted operations and containers running.
+
+The initial inventory is orchestrator, Memory, Knowledge, Meme, Book, Chat AI,
+Feeds, Voice and WhatsApp in `docker-compose.lite.yml`. Memory/Knowledge also need local
+embeddings and successful model initialization. Discord, scheduler and other interfaces are not implicitly launched. WhatsApp
+starts only when selected explicitly, and its auth/history volumes are retained. Running instances are recognized
+as consumers so their required dependencies are preserved. One operation runs at
+a time; a repeated identical pending action is idempotent. Failures permit an
+explicit retry. A timeout triggers status refresh, never blind resubmission.
+
+Container lifecycle and the existing **routing switches** are separate: starting
+a process does not override a deliberately disabled application capability.
+`running` means the container exists without a controller readiness check;
+`ready` means the application acknowledged its readiness probe. If the engine
+cannot be inspected, the UI shows unknown state and disables writes until refresh.
+
+Build/start from the desktop directory as usual. The build now also compiles the
+Go host controller, so Go 1.25, native ZeroMQ development libraries and pkg-config
+are required at build time. A running Docker/compatible Podman engine and
+`docker compose` command are required at runtime. Existing containers are reused;
+recreating them for image/configuration changes is a separate deployment action.
+The first startup may build images or initialize models and can take minutes.
+
+The shell finds the nearest checkout containing the lite Compose file. For a
+packaged build launched elsewhere, supply the trusted `--runtime-root` flag with
+an absolute checkout path. The renderer cannot choose that path or supply shell
+commands. Local controls are hidden for Windows and remote/custom orchestrator
+endpoints in this release. The browser demo uses synthetic stopped modules.
+
+The controller uses a private Unix socket, an OS instance lock and private
+ownership state under the desktop user's data directory, scoped to the canonical
+checkout. It runs as the current user with no root helper, TCP control port or
+Docker socket exposed to the renderer. It starts lazily and continues after the
+window closes; no login/boot autostart is installed. See the
+[controller documentation](../../dokja_orch/runtime/README.md) and
+[production runbook](../../dokja_docs/production-runbook.md) for operation limits.

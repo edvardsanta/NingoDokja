@@ -137,6 +137,27 @@ run_suite \
   "missing go.mod"
 
 run_suite \
+  "dokja_domain/dokja_runtime" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_domain/dokja_runtime" \
+  "[ -f '$ROOT_DIR/dokja_domain/dokja_runtime/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
+  "dokja_services/dokja_runtime" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_services/dokja_runtime" \
+  "[ -f '$ROOT_DIR/dokja_services/dokja_runtime/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
+  "dokja_orch/runtime" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_orch/runtime" \
+  "[ -f '$ROOT_DIR/dokja_orch/runtime/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
   "dokja_interfaces/cli" \
   "GOCACHE='$GOCACHE_DIR' go test ./..." \
   "$ROOT_DIR/dokja_interfaces/cli" \

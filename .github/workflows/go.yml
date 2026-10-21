@@ -26,6 +26,9 @@ jobs:
       with:
         go-version: '1.25.0'
 
+    - name: Install native ZeroMQ development headers
+      run: sudo apt-get update && sudo apt-get install -y libzmq3-dev pkg-config
+
     - name: Test
       working-directory: ./dokja_orch
       run: go test -v ./...
@@ -37,3 +40,15 @@ jobs:
     - name: Test the digest domain
       working-directory: ./dokja_domain/dokja_digest
       run: go test -v ./...
+
+    - name: Test local runtime domain
+      working-directory: ./dokja_domain/dokja_runtime
+      run: go test -race ./...
+
+    - name: Test local runtime adapter
+      working-directory: ./dokja_services/dokja_runtime
+      run: go test -race ./...
+
+    - name: Test bootstrap runtime orchestrator
+      working-directory: ./dokja_orch/runtime
+      run: go test -race ./...
