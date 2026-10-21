@@ -622,8 +622,8 @@ stateless Compose adapter. Normal feature requests still use the main
 orchestrator. Existing `services.set` controls only routing and remains unchanged;
 container startup does not silently enable a capability the owner disabled.
 
-The first inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice
-and WhatsApp. Embeddings/model initialization start only when required by Memory or
+The first inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
+Communications and WhatsApp. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
 Knowledge. Only an explicit WhatsApp selection starts its gateway. No module implicitly
 starts Discord or scheduled delivery.
 Running external consumers are recognized when deciding whether dependencies may

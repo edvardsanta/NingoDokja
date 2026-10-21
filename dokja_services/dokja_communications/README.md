@@ -5,7 +5,8 @@ Read-only HTTP adapter for the desktop's Discord conversation view. The desktop 
  domain validates the channel, and this service reads the external API. It does not run a model,
 store messages or send them. Sending reuses the orchestrator's existing delivery workflow.
 
-The service is optional. Enable the `communications` Compose profile and set the same
+The service is optional. Start it from the desktop (**System → Modules**), or enable the
+`communications` Compose profile, and set the same
 `DOKJA_COMMUNICATIONS_TOKEN` (at least 32 characters, randomly generated) in the desktop shell,
 orchestrator and this service. Leave it unset to disable the new actions. Never commit its value.
 The service's port is not published by Compose.
