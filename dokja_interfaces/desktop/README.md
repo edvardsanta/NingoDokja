@@ -316,8 +316,9 @@ an actionable failure. **Stop** retains data and shared dependencies. Closing
 desktop leaves accepted operations and containers running.
 
 The initial inventory is orchestrator, Memory, Knowledge, Meme, Book, Chat AI,
-Feeds, Voice, Communications and WhatsApp in `docker-compose.lite.yml`. Memory/Knowledge also need local
-embeddings and successful model initialization. Discord, scheduler and other interfaces are not implicitly launched. WhatsApp
+Feeds, Voice, Communications, WhatsApp, Discord and the scheduler in `docker-compose.lite.yml`. Memory/Knowledge also need local
+embeddings and successful model initialization. Discord and the scheduler answer or post once running, so their
+Start first shows, inside the row, what they will do with the switches and jobs already saved, and asks. WhatsApp
 starts only when selected explicitly, and its auth/history volumes are retained. Running instances are recognized
 as consumers so their required dependencies are preserved. One operation runs at
 a time; a repeated identical pending action is idempotent. Failures permit an

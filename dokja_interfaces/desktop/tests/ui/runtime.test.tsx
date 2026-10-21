@@ -36,6 +36,17 @@ describe("local runtime modules",()=>{
   fireEvent.click(await screen.findByRole("button",{name:"Start communications"}));
   await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"communications",enabled:true}]));
  });
+ it("asks before starting a module that posts, and starts nothing on cancel",async()=>{
+  const {transport,calls}=routedTransport({"runtime.modules":ok({modules:[{name:"scheduler",state:"stopped",error:"",dependencies:["orchestrator"]}],busy:false,error:""}),"runtime.set":page("starting",true)});
+  render(<I18nProvider locale="en"><RuntimeCard transport={transport} startNotice={()=>["meme.dispatch runs every 2h and posts memes to the meme channels on Discord."]}/></I18nProvider>);
+  fireEvent.click(await screen.findByRole("button",{name:"Start scheduler"}));
+  await screen.findByText("meme.dispatch runs every 2h and posts memes to the meme channels on Discord.");
+  fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
+  expect(calls.some(c=>c.type==="runtime.set")).toBe(false);
+  fireEvent.click(screen.getByRole("button",{name:"Start scheduler"}));
+  fireEvent.click(screen.getByRole("button",{name:"Start"}));
+  await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"scheduler",enabled:true}]));
+ });
  it("shows background readiness errors and permits an explicit retry",async()=>{
   const {transport,calls}=routedTransport({"runtime.modules":[page("failed",false,"Model initialization failed"),page("ready")],"runtime.set":page("starting",true)});show(transport);
   await screen.findByText("Model initialization failed");
