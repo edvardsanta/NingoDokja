@@ -738,7 +738,7 @@ func TestDiscordSendRejectsNSFWBypassOutsideTUI(t *testing.T) {
 			}
 			_, err := handler.Handle(context.Background(), event,
 				core.WorkflowStep{Domain: core.DomainSystem, Action: "send-discord-message"})
-			if err == nil || !strings.Contains(err.Error(), "only allowed for TUI") {
+			if err == nil || !strings.Contains(err.Error(), "only allowed for explicit desktop or TUI") {
 				t.Fatalf("expected TUI-only refusal, got %v", err)
 			}
 			if len(deliverer.deliveries) != 0 {

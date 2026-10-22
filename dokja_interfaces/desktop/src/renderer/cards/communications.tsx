@@ -131,17 +131,19 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
   const id = useId();
   const [content, setContent] = useState("");
   const [attachment, setAttachment] = useState("");
+  const [forceSend, setForceSend] = useState(false);
+  const [memeOffset, setMemeOffset] = useState(0);
   const busy = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // A WhatsApp conversation takes text only, so it has no memes to attach.
   const textOnly = isWhatsApp(channel);
-  const run = useCallback(async (draft: { content: string; attachment: string }): Promise<LoadResult<CommunicationSend | Off>> => {
+  const run = useCallback(async (draft: { content: string; attachment: string; force: boolean }): Promise<LoadResult<CommunicationSend | Off>> => {
     if (busy.current) return unexpected();
     busy.current = true;
     onSending(true);
     try {
-      const answer = await transport.request("communications.send", { channel_id: channel, content: draft.content, ...(textOnly ? {} : { attachment_url: draft.attachment }) }, { timeoutMs: 60_000 });
+      const answer = await transport.request("communications.send", { channel_id: channel, content: draft.content, ...(textOnly ? {} : { attachment_url: draft.attachment, ...(draft.force ? { force_nsfw: true } : {}) }) }, { timeoutMs: 60_000 });
       if (!answer.ok) return answer;
       if (!isRecord(answer.result)) return unexpected();
       if (answer.result.off === true) return { ok: true, data: { off: true, reason: String(answer.result.reason ?? "") } };
@@ -153,25 +155,26 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
   }, [transport, channel, textOnly, onSent, onSending]);
   const send = useAction(run);
   const sending = send.state.phase === "loading";
-  const loadMemes = useCallback(async (): Promise<LoadResult<MemePage | Off>> => {
+  const loadMemes = useCallback(async (offset: number): Promise<LoadResult<MemePage | Off>> => {
     // The shell caps a page of memes at 24, so ask for what it will give.
-    const answer = await transport.request("meme.list", { scope: "unsent", limit: 24, offset: 0 }, { timeoutMs: 15_000 });
+    const answer = await transport.request("meme.list", { scope: "unsent", limit: 12, offset: memeOffset }, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
     const page = parseMemePage(answer.result);
     return page ? { ok: true, data: page } : unexpected();
-  }, [transport]);
+  }, [transport, memeOffset]);
   const memes = useAction(loadMemes);
   return <form className="message-compose" onSubmit={(event) => {
     event.preventDefault();
-    if (!sending && (content.trim() || attachment)) send.start({ content: content.trim(), attachment });
+    if (!sending && (content.trim() || attachment)) send.start({ content: content.trim(), attachment, force: forceSend });
   }}>
     <label htmlFor={id}>{t("communications_message")}</label>
     <textarea id={id} value={content} maxLength={2000} rows={4} disabled={sending} onChange={(event) => setContent(event.target.value)} />
     <div className="pager">
-      {!textOnly && <button type="button" disabled={sending || memes.state.phase === "loading"} onClick={() => memes.start(undefined)}>{t("communications_memes")}</button>}
+      {!textOnly && <button type="button" disabled={sending || memes.state.phase === "loading"} onClick={() => memes.start(memeOffset)}>{t("communications_memes")}</button>}
+      {!textOnly && attachment && <label><input type="checkbox" checked={forceSend} disabled={sending} onChange={(event) => setForceSend(event.target.checked)} /> {t("communications_force_send")}</label>}
       <button type="submit" disabled={sending || (!content.trim() && !(attachment && !textOnly))}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</button>
     </div>
-    {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <MemePicker transport={transport} memes={memes.state.data.memes} selected={attachment} disabled={sending} onSelect={setAttachment} />}
+    {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <MemePicker transport={transport} memes={memes.state.data.memes} page={memes.state.data} selected={attachment} disabled={sending} onSelect={setAttachment} onPage={(offset) => { setMemeOffset(offset); memes.start(offset); }} />}
     {memes.state.phase === "error" && <Problem error={memes.state.error} />}
     {memes.state.phase === "ready" && memes.state.data.off && <OffNotice reason={memes.state.data.reason} />}
     <div aria-live="polite">

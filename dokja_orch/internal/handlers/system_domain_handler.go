@@ -487,8 +487,8 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	if forceNSFW && attachmentURL == "" {
 		return nil, fmt.Errorf("force_nsfw requires attachment_url")
 	}
-	if forceNSFW && !tuiNSFWBypassAllowed(event) {
-		return nil, fmt.Errorf("force_nsfw is only allowed for TUI discord.send requests")
+	if forceNSFW && !explicitNSFWBypassAllowed(event) {
+		return nil, fmt.Errorf("force_nsfw is only allowed for explicit desktop or TUI sends")
 	}
 
 	var targets []string
@@ -606,9 +606,13 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	return response, nil
 }
 
-func tuiNSFWBypassAllowed(event core.Event) bool {
-	return event.Type == "discord.send" && event.Source == core.SourceCLI &&
-		strings.TrimSpace(resultString(event.Context, "interface")) == "tui"
+func explicitNSFWBypassAllowed(event core.Event) bool {
+	if event.Source == core.SourceCLI && event.Type == "discord.send" &&
+		strings.TrimSpace(resultString(event.Context, "interface")) == "tui" {
+		return true
+	}
+	return event.Source == core.SourceDesktop && event.Type == "communications.send" &&
+		strings.TrimSpace(resultString(event.Context, "interface")) == "desktop"
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {

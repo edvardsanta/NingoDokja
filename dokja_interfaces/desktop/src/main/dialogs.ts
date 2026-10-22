@@ -60,7 +60,7 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
     }
     return {
       message: pt ? "Enviar pelo Ningo ao Discord?" : "Send to Discord as Ningo?",
-      detail: `${pt ? "Canal" : "Channel"}: ${String((wire.channel_ids as string[])[0])}\n\n${String(wire.content ?? "")}\n\n${String(wire.attachment_url ?? "")}`,
+      detail: `${pt ? "Canal" : "Channel"}: ${String((wire.channel_ids as string[])[0])}\n\n${String(wire.content ?? "")}\n\n${String(wire.attachment_url ?? "")}${wire.force_nsfw === true ? `\n\n${pt ? "AVISO: o envio forçado ignora a triagem de mídia." : "WARNING: force send bypasses media screening."}` : ""}`,
       accept: pt ? "Enviar" : "Send",
       cancel: pt ? "Cancelar" : "Cancel",
     };

@@ -70,7 +70,7 @@ export async function handleRequest(
   }
 
   // What cannot be undone waits for the person's yes, asked by the shell and not by the page.
-  if (needsConfirmation(type)) {
+  if (needsConfirmation(type, wire)) {
     if (!confirm) return fail("denied", "this change needs the person's confirmation, and there is no way to ask");
     if (!(await confirm(type, wire))) return fail("cancelled", "the person did not confirm");
   }

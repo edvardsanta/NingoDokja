@@ -20,7 +20,19 @@ test("sending needs real input and native confirmation, and targets only the sel
   assert.equal((await handleRequest(send, orchestrator, limits, undefined, here, async () => false)).ok, false);
   assert.equal(calls.length, 0);
   const result = await handleRequest(send, orchestrator, limits, undefined, here, async (_type, payload) => {
-    assert.deepEqual(payload, { channel_ids: ["123"], content: "hello" }); return true;
+    assert.deepEqual(payload, { channel_ids: ["123"], content: "hello", force_nsfw: true }); return true;
+  });
+
+  test("a normal send does not open a confirmation popup", async () => {
+    let asked = false;
+    const orchestrator = { request: async () => ok({ domain: "system", result: { sent_to: ["123"] } }) };
+    const result = await handleRequest(
+      { type: "communications.send", payload: { channel_id: "123", content: "hello" } },
+      orchestrator, limits, undefined, here,
+      async () => { asked = true; return true; },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(asked, false);
   });
   assert.deepEqual(result, { ok: true, result: { sent: true, skipped: false } });
   assert.equal(calls.length, 1);

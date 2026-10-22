@@ -455,7 +455,10 @@ export function createFakeTransport(delayMs = 400): Transport {
           const page: MemePage = { total: all.length, offset, memes: all.slice(offset, offset + limit) };
           return ok(page);
         }
+        case "meme.hashtag.tag":
+          return ok({ source_url: payload?.url ?? "", hashtag: payload?.hashtag ?? "", embedded: true });
       }
+      return ok({});
     },
 
     async preview(url): Promise<PreviewResult> {
