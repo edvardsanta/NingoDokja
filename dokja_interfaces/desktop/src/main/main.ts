@@ -9,7 +9,7 @@ import {
   type PreviewResult,
   type TransportResult,
 } from "../shared/transport.js";
-import { RuntimeClient, runtimeRoot } from "./runtime_client.js";
+import { RuntimeClient, runtimeRoot, runtimeStateHome } from "./runtime_client.js";
 import { DEFAULT_ENDPOINT } from "./config.js";
 import { parseConfig } from "./config.js";
 import { isTrustedSender } from "./guards.js";
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint, communicationsToken: process.env.DOKJA_COMMUNICATIONS_TOKEN });
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
   const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
-  const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
+  const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:runtimeStateHome(process.env, app.getPath("home")), legacyStateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
   const client = { request:(type:string,payload:Record<string,unknown>,timeout:number) =>
     type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout) };
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };

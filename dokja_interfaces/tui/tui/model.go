@@ -56,6 +56,15 @@ type tickMsg time.Time
 type statusMsg struct {
 	data statusData
 	err  error
+	// The modules come from the local runtime controller, which answers even when the
+	// orchestrator is stopped.
+	modules    *cli.RuntimeSnapshot
+	modulesErr string
+}
+
+// Runtime is the local runtime controller: it starts and stops the lite stack's containers.
+type Runtime interface {
+	Request(ctx context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error)
 }
 
 type memoryMsg struct{ view memoryView }
@@ -139,8 +148,12 @@ type Model struct {
 
 	status    *statusData
 	statusErr string
-	memes     memeList
-	screen    *screenData
+
+	runtime    Runtime
+	modules    *cli.RuntimeSnapshot
+	modulesErr string
+	memes      memeList
+	screen     *screenData
 	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
 	suggestion *suggestionEvidence
 	form       discordForm
@@ -311,14 +324,33 @@ func (m *Model) request(eventType string, payload map[string]any) (map[string]an
 	return res, nil
 }
 
+// SetRuntime gives the panel module controls. Without one, unavailable says why there are none.
+func (m *Model) SetRuntime(runtime Runtime, unavailable string) {
+	m.runtime, m.modulesErr = runtime, unavailable
+}
+
+func (m *Model) readModules() (*cli.RuntimeSnapshot, string) {
+	if m.runtime == nil {
+		return nil, m.modulesErr
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), min(m.timeout, 15*time.Second))
+	defer cancel()
+	snapshot, err := m.runtime.Request(ctx, "runtime.modules", nil)
+	if err != nil {
+		return nil, err.Error()
+	}
+	return &snapshot, ""
+}
+
 func (m *Model) cmdStatus() tea.Cmd {
 	if !m.begin(tr("refreshing_panel")) {
 		return nil
 	}
 	return func() tea.Msg {
+		modules, modulesErr := m.readModules()
 		system, err := m.request("ningo.status", map[string]any{})
 		if err != nil {
-			return statusMsg{err: err}
+			return statusMsg{err: err, modules: modules, modulesErr: modulesErr}
 		}
 		meme, err := m.request("meme.status", map[string]any{})
 		memeOff := false
@@ -327,11 +359,11 @@ func (m *Model) cmdStatus() tea.Cmd {
 		case errors.As(err, &skipped):
 			meme, memeOff = map[string]any{}, true // switched off: not an outage
 		case err != nil:
-			return statusMsg{err: err}
+			return statusMsg{err: err, modules: modules, modulesErr: modulesErr}
 		}
 		data := parseStatus(system, meme, m.now())
 		data.MemeOff = memeOff
-		return statusMsg{data: data}
+		return statusMsg{data: data, modules: modules, modulesErr: modulesErr}
 	}
 }
 
@@ -433,6 +465,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statusMsg:
 		m.busy = false
+		m.modules, m.modulesErr = msg.modules, msg.modulesErr
 		if msg.err != nil {
 			m.statusErr = msg.err.Error()
 			return m, nil
@@ -1205,18 +1238,24 @@ func (m *Model) upload(p *preview) {
 	p.uploaded, p.transmit = true, nil
 }
 
-// panelRow is one selectable line of the panel: a service or a job.
+// panelRow is one selectable line of the panel: a module, a service or a job.
 type panelRow struct {
-	isJob   bool
-	name    string
-	enabled bool
+	isModule bool
+	isJob    bool
+	name     string
+	enabled  bool
 }
 
 func (m *Model) panelRows() []panelRow {
-	if m.status == nil {
-		return nil
+	var rows []panelRow
+	if m.modules != nil {
+		for _, module := range m.modules.Modules {
+			rows = append(rows, panelRow{isModule: true, name: module.Name, enabled: !module.Stopped()})
+		}
 	}
-	rows := make([]panelRow, 0, len(m.status.Services)+len(m.status.Jobs))
+	if m.status == nil {
+		return rows
+	}
 	for _, service := range m.status.Services {
 		rows = append(rows, panelRow{name: service.Name, enabled: service.Enabled})
 	}
@@ -1250,7 +1289,13 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 			m.panelCursor++
 		}
 	case " ", "space", "enter", "t":
-		if row, ok := m.selectedPanelRow(); ok {
+		row, ok := m.selectedPanelRow()
+		switch {
+		case ok && row.isModule && m.modules != nil && m.modules.Busy:
+			m.setNotice(tr("modules_busy"), true)
+		case ok && row.isModule:
+			return m, m.exec(m.moduleToggle(row))
+		case ok:
 			return m, m.exec(m.togglePending(row))
 		}
 	case "x":
@@ -1331,6 +1376,28 @@ func (m *Model) togglePending(row panelRow) *pendingAction {
 		payload:   map[string]any{"name": row.name, "enabled": !row.enabled},
 		summarize: func(map[string]any) string { return "ok" },
 		reload:    true,
+	}
+}
+
+// moduleToggle starts or stops a module's containers. It changes no service switch or job, so
+// starting a module never makes Ningo post anything by itself.
+func (m *Model) moduleToggle(row panelRow) *pendingAction {
+	label := tr("start_module", row.name)
+	if row.enabled {
+		label = tr("stop_module", row.name)
+	}
+	runtime := m.runtime
+	return &pendingAction{
+		label: label,
+		local: func() (string, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), min(m.timeout, 15*time.Second))
+			defer cancel()
+			if _, err := runtime.Request(ctx, "runtime.set", map[string]any{"module": row.name, "enabled": !row.enabled}); err != nil {
+				return "", err
+			}
+			return tr("module_accepted"), nil
+		},
+		reload: true,
 	}
 }
 

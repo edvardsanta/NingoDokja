@@ -95,3 +95,23 @@ func TestBrowserOriginsAndOversizedPayloadsAreRejected(t *testing.T) {
 		t.Fatal("oversized request accepted")
 	}
 }
+func TestEveryLocalInterfaceGetsTheSameControl(t *testing.T) {
+	handler := Handler(domain.New(&fake{}, domain.Journal{}, nil), "fixture")
+	status := func(source string) int {
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewBufferString(`{"source":"`+source+`","type":"runtime.modules"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		return w.Code
+	}
+	for _, source := range []string{"desktop", "cli", "tui"} {
+		if status(source) != http.StatusOK {
+			t.Fatal(source)
+		}
+	}
+	for _, source := range []string{"", "discord", "whatsapp"} {
+		if status(source) == http.StatusOK {
+			t.Fatal(source)
+		}
+	}
+}

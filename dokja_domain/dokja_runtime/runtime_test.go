@@ -256,3 +256,29 @@ func TestCommunicationsStartsOnlyItsReaderAndCoreNeverDelivery(t *testing.T) {
 		t.Fatal(f.trace())
 	}
 }
+
+func TestAStopThatEndsWithANonZeroExitIsStillStopped(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "book", true)
+	change(t, d, "book", false)
+	// A process killed by the stop exits non-zero; the engine reports it as a failed exit.
+	f.mu.Lock()
+	f.containers["dokja-book"] = Container{Failed: true}
+	f.containers["dokja-orchestrator"] = Container{Failed: true}
+	f.mu.Unlock()
+	s := d.List(context.Background())
+	if row(s, "book").State != "stopped" || row(s, "orchestrator").State != "stopped" {
+		t.Fatalf("%+v", s.Modules)
+	}
+}
+
+func TestAContainerThatCrashesOnItsOwnIsAFailure(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "book", true)
+	f.mu.Lock()
+	f.containers["dokja-book"] = Container{Failed: true}
+	f.mu.Unlock()
+	if row(d.List(context.Background()), "book").State != "failed" {
+		t.Fatal("a crash the controller did not cause must show as failed")
+	}
+}

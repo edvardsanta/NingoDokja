@@ -23,6 +23,10 @@ type Event struct {
 	Context   map[string]any `json:"context"`
 }
 
+// controllers are the local interfaces that may manage modules. All of them reach the
+// daemon through the same private socket, so each gets the same control.
+var controllers = map[string]bool{"desktop": true, "cli": true, "tui": true}
+
 func Handler(d *domain.Domain, project string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -36,7 +40,7 @@ func Handler(d *domain.Domain, project string) http.Handler {
 		}
 		var e Event
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
-		if decoder.Decode(&e) != nil || e.Source != "desktop" {
+		if decoder.Decode(&e) != nil || !controllers[e.Source] {
 			w.WriteHeader(http.StatusBadRequest)
 			reply("error", nil, "invalid event envelope")
 			return

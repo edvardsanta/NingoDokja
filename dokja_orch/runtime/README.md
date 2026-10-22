@@ -1,11 +1,12 @@
 # Host runtime controller
 
-A small bootstrap orchestrator runs outside Compose, so desktop can start or stop
-modules while the main application orchestrator is stopped. Its restricted local
+A small bootstrap orchestrator runs outside Compose, so the local interfaces
+(desktop, CLI and TUI) can start or stop modules while the main application
+orchestrator is stopped. All three reach the same daemon and get the same control. Its restricted local
 router accepts the existing event envelope shape and dispatches `runtime.modules`
 and `runtime.set` to the Runtime domain and stateless Compose adapter:
 
-`Desktop → local request → bootstrap orchestrator → Runtime domain → Compose adapter`.
+`Desktop/CLI/TUI → local request → bootstrap orchestrator → Runtime domain → Compose adapter`.
 
 Conversational/domain requests continue through the main orchestrator unchanged.
 No application domain logic, arbitrary event dispatch, shell command API or remote
@@ -19,7 +20,13 @@ supported initially, on Unix hosts with Go 1.25 and native ZeroMQ available at
 build time and `docker compose` (Docker or compatible Podman) available at runtime.
 Windows and remote/custom application endpoints do not expose container controls.
 
-The daemon binds a Unix socket inside the desktop user's private data directory.
+The daemon binds a Unix socket in `$XDG_STATE_HOME/dokja/runtime-<checkout id>/`
+(default `~/.local/state/dokja/...`), shared by every local interface of that user.
+The desktop carries over the ownership journal earlier builds kept in its own data
+directory once. The CLI and TUI launch the daemon when none answers, from
+`DOKJA_RUNTIME_BIN`, `dokja-runtime` on `PATH`, or the desktop build's
+`dist/runtime/dokja-runtime`; inside a container they refuse, since the daemon
+drives the host's engine.
 The directory is mode 0700, the socket is mode 0600, and an OS file lock prevents
 duplicate processes or unsafe stale-socket replacement. Requests carry a protocol
 version and project-bound response identity. Browser origins and unknown actions

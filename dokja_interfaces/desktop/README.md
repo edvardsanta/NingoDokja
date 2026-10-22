@@ -345,8 +345,8 @@ commands. Local controls are hidden for Windows and remote/custom orchestrator
 endpoints in this release. The browser demo uses synthetic stopped modules.
 
 The controller uses a private Unix socket, an OS instance lock and private
-ownership state under the desktop user's data directory, scoped to the canonical
-checkout. It runs as the current user with no root helper, TCP control port or
+ownership state under `$XDG_STATE_HOME/dokja/` (default `~/.local/state/dokja/`),
+scoped to the canonical checkout and shared with the CLI and TUI. It runs as the current user with no root helper, TCP control port or
 Docker socket exposed to the renderer. It starts lazily and continues after the
 window closes; no login/boot autostart is installed. See the
 [controller documentation](../../dokja_orch/runtime/README.md) and

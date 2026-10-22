@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACTIONS } from "../src/main/actions.js";
 import { handleRequest } from "../src/main/ipc.js";
-import { RuntimeClient, runtimeRoot } from "../src/main/runtime_client.js";
+import { RuntimeClient, runtimeRoot, runtimeStateHome } from "../src/main/runtime_client.js";
+import { runtimeSnapshot } from "../src/main/runtime_actions.js";
 import { parseConfig } from "../src/main/config.js";
 
 const snapshot={modules:[{name:"memory",state:"stopped",dependencies:["orchestrator","embedding_init"],private:"drop"}],busy:false,error:""};
@@ -42,11 +43,24 @@ const server=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c)
 server.listen(path.join(state,'control.sock'));
 `;
  await writeFile(binary,source);await chmod(binary,0o700);
- const options={root:home,stateHome:home,binary,enabled:true};const first=new RuntimeClient(options);
+ const legacy=join(home,"legacy");const options={root:home,stateHome:home,legacyStateHome:legacy,binary,enabled:true};const first=new RuntimeClient(options);
+ await mkdir(join(legacy,`runtime-${first.projectId}`),{recursive:true});await writeFile(join(legacy,`runtime-${first.projectId}`,"ownership.json"),'{"owned":{"memory":true}}');
  t.after(async()=>{try{process.kill(Number(await readFile(join(first.stateDir,"pid"),"utf8")),"SIGTERM");}catch{}await rm(home,{recursive:true,force:true});});
  const read=await first.request("runtime.modules",{},3000);assert.equal(read.status,"ok");
  await assert.rejects(first.request("runtime.modules",{fixtureWrongProject:true},3000),/incompatible response/);
  const second=new RuntimeClient(options);await second.request("runtime.set",{module:"memory",enabled:true},3000);
  assert.equal(await readFile(join(first.stateDir,"launches"),"utf8"),"1");
+ assert.equal(await readFile(join(first.stateDir,"ownership.json"),"utf8"),'{"owned":{"memory":true}}');
  const event=JSON.parse(await readFile(join(first.stateDir,"last"),"utf8"));assert.equal(event.source,"desktop");assert.equal(event.type,"runtime.set");assert.deepEqual(event.payload,{module:"memory",enabled:true});assert.ok(event.event_id);assert.ok(event.timestamp);
+});
+
+test("every local interface finds the controller in the same state directory",()=>{
+ assert.equal(runtimeStateHome({XDG_STATE_HOME:"/state"},"/home/user"),"/state/dokja");
+ assert.equal(runtimeStateHome({XDG_STATE_HOME:"relative"},"/home/user"),"/home/user/.local/state/dokja");
+ assert.equal(runtimeStateHome({},"/home/user"),"/home/user/.local/state/dokja");
+});
+test("modules a newer controller adds are left out instead of breaking the card",()=>{
+ const result=runtimeSnapshot({busy:false,error:"",modules:[{name:"future_module",state:"stopped"},{name:"memory",state:"ready",dependencies:[]}]});
+ assert.deepEqual(result.modules.map(m=>m.name),["memory"]);
+ assert.throws(()=>runtimeSnapshot({busy:false,modules:[{name:"memory",state:"exploded"}]}));
 });

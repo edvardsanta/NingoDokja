@@ -234,5 +234,18 @@
   "memory_feedback_missing": "A experiência não existe mais; nada foi resolvido.",
   "memory_feedback_conflict": "Já existe um resultado: %s. Ele foi mantido.",
   "memory_feedback_saved": "Feedback salvo: %s.",
-  "memory_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Recarregue a lista antes de tentar de novo."
+  "memory_feedback_check": "Se o tempo de espera terminou, o resultado é desconhecido. Recarregue a lista antes de tentar de novo.",
+  "modules": "Módulos",
+  "module_toggle_help": "   espaço liga/desliga os containers (não mexe em switches nem jobs, então nada é postado)",
+  "modules_unavailable": "controle local de módulos indisponível: ",
+  "modules_busy": "aguarde: uma operação de módulo está em andamento",
+  "start_module": "ligar módulo %s",
+  "stop_module": "desligar módulo %s",
+  "module_accepted": "aceito; o painel acompanha o progresso",
+  "module_ready": "pronto",
+  "module_running": "rodando",
+  "module_starting": "iniciando",
+  "module_stopping": "parando",
+  "module_failed": "falhou",
+  "module_stopped": "desligado"
 }
