@@ -19,6 +19,7 @@ export const ACTION_TYPES = [
   "communications.channels",
   "communications.history",
   "communications.send",
+  "meme.hashtag.tag",
   "communications.link.status",
   "communications.link.start",
   "communications.link.reset",
@@ -51,6 +52,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "runtime.settings.set",
   "message.created",
   "communications.send",
+  "meme.hashtag.tag",
   "communications.link.start",
   "communications.link.reset",
   "services.set",
@@ -68,7 +70,8 @@ export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
   "knowledge.delete",
 ];
 
-export function needsConfirmation(type: ActionType): boolean {
+export function needsConfirmation(type: ActionType, payload?: Record<string, unknown>): boolean {
+  if (type === "communications.send") return payload?.force_nsfw === true;
   return CONFIRMED_ACTION_TYPES.includes(type);
 }
 

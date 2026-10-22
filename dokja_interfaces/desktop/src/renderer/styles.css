@@ -557,6 +557,7 @@ button[aria-pressed="true"] {
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
   padding: 0.25rem;
   border: 1px solid var(--edge);
   background: var(--static);
@@ -575,6 +576,50 @@ button[aria-pressed="true"] {
 .memes p {
   margin: 0.4rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.meme-tag-form {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.meme-tag-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.meme-tag-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.meme-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.meme-tag-suggestions button {
+  width: auto;
+  padding: 0.15rem 0.4rem;
+}
+
+.meme-tag-form button {
+  width: 100%;
+}
+
+.meme-tag-form span {
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
 }
 
 .meme-title {
@@ -761,6 +806,63 @@ button[aria-pressed="true"] {
   outline-offset: 2px;
 }
 
+.meme-tile {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.meme-attach {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  padding: 0.25rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: inherit;
+}
+
+.meme-attach img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.media-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(0 0 0 / 78%);
+}
+
+.media-viewer {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  width: min(90vw, 72rem);
+  max-height: 90vh;
+  padding: 1rem;
+  border: 1px solid var(--cyan);
+  background: var(--panel);
+  box-shadow: 0 0 2rem rgb(0 0 0 / 55%);
+}
+
+.media-viewer img,
+.media-viewer video {
+  display: block;
+  width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+}
+
+.media-viewer-close {
+  justify-self: end;
+}
+
 /* Documents open in tabs on top of Knowledge, after the base's own. The open one is lit like the open
    workspace; each document tab has its close button beside it. */
 .view-tabs {
@@ -848,7 +950,7 @@ button[aria-pressed="true"] {
   background: var(--static);
   color: var(--cyan);
   border-left: 3px solid var(--cyan);
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 /* Adding to the research base: the same plain fields as the search, one under another. */

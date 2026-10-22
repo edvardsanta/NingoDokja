@@ -434,6 +434,13 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, event co
 }
 
 func withHashtag(content, hashtag string) string {
+	hashtag = strings.TrimSpace(hashtag)
+	for _, word := range strings.Fields(content) {
+		word = strings.Trim(word, ".,!?;:()[]{}")
+		if strings.EqualFold(word, hashtag) {
+			return content
+		}
+	}
 	if content == "" {
 		return hashtag
 	}
@@ -487,8 +494,8 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	if forceNSFW && attachmentURL == "" {
 		return nil, fmt.Errorf("force_nsfw requires attachment_url")
 	}
-	if forceNSFW && !tuiNSFWBypassAllowed(event) {
-		return nil, fmt.Errorf("force_nsfw is only allowed for TUI discord.send requests")
+	if forceNSFW && !explicitNSFWBypassAllowed(event) {
+		return nil, fmt.Errorf("force_nsfw is only allowed for explicit desktop or TUI sends")
 	}
 
 	var targets []string
@@ -525,7 +532,10 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		return nil, fmt.Errorf("nothing sent: %s is switched off", strings.Join(switchedOff, ","))
 	}
 	targets = live
-	content, attempt := h.appendLearnedHashtag(ctx, event, content, attachmentURL)
+	var attempt *HashtagAttempt
+	if skip, _ := event.Payload["skip_hashtag"].(bool); !skip {
+		content, attempt = h.appendLearnedHashtag(ctx, event, content, attachmentURL)
+	}
 
 	// The safe-only rule applies here too. Only an explicit TUI --force bypasses it;
 	// otherwise a failed server-side screen counts as unsafe.
@@ -606,9 +616,13 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	return response, nil
 }
 
-func tuiNSFWBypassAllowed(event core.Event) bool {
-	return event.Type == "discord.send" && event.Source == core.SourceCLI &&
-		strings.TrimSpace(resultString(event.Context, "interface")) == "tui"
+func explicitNSFWBypassAllowed(event core.Event) bool {
+	if event.Source == core.SourceCLI && event.Type == "discord.send" &&
+		strings.TrimSpace(resultString(event.Context, "interface")) == "tui" {
+		return true
+	}
+	return event.Source == core.SourceDesktop && event.Type == "communications.send" &&
+		strings.TrimSpace(resultString(event.Context, "interface")) == "desktop"
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {

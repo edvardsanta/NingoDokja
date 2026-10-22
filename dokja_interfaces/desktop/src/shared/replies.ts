@@ -229,6 +229,7 @@ export type CommunicationMessage = {
 };
 export type CommunicationHistory = { channelId: string; messages: CommunicationMessage[]; before: string };
 export type CommunicationSend = { off?: false; sent: boolean; skipped: boolean };
+export type MemeHashtagTag = { sourceUrl: string; hashtag: string; embedded: boolean };
 
 
 export type ClassificationAxis = "form" | "content_kind";

@@ -29,7 +29,7 @@ export const memoryListPayload: ActionDefinition["payload"] = (raw) => {
 export function memoryPage(body: Record<string, unknown>): MemoryExperiences {
   if (!Array.isArray(body.experiences)) throw new Error("invalid experience page");
   return {
-    experiences: body.experiences.filter(isRecord).slice(0, 20).map((raw) => {
+    experiences: body.experiences.filter(isRecord).slice(0, 100).map((raw) => {
       // A listing never returns full context, even if an older/untrusted service includes it.
       const { context, context_truncated, ...summary } = raw;
       return experience(summary);
