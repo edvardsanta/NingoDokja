@@ -599,6 +599,20 @@ button[aria-pressed="true"] {
   min-width: 0;
 }
 
+.meme-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.meme-tag-suggestions button {
+  width: auto;
+  padding: 0.15rem 0.4rem;
+}
+
 .meme-tag-form button {
   width: 100%;
 }

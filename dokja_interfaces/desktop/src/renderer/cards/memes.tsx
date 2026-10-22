@@ -31,6 +31,10 @@ export function MemePicker({
   const [hashtag, setHashtag] = useState("");
   const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
+  const suggestions = Array.from(new Set(memes.flatMap((meme) => meme.tags.split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean))
+    .map((tag) => tag.startsWith("#") ? tag : `#${tag}`))).sort();
   const tag = useAction(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
     const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim() }, { timeoutMs: 30_000 });
@@ -77,9 +81,14 @@ export function MemePicker({
           {selected === meme.url && <div className="meme-tag-form">
             <label>
               {t("memes_tag")}
-              <input value={hashtag} disabled={tag.state.phase === "loading"}
+              <input list="meme-tag-suggestions" value={hashtag} disabled={tag.state.phase === "loading"}
                 onChange={(event) => setHashtag(event.target.value)} placeholder="#tag" />
             </label>
+            {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
+              <span>{t("memes_tag_suggestions")}</span>
+              {suggestions.map((suggestion) => <button key={suggestion} type="button"
+                onClick={() => setHashtag(suggestion)} disabled={tag.state.phase === "loading"}>{suggestion}</button>)}
+            </div>}
             <button type="button" disabled={tag.state.phase === "loading" || !hashtag.trim()}
               onClick={() => tag.start(undefined)}>
               {t("memes_create_tag")}
@@ -93,6 +102,9 @@ export function MemePicker({
         </li>
       ))}
     </ul>
+    <datalist id="meme-tag-suggestions">
+        {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+    </datalist>
     <div className="pager">
       <button type="button" disabled={disabled || page.offset === 0} onClick={() => onPage(Math.max(0, page.offset - memes.length))}>
         {t("memes_previous")}

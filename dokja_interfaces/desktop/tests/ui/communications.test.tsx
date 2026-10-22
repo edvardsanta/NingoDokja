@@ -126,6 +126,27 @@ describe("communications", () => {
     await screen.findByText("Message sent.");
     expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png" });
   });
+  it("offers existing meme tags as suggestions when tagging a meme", async () => {
+    const memePage = { total: 1, offset: 0, memes: [
+      { url: "https://images.example/a.png", title: "First", tags: "reaction, #cat", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const { preview } = previewer();
+    const { transport } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": ok(memePage),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Load memes" }));
+    const tile = await screen.findByRole("button", { name: "Attach First" });
+    await waitFor(() => expect(tile.querySelector("img")).not.toBeNull());
+    fireEvent.click(tile);
+    const input = screen.getByPlaceholderText("#tag") as HTMLInputElement;
+    expect(screen.getByRole("button", { name: "#reaction" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "#cat" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "#reaction" }));
+    expect(input.value).toBe("#reaction");
+  });
   it("lists the conversations beside the chosen one, and marks which one is open", async () => {
     const { transport, calls } = routedTransport({ "communications.channels": ok(channels), "communications.history": [ok(history()), ok({ ...history("456"), messages: [message("20", "second channel")] })] });
     render(view(transport));
