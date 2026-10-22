@@ -140,6 +140,9 @@ describe("communications", () => {
         { id: "meme-hashtag:1", title: "#reaction", kind: "meme_hashtag", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "" },
         { id: "meme-hashtag:2", title: "#cat", kind: "meme_hashtag", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "" },
       ] }),
+      "memory.list": ok({ total: 1, offset: 0, limit: 100, experiences: [
+        { ref: "experience:1", action: "hashtag.suggest", detail: "#PedroFutebol", outcome: "accepted" },
+      ] }),
     }, preview);
     render(view(transport));
     fireEvent.click(await screen.findByRole("button", { name: "Load memes" }));
@@ -149,6 +152,7 @@ describe("communications", () => {
     const input = screen.getByPlaceholderText("#tag") as HTMLInputElement;
     expect(screen.getByRole("button", { name: "#reaction" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "#cat" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "#PedroFutebol" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "#reaction" }));
     expect(input.value).toBe("#reaction");
     fireEvent.change(input, { target: { value: "" } });

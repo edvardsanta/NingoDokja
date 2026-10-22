@@ -38,12 +38,21 @@ export function MemePicker({
   const selectedMeme = memes.find((meme) => meme.url === selected);
   const suggestions = createdTags;
   const loadCreatedTags = useCallback(async () => {
-    const answer = await transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 });
-    if (!answer.ok || !isRecord(answer.result) || !Array.isArray(answer.result.documents)) return;
-    const tags = answer.result.documents.filter(isRecord)
+    const [knowledge, memory] = await Promise.all([
+      transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 }),
+      transport.request("memory.list", { state: "resolved", limit: 100, offset: 0 }, { timeoutMs: 15_000 }),
+    ]);
+    const knowledgeTags = knowledge.ok && isRecord(knowledge.result) && Array.isArray(knowledge.result.documents)
+      ? knowledge.result.documents.filter(isRecord)
       .filter((document) => text(document.kind) === "meme_hashtag")
       .map((document) => text(document.title).trim())
-      .filter(Boolean)
+      .filter(Boolean) : [];
+    const acceptedSuggestions = memory.ok && isRecord(memory.result) && Array.isArray(memory.result.experiences)
+      ? memory.result.experiences.filter(isRecord)
+        .filter((experience) => text(experience.action) === "hashtag.suggest" && text(experience.outcome) === "accepted")
+        .map((experience) => text(experience.detail).trim())
+        .filter(Boolean) : [];
+    const tags = [...knowledgeTags, ...acceptedSuggestions]
       .map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
     setCreatedTags(Array.from(new Set(tags)).sort());
   }, [transport]);
