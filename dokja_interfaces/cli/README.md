@@ -95,6 +95,10 @@ Switches and jobs:
   account is linked; `--new` asks for a fresh code first. `interfaces unlink whatsapp [--yes]` unlinks it and
   erases the saved session, after asking. Both need `DOKJA_COMMUNICATIONS_TOKEN`, the credential the
   orchestrator and the desktop share; it is sent only with `communications.*` requests and never printed.
+- `settings list` / `settings set <id>=<value>... [--yes]`: the stack's non-secret settings (Discord
+  channels and DMs, WhatsApp people and groups, models), saved in the checkout's `.env`. Setting saves
+  say which modules are recreated and ask first. Delivery channels show whether the bot or a webhook
+  delivers; webhooks and tokens are edited in `.env` by hand.
 - `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
   containers through the local runtime controller the desktop and TUI also use (launched when none is
   running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a

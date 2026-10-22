@@ -44,6 +44,8 @@ const (
 	overlayMemoryPredict
 	overlayMemoryFeedback
 	overlayLink
+	overlaySettings
+	overlaySettingEdit
 )
 
 const (
@@ -66,6 +68,8 @@ type statusMsg struct {
 // Runtime is the local runtime controller: it starts and stops the lite stack's containers.
 type Runtime interface {
 	Request(ctx context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error)
+	Settings(ctx context.Context) (cli.SettingsView, error)
+	SetSettings(ctx context.Context, values map[string]string) (cli.SettingsView, error)
 }
 
 type memoryMsg struct{ view memoryView }
@@ -169,8 +173,15 @@ type Model struct {
 	link     cli.LinkView
 	linkErr  string
 	linkOpen bool
-	memes    memeList
-	screen   *screenData
+
+	// The settings window: what the controller last said, the selected row and the one edited.
+	settings       *cli.SettingsView
+	settingsErr    string
+	settingsCursor int
+	settingEditing string
+	settingInput   textinput.Model
+	memes          memeList
+	screen         *screenData
 	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
 	suggestion *suggestionEvidence
 	form       discordForm
@@ -226,6 +237,10 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	image.CharLimit = 2000
 	image.Width = 60
 
+	settingText := textinput.New()
+	settingText.CharLimit = 2000
+	settingText.Width = 60
+
 	interval := textinput.New()
 	interval.Placeholder = tr("45m_6h_or_default")
 	interval.CharLimit = 16
@@ -269,6 +284,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 		form:                discordForm{text: text, image: image, selected: map[string]bool{}},
 		dispatchInput:       dispatch,
 		intervalInput:       interval,
+		settingInput:        settingText,
 		hashtagInput:        hashtag,
 		memoryInput:         memoryText,
 		memoryFeedbackInput: feedbackText,
@@ -504,6 +520,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memory = msg.view
 		return m, nil
 
+	case settingsMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.settingsErr = msg.err.Error()
+			return m, nil
+		}
+		m.settings, m.settingsErr = &msg.view, ""
+		m.settingsCursor = max(0, min(m.settingsCursor, len(m.settingRows())-1))
+		return m, nil
+
 	case linkMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -658,6 +684,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemoryPredict(msg)
 	case overlayLink:
 		return m.keyLink(key)
+	case overlaySettings:
+		return m.keySettings(key)
+	case overlaySettingEdit:
+		return m.keySettingEdit(msg)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -1356,6 +1386,8 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		m.memory = memoryView{}
 		m.overlay = overlayMemory
 		return m, cmd
+	case "c":
+		return m, m.openSettings()
 	case "l":
 		if row, ok := m.selectedPanelRow(); ok && row.name == "whatsapp" {
 			return m, m.openLink()

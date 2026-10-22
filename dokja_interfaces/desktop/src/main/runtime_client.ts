@@ -78,7 +78,7 @@ export class RuntimeClient {
     try { copyFileSync(legacy, journal); } catch { /* the controller starts with an empty journal */ }
   }
   async request(type: string, payload: Record<string,unknown>, timeoutMs: number): Promise<OrchestratorReply> {
-    if (type !== "runtime.modules" && type !== "runtime.set" && type !== "runtime.logs") throw new OrchestratorError("denied", "unsupported runtime action");
+    if (!["runtime.modules", "runtime.logs", "runtime.set", "runtime.settings", "runtime.settings.set"].includes(type)) throw new OrchestratorError("denied", "unsupported runtime action");
     await this.ensure();
     const body = JSON.stringify({event_id: randomUUID(), timestamp: new Date().toISOString(), source:"desktop", type,
       user:{id:"desktop-user",name:"desktop"},channel:{id:"desktop"},payload,context:{interface:"desktop"}});

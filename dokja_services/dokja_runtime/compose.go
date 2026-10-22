@@ -198,6 +198,16 @@ func (c *Compose) Start(ctx context.Context, m domain.Module) error {
 	_, err := c.Run(ctx, "up", "-d", "--no-deps", "--no-recreate", "--build", m.Service)
 	return err
 }
+
+// Recreate replaces the container so it reads the stack's configuration again. Like Start it
+// never removes volumes.
+func (c *Compose) Recreate(ctx context.Context, m domain.Module) error {
+	if !valid(m) {
+		return fmt.Errorf("unknown service")
+	}
+	_, err := c.Run(ctx, "up", "-d", "--no-deps", "--force-recreate", "--build", m.Service)
+	return err
+}
 func (c *Compose) Stop(ctx context.Context, m domain.Module) error {
 	if !valid(m) {
 		return fmt.Errorf("unknown service")

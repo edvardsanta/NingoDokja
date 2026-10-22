@@ -234,6 +234,17 @@ export function createFakeTransport(delayMs = 400): Transport {
   const experiences = structuredClone(EXPERIENCES);
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   const modules=RUNTIME_MODULES.map(name=>({name,state:"stopped",error:"",dependencies:[]}));
+  // Synthetic settings with placeholder ids; the demo keeps what is saved for the life of the page.
+  const settings=[
+    {id:"discord.meme_channels",group:"discord",kind:"list",options:[],value:"101,102",affects:["orchestrator","communications"],note:"sessions",default:""},
+    {id:"discord.safe_only_channels",group:"discord",kind:"list",options:[],value:"102",affects:["orchestrator"],note:"",default:""},
+    {id:"discord.answer_channels",group:"discord",kind:"list",options:[],value:"",affects:["discord"],note:"",default:""},
+    {id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["discord"],note:"",default:""},
+    {id:"whatsapp.people",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
+    {id:"whatsapp.groups",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
+    {id:"whatsapp.own_chat",group:"whatsapp",kind:"flag",options:["true","false"],value:"true",affects:["whatsapp"],note:"",default:""},
+    {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:""},
+  ];
   let documents = knowledgeDocuments();
   const classifications = new Map<string, KnowledgeClassification>();
   // Switches stay where they were put, as the orchestrator keeps them.
@@ -250,6 +261,13 @@ export function createFakeTransport(delayMs = 400): Transport {
           const module=modules.find(m=>m.name===payload?.module);
           if(module)module.state=payload?.enabled?"ready":"stopped";
           return ok({modules:structuredClone(modules),busy:false,error:""});
+        }
+        case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
+        case "runtime.settings.set": {
+          for (const [id,value] of Object.entries((payload?.values ?? {}) as Record<string,string>)) {
+            const row=settings.find(s=>s.id===id); if(row)row.value=value;
+          }
+          return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
         }
         case "communications.channels": return ok({ channels: [{ id: "123", name: "reading-room" }] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });

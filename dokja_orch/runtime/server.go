@@ -69,6 +69,29 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			reply("ok", result, "")
+		case "runtime.settings":
+			reply("ok", d.Settings(), "")
+		case "runtime.settings.set":
+			raw, ok := e.Payload["values"].(map[string]any)
+			if !ok || len(raw) == 0 {
+				reply("error", nil, "values are required")
+				return
+			}
+			values := map[string]string{}
+			for id, value := range raw {
+				text, ok := value.(string)
+				if !ok {
+					reply("error", nil, "every value must be text")
+					return
+				}
+				values[id] = text
+			}
+			result, err := d.SetSettings(values)
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
 		default:
 			reply("error", nil, "unsupported local runtime event")
 		}

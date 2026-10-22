@@ -941,6 +941,24 @@
           "blockers": [],
           "next_action": "Review and merge the implementation PR, rebuild/restart desktop, and validate chosen live modules. No production management or automatic full-stack startup is introduced.",
           "completed_on": "2026-10-21"
+        },
+        {
+          "id": "11.2",
+          "title": "Configure stack settings from desktop, CLI and TUI",
+          "status": "completed",
+          "evidence": [
+            "Added a bounded Runtime settings catalog and local settings actions. Values are stored atomically in the checkout .env without exposing webhook addresses or tokens. Interfaces distinguish Discord bot/webhook channels, WhatsApp people/groups and model defaults.",
+            "Saving explicitly recreates running readers and marks stopped readers for their next start. All affected readers retain stale markers across partial failure; embedding initialization precedes running embedding consumers. Settings validation and module operations are serialized.",
+            "Desktop requires real input and an impact review before saving. CLI and TUI share the same settings and show defaults. No live setting or container recreation was performed during verification."
+          ],
+          "checks": [
+            {
+              "name": "runtime_and_interfaces",
+              "status": "passed",
+              "detail": "Go race tests and vet passed for Runtime domain, adapter, bootstrap, CLI and TUI. Desktop typecheck, 215 Node tests and 214 UI tests passed; production build passed. Electron verification details are recorded in the PR."
+            }
+          ],
+          "completed_on": "2026-10-21"
         }
       ]
     }

@@ -98,7 +98,8 @@ func run() error {
 		}
 		return os.Rename(temp, path)
 	}
-	d := domain.New(service.New(root), journal, save)
+	// Settings live in the checkout's .env, which Compose reads for the lite stack.
+	d := domain.New(service.New(root), journal, save).WithSettings(service.EnvFile{Path: filepath.Join(root, ".env")})
 	hash := sha256.Sum256([]byte(root))
 	project := hex.EncodeToString(hash[:])[:16]
 	server := &http.Server{Handler: orchestration.Handler(d, project), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 15 * time.Second}

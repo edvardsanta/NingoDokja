@@ -83,11 +83,15 @@ type Backend interface {
 	Start(context.Context, Module) error
 	Stop(context.Context, Module) error
 	Ready(context.Context, Module) error
+	// Recreate replaces a module's container so it reads the stack's configuration again.
+	Recreate(context.Context, Module) error
 }
 
 type Journal struct {
 	Owned map[string]bool `json:"owned"`
 	Roots map[string]bool `json:"roots"`
+	// Stale holds stopped services whose settings changed: their next start recreates them.
+	Stale map[string]bool `json:"stale,omitempty"`
 }
 type Save func(Journal) error
 
@@ -114,11 +118,16 @@ type Domain struct {
 	// non-zero code (143 after SIGTERM, 137 when an ignored SIGTERM ends in SIGKILL); that exit is
 	// the stop the owner asked for, not a failure.
 	stopped      map[string]bool
+	stale        map[string]bool
 	save         Save
 	active       map[string]bool
 	lifecycle    sync.RWMutex
 	serviceLocks map[string]chan struct{}
-	timeout      time.Duration
+	// settings is where the stack's settings are kept; nil when this stack has none.
+	settings    SettingsStore
+	settingsErr string
+	busy        bool
+	timeout     time.Duration
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {
@@ -135,14 +144,20 @@ func New(backend Backend, journal Journal, save Save) *Domain {
 			roots[m.Name] = true
 		}
 	}
+	stale := map[string]bool{}
+	for _, m := range inventory {
+		if journal.Stale[m.Service] {
+			stale[m.Service] = true
+		}
+	}
 	locks := map[string]chan struct{}{}
 	for _, m := range inventory {
 		locks[m.Service] = make(chan struct{}, 1)
 	}
-	return &Domain{active: map[string]bool{}, serviceLocks: locks, backend: backend, states: map[string]State{}, owned: owned, roots: roots, stopped: map[string]bool{}, save: save, timeout: 10 * time.Minute}
+	return &Domain{active: map[string]bool{}, serviceLocks: locks, backend: backend, states: map[string]State{}, owned: owned, roots: roots, stopped: map[string]bool{}, stale: stale, save: save, timeout: 10 * time.Minute}
 }
 func (d *Domain) snapshotLocked() Snapshot {
-	s := Snapshot{Modules: []State{}, Busy: len(d.active) > 0}
+	s := Snapshot{Modules: []State{}, Busy: len(d.active) > 0 || d.busy}
 	for _, m := range inventory {
 		if m.Internal {
 			continue
@@ -196,6 +211,9 @@ func (d *Domain) Set(name string, enabled bool) (Snapshot, error) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.busy {
+		return Snapshot{}, fmt.Errorf("another module operation is in progress")
+	}
 	transition := "stopping"
 	if enabled {
 		transition = "starting"
@@ -221,26 +239,55 @@ func (d *Domain) remember(service string, owned bool) error {
 	} else {
 		delete(d.owned, service)
 	}
-	if d.save != nil {
-		copy := map[string]bool{}
-		for k, v := range d.owned {
-			copy[k] = v
+	if err := d.saveLocked(); err != nil {
+		if previous {
+			d.owned[service] = true
+		} else {
+			delete(d.owned, service)
 		}
-		roots := map[string]bool{}
-		for k, v := range d.roots {
-			roots[k] = v
-		}
-		if err := d.save(Journal{Owned: copy, Roots: roots}); err != nil {
-			if previous {
-				d.owned[service] = true
-			} else {
-				delete(d.owned, service)
-			}
-			return fmt.Errorf("cannot save runtime ownership; check local state directory permissions")
-		}
+		return fmt.Errorf("cannot save runtime ownership; check local state directory permissions")
 	}
 	return nil
 }
+
+// saveLocked writes the journal; the caller holds the lock.
+func (d *Domain) saveLocked() error {
+	if d.save == nil {
+		return nil
+	}
+	clone := func(in map[string]bool) map[string]bool {
+		out := map[string]bool{}
+		for k, v := range in {
+			out[k] = v
+		}
+		return out
+	}
+	return d.save(Journal{Owned: clone(d.owned), Roots: clone(d.roots), Stale: clone(d.stale)})
+}
+
+func (d *Domain) markStale(service string, stale bool) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stale[service] == stale {
+		return nil
+	}
+	if stale {
+		d.stale[service] = true
+	} else {
+		delete(d.stale, service)
+	}
+	if err := d.saveLocked(); err != nil {
+		return fmt.Errorf("cannot save runtime ownership; check local state directory permissions")
+	}
+	return nil
+}
+
+func (d *Domain) isStale(service string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.stale[service]
+}
+
 func (d *Domain) isOwned(service string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -372,7 +419,7 @@ func (d *Domain) start(ctx context.Context, root string, item Module) error {
 	if err != nil {
 		return err
 	}
-	if !containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed) {
+	if d.isStale(item.Service) || (!containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed)) {
 		if err := d.remember(item.Service, true); err != nil {
 			return err
 		}
@@ -380,7 +427,14 @@ func (d *Domain) start(ctx context.Context, root string, item Module) error {
 		delete(d.stopped, item.Service)
 		d.mu.Unlock()
 		d.progress(root, "starting:"+item.Name)
-		if err := d.backend.Start(ctx, item); err != nil {
+		start := d.backend.Start
+		if d.isStale(item.Service) {
+			start = d.backend.Recreate
+		}
+		if err := start(ctx, item); err != nil {
+			return err
+		}
+		if err := d.markStale(item.Service, false); err != nil {
 			return err
 		}
 	}

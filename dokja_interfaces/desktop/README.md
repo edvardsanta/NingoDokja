@@ -13,6 +13,7 @@ itself.
 
 | Workspace | Asks | Shows |
 |---|---|---|
+| system (settings) | `runtime.settings`, `runtime.settings.set` | below the modules: Discord channels (each delivery channel marked bot or webhook) and DMs, WhatsApp people and groups, and models; editing one shows which modules are recreated and asks |
 | system (health) | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its sources view | two views. **Documents**: the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over). **Sources**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |

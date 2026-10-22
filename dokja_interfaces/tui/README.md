@@ -79,6 +79,9 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 
 ## Switches and jobs
 
+- `c` opens the settings (Discord channels and DMs, WhatsApp people and groups, models), saved in the
+  checkout's `.env`. Enter edits one; saving names the modules recreated and waits for y.
+
 - `l` on the whatsapp row opens the link window: it draws the code to scan and refreshes every 2 s; `n` asks
   for a new code and `u` unlinks the account (erasing its saved session) after a confirmation. It needs
   `DOKJA_COMMUNICATIONS_TOKEN` in the TUI's environment, the credential the orchestrator and the desktop share.

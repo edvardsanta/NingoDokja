@@ -129,3 +129,26 @@ func TestModuleFailureMakesTheCommandFail(t *testing.T) {
 		t.Fatal("only the failed module fails the command")
 	}
 }
+
+func TestSettingsChangesTravelByIdAndComeBackAsAView(t *testing.T) {
+	var seen map[string]any
+	client := fakeDaemon(t, "/checkout", func(event map[string]any) map[string]any {
+		seen = event
+		return map[string]any{"version": 1, "project_id": RuntimeProjectID("/checkout"), "status": "ok", "result": map[string]any{
+			"domain": "runtime", "result": map[string]any{"busy": true, "webhook_channels": []any{"102"}, "settings": []any{
+				map[string]any{"id": "discord.direct_messages", "group": "discord", "kind": "enum", "value": "closed", "affects": []any{"discord"}},
+			}},
+		}}
+	})
+	view, err := client.SetSettings(context.Background(), map[string]string{"discord.direct_messages": "closed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	values, _ := seen["payload"].(map[string]any)["values"].(map[string]any)
+	if seen["type"] != "runtime.settings.set" || values["discord.direct_messages"] != "closed" {
+		t.Fatal(seen)
+	}
+	if row, ok := view.Lookup("discord.direct_messages"); !ok || row.Value != "closed" || !view.Busy || view.WebhookChannels[0] != "102" {
+		t.Fatalf("%+v", view)
+	}
+}
