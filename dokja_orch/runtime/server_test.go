@@ -220,3 +220,30 @@ func TestDatabaseSettingsAreSharedByEveryInterfaceAndSurviveRestart(t *testing.T
 		t.Fatal("settings started stopped modules")
 	}
 }
+
+func TestProviderInventoryIsReadOnlyAndSharedByLocalInterfaces(t *testing.T) {
+	backend := &fake{}
+	handler := Handler(domain.New(backend, domain.Journal{}, nil), "fixture")
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		raw, _ := json.Marshal(Event{Source: source, Type: "runtime.providers", Payload: map[string]any{"command": "ignored"}})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply struct {
+			Status string
+			Result struct{ Result domain.ProvidersView }
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" || len(reply.Result.Result.Providers) != 3 {
+			t.Fatal(w.Body.String(), err)
+		}
+		for _, row := range reply.Result.Result.Providers {
+			if row.InferenceStatus != "not_tested" {
+				t.Fatal(row)
+			}
+		}
+	}
+	if backend.starts != 0 {
+		t.Fatal("inventory started modules")
+	}
+}

@@ -69,6 +69,8 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			reply("ok", result, "")
+		case "runtime.providers":
+			reply("ok", d.Providers(r.Context()), "")
 		case "runtime.settings":
 			reply("ok", d.Settings(), "")
 		case "runtime.settings.set":
