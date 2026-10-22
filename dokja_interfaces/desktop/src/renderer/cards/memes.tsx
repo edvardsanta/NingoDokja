@@ -86,6 +86,7 @@ export function MemePicker({
             <button type="submit" disabled={tag.state.phase === "loading" || !hashtag.trim()}>
               {t("memes_create_tag")}
             </button>
+            {tag.state.phase === "loading" && <span role="status">{t("memes_creating_tag")}</span>}
             {tag.state.phase === "ready" && ("off" in tag.state.data
               ? <span>{tag.state.data.reason}</span>
               : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}

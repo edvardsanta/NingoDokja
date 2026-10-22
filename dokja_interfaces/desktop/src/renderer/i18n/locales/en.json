@@ -100,6 +100,7 @@
   "memes_tag": "Meme hashtag",
   "memes_create_tag": "Create tag",
   "memes_tagged": "Created {tag}",
+  "memes_creating_tag": "Creating tag…",
   "memes_close_preview": "Close preview",
   "memes_attach_short": "Attach",
   "memes_attached": "Attached",

@@ -100,6 +100,7 @@
   "memes_tag": "Hashtag do meme",
   "memes_create_tag": "Criar tag",
   "memes_tagged": "Criada {tag}",
+  "memes_creating_tag": "Criando tag…",
   "memes_close_preview": "Fechar prévia",
   "memes_attach_short": "Anexar",
   "memes_attached": "Anexado",
