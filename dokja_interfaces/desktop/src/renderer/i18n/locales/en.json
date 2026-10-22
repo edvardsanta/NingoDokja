@@ -99,7 +99,7 @@
   "communications_force_send": "Force send (bypass media screening)",
   "memes_tag": "Meme hashtag",
   "memes_create_tag": "Create tag",
-  "memes_tagged": "Created {tag}",
+  "memes_tagged_sent": "Created {tag} and sent it to Discord.",
   "memes_creating_tag": "Creating tag…",
   "memes_tag_suggestions": "Suggestions",
   "memes_close_preview": "Close preview",

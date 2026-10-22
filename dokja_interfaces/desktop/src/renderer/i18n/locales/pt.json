@@ -99,7 +99,7 @@
   "communications_force_send": "Forçar envio (ignorar triagem de mídia)",
   "memes_tag": "Hashtag do meme",
   "memes_create_tag": "Criar tag",
-  "memes_tagged": "Criada {tag}",
+  "memes_tagged_sent": "Criada {tag} e enviada para o Discord.",
   "memes_creating_tag": "Criando tag…",
   "memes_tag_suggestions": "Sugestões",
   "memes_close_preview": "Fechar prévia",

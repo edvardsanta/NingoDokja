@@ -147,6 +147,31 @@ describe("communications", () => {
     fireEvent.click(screen.getByRole("button", { name: "#reaction" }));
     expect(input.value).toBe("#reaction");
   });
+  it("sends the selected meme with its newly created hashtag", async () => {
+    const memePage = { total: 1, offset: 0, memes: [
+      { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const memeUrl = "https://images.example/a.png";
+    const { preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": ok(memePage),
+      "meme.hashtag.tag": ok({ source_url: memeUrl, hashtag: "#reaction", embedded: true }),
+      "communications.send": ok({ sent: true, skipped: false }),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Load memes" }));
+    const tile = await screen.findByRole("button", { name: "Attach First" });
+    await waitFor(() => expect(tile.querySelector("img")).not.toBeNull());
+    fireEvent.click(tile);
+    fireEvent.change(screen.getByPlaceholderText("#tag"), { target: { value: "#reaction" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag" }));
+    await waitFor(() => expect(calls.some((call) => call.type === "communications.send")).toBe(true));
+    expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({
+      channel_id: "123", content: "#reaction", attachment_url: memeUrl,
+    });
+  });
   it("lists the conversations beside the chosen one, and marks which one is open", async () => {
     const { transport, calls } = routedTransport({ "communications.channels": ok(channels), "communications.history": [ok(history()), ok({ ...history("456"), messages: [message("20", "second channel")] })] });
     render(view(transport));

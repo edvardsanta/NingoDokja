@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
-import type { MemeItem, Off } from "../../shared/replies.js";
+import type { CommunicationSend, MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { usePreview } from "./use_preview.js";
@@ -18,6 +18,7 @@ export function MemePicker({
   disabled,
   onSelect,
   onPage,
+  onSendTagged,
 }: {
   transport: Transport;
   memes: readonly MemeItem[];
@@ -26,6 +27,7 @@ export function MemePicker({
   disabled: boolean;
   onSelect: (url: string) => void;
   onPage: (offset: number) => void;
+  onSendTagged: (hashtag: string, url: string) => Promise<LoadResult<CommunicationSend | Off>>;
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
@@ -35,15 +37,20 @@ export function MemePicker({
     .map((tag) => tag.trim())
     .filter(Boolean))
     .map((tag) => tag.startsWith("#") ? tag : `#${tag}`))).sort();
-  const tag = useAction(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
+  const createTag = useCallback(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
     const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim() }, { timeoutMs: 30_000 });
     if (!answer.ok) return answer;
     if (!isRecord(answer.result)) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
     if (answer.result.off === true) return { ok: true, data: { off: true, reason: text(answer.result.reason) } };
     const value = text(answer.result.hashtag);
-    return value ? { ok: true, data: { hashtag: value } } : { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
-  });
+    if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
+    const sent = await onSendTagged(value, selectedMeme.url);
+    if (!sent.ok) return sent;
+    if (sent.data.off || !sent.data.sent) return { ok: false, error: { code: "orchestrator", message: "the tagged meme was not sent" } };
+    return { ok: true, data: { hashtag: value } };
+  }, [hashtag, onSendTagged, selectedMeme, transport]);
+  const tag = useAction(createTag);
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
 
@@ -96,7 +103,7 @@ export function MemePicker({
             {tag.state.phase === "loading" && <span role="status">{t("memes_creating_tag")}</span>}
             {tag.state.phase === "ready" && ("off" in tag.state.data
               ? <span>{tag.state.data.reason}</span>
-              : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}
+              : <span>{t("memes_tagged_sent", { tag: tag.state.data.hashtag })}</span>)}
             {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
           </div>}
         </li>
