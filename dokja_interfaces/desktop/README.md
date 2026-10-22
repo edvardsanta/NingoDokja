@@ -356,3 +356,9 @@ window closes; no login/boot autostart is installed. See the
 Content providers appear under Knowledge → Sources as processing plugins. Runtime
 controls manage Feeds as their host; Book/Meme are not separate desktop modules.
 See the [plugin migration contract](../../dokja_docs/feeds-content-plugins.md).
+
+Operational settings are stored in the shared local database through the runtime
+controller, so CLI, TUI and desktop see the same values. Allowed legacy `.env`
+options are imported once; tokens and webhook addresses remain outside this API.
+The embedding profile is visible and fixed. Manual Compose still uses legacy
+environment configuration; see the [runbook](../../dokja_docs/production-runbook.md).

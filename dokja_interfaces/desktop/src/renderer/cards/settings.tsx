@@ -43,7 +43,7 @@ export function impactOf(row: RuntimeSetting, running: readonly string[]) {
   };
 }
 
-// The stack's settings the interfaces may change, kept in the checkout's .env by the local runtime
+// The stack's settings the interfaces may change, kept in the shared local database by the runtime
 // controller. Credentials are never here: webhook addresses and tokens are edited in .env by hand.
 export function SettingsCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
@@ -104,7 +104,7 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
   return <li>
     <span className="service-name">{label}</span>
     <span className="service-status">{valueText(row, view, t)}</span>
-    {draft === undefined
+    {row.readOnly ? <span className="detail">{t("setting_fixed_profile")}</span> : draft === undefined
       ? <button type="button" disabled={busy} aria-label={t("setting_edit_named", { name: label })} onClick={() => setDraft(row.value || (row.options.length ? row.default : ""))}>{t("setting_edit")}</button>
       : <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
         <label htmlFor={id}>{label}</label>

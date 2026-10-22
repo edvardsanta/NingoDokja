@@ -74,3 +74,19 @@ func TestSettingsShowEffectiveDefaults(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestFixedEmbeddingProfileCannotEnterEditOrConfirmation(t *testing.T) {
+	m, runtime := settingsModel(t)
+	runtime.settings.Settings = append(runtime.settings.Settings, cli.SettingRow{ID: "models.embedding", Group: "models", Default: "bge-m3", ReadOnly: true})
+	press(m, "c", "down", "down", "down", "enter")
+	if m.overlay != overlaySettings || len(setCalls(runtime)) != 0 {
+		t.Fatal("fixed profile entered edit")
+	}
+	if !strings.Contains(m.View(), "bge-m3") || !strings.Contains(m.View(), tr("setting_fixed_profile")) {
+		t.Fatal(m.View())
+	}
+	m.askSaveSetting("models.embedding", "example/model")
+	if m.overlay != overlaySettings || len(setCalls(runtime)) != 0 {
+		t.Fatal("fixed profile entered confirmation")
+	}
+}

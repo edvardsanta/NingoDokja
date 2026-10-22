@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { ACTIONS } from "../src/main/actions.js";
 import { handleRequest } from "../src/main/ipc.js";
 import { RuntimeClient, runtimeRoot, runtimeStateHome } from "../src/main/runtime_client.js";
-import { runtimeSnapshot } from "../src/main/runtime_actions.js";
+import { runtimeSnapshot, runtimeSettings } from "../src/main/runtime_actions.js";
 import { parseConfig } from "../src/main/config.js";
 
 const snapshot={modules:[{name:"memory",state:"stopped",dependencies:["orchestrator","embedding_init"],private:"drop"}],busy:false,error:""};
@@ -84,4 +84,10 @@ test("settings writes require real input before reaching the controller", async 
  assert.equal((await handleRequest(request, client, limits, undefined, { recent: () => true })).ok, true);
  assert.deepEqual(calls, [{ type: "runtime.settings.set", payload: { values: { "discord.direct_messages": "closed" } } }]);
  assert.equal(ACTIONS["runtime.settings.set"].payload({ values: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`models.field_${String.fromCharCode(97+i)}`, "value"])) }), undefined);
+});
+
+
+test("settings projection preserves the server's fixed-profile flag", () => {
+ const view = runtimeSettings({ busy: false, settings: [{ id: "models.embedding", group: "models", kind: "text", value: "", default: "bge-m3", read_only: true }], webhook_channels: [] });
+ assert.equal((view as { settings: { readOnly: boolean }[] }).settings[0]?.readOnly, true);
 });

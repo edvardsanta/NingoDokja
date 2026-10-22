@@ -46,7 +46,7 @@ export function runtimeSettings(body:Record<string,unknown>):RuntimeSettings {
  for (const raw of body.settings.slice(0,64)) {
   if(!isRecord(raw)||!SETTING_ID.test(text(raw.id))) throw new Error("invalid runtime setting");
   settings.push({id:text(raw.id),group:text(raw.group).slice(0,20),kind:text(raw.kind).slice(0,10),options:strings(raw.options,8,20),
-   value:text(raw.value).slice(0,2000),affects:strings(raw.affects,12,40),note:text(raw.note).slice(0,20),default:text(raw.default).slice(0,200)});
+   value:text(raw.value).slice(0,2000),affects:strings(raw.affects,12,40),note:text(raw.note).slice(0,20),default:text(raw.default).slice(0,200),readOnly:raw.read_only===true});
  }
  return {settings,webhookChannels:strings(body.webhook_channels,64,20).filter(id=>/^[0-9]+$/.test(id)),busy:body.busy,error:text(body.error).slice(0,400)};
 }

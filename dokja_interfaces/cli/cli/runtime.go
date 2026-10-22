@@ -276,15 +276,16 @@ func (c *RuntimeClient) call(ctx context.Context, eventType string, payload map[
 // SettingRow is one setting as the controller describes it. Affects names the modules recreated
 // when it changes; Note names a consequence to mention (sessions, reindex).
 type SettingRow struct {
-	ID      string   `json:"id"`
-	Group   string   `json:"group"`
-	Env     string   `json:"env"`
-	Kind    string   `json:"kind"`
-	Options []string `json:"options,omitempty"`
-	Value   string   `json:"value"`
-	Affects []string `json:"affects"`
-	Note    string   `json:"note,omitempty"`
-	Default string   `json:"default,omitempty"`
+	ReadOnly bool     `json:"read_only,omitempty"`
+	ID       string   `json:"id"`
+	Group    string   `json:"group"`
+	Env      string   `json:"env"`
+	Kind     string   `json:"kind"`
+	Options  []string `json:"options,omitempty"`
+	Value    string   `json:"value"`
+	Affects  []string `json:"affects"`
+	Note     string   `json:"note,omitempty"`
+	Default  string   `json:"default,omitempty"`
 }
 
 type SettingsView struct {

@@ -358,7 +358,7 @@
   "delivery_job_refreshes": "{name} roda a cada {interval} e atualiza o pool de memes; não posta nada.",
   "delivery_job_runs": "{name} roda a cada {interval}.",
   "settings_title": "Configurações",
-  "settings_intro": "Com quem o Ningo fala e os modelos que ele usa. Salvo no .env do checkout; os módulos que leem a configuração são recriados.",
+  "settings_intro": "Com quem o Ningo conversa e os modelos que usa. Salvo no banco local compartilhado com CLI e TUI; os módulos afetados são recriados.",
   "settings_last_change": "A última mudança não terminou: {message}",
   "settings_webhooks_by_hand": "Canais por webhook se definem à mão no .env (DOKJA_DISCORD_WEBHOOKS): os endereços são credenciais.",
   "settings_group_models": "Modelos",
@@ -388,5 +388,6 @@
   "setting_recreated_now": "Recriados agora: {names}.",
   "setting_recreated_later": "Parados, recriados no próximo Ligar: {names}.",
   "setting_sessions_end": "Recriar o orquestrador encerra as sessões de chat em andamento e recusa pedidos por alguns instantes.",
-  "setting_reindex": "Memória e conhecimento recalculam os embeddings do que guardam com o novo modelo, um lote por vez."
+  "setting_reindex": "Memória e conhecimento recalculam os embeddings do que guardam com o novo modelo, um lote por vez.",
+  "setting_fixed_profile": "Fixado para esta versão."
 }

@@ -113,6 +113,10 @@ func (m *Model) keySettings(key string) (tea.Model, tea.Cmd) {
 	case "enter", "e":
 		if m.settingsCursor < len(rows) {
 			row := rows[m.settingsCursor]
+			if row.ReadOnly {
+				m.setNotice(tr("setting_fixed_profile"), false)
+				return m, nil
+			}
 			m.settingEditing = row.ID
 			m.settingInput.SetValue(row.Value)
 			m.settingInput.CursorEnd()
@@ -139,6 +143,12 @@ func (m *Model) keySettingEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // askSaveSetting confirms a change after saying which modules it recreates and what follows.
 func (m *Model) askSaveSetting(id, value string) {
+	if m.settings != nil {
+		if row, ok := m.settings.Lookup(id); ok && row.ReadOnly {
+			m.setNotice(tr("setting_fixed_profile"), false)
+			return
+		}
+	}
 	running := map[string]bool{}
 	if m.modules != nil {
 		for _, module := range m.modules.Modules {
@@ -203,6 +213,7 @@ func (m *Model) settingValue(row cli.SettingRow) string {
 		}
 		return tr("setting_none")
 	}
+	row.ReadOnly = false // The fixed-profile marker is localized in viewSettings.
 	return cli.SettingValueText(*m.settings, row)
 }
 
@@ -228,7 +239,11 @@ func (m *Model) viewSettings() string {
 		if i == m.settingsCursor {
 			marker = styleCursor.Render("▸ ")
 		}
-		b.WriteString(fmt.Sprintf("%s%-28s %s\n", marker, settingLabel(row.ID), m.settingValue(row)))
+		value := m.settingValue(row)
+		if row.ReadOnly {
+			value += " · " + tr("setting_fixed_profile")
+		}
+		b.WriteString(fmt.Sprintf("%s%-28s %s\n", marker, settingLabel(row.ID), value))
 	}
 	if len(m.settings.WebhookChannels) > 0 {
 		b.WriteString("\n" + styleDim.Render(tr("settings_webhooks_by_hand")) + "\n")

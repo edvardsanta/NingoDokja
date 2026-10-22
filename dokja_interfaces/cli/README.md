@@ -96,9 +96,12 @@ Switches and jobs:
   erases the saved session, after asking. Both need `DOKJA_COMMUNICATIONS_TOKEN`, the credential the
   orchestrator and the desktop share; it is sent only with `communications.*` requests and never printed.
 - `settings list` / `settings set <id>=<value>... [--yes]`: the stack's non-secret settings (Discord
-  channels and DMs, WhatsApp people and groups, models), saved in the checkout's `.env`. Setting saves
+  channels and DMs, WhatsApp people and groups, models), saved in the shared local database. Setting saves
   say which modules are recreated and ask first. Delivery channels show whether the bot or a webhook
-  delivers; webhooks and tokens are edited in `.env` by hand.
+  delivers; webhooks and tokens are edited in `.env` by hand. The embedding
+  profile is fixed and cannot be edited. Settings are shared with desktop and TUI
+  through the controller; its first read imports allowed legacy options once.
+  Manual Compose commands still use `.env`; see the production runbook.
 - `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
   containers through the local runtime controller the desktop and TUI also use (launched when none is
   running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a

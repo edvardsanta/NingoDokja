@@ -65,3 +65,16 @@ it("waits for module operations before allowing a settings edit", async () => {
   show(transport);
   expect((await screen.findByRole("button", { name: "Edit Direct messages" }) as HTMLButtonElement).disabled).toBe(true);
 });
+
+it("shows the fixed embedding profile without an edit action", async () => {
+  const { transport, calls } = routedTransport({
+    "runtime.settings": ok({ busy: false, error: "", webhookChannels: [], settings: [
+      { id: "models.embedding", group: "models", kind: "text", options: [], value: "", default: "bge-m3", readOnly: true, affects: ["memory", "knowledge"], note: "reindex" },
+    ] }), "runtime.modules": modules,
+  });
+  show(transport);
+  await screen.findByText("bge-m3 (default)");
+  expect(screen.getByText("Fixed for this version.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
+  expect(calls.some((call) => call.type === "runtime.settings.set")).toBe(false);
+});
