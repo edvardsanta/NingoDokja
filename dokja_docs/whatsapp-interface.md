@@ -1,16 +1,19 @@
-# WhatsApp Interface
+# WhatsApp communication adapter
 
-This document describes the Dokja WhatsApp interface.
+WhatsApp is classified as a communication-service adapter with inbound and outbound
+roles ([ADR 0012](decisions/0012-communication-services.md)). Source relocation is
+pending; the current path and legacy interface identifiers remain compatible.
 
-The WhatsApp interface is implemented in:
+The WhatsApp adapter is currently implemented in:
 
 - [dokja_interfaces/whatsapp](../dokja_interfaces/whatsapp)
 
 Inbound flow (talking to Ningo in WhatsApp):
 
-`WhatsApp -> Interface -> Orchestrator -> Domain -> Service -> Orchestrator -> Interface -> WhatsApp`
+`WhatsApp -> gateway ingress -> Event/Request -> Orchestrator -> Domain -> Service -> reply -> gateway -> WhatsApp`
 
-There is no outbound delivery path yet: the interface only answers messages sent to it.
+Outbound text delivery to configured named conversations is also available through
+the orchestrator; see [Sending from the desktop](#sending-from-the-desktop).
 
 ## How It Connects
 
@@ -19,8 +22,8 @@ a **linked device**, the same feature WhatsApp Web uses, through the Baileys lib
 client of that protocol). The phone stays the main device; Ningo appears next to it in
 Settings > Linked devices.
 
-- the service opens one outbound connection to WhatsApp and one to the orchestrator; it listens on
-  nothing and publishes no port
+- the service connects to WhatsApp and the orchestrator, and has an internal listener
+  for status, linking, configured history and text delivery; Compose publishes no port
 - linking is done once by scanning a QR code printed in the service log
 - the keys of the linked device are saved in a session folder (a Compose volume) and the service
   reconnects from them on every start; the QR code is not needed again

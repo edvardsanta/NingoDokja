@@ -4,6 +4,8 @@ Project-level architecture and behavior notes.
 
 Available docs:
 
+- [Communication services: source audit and migration](./communication-boundaries.md)
+
 - [Cognitive storage research and comparison](./cognitive-storage-research.md)
 - [Step 09 consolidation progress](./step-09-consolidation.md)
 - [Step 10 storage spike: W1](./step-10-storage-spike.md)

@@ -22,6 +22,8 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0011](./0011-inference-provider-boundaries.md) | Domain-owned inference contracts, interchangeable infrastructure providers and Dokja-owned cognitive orchestration | Accepted responsibility boundary; general inference integration pending |
 
+| [0012](./0012-communication-services.md) | Platform gateways are communication-service adapters; operator interfaces remain Desktop/CLI/TUI | Classification accepted; policy extraction and relocation pending |
+
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):
 the orchestrator supervises the Knowledge–Prediction–Experience cycle. Its

@@ -720,9 +720,68 @@
         {
           "id": "09.4",
           "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
-          "status": "pending",
-          "evidence": [],
-          "checks": []
+          "status": "in_progress",
+          "evidence": [
+            "Owner accepted classifying Discord and WhatsApp gateways as communication-service adapters, while Desktop/CLI/TUI remain operator interfaces. ADR 0012 records inbound/outbound roles and preserved contracts; source audit completed, no code or deployment moved."
+          ],
+          "checks": [
+            {
+              "name": "source_boundary_audit",
+              "status": "completed",
+              "detail": "Read gateway ingress/delivery/link/history, Communications domain/read service, routing and System handler; no live accounts or sessions modified."
+            }
+          ],
+          "references": [
+            "dokja_docs/decisions/0012-communication-services.md",
+            "dokja_docs/communication-boundaries.md"
+          ],
+          "batches": [
+            {
+              "id": "09.4-a",
+              "title": "Audit communication entry points, state and policy owners",
+              "status": "completed",
+              "evidence": [
+                "ADR 0012 and communication-boundaries.md; source-only audit, not live platform validation."
+              ]
+            },
+            {
+              "id": "09.4-b",
+              "title": "Extract normalized communication ports and domain eligibility/authorization",
+              "status": "pending",
+              "acceptance_criteria": [
+                "Preserve read/send/link contracts and current stricter transport restrictions.",
+                "Test destination eligibility, disabled routing, partial/unknown delivery and explicit authorization before moving gateways."
+              ]
+            },
+            {
+              "id": "09.4-c",
+              "title": "Relocate platform gateways as communication infrastructure",
+              "status": "pending",
+              "depends_on": [
+                "09.4-b"
+              ],
+              "acceptance_criteria": [
+                "Update package imports, scripts, Dockerfiles, all affected Compose stacks, runtime discovery and runbook together.",
+                "Keep current module IDs, environment names, session keys, source identifiers, volumes and rollback compatibility. No implicit platform startup."
+              ]
+            },
+            {
+              "id": "09.4-d",
+              "title": "Align operator terminology and validate platform communication flows",
+              "status": "pending",
+              "depends_on": [
+                "09.4-c"
+              ],
+              "acceptance_criteria": [
+                "Desktop/CLI/TUI distinguish operator interfaces from communication services without duplicate rows.",
+                "Verify inbound messages/commands/replies, operator/scheduled delivery, linking/history, disabled/unconfigured states, echo protection and restart/rollback using synthetic fixtures."
+              ]
+            }
+          ],
+          "remaining": [
+            "Implement communication policy/port extraction before physical relocation.",
+            "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
+          ]
         }
       ],
       "references": [

@@ -12,6 +12,10 @@ The domain layer is where business decisions live.
 
 ### Interfaces
 
+Desktop, CLI and TUI are operator interfaces. Platform gateways are communication
+service adapters with an ingress role; see [ADR 0012](decisions/0012-communication-services.md).
+Their source directories remain under `dokja_interfaces/` until the migration.
+
 Interfaces are responsible for:
 
 - receiving external input
@@ -72,6 +76,21 @@ Services should not:
 - decide workflows
 - embed domain policy
 
+### Communication adapters and policy
+
+Communications domain policy owns eligible conversations/destinations and is the
+target owner for application send authorization. The current implementation owns
+reads; System handlers and platform gateways still hold parts of delivery policy.
+This is pending extraction, not a completed consolidation.
+
+Adapters own SDK protocols, authentication/linking, connection state, transport
+limits and identity translation. Session/auth files and configured history retain
+their current owners until explicitly migrated; they do not become cognitive
+memory. Inbound adapters submit normalized events to orchestration, while outbound
+operations run only through domain/orchestrator-controlled requests.
+
+See the [audited source map and migration batches](communication-boundaries.md).
+
 ## Current Domains
 
 Current domain modules:
@@ -80,6 +99,7 @@ Current domain modules:
 - [dokja_chat](../dokja_domain/dokja_chat)
 - [dokja_meme](../dokja_domain/dokja_meme)
 - [dokja_moderation](../dokja_domain/dokja_moderation)
+- [dokja_communications](../dokja_domain/dokja_communications)
 
 ## Book Domain
 
@@ -197,4 +217,4 @@ When deciding where new code belongs:
 
 - if it decides behavior, it probably belongs in a domain
 - if it routes work between domains, it belongs in the orchestrator
-- if it talks to Discord, OpenAI, SQLite, HTTP APIs, or scraping targets, it belongs in a service or interface
+- if it integrates a platform SDK, model provider, database or external API, it belongs in an infrastructure adapter; operator interfaces request that capability through orchestration
