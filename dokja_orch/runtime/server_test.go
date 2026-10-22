@@ -28,7 +28,8 @@ func (f *fake) Start(context.Context, domain.Module) error {
 	f.mu.Unlock()
 	return nil
 }
-func (f *fake) Stop(context.Context, domain.Module) error { return nil }
+func (f *fake) Stop(context.Context, domain.Module) error     { return nil }
+func (f *fake) Recreate(context.Context, domain.Module) error { return nil }
 func (f *fake) Ready(ctx context.Context, _ domain.Module) error {
 	select {
 	case <-f.gate:
@@ -112,6 +113,27 @@ func TestEveryLocalInterfaceGetsTheSameControl(t *testing.T) {
 	for _, source := range []string{"", "discord", "whatsapp"} {
 		if status(source) == http.StatusOK {
 			t.Fatal(source)
+		}
+	}
+}
+func TestSettingsAreRoutedAndRefusedValuesAnswerAnError(t *testing.T) {
+	handler := Handler(domain.New(&fake{}, domain.Journal{}, nil), "fixture")
+	ask := func(kind string, payload map[string]any) map[string]any {
+		raw, _ := json.Marshal(Event{Type: kind, Source: "cli", Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply map[string]any
+		json.Unmarshal(w.Body.Bytes(), &reply)
+		return reply
+	}
+	if ask("runtime.settings", nil)["status"] != "ok" {
+		t.Fatal("settings are listed")
+	}
+	for _, payload := range []map[string]any{nil, {"values": map[string]any{}}, {"values": map[string]any{"discord.direct_messages": 1}}, {"values": map[string]any{"discord.direct_messages": "open"}}} {
+		if ask("runtime.settings.set", payload)["status"] != "error" {
+			t.Fatalf("%v must be refused (this stack has no settings store)", payload)
 		}
 	}
 }
