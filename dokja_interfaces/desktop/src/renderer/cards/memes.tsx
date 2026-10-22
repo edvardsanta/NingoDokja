@@ -105,13 +105,13 @@ export function MemePicker({
 
 // A meme is a picture or a short video; the shell says which by the type of the data it hands back.
 // In the grid a clip is a silent loop, like a GIF.
-function Media({ dataUrl, label, expanded = false, onOpen }: { dataUrl: string; label: string; expanded?: boolean; onOpen?: (dataUrl: string) => void }) {
+function Media({ dataUrl, label, expanded = false }: { dataUrl: string; label: string; expanded?: boolean }) {
   if (!dataUrl.startsWith("data:video/")) {
-    return <img src={dataUrl} alt="" onClick={(event) => { event.stopPropagation(); onOpen?.(dataUrl); }} />;
+    return <img src={dataUrl} alt="" />;
   }
   return <video className={expanded ? "media-expanded" : undefined} src={dataUrl} aria-label={label}
     autoPlay={expanded ? undefined : true} muted={!expanded} loop={!expanded} playsInline controls preload="auto"
-    onClick={(event) => { event.stopPropagation(); if (!expanded) onOpen?.(dataUrl); }} />;
+    onClick={(event) => event.stopPropagation()} />;
 }
 
 function MemeTile({
@@ -132,12 +132,22 @@ function MemeTile({
   const t = useTranslate();
   const preview = usePreview(transport, meme.url, true);
   const title = meme.title || t("memes_untitled");
+  const attach = <button type="button" className="meme-attach" aria-label={t("memes_attach", { title })}
+    aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
+    onClick={onToggle}>{preview.phase === "ready" && !preview.dataUrl.startsWith("data:video/")
+      ? <img src={preview.dataUrl} alt="" /> : attached ? t("memes_attached") : t("memes_attach_short")}</button>;
+  if (preview.phase === "ready" && preview.dataUrl.startsWith("data:video/")) {
+    return <div className="meme-tile">
+      <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
+        onClick={() => onOpen(preview.dataUrl)}>
+        <Media dataUrl={preview.dataUrl} label={title} />
+      </button>
+      {attach}
+    </div>;
+  }
   return <div className="meme-tile">
-    <button type="button" className="preview preview-open" aria-label={t("memes_attach", { title })}
-      aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
-      onClick={onToggle}>
-      {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} onOpen={onOpen} />}
-      {preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}
-    </button>
+    {preview.phase === "ready" ? attach : <button type="button" className="preview preview-open"
+      aria-label={t("memes_attach", { title })} aria-busy={preview.phase === "loading"} disabled={disabled}
+      onClick={onToggle}>{preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}</button>}
   </div>;
 }

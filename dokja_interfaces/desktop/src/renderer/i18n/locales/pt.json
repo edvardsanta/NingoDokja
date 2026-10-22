@@ -101,6 +101,8 @@
   "memes_create_tag": "Criar tag",
   "memes_tagged": "Criada {tag}",
   "memes_close_preview": "Fechar prévia",
+  "memes_attach_short": "Anexar",
+  "memes_attached": "Anexado",
   "add_title": "Adicionar à base de pesquisa",
   "add_drop_hint": "Solte o arquivo para adicioná-lo à base de pesquisa.",
   "add_mode_note": "Nota",
