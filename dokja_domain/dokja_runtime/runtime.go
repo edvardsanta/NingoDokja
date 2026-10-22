@@ -95,6 +95,7 @@ type State struct {
 	State        string   `json:"state"`
 	Error        string   `json:"error,omitempty"`
 	Dependencies []string `json:"dependencies"`
+	Progress     string   `json:"progress,omitempty"`
 }
 type Snapshot struct {
 	Modules []State `json:"modules"`
@@ -111,10 +112,12 @@ type Domain struct {
 	// stopped holds the services this controller stopped. A stopped process often leaves with a
 	// non-zero code (143 after SIGTERM, 137 when an ignored SIGTERM ends in SIGKILL); that exit is
 	// the stop the owner asked for, not a failure.
-	stopped map[string]bool
-	save    Save
-	busy    bool
-	timeout time.Duration
+	stopped      map[string]bool
+	save         Save
+	active       map[string]bool
+	lifecycle    sync.RWMutex
+	serviceLocks map[string]chan struct{}
+	timeout      time.Duration
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {
@@ -131,10 +134,14 @@ func New(backend Backend, journal Journal, save Save) *Domain {
 			roots[m.Name] = true
 		}
 	}
-	return &Domain{backend: backend, states: map[string]State{}, owned: owned, roots: roots, stopped: map[string]bool{}, save: save, timeout: 10 * time.Minute}
+	locks := map[string]chan struct{}{}
+	for _, m := range inventory {
+		locks[m.Service] = make(chan struct{}, 1)
+	}
+	return &Domain{active: map[string]bool{}, serviceLocks: locks, backend: backend, states: map[string]State{}, owned: owned, roots: roots, stopped: map[string]bool{}, save: save, timeout: 10 * time.Minute}
 }
 func (d *Domain) snapshotLocked() Snapshot {
-	s := Snapshot{Modules: []State{}, Busy: d.busy}
+	s := Snapshot{Modules: []State{}, Busy: len(d.active) > 0}
 	for _, m := range inventory {
 		if m.Internal {
 			continue
@@ -192,13 +199,13 @@ func (d *Domain) Set(name string, enabled bool) (Snapshot, error) {
 	if enabled {
 		transition = "starting"
 	}
-	if d.busy {
-		if d.states[name].State == transition {
+	if direction, exists := d.active[name]; exists {
+		if direction == enabled {
 			return d.snapshotLocked(), nil
 		}
-		return Snapshot{}, fmt.Errorf("another module operation is in progress")
+		return Snapshot{}, fmt.Errorf("this module already has an operation in progress")
 	}
-	d.busy = true
+	d.active[name] = enabled
 	d.states[name] = State{Name: name, State: transition, Dependencies: m.Dependencies}
 	go d.perform(m, enabled)
 	return d.snapshotLocked(), nil
@@ -240,6 +247,21 @@ func (d *Domain) isOwned(service string) bool {
 }
 
 func (d *Domain) perform(m Module, enabled bool) {
+	// Starts may overlap; destructive dependency cleanup waits for all starts.
+	// The per-service gate below prevents duplicate builds of shared dependencies.
+	d.progress(m.Name, "queued")
+	if enabled {
+		d.lifecycle.RLock()
+	} else {
+		d.lifecycle.Lock()
+	}
+	defer func() {
+		if enabled {
+			d.lifecycle.RUnlock()
+		} else {
+			d.lifecycle.Unlock()
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
 	defer cancel()
 	err := d.change(ctx, m, enabled)
@@ -255,13 +277,9 @@ func (d *Domain) perform(m Module, enabled bool) {
 		message = err.Error()
 	}
 	d.states[m.Name] = State{Name: m.Name, State: state, Error: message, Dependencies: m.Dependencies}
-	d.busy = false
+	delete(d.active, m.Name)
 }
 func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
-	containers, err := d.backend.Status(ctx)
-	if err != nil {
-		return err
-	}
 	plan := Plan(m.Name)
 	if enabled {
 		d.mu.Lock()
@@ -271,24 +289,15 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 			return err
 		}
 		for _, item := range plan {
-			if !containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed) {
-				// Persist intent before creating a container, so a daemon restart retains
-				// dependency ownership. A failed startup never stops other modules.
-				if err := d.remember(item.Service, true); err != nil {
-					return err
-				}
-				d.mu.Lock()
-				delete(d.stopped, item.Service)
-				d.mu.Unlock()
-				if err := d.backend.Start(ctx, item); err != nil {
-					return err
-				}
-			}
-			if err := d.backend.Ready(ctx, item); err != nil {
+			if err := d.start(ctx, m.Name, item); err != nil {
 				return err
 			}
 		}
 		return nil
+	}
+	containers, err := d.backend.Status(ctx)
+	if err != nil {
+		return err
 	}
 	needed := map[string]bool{}
 	inPlan := map[string]bool{}
@@ -320,6 +329,7 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 		if needed[item.Service] || (item.Name != m.Name && !d.isOwned(item.Service)) {
 			continue
 		}
+		d.progress(m.Name, "stopping:"+item.Name)
 		if err := d.backend.Stop(ctx, item); err != nil {
 			return err
 		}
@@ -336,4 +346,65 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 		}
 	}
 	return nil
+}
+
+// Progress names inventory entries only; clients translate the stage labels.
+func (d *Domain) progress(name, value string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	row := d.states[name]
+	row.Progress = value
+	d.states[name] = row
+}
+
+func (d *Domain) start(ctx context.Context, root string, item Module) error {
+	d.progress(root, "waiting:"+item.Name)
+	gate := d.serviceLocks[item.Service]
+	select {
+	case gate <- struct{}{}:
+		defer func() { <-gate }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	// Re-read after acquiring the gate: another start may have created this dependency.
+	containers, err := d.backend.Status(ctx)
+	if err != nil {
+		return err
+	}
+	if !containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed) {
+		if err := d.remember(item.Service, true); err != nil {
+			return err
+		}
+		d.mu.Lock()
+		delete(d.stopped, item.Service)
+		d.mu.Unlock()
+		d.progress(root, "starting:"+item.Name)
+		if err := d.backend.Start(ctx, item); err != nil {
+			return err
+		}
+	}
+	d.progress(root, "readiness:"+item.Name)
+	return d.backend.Ready(ctx, item)
+}
+
+type Logs struct {
+	Module string `json:"module"`
+	Text   string `json:"text"`
+}
+
+// Tail includes dependencies because model initialization can hold up a module.
+// The optional port keeps existing backends compatible with lifecycle control.
+func (d *Domain) Tail(ctx context.Context, name string) (Logs, error) {
+	m, ok := Lookup(name)
+	if !ok || m.Internal {
+		return Logs{}, fmt.Errorf("unknown module")
+	}
+	backend, ok := d.backend.(interface {
+		Logs(context.Context, []Module) (string, error)
+	})
+	if !ok {
+		return Logs{}, fmt.Errorf("runtime logs are unavailable")
+	}
+	text, err := backend.Logs(ctx, Plan(name))
+	return Logs{Module: name, Text: text}, err
 }

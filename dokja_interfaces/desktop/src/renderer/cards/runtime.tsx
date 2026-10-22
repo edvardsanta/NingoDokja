@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isRecord } from "../../shared/records.js";
 import { RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../../shared/runtime.js";
@@ -35,7 +35,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
     if (!isRecord(result.result) || !Array.isArray(result.result.modules)) return unexpected();
     return { ok: true, data: result.result as RuntimeSnapshot };
   }, [transport]);
-  const { state, reload, poll } = useCard(load);
+  const { state, poll } = useCard(load);
   const run = useCallback(async (choice: Change): Promise<LoadResult<RuntimeSnapshot>> => {
     const answer = await transport.request("runtime.set", choice, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
@@ -44,7 +44,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
   }, [transport]);
   const action = useAction(run);
   const snapshot = state.phase === "ready" ? state.data : undefined;
-  const busy = snapshot?.busy || action.state.phase === "loading";
+  const busy = action.state.phase === "loading";
 
   const wasBusy = useRef(false);
   useEffect(() => {
@@ -52,7 +52,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
     if (wasBusy.current && !snapshot.busy) onChanged?.();
     wasBusy.current = snapshot.busy;
   }, [snapshot, onChanged]);
-  const refresh = useCallback(() => { reload(); onChanged?.(); }, [reload, onChanged]);
+  const refresh = useCallback(() => { poll(); onChanged?.(); }, [poll, onChanged]);
 
   // An acknowledgement starts a background operation; it is not readiness. Read
   // the controller again after both success and failure, then poll while busy.
@@ -76,11 +76,13 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
         return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : "ok"}>
           <span className="service-name">{module.name}</span>
           <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
-          <button type="button" className="switch" disabled={!!busy || !!view.error}
+          <button type="button" className="switch" disabled={!!busy || !!view.error || module.state === "starting" || module.state === "stopping"}
             aria-label={t(start ? "runtime_start_named" : "runtime_stop_named", { name: module.name })}
             onClick={() => action.start({ module: module.name, enabled: start })}>
             {t(start ? "runtime_start" : "runtime_stop")}
           </button>
+          {module.progress && <p className="module-progress">{progressText(module.progress, t)}</p>}
+          <RuntimeLogs transport={transport} name={module.name} />
           {module.error && <p className="module-error" role="alert">{module.error}</p>}
           {(details || module.state === "failed") && <details className="module-options">
             <summary>{t("runtime_options", { name: module.name })}</summary>
@@ -98,4 +100,51 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
 
 function unexpected(): LoadResult<never> {
   return { ok: false, error: { code: "unexpected", message: "unexpected runtime response" } };
+}
+
+function progressText(progress: string, t: ReturnType<typeof useTranslate>): string {
+  const [stage, name] = progress.split(":");
+  const messages: Record<string, MessageId> = { queued: "runtime_queued", waiting: "runtime_waiting", starting: "runtime_building", readiness: "runtime_readiness", stopping: "runtime_stopping_dependency" };
+  return t(messages[stage ?? "queued"] ?? "runtime_queued", { name: name ?? "" });
+}
+
+function RuntimeLogs({ transport, name }: { transport: Transport; name: RuntimeModule }) {
+  const t = useTranslate();
+  const [open, setOpen] = useState(false);
+  const [output, setOutput] = useState("");
+  const [error, setError] = useState(false);
+  const box = useRef<HTMLPreElement>(null);
+  const follow = useRef(true);
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const read = async () => {
+      try {
+        const answer = await transport.request("runtime.logs", { module: name }, { timeoutMs: 8000 });
+        if (!current) return;
+        if (answer.ok && isRecord(answer.result) && answer.result.module === name && typeof answer.result.text === "string") {
+          setOutput(answer.result.text);
+          setError(false);
+        } else setError(true);
+      } catch { if (current) setError(true); }
+      if (current) timer = setTimeout(read, 2000);
+    };
+    void read();
+    return () => { current = false; clearTimeout(timer); };
+  }, [open, transport, name]);
+  useEffect(() => {
+    if (follow.current && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [output]);
+  return <details className="runtime-logs" onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <summary>{t("runtime_logs", { name })}</summary>
+    {open && <>
+      <p className="detail">{t("runtime_logs_hint")}</p>
+      {error && <p role="status">{t("runtime_logs_error")}</p>}
+      <pre ref={box} tabIndex={0} aria-label={t("runtime_logs", { name })}
+        onScroll={() => { const node = box.current; if (node) follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40; }}>
+        {output || t("runtime_logs_empty")}
+      </pre>
+    </>}
+  </details>;
 }

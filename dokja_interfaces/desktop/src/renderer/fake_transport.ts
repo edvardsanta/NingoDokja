@@ -243,6 +243,8 @@ export function createFakeTransport(delayMs = 400): Transport {
     async request(type, payload) {
       await sleep(delayMs);
       switch (type) {
+        case "message.created": return ok({reply:"Let us look at that together.",sessionNotice:""});
+        case "runtime.logs": return ok({module:payload?.module,text:"[demo] Module output appears here."});
         case "runtime.modules":return ok({modules:structuredClone(modules),busy:false,error:""});
         case "runtime.set": {
           const module=modules.find(m=>m.name===payload?.module);

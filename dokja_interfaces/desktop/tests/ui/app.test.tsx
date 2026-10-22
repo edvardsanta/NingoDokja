@@ -34,6 +34,7 @@ describe("the screen", () => {
     expect(wordmark().textContent).toBe("Ningo");
     expect(screen.getByRole("tablist", { name: "Áreas de trabalho" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Ningo",
       "conhecimento",
       "memória",
       "mensagens",

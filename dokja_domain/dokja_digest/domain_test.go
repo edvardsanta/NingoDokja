@@ -378,3 +378,26 @@ func TestTheReplyCarriesWhatTheScreenNeeds(t *testing.T) {
 		t.Fatalf("an undated item has published %q", last["published"])
 	}
 }
+
+func TestReferenceResolvesOnlyCachedItemsAndBoundsContext(t *testing.T) {
+	service := &fakeService{reply: itemsReply(t,
+		entry("item-1", "Alpha", "A useful title", 1, "https://example.test/article"),
+		entry("item-2", "Beta", "Another title", 1, "https://example.test/other"),
+	)}
+	reference, err := New(service).Reference(context.Background(), "item-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reference.ID != "item-2" || reference.Title != "Another title" || reference.Source != "Beta" {
+		t.Fatal(reference)
+	}
+	if len(service.types) != 1 || service.types[0] != "feeds.items" {
+		t.Fatal(service.types)
+	}
+	if _, err := New(service).Reference(context.Background(), "not-current"); err == nil {
+		t.Fatal("a stale ID must not resolve")
+	}
+	if _, err := New(service).Reference(context.Background(), strings.Repeat("x", 513)); err == nil {
+		t.Fatal("oversized ID accepted")
+	}
+}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	digestdomain "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -297,5 +298,35 @@ func TestChatDomainHandlerSendsConversationHistoryToGenerator(t *testing.T) {
 	}
 	if generator.messages[0]["content"] != "first" || generator.messages[1]["role"] != "assistant" || generator.messages[2]["content"] != "second" {
 		t.Fatalf("unexpected conversation history %#v", generator.messages)
+	}
+}
+
+func TestDesktopReadingConversationUsesServerResolvedExcerptAndPrivateSession(t *testing.T) {
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "Here is the central idea."}}
+	resolveCalls := 0
+	handler := NewChatDomainHandler(generator).WithReading(func(_ context.Context, id string) (digestdomain.Reference, error) {
+		resolveCalls++
+		if id != "cached-item" {
+			t.Fatalf("unexpected reading id %q", id)
+		}
+		return digestdomain.Reference{ID: id, Title: "Systems", Source: "Journal", Summary: "Bounded excerpt"}, nil
+	})
+	for _, question := range []string{"Explain the claim", "What could be wrong?"} {
+		result, err := handler.Handle(context.Background(), core.Event{
+			Source: core.SourceDesktop, User: core.EventUser{ID: "desktop-user"}, Channel: core.EventChannel{ID: "desktop"},
+			Type: "message.created", Payload: map[string]any{"content": question, "conversation_id": "reading-session-1", "reading_id": "cached-item"},
+		}, core.WorkflowStep{Domain: core.DomainChat, Action: "generate-response"})
+		if err != nil || result["reply"] != "Here is the central idea." {
+			t.Fatalf("%v %v", result, err)
+		}
+	}
+	if resolveCalls != 2 {
+		t.Fatalf("selected reading must be validated each turn: %d", resolveCalls)
+	}
+	if len(generator.messages) == 0 || !strings.Contains(generator.messages[0]["content"], "Bounded excerpt") || !strings.Contains(generator.messages[0]["content"], "have read the full article") {
+		t.Fatalf("missing grounded reading context: %+v", generator.messages)
+	}
+	if len(generator.messages) < 3 || generator.messages[len(generator.messages)-1]["content"] != "What could be wrong?" {
+		t.Fatalf("followup did not keep its conversation: %+v", generator.messages)
 	}
 }

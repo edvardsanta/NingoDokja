@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
+	digestdomain "read_books/dokja_domain/dokja_digest"
 	store "read_books/dokja_store"
 	"read_books/internal/app"
 	"read_books/internal/clients"
@@ -118,7 +121,12 @@ func main() {
 		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
-		),
+		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
+			if controls != nil && !controls.ServiceEnabled("feeds") {
+				return digestdomain.Reference{}, fmt.Errorf("reading sources are disabled")
+			}
+			return digestdomain.New(feedsClient).Reference(ctx, id)
+		}),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),

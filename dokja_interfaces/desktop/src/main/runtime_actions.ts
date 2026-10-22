@@ -1,6 +1,13 @@
 import { isRecord, text } from "../shared/records.js";
 import { RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../shared/runtime.js";
 
+export function runtimeModule(raw:Record<string,unknown>):Record<string,unknown>|undefined {
+ return RUNTIME_MODULES.includes(raw.module as RuntimeModule) ? {module:raw.module}:undefined;
+}
+export function runtimeLogs(body:Record<string,unknown>):{module:RuntimeModule;text:string} {
+ if (!RUNTIME_MODULES.includes(body.module as RuntimeModule) || typeof body.text !== "string") throw new Error("invalid runtime logs");
+ return {module:body.module as RuntimeModule,text:body.text.slice(-24576)};
+}
 export function runtimeSet(raw:Record<string,unknown>):Record<string,unknown>|undefined {
  return RUNTIME_MODULES.includes(raw.module as RuntimeModule) && typeof raw.enabled === "boolean" ? {module:raw.module,enabled:raw.enabled}:undefined;
 }
@@ -13,7 +20,7 @@ export function runtimeSnapshot(body:Record<string,unknown>):RuntimeSnapshot {
  for (const raw of body.modules.slice(0,64)) {
   if(!isRecord(raw)||!states.includes(text(raw.state))) throw new Error("invalid runtime module");
   if(!RUNTIME_MODULES.includes(raw.name as RuntimeModule)) continue;
-  modules.push({name:raw.name as RuntimeModule,state:raw.state as RuntimeState,error:text(raw.error).slice(0,400),dependencies:Array.isArray(raw.dependencies)?raw.dependencies.filter((v):v is string=>typeof v==="string").slice(0,4).map(v=>v.slice(0,40)):[]});
+  modules.push({name:raw.name as RuntimeModule,state:raw.state as RuntimeState,error:text(raw.error).slice(0,400),progress:text(raw.progress).slice(0,100),dependencies:Array.isArray(raw.dependencies)?raw.dependencies.filter((v):v is string=>typeof v==="string").slice(0,4).map(v=>v.slice(0,40)):[]});
  }
  return {modules,busy:body.busy,error:text(body.error).slice(0,400)};
 }

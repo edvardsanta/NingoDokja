@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import type { MessageId } from "../i18n/i18n.js";
+import { AssistantCard } from "./assistant.js";
 import { CommunicationsCard } from "./communications.js";
 import { HealthCard } from "./health.js";
 import { KnowledgeWorkspace } from "./knowledge_workspace.js";
@@ -25,6 +26,7 @@ export type CardEntry = {
 // Messages, where they are sent. Reading is how knowledge comes in, so the sources it reads are a
 // view of Knowledge rather than a workspace of their own.
 export const CARDS: readonly CardEntry[] = [
+  { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard },
   { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
   { kind: "memory", labelId: "kind_memory", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
