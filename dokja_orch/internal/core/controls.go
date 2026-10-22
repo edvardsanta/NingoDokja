@@ -111,11 +111,12 @@ type JobInfo struct {
 // Controls holds the switches the operator can flip at runtime. It is read from the
 // ZeroMQ, request and HTTP ingresses at once, so every access goes through the mutex.
 type Controls struct {
-	mu       sync.RWMutex
-	path     string
-	state    persistedState
-	runtime  map[string]*jobRuntime
-	loadNote string
+	contentPlugins bool
+	mu             sync.RWMutex
+	path           string
+	state          persistedState
+	runtime        map[string]*jobRuntime
+	loadNote       string
 }
 
 // NewControls loads the state file (missing means defaults). A corrupt file starts
@@ -156,10 +157,14 @@ func NewControls(path string) (*Controls, error) {
 // LoadNote is non-empty when the state file could not be read.
 func (c *Controls) LoadNote() string { return c.loadNote }
 
+// UseContentPlugins groups the legacy workflow switches under Feeds in status.
+// Existing off switches remain effective; disabling Feeds also pauses both facades.
+func (c *Controls) UseContentPlugins() { c.mu.Lock(); c.contentPlugins = true; c.mu.Unlock() }
+
 func (c *Controls) ServiceEnabled(name string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return !c.state.Services[name]
+	return !c.state.Services[name] && (!c.contentPlugins || name != "book" && name != "meme" || !c.state.Services["feeds"])
 }
 
 func (c *Controls) SetService(name string, enabled bool) error {
@@ -306,6 +311,9 @@ func (c *Controls) Services() []ServiceInfo {
 	defer c.mu.RUnlock()
 	out := make([]ServiceInfo, 0, len(KnownServices))
 	for _, name := range KnownServices {
+		if c.contentPlugins && (name == "book" || name == "meme") {
+			continue
+		}
 		out = append(out, ServiceInfo{Name: name, Enabled: !c.state.Services[name]})
 	}
 	return out

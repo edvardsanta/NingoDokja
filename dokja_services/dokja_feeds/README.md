@@ -256,3 +256,11 @@ The service links libzmq through cgo (`libzmq3-dev` and `pkg-config`), like the 
 ```sh
 cd dokja_services/dokja_feeds && go test ./...
 ```
+
+## Content and scraper plugins
+
+Feeds also hosts Book/Meme compatibility mechanisms through `feeds.invoke`, and
+collectors can be refreshed through `feeds.refresh`. See the
+[content plugin contract and migration](../../dokja_docs/feeds-content-plugins.md)
+for scraper extension, media observations, bundled cache, optional dependencies,
+provider status and rollback.

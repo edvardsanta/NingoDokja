@@ -265,6 +265,12 @@ function memePage(body: Record<string, unknown>): MemePage {
 
 function digestStatus(body: Record<string, unknown>): DigestStatus {
   return {
+    ...(Array.isArray(body.providers) ? {providers: records(body.providers, (plugin) => ({
+      id: shorten(text(plugin.id),64), name: shorten(text(plugin.name) || text(plugin.id),80),
+      state: SOURCE_STATES.has(text(plugin.state)) ? text(plugin.state) : "unknown",
+      running: plugin.running === true, items: 0, skipped: 0,
+      lastOk: text(plugin.last_ok), error: shorten(text(plugin.last_error)),
+    })).slice(0,MAX_SOURCES)} : {}),
     configured: body.configured === true,
     directoryError: shorten(text(body.directory_error)),
     ok: count(body.ok),

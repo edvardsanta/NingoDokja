@@ -147,7 +147,7 @@ func TestHTTPProbeDoesNotFollowRedirects(t *testing.T) {
 	defer server.Close()
 	u, _ := url.Parse(server.URL)
 	port, _ := strconv.Atoi(u.Port())
-	if err := probe(context.Background(), domain.Module{Name: "book", Port: port}); err == nil {
+	if err := probe(context.Background(), domain.Module{Name: "chat_ai", Port: port}); err == nil {
 		t.Fatal("redirect must not count as ready")
 	}
 }
@@ -262,7 +262,7 @@ func TestKnownRemoteEngineTargetsAreRejected(t *testing.T) {
 	}
 }
 
-func TestLogsTailSelectedModuleAndItsDependenciesWithoutUnboundedOutput(t *testing.T) {
+func TestLogsTailOnlySelectedModuleWithoutUnboundedOutput(t *testing.T) {
 	var calls [][]string
 	c := &Compose{Run: func(_ context.Context, args ...string) ([]byte, error) {
 		calls = append(calls, args)
@@ -272,14 +272,15 @@ func TestLogsTailSelectedModuleAndItsDependenciesWithoutUnboundedOutput(t *testi
 		c.output[nameService(name)] = &tailBuffer{}
 		c.output[nameService(name)].Write([]byte("build output for " + name))
 	}
-	logs, err := c.Logs(context.Background(), domain.Plan("memory"))
+	module, _ := domain.Lookup("memory")
+	logs, err := c.Logs(context.Background(), []domain.Module{module})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 1 || !reflect.DeepEqual(calls[0], []string{"logs", "--no-color", "--timestamps", "--tail", "40", "dokja-orchestrator", "dokja-ollama", "dokja-embedding-init", "dokja-memory"}) {
+	if len(calls) != 1 || !reflect.DeepEqual(calls[0], []string{"logs", "--no-color", "--timestamps", "--tail", "40", "dokja-memory"}) {
 		t.Fatal(calls)
 	}
-	for _, want := range []string{"build output for embedding_init", "api readyred"} {
+	for _, want := range []string{"build output for memory", "api readyred"} {
 		if !strings.Contains(logs, want) {
 			t.Fatalf("missing %q in logs %q", want, logs)
 		}

@@ -1,0 +1,35 @@
+{
+  "plugin_api": 1,
+  "id": "media-perception",
+  "version": "0.1.0",
+  "name": "Media Perception",
+  "provides": [
+    "media.perceive.v1"
+  ],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "env": [
+    "DOKJA_REPO_ROOT",
+    "DOKJA_NSFW_MODEL_PATH",
+    "DOKJA_OCR_MODEL_DIR",
+    "DOKJA_OCR_REC_MODEL",
+    "MEME_NSFW_FILTER",
+    "MEME_NSFW_THRESHOLD",
+    "MEME_NSFW_STRICT",
+    "MEME_NSFW_STRICT_THRESHOLD",
+    "MEME_NSFW_EXTRA_WORDS",
+    "MEME_ATTACHMENT_FETCH",
+    "MEME_ATTACHMENT_MAX_BYTES",
+    "MEME_ATTACHMENT_TIMEOUT"
+  ],
+  "limits": {
+    "timeout_ms": 90000,
+    "output_bytes": 29360128
+  }
+}

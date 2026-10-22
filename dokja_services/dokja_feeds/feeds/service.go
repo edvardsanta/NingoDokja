@@ -23,6 +23,7 @@ type Options struct {
 
 // entry is one directory of the plugins directory and what the service knows about it.
 type entry struct {
+	collectGate  chan struct{}
 	dir          string
 	plugin       *Plugin // nil when the manifest is not usable
 	invalid      string  // why, when plugin is nil
@@ -84,13 +85,30 @@ func New(config Config, options Options) *Service {
 		s.now = time.Now
 	}
 
-	found, err := Discover(config.PluginsDir, config.Limits)
+	found, builtinErr := Discover(config.BuiltinPluginsDir, config.Limits)
+	custom, err := Discover(config.PluginsDir, config.Limits)
+	if builtinErr != nil && err == nil {
+		err = builtinErr
+	}
+	// A local manifest, including a disabled or invalid one, explicitly replaces
+	// the bundled provider with the same directory id. Never execute both.
+	customIDs := map[string]bool{}
+	for _, f := range custom {
+		customIDs[f.Dir] = true
+	}
+	merged := make([]Found, 0, len(found)+len(custom))
+	for _, f := range found {
+		if !customIDs[f.Dir] {
+			merged = append(merged, f)
+		}
+	}
+	found = append(merged, custom...)
 	if err != nil {
 		s.dirErr = cleanText(err.Error(), 200)
 		s.logger.Printf("plugins directory unusable: %s", s.dirErr)
 	}
 	for _, f := range found {
-		e := &entry{dir: f.Dir, plugin: f.Plugin, incompatible: errors.Is(f.Err, ErrIncompatible)}
+		e := &entry{collectGate: make(chan struct{}, 1), dir: f.Dir, plugin: f.Plugin, incompatible: errors.Is(f.Err, ErrIncompatible)}
 		if f.Err != nil {
 			e.invalid = cleanText(f.Err.Error(), 300)
 			s.logger.Printf("plugin %s is not usable: %s", cleanText(f.Dir, 64), e.invalid)
@@ -132,6 +150,15 @@ func (s *Service) follow(ctx context.Context, e *entry) {
 // refresh runs one plugin and records the outcome. A failed run keeps the last good items
 // and says why it failed, so a flaky source does not blank the digest.
 func (s *Service) refresh(ctx context.Context, e *entry) {
+	select {
+	case e.collectGate <- struct{}{}:
+		defer func() { <-e.collectGate }()
+	case <-ctx.Done():
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
 	s.mu.Lock()
 	e.running = true
 	s.mu.Unlock()
@@ -190,6 +217,10 @@ func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[st
 		return s.status(), nil
 	case "feeds.items":
 		return s.itemsReply(), nil
+	case "feeds.invoke":
+		return s.invoke(ctx, payload)
+	case "feeds.refresh":
+		return s.refreshSources(ctx, payload)
 	case "feeds.extract":
 		return s.extract(ctx, payload)
 	case "feeds.classify":
@@ -212,6 +243,7 @@ func (s *Service) status() map[string]any {
 		if e.plugin != nil && !e.plugin.Collects() {
 			extractors = append(extractors, map[string]any{
 				"id": e.plugin.ID, "name": e.plugin.Name, "enabled": e.plugin.Enabled,
+				"state": e.state(), "running": e.running,
 				"plugin_api": e.plugin.APIVersion, "version": e.plugin.Version,
 				"provides": e.plugin.Provides, "formats": e.plugin.Formats,
 				"last_run": stamp(e.lastRun), "last_ok": stamp(e.lastOK),
@@ -241,7 +273,17 @@ func (s *Service) status() map[string]any {
 		}
 		plugins = append(plugins, row)
 	}
+	providerEnabled, providerFailed := 0, 0
+	for _, row := range extractors {
+		if row["enabled"] == true {
+			providerEnabled++
+		}
+		if row["state"] == "failed" {
+			providerFailed++
+		}
+	}
 	return map[string]any{
+		"providers": extractors, "provider_enabled": providerEnabled, "provider_failed": providerFailed,
 		"configured":      s.config.PluginsDir != "",
 		"directory_error": s.dirErr,
 		"plugins":         plugins,
@@ -283,6 +325,7 @@ func (s *Service) itemsReply() map[string]any {
 				"url":       item.URL,
 				"published": stamp(item.Published),
 				"source":    item.Source,
+				"kind":      item.Kind, "media_url": item.MediaURL, "tags": item.Tags,
 			})
 		}
 	}

@@ -72,7 +72,18 @@ func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, pay
 	if c == nil {
 		return nil, fmt.Errorf("feeds service requester factory is not configured")
 	}
-	return c.send(ctx, c.requesterFactory, eventType, payload)
+	factory := c.requesterFactory
+	if eventType == "feeds.refresh" {
+		factory = c.extractFactory
+	}
+	return c.send(ctx, factory, eventType, payload)
+}
+
+func (c *FeedsServiceClient) Invoke(ctx context.Context, capability, action string, input map[string]any) (map[string]any, error) {
+	if c == nil {
+		return nil, fmt.Errorf("feeds service requester factory is not configured")
+	}
+	return c.send(ctx, c.extractFactory, "feeds.invoke", map[string]any{"capability": capability, "action": action, "input": input})
 }
 
 // Extract reads one file through the reading host (feeds.extract). The file is the user's:

@@ -30,7 +30,7 @@ const (
 // timeoutFor is how long one request may take.
 func timeoutFor(eventType string) time.Duration {
 	switch eventType {
-	case "feeds.extract":
+	case "feeds.extract", "feeds.invoke", "feeds.refresh":
 		return extractTimeout
 	case "feeds.classify":
 		return classifyTimeout

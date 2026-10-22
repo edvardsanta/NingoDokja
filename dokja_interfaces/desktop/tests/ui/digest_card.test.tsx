@@ -336,3 +336,15 @@ it("a reading opens its own Ningo conversation grounded by server-validated read
   expect(secondMessage.payload?.conversation_id).toBe(firstMessage.payload?.conversation_id);
   for (const message of messages) expect(message.payload).not.toHaveProperty("summary");
 });
+
+it("shows processing plugins with their errors even without configured sources", async () => {
+  const { transport, calls } = routedTransport({
+    "digest.status": ok(status({ configured: false, sources: [], providers: [digestSource("media-library", { name: "Media library", state: "failed", error: "cache unavailable" })] })),
+  });
+  renderCard(transport);
+  const plugins = (await screen.findByText("Processing plugins")).closest("details") as HTMLDetailsElement;
+  expect(plugins.open).toBe(true);
+  expect(await screen.findByText("Media library")).toBeTruthy();
+  expect(await screen.findByText(/cache unavailable/)).toBeTruthy();
+  expect(itemCalls(calls)).toEqual([]);
+});

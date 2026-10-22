@@ -480,3 +480,34 @@ func TestInterfaceNamesAreSwitchableButAreNotServices(t *testing.T) {
 		}
 	}
 }
+
+func TestContentPluginsUseFeedsGateWithoutResumingDisabledWorkflows(t *testing.T) {
+	c, err := NewControls("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.SetService("meme", false); err != nil {
+		t.Fatal(err)
+	}
+	c.UseContentPlugins()
+	if c.ServiceEnabled("meme") {
+		t.Fatal("migration resumed a disabled workflow")
+	}
+	for _, info := range c.Services() {
+		if info.Name == "book" || info.Name == "meme" {
+			t.Fatal("content facade exposed as standalone service", info)
+		}
+	}
+	if err = c.SetService("feeds", false); err != nil {
+		t.Fatal(err)
+	}
+	if c.ServiceEnabled("book") || c.ServiceEnabled("meme") {
+		t.Fatal("content workflow bypassed Feeds switch")
+	}
+	if err = c.SetService("feeds", true); err != nil {
+		t.Fatal(err)
+	}
+	if !c.ServiceEnabled("book") || c.ServiceEnabled("meme") {
+		t.Fatal("individual workflow state was lost")
+	}
+}

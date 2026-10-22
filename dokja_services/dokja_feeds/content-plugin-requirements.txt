@@ -1,0 +1,12 @@
+# Optional compatibility mechanisms; the default Feeds image uses none of these.
+curl_cffi==0.14.0
+requests==2.32.5
+nudenet==3.4.2
+rapidocr-onnxruntime==1.2.3
+fastapi
+uvicorn
+transformers
+torch
+PyMuPDF
+mobi
+markdown-it-py

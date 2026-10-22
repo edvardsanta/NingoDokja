@@ -141,10 +141,10 @@ func TestSharedDependenciesAndExplicitCoreSurviveStoppingOneModule(t *testing.T)
 	change(t, d, "knowledge", false)
 	d, f = fresh()
 	change(t, d, "orchestrator", true)
-	change(t, d, "meme", true)
+	change(t, d, "voice", true)
 	before = len(f.trace())
-	change(t, d, "meme", false)
-	if got := f.trace()[before:]; !reflect.DeepEqual(got, []string{"stop:meme"}) {
+	change(t, d, "voice", false)
+	if got := f.trace()[before:]; !reflect.DeepEqual(got, []string{"stop:voice"}) {
 		t.Fatalf("explicit core should remain: %v", got)
 	}
 }
@@ -161,9 +161,9 @@ func TestBorrowedAndExternallyRunningDependenciesArePreserved(t *testing.T) {
 }
 func TestStoppedContainerWithZeroExitCodeIsRestarted(t *testing.T) {
 	d, f := fresh()
-	f.containers["dokja-book"] = Container{Completed: true}
-	change(t, d, "book", true)
-	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:book"}) {
+	f.containers["dokja-feeds"] = Container{Completed: true}
+	change(t, d, "feeds", true)
+	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:feeds"}) {
 		t.Fatal(f.trace())
 	}
 }
@@ -192,18 +192,18 @@ func TestSlowEmbeddingsDoNotBlockIndependentModules(t *testing.T) {
 	if _, err = d.Set("memory", true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = d.Set("book", true); err != nil {
+	if _, err = d.Set("feeds", true); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
 		s = d.List(context.Background())
-		if row(s, "book").State == "ready" {
+		if row(s, "feeds").State == "ready" {
 			break
 		}
 		time.Sleep(time.Millisecond)
 	}
-	if row(s, "book").State != "ready" || row(s, "memory").State != "starting" || !s.Busy {
+	if row(s, "feeds").State != "ready" || row(s, "memory").State != "starting" || !s.Busy {
 		t.Fatalf("independent start was blocked: %+v", s)
 	}
 	if _, err = d.Set("memory", false); err == nil {
@@ -288,33 +288,33 @@ func TestCommunicationsStartsOnlyItsReaderAndCoreNeverDelivery(t *testing.T) {
 
 func TestAStopThatEndsWithANonZeroExitIsStillStopped(t *testing.T) {
 	d, f := fresh()
-	change(t, d, "book", true)
-	change(t, d, "book", false)
+	change(t, d, "feeds", true)
+	change(t, d, "feeds", false)
 	// A process killed by the stop exits non-zero; the engine reports it as a failed exit.
 	f.mu.Lock()
-	f.containers["dokja-book"] = Container{Failed: true}
+	f.containers["dokja-feeds"] = Container{Failed: true}
 	f.containers["dokja-orchestrator"] = Container{Failed: true}
 	f.mu.Unlock()
 	s := d.List(context.Background())
-	if row(s, "book").State != "stopped" || row(s, "orchestrator").State != "stopped" {
+	if row(s, "feeds").State != "stopped" || row(s, "orchestrator").State != "stopped" {
 		t.Fatalf("%+v", s.Modules)
 	}
 }
 
 func TestAContainerThatCrashesOnItsOwnIsAFailure(t *testing.T) {
 	d, f := fresh()
-	change(t, d, "book", true)
+	change(t, d, "feeds", true)
 	f.mu.Lock()
-	f.containers["dokja-book"] = Container{Failed: true}
+	f.containers["dokja-feeds"] = Container{Failed: true}
 	f.mu.Unlock()
-	if row(d.List(context.Background()), "book").State != "failed" {
+	if row(d.List(context.Background()), "feeds").State != "failed" {
 		t.Fatal("a crash the controller did not cause must show as failed")
 	}
 }
 
 func TestStopWaitsForStartsAndPreservesTheirDependencies(t *testing.T) {
 	d, f := fresh()
-	change(t, d, "book", true)
+	change(t, d, "feeds", true)
 	f.gate = make(chan struct{})
 	f.gateAt = "embedding_init"
 	d.Set("memory", true)
@@ -326,10 +326,10 @@ func TestStopWaitsForStartsAndPreservesTheirDependencies(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	d.Set("book", false)
+	d.Set("feeds", false)
 	close(f.gate)
 	s := settle(t, d)
-	if row(s, "memory").State != "ready" || row(s, "book").State != "stopped" {
+	if row(s, "memory").State != "ready" || row(s, "feeds").State != "stopped" {
 		t.Fatal(s)
 	}
 	for _, call := range f.trace() {
@@ -349,5 +349,33 @@ func TestDiscordStartsWithItsVoiceAndSchedulerOnlyWithTheCore(t *testing.T) {
 	change(t, d, "scheduler", true)
 	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:scheduler"}) {
 		t.Fatal(f.trace())
+	}
+}
+
+type scopedLogsBackend struct {
+	*fake
+	requested []Module
+}
+
+func (b *scopedLogsBackend) Logs(_ context.Context, modules []Module) (string, error) {
+	b.requested = modules
+	return "selected output", nil
+}
+func TestModuleLogsExcludeDependenciesAndRetiredContainers(t *testing.T) {
+	backend := &scopedLogsBackend{fake: &fake{containers: map[string]Container{}}}
+	d := New(backend, Journal{}, nil)
+	result, err := d.Tail(context.Background(), "memory")
+	if err != nil || result.Text != "selected output" || len(backend.requested) != 1 || backend.requested[0].Service != "dokja-memory" {
+		t.Fatal(result, backend.requested, err)
+	}
+	for _, name := range []string{"book", "meme"} {
+		if _, err := d.Set(name, true); err == nil {
+			t.Fatalf("retired container %s can still be started", name)
+		}
+	}
+	for _, row := range d.List(context.Background()).Modules {
+		if row.Name == "book" || row.Name == "meme" {
+			t.Fatal(row)
+		}
 	}
 }

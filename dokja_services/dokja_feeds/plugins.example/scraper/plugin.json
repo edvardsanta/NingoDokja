@@ -1,0 +1,27 @@
+{
+  "plugin_api": 1,
+  "id": "scraper",
+  "version": "0.1.0",
+  "name": "Scraper",
+  "provides": [
+    "source.collect.v1"
+  ],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "env": [
+    "FEEDS_SCRAPER_PATH",
+    "FEEDS_SCRAPER_FACTORY"
+  ],
+  "limits": {
+    "timeout_ms": 90000,
+    "output_bytes": 1048576
+  },
+  "interval": "15m",
+  "max_items": 50
+}

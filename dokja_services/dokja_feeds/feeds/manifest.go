@@ -35,6 +35,9 @@ const (
 	CapabilitySourceCollect    = "source.collect.v1"
 	CapabilityDocumentExtract  = "document.extract.v1"
 	CapabilityDocumentClassify = "document.classify.v1"
+	CapabilityDocumentProcess  = "document.process.v1"
+	CapabilityMediaLibrary     = "media.library.v1"
+	CapabilityMediaPerceive    = "media.perceive.v1"
 	maxFormats                 = 20
 )
 
@@ -47,7 +50,7 @@ var (
 	envPattern     = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 	versionPattern = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$`)
 	formatPattern  = regexp.MustCompile(`^\.[a-z0-9]{1,10}$`)
-	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true}
+	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true, CapabilityDocumentProcess: true, CapabilityMediaLibrary: true, CapabilityMediaPerceive: true}
 )
 
 // manifest is plugin.json. It is read without running the plugin, so a plugin that is
@@ -349,6 +352,9 @@ func loadV1(dir, name string, raw []byte, limits Limits) (*Plugin, error) {
 	outputCeiling := maxOutput
 	if !seen[CapabilitySourceCollect] {
 		outputCeiling = maxExtractOutput
+	}
+	if seen[CapabilityMediaPerceive] && !seen[CapabilitySourceCollect] {
+		outputCeiling = 28 << 20
 	}
 	if m.Limits.OutputBytes <= 0 || m.Limits.OutputBytes > outputCeiling {
 		return nil, fmt.Errorf("limits.output_bytes must be between 1 and %d", outputCeiling)

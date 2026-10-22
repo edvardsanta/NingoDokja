@@ -1,4 +1,5 @@
-export const RUNTIME_MODULES = ["orchestrator", "memory", "knowledge", "meme", "book", "chat_ai", "feeds", "voice", "communications", "whatsapp", "discord", "scheduler"] as const;
+// Book and Meme are Feeds plugins, not standalone desktop runtime modules.
+export const RUNTIME_MODULES = ["orchestrator", "memory", "knowledge", "chat_ai", "feeds", "voice", "communications", "whatsapp", "discord", "scheduler"] as const;
 export type RuntimeSetting = { id: string; group: string; kind: string; options: string[]; value: string; affects: string[]; note: string; default: string };
 export type RuntimeSettings = { settings: RuntimeSetting[]; webhookChannels: string[]; busy: boolean; error: string };
 

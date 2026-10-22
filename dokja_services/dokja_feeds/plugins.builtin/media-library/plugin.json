@@ -1,0 +1,24 @@
+{
+  "plugin_api": 1,
+  "id": "media-library",
+  "version": "0.1.0",
+  "name": "Media Library",
+  "provides": [
+    "media.library.v1"
+  ],
+  "runtime": "subprocess",
+  "enabled": true,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "env": [
+    "FEEDS_MEDIA_DB_FILE"
+  ],
+  "limits": {
+    "timeout_ms": 90000,
+    "output_bytes": 16000000
+  }
+}

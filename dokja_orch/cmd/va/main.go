@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	bookdomain "read_books/dokja_domain/dokja_book"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	memedomain "read_books/dokja_domain/dokja_meme"
 	store "read_books/dokja_store"
 	"read_books/internal/app"
 	"read_books/internal/clients"
@@ -47,11 +49,33 @@ func main() {
 		}
 	}
 
-	memeClient := clients.NewMemeServiceClient("")
 	knowledgeClient := clients.NewKnowledgeServiceClient("")
 	memoryClient := clients.NewMemoryServiceClient("")
 	feedsClient := clients.NewFeedsServiceClient("")
-	bookClient := clients.NewBookServiceClient("")
+	backend := os.Getenv("DOKJA_CONTENT_BACKEND")
+	if backend != "" && backend != "feeds" && backend != "legacy" {
+		logger.Error("invalid DOKJA_CONTENT_BACKEND", fmt.Errorf("expected feeds or legacy"))
+		os.Exit(1)
+	}
+	contentPlugins := backend != "legacy"
+	var memeClient interface {
+		memedomain.Service
+		ReadText(context.Context, string) (map[string]any, error)
+		MarkSent(context.Context, string) error
+		FetchAttachment(context.Context, string) ([]byte, string, error)
+	} = memedomain.NewReadingService(feedsClient)
+	var bookClient bookdomain.Service = bookdomain.NewReadingService(feedsClient)
+	serviceProbes := map[string]handlers.ServiceProbe{
+		"knowledge": handlers.StatusProbe(knowledgeClient), "memory": handlers.StatusProbe(memoryClient), "feeds": handlers.FeedsProbe(feedsClient),
+	}
+	if contentPlugins {
+		controls.UseContentPlugins()
+	} else {
+		memeClient = clients.NewMemeServiceClient("")
+		legacyBook := clients.NewBookServiceClient("")
+		bookClient = legacyBook
+		serviceProbes["book"] = handlers.HealthProbe(legacyBook)
+	}
 	memoryEnabled := func() bool { return controls == nil || controls.ServiceEnabled("memory") }
 	hashtagExperience := handlers.NewHashtagExperience(memoryClient, memoryEnabled)
 	hashtagMinScore := 0.6
@@ -106,12 +130,7 @@ func main() {
 			// Step 06: suggestions run as a typed task with a frozen shadow prediction. Removing
 			// this line returns to the earlier path above.
 			WithHashtagTask(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience).
-			WithServiceProbes(map[string]handlers.ServiceProbe{
-				"book":      handlers.HealthProbe(bookClient),
-				"knowledge": handlers.StatusProbe(knowledgeClient),
-				"memory":    handlers.StatusProbe(memoryClient),
-				"feeds":     handlers.FeedsProbe(feedsClient),
-			}).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
+			WithContentPlugins(contentPlugins).WithServiceProbes(serviceProbes).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithReading(handlers.NewReadingTask(

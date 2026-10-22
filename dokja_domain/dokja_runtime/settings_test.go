@@ -86,17 +86,17 @@ func TestARefusedValueWritesNothing(t *testing.T) {
 func TestAStoppedReaderIsRecreatedOnItsNextStart(t *testing.T) {
 	d, f, _ := withStore()
 	f.mu.Lock()
-	f.containers["dokja-book"] = Container{}
+	f.containers["dokja-feeds"] = Container{}
 	f.mu.Unlock()
 	if _, err := d.SetSettings(map[string]string{"models.book_overview": "org/model-name"}); err != nil {
 		t.Fatal(err)
 	}
 	settleSettings(t, d)
-	if strings.Contains(strings.Join(f.trace(), ","), "book") {
+	if strings.Contains(strings.Join(f.trace(), ","), "feeds") {
 		t.Fatal("a stopped module is not started by a settings change")
 	}
-	change(t, d, "book", true)
-	if trace := strings.Join(f.trace(), ","); !strings.Contains(trace, "recreate:book") || strings.Contains(trace, "start:book") {
+	change(t, d, "feeds", true)
+	if trace := strings.Join(f.trace(), ","); !strings.Contains(trace, "recreate:feeds") || strings.Contains(trace, "start:feeds") {
 		t.Fatal(trace)
 	}
 }
@@ -193,7 +193,7 @@ func TestSettingsReserveOperationBeforeReadingForValidation(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { _, err := d.SetSettings(map[string]string{"discord.direct_messages": "closed"}); done <- err }()
 	<-blocked.entered
-	if _, err := d.Set("book", true); err == nil {
+	if _, err := d.Set("feeds", true); err == nil {
 		t.Fatal("module changes must wait for settings validation")
 	}
 	if _, err := d.SetSettings(map[string]string{"whatsapp.own_chat": "false"}); err == nil {

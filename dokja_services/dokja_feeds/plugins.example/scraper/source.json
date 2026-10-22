@@ -1,0 +1,6 @@
+{
+  "factory": "my_scraper:Scraper",
+  "kind": "media",
+  "max_items": 50,
+  "options": {}
+}

@@ -498,7 +498,7 @@ func TestTheShippedExamplePluginWorksThroughARealProcess(t *testing.T) {
 
 func TestTheShippedExamplesAreDisabledUntilTheOwnerEnablesThem(t *testing.T) {
 	found, err := Discover(filepath.Join("..", "plugins.example"), DefaultLimits())
-	if err != nil || len(found) != 3 {
+	if err != nil || len(found) != 6 {
 		t.Fatalf("found=%+v err=%v", found, err)
 	}
 	for _, f := range found {
