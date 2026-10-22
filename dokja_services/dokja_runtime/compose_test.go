@@ -39,6 +39,21 @@ func TestComposeTargetsOneServiceAndNeverRemovesData(t *testing.T) {
 		t.Fatal("invalid service reached engine")
 	}
 }
+func TestRecreateReplacesOneContainerWithoutRemovingData(t *testing.T) {
+	var calls [][]string
+	c := &Compose{Run: func(_ context.Context, args ...string) ([]byte, error) { calls = append(calls, args); return nil, nil }}
+	m, _ := domain.Lookup("discord")
+	if err := c.Recreate(context.Background(), m); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(calls, [][]string{{"up", "-d", "--no-deps", "--force-recreate", "--build", "dokja-discord"}}) {
+		t.Fatal(calls)
+	}
+	if c.Recreate(context.Background(), domain.Module{Name: "discord", Service: "other"}) == nil || len(calls) != 1 {
+		t.Fatal("unknown service must be rejected before the engine")
+	}
+}
+
 func TestStatusHandlesDockerAndPodmanWithoutExposingPrivateFields(t *testing.T) {
 	for _, podman := range []bool{false, true} {
 		var calls [][]string
