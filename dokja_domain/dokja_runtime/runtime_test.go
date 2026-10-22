@@ -331,3 +331,16 @@ func TestStopWaitsForStartsAndPreservesTheirDependencies(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscordStartsWithItsVoiceAndSchedulerOnlyWithTheCore(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "discord", true)
+	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:voice", "start:discord"}) {
+		t.Fatal(f.trace())
+	}
+	d, f = fresh()
+	change(t, d, "scheduler", true)
+	if !reflect.DeepEqual(f.trace(), []string{"start:orchestrator", "start:scheduler"}) {
+		t.Fatal(f.trace())
+	}
+}

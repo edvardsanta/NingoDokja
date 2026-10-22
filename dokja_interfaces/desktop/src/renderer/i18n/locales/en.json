@@ -332,5 +332,17 @@
   "assistant_continue": "Discuss with Ningo",
   "assistant_close": "Close discussion",
   "assistant_new_conversation": "Start a new conversation",
-  "assistant_excerpt_limit": "Ningo uses the summary available in the feed, not the full article. It will tell you when it needs the complete text."
+  "assistant_excerpt_limit": "Ningo uses the summary available in the feed, not the full article. It will tell you when it needs the complete text.",
+  "runtime_confirm_title": "Start {name}?",
+  "runtime_confirm_start": "Start",
+  "runtime_confirm_cancel": "Cancel",
+  "delivery_status_unknown": "The orchestrator's state is unknown: starting it acts on the switches and jobs already saved.",
+  "delivery_discord_voice": "Voice starts as well; Discord needs it.",
+  "delivery_discord_answers": "The bot goes online, answers mentions and commands in Discord and receives Ningo's deliveries.",
+  "delivery_discord_switch_off": "The discord switch is off: the bot goes online but neither answers nor receives deliveries.",
+  "delivery_scheduler_switch_off": "The scheduler switch is off: no scheduled job runs until it is switched on.",
+  "delivery_scheduler_all_paused": "Every scheduled job is paused: nothing runs until one is resumed.",
+  "delivery_job_posts": "{name} runs every {interval} and posts memes to the meme channels on Discord.",
+  "delivery_job_refreshes": "{name} runs every {interval} and refreshes the meme pool; it posts nothing.",
+  "delivery_job_runs": "{name} runs every {interval}."
 }

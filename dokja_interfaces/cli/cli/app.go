@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +21,8 @@ type App struct {
 	newRequester func(endpoint string) (*Requester, error)
 	emitOpts     emitCommandOptions
 	runtimeRoot  string
+	// stdin answers the confirmations the CLI asks.
+	stdin io.Reader
 }
 
 type emitCommandOptions struct {
@@ -49,6 +52,7 @@ func NewApp() *App {
 			payload:         map[string]string{},
 			timeout:         defaultRequestTimeout,
 		},
+		stdin: os.Stdin,
 	}
 }
 
@@ -94,6 +98,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(a.newServicesCommand(ctx))
 	root.AddCommand(a.newJobsCommand(ctx))
 	root.AddCommand(a.newModulesCommand(ctx))
+	root.AddCommand(a.newInterfacesCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
 	root.AddCommand(a.newKnowledgeCommand(ctx))
 	root.AddCommand(a.newMemoryCommand(ctx))

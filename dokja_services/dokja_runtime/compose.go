@@ -215,8 +215,12 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 		return fmt.Errorf("unknown service")
 	}
 	wait := c.Wait
-	if m.Name == "embedding_init" {
+	switch m.Name {
+	case "embedding_init":
 		wait = 8 * time.Minute
+	case "discord":
+		// The development image installs its packages when it starts.
+		wait = 5 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(parent, wait)
 	defer cancel()
@@ -252,6 +256,17 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 				if err == nil {
 					return nil
 				}
+			} else if m.Name == "discord" {
+				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err := c.Run(probeContext, "exec", "-T", m.Service, "node", "--input-type=module", "-e", discordHealth)
+				cancel()
+				if err == nil {
+					return nil
+				}
+			} else if m.Name == "scheduler" {
+				// It serves nothing to probe: a running scheduler is ready, and announces itself to
+				// the orchestrator within a minute.
+				return nil
 			} else if m.Name == "communications" {
 				// Its port is not published, so readiness is read inside the container.
 				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -358,6 +373,8 @@ func engineEnvironment(env []string) []string {
 }
 
 const communicationsHealth = `import urllib.request; urllib.request.urlopen('http://127.0.0.1:8084/health', timeout=2)`
+
+const discordHealth = `const r=await fetch('http://localhost:8092/status',{redirect:'error',signal:AbortSignal.timeout(2000)}); if(!r.ok)process.exit(1);const b=await r.json();if(typeof b.state!=='string')process.exit(1);`
 
 const whatsappHealth = `const r=await fetch('http://localhost:8094/status',{redirect:'error',signal:AbortSignal.timeout(2000)}); if(!r.ok)process.exit(1);const b=await r.json();if(typeof b.state!=='string')process.exit(1);`
 

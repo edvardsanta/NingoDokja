@@ -587,9 +587,12 @@ heading, with their state and a switch each. See the interface docs for each sta
   `communications.send` only, one named conversation at a time, as text, under a fixed budget of 6 a
   minute and 40 an hour. The desktop asks in a window of its own first. Turning WhatsApp off in the
   health tab stops it as well.
-- **Linking WhatsApp from the desktop** uses `communications.link.status`, `.start` and `.reset`. They
-  need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and on the desktop process; the desktop
-  draws the code itself and never shows it as text. The orchestrator derives the link routes from
+- **Linking WhatsApp from the desktop, CLI or TUI** uses `communications.link.status`, `.start` and
+  `.reset`. They need `DOKJA_COMMUNICATIONS_TOKEN` on the orchestrator and in the environment of the
+  desktop process, `dokja-cli` or `dokja-tui`; each draws the code itself (the CLI and TUI with
+  terminal blocks) and never shows it as text. `dokja-cli interfaces link whatsapp [--new]` waits
+  for the scan; `interfaces unlink whatsapp` asks first. In the TUI, `l` on the whatsapp row opens
+  the link window. The orchestrator derives the link routes from
   `WHATSAPP_INTERFACE_STATUS_ENDPOINT`, so that is the only address to set. Starting over unlinks the
   device and erases the saved session; the session volume itself is not removed.
 
@@ -622,10 +625,13 @@ stateless Compose adapter. Normal feature requests still use the main
 orchestrator. Existing `services.set` controls only routing and remains unchanged;
 container startup does not silently enable a capability the owner disabled.
 
-The first inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
-Communications and WhatsApp. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
+The inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
+Communications, WhatsApp, Discord and the scheduler. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
 Knowledge. Only an explicit WhatsApp selection starts its gateway. No module implicitly
-starts Discord or scheduled delivery.
+starts Discord or scheduled delivery: Discord (with Voice) and the scheduler start only when
+selected, and every interface first says what they will do with the switches and jobs already
+saved (which jobs post and when, whether the bot answers) and asks; nothing is changed on the
+way. `dokja-cli modules start` takes `--yes` to skip that question.
 Running external consumers are recognized when deciding whether dependencies may
 stop. Existing containers are reused rather than recreated; configuration/image
 deployment is separate from runtime Start/Stop.

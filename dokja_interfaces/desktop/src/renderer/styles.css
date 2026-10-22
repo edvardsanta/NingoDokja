@@ -511,6 +511,19 @@ button:focus-visible {
   margin-top: 1rem;
 }
 
+/* Starting a module that answers or posts outside asks first, inside its row. */
+.module-confirm {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--edge);
+}
+
+.module-confirm ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
 /* The views of a workspace sit above its card. */
 .knowledge-views {
   margin: 0 0 1rem;

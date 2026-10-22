@@ -32,11 +32,12 @@ var inventory = []Module{
 	{Name: "voice", Service: "dokja-voice", Dependencies: []string{"orchestrator"}, Port: 8081},
 	// Communications only reads channels and history for the desktop; it never sends.
 	{Name: "communications", Service: "dokja-communications", Dependencies: []string{"orchestrator"}},
-	// Recognize externally managed consumers without exposing launch controls for
-	// delivery, scheduling, authentication or other interfaces in this release.
-	{Name: "discord", Service: "dokja-discord", Dependencies: []string{"orchestrator", "voice"}, Internal: true},
-	{Name: "scheduler", Service: "dokja-scheduler", Dependencies: []string{"orchestrator"}, Internal: true},
+	// Discord answers and delivers, and the scheduler triggers scheduled posts. They are started
+	// like any module; the interfaces show what will be sent and ask before starting them.
+	{Name: "discord", Service: "dokja-discord", Dependencies: []string{"orchestrator", "voice"}},
+	{Name: "scheduler", Service: "dokja-scheduler", Dependencies: []string{"orchestrator"}},
 	{Name: "whatsapp", Service: "dokja-whatsapp", Dependencies: []string{"orchestrator"}},
+	// Consumers people run themselves; they hold the orchestrator up while they are running.
 	{Name: "cli", Service: "dokja-cli", Dependencies: []string{"orchestrator"}, Internal: true},
 	{Name: "tui", Service: "dokja-tui", Dependencies: []string{"orchestrator"}, Internal: true},
 }

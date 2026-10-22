@@ -13,12 +13,14 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0002](./0002-plugin-lifecycle.md) | Versioned lifecycle metadata with capability-specific contracts and legacy adapters | Adopted for reading (step 08) |
 | [0003](./0003-state-ownership.md) | Preserve current stores; add no durable prototype state; isolate the unresolved service-policy question | Accepted for prototype scope; broader rule change deferred |
 | [0004](./0004-shadow-prediction.md) | Hashtag acceptance prediction with explicit feedback, frozen probabilities, and shadow evaluation | Kept in shadow (step 08) |
-| [0005](./0005-knowledge-experience-content.md) | Orchestrator-supervised Knowledge–Prediction–Experience cycle with snapshot reuse and explicit stopping outcomes | Accepted for prototype |
+| [0005](./0005-knowledge-experience-content.md) | Orchestrator-supervised Knowledge–Prediction–Experience cycle with snapshot reuse and explicit stopping outcomes | Historical prototype choice; causal follow-up reviewed, permanent allocation open |
 | [0006](./0006-reading-macro-component.md) | Reading is one macro-component grown from Feeds; Knowledge stores, Experience records the episode; no Book service | Accepted as target direction; migration pending |
 | [0007](./0007-faculties-not-features.md) | Macro-components are faculties; Book, Meme and Digest are workflows over them | Accepted as target direction; migration pending. 0010 proposes replacing its faculty list |
 | [0008](./0008-consolidation-by-kind-of-knowledge.md) | Separate form/content kinds with structured metadata; shared consolidation and summary methods | Representation accepted; Book retirement and provider/migration details open |
 | [0009](./0009-cognitive-storage-evaluation.md) | Compare explicit cognitive graph workloads on SQLite, PostgreSQL+pgvector and Neo4j before engine selection | Proposed; research complete, benchmark and adoption pending |
 | [0010](./0010-four-concepts.md) | Four concepts (Knowledge, Memory, Action, Rules) replace the nine faculties; reading is Knowledge intake | Proposed; awaiting the owner's review |
+
+| [0011](./0011-inference-provider-boundaries.md) | Domain-owned inference contracts, interchangeable infrastructure providers and Dokja-owned cognitive orchestration | Accepted responsibility boundary; general inference integration pending |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):

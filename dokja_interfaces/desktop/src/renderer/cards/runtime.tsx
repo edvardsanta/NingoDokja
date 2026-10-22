@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isRecord } from "../../shared/records.js";
-import { RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../../shared/runtime.js";
+import { DELIVERY_MODULES, RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../../shared/runtime.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -25,10 +25,14 @@ type Props = {
   moduleDetails?: (name: RuntimeModule) => ReactNode;
   onChanged?: () => void;
   renderActivity?: (runtimeAvailable: boolean) => ReactNode;
+  // What starting a delivery module will do, from the switches and jobs already saved; undefined
+  // when they are unknown.
+  startNotice?: (name: RuntimeModule) => string[] | undefined;
 };
 
-export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivity }: Props) {
+export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivity, startNotice }: Props) {
   const t = useTranslate();
+  const [asking, setAsking] = useState<RuntimeModule>();
   const load = useCallback(async (): Promise<LoadResult<RuntimeSnapshot>> => {
     const result = await transport.request("runtime.modules", {}, { timeoutMs: 15_000 });
     if (!result.ok) return result;
@@ -78,11 +82,17 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
           <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
           <button type="button" className="switch" disabled={!!busy || !!view.error || module.state === "starting" || module.state === "stopping"}
             aria-label={t(start ? "runtime_start_named" : "runtime_stop_named", { name: module.name })}
-            onClick={() => action.start({ module: module.name, enabled: start })}>
+            onClick={() => start && DELIVERY_MODULES.includes(module.name) ? setAsking(module.name) : action.start({ module: module.name, enabled: start })}>
             {t(start ? "runtime_start" : "runtime_stop")}
           </button>
           {module.progress && <p className="module-progress">{progressText(module.progress, t)}</p>}
           <RuntimeLogs transport={transport} name={module.name} />
+          {asking === module.name && start && <div className="module-confirm" role="alertdialog" aria-label={t("runtime_confirm_title", { name: module.name })}>
+            <p>{t("runtime_confirm_title", { name: module.name })}</p>
+            <ul>{(startNotice?.(module.name) ?? [t("delivery_status_unknown")]).map((line) => <li key={line}>{line}</li>)}</ul>
+            <button type="button" disabled={!!busy || !!view.error} onClick={() => { setAsking(undefined); action.start({ module: module.name, enabled: true }); }}>{t("runtime_confirm_start")}</button>
+            <button type="button" onClick={() => setAsking(undefined)}>{t("runtime_confirm_cancel")}</button>
+          </div>}
           {module.error && <p className="module-error" role="alert">{module.error}</p>}
           {(details || module.state === "failed") && <details className="module-options">
             <summary>{t("runtime_options", { name: module.name })}</summary>

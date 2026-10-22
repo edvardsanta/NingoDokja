@@ -79,9 +79,14 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 
 ## Switches and jobs
 
+- `l` on the whatsapp row opens the link window: it draws the code to scan and refreshes every 2 s; `n` asks
+  for a new code and `u` unlinks the account (erasing its saved session) after a confirmation. It needs
+  `DOKJA_COMMUNICATIONS_TOKEN` in the TUI's environment, the credential the orchestrator and the desktop share.
+
 - The panel starts with **Modules**: the lite stack's containers, from the local runtime controller the
   desktop and CLI also use. Space starts or stops the selected one (with the dependencies it needs) and
-  changes no switch or job, so nothing is posted. They show even when the orchestrator is down. Run the TUI
+  changes no switch or job. Starting discord or the scheduler first shows what they will do with the saved
+  switches and jobs (which jobs post and when, whether the bot answers) and waits for y. They show even when the orchestrator is down. Run the TUI
   on the host for this; in the `dokja-tui` container the panel says module control is unavailable.
   `--runtime-root` names the checkout when the TUI is started outside it.
 

@@ -43,6 +43,7 @@ const (
 	overlayMemoryList
 	overlayMemoryPredict
 	overlayMemoryFeedback
+	overlayLink
 )
 
 const (
@@ -68,6 +69,16 @@ type Runtime interface {
 }
 
 type memoryMsg struct{ view memoryView }
+
+type linkMsg struct {
+	view cli.LinkView
+	err  error
+}
+
+type linkTickMsg struct{}
+
+// linkPoll is how often the link window reads the state while it is open.
+const linkPoll = 2 * time.Second
 
 // memoryScoredAction is the action the overlay scores: the hashtag suggestion is the only
 // one that records experiences so far.
@@ -152,8 +163,14 @@ type Model struct {
 	runtime    Runtime
 	modules    *cli.RuntimeSnapshot
 	modulesErr string
-	memes      memeList
-	screen     *screenData
+
+	// The WhatsApp link window: what the orchestrator last said, and whether the window is open
+	// (it stays open behind the unlink confirmation).
+	link     cli.LinkView
+	linkErr  string
+	linkOpen bool
+	memes    memeList
+	screen   *screenData
 	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
 	suggestion *suggestionEvidence
 	form       discordForm
@@ -487,6 +504,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memory = msg.view
 		return m, nil
 
+	case linkMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.linkErr = msg.err.Error()
+			return m, nil
+		}
+		m.link, m.linkErr = msg.view, ""
+		return m, nil
+
+	case linkTickMsg:
+		if !m.linkOpen {
+			return m, nil
+		}
+		if m.overlay == overlayLink && !m.busy {
+			return m, tea.Batch(m.cmdLink("communications.link.status"), m.linkTick())
+		}
+		return m, m.linkTick()
+
 	case memoryListMsg:
 		m.busy = false
 		list := msg.list
@@ -621,6 +656,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemoryFeedback(msg)
 	case overlayMemoryPredict:
 		return m.keyMemoryPredict(msg)
+	case overlayLink:
+		return m.keyLink(key)
 	}
 
 	if next, ok := tabForKey(key, m.typing()); ok {
@@ -1293,6 +1330,11 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		switch {
 		case ok && row.isModule && m.modules != nil && m.modules.Busy:
 			m.setNotice(tr("modules_busy"), true)
+		case ok && row.isModule && !row.enabled && cli.DeliveryModules[row.name]:
+			// Discord answers and the scheduler posts once running: say what will happen first.
+			action := m.moduleToggle(row)
+			action.lines = m.deliveryLines(row.name)
+			m.askConfirm(action)
 		case ok && row.isModule:
 			return m, m.exec(m.moduleToggle(row))
 		case ok:
@@ -1314,6 +1356,11 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		m.memory = memoryView{}
 		m.overlay = overlayMemory
 		return m, cmd
+	case "l":
+		if row, ok := m.selectedPanelRow(); ok && row.name == "whatsapp" {
+			return m, m.openLink()
+		}
+		m.setNotice(tr("link_select_whatsapp"), true)
 	case "i":
 		if row, ok := m.selectedPanelRow(); ok && row.isJob {
 			m.openInterval(row.name)
@@ -1399,6 +1446,53 @@ func (m *Model) moduleToggle(row panelRow) *pendingAction {
 		},
 		reload: true,
 	}
+}
+
+// deliveryLines says what starting discord or the scheduler will do with the switches and jobs
+// already saved. Nothing is changed on the way.
+func (m *Model) deliveryLines(module string) []string {
+	lines := []string{tr("start_module", module), ""}
+	if m.status == nil {
+		return append(lines, tr("delivery_status_unknown"))
+	}
+	on := func(name string) bool {
+		row, ok := m.status.service(name)
+		return !ok || row.Enabled
+	}
+	switch module {
+	case "discord":
+		lines = append(lines, tr("delivery_discord_voice"))
+		if on("discord") {
+			return append(lines, tr("delivery_discord_answers"))
+		}
+		return append(lines, tr("delivery_discord_switch_off"))
+	case "scheduler":
+		if !on("scheduler") {
+			return append(lines, tr("delivery_scheduler_switch_off"))
+		}
+		running := 0
+		for _, job := range m.status.Jobs {
+			if !job.Enabled {
+				continue
+			}
+			running++
+			line := tr("delivery_job_every", job.Name, job.Interval)
+			if !job.NextAt.IsZero() {
+				line += tr("delivery_job_next", clock(job.NextAt, m.now()))
+			}
+			switch job.Name {
+			case "meme.dispatch":
+				line += tr("delivery_job_posts_memes", len(m.status.Channels.Meme))
+			case "meme.refresh":
+				line += tr("delivery_job_refreshes")
+			}
+			lines = append(lines, line)
+		}
+		if running == 0 {
+			lines = append(lines, tr("delivery_scheduler_all_paused"))
+		}
+	}
+	return lines
 }
 
 // jobServices lists the service each job depends on, to warn before a run that will be refused.
@@ -1615,4 +1709,50 @@ func (m *Model) saveProfileForm() tea.Cmd {
 	m.addHistory(tr("create_profile")+profile.Name, tr("saved_in_the_local_database"), true)
 	m.setNotice(tr("profile_notice_prefix")+profile.Name+tr("saved_press_enter_on_the_profile_to_activate_it"), false)
 	return m.cmdStatus()
+}
+
+func (m *Model) linkTick() tea.Cmd {
+	return tea.Tick(linkPoll, func(time.Time) tea.Msg { return linkTickMsg{} })
+}
+
+// openLink shows the WhatsApp link window, which reads the state now and every couple of seconds.
+func (m *Model) openLink() tea.Cmd {
+	m.link, m.linkErr, m.linkOpen, m.overlay = cli.LinkView{}, "", true, overlayLink
+	return tea.Batch(m.cmdLink("communications.link.status"), m.linkTick())
+}
+
+func (m *Model) cmdLink(eventType string) tea.Cmd {
+	if !m.begin(tr("link_reading")) {
+		return nil
+	}
+	return func() tea.Msg {
+		res, err := m.request(eventType, map[string]any{"interface": "whatsapp"})
+		if err != nil {
+			return linkMsg{err: err}
+		}
+		return linkMsg{view: cli.ParseLink(res)}
+	}
+}
+
+func (m *Model) keyLink(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "esc", "q":
+		m.linkOpen, m.overlay = false, overlayNone
+	case "n":
+		return m, m.cmdLink("communications.link.start")
+	case "u":
+		m.askConfirm(&pendingAction{
+			label:     tr("link_unlink_label"),
+			eventType: "communications.link.reset",
+			payload:   map[string]any{"interface": "whatsapp"},
+			lines:     []string{tr("link_unlink_label"), "", tr("link_unlink_warning")},
+			summarize: func(res map[string]any) string { return cli.LinkStateText(str(res, "state")) },
+			onSuccess: func(m *Model, res map[string]any) tea.Cmd {
+				m.link = cli.ParseLink(res)
+				return nil
+			},
+			back: overlayLink,
+		})
+	}
+	return m, nil
 }

@@ -332,5 +332,17 @@
   "assistant_continue": "Conversar com Ningo",
   "assistant_close": "Fechar conversa",
   "assistant_new_conversation": "Começar nova conversa",
-  "assistant_excerpt_limit": "Ningo usa o resumo disponível no feed, não o artigo completo. Ela vai avisar quando precisar do texto integral."
+  "assistant_excerpt_limit": "Ningo usa o resumo disponível no feed, não o artigo completo. Ela vai avisar quando precisar do texto integral.",
+  "runtime_confirm_title": "Ligar {name}?",
+  "runtime_confirm_start": "Ligar",
+  "runtime_confirm_cancel": "Cancelar",
+  "delivery_status_unknown": "Estado do orquestrador desconhecido: ligar segue os switches e jobs já salvos.",
+  "delivery_discord_voice": "A voz liga junto; o Discord precisa dela.",
+  "delivery_discord_answers": "O bot fica online, responde menções e comandos no Discord e recebe as entregas do Ningo.",
+  "delivery_discord_switch_off": "O switch discord está desligado: o bot fica online mas não responde nem recebe entregas.",
+  "delivery_scheduler_switch_off": "O switch scheduler está desligado: nenhum job agendado roda até ele ser ligado.",
+  "delivery_scheduler_all_paused": "Todos os jobs agendados estão pausados: nada roda até um ser retomado.",
+  "delivery_job_posts": "{name} roda a cada {interval} e posta memes nos canais de memes do Discord.",
+  "delivery_job_refreshes": "{name} roda a cada {interval} e atualiza o pool de memes; não posta nada.",
+  "delivery_job_runs": "{name} roda a cada {interval}."
 }
