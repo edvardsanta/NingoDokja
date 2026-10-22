@@ -66,3 +66,11 @@ func TestCancellingAnEditSavesNothing(t *testing.T) {
 		t.Fatal("nothing is saved when the edit is left")
 	}
 }
+
+func TestSettingsShowEffectiveDefaults(t *testing.T) {
+	m, _ := settingsModel(t)
+	row := cli.SettingRow{ID: "discord.direct_messages", Default: "open"}
+	if got := m.settingValue(row); !strings.Contains(got, "open") || strings.Contains(got, "none") {
+		t.Fatal(got)
+	}
+}

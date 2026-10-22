@@ -284,6 +284,7 @@ type SettingRow struct {
 	Value   string   `json:"value"`
 	Affects []string `json:"affects"`
 	Note    string   `json:"note,omitempty"`
+	Default string   `json:"default,omitempty"`
 }
 
 type SettingsView struct {

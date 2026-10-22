@@ -42,3 +42,11 @@ func TestSetRefusesArgumentsThatAreNotAssignments(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEmptySettingsDisplayTheirEffectiveDefaults(t *testing.T) {
+	for _, row := range []SettingRow{{ID: "discord.direct_messages", Default: "open"}, {ID: "whatsapp.own_chat", Default: "true"}, {ID: "models.embedding", Kind: "text", Default: "bge-m3"}} {
+		if got := SettingValueText(SettingsView{}, row); got != row.Default+" (default)" {
+			t.Fatal(got)
+		}
+	}
+}

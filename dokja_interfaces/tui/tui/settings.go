@@ -193,10 +193,12 @@ func (m *Model) askSaveSetting(id, value string) {
 
 func (m *Model) settingValue(row cli.SettingRow) string {
 	if row.Value == "" {
-		switch row.ID {
-		case "discord.answer_channels":
+		switch {
+		case row.ID == "discord.answer_channels":
 			return tr("setting_every_channel")
-		case "models.embedding", "models.book_classifier", "models.book_overview", "models.speech_to_text", "models.ocr":
+		case row.Default != "":
+			return row.Default + " " + tr("setting_default")
+		case row.Kind == "text":
 			return tr("setting_default")
 		}
 		return tr("setting_none")

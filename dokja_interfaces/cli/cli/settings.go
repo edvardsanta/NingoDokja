@@ -24,10 +24,12 @@ func SettingName(id string) string {
 // delivers to it, an empty list what it means.
 func SettingValueText(view SettingsView, row SettingRow) string {
 	if row.Value == "" {
-		switch row.ID {
-		case "discord.answer_channels":
+		switch {
+		case row.ID == "discord.answer_channels":
 			return "(every channel)"
-		case "models.embedding", "models.book_classifier", "models.book_overview", "models.speech_to_text", "models.ocr":
+		case row.Default != "":
+			return row.Default + " (default)"
+		case row.Kind == "text":
 			return "(default)"
 		}
 		return "(none)"
