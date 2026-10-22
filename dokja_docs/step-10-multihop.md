@@ -41,13 +41,21 @@ budget failure, cancellation, malformed edges and input-order independence.
 This establishes a correctness oracle for subsequent storage adapters. It does
 not establish performance or correctness of any SQL or Cypher implementation.
 
+## Storage adapters and measured baseline
+
+The [three-engine W2 baseline](step-10-multihop-storage-results.md) implements
+paged adjacency readers and identical bounded client traversal. Live SQLite,
+PostgreSQL and Neo4j passed the correctness contract. Nine warm-cache runs
+through 127,000 nodes compared 2,700 queries at 1/3/6 hops against the reference.
+The report distinguishes this shared traversal policy from native recursive
+queries and records resources, failure corrections and unmeasured cases.
+
 ## Remaining validation
 
-1. Implement isolated SQLite, PostgreSQL and Neo4j adapters against this contract.
-2. Compare their full ordered paths and truncation/error behavior with the oracle
-   and hand-written expectations. Add engine timeout and cancellation checks.
-3. Run matched synthetic fixtures at 1/3/6 hops, recording p50/p95/p99, resource
-   use, graph size, fanout, cache state and concurrency. Report skipped engines.
-4. Define W4 separately, retaining frozen predictions and observed outcomes.
-5. Revisit ADR 0009 only after measurements. W1 remains vector-search evidence;
-   the current W2 reference does not justify adopting or migrating a database.
+1. Compare native SQL/Cypher traversal under equivalent result/work budgets;
+   retain explicit ordering, eligibility, cancellation and truncation semantics.
+2. Exercise cold caches, larger connected reachable graphs, concurrent callers,
+   database CPU/peak RSS and engine-side query cancellation.
+3. Define W4 separately, retaining frozen predictions and observed outcomes.
+4. Revisit ADR 0009 only after those measurements. W1 remains vector-search
+   evidence and W2 remains a preliminary baseline, not an adoption decision.
