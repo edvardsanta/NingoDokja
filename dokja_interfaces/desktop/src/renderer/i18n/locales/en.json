@@ -389,5 +389,15 @@
   "setting_recreated_later": "Not running, recreated on their next start: {names}.",
   "setting_sessions_end": "Recreating the orchestrator ends the chat sessions in progress and briefly refuses every request.",
   "setting_reindex": "Memory and knowledge embed what they store again with the new model, a batch at a time.",
-  "setting_fixed_profile": "Fixed for this version."
+  "setting_fixed_profile": "Fixed for this version.",
+  "providers_title": "Inference providers",
+  "providers_discovery_only": "Discovery only. Authentication, quota and inference have not been tested. Listing models does not select one or start a service.",
+  "provider_installed": "CLI found",
+  "provider_reachable": "Responding",
+  "provider_unavailable": "Unavailable",
+  "provider_no_models": "No local models.",
+  "provider_models_unavailable": "Model catalog unavailable.",
+  "provider_models_truncated": "Model list truncated.",
+  "providers_inspect": "Inspect providers",
+  "provider_service_stopped": "Stack service is stopped"
 }

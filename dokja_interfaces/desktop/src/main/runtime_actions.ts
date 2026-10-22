@@ -50,3 +50,22 @@ export function runtimeSettings(body:Record<string,unknown>):RuntimeSettings {
  }
  return {settings,webhookChannels:strings(body.webhook_channels,64,20).filter(id=>/^[0-9]+$/.test(id)),busy:body.busy,error:text(body.error).slice(0,400)};
 }
+
+export function runtimeProviders(body: Record<string, unknown>): import("../shared/runtime.js").ProvidersView {
+ if (!Array.isArray(body.providers)) throw new Error("invalid provider inventory");
+ const names: Record<string, string> = { codex: "Codex", claude_code: "Claude Code", ollama: "Ollama" };
+ const seen = new Set<string>();
+ const providers: import("../shared/runtime.js").ProviderRow[] = [];
+ for (const raw of body.providers.slice(0, 3)) {
+  if (!isRecord(raw) || typeof raw.id !== "string" || !Object.hasOwn(names, raw.id) || seen.has(raw.id)) continue;
+  seen.add(raw.id);
+  const states = raw.id === "ollama" ? ["reachable", "unavailable"] : ["installed", "unavailable"];
+  if (!states.includes(String(raw.state))) throw new Error("invalid provider state");
+  const reasons = ["", "executable_missing", "service_stopped", "engine_unavailable", "inspection_failed", "invalid_response", "timeout", "inspection_unavailable"];
+  providers.push({ id: raw.id, name: names[raw.id]!, state: String(raw.state), reason: reasons.includes(String(raw.reason ?? "")) ? String(raw.reason ?? "") : "inspection_unavailable",
+   models: raw.id === "ollama" && raw.state === "reachable" ? strings(raw.models, 64, 128).filter((name) => /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(name)) : [],
+   modelDiscovery: raw.id !== "ollama" ? "unsupported" : raw.state === "reachable" && raw.model_discovery === "listed" ? "listed" : "unavailable",
+   inferenceStatus: "not_tested", truncated: raw.models_truncated === true });
+ }
+ return { providers, checkedAt: text(body.checked_at).slice(0, 40) };
+}

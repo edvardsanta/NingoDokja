@@ -389,5 +389,15 @@
   "setting_recreated_later": "Parados, recriados no próximo Ligar: {names}.",
   "setting_sessions_end": "Recriar o orquestrador encerra as sessões de chat em andamento e recusa pedidos por alguns instantes.",
   "setting_reindex": "Memória e conhecimento recalculam os embeddings do que guardam com o novo modelo, um lote por vez.",
-  "setting_fixed_profile": "Fixado para esta versão."
+  "setting_fixed_profile": "Fixado para esta versão.",
+  "providers_title": "Provedores de inferência",
+  "providers_discovery_only": "Somente descoberta. Autenticação, quota e inferência não foram testadas. Listar modelos não seleciona um nem inicia serviços.",
+  "provider_installed": "CLI encontrado",
+  "provider_reachable": "Respondendo",
+  "provider_unavailable": "Indisponível",
+  "provider_no_models": "Nenhum modelo local.",
+  "provider_models_unavailable": "Catálogo de modelos indisponível.",
+  "provider_models_truncated": "Lista de modelos truncada.",
+  "providers_inspect": "Inspecionar provedores",
+  "provider_service_stopped": "Serviço da stack desligado"
 }

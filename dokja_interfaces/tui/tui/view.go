@@ -51,6 +51,8 @@ func (m *Model) View() string {
 		body = m.viewMemoryPredict()
 	case overlayLink:
 		body = m.viewLink()
+	case overlayProviders:
+		body = m.viewProviders()
 	case overlaySettings:
 		body = m.viewSettings()
 	case overlaySettingEdit:
@@ -123,6 +125,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("memory_predict_help")
 	case overlayLink:
 		hint = tr("link_help")
+	case overlayProviders:
+		hint = tr("providers_help")
 	case overlaySettings:
 		hint = tr("settings_help")
 	case overlaySettingEdit:

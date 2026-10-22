@@ -162,3 +162,7 @@ selects one through the orchestrator (name only). `n` creates one and `d` delete
 database directly: the token is typed masked, is cleared from the form once saved, and is never shown, logged
 in the history or sent to the orchestrator. Without local access to the database (`--db` / `DOKJA_DB_FILE`) you
 can still list and select, just not create or delete.
+
+From settings (`c`), press `p` to inspect inference providers; `r` refreshes and
+Esc returns. Discovery starts no service and runs no inference. See
+[provider inventory](../../dokja_docs/provider-inventory.md).

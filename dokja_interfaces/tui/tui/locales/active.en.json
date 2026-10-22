@@ -272,7 +272,7 @@
   "settings_title": "Settings",
   "settings_last_change": "last change: ",
   "settings_webhooks_by_hand": "Webhook channels are set in .env (DOKJA_DISCORD_WEBHOOKS) by hand; their addresses are credentials.",
-  "settings_help": "↑↓ move · enter edit · esc close (saved in the database)",
+  "settings_help": "↑↓ move · enter edit · esc close (saved in the database) · p providers",
   "setting_group_models": "Models",
   "setting_meme_channels": "meme delivery channels",
   "setting_safe_only_channels": "safe-only channels",
@@ -298,5 +298,15 @@
   "setting_sessions_end": "Recreating the orchestrator ends the chat sessions in progress and briefly refuses every request.",
   "setting_reindex": "Memory and knowledge embed what they store again with the new model, a batch at a time.",
   "setting_saved": "saved",
-  "setting_fixed_profile": "Fixed for this version."
+  "setting_fixed_profile": "Fixed for this version.",
+  "providers_title": "Inference providers",
+  "providers_discovery_only": "Discovery only. Authentication, quota and inference have not been tested. Listing models does not select one or start a service.",
+  "provider_installed": "CLI found",
+  "provider_reachable": "Responding",
+  "provider_unavailable": "Unavailable",
+  "provider_no_models": "No local models.",
+  "provider_models_unavailable": "Model catalog unavailable.",
+  "provider_models_truncated": "Model list truncated.",
+  "providers_help": "r refresh · esc back",
+  "provider_service_stopped": "Stack service is stopped"
 }

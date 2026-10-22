@@ -14,6 +14,7 @@ export const ACTION_TYPES = [
   "runtime.logs",
   "message.created",
   "runtime.set",
+  "runtime.providers",
   "runtime.settings",
   "runtime.settings.set",
   "communications.channels",

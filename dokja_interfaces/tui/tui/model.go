@@ -44,6 +44,7 @@ const (
 	overlayMemoryPredict
 	overlayMemoryFeedback
 	overlayLink
+	overlayProviders
 	overlaySettings
 	overlaySettingEdit
 )
@@ -67,6 +68,7 @@ type statusMsg struct {
 
 // Runtime is the local runtime controller: it starts and stops the lite stack's containers.
 type Runtime interface {
+	Providers(context.Context) (cli.ProvidersView, error)
 	Request(ctx context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error)
 	Settings(ctx context.Context) (cli.SettingsView, error)
 	SetSettings(ctx context.Context, values map[string]string) (cli.SettingsView, error)
@@ -175,6 +177,8 @@ type Model struct {
 	linkOpen bool
 
 	// The settings window: what the controller last said, the selected row and the one edited.
+	providers      *cli.ProvidersView
+	providersErr   string
 	settings       *cli.SettingsView
 	settingsErr    string
 	settingsCursor int
@@ -520,6 +524,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memory = msg.view
 		return m, nil
 
+	case providersMsg:
+		m.busy = false
+		if msg.err != nil {
+			m.providersErr = msg.err.Error()
+			return m, nil
+		}
+		m.providers, m.providersErr = &msg.view, ""
+		return m, nil
 	case settingsMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -684,6 +696,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemoryPredict(msg)
 	case overlayLink:
 		return m.keyLink(key)
+	case overlayProviders:
+		return m.keyProviders(key)
 	case overlaySettings:
 		return m.keySettings(key)
 	case overlaySettingEdit:

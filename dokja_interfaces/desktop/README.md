@@ -362,3 +362,7 @@ controller, so CLI, TUI and desktop see the same values. Allowed legacy `.env`
 options are imported once; tokens and webhook addresses remain outside this API.
 The embedding profile is visible and fixed. Manual Compose still uses legacy
 environment configuration; see the [runbook](../../dokja_docs/production-runbook.md).
+
+System → Inference providers → Inspect providers reads the same inventory as
+CLI and TUI, only on demand. A CLI found on PATH is not proof of authentication
+or successful inference. See [provider inventory](../../dokja_docs/provider-inventory.md).

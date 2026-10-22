@@ -100,6 +100,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(a.newModulesCommand(ctx))
 	root.AddCommand(a.newInterfacesCommand(ctx))
 	root.AddCommand(a.newSettingsCommand(ctx))
+	root.AddCommand(a.newProvidersCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
 	root.AddCommand(a.newKnowledgeCommand(ctx))
 	root.AddCommand(a.newMemoryCommand(ctx))
