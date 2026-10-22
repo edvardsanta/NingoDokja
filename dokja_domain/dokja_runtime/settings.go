@@ -22,8 +22,10 @@ type Setting struct {
 	// Affects are the modules that read the setting and are recreated when it changes.
 	Affects []string
 	// Note names a consequence the interfaces mention before saving (sessions, reindex).
-	Note  string
-	parse func(string) (string, error)
+	Note string
+	// Default is what the stack uses while the setting is empty, as the compose file says.
+	Default string
+	parse   func(string) (string, error)
 }
 
 var (
@@ -38,14 +40,14 @@ var settingsCatalog = []Setting{
 	{ID: "discord.meme_channels", Group: "discord", Env: "DISCORD_SCHEDULED_MEME_CHANNEL_ID", Kind: "list", Affects: []string{"orchestrator", "communications"}, Note: "sessions", parse: listOf(channel)},
 	{ID: "discord.safe_only_channels", Group: "discord", Env: "DISCORD_SAFE_ONLY_CHANNEL_IDS", Kind: "list", Affects: []string{"orchestrator"}, Note: "sessions", parse: listOf(channel)},
 	{ID: "discord.answer_channels", Group: "discord", Env: "DISCORD_ALLOWED_CHANNELS", Kind: "list", Affects: []string{"discord"}, parse: listOf(channel)},
-	{ID: "discord.direct_messages", Group: "discord", Env: "DISCORD_DM_POLICY", Kind: "enum", Options: []string{"open", "closed"}, Affects: []string{"discord"}, parse: oneOf("open", "closed")},
+	{ID: "discord.direct_messages", Group: "discord", Env: "DISCORD_DM_POLICY", Default: "open", Kind: "enum", Options: []string{"open", "closed"}, Affects: []string{"discord"}, parse: oneOf("open", "closed")},
 	{ID: "whatsapp.people", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOW_FROM", Kind: "list", Affects: []string{"whatsapp"}, parse: listOf(phoneNumber)},
 	{ID: "whatsapp.groups", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOWED_GROUPS", Kind: "list", Affects: []string{"whatsapp"}, parse: listOf(group)},
-	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"whatsapp"}, parse: oneOf("true", "false")},
-	{ID: "models.embedding", Group: "models", Env: "DOKJA_EMBED_MODEL", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
-	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Kind: "text", Affects: []string{"book"}, parse: model},
-	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Kind: "text", Affects: []string{"book"}, parse: model},
-	{ID: "models.speech_to_text", Group: "models", Env: "DOKJA_VOICE_STT_MODEL", Kind: "text", Affects: []string{"voice"}, parse: model},
+	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"whatsapp"}, parse: oneOf("true", "false")},
+	{ID: "models.embedding", Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
+	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"book"}, parse: model},
+	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"book"}, parse: model},
+	{ID: "models.speech_to_text", Group: "models", Env: "DOKJA_VOICE_STT_MODEL", Default: "openai/whisper-tiny", Kind: "text", Affects: []string{"voice"}, parse: model},
 	{ID: "models.ocr", Group: "models", Env: "DOKJA_OCR_REC_MODEL", Kind: "text", Affects: []string{"meme"}, parse: model},
 }
 
@@ -153,6 +155,7 @@ type SettingRow struct {
 	Value   string   `json:"value"`
 	Affects []string `json:"affects"`
 	Note    string   `json:"note,omitempty"`
+	Default string   `json:"default,omitempty"`
 }
 
 type SettingsView struct {
@@ -183,7 +186,7 @@ func (d *Domain) Settings() SettingsView {
 		return view
 	}
 	for _, s := range settingsCatalog {
-		view.Settings = append(view.Settings, SettingRow{ID: s.ID, Group: s.Group, Env: s.Env, Kind: s.Kind, Options: s.Options, Value: values[s.Env], Affects: s.Affects, Note: s.Note})
+		view.Settings = append(view.Settings, SettingRow{ID: s.ID, Group: s.Group, Env: s.Env, Kind: s.Kind, Options: s.Options, Value: values[s.Env], Affects: s.Affects, Note: s.Note, Default: s.Default})
 	}
 	if webhooks != nil {
 		view.WebhookChannels = webhooks
@@ -200,6 +203,21 @@ func (d *Domain) SetSettings(changes map[string]string) (SettingsView, error) {
 	if len(changes) == 0 {
 		return SettingsView{}, fmt.Errorf("no setting to change")
 	}
+	d.mu.Lock()
+	if d.busy {
+		d.mu.Unlock()
+		return SettingsView{}, fmt.Errorf("another module operation is in progress")
+	}
+	d.busy = true
+	d.mu.Unlock()
+	accepted := false
+	defer func() {
+		if !accepted {
+			d.mu.Lock()
+			d.busy = false
+			d.mu.Unlock()
+		}
+	}()
 	current, _, err := d.settings.Read()
 	if err != nil {
 		return SettingsView{}, err
@@ -230,12 +248,9 @@ func (d *Domain) SetSettings(changes map[string]string) (SettingsView, error) {
 		return SettingsView{}, fmt.Errorf("whatsapp would answer nobody: keep its own chat, or list people or groups")
 	}
 	d.mu.Lock()
-	if d.busy {
-		d.mu.Unlock()
-		return SettingsView{}, fmt.Errorf("another module operation is in progress")
-	}
-	d.busy, d.settingsErr = true, ""
+	d.settingsErr = ""
 	d.mu.Unlock()
+	accepted = true
 	go d.applySettings(values, affected)
 	return d.Settings(), nil
 }
@@ -258,6 +273,15 @@ func (d *Domain) applySettings(values map[string]string, affected map[string]boo
 // recreate brings running modules that read a changed setting back with it. A stopped container
 // keeps its old environment, so it is marked to be recreated on its next start.
 func (d *Domain) recreate(ctx context.Context, affected map[string]bool) error {
+	// Persist every reader before attempting any recreation. A failed reader or
+	// unavailable engine must not leave later readers using old configuration.
+	for _, m := range inventory {
+		if affected[m.Name] {
+			if err := d.markStale(m.Service, true); err != nil {
+				return err
+			}
+		}
+	}
 	containers, err := d.backend.Status(ctx)
 	if err != nil {
 		return err
@@ -266,13 +290,9 @@ func (d *Domain) recreate(ctx context.Context, affected map[string]bool) error {
 		if !affected[m.Name] {
 			continue
 		}
-		state, exists := containers[m.Service]
-		if !state.Running {
-			if exists {
-				if err := d.markStale(m.Service, true); err != nil {
-					return err
-				}
-			}
+		state := containers[m.Service]
+		initialize := m.Name == "embedding_init" && (containers["dokja-memory"].Running || containers["dokja-knowledge"].Running)
+		if !state.Running && !initialize {
 			continue
 		}
 		d.setState(m, "starting", "")

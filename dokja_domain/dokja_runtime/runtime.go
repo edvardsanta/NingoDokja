@@ -315,7 +315,7 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 			return err
 		}
 		for _, item := range plan {
-			if !containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed) {
+			if d.isStale(item.Service) || (!containers[item.Service].Running && !(item.Name == "embedding_init" && containers[item.Service].Completed)) {
 				// Persist intent before creating a container, so a daemon restart retains
 				// dependency ownership. A failed startup never stops other modules.
 				if err := d.remember(item.Service, true); err != nil {

@@ -116,3 +116,102 @@ func TestSettingsListGroupsEverySettingWithItsReaders(t *testing.T) {
 		t.Fatal("a stack without settings says so")
 	}
 }
+
+func TestFailedRecreationKeepsEveryReaderStaleForRetry(t *testing.T) {
+	d, f, _ := withStore()
+	f.containers["dokja-orchestrator"] = Container{Running: true}
+	f.containers["dokja-communications"] = Container{Running: true}
+	f.fail = "orchestrator"
+	if _, err := d.SetSettings(map[string]string{"discord.meme_channels": "101"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := settleSettings(t, d); got.Error == "" {
+		t.Fatal("expected recreation failure")
+	}
+	if !d.isStale("dokja-orchestrator") || !d.isStale("dokja-communications") {
+		t.Fatal("all readers must remain stale after partial failure")
+	}
+	f.fail = ""
+	change(t, d, "communications", true)
+	if got := strings.Join(f.trace(), ","); !strings.Contains(got, "recreate:communications") {
+		t.Fatal(got)
+	}
+	if d.isStale("dokja-communications") {
+		t.Fatal("successful retry must clear stale state")
+	}
+}
+
+func TestEmbeddingModelChangeRunsInitializerBeforeRunningReaders(t *testing.T) {
+	d, f, _ := withStore()
+	f.containers["dokja-orchestrator"] = Container{Running: true}
+	f.containers["dokja-ollama"] = Container{Running: true}
+	f.containers["dokja-embedding-init"] = Container{Completed: true}
+	f.containers["dokja-memory"] = Container{Running: true}
+	if _, err := d.SetSettings(map[string]string{"models.embedding": "example/model"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := settleSettings(t, d); got.Error != "" {
+		t.Fatal(got.Error)
+	}
+	if got := f.trace(); !reflect.DeepEqual(got, []string{"recreate:embedding_init", "recreate:memory"}) {
+		t.Fatal(got)
+	}
+	if !d.isStale("dokja-knowledge") {
+		t.Fatal("stopped knowledge must adopt the model on its next start")
+	}
+}
+
+func TestCompletedInitializerWithChangedSettingsIsRecreatedOnStart(t *testing.T) {
+	d, f, _ := withStore()
+	f.containers["dokja-embedding-init"] = Container{Completed: true}
+	if _, err := d.SetSettings(map[string]string{"models.embedding": "example/model"}); err != nil {
+		t.Fatal(err)
+	}
+	settleSettings(t, d)
+	change(t, d, "memory", true)
+	if got := strings.Join(f.trace(), ","); !strings.Contains(got, "recreate:embedding_init") {
+		t.Fatal(got)
+	}
+}
+
+type blockingSettingsStore struct {
+	*memoryStore
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *blockingSettingsStore) Read() (map[string]string, []string, error) {
+	s.once.Do(func() { close(s.entered) })
+	<-s.release
+	return s.memoryStore.Read()
+}
+func TestSettingsReserveOperationBeforeReadingForValidation(t *testing.T) {
+	d, _, store := withStore()
+	blocked := &blockingSettingsStore{memoryStore: store, entered: make(chan struct{}), release: make(chan struct{})}
+	d.WithSettings(blocked)
+	done := make(chan error, 1)
+	go func() { _, err := d.SetSettings(map[string]string{"discord.direct_messages": "closed"}); done <- err }()
+	<-blocked.entered
+	if _, err := d.Set("book", true); err == nil {
+		t.Fatal("module changes must wait for settings validation")
+	}
+	if _, err := d.SetSettings(map[string]string{"whatsapp.own_chat": "false"}); err == nil {
+		t.Fatal("concurrent settings must be refused before reading")
+	}
+	close(blocked.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	settleSettings(t, d)
+}
+
+func TestSettingsExposeEffectiveDefaults(t *testing.T) {
+	d, _, _ := withStore()
+	defaults := map[string]string{"discord.direct_messages": "open", "whatsapp.own_chat": "true", "models.embedding": "bge-m3"}
+	for _, row := range d.Settings().Settings {
+		if want, ok := defaults[row.ID]; ok && row.Default != want {
+			t.Fatalf("%s default: %q, want %q", row.ID, row.Default, want)
+		}
+	}
+}
