@@ -578,6 +578,36 @@ button[aria-pressed="true"] {
   overflow-wrap: anywhere;
 }
 
+.meme-tag-form {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.meme-tag-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.meme-tag-form input {
+  width: 100%;
+  min-width: 0;
+}
+
+.meme-tag-form button {
+  width: 100%;
+}
+
+.meme-tag-form span {
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+}
+
 .meme-title {
   font-size: 0.875rem;
 }

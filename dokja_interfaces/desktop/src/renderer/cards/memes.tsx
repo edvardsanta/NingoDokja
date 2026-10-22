@@ -74,6 +74,23 @@ export function MemePicker({
             onOpen={(dataUrl) => setViewer({ dataUrl, title: meme.title || t("memes_untitled") })}
           />
           <p className="meme-title">{meme.title || t("memes_untitled")}</p>
+          {selected === meme.url && <form className="meme-tag-form" onSubmit={(event) => {
+            event.preventDefault();
+            if (tag.state.phase !== "loading") tag.start(undefined);
+          }}>
+            <label>
+              {t("memes_tag")}
+              <input value={hashtag} disabled={tag.state.phase === "loading"}
+                onChange={(event) => setHashtag(event.target.value)} placeholder="#tag" />
+            </label>
+            <button type="submit" disabled={tag.state.phase === "loading" || !hashtag.trim()}>
+              {t("memes_create_tag")}
+            </button>
+            {tag.state.phase === "ready" && ("off" in tag.state.data
+              ? <span>{tag.state.data.reason}</span>
+              : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}
+            {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
+          </form>}
         </li>
       ))}
     </ul>
@@ -85,12 +102,6 @@ export function MemePicker({
         {t("memes_next")}
       </button>
     </div>
-    {selectedMeme && <form className="pager" onSubmit={(event) => { event.preventDefault(); if (tag.state.phase !== "loading") tag.start(undefined); }}>
-      <input aria-label={t("memes_tag")} value={hashtag} disabled={tag.state.phase === "loading"} onChange={(event) => setHashtag(event.target.value)} placeholder="#tag" />
-      <button type="submit" disabled={tag.state.phase === "loading" || !hashtag.trim()}>{t("memes_create_tag")}</button>
-      {tag.state.phase === "ready" && ("off" in tag.state.data ? <span>{tag.state.data.reason}</span> : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}
-      {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
-    </form>}
     {viewer && <div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) setViewer(undefined);
     }}>
@@ -135,7 +146,10 @@ function MemeTile({
   const attach = <button type="button" className="meme-attach" aria-label={t("memes_attach", { title })}
     aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
     onClick={onToggle}>{preview.phase === "ready" && !preview.dataUrl.startsWith("data:video/")
-      ? <img src={preview.dataUrl} alt="" /> : attached ? t("memes_attached") : t("memes_attach_short")}</button>;
+      ? <img src={preview.dataUrl} alt="" onClick={(event) => {
+        event.stopPropagation();
+        onOpen(preview.dataUrl);
+      }} /> : attached ? t("memes_attached") : t("memes_attach_short")}</button>;
   if (preview.phase === "ready" && preview.dataUrl.startsWith("data:video/")) {
     return <div className="meme-tile">
       <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
