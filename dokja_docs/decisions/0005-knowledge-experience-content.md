@@ -1,9 +1,30 @@
-# ADR 0005: Knowledge defines the general strategy; Experience grounds its use
+# ADR 0005: Knowledge, Experience and Prediction cycle
 
 Date: 2026-10-18. Status: accepted for prototype (owner decision after step 03).
 Implementation: step `04`. Refines ADRs 0001 and 0003.
 Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 [state ownership](./0003-state-ownership.md), [capability map](../capability-map.md).
+
+## Current review scope (2026-10-21)
+
+The owner requested a fresh causal experiment. The historical prototype topology
+choice below remains a record of step 03; it does not settle cognitive capability
+boundaries. In particular, general strategy versus exact application is a
+hypothesis, not an established Knowledge/Experience division. Neither three
+services nor three databases nor a fixed faculty sequence follows from this ADR.
+
+The [new evaluation](../cognitive-cycle-experiment.md) demonstrates dependent
+retrieval, prediction revision, a simulated action and reuse of its observed
+result in PostgreSQL. Evidence interventions and a no-memory control establish
+causality within the synthetic fixture. A fixed three-hop baseline also succeeds
+at retrieval with fewer prediction calls, so adaptive-loop superiority is not
+established. The predictor and experience-selection rule are hand-written;
+production readiness and generalized learning remain unvalidated.
+
+Proposed revision: preserve orchestration ownership and domain transition policy
+as the next integration hypothesis, but defer permanent cognitive responsibility
+boundaries and storage adoption to broader evaluations. No production topology,
+public contract or deployment is changed by this review.
 
 ## Context
 
