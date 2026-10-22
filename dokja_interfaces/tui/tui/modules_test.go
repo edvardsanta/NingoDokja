@@ -12,7 +12,22 @@ import (
 
 type fakeRuntime struct {
 	snapshot cli.RuntimeSnapshot
+	settings cli.SettingsView
 	calls    []call
+}
+
+func (f *fakeRuntime) Settings(context.Context) (cli.SettingsView, error) {
+	f.calls = append(f.calls, call{"runtime.settings", nil})
+	return f.settings, nil
+}
+
+func (f *fakeRuntime) SetSettings(_ context.Context, values map[string]string) (cli.SettingsView, error) {
+	payload := map[string]any{}
+	for k, v := range values {
+		payload[k] = v
+	}
+	f.calls = append(f.calls, call{"runtime.settings.set", payload})
+	return f.settings, nil
 }
 
 func (f *fakeRuntime) Request(_ context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error) {
