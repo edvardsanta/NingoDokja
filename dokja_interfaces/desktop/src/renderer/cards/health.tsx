@@ -7,6 +7,7 @@ import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { RuntimeEnabled } from "../runtime_context.js";
 import { RuntimeCard } from "./runtime.js";
+import { SettingsCard } from "./settings.js";
 import { usePulse } from "../pulse.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import {
@@ -116,7 +117,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
 
   if (runtimeEnabled) {
     const health = state.phase === "ready" ? state.data : undefined;
-    return <RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
+    return <><RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
@@ -132,7 +133,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
       {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
       {health && <HealthBody health={health} busy={change.state.phase === "loading"}
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
-    </>} />;
+    </>} /><SettingsCard transport={transport} /></>;
   }
 
   return (

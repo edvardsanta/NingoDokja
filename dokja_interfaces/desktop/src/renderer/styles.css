@@ -511,6 +511,16 @@ button:focus-visible {
   margin-top: 1rem;
 }
 
+/* A setting is edited inside its row, across the whole width. */
+.setting-edit {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 /* Starting a module that answers or posts outside asks first, inside its row. */
 .module-confirm {
   grid-column: 1 / -1;

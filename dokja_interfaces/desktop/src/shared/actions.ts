@@ -12,6 +12,8 @@
 export const ACTION_TYPES = [
   "runtime.modules",
   "runtime.set",
+  "runtime.settings",
+  "runtime.settings.set",
   "communications.channels",
   "communications.history",
   "communications.send",
@@ -44,6 +46,7 @@ export type ActionType = (typeof ACTION_TYPES)[number];
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "memory.resolve",
   "runtime.set",
+  "runtime.settings.set",
   "communications.send",
   "communications.link.start",
   "communications.link.reset",

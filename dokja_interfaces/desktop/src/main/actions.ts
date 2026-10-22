@@ -1,4 +1,4 @@
-import { runtimeSet, runtimeSnapshot } from "./runtime_actions.js";
+import { runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryResolvePayload, memoryResolution } from "./memory_experiences.js";
@@ -481,6 +481,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   },
   "runtime.modules": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
+  "runtime.settings": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSettings) },
+  "runtime.settings.set": { payload: runtimeSettingsSet, project: (result) => inDomain(result,"runtime",runtimeSettings) },
   "memory.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "memory", memoryStatus),

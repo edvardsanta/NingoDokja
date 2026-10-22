@@ -64,3 +64,24 @@ test("modules a newer controller adds are left out instead of breaking the card"
  assert.deepEqual(result.modules.map(m=>m.name),["memory"]);
  assert.throws(()=>runtimeSnapshot({busy:false,modules:[{name:"memory",state:"exploded"}]}));
 });
+test("settings changes carry only ids and text, and replies only the known fields", async () => {
+ const { runtimeSettings, runtimeSettingsSet } = await import("../src/main/runtime_actions.js");
+ assert.deepEqual(runtimeSettingsSet({values:{"discord.direct_messages":"closed"},command:"rm"}),{values:{"discord.direct_messages":"closed"}});
+ for (const raw of [{},{values:{}},{values:{"../x":"1"}},{values:{"discord.direct_messages":1}}]) assert.equal(runtimeSettingsSet(raw as Record<string,unknown>),undefined);
+ const view=runtimeSettings({busy:false,webhook_channels:["102","https://hooks.example/x"],settings:[{id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["discord"],secret:"drop"}]});
+ assert.deepEqual(view.webhookChannels,["102"]);
+ assert.equal(JSON.stringify(view).includes("drop"),false);
+});
+
+
+test("settings writes require real input before reaching the controller", async () => {
+ const calls: unknown[] = [];
+ const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({ type, payload }); return { status: "ok", result: wrap({ busy: false, settings: [], webhook_channels: [] }) }; } };
+ const request = { type: "runtime.settings.set", payload: { values: { "discord.direct_messages": "closed" }, private: "drop" } };
+ const limits = { defaultTimeoutMs: 15000, maxTimeoutMs: 120000 };
+ assert.equal((await handleRequest(request, client, limits)).ok, false);
+ assert.equal(calls.length, 0);
+ assert.equal((await handleRequest(request, client, limits, undefined, { recent: () => true })).ok, true);
+ assert.deepEqual(calls, [{ type: "runtime.settings.set", payload: { values: { "discord.direct_messages": "closed" } } }]);
+ assert.equal(ACTIONS["runtime.settings.set"].payload({ values: Object.fromEntries(Array.from({ length: 17 }, (_, i) => [`models.field_${String.fromCharCode(97+i)}`, "value"])) }), undefined);
+});
