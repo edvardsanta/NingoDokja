@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
-import type { MemeItem, Off } from "../../shared/replies.js";
+import type { KnowledgeDocuments, MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { usePreview } from "./use_preview.js";
@@ -31,12 +31,10 @@ export function MemePicker({
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
+  const [createdTags, setCreatedTags] = useState<string[]>([]);
   const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
-  const suggestions = Array.from(new Set(memes.flatMap((meme) => meme.tags.split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean))
-    .map((tag) => tag.startsWith("#") ? tag : `#${tag}`))).sort();
+  const suggestions = createdTags;
   const createTag = useCallback(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
     const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim() }, { timeoutMs: 30_000 });
@@ -51,6 +49,20 @@ export function MemePicker({
   const tag = useAction(createTag);
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
+
+  useEffect(() => {
+    let current = true;
+    void transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 }).then((answer) => {
+      if (!current || !answer.ok || !isRecord(answer.result) || !Array.isArray(answer.result.documents)) return;
+      const tags = answer.result.documents.filter(isRecord)
+        .filter((document) => text(document.kind) === "meme_hashtag")
+        .map((document) => text(document.title).trim())
+        .filter(Boolean)
+        .map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
+      setCreatedTags(Array.from(new Set(tags)).sort());
+    });
+    return () => { current = false; };
+  }, [transport]);
 
   useEffect(() => {
     if (!viewer) return;

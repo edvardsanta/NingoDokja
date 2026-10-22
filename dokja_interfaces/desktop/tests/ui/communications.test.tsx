@@ -136,6 +136,10 @@ describe("communications", () => {
       "communications.channels": ok(channels),
       "communications.history": ok(history()),
       "meme.list": ok(memePage),
+      "knowledge.list": ok({ total: 2, offset: 0, documents: [
+        { id: "meme-hashtag:1", title: "#reaction", kind: "meme_hashtag", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "" },
+        { id: "meme-hashtag:2", title: "#cat", kind: "meme_hashtag", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "" },
+      ] }),
     }, preview);
     render(view(transport));
     fireEvent.click(await screen.findByRole("button", { name: "Load memes" }));
