@@ -33,6 +33,10 @@ version and project-bound response identity. Browser origins and unknown actions
 are rejected; input and output have bounds. There is no TCP listener or root
 helper. It runs with the same user and engine permissions as desktop.
 
+`runtime.settings` lists the stack settings the interfaces may change and
+`runtime.settings.set` (`values`: setting id → text) saves them to the checkout's
+`.env` and recreates the running modules that read them; see the runbook.
+
 `runtime.set` accepts a known `module` and boolean `enabled`. It acknowledges the
 operation immediately; desktop polls `runtime.modules` until ready, stopped or
 failed. One operation runs at a time, repeated identical transitions are

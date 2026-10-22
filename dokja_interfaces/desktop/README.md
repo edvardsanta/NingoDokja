@@ -13,6 +13,7 @@ itself.
 
 | Workspace | Asks | Shows |
 |---|---|---|
+| system (settings) | `runtime.settings`, `runtime.settings.set` | below the modules: Discord channels (each delivery channel marked bot or webhook) and DMs, WhatsApp people and groups, and models; editing one shows which modules are recreated and asks |
 | system (health) | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | digest | `digest.status`, `digest.items` | what the feeds service follows and the first entries it gave, newest first |
 | memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
