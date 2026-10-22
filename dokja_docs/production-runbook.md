@@ -725,3 +725,15 @@ See [the migration and rollback contract](feeds-content-plugins.md) for the exac
 paths, plugin setup and preserved legacy controls. Existing status examples
 listing Book/Meme refer to `DOKJA_CONTENT_BACKEND=legacy`; plugin mode reports
 providers under Feeds and does not probe standalone Book/Meme endpoints.
+
+## Local inference-provider inspection
+
+The local lite controller exposes read-only `runtime.providers`: desktop System
+→ Inference providers → Inspect providers; `dokja-cli providers`; TUI settings
+(`c`) → providers (`p`). CLI executables are discovered from the daemon’s PATH.
+Ollama models are listed inside the selected running lite-stack container; no
+host port, credential, environment variable or Compose change is introduced.
+Discovery does not start services, load/pull models or perform inference. Rebuild
+and restart the old controller once to enable the new action. Authentication,
+quota and capability/inference validation remain untested by this operation.
+See [provider inventory](provider-inventory.md) for bounds and pending bindings.

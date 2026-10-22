@@ -65,3 +65,9 @@ leaves background work running, but no OS login/boot autostart is installed.
 Run `go test -race ./...` and `go vet ./...` in this nested Go module. The root
 orchestrator module's `go test ./...` does not traverse nested modules; CI and
 `scripts/test_all.sh` explicitly include it.
+
+`runtime.providers` is a read-only local-provider inventory for every operator
+interface. Infrastructure discovers host CLIs and queries only the selected
+stack’s running Ollama. The Runtime domain reports installation/listing separately
+from inference, which is never performed by discovery. See
+[provider inventory](../../dokja_docs/provider-inventory.md).

@@ -1059,7 +1059,7 @@
         {
           "id": "11.4",
           "title": "Configure inference providers and capability bindings through shared settings",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "11.3",
             "10.3"
@@ -1076,8 +1076,64 @@
             "Validate new selections before applying; preserve existing consumers through documented compatibility adapters until each capability migrates.",
             "Compare provider/capability behavior with reproducible tests and document unavailable live providers without claiming they passed."
           ],
-          "checks": [],
-          "evidence": []
+          "checks": [
+            {
+              "name": "provider_discovery_and_operator_contracts",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./... passed in Runtime domain, service adapter, bootstrap orchestrator, CLI and TUI. Fixtures cover stopped services, malformed/bounded model listings, cancellation, private-field omission, shared routes and explicit refresh without lifecycle operations."
+            },
+            {
+              "name": "desktop_discovery",
+              "status": "passed",
+              "detail": "pnpm typecheck, pnpm test (220 Node and 224 UI tests), and pnpm build passed. Electron e2e and live provider authentication/inference were not run."
+            }
+          ],
+          "evidence": [
+            "Discovery batch adds runtime.providers through bootstrap orchestration, Runtime domain interpretation and bounded infrastructure inspection. CLI, TUI and desktop share this read-only inventory.",
+            "Codex and Claude Code report only executable discovery; model catalog, authentication, quota and inference are not inferred. Ollama lists models only inside the selected running lite-stack container; a stopped service is not started and is distinct from an empty reachable catalog.",
+            "Discovery runs on explicit operator input with a three-second context budget, bounded model output, static provider identities and no raw paths/commands/credentials in responses. Every row explicitly reports inference_status=not_tested. Observations are ephemeral, not database registrations or capability bindings."
+          ],
+          "batches": [
+            {
+              "id": "discovery",
+              "status": "completed",
+              "completed_on": "2026-10-22",
+              "deliverables": [
+                "dokja_docs/provider-inventory.md",
+                "Read-only inventory in desktop, CLI and TUI"
+              ]
+            },
+            {
+              "id": "provider_configuration",
+              "status": "pending",
+              "deliverables": [
+                "Durable provider registrations and validated configurable adapter choices in the shared database"
+              ]
+            },
+            {
+              "id": "capability_bindings",
+              "status": "pending",
+              "depends_on": [
+                "10.3"
+              ],
+              "deliverables": [
+                "Capability-specific provider/model selection preserving inference contracts, scope and cognitive task budgets"
+              ]
+            },
+            {
+              "id": "ocr_and_legacy_consumers",
+              "status": "pending",
+              "deliverables": [
+                "Specific OCR options and evaluated legacy classifier/provider migration"
+              ]
+            }
+          ],
+          "next_action": "Persist provider configuration and add validated capability bindings after inference integration review. Keep observed availability separate from configured preference and successful inference; discovery alone does not complete this step.",
+          "references": [
+            "dokja_docs/provider-inventory.md",
+            "dokja_docs/decisions/0013-database-runtime-settings.md",
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+          ]
         }
       ]
     }

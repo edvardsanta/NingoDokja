@@ -325,3 +325,8 @@ runtime infrastructure adapter stores a revisioned snapshot in the shared
 Legacy `.env` values are imported once; credentials stay outside this API and the
 embedding profile is fixed. Provider inventory and model/capability bindings remain
 pending. See [ADR 0013](decisions/0013-database-runtime-settings.md).
+
+The bootstrap controller also routes read-only `runtime.providers` through the
+Runtime domain and provider-discovery infrastructure. Operator interfaces share
+the same inventory; discovery cannot infer, select a model, start a module or
+write memory. See [provider inventory](provider-inventory.md).

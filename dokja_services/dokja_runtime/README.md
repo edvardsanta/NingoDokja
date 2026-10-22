@@ -41,3 +41,8 @@ and credentials. It never rewrites `.env`. The default database is the checkout'
 `.dokja/dokja.db`; an exported `DOKJA_DB_FILE` selects another file. This adapter
 holds no mutable configuration cache. See [ADR 0013](../../dokja_docs/decisions/0013-database-runtime-settings.md)
 for precedence, failure behavior and manual-Compose/rollback limits.
+
+`ProviderDiscovery` locates host Codex/Claude Code executables without invoking
+them and lists models only in the selected running Ollama container. It never
+starts a service or performs inference. Unknown CLI table formats fail explicitly;
+see [provider inventory](../../dokja_docs/provider-inventory.md) for limits.
