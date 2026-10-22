@@ -27,6 +27,17 @@ For a new cross-layer operation:
    and the relevant service, then wire dependencies in [main.go](../dokja_orch/cmd/va/main.go).
 6. Verify public compatibility and affected module tests before migrating callers.
 
+## Communication boundary classification
+
+[ADR 0012](decisions/0012-communication-services.md) classifies Discord and
+WhatsApp gateways as communication-service adapters, with inbound ingress and
+outbound transport roles. Desktop, CLI and TUI are operator interfaces. Current
+gateways still live under `dokja_interfaces/`; policy extraction and relocation
+are pending in step 09.4. The [source audit](communication-boundaries.md) identifies
+existing read, send, linking and session ownership without changing contracts.
+Gateway ingress still submits the existing event/request to orchestration;
+reclassification does not permit service-to-domain or operator-to-service bypasses.
+
 ## Capability ownership and consumers
 
 The table distinguishes current implementation owners from target cognitive
