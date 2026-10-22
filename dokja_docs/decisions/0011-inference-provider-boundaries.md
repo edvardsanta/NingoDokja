@@ -1,8 +1,8 @@
 # ADR 0011: Dokja owns cognition; models provide inference capabilities
 
 Date: 2026-10-21. Status: accepted responsibility boundary (owner direction).
-Implementation: classifier-specific adapters exist; general inference integration
-is pending in step 10.3. Refines [ADR 0005](./0005-knowledge-experience-content.md).
+Implementation: classifier adapters and an experimental general inference loop
+exist; reliable model-assisted memory reuse remains pending in step 10.3. Refines [ADR 0005](./0005-knowledge-experience-content.md).
 
 ## Decision
 
@@ -62,9 +62,11 @@ future adapters are isolated.
 - `dokja_domain/dokja_knowledge/classification.go` owns classification meaning,
   validation and precedence over provider suggestions.
 - The [causal experiment](../cognitive-cycle-experiment.md) uses a deterministic
-  fixture predictor. It has not exercised these LLM providers in the new loop.
+  fixture predictor. Its manual predictor remains the baseline for the
+  [model-assisted evaluation](../model-assisted-cognition-experiment.md).
 
-The general inference contract is not yet implemented. No new service, database,
+An experimental domain inference contract is implemented; live evaluation has
+not established reliable outcome reuse. No new service, database,
 provider order, public route, deployment setting or production model call is
 introduced by this decision. The cognitive capability split remains provisional;
 this responsibility boundary does not mandate three cognitive components or a

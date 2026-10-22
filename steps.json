@@ -856,7 +856,7 @@
         {
           "id": "10.3",
           "title": "Integrate domain inference contracts with interchangeable infrastructure providers",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "10.2"
           ],
@@ -873,11 +873,16 @@
             "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration."
           ],
           "evidence": [
-            "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration."
+            "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration.",
+            "Experimental domain contract, three infrastructure adapters and bounded cognitive driver implemented. Live Codex requested dependent evidence and produced an observed simulation outcome; paired memory reuse remained unreliable and did not establish improved decisions. Claude quota and unavailable Ollama blocked their live evaluation."
           ],
-          "checks": [],
+          "checks": [
+            "Domain and spike: go test -race ./...; go vet ./... passed.",
+            "Live paired and counterfactual observations documented; acceptance remains incomplete."
+          ],
           "references": [
-            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md",
+            "dokja_docs/model-assisted-cognition-experiment.md"
           ]
         }
       ]
