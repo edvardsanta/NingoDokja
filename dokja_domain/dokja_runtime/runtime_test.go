@@ -36,6 +36,13 @@ func (f *fake) Start(_ context.Context, m Module) error {
 	}
 	return nil
 }
+func (f *fake) Recreate(_ context.Context, m Module) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "recreate:"+m.Name)
+	f.containers[m.Service] = Container{Running: true}
+	return nil
+}
 func (f *fake) Stop(_ context.Context, m Module) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
