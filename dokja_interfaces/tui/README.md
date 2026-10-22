@@ -79,6 +79,10 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 
 ## Switches and jobs
 
+- `l` on the whatsapp row opens the link window: it draws the code to scan and refreshes every 2 s; `n` asks
+  for a new code and `u` unlinks the account (erasing its saved session) after a confirmation. It needs
+  `DOKJA_COMMUNICATIONS_TOKEN` in the TUI's environment, the credential the orchestrator and the desktop share.
+
 - The panel starts with **Modules**: the lite stack's containers, from the local runtime controller the
   desktop and CLI also use. Space starts or stops the selected one (with the dependencies it needs) and
   changes no switch or job. Starting discord or the scheduler first shows what they will do with the saved

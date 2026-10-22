@@ -49,6 +49,8 @@ func (m *Model) View() string {
 		body = m.viewMemoryFeedback()
 	case overlayMemoryPredict:
 		body = m.viewMemoryPredict()
+	case overlayLink:
+		body = m.viewLink()
 	default:
 		switch m.tab {
 		case tabPanel:
@@ -115,6 +117,8 @@ func (m *Model) viewFooter() string {
 		hint = tr("enter_continue_esc_cancel")
 	case overlayMemoryPredict:
 		hint = tr("memory_predict_help")
+	case overlayLink:
+		hint = tr("link_help")
 	}
 	footer := styleDim.Render(hint)
 	if m.notice != "" {
@@ -728,4 +732,28 @@ func (m *Model) viewProfileForm() string {
 		b.WriteString(fmt.Sprintf("%s%s %s\n", marker, label, m.profileForm[i].View()))
 	}
 	return styleBox.Render(b.String())
+}
+
+func (m *Model) viewLink() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(tr("link_title")) + "\n\n")
+	if m.linkErr != "" {
+		b.WriteString(styleBad.Render(m.linkErr) + "\n")
+	}
+	switch {
+	case m.link.State == "connected":
+		b.WriteString(styleOK.Render(tr("link_done")) + "\n")
+	case len(m.link.Matrix) > 0:
+		if code, err := cli.RenderLinkCode(m.link.Matrix); err == nil {
+			b.WriteString(tr("link_steps") + "\n" + code)
+		} else {
+			b.WriteString(styleBad.Render(err.Error()) + "\n")
+		}
+	case m.link.State != "":
+		b.WriteString(styleDim.Render(tr("link_waiting")) + "\n")
+	}
+	if m.link.State != "" {
+		b.WriteString(styleDim.Render(tr("link_state")+cli.LinkStateText(m.link.State)) + "\n")
+	}
+	return b.String()
 }
