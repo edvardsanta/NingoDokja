@@ -186,12 +186,12 @@ func Run(parent context.Context, store Store, c Config) (s State) {
 			if !call() {
 				return finish("budget_exhausted", "deadline or call limit")
 			}
-			s.Observed = Simulate(d.Target, c.Tokens, c.Expected)
+			s.Observed, s.Diagnostic = ObserveSimulation(d.Target, c.Tokens, c.Expected)
 			s.transition("simulate", "observed local computation; not production feedback")
 			if s.Observed == "unknown" {
 				return finish("outcome_unknown", "no resolved experience")
 			}
-			e := Episode{ID: c.Attempt, Scope: c.Scope, Context: c.Context, Action: s.Action, Outcome: s.Observed, Simulation: true, Evidence: s.refs(), Predicted: s.Prediction.Probability}
+			e := Episode{ID: c.Attempt, Scope: c.Scope, Context: c.Context, Action: s.Action, Outcome: s.Observed, Diagnostic: s.Diagnostic, Simulation: true, Evidence: s.refs(), Predicted: s.Prediction.Probability}
 			if !call() {
 				return finish("record_failed", "action observed but recording budget exhausted")
 			}

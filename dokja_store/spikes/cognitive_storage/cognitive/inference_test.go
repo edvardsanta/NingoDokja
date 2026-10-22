@@ -121,3 +121,50 @@ func TestProviderReceivesSnapshotCopy(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestObservedDiagnosticsAreReusableFacts(t *testing.T) {
+	for _, tc := range []struct {
+		action              string
+		tokens              []string
+		want                int
+		outcome, diagnostic string
+	}{
+		{"fast", []string{"１２", "3"}, 15, "failed", "parse_error_full_width_digits"},
+		{"normalize", []string{"１２", "3"}, 15, "success", "sum_verified"},
+		{"fast", []string{"abc"}, 15, "failed", "parse_error"},
+		{"normalize", []string{"abc"}, 15, "failed", "parse_error"},
+		{"fast", []string{"12", "3"}, 16, "failed", "sum_mismatch"},
+		{"shell", []string{"12"}, 12, "unknown", ""},
+	} {
+		outcome, diagnostic := ObserveSimulation(tc.action, tc.tokens, tc.want)
+		if outcome != tc.outcome || diagnostic != tc.diagnostic {
+			t.Fatal(tc, outcome, diagnostic)
+		}
+	}
+	m := NewMemory(Fixture())
+	c := config("iterative", "diagnostic-first")
+	c.Inference = inferenceFunc(func(_ context.Context, r inference.Request) (inference.Result, error) { return validReply(r), nil })
+	first := Run(context.Background(), m, c)
+	if first.Diagnostic != "parse_error_full_width_digits" || len(m.Episodes) != 1 || m.Episodes[0].Diagnostic != first.Diagnostic {
+		t.Fatal(first, m.Episodes)
+	}
+	c.Attempt = "diagnostic-second"
+	seen := false
+	c.Inference = inferenceFunc(func(_ context.Context, r inference.Request) (inference.Result, error) {
+		if len(r.Experiences) != 1 || r.Experiences[0].Diagnostic != first.Diagnostic {
+			t.Fatal(r)
+		}
+		seen = true
+		return validReply(r), nil
+	})
+	second := Run(context.Background(), m, c)
+	if !seen || second.Diagnostic != "sum_verified" {
+		t.Fatal(second)
+	}
+	bad := m.Episodes[0]
+	bad.ID = "invalid"
+	bad.Diagnostic = "sum_verified"
+	if m.Record(context.Background(), bad) == nil {
+		t.Fatal("accepted contradictory observed diagnostic")
+	}
+}

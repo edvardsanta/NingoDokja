@@ -24,6 +24,7 @@ type Node struct {
 }
 type Episode struct {
 	ID, Scope, Context, Action, Outcome string
+	Diagnostic                          string `json:",omitempty"`
 	Simulation                          bool
 	Evidence                            []Ref
 	Predicted                           float64
@@ -56,6 +57,7 @@ type State struct {
 	Episodes                                           []Episode
 	Prediction                                         Prediction
 	Trace                                              []Transition
+	Diagnostic                                         string `json:",omitempty"`
 	Outcome, Action, Observed                          string
 	Hops, Calls, Iterations, DuplicateReads, Conflicts int
 }
@@ -173,8 +175,15 @@ func Decide(s State) Decision {
 // Both strategies try to sum the fixture's tokens. Predictions never supply the
 // verdict. It performs no external I/O and cannot execute arbitrary action names.
 func Simulate(action string, tokens []string, want int) string {
+	outcome, _ := ObserveSimulation(action, tokens, want)
+	return outcome
+}
+
+// ObserveSimulation reports what the parser/comparison actually observed. It
+// never recommends the next strategy or records a provider-generated verdict.
+func ObserveSimulation(action string, tokens []string, want int) (string, string) {
 	if action != "fast" && action != "normalize" {
-		return "unknown"
+		return "unknown", ""
 	}
 	sum := 0
 	for _, token := range tokens {
@@ -188,14 +197,18 @@ func Simulate(action string, tokens []string, want int) string {
 		}
 		n, err := strconv.Atoi(token)
 		if err != nil {
-			return "failed"
+			diagnostic := "parse_error"
+			if strings.ContainsFunc(token, func(r rune) bool { return r >= '０' && r <= '９' }) {
+				diagnostic = "parse_error_full_width_digits"
+			}
+			return "failed", diagnostic
 		}
 		sum += n
 	}
 	if sum == want {
-		return "success"
+		return "success", "sum_verified"
 	}
-	return "failed"
+	return "failed", "sum_mismatch"
 }
 func clone[T any](v T) T { b, _ := json.Marshal(v); var out T; _ = json.Unmarshal(b, &out); return out }
 func valid(n Node, scope string) bool {
