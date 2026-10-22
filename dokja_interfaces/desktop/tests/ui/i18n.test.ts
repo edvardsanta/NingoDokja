@@ -41,7 +41,7 @@ describe("the catalogs", () => {
   });
 
   // Words that are the same in both languages by nature, not because a message was forgotten.
-  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot"]);
+  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant"]);
 
   it("translate every message, so none was left in English", () => {
     const same = Object.keys(en).filter(

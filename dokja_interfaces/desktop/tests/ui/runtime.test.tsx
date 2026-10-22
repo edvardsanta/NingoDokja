@@ -16,7 +16,7 @@ describe("local runtime modules",()=>{
   const {transport,calls}=routedTransport({"runtime.modules":[page(),page("starting",true),page("ready")],"runtime.set":page("starting",true)});show(transport);
   fireEvent.click(await screen.findByRole("button",{name:"Start memory"}));
   await screen.findByText("Starting");
-  expect((screen.getByRole("button",{name:"Start book"}) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button",{name:"Start book"}) as HTMLButtonElement).disabled).toBe(false);
   await screen.findByText("Ready",{}, {timeout:3000});
   expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"memory",enabled:true}]);
   expect(calls.some(c=>c.type==="services.set")).toBe(false);
@@ -119,4 +119,18 @@ it("retains service visibility when the runtime controller is unavailable", asyn
   render(<App transport={transport} locale="en" runtimeControls />);
   expect(await screen.findByText("memory")).toBeTruthy();
   expect(screen.getByRole("switch", { name: "memory switch" })).toBeTruthy();
+});
+
+it("shows logs on demand while other modules remain usable", async () => {
+ const {transport,calls}=routedTransport({"runtime.modules":page("starting",true),"runtime.logs":ok({module:"memory",text:"embedding model: downloading"}),"runtime.set":page("starting",true)});
+ show(transport);
+ await screen.findByText("Starting");
+ expect(calls.some(c=>c.type==="runtime.logs")).toBe(false);
+ const details=screen.getByText("Logs for memory").closest("details")!;
+ details.open=true;
+ fireEvent(details,new Event("toggle"));
+ await screen.findByText("embedding model: downloading");
+ fireEvent.click(screen.getByRole("button",{name:"Start book"}));
+ await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"book",enabled:true}]));
+ expect(screen.getByText("embedding model: downloading")).toBeTruthy();
 });

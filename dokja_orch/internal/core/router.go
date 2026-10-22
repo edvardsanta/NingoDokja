@@ -65,6 +65,8 @@ func (r *RuleBasedEventRouter) Route(_ context.Context, event Event) (Route, err
 			Workflow: "ningo",
 			Domains:  []Domain{DomainSystem},
 		}, nil
+	case eventType == "message.created" && event.Source == SourceDesktop:
+		return Route{Workflow: "desktop-conversation", Domains: []Domain{DomainChat}}, nil
 	case strings.HasPrefix(eventType, "message."):
 		return Route{
 			Workflow: "conversation",

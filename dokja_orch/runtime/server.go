@@ -48,6 +48,14 @@ func Handler(d *domain.Domain, project string) http.Handler {
 		switch e.Type {
 		case "runtime.modules":
 			reply("ok", d.List(r.Context()), "")
+		case "runtime.logs":
+			name, _ := e.Payload["module"].(string)
+			result, err := d.Tail(r.Context(), name)
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
 		case "runtime.set":
 			name, ok := e.Payload["module"].(string)
 			enabled, flag := e.Payload["enabled"].(bool)

@@ -16,8 +16,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
+	"unicode"
 
 	zmq "github.com/pebbe/zmq4"
 	domain "read_books/dokja_domain/dokja_runtime"
@@ -25,14 +27,18 @@ import (
 
 type Runner func(context.Context, ...string) ([]byte, error)
 type Compose struct {
-	Run     Runner
-	Inspect Runner
-	Poll    time.Duration
-	Wait    time.Duration
+	Run          Runner
+	Inspect      Runner
+	Poll         time.Duration
+	Wait         time.Duration
+	startCommand func(context.Context, domain.Module) error
+	outputMu     sync.Mutex
+	output       map[string]*tailBuffer
 }
 
 func New(root string) *Compose {
-	execute := func(ctx context.Context, args ...string) ([]byte, error) {
+	c := &Compose{output: map[string]*tailBuffer{}}
+	execute := func(ctx context.Context, stream io.Writer, args ...string) ([]byte, error) {
 		if err := localEngine(os.Environ()); err != nil {
 			return nil, err
 		}
@@ -50,6 +56,10 @@ func New(root string) *Compose {
 		out := &boundedBuffer{}
 		cmd.Stdout = out
 		cmd.Stderr = io.Discard
+		if stream != nil {
+			cmd.Stdout = stream
+			cmd.Stderr = stream
+		}
 		if err := cmd.Run(); err != nil {
 			return nil, fmt.Errorf("container command failed; check that the engine is running, images can build and local ports are available")
 		}
@@ -58,11 +68,23 @@ func New(root string) *Compose {
 		}
 		return out.Bytes(), nil
 	}
-	return &Compose{Run: func(ctx context.Context, args ...string) ([]byte, error) {
-		return execute(ctx, composeArgs(root, args)...)
-	}, Inspect: func(ctx context.Context, ids ...string) ([]byte, error) {
-		return execute(ctx, append([]string{"inspect"}, ids...)...)
-	}, Poll: time.Second, Wait: 2 * time.Minute}
+	c.Run = func(ctx context.Context, args ...string) ([]byte, error) {
+		return execute(ctx, nil, composeArgs(root, args)...)
+	}
+	c.Inspect = func(ctx context.Context, ids ...string) ([]byte, error) {
+		return execute(ctx, nil, append([]string{"inspect"}, ids...)...)
+	}
+	c.Poll = time.Second
+	c.Wait = 2 * time.Minute
+	c.startCommand = func(ctx context.Context, m domain.Module) error {
+		tail := &tailBuffer{}
+		c.outputMu.Lock()
+		c.output[m.Service] = tail
+		c.outputMu.Unlock()
+		_, err := execute(ctx, tail, composeArgs(root, []string{"up", "-d", "--no-deps", "--no-recreate", "--build", m.Service})...)
+		return err
+	}
+	return c
 }
 
 // profiles are the opt-in Compose profiles of modules the controller may start. Podman Compose
@@ -169,6 +191,9 @@ func (c *Compose) Status(ctx context.Context) (map[string]domain.Container, erro
 func (c *Compose) Start(ctx context.Context, m domain.Module) error {
 	if !valid(m) {
 		return fmt.Errorf("unknown service")
+	}
+	if c.startCommand != nil {
+		return c.startCommand(ctx, m)
 	}
 	_, err := c.Run(ctx, "up", "-d", "--no-deps", "--no-recreate", "--build", m.Service)
 	return err
@@ -377,4 +402,74 @@ func localEngine(env []string) error {
 		}
 	}
 	return nil
+}
+
+// Keep the newest build output, including stderr, without blocking a long build.
+const maxLogBytes = 24 * 1024
+
+type tailBuffer struct {
+	mu   sync.Mutex
+	data []byte
+}
+
+func (b *tailBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	n := len(p)
+	if len(p) >= maxLogBytes {
+		b.data = append(b.data[:0], p[len(p)-maxLogBytes:]...)
+	} else {
+		if len(b.data)+len(p) > maxLogBytes {
+			b.data = b.data[len(b.data)+len(p)-maxLogBytes:]
+		}
+		b.data = append(b.data, p...)
+	}
+	return n, nil
+}
+func (b *tailBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return string(b.data)
+}
+func cleanLogs(raw string) string {
+	// Display plain text only; remove ANSI escapes and control characters.
+	raw = ansiEscape.ReplaceAllString(strings.ToValidUTF8(raw, "�"), "")
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, raw)
+}
+
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+
+func (c *Compose) Logs(parent context.Context, modules []domain.Module) (string, error) {
+	args := []string{"logs", "--no-color", "--timestamps", "--tail", "40"}
+	var builds strings.Builder
+	for _, m := range modules {
+		if !valid(m) {
+			return "", fmt.Errorf("unknown service")
+		}
+		args = append(args, m.Service)
+		c.outputMu.Lock()
+		tail := c.output[m.Service]
+		c.outputMu.Unlock()
+		if tail != nil {
+			builds.WriteString("[build " + m.Name + "]\n" + tail.String() + "\n")
+		}
+	}
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	defer cancel()
+	raw, err := c.Run(ctx, args...)
+	if err != nil && builds.Len() == 0 {
+		return "", err
+	}
+	combined := &tailBuffer{}
+	combined.Write([]byte(builds.String()))
+	combined.Write(raw)
+	if err != nil {
+		combined.Write([]byte("\nContainer logs are not available yet.\n"))
+	}
+	return cleanLogs(combined.String()), nil
 }

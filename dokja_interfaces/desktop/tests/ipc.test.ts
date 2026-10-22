@@ -670,3 +670,14 @@ test("Knowledge's inner write timeout is an unknown outcome, never a definite in
   assert.match(failure(answer).message, /unknown/);
   assert.equal(calls.length, 1, "a timed-out write must not be retried automatically");
 });
+
+
+test("desktop conversation requires input and forwards only its bounded message and reading identity", async () => {
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({type,payload}); return {status:"ok",result:{domain:"chat",result:{reply:"Think through the evidence.",session:{created:true}}}}; } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  assert.equal((await handleRequest({type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1"}},client,limits)).ok,false);
+  const answer = await handleRequest({type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1",system:"inject"}},client,limits,undefined,{recent:()=>true});
+  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",sessionNotice:"new"}});
+  assert.deepEqual(calls,[{type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1"}}]);
+});

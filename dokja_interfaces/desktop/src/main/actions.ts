@@ -1,4 +1,4 @@
-import { runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot } from "./runtime_actions.js";
+import { runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryResolvePayload, memoryResolution } from "./memory_experiences.js";
@@ -119,6 +119,21 @@ function inDomain<T>(
 }
 
 const noPayload = (): Record<string, unknown> => ({});
+
+function chatPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const content = text(raw.content).trim();
+  const conversationId = text(raw.conversation_id);
+  const readingId = text(raw.reading_id);
+  if (!content || content.length > 12000 || conversationId.length > 512 || readingId.length > 512) return undefined;
+  return { content, conversation_id: conversationId, ...(readingId ? { reading_id: readingId } : {}) };
+}
+
+function chatReply(result: unknown): { reply: string; sessionNotice: string } | Off {
+  return inDomain(result, "chat", (body) => {
+    const session = isRecord(body.session) ? body.session : {};
+    return { reply: shorten(text(body.reply), 12000), sessionNotice: session.created === true ? "new" : session.revoked === true ? "reset" : "" };
+  });
+}
 
 // The three link actions share one payload (the interface, fixed) and one projection (the state and
 // the picture of the code), so a screen cannot ask the orchestrator for anything else.
@@ -480,6 +495,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     project: (result) => inDomain(result, "system", systemStatus),
   },
   "runtime.modules": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
+  "runtime.logs": { payload: runtimeModule, project: (result) => inDomain(result,"runtime",runtimeLogs) },
+  "message.created": { payload: chatPayload, project: chatReply },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.settings": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSettings) },
   "runtime.settings.set": { payload: runtimeSettingsSet, project: (result) => inDomain(result,"runtime",runtimeSettings) },
