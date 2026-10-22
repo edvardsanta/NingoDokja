@@ -434,6 +434,13 @@ func (h *SystemDomainHandler) appendLearnedHashtag(ctx context.Context, event co
 }
 
 func withHashtag(content, hashtag string) string {
+	hashtag = strings.TrimSpace(hashtag)
+	for _, word := range strings.Fields(content) {
+		word = strings.Trim(word, ".,!?;:()[]{}")
+		if strings.EqualFold(word, hashtag) {
+			return content
+		}
+	}
 	if content == "" {
 		return hashtag
 	}

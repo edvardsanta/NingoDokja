@@ -46,6 +46,7 @@ func TestManualSendHashtagDelivery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			if tc.disabled {
 				if err := controls.SetService("meme", false); err != nil {
 					t.Fatal(err)
@@ -65,6 +66,25 @@ func TestManualSendHashtagDelivery(t *testing.T) {
 				t.Fatal("disabled service was called")
 			}
 		})
+	}
+}
+
+func TestManualSendDoesNotDuplicateProvidedHashtag(t *testing.T) {
+	controls, err := core.NewControls("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	suggester := &fakeMemeHashtagSuggester{result: map[string]any{"hashtag": "#Humor", "relevant": true}}
+	deliverer := &fakeDiscordDeliverer{}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "channel").WithControls(controls).WithHashtagSuggestions(suggester)
+	event, step := discordSendEvent(map[string]any{
+		"channel_ids": []any{"channel"}, "content": "#Humor", "attachment_url": "https://media.example/a.png",
+	})
+	if _, err := handler.Handle(context.Background(), event, step); err != nil {
+		t.Fatal(err)
+	}
+	if len(deliverer.deliveries) != 1 || deliverer.deliveries[0].content != "#Humor" {
+		t.Fatalf("unexpected delivery: %+v", deliverer.deliveries)
 	}
 }
 
