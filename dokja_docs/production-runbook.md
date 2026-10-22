@@ -636,25 +636,45 @@ Running external consumers are recognized when deciding whether dependencies may
 stop. Existing containers are reused rather than recreated; image deployment is
 separate from runtime Start/Stop.
 
-**Stack settings.** The desktop (System → Settings), `dokja-cli settings list|set` and the TUI
-(`c`) change a fixed list of non-secret settings through the controller (`runtime.settings`,
-`runtime.settings.set`): Discord meme delivery, safe-only and answer channels and the direct
-message policy (`DISCORD_SCHEDULED_MEME_CHANNEL_ID`, `DISCORD_SAFE_ONLY_CHANNEL_IDS`,
-`DISCORD_ALLOWED_CHANNELS`, `DISCORD_DM_POLICY`); WhatsApp people, groups and own chat
-(`DOKJA_WHATSAPP_ALLOW_FROM`, `DOKJA_WHATSAPP_ALLOWED_GROUPS`, `DOKJA_WHATSAPP_SELF_CHAT`); and the
-embedding, book, speech-to-text and OCR models. They are written to the checkout's `.env`, only on
-their own lines (the rest of the file is kept byte for byte, atomically, with its mode), so a stack
-started by hand sees the same values. Every value is checked against a strict pattern; whitespace,
-`$`, `#`, quotes and backslashes are refused. Saving recreates the running modules that read the
-setting (`up -d --no-deps --force-recreate`, data kept); stopped ones are recreated on their next
-Start. If a recreation fails, remaining readers keep their stale markers and an explicit
-Start retries with the saved settings. Changing the embedding model reruns its initializer
-before recreating running readers. Recreating the orchestrator ends chat sessions in progress; changing the embedding model
-makes memory and knowledge embed again. Credentials are never settings: tokens and
-`DOKJA_DISCORD_WEBHOOKS` (whose channel ids are only shown, to mark webhook delivery) stay edited by
-hand. A variable exported in the controller's own environment overrides `.env` for Compose.
-After replacing the controller binary, stop its existing process once with SIGTERM and reopen
-a local interface so the new settings actions are available; application containers stay running.
+**Stack settings.** Desktop (System → Settings), `dokja-cli settings list|set` and the TUI
+(`c`) use the same controller actions (`runtime.settings`, `runtime.settings.set`). Operational
+settings now live in the shared SQLite database, default `<checkout>/.dokja/dokja.db`.
+The daemon's process environment may select `DOKJA_DB_FILE`; relative paths resolve against the
+checkout. It does not load this bootstrap path from `.env`. Prefer an absolute custom path and
+ensure profile clients/container mounts address the same database.
+
+The first settings read or controller Compose command imports only the allowed communication
+and model options from `.env`, overlaid by managed variables exported to the daemon. Import
+happens once; future database edits win over both sources. Credentials and webhook addresses
+are excluded, and `.env` content and permissions are unchanged. An invalid legacy value refuses
+import until corrected. A custom embedding model also refuses import: this version supports the
+fixed `bge-m3` profile, shown read-only in all three interfaces. Do not change the vector space
+without a separate evaluated reindex/migration plan.
+
+The catalog covers Discord meme delivery, safe-only and answer channels and DM policy; WhatsApp
+people, groups and own chat; and existing book, speech-to-text and OCR model settings. Tokens and
+`DOKJA_DISCORD_WEBHOOKS` remain edited by hand. Only webhook channel IDs are displayed. Provider
+inventory/discovery and capability bindings are a later lot, not delivered by this migration.
+
+Before each controller Compose command, database settings are supplied in the child process's
+environment using the existing variable names. Running readers are recreated after saving
+(`up -d --no-deps --force-recreate`, data kept); stopped readers wait until their next Start.
+Failed recreation retains stale markers for explicit retry. Recreating the orchestrator ends
+active chat sessions. A database failure refuses the operation rather than silently using old
+values. Legacy-file read errors also block projection because webhook channel labels are still
+read there. Services themselves do not query this configuration snapshot.
+
+**Upgrade/rollback:** back up the database and `.env`, rebuild the controller/interfaces, stop
+the existing daemon once with SIGTERM, then reopen a local interface. Application containers
+stay running. The SQLite schema version and profile rows are unchanged. Older daemons and manual
+Compose commands still use legacy environment configuration: they do not see subsequent database
+edits. Reconcile desired values explicitly before recreating containers with those paths. No
+export command is provided yet. Keep session/history volumes intact.
+
+The settings commit and stale-reader journal are not one transaction: a daemon crash between
+them can leave a reader on old values. Durable apply/recovery remains pending. This behavior is
+limited to the local lite controller; production configuration and deployment are unchanged.
+See [ADR 0013](decisions/0013-database-runtime-settings.md) for the boundary and verification.
 
 The daemon listens on a mode-0600 Unix socket in a mode-0700 per-checkout directory
 under `$XDG_STATE_HOME/dokja/` (default `~/.local/state/dokja/`), shared by the

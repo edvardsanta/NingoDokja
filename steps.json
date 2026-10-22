@@ -1022,6 +1022,62 @@
             }
           ],
           "completed_on": "2026-10-21"
+        },
+        {
+          "id": "11.3",
+          "title": "Move operational settings to the shared database",
+          "status": "completed",
+          "completed_on": "2026-10-22",
+          "evidence": [
+            "Runtime settings now use a versioned, revisioned snapshot in the existing dokja_store SQLite settings table; no schema/user_version change. CAS prevents overwriting a concurrent update.",
+            "First use imports only catalogued legacy variables and managed daemon environment overrides. Subsequent database values are authoritative; tokens and webhook addresses are excluded and the legacy file is never rewritten.",
+            "Bootstrap controller projects saved values into Compose child environments using existing consumer contracts. CLI, TUI and desktop share settings through the same requests; bge-m3 is visible as the fixed embedding profile.",
+            "Disposable integration tests write through the CLI source, reopen persistence and read the same value through CLI/TUI/desktop sources. Fake-engine tests verify projection and database-unavailable refusal without touching live containers."
+          ],
+          "checks": [
+            {
+              "name": "runtime_store_and_operator_interfaces",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./... passed in dokja_store, Runtime domain, runtime service adapter, bootstrap orchestrator, CLI and TUI. Tests cover migration, persistence, concurrency, credentials, fixed profile and subprocess projection."
+            },
+            {
+              "name": "desktop_settings",
+              "status": "passed",
+              "detail": "pnpm typecheck, pnpm test (219 Node and 221 UI tests), and pnpm build passed. Electron e2e and live operator configuration/container recreation were not run."
+            }
+          ],
+          "limitations": [
+            "Manual Compose, older daemons and production stacks still use legacy environment configuration. Existing daemon requires a restart after replacement; no export command is provided.",
+            "Saving settings and marking readers stale remain separate commits; durable recovery of a crash between them is pending.",
+            "Provider inventory/discovery and general model-to-capability bindings are not implemented by this lot."
+          ],
+          "references": [
+            "dokja_docs/decisions/0013-database-runtime-settings.md",
+            "dokja_docs/production-runbook.md"
+          ]
+        },
+        {
+          "id": "11.4",
+          "title": "Configure inference providers and capability bindings through shared settings",
+          "status": "pending",
+          "depends_on": [
+            "11.3",
+            "10.3"
+          ],
+          "deliverables": [
+            "Shared provider inventory for Codex, Claude Code and Ollama with explicit available/unavailable states",
+            "Capability-specific validated provider/model bindings and OCR options via the same operator API",
+            "CLI, TUI and desktop discovery and configuration views"
+          ],
+          "acceptance_criteria": [
+            "Keep inference contracts in the domain and adapter details in infrastructure; cognitive orchestration chooses when to infer, retrieve memory or continue another hop.",
+            "Distinguish embeddings, classification, generation and OCR; preserve the fixed approved embedding profile and expose unsupported combinations explicitly.",
+            "Persist non-secret operational choices in the shared database; keep credentials and bootstrap information out of operator read projections.",
+            "Validate new selections before applying; preserve existing consumers through documented compatibility adapters until each capability migrates.",
+            "Compare provider/capability behavior with reproducible tests and document unavailable live providers without claiming they passed."
+          ],
+          "checks": [],
+          "evidence": []
         }
       ]
     }

@@ -317,3 +317,11 @@ recognized external consumers. Runtime lifecycle and `services.set` routing
 controls remain separate. The first backend is the local lite stack on Unix;
 production, remote hosts and Windows are outside this initial implementation.
 See [runtime controller](../dokja_orch/runtime/README.md).
+
+Runtime operational settings are shared by Desktop, CLI and TUI through the
+bootstrap controller. The Runtime domain owns validation and apply policy; the
+runtime infrastructure adapter stores a revisioned snapshot in the shared
+`dokja_store` SQLite settings table and projects it into Compose child processes.
+Legacy `.env` values are imported once; credentials stay outside this API and the
+embedding profile is fixed. Provider inventory and model/capability bindings remain
+pending. See [ADR 0013](decisions/0013-database-runtime-settings.md).

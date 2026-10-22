@@ -5,7 +5,7 @@ This is a stateless Go adapter linked into the host bootstrap orchestrator in
 has no Dockerfile: a container cannot bootstrap its own stopped container engine
 or application stack. Runtime lifecycle policy belongs to
 `dokja_domain/dokja_runtime`; this package executes fixed service operations and
-readiness probes only.
+readiness probes, plus validated settings persistence/projection.
 
 The adapter runs `docker compose -f <trusted-root>/docker-compose.lite.yml` from
 that checkout. Docker Compose and the installed Podman Compose provider are
@@ -33,3 +33,11 @@ The adapter cancels entire command process groups on timeout.
 
 Run `go test -race ./...` and `go vet ./...` here. Native ZeroMQ headers and
 library (`libzmq3-dev` and `pkg-config` on the CI Linux host) are required.
+
+`DatabaseSettings` uses `dokja_store` for one revisioned runtime configuration key
+in the existing settings table. It imports allowed legacy values once and projects
+saved values into Compose subprocess environments, preserving unrelated variables
+and credentials. It never rewrites `.env`. The default database is the checkout's
+`.dokja/dokja.db`; an exported `DOKJA_DB_FILE` selects another file. This adapter
+holds no mutable configuration cache. See [ADR 0013](../../dokja_docs/decisions/0013-database-runtime-settings.md)
+for precedence, failure behavior and manual-Compose/rollback limits.
