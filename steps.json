@@ -852,6 +852,33 @@
             "Memory survives tasks within the experiment connection, not restart; no durable production execution.",
             "W2/W4 scalable traversal, Neo4j comparison, CPU/RSS, concurrency and real-world decision quality remain pending."
           ]
+        },
+        {
+          "id": "10.3",
+          "title": "Integrate domain inference contracts with interchangeable infrastructure providers",
+          "status": "pending",
+          "depends_on": [
+            "10.2"
+          ],
+          "deliverables": [
+            "Domain-owned typed inference contract and validation",
+            "Infrastructure adapters for Codex, Claude Code and Ollama, reusing classifier isolation where appropriate",
+            "Cognitive orchestration transitions for inference, retrieval, memory, revision and bounded continuation"
+          ],
+          "acceptance_criteria": [
+            "Dokja owns task state and the decision to invoke models, retrieve memory or execute another hop; domains define semantic contracts and preconditions.",
+            "Provider replacement preserves contracts, scope, authorization, state ownership and cumulative task budgets; unsupported capabilities are explicit.",
+            "Trace every answering provider/model and consumed evidence/state revision; stale, malformed, unavailable and late results cannot silently mutate task state.",
+            "Provider inference cannot directly write memory, control the workflow or execute external actions.",
+            "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration."
+          ],
+          "evidence": [
+            "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration."
+          ],
+          "checks": [],
+          "references": [
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+          ]
         }
       ]
     },

@@ -224,3 +224,14 @@ production topology decision. Source references consulted: PostgreSQL 17 manual,
 section 7.8 (recursive queries and cycle handling), and pgvector upstream README
 (exact vector search and filtered queries); no recursive SQL performance claim
 is made by this key-following experiment.
+
+## Provider integration direction
+
+The owner subsequently accepted the responsibility boundary in
+[ADR 0011](./decisions/0011-inference-provider-boundaries.md): Dokja owns cognition,
+domain contracts express inference semantics, infrastructure hosts interchangeable
+Codex/Claude Code/Ollama adapters, and cognitive orchestration controls model
+consultation, memory retrieval and additional hops. The fixture `Decide` function
+is a typed policy proposal consumed by the driver, not authority for a provider
+to drive the task. General LLM-backed integration remains step 10.3; the measured
+results above still use the deterministic predictor exclusively.

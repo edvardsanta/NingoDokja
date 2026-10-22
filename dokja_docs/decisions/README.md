@@ -20,6 +20,8 @@ validated, deployed, or approved as a new repository-wide rule.
 | [0009](./0009-cognitive-storage-evaluation.md) | Compare explicit cognitive graph workloads on SQLite, PostgreSQL+pgvector and Neo4j before engine selection | Proposed; research complete, benchmark and adoption pending |
 | [0010](./0010-four-concepts.md) | Four concepts (Knowledge, Memory, Action, Rules) replace the nine faculties; reading is Knowledge intake | Proposed; awaiting the owner's review |
 
+| [0011](./0011-inference-provider-boundaries.md) | Domain-owned inference contracts, interchangeable infrastructure providers and Dokja-owned cognitive orchestration | Accepted responsibility boundary; general inference integration pending |
+
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):
 the orchestrator supervises the Knowledge–Prediction–Experience cycle. Its

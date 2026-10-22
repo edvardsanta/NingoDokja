@@ -26,6 +26,16 @@ as the next integration hypothesis, but defer permanent cognitive responsibility
 boundaries and storage adoption to broader evaluations. No production topology,
 public contract or deployment is changed by this review.
 
+## Inference ownership refinement
+
+[ADR 0011](./0011-inference-provider-boundaries.md) records the owner's direction:
+Codex, Claude Code and Ollama belong to infrastructure; inference contracts belong
+to domains; cognitive orchestration controls when to infer, recall, retrieve or
+perform another hop. Domains supply semantic assessments and preconditions;
+orchestration chooses and executes the transition within task budgets. Historical
+references below to domains deciding the next step mean typed transition
+proposals, not domain-owned recursive workflows or provider-owned task control.
+
 ## Context
 
 The user clarified the intended abstraction: Knowledge defines the macro model
