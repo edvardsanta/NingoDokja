@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	inference "read_books/dokja_domain/dokja_inference"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ type Store interface {
 	Record(context.Context, Episode) error
 }
 type Prediction struct {
+	Status                 string
 	Model, Action, Missing string
 	Probability            float64
 	Inputs                 []Ref
@@ -47,6 +49,7 @@ type Transition struct {
 	Prediction        *Prediction `json:",omitempty"`
 }
 type State struct {
+	Inferences                                         []inference.Result `json:",omitempty"`
 	Revision                                           int
 	Goal, Scope, Context                               string
 	Nodes                                              []Node
@@ -148,6 +151,9 @@ func Decide(s State) Decision {
 	}
 	if s.Prediction.Model == "" {
 		return Decision{"predict", "", "evaluate evidence and comparable episodes"}
+	}
+	if s.Prediction.Status == "abstain" || s.Prediction.Status == "clarify" {
+		return Decision{s.Prediction.Status, "", "model proposal requests stopping; no action"}
 	}
 	if s.Prediction.Missing != "" {
 		return Decision{"retrieve", s.Prediction.Missing, "prediction requires an observation"}
