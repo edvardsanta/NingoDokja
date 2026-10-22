@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
-import type { CommunicationSend, MemeItem, Off } from "../../shared/replies.js";
+import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { usePreview } from "./use_preview.js";
@@ -18,7 +18,7 @@ export function MemePicker({
   disabled,
   onSelect,
   onPage,
-  onSendTagged,
+  onPrepareTagged,
 }: {
   transport: Transport;
   memes: readonly MemeItem[];
@@ -27,7 +27,7 @@ export function MemePicker({
   disabled: boolean;
   onSelect: (url: string) => void;
   onPage: (offset: number) => void;
-  onSendTagged: (hashtag: string, url: string) => Promise<LoadResult<CommunicationSend | Off>>;
+  onPrepareTagged: (hashtag: string, url: string) => void;
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
@@ -45,11 +45,9 @@ export function MemePicker({
     if (answer.result.off === true) return { ok: true, data: { off: true, reason: text(answer.result.reason) } };
     const value = text(answer.result.hashtag);
     if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
-    const sent = await onSendTagged(value, selectedMeme.url);
-    if (!sent.ok) return sent;
-    if (sent.data.off || !sent.data.sent) return { ok: false, error: { code: "orchestrator", message: "the tagged meme was not sent" } };
+    onPrepareTagged(value, selectedMeme.url);
     return { ok: true, data: { hashtag: value } };
-  }, [hashtag, onSendTagged, selectedMeme, transport]);
+  }, [hashtag, onPrepareTagged, selectedMeme, transport]);
   const tag = useAction(createTag);
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
@@ -103,7 +101,7 @@ export function MemePicker({
             {tag.state.phase === "loading" && <span role="status">{t("memes_creating_tag")}</span>}
             {tag.state.phase === "ready" && ("off" in tag.state.data
               ? <span>{tag.state.data.reason}</span>
-              : <span>{t("memes_tagged_sent", { tag: tag.state.data.hashtag })}</span>)}
+              : <span>{t("memes_tagged_ready", { tag: tag.state.data.hashtag })}</span>)}
             {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
           </div>}
         </li>
@@ -163,11 +161,7 @@ function MemeTile({
   const title = meme.title || t("memes_untitled");
   const attach = <button type="button" className="meme-attach" aria-label={t("memes_attach", { title })}
     aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
-    onClick={onToggle}>{preview.phase === "ready" && !preview.dataUrl.startsWith("data:video/")
-      ? <img src={preview.dataUrl} alt="" onClick={(event) => {
-        event.stopPropagation();
-        onOpen(preview.dataUrl);
-      }} /> : attached ? t("memes_attached") : t("memes_attach_short")}</button>;
+    onClick={onToggle}>{attached ? t("memes_attached") : t("memes_attach_short")}</button>;
   if (preview.phase === "ready" && preview.dataUrl.startsWith("data:video/")) {
     return <div className="meme-tile">
       <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
@@ -178,7 +172,13 @@ function MemeTile({
     </div>;
   }
   return <div className="meme-tile">
-    {preview.phase === "ready" ? attach : <button type="button" className="preview preview-open"
+    {preview.phase === "ready" ? <>
+      <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
+        onClick={() => onOpen(preview.dataUrl)}>
+        <img src={preview.dataUrl} alt="" />
+      </button>
+      {attach}
+    </> : <button type="button" className="preview preview-open"
       aria-label={t("memes_attach", { title })} aria-busy={preview.phase === "loading"} disabled={disabled}
       onClick={onToggle}>{preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}</button>}
   </div>;

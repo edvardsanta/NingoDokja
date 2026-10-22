@@ -175,7 +175,7 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
       <button type="submit" disabled={sending || (!content.trim() && !(attachment && !textOnly))}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</button>
     </div>
     {!textOnly && memes.state.phase === "ready" && !memes.state.data.off && <MemePicker transport={transport} memes={memes.state.data.memes} page={memes.state.data} selected={attachment} disabled={sending} onSelect={setAttachment} onPage={(offset) => { setMemeOffset(offset); memes.start(offset); }}
-      onSendTagged={(hashtag, url) => run({ content: hashtag, attachment: url, force: false })} />}
+      onPrepareTagged={(hashtag, url) => { setContent(hashtag); setAttachment(url); }} />}
     {memes.state.phase === "error" && <Problem error={memes.state.error} />}
     {memes.state.phase === "ready" && memes.state.data.off && <OffNotice reason={memes.state.data.reason} />}
     <div aria-live="polite">
