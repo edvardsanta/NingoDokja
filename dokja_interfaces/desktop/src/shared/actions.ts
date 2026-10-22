@@ -11,6 +11,8 @@
 // heartbeat) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
   "runtime.modules",
+  "runtime.logs",
+  "message.created",
   "runtime.set",
   "communications.channels",
   "communications.history",
@@ -44,6 +46,7 @@ export type ActionType = (typeof ACTION_TYPES)[number];
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "memory.resolve",
   "runtime.set",
+  "message.created",
   "communications.send",
   "communications.link.start",
   "communications.link.reset",

@@ -1043,3 +1043,19 @@ button[aria-pressed="true"] {
 .module-options summary { color: var(--ink-dim); cursor: pointer; font-size: 0.8125rem; }
 .module-options[open] { padding-bottom: 0.5rem; }
 .module-options .switch { margin-top: 0.35rem; }
+
+.runtime-modules .module-progress,
+.runtime-modules .runtime-logs { grid-column: 1 / -1; }
+.runtime-logs { min-width: 0; width: 100%; }
+.runtime-logs pre { max-height: 18rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; padding: .8rem; background: var(--static); }
+
+.assistant-conversation { display: grid; gap: .75rem; min-width: 0; margin-block: 1rem; }
+.assistant-prompts, .assistant-turns li { padding: .85rem; border-left: 3px solid var(--cyan); background: rgb(39 215 228 / 6%); }
+.assistant-prompts { display: grid; gap: .5rem; }
+.assistant-prompt { justify-self: start; text-align: left; }
+.assistant-turns { list-style: none; padding: 0; display: grid; gap: .7rem; }
+.assistant-turns li { padding: .85rem; border-left: 3px solid var(--muted); overflow-wrap: anywhere; }
+.assistant-turns li[data-role="assistant"] { border-left-color: var(--cyan); }
+.assistant-turns p { white-space: pre-wrap; margin-bottom: 0; }
+.assistant-conversation form { display: grid; gap: .5rem; }
+.assistant-conversation textarea { width: 100%; resize: vertical; font: inherit; color: inherit; background: var(--static); border: 1px solid var(--muted); padding: .7rem; }

@@ -308,3 +308,31 @@ describe("the digest card", () => {
     within(sources).getByText("exit status 2");
   });
 });
+
+
+it("a reading opens its own Ningo conversation grounded by server-validated reading ID", async () => {
+  const { transport, calls } = routedTransport({
+    "digest.status": ok(DIGEST_STATUS),
+    "digest.items": ok(digestPage([digestItem(1)])),
+    "message.created": [
+      ok({reply:"The author argues that shared rules make coordination possible.",sessionNotice:""}),
+      ok({reply:"The second turn keeps the context of this discussion.",sessionNotice:""}),
+    ],
+  });
+  renderCard(transport);
+  fireEvent.click(await screen.findByRole("button", {name:"Discuss with Ningo: Entry 1"}));
+  fireEvent.click(screen.getByRole("button", {name:"Explain the main idea in plain language"}));
+  expect(await screen.findByText("The author argues that shared rules make coordination possible.")).toBeTruthy();
+  const input = screen.getByRole("textbox", {name:"Your message"});
+  fireEvent.change(input, {target:{value:"What should I question?"}});
+  fireEvent.click(screen.getByRole("button", {name:"Send"}));
+  expect(await screen.findByText("The second turn keeps the context of this discussion.")).toBeTruthy();
+  const messages = calls.filter((call)=>call.type==="message.created");
+  expect(messages).toHaveLength(2);
+  const firstMessage = messages[0]!;
+  const secondMessage = messages[1]!;
+  expect(firstMessage.payload).toMatchObject({content:"Explain the main idea in plain language",reading_id:"item-1"});
+  expect(secondMessage.payload).toMatchObject({content:"What should I question?",reading_id:"item-1"});
+  expect(secondMessage.payload?.conversation_id).toBe(firstMessage.payload?.conversation_id);
+  for (const message of messages) expect(message.payload).not.toHaveProperty("summary");
+});

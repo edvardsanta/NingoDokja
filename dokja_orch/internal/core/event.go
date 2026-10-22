@@ -12,6 +12,7 @@ type EventSource string
 
 const (
 	SourceDiscord      EventSource = "discord"
+	SourceDesktop      EventSource = "desktop"
 	SourceWhatsApp     EventSource = "whatsapp"
 	SourceCLI          EventSource = "cli"
 	SourceWeb          EventSource = "web"

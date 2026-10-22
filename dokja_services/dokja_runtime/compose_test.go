@@ -246,3 +246,34 @@ func TestKnownRemoteEngineTargetsAreRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLogsTailSelectedModuleAndItsDependenciesWithoutUnboundedOutput(t *testing.T) {
+	var calls [][]string
+	c := &Compose{Run: func(_ context.Context, args ...string) ([]byte, error) {
+		calls = append(calls, args)
+		return []byte("2026-10-21T12:00:00Z api ready\x1b[31mred\x1b[0m\x07"), nil
+	}, output: map[string]*tailBuffer{}}
+	for _, name := range []string{"orchestrator", "embeddings", "embedding_init", "memory"} {
+		c.output[nameService(name)] = &tailBuffer{}
+		c.output[nameService(name)].Write([]byte("build output for " + name))
+	}
+	logs, err := c.Logs(context.Background(), domain.Plan("memory"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || !reflect.DeepEqual(calls[0], []string{"logs", "--no-color", "--timestamps", "--tail", "40", "dokja-orchestrator", "dokja-ollama", "dokja-embedding-init", "dokja-memory"}) {
+		t.Fatal(calls)
+	}
+	for _, want := range []string{"build output for embedding_init", "api readyred"} {
+		if !strings.Contains(logs, want) {
+			t.Fatalf("missing %q in logs %q", want, logs)
+		}
+	}
+	if strings.Contains(logs, "\x1b") || strings.ContainsRune(logs, '\x07') || len(logs) > 24*1024 {
+		t.Fatal("log output must be clean and bounded")
+	}
+}
+func nameService(name string) string {
+	module, _ := domain.Lookup(name)
+	return module.Service
+}

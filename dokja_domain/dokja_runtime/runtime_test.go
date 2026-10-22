@@ -15,6 +15,7 @@ type fake struct {
 	calls      []string
 	fail       string
 	gate       chan struct{}
+	gateAt     string
 }
 
 func (f *fake) Status(context.Context) (map[string]Container, error) {
@@ -44,7 +45,7 @@ func (f *fake) Stop(_ context.Context, m Module) error {
 	return nil
 }
 func (f *fake) Ready(ctx context.Context, m Module) error {
-	if f.gate != nil {
+	if f.gate != nil && (f.gateAt == "" || f.gateAt == m.Name) {
 		select {
 		case <-f.gate:
 		case <-ctx.Done():
@@ -172,9 +173,11 @@ func TestReadinessFailureIsNotReadyAndCanBeRetried(t *testing.T) {
 		t.Fatal(s)
 	}
 }
-func TestDuplicateTransitionIsIdempotentAndOtherOperationsCannotCross(t *testing.T) {
+func TestSlowEmbeddingsDoNotBlockIndependentModules(t *testing.T) {
 	d, f := fresh()
 	f.gate = make(chan struct{})
+	f.gateAt = "embedding_init"
+	defer close(f.gate)
 	s, err := d.Set("memory", true)
 	if err != nil || !s.Busy {
 		t.Fatal(s, err)
@@ -182,14 +185,33 @@ func TestDuplicateTransitionIsIdempotentAndOtherOperationsCannotCross(t *testing
 	if _, err = d.Set("memory", true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = d.Set("book", true); err == nil {
-		t.Fatal("parallel lifecycle operations must be refused")
+	if _, err = d.Set("book", true); err != nil {
+		t.Fatal(err)
 	}
-	close(f.gate)
-	settle(t, d)
-	if len(f.trace()) != 4 {
-		t.Fatal(f.trace())
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		s = d.List(context.Background())
+		if row(s, "book").State == "ready" {
+			break
+		}
+		time.Sleep(time.Millisecond)
 	}
+	if row(s, "book").State != "ready" || row(s, "memory").State != "starting" || !s.Busy {
+		t.Fatalf("independent start was blocked: %+v", s)
+	}
+	if _, err = d.Set("memory", false); err == nil {
+		t.Fatal("conflicting operation on the same module accepted")
+	}
+	count := 0
+	for _, call := range f.trace() {
+		if call == "start:orchestrator" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("shared dependency started %d times", count)
+	}
+
 }
 func TestOwnershipJournalSurvivesDaemonRestartWithoutStartingAnything(t *testing.T) {
 	d, f := fresh()
@@ -280,6 +302,33 @@ func TestAContainerThatCrashesOnItsOwnIsAFailure(t *testing.T) {
 	f.mu.Unlock()
 	if row(d.List(context.Background()), "book").State != "failed" {
 		t.Fatal("a crash the controller did not cause must show as failed")
+	}
+}
+
+func TestStopWaitsForStartsAndPreservesTheirDependencies(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "book", true)
+	f.gate = make(chan struct{})
+	f.gateAt = "embedding_init"
+	d.Set("memory", true)
+	deadline := time.Now().Add(time.Second)
+	for row(d.List(context.Background()), "memory").Progress != "readiness:embedding_init" {
+		if time.Now().After(deadline) {
+			close(f.gate)
+			t.Fatal("start did not reach initializer")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	d.Set("book", false)
+	close(f.gate)
+	s := settle(t, d)
+	if row(s, "memory").State != "ready" || row(s, "book").State != "stopped" {
+		t.Fatal(s)
+	}
+	for _, call := range f.trace() {
+		if call == "stop:orchestrator" {
+			t.Fatal("shared dependency stopped")
+		}
 	}
 }
 

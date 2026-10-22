@@ -3,4 +3,4 @@ export const RUNTIME_MODULES = ["orchestrator", "memory", "knowledge", "meme", "
 export const DELIVERY_MODULES: readonly string[] = ["discord", "scheduler"];
 export type RuntimeModule = (typeof RUNTIME_MODULES)[number];
 export type RuntimeState = "starting" | "ready" | "running" | "stopping" | "stopped" | "failed";
-export type RuntimeSnapshot = { modules: { name: RuntimeModule; state: RuntimeState; error: string; dependencies: string[] }[]; busy: boolean; error: string };
+export type RuntimeSnapshot = { modules: { name: RuntimeModule; state: RuntimeState; error: string; dependencies: string[]; progress?: string }[]; busy: boolean; error: string };

@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -160,4 +162,43 @@ func wholeNumber(payload map[string]any, name string, fallback, low, high int) (
 		return high, nil
 	}
 	return int(value), nil
+}
+
+// Reference resolves a selected cached reading by identity. The caller supplies no article
+// text: the domain takes it from the same feeds cache used to build the reading list.
+type Reference struct {
+	ID      string
+	Title   string
+	Summary string
+	Source  string
+}
+
+func (d *Domain) Reference(ctx context.Context, id string) (Reference, error) {
+	if strings.TrimSpace(id) == "" || len(id) > 512 {
+		return Reference{}, fmt.Errorf("reading id is required and must be at most 512 bytes")
+	}
+	if d == nil || d.service == nil {
+		return Reference{}, fmt.Errorf("reading sources are not configured")
+	}
+	reply, err := d.service.Dispatch(ctx, "feeds.items", nil)
+	if err != nil {
+		return Reference{}, err
+	}
+	items, err := itemsFrom(reply)
+	if err != nil {
+		return Reference{}, err
+	}
+	for _, item := range items {
+		if item.id != id {
+			continue
+		}
+		bound := func(s string, n int) string {
+			if utf8.RuneCountInString(s) > n {
+				return string([]rune(s)[:n])
+			}
+			return s
+		}
+		return Reference{ID: id, Title: bound(item.title, 300), Summary: bound(item.summary, 6000), Source: bound(item.source, 100)}, nil
+	}
+	return Reference{}, fmt.Errorf("selected reading is no longer available; refresh the reading list")
 }
