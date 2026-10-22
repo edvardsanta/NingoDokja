@@ -532,7 +532,10 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		return nil, fmt.Errorf("nothing sent: %s is switched off", strings.Join(switchedOff, ","))
 	}
 	targets = live
-	content, attempt := h.appendLearnedHashtag(ctx, event, content, attachmentURL)
+	var attempt *HashtagAttempt
+	if skip, _ := event.Payload["skip_hashtag"].(bool); !skip {
+		content, attempt = h.appendLearnedHashtag(ctx, event, content, attachmentURL)
+	}
 
 	// The safe-only rule applies here too. Only an explicit TUI --force bypasses it;
 	// otherwise a failed server-side screen counts as unsafe.

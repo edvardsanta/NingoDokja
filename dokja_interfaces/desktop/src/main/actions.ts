@@ -440,6 +440,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       const content = text(raw.content).trim();
       const attachment = text(raw.attachment_url);
       const force = raw.force_nsfw === true;
+      const skipHashtag = raw.skip_hashtag === true;
       const channel = text(raw.channel_id);
       // A WhatsApp conversation takes text only: it goes out as the owner's own account.
       if (/^whatsapp:[a-z0-9][a-z0-9_-]{0,31}$/.test(channel)) {
@@ -448,7 +449,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       }
       if (!/^[0-9]{1,20}$/.test(channel) || content.length > 2000 || (!content && !attachment)) return undefined;
       if (attachment && (!/^https?:\/\//.test(attachment) || attachment.length > 2048)) return undefined;
-      return { channel_ids: [raw.channel_id], content, ...(attachment ? { attachment_url: attachment } : {}), ...(force ? { force_nsfw: true } : {}) };
+      return { channel_ids: [raw.channel_id], content, ...(attachment ? { attachment_url: attachment } : {}), ...(force ? { force_nsfw: true } : {}), ...(skipHashtag ? { skip_hashtag: true } : {}) };
     },
     project: (result) => inDomain(result, "system", (body) => ({
       sent: words(body.sent_to).length === 1, skipped: words(body.skipped_unsafe).length > 0,

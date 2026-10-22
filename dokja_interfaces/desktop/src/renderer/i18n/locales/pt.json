@@ -97,6 +97,7 @@
   "memes_previous": "Memes anteriores",
   "memes_next": "Próximos memes",
   "communications_force_send": "Forçar envio (ignorar triagem de mídia)",
+  "communications_skip_hashtag": "Enviar sem hashtag",
   "memes_tag": "Hashtag do meme",
   "memes_create_tag": "Criar tag",
   "memes_tagged_ready": "Criada {tag}; clique em Enviar para publicar no Discord.",
