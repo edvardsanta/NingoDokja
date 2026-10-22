@@ -148,7 +148,8 @@
         "ADR 0005 was withdrawn from accepted status and remains proposed. The follow-up research separates semantic, inference, runtime, and package dependencies; compares two compatible cycle owners; and distinguishes pre-action simulation from post-action observed learning using six primary/official sources.",
         "ADR 0006 records the owner's decision that reading is one macro-component grown from Feeds, Knowledge stores content with provenance, Experience records the reading episode, and Book is not a service Extraction is the middle ground: Reading acquires and extracts into Knowledge's Extracted contract, Knowledge owns that contract plus chunking, embedding, storage and retrieval.",
         "ADR 0007 records the owner's confirmation that macro-components are faculties (Reading, Knowledge, Experience, Prediction, Moderation, Attention, Language, Action, Coordination) and that Book, Meme and Digest are workflows over them; workflow recipes sequence and configure, faculty domains decide.",
-        "ADR 0007 resolves its questions with the owner: Moderation (admissibility) and Attention (priority) are separate faculties; the meme pool is a reading cache; workflows go from feature handlers to typed Go workflows to versioned recipes, with recipes as an outcome of migration."
+        "ADR 0007 resolves its questions with the owner: Moderation (admissibility) and Attention (priority) are separate faculties; the meme pool is a reading cache; workflows go from feature handlers to typed Go workflows to versioned recipes, with recipes as an outcome of migration.",
+        "Owner reopened cognitive allocation as a hypothesis on 2026-10-21. ADR 0005 preserves the historical prototype decision and adds a causal follow-up review proposal; see step 10.2. No final capability/deployment boundary is inferred."
       ],
       "checks": [
         {
@@ -538,7 +539,7 @@
         "Chat domain ownership migration",
         "Focused delivery and administration workflows",
         "Generic knowledge consolidation and summary flow; Book runtime retirement scope still to resolve",
-        "Meme and Digest expressed as workflows over faculties behind meme.* and digest.* facades (ADR 0007)",
+        "Meme and Digest expressed as workflows over the four concepts behind meme.* and digest.* facades (ADR 0007, ADR 0010)",
         "dokja_domain/dokja_knowledge/classification.go",
         "dokja_domain/dokja_knowledge/classification_test.go",
         "dokja_docs/step-09-consolidation.md"
@@ -550,7 +551,7 @@
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
         "The generic flow covers existing Book uses before the approved CLI book removal; remaining book.* route/domain/service retirement scope is resolved explicitly under ADR 0008.",
-        "Meme scrapers and OCR run as reading plugins with the pool as a reading cache, screening sits under Moderation, digest ordering and the hashtag relevance threshold under Attention, and sent receipts are experience, with existing commands and triggers passing their baseline tests.",
+        "Meme scrapers and OCR run as Feeds plugins (Knowledge intake) with the pool as an intake cache, screening, digest ordering and the hashtag relevance threshold sit under Rules, and sent receipts are Memory (ADR 0010, proposed), with existing commands and triggers passing their baseline tests.",
         "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that.",
         "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06).",
         "New workflows meet the step 08 budgets: workspace overhead at most 1 ms p95 per task; shadow prediction at most 1 s on a delivery path; on-demand reading within the plugin's manifest timeout, at most 2 minutes."
@@ -717,7 +718,7 @@
         },
         {
           "id": "09.4",
-          "title": "Migrate Meme, Digest, delivery and conversation responsibilities to faculties",
+          "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
           "status": "pending",
           "evidence": [],
           "checks": []
@@ -769,7 +770,117 @@
         "recommendation_status": "proposed",
         "benchmarks": "not_run",
         "next_action": "Define the first graph consumer and scope/durability requirements, then run an isolated correctness-first comparison. Step 10 implementation remains pending."
-      }
+      },
+      "substeps": [
+        {
+          "id": "10.1",
+          "title": "Evaluate bounded multi-hop graph traversal before choosing a storage engine",
+          "status": "pending",
+          "deliverables": [
+            "Consumer and query contracts for W2 (claim evidence/dependencies) and W4 (method/procedure/episode/outcome)",
+            "Deterministic graph fixtures, independent expected results and adapters for SQLite, PostgreSQL and Neo4j",
+            "Recorded correctness, latency and resource measurements for bounded 1/3/6-hop traversal"
+          ],
+          "acceptance_criteria": [
+            "Define the intended consumer, edge types/directions, version and scope eligibility, depth/result/time limits before running the comparison; W2 is the proposed first workload, W4 follows when its consumer is defined.",
+            "W2 preserves supporting and contradicting evidence and reports dependency paths; W4 preserves the method -> procedure -> episode -> observed outcome chain without treating predictions as observed outcomes.",
+            "Exercise cycles, high-degree nodes, conflicting assertions, superseded/deleted records and cross-scope paths against independent expected results; reachability alone must not be presented as factual support or proof.",
+            "Compare the same fixtures on SQLite, PostgreSQL and Neo4j at 1/3/6 hops, reporting p50/p95/p99, bounded-result correctness and resource use, with dataset sizes, cache conditions and concurrency stated explicitly.",
+            "Keep W1 filtered-retrieval results separate from multi-hop evidence; record unrun cases and limitations before proposing any engine adoption or migration."
+          ],
+          "evidence": [
+            "Owner requested tracking the multi-hop evaluation for later; no implementation, benchmark run or engine selection is authorized by this scheduling entry.",
+            "Resumed at owner request in .worktrees/knowledge-memory-action: isolated W2 contract, reference traversal and independent expected paths implemented; see dokja_docs/step-10-multihop.md. No engine adapter or multi-hop benchmark has run.",
+            "The separate causal vertical experiment is recorded in step 10.2. Its PostgreSQL key-following queries do not complete the W2/W4 three-engine traversal benchmark."
+          ],
+          "checks": [
+            {
+              "name": "reference_correctness",
+              "status": "passed",
+              "detail": "go test -race ./multihop and go vet ./multihop; independent 1/3/6-hop paths, high-degree budget, cycles, conflicts, eligibility and cancellation."
+            }
+          ],
+          "blockers": [],
+          "references": [
+            "dokja_docs/cognitive-storage-research.md#queries-that-should-drive-the-decision",
+            "dokja_docs/cognitive-storage-research.md#reproducible-comparison-plan"
+          ],
+          "next_action": "Implement storage adapters against the W2 path contract, verify identical results, then measure 1/3/6 hops. W4 remains a separate pending contract."
+        },
+        {
+          "id": "10.2",
+          "title": "Evaluate a causal knowledge-experience-prediction-action cycle",
+          "status": "completed",
+          "completed_on": "2026-10-21",
+          "deliverables": [
+            "dokja_docs/cognitive-cycle-experiment.md",
+            "dokja_store/spikes/cognitive_storage/cognitive",
+            "dokja_store/spikes/cognitive_storage/cmd/cognitivebench",
+            "ADR 0005 review proposal"
+          ],
+          "acceptance_criteria": [
+            "At least two dependent information hops with versioned provenance and an observable prediction-driven evidence request.",
+            "Evidence interventions change subsequent retrieval or the decision, with safe authorization and explicit stopping outcomes.",
+            "An observed simulated result is recorded and changes a subsequent decision; removing memory removes that effect.",
+            "Compare single retrieval, fixed bounded traversal and state-directed iteration, reporting measured limits and avoiding production-readiness claims."
+          ],
+          "evidence": [
+            "PostgreSQL 17.11 and pgvector 0.8.7 exercised in disposable infrastructure with connection-local tables; no application data or deployment changed.",
+            "Four-node synthetic scenario needs three hops. Missing, negative, conflicting, foreign and superseded evidence alter continuation. First simulated parse fails; its recorded episode selects normalization in the next task; no-memory control repeats failure.",
+            "100 repetitions per condition: single/bounded2 abstain, bounded3/iterative retrieve all evidence but fast computation fails, iterative with memory computes successfully. Fixed-depth three uses fewer prediction calls; iterative superiority is not demonstrated.",
+            "Hypothetical predictions, observed simulation outcomes, evidence versions and state revisions remain distinct. General capability allocation and production storage adoption remain open."
+          ],
+          "checks": [
+            {
+              "name": "storage_spike_suite",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./...; cognitive PostgreSQL enabled, old W1 PostgreSQL/Neo4j integration not enabled; W1 SQLite ran."
+            },
+            {
+              "name": "existing_reference_loop",
+              "status": "passed",
+              "detail": "go test ./internal/experiments/cognitiveloop in dokja_orch."
+            },
+            {
+              "name": "causal_mutations",
+              "status": "passed",
+              "detail": "Removing episode use or contrary-premise rejection fails the respective regression test; mutations restored."
+            }
+          ],
+          "limitations": [
+            "Synthetic rule-based policy and three-dimensional vectors; no LLM calibration or generalization measurement.",
+            "Memory survives tasks within the experiment connection, not restart; no durable production execution.",
+            "W2/W4 scalable traversal, Neo4j comparison, CPU/RSS, concurrency and real-world decision quality remain pending."
+          ]
+        },
+        {
+          "id": "10.3",
+          "title": "Integrate domain inference contracts with interchangeable infrastructure providers",
+          "status": "pending",
+          "depends_on": [
+            "10.2"
+          ],
+          "deliverables": [
+            "Domain-owned typed inference contract and validation",
+            "Infrastructure adapters for Codex, Claude Code and Ollama, reusing classifier isolation where appropriate",
+            "Cognitive orchestration transitions for inference, retrieval, memory, revision and bounded continuation"
+          ],
+          "acceptance_criteria": [
+            "Dokja owns task state and the decision to invoke models, retrieve memory or execute another hop; domains define semantic contracts and preconditions.",
+            "Provider replacement preserves contracts, scope, authorization, state ownership and cumulative task budgets; unsupported capabilities are explicit.",
+            "Trace every answering provider/model and consumed evidence/state revision; stale, malformed, unavailable and late results cannot silently mutate task state.",
+            "Provider inference cannot directly write memory, control the workflow or execute external actions.",
+            "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration."
+          ],
+          "evidence": [
+            "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration."
+          ],
+          "checks": [],
+          "references": [
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+          ]
+        }
+      ]
     },
     {
       "id": "11",
