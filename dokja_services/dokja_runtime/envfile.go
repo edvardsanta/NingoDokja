@@ -12,9 +12,9 @@ import (
 	domain "read_books/dokja_domain/dokja_runtime"
 )
 
-// EnvFile keeps the stack's settings in the owner's .env, the file Compose reads, so a stack
-// started by hand sees the same values. Only the settings' own lines change: every other line,
-// comment and credential is left byte for byte, and only setting variables are ever parsed.
+// EnvFile reads the legacy configuration for import and webhook channel labels.
+// Write supports the previous file backend; the database-backed controller never
+// uses it to apply settings. Only catalogued variables are parsed.
 type EnvFile struct {
 	Path string
 }
@@ -72,6 +72,9 @@ func (e EnvFile) Read() (map[string]string, []string, error) {
 			continue
 		}
 		values[match[2]] = unquote(match[3])
+	}
+	if scanner.Err() != nil {
+		return nil, nil, fmt.Errorf("cannot parse the stack legacy configuration")
 	}
 	return values, webhooks, nil
 }

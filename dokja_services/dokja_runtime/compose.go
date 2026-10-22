@@ -27,6 +27,7 @@ import (
 
 type Runner func(context.Context, ...string) ([]byte, error)
 type Compose struct {
+	Environment  func([]string) ([]string, error)
 	Run          Runner
 	Inspect      Runner
 	Poll         time.Duration
@@ -45,6 +46,13 @@ func New(root string) *Compose {
 		cmd := exec.CommandContext(ctx, "docker", args...)
 		cmd.Dir = root
 		cmd.Env = engineEnvironment(os.Environ())
+		if len(args) > 0 && args[0] == "compose" && c.Environment != nil {
+			values, err := c.Environment(cmd.Env)
+			if err != nil {
+				return nil, err
+			}
+			cmd.Env = values
+		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		cmd.Cancel = func() error {
 			if cmd.Process != nil {

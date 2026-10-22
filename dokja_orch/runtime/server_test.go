@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	service "read_books/dokja_services/dokja_runtime"
 	"sync"
 	"testing"
 	"time"
@@ -135,5 +138,85 @@ func TestSettingsAreRoutedAndRefusedValuesAnswerAnError(t *testing.T) {
 		if ask("runtime.settings.set", payload)["status"] != "error" {
 			t.Fatalf("%v must be refused (this stack has no settings store)", payload)
 		}
+	}
+}
+
+func TestDatabaseSettingsAreSharedByEveryInterfaceAndSurviveRestart(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DOKJA_DB_FILE", "")
+	t.Setenv("DISCORD_DM_POLICY", "open")
+	envPath := filepath.Join(root, ".env")
+	legacy := "DISCORD_DM_POLICY=open\nDISCORD_BOT_TOKEN=fixture-token\n"
+	if err := os.WriteFile(envPath, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := service.OpenDatabaseSettings(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { settings.Close() }()
+	backend := &fake{}
+	d := domain.New(backend, domain.Journal{}, nil).WithSettings(settings)
+	handler := Handler(d, "fixture")
+	ask := func(source, kind string, payload map[string]any) domain.SettingsView {
+		t.Helper()
+		raw, _ := json.Marshal(Event{Source: source, Type: kind, Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply struct {
+			Status string `json:"status"`
+			Error  string `json:"error"`
+			Result struct {
+				Result domain.SettingsView `json:"result"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" {
+			t.Fatal(w.Body.String(), err)
+		}
+		if bytes.Contains(w.Body.Bytes(), []byte("fixture-token")) {
+			t.Fatal("secret exposed")
+		}
+		return reply.Result.Result
+	}
+	ask("cli", "runtime.settings.set", map[string]any{"values": map[string]string{"discord.direct_messages": "closed"}})
+	deadline := time.Now().Add(time.Second)
+	for d.Settings().Busy {
+		if time.Now().After(deadline) {
+			t.Fatal("settings did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := d.Settings().Error; err != "" {
+		t.Fatal(err)
+	}
+	// Restart the persistence adapter and router, keeping the same database file.
+	if err := settings.Close(); err != nil {
+		t.Fatal(err)
+	}
+	settings, err = service.OpenDatabaseSettings(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = domain.New(backend, domain.Journal{}, nil).WithSettings(settings)
+	handler = Handler(d, "fixture")
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		view := ask(source, "runtime.settings", nil)
+		found := false
+		for _, row := range view.Settings {
+			if row.ID == "discord.direct_messages" {
+				found = row.Value == "closed"
+			}
+		}
+		if !found || view.Error != "" {
+			t.Fatal(source, view)
+		}
+	}
+	if raw, _ := os.ReadFile(envPath); string(raw) != legacy {
+		t.Fatal("legacy configuration changed")
+	}
+	if backend.starts != 0 {
+		t.Fatal("settings started stopped modules")
 	}
 }
