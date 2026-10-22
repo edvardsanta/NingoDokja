@@ -196,3 +196,14 @@ test("an interface with a problem makes the name unwell", () => {
 
   assert.equal(pulseOf({ phase: "ready", data: health }), "unwell");
 });
+
+test("the scheduler notice names the enabled jobs and what they do", async () => {
+  const { deliveryNotice } = await import("../src/renderer/cards/health.js");
+  const t = ((id: string, values?: Record<string, string>) => `${id}:${values ? Object.values(values).join(",") : ""}`) as never;
+  const health = { rows: [{ name: "scheduler", enabled: true }], interfaces: [{ name: "discord", enabled: false }], counts: {}, jobs: [
+    { name: "meme.dispatch", enabled: true, interval: "2h0m0s" }, { name: "meme.refresh", enabled: false, interval: "45m0s" }] } as never;
+  const lines = deliveryNotice("scheduler", health, t);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0] ?? "", /^delivery_job_posts:meme.dispatch,/);
+  assert.deepEqual(deliveryNotice("discord", health, t), ["delivery_discord_voice:", "delivery_discord_switch_off:"]);
+});

@@ -1293,6 +1293,11 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		switch {
 		case ok && row.isModule && m.modules != nil && m.modules.Busy:
 			m.setNotice(tr("modules_busy"), true)
+		case ok && row.isModule && !row.enabled && cli.DeliveryModules[row.name]:
+			// Discord answers and the scheduler posts once running: say what will happen first.
+			action := m.moduleToggle(row)
+			action.lines = m.deliveryLines(row.name)
+			m.askConfirm(action)
 		case ok && row.isModule:
 			return m, m.exec(m.moduleToggle(row))
 		case ok:
@@ -1399,6 +1404,53 @@ func (m *Model) moduleToggle(row panelRow) *pendingAction {
 		},
 		reload: true,
 	}
+}
+
+// deliveryLines says what starting discord or the scheduler will do with the switches and jobs
+// already saved. Nothing is changed on the way.
+func (m *Model) deliveryLines(module string) []string {
+	lines := []string{tr("start_module", module), ""}
+	if m.status == nil {
+		return append(lines, tr("delivery_status_unknown"))
+	}
+	on := func(name string) bool {
+		row, ok := m.status.service(name)
+		return !ok || row.Enabled
+	}
+	switch module {
+	case "discord":
+		lines = append(lines, tr("delivery_discord_voice"))
+		if on("discord") {
+			return append(lines, tr("delivery_discord_answers"))
+		}
+		return append(lines, tr("delivery_discord_switch_off"))
+	case "scheduler":
+		if !on("scheduler") {
+			return append(lines, tr("delivery_scheduler_switch_off"))
+		}
+		running := 0
+		for _, job := range m.status.Jobs {
+			if !job.Enabled {
+				continue
+			}
+			running++
+			line := tr("delivery_job_every", job.Name, job.Interval)
+			if !job.NextAt.IsZero() {
+				line += tr("delivery_job_next", clock(job.NextAt, m.now()))
+			}
+			switch job.Name {
+			case "meme.dispatch":
+				line += tr("delivery_job_posts_memes", len(m.status.Channels.Meme))
+			case "meme.refresh":
+				line += tr("delivery_job_refreshes")
+			}
+			lines = append(lines, line)
+		}
+		if running == 0 {
+			lines = append(lines, tr("delivery_scheduler_all_paused"))
+		}
+	}
+	return lines
 }
 
 // jobServices lists the service each job depends on, to warn before a run that will be refused.

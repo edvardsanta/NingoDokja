@@ -298,5 +298,17 @@
   "runtime_routing_named": "Processar solicitações de {name}",
   "runtime_routing_hint": "Esta opção pausa as solicitações e mantém o módulo funcionando.",
   "runtime_activity_unavailable": "Atividade e tarefas agendadas estarão disponíveis quando o orquestrador responder.",
-  "runtime_automation": "Automação"
+  "runtime_automation": "Automação",
+  "runtime_confirm_title": "Ligar {name}?",
+  "runtime_confirm_start": "Ligar",
+  "runtime_confirm_cancel": "Cancelar",
+  "delivery_status_unknown": "Estado do orquestrador desconhecido: ligar segue os switches e jobs já salvos.",
+  "delivery_discord_voice": "A voz liga junto; o Discord precisa dela.",
+  "delivery_discord_answers": "O bot fica online, responde menções e comandos no Discord e recebe as entregas do Ningo.",
+  "delivery_discord_switch_off": "O switch discord está desligado: o bot fica online mas não responde nem recebe entregas.",
+  "delivery_scheduler_switch_off": "O switch scheduler está desligado: nenhum job agendado roda até ele ser ligado.",
+  "delivery_scheduler_all_paused": "Todos os jobs agendados estão pausados: nada roda até um ser retomado.",
+  "delivery_job_posts": "{name} roda a cada {interval} e posta memes nos canais de memes do Discord.",
+  "delivery_job_refreshes": "{name} roda a cada {interval} e atualiza o pool de memes; não posta nada.",
+  "delivery_job_runs": "{name} roda a cada {interval}."
 }

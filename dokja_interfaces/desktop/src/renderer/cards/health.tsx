@@ -116,7 +116,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
 
   if (runtimeEnabled) {
     const health = state.phase === "ready" ? state.data : undefined;
-    return <RuntimeCard transport={transport} onChanged={refresh} moduleDetails={(name) => {
+    return <RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
@@ -456,4 +456,18 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
       </form>
     </li>
   );
+}
+
+// What starting discord or the scheduler will do with the switches and jobs already saved.
+export function deliveryNotice(name: string, health: Health, t: ReturnType<typeof useTranslate>): string[] {
+  const on = (service: string) => [...health.rows, ...health.interfaces].find((row) => row.name === service)?.enabled !== false;
+  if (name === "discord") {
+    return [t("delivery_discord_voice"), t(on("discord") ? "delivery_discord_answers" : "delivery_discord_switch_off")];
+  }
+  if (name !== "scheduler") return [];
+  if (!on("scheduler")) return [t("delivery_scheduler_switch_off")];
+  const lines = health.jobs.filter((job) => job.enabled).map((job) =>
+    t(job.name === "meme.dispatch" ? "delivery_job_posts" : job.name === "meme.refresh" ? "delivery_job_refreshes" : "delivery_job_runs",
+      { name: job.name, interval: formatInterval(job.interval) }));
+  return lines.length > 0 ? lines : [t("delivery_scheduler_all_paused")];
 }
