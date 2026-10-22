@@ -97,7 +97,6 @@
   "memes_previous": "Previous memes",
   "memes_next": "Next memes",
   "communications_force_send": "Force send (bypass media screening)",
-  "communications_skip_hashtag": "Send without hashtag",
   "memes_tag": "Meme hashtag",
   "memes_create_tag": "Create tag",
   "memes_tagged_ready": "Created {tag}; click Send to post it to Discord.",

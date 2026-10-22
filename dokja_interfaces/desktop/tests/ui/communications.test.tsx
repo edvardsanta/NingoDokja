@@ -125,7 +125,7 @@ describe("communications", () => {
     fireEvent.click(attachButton());
     fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
     await screen.findByText("Message sent.");
-    expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png" });
+    expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png", skip_hashtag: true });
   });
   it("offers existing meme tags as suggestions when tagging a meme", async () => {
     const memePage = { total: 1, offset: 0, memes: [

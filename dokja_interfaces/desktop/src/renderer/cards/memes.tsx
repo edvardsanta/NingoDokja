@@ -108,7 +108,8 @@ export function MemePicker({
             {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
               <span>{t("memes_tag_suggestions")}</span>
               {suggestions.map((suggestion) => <button key={suggestion} type="button"
-                onClick={() => setHashtag(suggestion)} disabled={tag.state.phase === "loading"}>{suggestion}</button>)}
+                onClick={() => { setHashtag(suggestion); onPrepareTagged(suggestion, meme.url); }}
+                disabled={tag.state.phase === "loading"}>{suggestion}</button>)}
             </div>}
             <button type="button" disabled={tag.state.phase === "loading" || !hashtag.trim()}
               onClick={() => tag.start(undefined)}>
