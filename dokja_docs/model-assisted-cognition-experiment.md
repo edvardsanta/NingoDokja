@@ -2,7 +2,11 @@
 
 Date: 2026-10-22. Step 10.3: in progress. This experiment validates ownership
 boundaries and exposes an unreliable inference policy; it does **not** establish
-successful model-assisted learning or production readiness.
+reliable model-assisted learning or production readiness.
+
+A [follow-up evaluation](model-assisted-cognition-follow-up.md) adds grounded
+schemas and observed diagnostics, demonstrating an individual successful real
+model cycle while retaining open reliability and rationale-quality concerns.
 
 ## Implementation and responsibilities
 
