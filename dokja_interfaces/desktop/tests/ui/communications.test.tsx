@@ -151,6 +151,9 @@ describe("communications", () => {
     expect(screen.getByRole("button", { name: "#cat" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "#reaction" }));
     expect(input.value).toBe("#reaction");
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input.value).toBe("");
+    expect((screen.getByRole("textbox", { name: "Message to send as Ningo" }) as HTMLTextAreaElement).value).toBe("");
   });
   it("fills the composer with the newly created hashtag and meme", async () => {
     const memePage = { total: 1, offset: 0, memes: [

@@ -19,6 +19,7 @@ export function MemePicker({
   onSelect,
   onPage,
   onPrepareTagged,
+  onClearPreparedTag,
 }: {
   transport: Transport;
   memes: readonly MemeItem[];
@@ -28,6 +29,7 @@ export function MemePicker({
   onSelect: (url: string) => void;
   onPage: (offset: number) => void;
   onPrepareTagged: (hashtag: string, url: string) => void;
+  onClearPreparedTag: () => void;
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
@@ -103,7 +105,11 @@ export function MemePicker({
             <label>
               {t("memes_tag")}
               <input list="meme-tag-suggestions" value={hashtag} disabled={tag.state.phase === "loading"}
-                onChange={(event) => setHashtag(event.target.value)} placeholder="#tag" />
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setHashtag(value);
+                  if (!value.trim()) onClearPreparedTag();
+                }} placeholder="#tag" />
             </label>
             {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
               <span>{t("memes_tag_suggestions")}</span>
