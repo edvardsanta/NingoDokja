@@ -6,29 +6,16 @@ import (
 	communications "read_books/dokja_domain/dokja_communications"
 	"read_books/internal/core"
 	"read_books/internal/logger"
-	"strings"
 )
 
 // WhatsAppSender is the WhatsApp interface seen from the desktop's send: the conversations the
 // owner named (by alias) and a way to send text into one of them.
-type WhatsAppSender interface {
-	List(ctx context.Context) ([]communications.Conversation, error)
-	Deliver(ctx context.Context, alias, content string) error
-}
+type WhatsAppSender = communications.ConversationSender
 
 // WithWhatsApp lets communications.send reach the conversations named on the WhatsApp interface.
 func (h *SystemDomainHandler) WithWhatsApp(sender WhatsAppSender) *SystemDomainHandler {
 	h.whatsapp = sender
 	return h
-}
-
-func anyWhatsApp(channels []string) bool {
-	for _, channel := range channels {
-		if strings.HasPrefix(channel, communications.WhatsAppPrefix) {
-			return true
-		}
-	}
-	return false
 }
 
 // handleWhatsAppSend sends text into one named WhatsApp conversation. It is stricter than a Discord
@@ -41,22 +28,11 @@ func (h *SystemDomainHandler) handleWhatsAppSend(
 	workflow core.WorkflowStep,
 	channels []string,
 ) (map[string]any, error) {
-	if event.Type != "communications.send" {
-		return nil, fmt.Errorf("WhatsApp conversations can only be sent to through communications.send")
+	plan, err := communications.ValidateConversationSend(communicationSendRequest(event))
+	if err != nil {
+		return nil, err
 	}
-	if all, _ := event.Payload["all"].(bool); all || len(channels) != 1 {
-		return nil, fmt.Errorf("send to one WhatsApp conversation at a time")
-	}
-	if strings.TrimSpace(resultString(event.Payload, "attachment_url")) != "" {
-		return nil, fmt.Errorf("WhatsApp conversations take text only")
-	}
-	if forced, _ := event.Payload["force_nsfw"].(bool); forced {
-		return nil, fmt.Errorf("force_nsfw does not apply to WhatsApp conversations")
-	}
-	content := strings.TrimSpace(resultString(event.Payload, "content"))
-	if content == "" {
-		return nil, fmt.Errorf("send requires content")
-	}
+	content := plan.Content
 	if h.whatsapp == nil {
 		return nil, fmt.Errorf("the WhatsApp interface is not configured")
 	}
@@ -65,20 +41,13 @@ func (h *SystemDomainHandler) handleWhatsAppSend(
 	}
 
 	channel := channels[0]
-	alias := strings.TrimPrefix(channel, communications.WhatsAppPrefix)
 	listed, err := h.whatsapp.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("the WhatsApp conversations are not available")
 	}
-	named := false
-	for _, conversation := range listed {
-		if conversation.Alias == alias {
-			named = true
-			break
-		}
-	}
-	if !named {
-		return nil, fmt.Errorf("channel %s is not a named WhatsApp conversation", channel)
+	alias, err := communications.NamedConversation(channel, listed)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := h.whatsapp.Deliver(ctx, alias, content); err != nil {

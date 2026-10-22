@@ -1254,3 +1254,14 @@ func TestProfileEventsFailCleanlyWithoutADatabase(t *testing.T) {
 		}
 	}
 }
+
+func TestCommunicationTimeoutDoesNotRetryOrMarkSent(t *testing.T) {
+	deliverer := &channelFailingDeliverer{failChannel: "one", err: context.DeadlineExceeded}
+	marker := &fakeMarker{}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "one").WithMemeTools(&fakeScreener{result: map[string]any{"safe": true}}, marker)
+	event, step := discordSendEvent(map[string]any{"channel_ids": []string{"one"}, "attachment_url": "https://media.example/item.png", "mark_sent": true, "skip_hashtag": true})
+	_, err := handler.Handle(context.Background(), event, step)
+	if !errors.Is(err, context.DeadlineExceeded) || deliverer.attempts["one"] != 1 || len(marker.urls) != 0 {
+		t.Fatal(err, deliverer.attempts, marker.urls)
+	}
+}
