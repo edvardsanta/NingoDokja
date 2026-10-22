@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
 import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -29,6 +29,7 @@ export function MemePicker({
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
+  const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
   const tag = useAction(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
@@ -41,6 +42,15 @@ export function MemePicker({
   });
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
+
+  useEffect(() => {
+    if (!viewer) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setViewer(undefined);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [viewer]);
 
   if (attachable.length === 0) {
     return (
@@ -61,6 +71,7 @@ export function MemePicker({
             attached={selected === meme.url}
             disabled={disabled}
             onToggle={() => onSelect(selected === meme.url ? "" : meme.url)}
+            onOpen={(dataUrl) => setViewer({ dataUrl, title: meme.title || t("memes_untitled") })}
           />
           <p className="meme-title">{meme.title || t("memes_untitled")}</p>
         </li>
@@ -80,15 +91,27 @@ export function MemePicker({
       {tag.state.phase === "ready" && ("off" in tag.state.data ? <span>{tag.state.data.reason}</span> : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}
       {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
     </form>}
+    {viewer && <div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) setViewer(undefined);
+    }}>
+      <section className="media-viewer" role="dialog" aria-modal="true" aria-label={viewer.title}>
+        <button type="button" className="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</button>
+        <Media dataUrl={viewer.dataUrl} label={viewer.title} expanded />
+      </section>
+    </div>}
     </>
   );
 }
 
 // A meme is a picture or a short video; the shell says which by the type of the data it hands back.
 // In the grid a clip is a silent loop, like a GIF.
-function Media({ dataUrl, label }: { dataUrl: string; label: string }) {
-  if (!dataUrl.startsWith("data:video/")) return <img src={dataUrl} alt="" />;
-  return <video src={dataUrl} aria-label={label} autoPlay muted loop playsInline controls preload="auto" onClick={(event) => event.stopPropagation()} />;
+function Media({ dataUrl, label, expanded = false, onOpen }: { dataUrl: string; label: string; expanded?: boolean; onOpen?: (dataUrl: string) => void }) {
+  if (!dataUrl.startsWith("data:video/")) {
+    return <img src={dataUrl} alt="" onClick={(event) => { event.stopPropagation(); onOpen?.(dataUrl); }} />;
+  }
+  return <video className={expanded ? "media-expanded" : undefined} src={dataUrl} aria-label={label}
+    autoPlay={expanded ? undefined : true} muted={!expanded} loop={!expanded} playsInline controls preload="auto"
+    onClick={(event) => { event.stopPropagation(); if (!expanded) onOpen?.(dataUrl); }} />;
 }
 
 function MemeTile({
@@ -97,28 +120,24 @@ function MemeTile({
   attached,
   disabled,
   onToggle,
+  onOpen,
 }: {
   transport: Transport;
   meme: MemeItem;
   attached: boolean;
   disabled: boolean;
   onToggle: () => void;
+  onOpen: (dataUrl: string) => void;
 }) {
   const t = useTranslate();
   const preview = usePreview(transport, meme.url, true);
   const title = meme.title || t("memes_untitled");
-  return (
-    <button
-      type="button"
-      className="preview preview-open"
-      aria-label={t("memes_attach", { title })}
-      aria-pressed={attached}
-      aria-busy={preview.phase === "loading"}
-      disabled={disabled}
-      onClick={onToggle}
-    >
-      {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} />}
+  return <div className="meme-tile">
+    <button type="button" className="preview preview-open" aria-label={t("memes_attach", { title })}
+      aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
+      onClick={onToggle}>
+      {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} onOpen={onOpen} />}
       {preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}
     </button>
-  );
+  </div>;
 }
