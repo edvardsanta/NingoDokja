@@ -1,6 +1,7 @@
 # ADR 0007: macro-components are faculties; features are workflows
 
 Date: 2026-10-18. Status: accepted as the target direction. Migration: pending.
+[ADR 0010](./0010-four-concepts.md) proposes replacing its faculty list with four concepts.
 Generalizes [ADR 0006](./0006-reading-macro-component.md).
 Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 [capability map](../capability-map.md),

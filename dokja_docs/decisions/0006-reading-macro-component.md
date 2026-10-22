@@ -1,5 +1,8 @@
 # ADR 0006: reading is one macro-component; Book is not a service
 
+> [ADR 0010](./0010-four-concepts.md) proposes treating reading as how Knowledge comes
+> in (and an episode Memory keeps), not as a concept of its own.
+
 Date: 2026-10-18. Status: accepted as the target direction. Migration: stage 2 done
 (step `07`, [record](../step-07-reading.md)); stages 3 and 4 pending.
 Supersedes the Book/source half of [ADR 0005](./0005-knowledge-experience-content.md).

@@ -3,9 +3,8 @@ import type { ComponentType } from "react";
 import type { Transport } from "../../shared/transport.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { CommunicationsCard } from "./communications.js";
-import { DigestCard } from "./digest.js";
 import { HealthCard } from "./health.js";
-import { KnowledgeCard } from "./knowledge.js";
+import { KnowledgeWorkspace } from "./knowledge_workspace.js";
 import { MemoryCard } from "./memory.js";
 
 export type CardEntry = {
@@ -23,10 +22,10 @@ export type CardEntry = {
 // Every workspace the screen knows, in the order of the sidebar. Adding one is adding a line here
 // (and its action to the allow-list in src/shared/actions.ts). System holds the switches and is the
 // one that reads the status, so the screen opens on it. Memes have no workspace: they are picked in
-// Messages, where they are sent.
+// Messages, where they are sent. Reading is how knowledge comes in, so the sources it reads are a
+// view of Knowledge rather than a workspace of their own.
 export const CARDS: readonly CardEntry[] = [
-  { kind: "digest", labelId: "kind_digest", Card: DigestCard },
-  { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeCard, services: ["knowledge"] },
+  { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
   { kind: "memory", labelId: "kind_memory", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
   { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },

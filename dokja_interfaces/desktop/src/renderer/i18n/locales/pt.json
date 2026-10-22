@@ -50,6 +50,8 @@
   "memory_beats_baseline": "Skill {skill}: supera o baseline.",
   "memory_does_not_beat": "Skill {skill}: não supera o baseline.",
   "kind_knowledge": "conhecimento",
+  "knowledge_view_documents": "documentos",
+  "knowledge_view_sources": "fontes",
   "knowledge_title": "Base de pesquisa",
   "knowledge_counts": "{documents} documentos em {chunks} trechos",
   "knowledge_empty": "A base de pesquisa está vazia: solte um arquivo em qualquer lugar aqui, ou adicione uma nota ou um endereço abaixo.",

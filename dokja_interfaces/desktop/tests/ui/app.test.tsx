@@ -8,7 +8,7 @@ import pt from "../../src/renderer/i18n/locales/pt.json";
 import type { ActionType } from "../../src/shared/actions.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { TransportResult } from "../../src/shared/transport.js";
-import { ALL_UP, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
+import { ALL_UP, KNOWLEDGE_STATUS, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
 
 const wordmark = () => screen.getByRole("heading", { level: 1 });
 const tabNamed = (name: string) => screen.getByRole("tab", { name });
@@ -34,7 +34,6 @@ describe("the screen", () => {
     expect(wordmark().textContent).toBe("Ningo");
     expect(screen.getByRole("tablist", { name: "Áreas de trabalho" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "leituras",
       "conhecimento",
       "memória",
       "mensagens",
@@ -53,23 +52,39 @@ describe("the screen", () => {
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
   });
 
+  it("keeps a knowledge search while the sources are looked at", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP), { "knowledge.status": ok(KNOWLEDGE_STATUS) });
+    render(<App transport={transport} locale="en" />);
+
+    fireEvent.click(tabNamed("knowledge"));
+    const field = (await screen.findByRole("searchbox")) as HTMLInputElement;
+    fireEvent.change(field, { target: { value: "stoics" } });
+    fireEvent.click(screen.getByRole("button", { name: "sources" }));
+    await screen.findByRole("heading", { name: "Reading digest" });
+    fireEvent.click(screen.getByRole("button", { name: "documents" }));
+
+    expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("stoics");
+    expect(calls.filter((call) => call.type === "knowledge.status")).toHaveLength(1);
+    expect(calls.filter((call) => call.type === "digest.status")).toHaveLength(1);
+  });
+
   it("opens each workspace from the sidebar", async () => {
     const { transport, calls } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="en" />);
 
-    fireEvent.click(tabNamed("digest"));
-    await screen.findByRole("heading", { name: "Reading digest" });
     fireEvent.click(tabNamed("memory"));
     await screen.findByRole("heading", { name: "Experience memory" });
     fireEvent.click(tabNamed("knowledge"));
     await screen.findByRole("heading", { name: "Research base" });
+    fireEvent.click(screen.getByRole("button", { name: "sources" }));
+    await screen.findByRole("heading", { name: "Reading digest" });
 
     await waitFor(() =>
       expect(calls.map((call) => call.type)).toEqual([
         "ningo.status",
-        "digest.status",
         "memory.status",
         "knowledge.status",
+        "digest.status",
       ]),
     );
   });

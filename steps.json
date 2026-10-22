@@ -538,7 +538,7 @@
         "Chat domain ownership migration",
         "Focused delivery and administration workflows",
         "Generic knowledge consolidation and summary flow; Book runtime retirement scope still to resolve",
-        "Meme and Digest expressed as workflows over faculties behind meme.* and digest.* facades (ADR 0007)",
+        "Meme and Digest expressed as workflows over the four concepts behind meme.* and digest.* facades (ADR 0007, ADR 0010)",
         "dokja_domain/dokja_knowledge/classification.go",
         "dokja_domain/dokja_knowledge/classification_test.go",
         "dokja_docs/step-09-consolidation.md"
@@ -550,7 +550,7 @@
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
         "The generic flow covers existing Book uses before the approved CLI book removal; remaining book.* route/domain/service retirement scope is resolved explicitly under ADR 0008.",
-        "Meme scrapers and OCR run as reading plugins with the pool as a reading cache, screening sits under Moderation, digest ordering and the hashtag relevance threshold under Attention, and sent receipts are experience, with existing commands and triggers passing their baseline tests.",
+        "Meme scrapers and OCR run as Feeds plugins (Knowledge intake) with the pool as an intake cache, screening, digest ordering and the hashtag relevance threshold sit under Rules, and sent receipts are Memory (ADR 0010, proposed), with existing commands and triggers passing their baseline tests.",
         "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that.",
         "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06).",
         "New workflows meet the step 08 budgets: workspace overhead at most 1 ms p95 per task; shadow prediction at most 1 s on a delivery path; on-demand reading within the plugin's manifest timeout, at most 2 minutes."
@@ -717,7 +717,7 @@
         },
         {
           "id": "09.4",
-          "title": "Migrate Meme, Digest, delivery and conversation responsibilities to faculties",
+          "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
           "status": "pending",
           "evidence": [],
           "checks": []
