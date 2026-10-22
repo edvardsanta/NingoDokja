@@ -44,9 +44,13 @@ export function MemePicker({
     const value = text(answer.result.hashtag);
     if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
     onPrepareTagged(value, selectedMeme.url);
+    setHashtag("");
     return { ok: true, data: { hashtag: value } };
   }, [hashtag, onPrepareTagged, selectedMeme, transport]);
   const tag = useAction(createTag);
+  useEffect(() => {
+    setHashtag("");
+  }, [selected]);
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
 
