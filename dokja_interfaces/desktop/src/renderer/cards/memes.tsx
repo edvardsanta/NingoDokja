@@ -74,16 +74,14 @@ export function MemePicker({
             onOpen={(dataUrl) => setViewer({ dataUrl, title: meme.title || t("memes_untitled") })}
           />
           <p className="meme-title">{meme.title || t("memes_untitled")}</p>
-          {selected === meme.url && <form className="meme-tag-form" onSubmit={(event) => {
-            event.preventDefault();
-            if (tag.state.phase !== "loading") tag.start(undefined);
-          }}>
+          {selected === meme.url && <div className="meme-tag-form">
             <label>
               {t("memes_tag")}
               <input value={hashtag} disabled={tag.state.phase === "loading"}
                 onChange={(event) => setHashtag(event.target.value)} placeholder="#tag" />
             </label>
-            <button type="submit" disabled={tag.state.phase === "loading" || !hashtag.trim()}>
+            <button type="button" disabled={tag.state.phase === "loading" || !hashtag.trim()}
+              onClick={() => tag.start(undefined)}>
               {t("memes_create_tag")}
             </button>
             {tag.state.phase === "loading" && <span role="status">{t("memes_creating_tag")}</span>}
@@ -91,7 +89,7 @@ export function MemePicker({
               ? <span>{tag.state.data.reason}</span>
               : <span>{t("memes_tagged", { tag: tag.state.data.hashtag })}</span>)}
             {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
-          </form>}
+          </div>}
         </li>
       ))}
     </ul>
