@@ -184,8 +184,45 @@ func (c *RuntimeClient) Request(ctx context.Context, eventType string, payload m
 	if eventType != "runtime.modules" && eventType != "runtime.set" {
 		return RuntimeSnapshot{}, fmt.Errorf("unsupported runtime action %q", eventType)
 	}
-	if err := c.ensure(ctx); err != nil {
+	var snapshot *RuntimeSnapshot
+	if err := c.call(ctx, eventType, payload, &snapshot); err != nil {
 		return RuntimeSnapshot{}, err
+	}
+	if snapshot == nil {
+		return RuntimeSnapshot{}, errors.New("the local runtime controller returned no modules")
+	}
+	return *snapshot, nil
+}
+
+// Settings reads the stack's settings the interfaces may change.
+func (c *RuntimeClient) Settings(ctx context.Context) (SettingsView, error) {
+	return c.settingsCall(ctx, "runtime.settings", nil)
+}
+
+// SetSettings changes settings by id; the controller recreates the modules that read them.
+func (c *RuntimeClient) SetSettings(ctx context.Context, values map[string]string) (SettingsView, error) {
+	payload := map[string]any{}
+	for id, value := range values {
+		payload[id] = value
+	}
+	return c.settingsCall(ctx, "runtime.settings.set", map[string]any{"values": payload})
+}
+
+func (c *RuntimeClient) settingsCall(ctx context.Context, eventType string, payload map[string]any) (SettingsView, error) {
+	var view *SettingsView
+	if err := c.call(ctx, eventType, payload, &view); err != nil {
+		return SettingsView{}, err
+	}
+	if view == nil {
+		return SettingsView{}, errors.New("the local runtime controller returned no settings")
+	}
+	return *view, nil
+}
+
+// call sends one request to the controller and decodes its result into out.
+func (c *RuntimeClient) call(ctx context.Context, eventType string, payload map[string]any, out any) error {
+	if err := c.ensure(ctx); err != nil {
+		return err
 	}
 	if payload == nil {
 		payload = map[string]any{}
@@ -196,7 +233,7 @@ func (c *RuntimeClient) Request(ctx context.Context, eventType string, payload m
 	})
 	body, err := json.Marshal(event)
 	if err != nil {
-		return RuntimeSnapshot{}, err
+		return err
 	}
 	client := http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		var dialer net.Dialer
@@ -204,12 +241,12 @@ func (c *RuntimeClient) Request(ctx context.Context, eventType string, payload m
 	}}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://runtime/request", bytes.NewReader(body))
 	if err != nil {
-		return RuntimeSnapshot{}, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return RuntimeSnapshot{}, fmt.Errorf("the local runtime controller is unavailable: %w", err)
+		return fmt.Errorf("the local runtime controller is unavailable: %w", err)
 	}
 	defer resp.Body.Close()
 	var reply struct {
@@ -218,17 +255,50 @@ func (c *RuntimeClient) Request(ctx context.Context, eventType string, payload m
 		Status    string `json:"status"`
 		Error     string `json:"error"`
 		Result    struct {
-			Result *RuntimeSnapshot `json:"result"`
+			Result json.RawMessage `json:"result"`
 		} `json:"result"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 65536)).Decode(&reply); err != nil || reply.Version != 1 || reply.ProjectID != RuntimeProjectID(c.Root) {
-		return RuntimeSnapshot{}, errors.New("the local runtime controller returned an incompatible response")
+		return errors.New("the local runtime controller returned an incompatible response")
 	}
 	if reply.Status != "ok" {
-		return RuntimeSnapshot{}, errors.New(reply.Error)
+		return errors.New(reply.Error)
 	}
-	if reply.Result.Result == nil {
-		return RuntimeSnapshot{}, errors.New("the local runtime controller returned no modules")
+	if len(reply.Result.Result) == 0 {
+		return nil
 	}
-	return *reply.Result.Result, nil
+	if err := json.Unmarshal(reply.Result.Result, out); err != nil {
+		return errors.New("the local runtime controller returned an incompatible response")
+	}
+	return nil
+}
+
+// SettingRow is one setting as the controller describes it. Affects names the modules recreated
+// when it changes; Note names a consequence to mention (sessions, reindex).
+type SettingRow struct {
+	ID      string   `json:"id"`
+	Group   string   `json:"group"`
+	Env     string   `json:"env"`
+	Kind    string   `json:"kind"`
+	Options []string `json:"options,omitempty"`
+	Value   string   `json:"value"`
+	Affects []string `json:"affects"`
+	Note    string   `json:"note,omitempty"`
+}
+
+type SettingsView struct {
+	Settings []SettingRow `json:"settings"`
+	// WebhookChannels are the channel ids that deliver through a webhook rather than the bot.
+	WebhookChannels []string `json:"webhook_channels"`
+	Busy            bool     `json:"busy"`
+	Error           string   `json:"error,omitempty"`
+}
+
+func (v SettingsView) Lookup(id string) (SettingRow, bool) {
+	for _, row := range v.Settings {
+		if row.ID == id {
+			return row, true
+		}
+	}
+	return SettingRow{}, false
 }
