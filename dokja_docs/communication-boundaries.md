@@ -2,7 +2,8 @@
 
 Source review: 2026-10-22, base `cca73e1`. Decision:
 [ADR 0012](decisions/0012-communication-services.md). Step: 09.4.
-This is a source audit, not a live platform or delivery test.
+The initial inventory is a source audit, not a live platform or delivery test.
+The outbound policy extraction below has automated domain/orchestrator coverage.
 
 ## Current implementation and target roles
 
@@ -52,3 +53,33 @@ Existing tests under the two gateway directories, Communications domain/service,
 orchestrator clients/handlers and Runtime provide starting regression coverage.
 They have not been rerun for this documentation-only audit. Teams is not present
 in the current implementation and receives no implied migration or capability.
+
+## Outbound policy extraction (step 09.4-b, partial)
+
+`dokja_domain/dokja_communications/delivery.go` now owns typed send intent,
+channel/conversation delivery ports, configured destination validation, stable
+target deduplication, disabled-platform filtering, explicit desktop/TUI bypass
+eligibility, shared safe-only decisions and named text-conversation restrictions.
+Ports contain no SDK or HTTP types. Legacy handler port names remain aliases, so
+existing client implementations continue to satisfy them.
+
+System handlers normalize the existing event, supply the configured destinations
+and routing-state snapshot, ask the domain for a plan, obtain any required safety
+observation and execute eligible operations. Both manual and scheduled sends use
+the domain safety decision. Current response/error shapes, partial delivery,
+attachment fetching, receipts and timeout behavior remain unchanged. A source or
+interface label is not authentication; existing ingress credentials and desktop
+confirmation remain required and are not replaced by the domain origin check.
+
+Checks passed: Communications domain `go test -race ./...` and `go vet ./...`;
+orchestrator `go test -race ./...` and `go vet ./...`; final handler-focused race
+and vet checks after sharing the safety decision. Tests cover target-set refusal
+before effects, order/deduplication, disabled routing, the explicit bypass matrix,
+text-only named conversations, safety gating, partial failure and timeout without
+retry or marking sent. All transports are fakes; no live message was sent and no
+account, session or configuration changed.
+
+Still pending within 09.4-b: inbound gateway eligibility, linking authorization,
+and any remaining delivery-policy decisions in handlers. Gateway relocation stays
+pending until those boundaries have parity coverage. This extraction does not
+move platform code, change public actions or introduce a new delivery guarantee.

@@ -729,6 +729,11 @@
               "name": "source_boundary_audit",
               "status": "completed",
               "detail": "Read gateway ingress/delivery/link/history, Communications domain/read service, routing and System handler; no live accounts or sessions modified."
+            },
+            {
+              "name": "outbound_policy_extraction",
+              "status": "passed",
+              "detail": "Communications domain and orchestrator go test -race ./... and go vet ./...; final handler-focused race/vet after shared safety policy. Includes target refusal, bypass matrix, disabled destinations, named text restrictions, partial failure and timeout with no resend or mark-sent. Fake transports only."
             }
           ],
           "references": [
@@ -747,10 +752,17 @@
             {
               "id": "09.4-b",
               "title": "Extract normalized communication ports and domain eligibility/authorization",
-              "status": "pending",
+              "status": "in_progress",
               "acceptance_criteria": [
                 "Preserve read/send/link contracts and current stricter transport restrictions.",
                 "Test destination eligibility, disabled routing, partial/unknown delivery and explicit authorization before moving gateways."
+              ],
+              "evidence": [
+                "Communications owns typed delivery ports, send planning, configured/disabled destinations, explicit bypass and shared safe-only eligibility; named text-conversation validation is domain-owned.",
+                "Existing handler/client port names remain compatible aliases. Ingress credentials, public events, response/error shapes and gateway transport restrictions are preserved."
+              ],
+              "remaining": [
+                "Extract inbound gateway eligibility and linking authorization with parity tests before relocating gateways."
               ]
             },
             {
@@ -779,7 +791,7 @@
             }
           ],
           "remaining": [
-            "Implement communication policy/port extraction before physical relocation.",
+            "Complete inbound/linking and remaining handler policy extraction before physical relocation; outbound validation/ports are implemented.",
             "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
           ]
         }

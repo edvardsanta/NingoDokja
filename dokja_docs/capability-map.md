@@ -32,8 +32,8 @@ For a new cross-layer operation:
 [ADR 0012](decisions/0012-communication-services.md) classifies Discord and
 WhatsApp gateways as communication-service adapters, with inbound ingress and
 outbound transport roles. Desktop, CLI and TUI are operator interfaces. Current
-gateways still live under `dokja_interfaces/`; policy extraction and relocation
-are pending in step 09.4. The [source audit](communication-boundaries.md) identifies
+gateways still live under `dokja_interfaces/`; outbound policy extraction has begun and relocation
+remains pending in step 09.4. The [source audit](communication-boundaries.md) identifies
 existing read, send, linking and session ownership without changing contracts.
 Gateway ingress still submits the existing event/request to orchestration;
 reclassification does not permit service-to-domain or operator-to-service bypasses.
@@ -317,3 +317,11 @@ recognized external consumers. Runtime lifecycle and `services.set` routing
 controls remain separate. The first backend is the local lite stack on Unix;
 production, remote hosts and Windows are outside this initial implementation.
 See [runtime controller](../dokja_orch/runtime/README.md).
+
+## Communication outbound policy update
+
+Step 09.4-b adds domain-owned [delivery ports and policy](../dokja_domain/dokja_communications/delivery.go).
+System handlers continue to sequence I/O but delegate target validation,
+disabled-platform selection, explicit bypass permission, safe-only decisions and
+named-conversation restrictions. [Evidence and remaining boundaries](communication-boundaries.md#outbound-policy-extraction-step-094-b-partial)
+separate this delivered slice from pending inbound/linking policy and relocation.
