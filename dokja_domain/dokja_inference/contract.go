@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"sort"
 )
 
 const Version = "inference.v1"
@@ -31,6 +32,7 @@ type Experience struct {
 	Action     string `json:"action"`
 	Outcome    string `json:"observed_outcome"`
 	Simulation bool   `json:"simulation"`
+	Diagnostic string `json:"diagnostic,omitempty"`
 }
 type Action struct {
 	ID          string `json:"id"`
@@ -46,6 +48,7 @@ type Request struct {
 	Experiences    []Experience `json:"experiences"`
 	Actions        []Action     `json:"actions"`
 	RemainingCalls int          `json:"remaining_calls"`
+	RequiredFacts  []string     `json:"required_facts"`
 }
 type Proposal struct {
 	Contract    string   `json:"contract"`
@@ -81,6 +84,16 @@ func ValidateRequest(r Request) error {
 	if err != nil || len(b) > MaxRequestBytes || r.Contract != Version || r.TaskID == "" || r.Scope == "" || r.Revision < 1 || r.Goal == "" || r.RemainingCalls < 1 || r.RemainingCalls > 32 || len(r.Evidence) > 32 || len(r.Experiences) > 16 || len(r.Actions) == 0 || len(r.Actions) > 8 {
 		return errors.New("invalid inference request")
 	}
+	if len(r.RequiredFacts) > 32 {
+		return errors.New("too many action preconditions")
+	}
+	facts := map[string]bool{}
+	for _, fact := range r.RequiredFacts {
+		if fact == "" || facts[fact] {
+			return errors.New("invalid action precondition")
+		}
+		facts[fact] = true
+	}
 	ids := map[string]bool{}
 	for _, e := range r.Evidence {
 		if e.ID == "" || e.Version == "" || e.Source == "" || ids[e.ID] {
@@ -92,6 +105,9 @@ func ValidateRequest(r Request) error {
 	for _, e := range r.Experiences {
 		if e.ID == "" || ids[e.ID] || !e.Simulation || (e.Outcome != "success" && e.Outcome != "failed") {
 			return errors.New("invalid simulation experience")
+		}
+		if !ValidDiagnostic(e.Outcome, e.Diagnostic) {
+			return errors.New("invalid observed diagnostic")
 		}
 		ids[e.ID] = true
 	}
@@ -211,4 +227,78 @@ func Schema() map[string]any {
 		props[key] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 	}
 	return map[string]any{"type": "object", "additionalProperties": false, "properties": props, "required": []string{"contract", "revision", "status", "action", "missing", "target", "probability", "evidence_ids", "experience_ids", "summary"}}
+}
+
+// ValidDiagnostic accepts observed computation categories, never model advice.
+// Empty diagnostics keep earlier experimental episodes readable.
+func ValidDiagnostic(outcome, diagnostic string) bool {
+	switch diagnostic {
+	case "":
+		return true
+	case "sum_verified":
+		return outcome == "success"
+	case "parse_error_full_width_digits", "parse_error", "sum_mismatch":
+		return outcome == "failed"
+	default:
+		return false
+	}
+}
+
+// Retrievable returns only unresolved references declared by supplied evidence.
+// It describes available operations without choosing a retrieval or strategy.
+func Retrievable(r Request) []string {
+	known := map[string]bool{}
+	for _, e := range r.Evidence {
+		known[e.ID] = true
+	}
+	unresolved := map[string]bool{}
+	for _, e := range r.Evidence {
+		for _, id := range append(append([]string{}, e.Requires...), e.Question) {
+			if id != "" && !known[id] {
+				unresolved[id] = true
+			}
+		}
+	}
+	ids := []string{}
+	for id := range unresolved {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// SchemaFor grounds lexical choices in the current snapshot. Runtime validation
+// still checks cross-field semantics; structured decoding cannot establish truth.
+func SchemaFor(r Request) map[string]any {
+	schema := Schema()
+	props := schema["properties"].(map[string]any)
+	props["revision"] = map[string]any{"type": "integer", "enum": []int{r.Revision}}
+	props["missing"] = map[string]any{"type": "string", "enum": append([]string{""}, Retrievable(r)...)}
+	actions := []string{""}
+	for _, a := range r.Actions {
+		actions = append(actions, a.ID)
+	}
+	props["action"] = map[string]any{"type": "string", "enum": actions}
+	props["target"] = map[string]any{"type": "string", "enum": []string{"", "simulated_sum_success"}}
+	for _, key := range []string{"evidence_ids", "experience_ids"} {
+		ids := []string{}
+		if key == "evidence_ids" {
+			for _, e := range r.Evidence {
+				ids = append(ids, e.ID)
+			}
+		} else {
+			for _, e := range r.Experiences {
+				ids = append(ids, e.ID)
+			}
+		}
+		items := map[string]any{"type": "string"}
+		if len(ids) > 0 {
+			items["enum"] = ids
+		}
+		props[key] = map[string]any{"type": "array", "items": items, "maxItems": len(ids)}
+		if key == "evidence_ids" && len(ids) > 0 {
+			props[key].(map[string]any)["minItems"] = 1
+		}
+	}
+	return schema
 }

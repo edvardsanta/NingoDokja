@@ -28,6 +28,11 @@ func TestOllamaFallbackAndBudget(t *testing.T) {
 		}
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		schema := body["format"].(map[string]any)
+		missing := schema["properties"].(map[string]any)["missing"].(map[string]any)["enum"].([]any)
+		if len(missing) != 2 || missing[1] != "sample" {
+			t.Error("schema not grounded", missing)
+		}
 		if body["format"] == nil || body["stream"] != false {
 			t.Error(body)
 		}

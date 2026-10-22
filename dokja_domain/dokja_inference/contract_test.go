@@ -7,7 +7,7 @@ import (
 )
 
 func request() Request {
-	return Request{Contract: Version, TaskID: "task", Revision: 3, Scope: "owner", Goal: "simulate", RemainingCalls: 2, Evidence: []Evidence{{Ref: Ref{"rule", "1", "fixture:rule"}, Question: "sample"}}, Actions: []Action{{"fast", "parse"}}, Experiences: []Experience{{"old", "fast", "failed", true}}}
+	return Request{Contract: Version, TaskID: "task", Revision: 3, Scope: "owner", Goal: "simulate", RemainingCalls: 2, Evidence: []Evidence{{Ref: Ref{"rule", "1", "fixture:rule"}, Question: "sample"}}, Actions: []Action{{"fast", "parse"}}, Experiences: []Experience{{ID: "old", Action: "fast", Outcome: "failed", Simulation: true}}}
 }
 func proposal() Proposal {
 	return Proposal{Contract: Version, Revision: 3, Status: "need_evidence", Missing: "sample", Evidence: []string{"rule"}, Experiences: []string{}, Summary: "Need the referenced observation"}
@@ -60,5 +60,47 @@ func TestProposalsDoNotGrantEffects(t *testing.T) {
 	r.Experiences[0].Simulation = false
 	if err := ValidateRequest(r); err == nil {
 		t.Fatal("unlabelled simulated memory")
+	}
+}
+
+func TestGroundedSchemaAndObservedDiagnostics(t *testing.T) {
+	r := request()
+	r.Evidence = append(r.Evidence, Evidence{Ref: Ref{"sample", "1", "fixture:sample"}, Requires: []string{"rule", "other", "other"}})
+	ids := Retrievable(r)
+	if len(ids) != 1 || ids[0] != "other" {
+		t.Fatal(ids)
+	}
+	props := SchemaFor(r)["properties"].(map[string]any)
+	missing := props["missing"].(map[string]any)["enum"].([]string)
+	if len(missing) != 2 || missing[1] != "other" {
+		t.Fatal(missing)
+	}
+	for _, diagnostic := range []string{"parse_error_full_width_digits", "parse_error", "sum_mismatch"} {
+		r.Experiences[0].Diagnostic = diagnostic
+		if err := ValidateRequest(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, diagnostic := range []string{"sum_verified", "use_normalize", "untrusted advice"} {
+		r.Experiences[0].Diagnostic = diagnostic
+		if ValidateRequest(r) == nil {
+			t.Fatal("accepted invalid diagnostic", diagnostic)
+		}
+	}
+}
+
+func TestSchemaRequiresGroundedCitation(t *testing.T) {
+	r := request()
+	props := SchemaFor(r)["properties"].(map[string]any)
+	if props["evidence_ids"].(map[string]any)["minItems"] != 1 {
+		t.Fatal("citation not required")
+	}
+	r.RequiredFacts = []string{"sample_verified", "sample_verified"}
+	if ValidateRequest(r) == nil {
+		t.Fatal("duplicate prerequisites accepted")
+	}
+	r.RequiredFacts = []string{"sample_verified"}
+	if err := ValidateRequest(r); err != nil {
+		t.Fatal(err)
 	}
 }

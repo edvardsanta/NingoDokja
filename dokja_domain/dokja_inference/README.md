@@ -11,3 +11,7 @@ Provider probabilities are uncalibrated hypothetical estimates.
 
 Run `go test -race ./...` and `go vet ./...` in this directory.
 See `dokja_docs/model-assisted-cognition-experiment.md` for integration and limits.
+
+`SchemaFor` grounds output choices in each request. `required_facts` exposes
+execution prerequisites. Optional episode diagnostics describe observed parser
+or sum results; they are not model recommendations or evidence of future success.
