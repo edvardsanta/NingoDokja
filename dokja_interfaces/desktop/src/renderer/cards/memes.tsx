@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
-import type { KnowledgeDocuments, MemeItem, Off } from "../../shared/replies.js";
+import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { usePreview } from "./use_preview.js";
@@ -37,6 +37,16 @@ export function MemePicker({
   const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
   const suggestions = createdTags;
+  const loadCreatedTags = useCallback(async () => {
+    const answer = await transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 });
+    if (!answer.ok || !isRecord(answer.result) || !Array.isArray(answer.result.documents)) return;
+    const tags = answer.result.documents.filter(isRecord)
+      .filter((document) => text(document.kind) === "meme_hashtag")
+      .map((document) => text(document.title).trim())
+      .filter(Boolean)
+      .map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
+    setCreatedTags(Array.from(new Set(tags)).sort());
+  }, [transport]);
   const createTag = useCallback(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
     const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim() }, { timeoutMs: 30_000 });
@@ -47,8 +57,9 @@ export function MemePicker({
     if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
     onPrepareTagged(value, selectedMeme.url);
     setHashtag("");
+    await loadCreatedTags();
     return { ok: true, data: { hashtag: value } };
-  }, [hashtag, onPrepareTagged, selectedMeme, transport]);
+  }, [hashtag, loadCreatedTags, onPrepareTagged, selectedMeme, transport]);
   const tag = useAction(createTag);
   useEffect(() => {
     setHashtag("");
@@ -57,18 +68,8 @@ export function MemePicker({
   const attachable = memes.filter((meme) => meme.url !== "");
 
   useEffect(() => {
-    let current = true;
-    void transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 }).then((answer) => {
-      if (!current || !answer.ok || !isRecord(answer.result) || !Array.isArray(answer.result.documents)) return;
-      const tags = answer.result.documents.filter(isRecord)
-        .filter((document) => text(document.kind) === "meme_hashtag")
-        .map((document) => text(document.title).trim())
-        .filter(Boolean)
-        .map((tag) => tag.startsWith("#") ? tag : `#${tag}`);
-      setCreatedTags(Array.from(new Set(tags)).sort());
-    });
-    return () => { current = false; };
-  }, [transport]);
+    void loadCreatedTags();
+  }, [loadCreatedTags]);
 
   useEffect(() => {
     if (!viewer) return;
