@@ -32,7 +32,7 @@ changes are never retried automatically. Adding, indexing and deleting refresh t
 document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link.
 
 System is also where things are switched on and off. Each service the orchestrator can switch
-(`meme`, `chat_ai`, `book`, `knowledge`, `memory`, `scheduler`) has a switch, and each scheduled job has a
+(`feeds`, `chat_ai`, `knowledge`, `memory`, `scheduler`; legacy mode also lists `meme` and `book`) has a switch, and each scheduled job has a
 switch and an interval (minutes or hours, between one minute and thirty days; "Back to default" drops a
 custom one). Switching `scheduler` off pauses every job. A switch needs a real click or key press just
 before it, like any change, and asks for no window, because the operator can switch it back at once. The
@@ -352,3 +352,7 @@ Docker socket exposed to the renderer. It starts lazily and continues after the
 window closes; no login/boot autostart is installed. See the
 [controller documentation](../../dokja_orch/runtime/README.md) and
 [production runbook](../../dokja_docs/production-runbook.md) for operation limits.
+
+Content providers appear under Knowledge → Sources as processing plugins. Runtime
+controls manage Feeds as their host; Book/Meme are not separate desktop modules.
+See the [plugin migration contract](../../dokja_docs/feeds-content-plugins.md).

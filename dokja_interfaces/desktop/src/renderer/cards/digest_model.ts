@@ -32,6 +32,7 @@ export function parseDigestStatus(value: unknown): DigestStatus | Off | undefine
   if (value.off === true) return { off: true, reason: text(value.reason) };
   if (!Array.isArray(value.sources)) return undefined;
   return {
+    ...(Array.isArray(value.providers) ? {providers: value.providers.map(parseSource).filter((source): source is DigestSource => source !== undefined)} : {}),
     configured: value.configured === true,
     directoryError: text(value.directoryError),
     ok: num(value.ok),

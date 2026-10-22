@@ -1,6 +1,7 @@
 # Current capability map
 
 Verified: 2026-10-18 against the current working tree, based on commit `dd0efd4`.
+Content plugin update: 2026-10-22; see [migration contract](feeds-content-plugins.md).
 Tracking: [steps.json](../steps.json), step `01`.
 Design background: [cognitive macro-components research](./cognitive-macrocomponents-research.md).
 
@@ -46,8 +47,8 @@ a cognitive macro-component.
 | Experience | `dokja_domain/dokja_memory` currently interprets episodes and outcomes | `dokja_services/dokja_memory` | Hashtag experience records suggestions and resolves explicit feedback; Memory commands inspect experiences | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; current episodic storage does not implement the complete target |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_chat_ai` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
-| Media perception and meme pool | `dokja_domain/dokja_meme`; orchestration handlers currently also enforce delivery decisions | `dokja_services/dokja_meme`, wrapping legacy Lab components | Meme fetch/screen/list, hashtag OCR, scheduled delivery | A workflow, not a concept (ADR 0010, proposed): scrapers, OCR and attachments move to Knowledge intake (Feeds plugins) with the pool as an intake cache, screening and the relevance threshold to Rules, sent receipts to Memory; meme events kept as a facade |
-| Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | `dokja_services/dokja_book` | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
+| Media perception and meme pool | `dokja_domain/dokja_meme`; orchestration handlers currently also enforce delivery decisions | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | A workflow, not a concept (ADR 0010, proposed): scrapers, OCR and attachments move to Knowledge intake (Feeds plugins) with the pool as an intake cache, screening and the relevance threshold to Rules, sent receipts to Memory; meme events kept as a facade |
+| Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | Feeds `document.process.v1` compatibility plugin; legacy HTTP transport opt-in | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
 | Communications and delivery | Communications domain owns read eligibility; System handler currently owns much sending/linking behavior | Communications HTTP service; Discord and WhatsApp interface clients | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and action adapters behind explicit eligibility and delivery policy |
 | Voice/audio | Provider selection currently in Voice service; no Voice domain binding found in inspected orchestrator entry point | `dokja_services/dokja_voice` | Service exposes synthesis, transcription, wakeword, and streaming APIs; full runtime consumer wiring is not established by this review | Audio perception/output providers, pending orchestration integration review |
 | Scheduling | Orchestrator controls decide whether a scheduled operation runs | `dokja_services/dokja_scheduler` emits events | Meme refresh and dispatch schedules | Trigger acquisition; workflow execution remains orchestrated |
@@ -88,12 +89,12 @@ a cognitive macro-component.
 | Boundary | Current contract | Current state | Extension point and compatibility concern |
 | --- | --- | --- | --- |
 | Orchestrator ingress | Envelope: `event_id`, `timestamp`, `source`, `type`, `user`, `channel`, `payload`, `context`; HTTP bridge or ZeroMQ request/reply; PUB/SUB events | Controls state; handler-owned sessions; per-request context maps | Preserve envelope and compact/debug responses; normalize typed internal contracts behind ingress |
-| Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached), `feeds.extract` (on demand, step `07`) and `feeds.classify` (on demand, step `09`); status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract; a `document.classify.v1` classifier reads documents and prints one proposal per document |
+| Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached), `feeds.extract` (on demand, step `07`), `feeds.classify` (on demand, step `09`), `feeds.refresh` and bounded `feeds.invoke` content providers; status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract; a `document.classify.v1` classifier reads documents and prints one proposal per document |
 | Knowledge | ZeroMQ `knowledge.*`; typed-by-operation payload represented as dictionaries/maps | Own SQLite documents, schema-2 structured metadata, chunks, keyword index, and model-tagged embeddings | Python `register(registry)` adds extractors/fetchers; plugins execute inside the host |
 | Memory | ZeroMQ service requests for record, resolve, recall, listing and status; prediction/stats handled by the domain | Own SQLite experiences, original probabilities, outcomes, and embeddings | Injected embedder; no general runtime predictor plugin protocol in inspected code |
 | Chat AI | HTTP `POST /chat`, `GET /health` | Provider/client cache; reads selected profile from shared SQLite; conversation history supplied by caller | Provider abstraction/configuration; not the Feeds manifest protocol |
-| Book | HTTP `POST /books/classify`, `POST /books/summarize`, `GET /health` | Per-request processing; no durable book repository established in inspected request path | Classifier/overview/extraction implementations; preserve request fields and response envelopes |
-| Meme | ZeroMQ `meme.*`; orchestrated `meme.hashtag.*` is separate from media service operations | Legacy pool/sent state in SQLite | Existing Lab scraper/provider mechanisms; extraction boundary is still coupled to Lab |
+| Book | `book.*` facade over Feeds `document.process.v1`; legacy HTTP classify/summarize/health endpoints remain opt-in | Per-request processing; no durable book repository established in inspected request path | Classifier/overview/extraction implementations; preserve request fields and response envelopes |
+| Meme | `meme.*` facade over Feeds collection/library/perception plugins; legacy ZeroMQ transport remains opt-in | Legacy pool/sent state in SQLite | Existing Lab scraper/provider mechanisms; extraction boundary is still coupled to Lab |
 | Communications | Authenticated HTTP dispatch for reads; interface clients for delivery/linking/history | Read service is an adapter; platform/interface state varies | Platform-specific adapters; preserve configured-channel and conversation-alias eligibility |
 | Voice | HTTP `/tts`, `/stt`, `/wakeword`, `/health`; WebSocket `/tts/stream` | Loaded providers/models and per-stream buffers | Environment-selected provider classes and stubs; no shared plugin manifest |
 | Scheduler | Existing envelope, asynchronous scheduled events and job announcements | Timers; reads orchestrator-owned interval configuration | Configured schedules; publish success is not durable workflow acceptance |
@@ -139,7 +140,12 @@ Sources: [Digest handler](../dokja_orch/internal/handlers/digest_domain_handler.
 
 ### Book
 
-`book.resource.classify / book.summary.requested -> Book domain -> Book HTTP client -> Python service`
+`book.resource.classify / book.summary.requested -> Book domain -> Feeds client -> document.process.v1 plugin`
+
+The default uses the versioned plugin host; `DOKJA_CONTENT_BACKEND=legacy`
+restores the HTTP path. The compatibility adapter preserves the earlier result
+shape. [Content plugins](feeds-content-plugins.md) describes collection, media
+cache and perception hosting, dependency setup and rollback.
 
 The domain selects the service operation and merges event context/payload. Python
 implements classification, processing strategy, and summary preparation. The

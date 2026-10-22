@@ -60,7 +60,7 @@ test("every local interface finds the controller in the same state directory",()
  assert.equal(runtimeStateHome({},"/home/user"),"/home/user/.local/state/dokja");
 });
 test("modules a newer controller adds are left out instead of breaking the card",()=>{
- const result=runtimeSnapshot({busy:false,error:"",modules:[{name:"future_module",state:"stopped"},{name:"memory",state:"ready",dependencies:[]}]});
+ const result=runtimeSnapshot({busy:false,error:"",modules:[{name:"future_module",state:"stopped"},{name:"book",state:"stopped"},{name:"meme",state:"stopped"},{name:"memory",state:"ready",dependencies:[]}]});
  assert.deepEqual(result.modules.map(m=>m.name),["memory"]);
  assert.throws(()=>runtimeSnapshot({busy:false,modules:[{name:"memory",state:"exploded"}]}));
 });

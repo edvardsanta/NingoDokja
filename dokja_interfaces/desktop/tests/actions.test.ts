@@ -545,3 +545,18 @@ test("interface setup state survives projection without exposing its endpoint",(
  const result=ACTIONS["ningo.status"].project({domain:"system",result:{status:"ok",services:{whatsapp:{kind:"interface",status:"unchecked",state:"not_configured",configured:false,endpoint:"http://private.example/status",enabled:true}}}}) as {services:Record<string,unknown>};
  assert.deepEqual(result.services.whatsapp,{kind:"interface",status:"unchecked",state:"not_configured",configured:false,enabled:true,detail:""});
 });
+
+test("digest.status exposes processing state without plugin commands or environment", () => {
+  const result = ACTIONS["digest.status"].project({ domain: "digest", result: {
+    configured: true, plugins: [], providers: [{
+      id: "media-library", name: "Media library", state: "failed", enabled: true,
+      last_error: "cache unavailable", last_ok: "", command: ["private-command"], env: ["PRIVATE_SETTING"],
+    }],
+  } });
+  assert.deepEqual((result as {providers:unknown[]}).providers, [{
+    id: "media-library", name: "Media library", state: "failed", running: false,
+    items: 0, skipped: 0, lastOk: "", error: "cache unavailable",
+  }]);
+  assert.equal(JSON.stringify(result).includes("private-command"), false);
+  assert.equal(JSON.stringify(result).includes("PRIVATE_SETTING"), false);
+});

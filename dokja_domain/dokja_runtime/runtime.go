@@ -25,8 +25,6 @@ var inventory = []Module{
 	{Name: "embedding_init", Service: "dokja-embedding-init", Dependencies: []string{"embeddings"}, Internal: true},
 	{Name: "memory", Service: "dokja-memory", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5562},
 	{Name: "knowledge", Service: "dokja-knowledge", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5561},
-	{Name: "meme", Service: "dokja-meme", Dependencies: []string{"orchestrator"}, Port: 5557},
-	{Name: "book", Service: "dokja-book", Dependencies: []string{"orchestrator"}, Port: 8083},
 	{Name: "chat_ai", Service: "dokja-chat-ai", Dependencies: []string{"orchestrator"}, Port: 8080},
 	{Name: "feeds", Service: "dokja-feeds", Dependencies: []string{"orchestrator"}, Port: 5563},
 	{Name: "voice", Service: "dokja-voice", Dependencies: []string{"orchestrator"}, Port: 8081},
@@ -447,7 +445,7 @@ type Logs struct {
 	Text   string `json:"text"`
 }
 
-// Tail includes dependencies because model initialization can hold up a module.
+// Tail scopes output to the selected module, including its own build output.
 // The optional port keeps existing backends compatible with lifecycle control.
 func (d *Domain) Tail(ctx context.Context, name string) (Logs, error) {
 	m, ok := Lookup(name)
@@ -460,6 +458,6 @@ func (d *Domain) Tail(ctx context.Context, name string) (Logs, error) {
 	if !ok {
 		return Logs{}, fmt.Errorf("runtime logs are unavailable")
 	}
-	text, err := backend.Logs(ctx, Plan(name))
+	text, err := backend.Logs(ctx, []Module{m})
 	return Logs{Module: name, Text: text}, err
 }

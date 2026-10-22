@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-21",
+  "updated_on": "2026-10-22",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "09",
   "status_values": [
@@ -561,7 +561,8 @@
         "Step 09.2 persistence, API/CLI answers, reading-time classifier and explicit stored-document reclassification are implemented. Desktop/chat continuation and other listed remaining items keep 09.2 in progress; generic consolidation and faculty migrations remain pending.",
         "Inspectable Memory desktop: paginated read-only memory.list and per-reference memory.get expose context, action/detail, frozen predictions, baseline, similarity and observed outcomes. Memory domain provides feedback guidance; the service adds opt-in bounded context to get without changing listing excerpts, default reads, verdicts or schema. See dokja_docs/step-09-consolidation.md#inspectable-experience-memory.",
         "Desktop is the primary explicit experience feedback interface: inspected records offer acceptance, observed-result comparison and explicit non-use, protected by real input and native confirmation. TUI list keys a/c/i provide the secondary path; coding-agent mediation is documented using the existing synchronous request adapter. The Memory store now acknowledges only the winning verdict under concurrent writes. See dokja_docs/experience-feedback.md.",
-        "WhatsApp visibility regression fixed: known interfaces remain in the orchestrator catalog without a status endpoint, with configured:false and not_configured/unchecked state. Desktop retains the row, explains setup, and waits to offer QR/routing controls until configured. Existing configured link/unlink flows are preserved."
+        "WhatsApp visibility regression fixed: known interfaces remain in the orchestrator catalog without a status endpoint, with configured:false and not_configured/unchecked state. Desktop retains the row, explains setup, and waits to offer QR/routing controls until configured. Existing configured link/unlink flows are preserved.",
+        "2026-10-22: content acquisition now has versioned document.process.v1, media.library.v1 and media.perceive.v1 providers under Feeds. Book/Meme facades default to plugin transports, with legacy-content Compose rollback; scrapers use source.collect.v1 adapters. See dokja_docs/feeds-content-plugins.md. This does not complete the broader domain-policy or Memory receipt migration."
       ],
       "checks": [
         {
@@ -723,6 +724,9 @@
           "evidence": [],
           "checks": []
         }
+      ],
+      "references": [
+        "dokja_docs/feeds-content-plugins.md"
       ]
     },
     {

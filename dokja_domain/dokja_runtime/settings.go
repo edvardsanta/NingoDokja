@@ -45,10 +45,10 @@ var settingsCatalog = []Setting{
 	{ID: "whatsapp.groups", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOWED_GROUPS", Kind: "list", Affects: []string{"whatsapp"}, parse: listOf(group)},
 	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"whatsapp"}, parse: oneOf("true", "false")},
 	{ID: "models.embedding", Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
-	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"book"}, parse: model},
-	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"book"}, parse: model},
+	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"feeds"}, parse: model},
+	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"feeds"}, parse: model},
 	{ID: "models.speech_to_text", Group: "models", Env: "DOKJA_VOICE_STT_MODEL", Default: "openai/whisper-tiny", Kind: "text", Affects: []string{"voice"}, parse: model},
-	{ID: "models.ocr", Group: "models", Env: "DOKJA_OCR_REC_MODEL", Kind: "text", Affects: []string{"meme"}, parse: model},
+	{ID: "models.ocr", Group: "models", Env: "DOKJA_OCR_REC_MODEL", Kind: "text", Affects: []string{"feeds"}, parse: model},
 }
 
 // SettingsEnv names every variable a setting may write, and the one listing webhook channels.

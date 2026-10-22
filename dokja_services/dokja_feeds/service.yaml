@@ -1,5 +1,5 @@
 name: dokja-feeds
-description: Follows the plugins the owner puts in a directory outside the repository and keeps their latest items in memory
+description: Hosts versioned collection, document processing and media plugins for content workflows
 
 type: service
 language: go

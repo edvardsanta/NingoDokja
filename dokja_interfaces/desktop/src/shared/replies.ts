@@ -139,6 +139,7 @@ export type DigestSource = {
 };
 
 export type DigestStatus = {
+  providers?: DigestSource[];
   off?: false;
   // false when the feeds service has no plugins directory at all
   configured: boolean;

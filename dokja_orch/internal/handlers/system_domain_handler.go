@@ -63,6 +63,7 @@ type MemeAttachmentFetcher interface {
 }
 
 type SystemDomainHandler struct {
+	contentPlugins   bool
 	chatAI           ChatAIHealthChecker
 	memeStatus       MemeStatusReader
 	memeFetch        MemeFetcher
@@ -243,7 +244,7 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 		}
 	}
 
-	if h.memeStatus != nil && h.serviceEnabled("meme") {
+	if !h.contentPlugins && h.memeStatus != nil && h.serviceEnabled("meme") {
 		result, err := h.memeStatus.Status(ctx)
 		if err != nil {
 			overallStatus = "degraded"
@@ -987,4 +988,10 @@ func (h *SystemDomainHandler) handleProfileUse(event core.Event) (map[string]any
 	}
 	logger.Info(fmt.Sprintf("system handler chat profile selected event_id=%s name=%s", event.EventID, name))
 	return map[string]any{"active": name}, nil
+}
+
+// WithContentPlugins reports content providers through Feeds instead of standalone services.
+func (h *SystemDomainHandler) WithContentPlugins(enabled bool) *SystemDomainHandler {
+	h.contentPlugins = enabled
+	return h
 }

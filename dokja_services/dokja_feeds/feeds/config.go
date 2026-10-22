@@ -46,8 +46,9 @@ func DefaultLimits() Limits {
 type Config struct {
 	Endpoint string
 	// PluginsDir holds one directory per plugin. Empty means no plugins.
-	PluginsDir string
-	Limits     Limits
+	PluginsDir        string
+	BuiltinPluginsDir string
+	Limits            Limits
 }
 
 // ConfigFromEnv reads FEEDS_SERVICE_ENDPOINT and FEEDS_PLUGINS_DIR. getenv is os.Getenv in
@@ -58,8 +59,9 @@ func ConfigFromEnv(getenv func(string) string) Config {
 		endpoint = DefaultEndpoint
 	}
 	return Config{
-		Endpoint:   endpoint,
-		PluginsDir: strings.TrimSpace(getenv("FEEDS_PLUGINS_DIR")),
-		Limits:     DefaultLimits(),
+		Endpoint:          endpoint,
+		PluginsDir:        strings.TrimSpace(getenv("FEEDS_PLUGINS_DIR")),
+		BuiltinPluginsDir: strings.TrimSpace(getenv("FEEDS_BUILTIN_PLUGINS_DIR")),
+		Limits:            DefaultLimits(),
 	}
 }

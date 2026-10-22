@@ -27,22 +27,28 @@ const (
 
 // Item is one entry of a plugin's output once it has been checked.
 type Item struct {
-	ID      string
-	Title   string
-	Summary string
-	URL     string
+	Kind     string
+	MediaURL string
+	Tags     []string
+	ID       string
+	Title    string
+	Summary  string
+	URL      string
 	// Published is the zero time when the plugin gave none, or none that can be believed.
 	Published time.Time
 	Source    string
 }
 
 type rawItem struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Summary   string `json:"summary"`
-	URL       string `json:"url"`
-	Published string `json:"published"`
-	Source    string `json:"source"`
+	Kind      string   `json:"kind"`
+	MediaURL  string   `json:"media_url"`
+	Tags      []string `json:"tags"`
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Summary   string   `json:"summary"`
+	URL       string   `json:"url"`
+	Published string   `json:"published"`
+	Source    string   `json:"source"`
 }
 
 var errNoItems = errors.New(`output has no "items" list`)
@@ -94,7 +100,18 @@ func normalizeItem(raw rawItem, plugin Plugin, now time.Time) (Item, bool) {
 	if source == "" {
 		source = plugin.Name
 	}
+	tags := make([]string, 0, min(len(raw.Tags), 20))
+	for _, tag := range raw.Tags {
+		if len(tags) >= 20 {
+			break
+		}
+		if tag = cleanText(tag, 80); tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	kind := cleanText(raw.Kind, 40)
 	return Item{
+		Kind: kind, MediaURL: cleanURL(raw.MediaURL), Tags: tags,
 		ID:        id,
 		Title:     title,
 		Summary:   cleanText(raw.Summary, maxSummaryRunes),

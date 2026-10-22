@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { RuntimeCard } from "../../src/renderer/cards/runtime.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import { deferred, failure, ok, routedTransport, scriptedTransport } from "./support.js";
-const page=(state="stopped",busy=false,error="")=>ok({modules:[{name:"memory",state,error,dependencies:["orchestrator","embedding_init"]},{name:"book",state:"stopped",error:"",dependencies:["orchestrator"]}],busy,error:""});
+const page=(state="stopped",busy=false,error="")=>ok({modules:[{name:"memory",state,error,dependencies:["orchestrator","embedding_init"]},{name:"book",state:"stopped",error:"",dependencies:["orchestrator"]},{name:"meme",state:"stopped",error:"",dependencies:["orchestrator"]},{name:"feeds",state:"stopped",error:"",dependencies:["orchestrator"]}],busy,error:""});
 const show=(transport:Parameters<typeof RuntimeCard>[0]["transport"])=>render(<I18nProvider locale="en"><RuntimeCard transport={transport}/></I18nProvider>);
 describe("local runtime modules",()=>{
  it("lists stopped modules without starting any container, even when the main orchestrator is down",async()=>{
   const {transport,calls}=routedTransport({"runtime.modules":page()});show(transport);
   await screen.findAllByText("Stopped");
+  expect(screen.queryByRole("button",{name:"Start book"})).toBeNull();
+  expect(screen.queryByRole("button",{name:"Start meme"})).toBeNull();
+  expect(screen.getByRole("button",{name:"Start feeds"})).toBeTruthy();
   expect(calls.map(c=>c.type)).toEqual(["runtime.modules"]);
   expect(screen.queryByRole("button",{name:"Stop memory"})).toBeNull();
  });
@@ -16,7 +19,7 @@ describe("local runtime modules",()=>{
   const {transport,calls}=routedTransport({"runtime.modules":[page(),page("starting",true),page("ready")],"runtime.set":page("starting",true)});show(transport);
   fireEvent.click(await screen.findByRole("button",{name:"Start memory"}));
   await screen.findByText("Starting");
-  expect((screen.getByRole("button",{name:"Start book"}) as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole("button",{name:"Start feeds"}) as HTMLButtonElement).disabled).toBe(false);
   await screen.findByText("Ready",{}, {timeout:3000});
   expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"memory",enabled:true}]);
   expect(calls.some(c=>c.type==="services.set")).toBe(false);
@@ -130,7 +133,7 @@ it("shows logs on demand while other modules remain usable", async () => {
  details.open=true;
  fireEvent(details,new Event("toggle"));
  await screen.findByText("embedding model: downloading");
- fireEvent.click(screen.getByRole("button",{name:"Start book"}));
- await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"book",enabled:true}]));
+ fireEvent.click(screen.getByRole("button",{name:"Start feeds"}));
+ await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"feeds",enabled:true}]));
  expect(screen.getByText("embedding model: downloading")).toBeTruthy();
 });

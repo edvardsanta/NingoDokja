@@ -1,0 +1,34 @@
+{
+  "plugin_api": 1,
+  "id": "document-processor",
+  "version": "0.1.0",
+  "name": "Document Processor",
+  "provides": [
+    "document.process.v1"
+  ],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "env": [
+    "DOKJA_BOOK_DIR",
+    "DOKJA_BOOK_DEFAULT_LANGUAGE",
+    "DOKJA_BOOK_DEFAULT_GOAL",
+    "DOKJA_BOOK_CLASSIFIER_PROVIDER",
+    "DOKJA_BOOK_CLASSIFIER_MODEL",
+    "DOKJA_BOOK_CLASSIFIER_ENDPOINT",
+    "DOKJA_BOOK_OVERVIEW_PROVIDER",
+    "DOKJA_BOOK_OVERVIEW_MODEL",
+    "DOKJA_BOOK_OVERVIEW_ENDPOINT",
+    "DOKJA_BOOK_MODEL_CACHE_DIR",
+    "HF_HOME"
+  ],
+  "limits": {
+    "timeout_ms": 90000,
+    "output_bytes": 16000000
+  }
+}

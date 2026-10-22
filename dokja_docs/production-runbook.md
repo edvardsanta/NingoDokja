@@ -687,3 +687,21 @@ The three new Go modules are tested explicitly in CI and `scripts/test_all.sh`;
 the nested bootstrap module is not traversed by the existing orchestrator test
 command. Rollback is the previous desktop build; stop the host daemon separately
 if no longer wanted. There are no application schema or deployment migrations.
+
+## Feeds content plugin migration
+
+Book/Meme now default to the Feeds backend (`DOKJA_CONTENT_BACKEND=feeds`). Their
+old containers are opt-in through the `legacy-content` profile. Before rollout,
+point `FEEDS_MEDIA_DB_FILE` at the existing database, stop the old queue consumer,
+and configure source and processing plugins. The optional
+`FEEDS_PLUGIN_EXTRAS=content` build argument installs the shipped compatibility
+processors' dependencies; `none` is the small default.
+
+All stacks configure `FEEDS_BUILTIN_PLUGINS_DIR`, the existing `dokja-data` volume
+for plugin state/model cache, and an optional models mount. Processing settings
+are passed to Feeds instead of requiring Book/Meme containers. Source manifests
+are still supplied by `FEEDS_PLUGINS_HOST_DIR`. No port changes are introduced.
+See [the migration and rollback contract](feeds-content-plugins.md) for the exact
+paths, plugin setup and preserved legacy controls. Existing status examples
+listing Book/Meme refer to `DOKJA_CONTENT_BACKEND=legacy`; plugin mode reports
+providers under Feeds and does not probe standalone Book/Meme endpoints.

@@ -20,6 +20,7 @@ services:
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
+      DOKJA_CONTENT_BACKEND: ${DOKJA_CONTENT_BACKEND:-feeds}
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
@@ -60,6 +61,7 @@ services:
       - dokja-net
 
   dokja-book:
+    profiles: [legacy-content]
     build:
       context: .
       dockerfile: dokja_services/dokja_book/Dockerfile.dev
@@ -85,6 +87,7 @@ services:
       - dokja-net
 
   dokja-meme:
+    profiles: [legacy-content]
     build:
       context: .
       dockerfile: dokja_services/dokja_meme/Dockerfile.dev
@@ -160,11 +163,37 @@ services:
     build:
       context: .
       dockerfile: dokja_services/dokja_feeds/Dockerfile.dev
+      args:
+        FEEDS_PLUGIN_EXTRAS: ${FEEDS_PLUGIN_EXTRAS:-none}
     working_dir: /workspace/dokja_services/dokja_feeds
     command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-feeds"]
     environment:
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
       FEEDS_PLUGINS_DIR: /plugins
+      FEEDS_BUILTIN_PLUGINS_DIR: /workspace/dokja_services/dokja_feeds/plugins.builtin
+      FEEDS_MEDIA_DB_FILE: ${FEEDS_MEDIA_DB_FILE:-/workspace/ningo_memory.db}
+      DOKJA_REPO_ROOT: /workspace
+      DOKJA_BOOK_DIR: /workspace/dokja_services/dokja_book
+      DOKJA_BOOK_DEFAULT_LANGUAGE: ${DOKJA_BOOK_DEFAULT_LANGUAGE:-pt-BR}
+      DOKJA_BOOK_DEFAULT_GOAL: ${DOKJA_BOOK_DEFAULT_GOAL:-study}
+      DOKJA_BOOK_CLASSIFIER_PROVIDER: ${DOKJA_BOOK_CLASSIFIER_PROVIDER:-local}
+      DOKJA_BOOK_CLASSIFIER_MODEL: ${DOKJA_BOOK_CLASSIFIER_MODEL:-typeform/distilbert-base-uncased-mnli}
+      DOKJA_BOOK_CLASSIFIER_ENDPOINT: ${DOKJA_BOOK_CLASSIFIER_ENDPOINT:-}
+      DOKJA_BOOK_OVERVIEW_PROVIDER: ${DOKJA_BOOK_OVERVIEW_PROVIDER:-extractive}
+      DOKJA_BOOK_OVERVIEW_MODEL: ${DOKJA_BOOK_OVERVIEW_MODEL:-sshleifer/distilbart-cnn-12-6}
+      DOKJA_BOOK_OVERVIEW_ENDPOINT: ${DOKJA_BOOK_OVERVIEW_ENDPOINT:-}
+      DOKJA_BOOK_MODEL_CACHE_DIR: /data/book-models
+      DOKJA_NSFW_MODEL_PATH: /models/nudenet/320n.onnx
+      DOKJA_OCR_MODEL_DIR: /models/rapidocr
+      DOKJA_OCR_REC_MODEL: ${DOKJA_OCR_REC_MODEL:-}
+      MEME_NSFW_FILTER: ${MEME_NSFW_FILTER:-on}
+      MEME_NSFW_THRESHOLD: ${MEME_NSFW_THRESHOLD:-0.4}
+      MEME_NSFW_STRICT: ${MEME_NSFW_STRICT:-on}
+      MEME_NSFW_STRICT_THRESHOLD: ${MEME_NSFW_STRICT_THRESHOLD:-0.5}
+      MEME_NSFW_EXTRA_WORDS: ${MEME_NSFW_EXTRA_WORDS:-}
+      MEME_ATTACHMENT_FETCH: ${MEME_ATTACHMENT_FETCH:-on}
+      MEME_ATTACHMENT_MAX_BYTES: ${MEME_ATTACHMENT_MAX_BYTES:-20000000}
+      MEME_ATTACHMENT_TIMEOUT: ${MEME_ATTACHMENT_TIMEOUT:-30}
       # Knowledge's extractors, for the knowledge-extractors reading plugin.
       KNOWLEDGE_EXTRACTORS_DIR: /workspace/dokja_services/dokja_knowledge
       GOCACHE: /tmp/go-build
@@ -177,6 +206,8 @@ services:
       - ./:/workspace
       # Plugins are the owner's and stay out of git; an empty directory means no plugins.
       - ${FEEDS_PLUGINS_HOST_DIR:-./feeds_plugins}:/plugins:ro
+      - dokja-data:/data
+      - ${DOKJA_MODELS_DIR:-./models}:/models:ro
 
   dokja-ollama:
     image: docker.io/ollama/ollama:latest
@@ -352,6 +383,7 @@ services:
       - dokja-net
 
 volumes:
+  dokja-data:
   dokja-whatsapp-auth:
   dokja-whatsapp-history:
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import type { DigestPage, DigestStatus, Off } from "../../shared/replies.js";
+import type { DigestPage, DigestSource, DigestStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -95,8 +95,9 @@ function DigestBody({ transport, status }: { transport: Transport; status: Diges
         </p>
       )}
       {following === "following" && <Reading transport={transport} />}
+      {!!status.providers?.length && <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some(provider => provider.state === "failed")} />}
       {status.sources.length > 0 && (
-        <SourceList status={status} open={explanation !== undefined || status.failed + status.invalid > 0} />
+        <SourceList sources={status.sources} title="digest_sources_title" open={explanation !== undefined || status.failed + status.invalid > 0} />
       )}
     </>
   );
@@ -181,14 +182,14 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
   );
 }
 
-function SourceList({ status, open }: { status: DigestStatus; open: boolean }) {
+function SourceList({ sources, title, open }: { sources: readonly DigestSource[]; title: MessageId; open: boolean }) {
   const t = useTranslate();
   const { ago } = useTimes();
   return (
     <details className="sources" open={open}>
-      <summary>{t("digest_sources_title")}</summary>
+      <summary>{t(title)}</summary>
       <ul className="services">
-        {status.sources.map((source, index) => {
+        {sources.map((source, index) => {
           const detail = [
             source.error,
             source.items > 0 ? t("digest_source_items", { count: source.items }) : "",

@@ -55,6 +55,10 @@ func StatusProbeWith(reader ServiceStatusReader, note func(status map[string]any
 func feedsNote(status map[string]any) string {
 	enabled, _ := status["enabled"].(float64)
 	failed, _ := status["failed"].(float64)
+	providers, _ := status["provider_enabled"].(float64)
+	providerFailed, _ := status["provider_failed"].(float64)
+	enabled += providers
+	failed += providerFailed
 	switch {
 	case enabled == 0:
 		return "no plugins enabled"
