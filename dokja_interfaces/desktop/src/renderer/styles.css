@@ -270,6 +270,11 @@ body {
   list-style: none;
 }
 
+/* What to do about a part, under it, across the whole row: linking WhatsApp. */
+.attention-action {
+  flex-basis: 100%;
+}
+
 .attention-list li {
   display: flex;
   flex-wrap: wrap;

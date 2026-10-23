@@ -13,6 +13,7 @@ import { SettingsCard } from "./settings.js";
 import { useStatus } from "../status_context.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import { useViewTabs } from "./view_tabs.js";
+import { notSetUp } from "./communications.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 import {
   formatInterval,
@@ -110,7 +111,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
   const trail = tabs ? [t("nav_system"), currentLabel] : [t("nav_system")];
 
   if (runtimeEnabled) {
-    const status = <>{health && <NeedsAttention health={health} />}<RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
+    const status = <>{health && <NeedsAttention health={health} link={link} />}<RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
@@ -119,7 +120,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
           onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
         {row.enabled !== undefined && <p className="detail">{t("runtime_routing_hint")}</p>}
         {name === LINKABLE && (row.configured === false
-          ? <p className="note">{t("whatsapp_setup_missing")}</p> : <LinkControl link={link} />)}
+          ? <p className="note">{t("whatsapp_setup_missing")}</p> : needsLink(row) ? <p className="detail">{t("link_see_attention")}</p> : <LinkControl link={link} />)}
       </> : null;
     }} renderActivity={(runtimeAvailable) => <>
       {failure && <Problem error={failure} />}
@@ -134,7 +135,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
 
   return (
     <WorkspacePanel trail={trail} views={tabs}>
-      {health && <NeedsAttention health={health} />}
+      {health && <NeedsAttention health={health} link={link} />}
       <CardFrame title={t("health_title")} state={state} onReload={refresh}>
         {(health) => (
           <HealthBody
@@ -201,7 +202,7 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
                 busy={busy}
                 onChange={onChange}
                 extra={
-                  row.name === LINKABLE ? row.configured === false ? <p className="note">{t("whatsapp_setup_missing")}</p> : <LinkControl link={link} /> : undefined
+                  row.name === LINKABLE ? row.configured === false ? <p className="note">{t("whatsapp_setup_missing")}</p> : needsLink(row) ? <p className="detail">{t("link_see_attention")}</p> : <LinkControl link={link} /> : undefined
                 }
               />
             ))}
@@ -241,7 +242,12 @@ function stateWord(row: ServiceRow, t: ReturnType<typeof useTranslate>): string 
 }
 
 // What is not well, first and in full: a problem or an unchecked part never hides in a closed row.
-function NeedsAttention({ health }: { health: Health }) {
+// WhatsApp waits for the owner's phone: the link is what needs doing, so it is offered where the
+// problem is said, not inside the module's closed options.
+const LINK_STATES = new Set(["waiting_for_link", "refused", "logged_out", "replaced"]);
+const needsLink = (row: ServiceRow) => row.name === LINKABLE && row.configured !== false && LINK_STATES.has(row.state ?? "");
+
+function NeedsAttention({ health, link }: { health: Health; link: Link }) {
   const t = useTranslate();
   const titleId = useId();
   const rows = [...health.rows, ...health.interfaces].filter((row) => row.tone === "problem" || row.tone === "unchecked");
@@ -256,6 +262,7 @@ function NeedsAttention({ health }: { health: Health }) {
             <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
             <span className="service-status">{stateWord(row, t)}</span>
             {row.detail && <span className="service-detail">{row.detail}</span>}
+            {needsLink(row) && <div className="attention-action"><LinkControl link={link} /></div>}
           </li>
         ))}
       </ul>
@@ -370,7 +377,7 @@ function LinkControl({ link }: { link: Link }) {
   return (
     <>
       <button type="button" className="link-open" aria-expanded={link.open} onClick={link.toggle}>
-        {link.open ? t("link_close") : t("link_open")}
+        {link.open ? t("link_close") : t("link_open_whatsapp")}
       </button>
       {link.open && <LinkPanel link={link} />}
     </>
@@ -385,7 +392,9 @@ function LinkPanel({ link }: { link: Link }) {
   return (
     <div className="link-panel" aria-busy={busy}>
       <h4>{t("link_title")}</h4>
-      {failure && <Problem error={failure} />}
+      {failure && (notSetUp(failure.message)
+        ? <div className="note" data-tone="unchecked"><p>{t("link_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></div>
+        : <Problem error={failure} />)}
       {state === "connected" ? (
         <p className="note" data-tone="ok">
           {t("link_done")}
