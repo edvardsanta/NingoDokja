@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 	"fmt"
+	communications "read_books/dokja_domain/dokja_communications"
 	"read_books/internal/core"
 	"read_books/internal/logger"
-	"strings"
 )
 
 // InterfaceLinker is an interface that links to an account (WhatsApp). Status gives its state and,
@@ -28,11 +28,17 @@ func (h *SystemDomainHandler) WithInterfaceLinks(links map[string]InterfaceLinke
 // communications prefix, so the orchestrator has already checked the communications credential;
 // the code is returned to the caller and is never logged.
 func (h *SystemDomainHandler) handleInterfaceLink(ctx context.Context, event core.Event) (map[string]any, error) {
-	name := strings.TrimSpace(resultString(event.Payload, "interface"))
-	linker := h.links[name]
-	if name == "" || linker == nil {
-		return nil, fmt.Errorf("interface %q cannot be linked from here", name)
+	available := make(map[string]bool, len(h.links))
+	for name, linker := range h.links {
+		available[name] = linker != nil
 	}
+	name, authorizationErr := (communications.LinkPolicy{Available: available}).Authorize(
+		communications.LinkAction(event.Type), resultString(event.Payload, "interface"),
+	)
+	if authorizationErr != nil {
+		return nil, authorizationErr
+	}
+	linker := h.links[name]
 
 	var (
 		state  string

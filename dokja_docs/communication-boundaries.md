@@ -79,7 +79,17 @@ text-only named conversations, safety gating, partial failure and timeout withou
 retry or marking sent. All transports are fakes; no live message was sent and no
 account, session or configuration changed.
 
-Still pending within 09.4-b: inbound gateway eligibility, linking authorization,
-and any remaining delivery-policy decisions in handlers. Gateway relocation stays
+Named conversation routing enablement now passes through
+`Communications.DeliveryPolicy.AuthorizeConversation` before an adapter list or
+send. The handler retains the configured-adapter check and fixed unavailable
+error. Linking authorization now passes through `Communications.LinkPolicy` before the
+System handler calls a registered adapter. The domain accepts only a configured,
+available platform and the three existing link operations; ingress credentials,
+adapter session state and the reply contract are unchanged. Domain and handler
+tests cover refusal before an adapter call. This does not make a source label an
+authentication credential.
+
+Still pending within 09.4-b: inbound gateway eligibility and a final review of
+delivery-policy decisions in handlers. Gateway relocation stays
 pending until those boundaries have parity coverage. This extraction does not
 move platform code, change public actions or introduce a new delivery guarantee.
