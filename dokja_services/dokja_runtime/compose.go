@@ -27,9 +27,11 @@ import (
 
 type Runner func(context.Context, ...string) ([]byte, error)
 type Compose struct {
-	Environment  func([]string) ([]string, error)
-	Run          Runner
-	Inspect      Runner
+	Environment func([]string) ([]string, error)
+	Run         Runner
+	Inspect     Runner
+	// Stream runs a compose command that reports as it goes, writing its output to the writer.
+	Stream       func(context.Context, io.Writer, ...string) error
 	Poll         time.Duration
 	Wait         time.Duration
 	startCommand func(context.Context, domain.Module) error
@@ -78,6 +80,10 @@ func New(root string) *Compose {
 	}
 	c.Run = func(ctx context.Context, args ...string) ([]byte, error) {
 		return execute(ctx, nil, composeArgs(root, args)...)
+	}
+	c.Stream = func(ctx context.Context, w io.Writer, args ...string) error {
+		_, err := execute(ctx, w, composeArgs(root, args)...)
+		return err
 	}
 	c.Inspect = func(ctx context.Context, ids ...string) ([]byte, error) {
 		return execute(ctx, nil, append([]string{"inspect"}, ids...)...)

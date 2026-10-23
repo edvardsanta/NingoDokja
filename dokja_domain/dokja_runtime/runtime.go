@@ -129,6 +129,7 @@ type Domain struct {
 	settingsErr      string
 	busy             bool
 	timeout          time.Duration
+	models           *modelState
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {
@@ -210,6 +211,11 @@ func (d *Domain) Set(name string, enabled bool) (Snapshot, error) {
 	if !ok || m.Internal {
 		return Snapshot{}, fmt.Errorf("unknown module")
 	}
+	return d.set(m, enabled)
+}
+
+func (d *Domain) set(m Module, enabled bool) (Snapshot, error) {
+	name := m.Name
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.busy {

@@ -106,7 +106,7 @@ func run() error {
 	defer settings.Close()
 	backend := service.New(root)
 	backend.Environment = settings.Environment
-	d := domain.New(backend, journal, save).WithSettings(settings).WithProviders(service.ProviderDiscovery{Compose: backend}).WithProviderSettings(settings).WithChat(settings, service.ChatAdapters{Root: root, Environment: settings.Environment})
+	d := domain.New(backend, journal, save).WithSettings(settings).WithProviders(service.ProviderDiscovery{Compose: backend}).WithProviderSettings(settings).WithChat(settings, service.ChatAdapters{Root: root, Environment: settings.Environment}).WithModels(service.OllamaModels{Compose: backend, Environment: settings.Environment})
 	// Only the inference directory is mounted into application containers.
 	inferenceDir := filepath.Join(root, ".dokja", "inference")
 	if err := os.MkdirAll(inferenceDir, 0700); err != nil {

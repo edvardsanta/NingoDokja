@@ -771,6 +771,14 @@ and restart the old controller once to enable the new action. Authentication,
 quota and capability/inference validation remain untested by this operation.
 See [provider inventory](provider-inventory.md) for bounds and pending bindings.
 
+The same controller can start the Ollama engine on its own and download and remove its models
+(`runtime.models.engine.start`, `.pull`, `.cancel`, `.remove`, `.status`), always inside the stack's running `dokja-ollama` container, through
+`docker compose exec`. Models land in the existing Ollama volume (`OLLAMA_MODELS_DIR`). There is no new
+port, environment variable or Compose change. A download can take gigabytes of disk and network, and
+starts only when an operator interface asks for it. The embedding model (`DOKJA_EMBED_MODEL`, default
+`bge-m3`) cannot be removed while memory or knowledge run. Rebuild and restart the controller once to
+enable the actions.
+
 ## Persistent provider registrations
 
 The same local controller now stores discovery eligibility and up to 16 declared
