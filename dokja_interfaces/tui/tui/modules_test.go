@@ -11,11 +11,33 @@ import (
 )
 
 type fakeRuntime struct {
+	chat        cli.ChatBinding
+	chatErr     error
 	snapshot    cli.RuntimeSnapshot
 	settings    cli.SettingsView
 	providers   cli.ProvidersView
 	providerErr error
 	calls       []call
+}
+
+func (f *fakeRuntime) ChatBinding(context.Context) (cli.ChatBinding, error) {
+	f.calls = append(f.calls, call{"runtime.chat", nil})
+	if f.chat.Revision == 0 {
+		f.chat.Revision = 2
+	}
+	return f.chat, f.chatErr
+}
+func (f *fakeRuntime) ConfigureChat(_ context.Context, b cli.ChatBinding) (cli.ChatBinding, error) {
+	f.calls = append(f.calls, call{"runtime.chat.configure", map[string]any{"configuration_revision": b.Revision, "provider": b.Provider, "model": b.Model}})
+	if f.chatErr != nil {
+		return cli.ChatBinding{}, f.chatErr
+	}
+	if b.Revision != f.chat.Revision {
+		return cli.ChatBinding{}, errors.New("chat configuration changed; reload before saving")
+	}
+	b.Revision++
+	f.chat = b
+	return b, nil
 }
 
 func (f *fakeRuntime) ConfigureProvider(_ context.Context, revision uint64, p cli.ProviderRegistration) (cli.ProviderSaved, error) {

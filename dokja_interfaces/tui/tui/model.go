@@ -46,6 +46,7 @@ const (
 	overlayLink
 	overlayProviders
 	overlayProviderEdit
+	overlayChatBinding
 	overlaySettings
 	overlaySettingEdit
 )
@@ -69,6 +70,8 @@ type statusMsg struct {
 
 // Runtime is the local runtime controller: it starts and stops the lite stack's containers.
 type Runtime interface {
+	ChatBinding(context.Context) (cli.ChatBinding, error)
+	ConfigureChat(context.Context, cli.ChatBinding) (cli.ChatBinding, error)
 	Providers(context.Context) (cli.ProvidersView, error)
 	ConfigureProvider(context.Context, uint64, cli.ProviderRegistration) (cli.ProviderSaved, error)
 	Request(ctx context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error)
@@ -181,6 +184,10 @@ type Model struct {
 	// The settings window: what the controller last said, the selected row and the one edited.
 	providers               *cli.ProvidersView
 	providersErr            string
+	chatBinding             cli.ChatBinding
+	chatBindingErr          string
+	chatChoices             []cli.ChatBinding
+	chatCursor              int
 	providersCursor         int
 	providerEditing         cli.ProviderRegistration
 	providerEditingRevision uint64
@@ -529,6 +536,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memory = msg.view
 		return m, nil
 
+	case chatBindingMsg:
+		m.busy = false
+		if m.overlay != overlayChatBinding {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.chatBindingErr = msg.err.Error()
+			return m, nil
+		}
+		m.chatBinding, m.chatBindingErr = msg.binding, ""
+		for i, choice := range m.chatChoices {
+			if choice.Provider == msg.binding.Provider && choice.Model == msg.binding.Model {
+				m.chatCursor = i
+			}
+		}
+		return m, nil
 	case providersMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -702,6 +725,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemoryPredict(msg)
 	case overlayLink:
 		return m.keyLink(key)
+	case overlayChatBinding:
+		return m.keyChatBinding(key)
 	case overlayProviderEdit:
 		return m.keyProviderEdit(msg)
 	case overlayProviders:

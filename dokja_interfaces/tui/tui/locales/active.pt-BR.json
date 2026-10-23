@@ -305,7 +305,7 @@
   "provider_no_models": "Nenhum modelo local.",
   "provider_models_unavailable": "Catálogo de modelos indisponível.",
   "provider_models_truncated": "Lista de modelos truncada.",
-  "providers_help": "↑↓ selecionar · e editar · r atualizar · esc voltar",
+  "providers_help": "↑↓ selecionar · e editar · r atualizar · esc voltar · c seleção do chat",
   "provider_service_stopped": "Serviço da stack desligado",
   "provider_declared_models": "Modelos declarados (não verificados)",
   "provider_no_declarations": "Nenhum modelo declarado.",
@@ -317,5 +317,12 @@
   "provider_registration_saved": "Cadastro do provedor salvo.",
   "provider_edit_help": "ctrl+t habilitar/desabilitar descoberta · enter revisar · esc cancelar",
   "provider_models_hint": "Até 16 nomes de modelos separados por vírgula; deixe vazio para limpar.",
-  "legacy_profiles_do_not_select_chat": "Perfis antigos não selecionam o chat. Use providers chat <provedor> <modelo>.\n"
+  "legacy_profiles_do_not_select_chat": "Perfis antigos não selecionam o chat. Use providers chat <provedor> <modelo>.\n",
+  "chat_binding_title": "Provedor e modelo do chat",
+  "chat_binding_notice": "A seleção usa os modelos declarados. Autenticação, cota e inferência não são testadas. Salvar não consulta o modelo.",
+  "chat_binding_save": "Salvar seleção do chat",
+  "chat_binding_saved": "Seleção do chat salva.",
+  "chat_binding_missing": "Nenhum provedor/modelo selecionado para o chat.",
+  "chat_binding_no_choices": "Habilite um provedor e declare um modelo; depois reabra esta seleção.",
+  "chat_binding_help": "↑↓ selecionar · enter revisar · r recarregar · esc voltar"
 }

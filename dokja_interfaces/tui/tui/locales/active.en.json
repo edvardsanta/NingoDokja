@@ -305,7 +305,7 @@
   "provider_no_models": "No local models.",
   "provider_models_unavailable": "Model catalog unavailable.",
   "provider_models_truncated": "Model list truncated.",
-  "providers_help": "↑↓ select · e edit · r refresh · esc back",
+  "providers_help": "↑↓ select · e edit · r refresh · esc back · c chat selection",
   "provider_service_stopped": "Stack service is stopped",
   "provider_declared_models": "Declared models (unverified)",
   "provider_no_declarations": "No declared models.",
@@ -317,5 +317,12 @@
   "provider_registration_saved": "Provider registration saved.",
   "provider_edit_help": "ctrl+t enable/disable discovery · enter review · esc cancel",
   "provider_models_hint": "Up to 16 comma-separated model names; leave empty to clear.",
-  "legacy_profiles_do_not_select_chat": "Legacy profiles do not select chat inference. Use providers chat <provider> <model>.\n"
+  "legacy_profiles_do_not_select_chat": "Legacy profiles do not select chat inference. Use providers chat <provider> <model>.\n",
+  "chat_binding_title": "Chat provider and model",
+  "chat_binding_notice": "Selection uses registered declarations. Authentication, quota and inference are not tested. No model is called when saving.",
+  "chat_binding_save": "Save chat selection",
+  "chat_binding_saved": "Chat selection saved.",
+  "chat_binding_missing": "No chat provider/model selected.",
+  "chat_binding_no_choices": "Enable a provider and declare a model, then reopen this selection.",
+  "chat_binding_help": "↑↓ select · enter review · r reload · esc back"
 }

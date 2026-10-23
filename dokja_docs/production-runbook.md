@@ -767,7 +767,8 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
    using their existing build commands, and restart the controller as described above.
 2. Register an enabled adapter and declare a model in System → Inference providers, or
    `dokja-cli providers configure <provider> --models=<model>`.
-3. Select the pair under Chat provider and model, or
+3. Select the pair under Chat provider and model, use TUI settings (`c`) →
+   providers (`p`) → chat (`c`) and confirm the selected pair, or run
    `dokja-cli providers chat <provider> <model>`. Selection is stored in `runtime.chat.v1`
    with a separate compare-and-swap revision. No database table/schema migration is required.
 4. Recreate the orchestrator from the updated Compose definition. Every stack mounts only

@@ -28,6 +28,8 @@ func (m *Model) cmdProviders() tea.Cmd {
 }
 func (m *Model) keyProviders(key string) (tea.Model, tea.Cmd) {
 	switch key {
+	case "c":
+		return m, m.openChatBinding()
 	case "up", "k":
 		m.providersCursor = max(0, m.providersCursor-1)
 	case "down", "j":

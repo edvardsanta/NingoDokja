@@ -176,3 +176,11 @@ Chat requires an explicit enabled provider and declared model. Select it in Desk
 System → Inference providers → Chat provider and model, or run
 `dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
 shows a setup error. Archived profile editing no longer selects live inference.
+
+From the providers view (`c` settings → `p` providers), press `c` for chat
+selection. Only declared models from enabled registrations are offered. Use ↑/↓,
+Enter to review, then confirm to save. Esc cancels; `r` reloads the binding. To
+refresh declarations first, return to providers and refresh that inventory.
+Selections keep the original binding revision; conflicts require explicit reload
+and review. Reading/saving does not authenticate providers, start services or
+perform inference. This uses the same `runtime.chat` actions as Desktop and CLI.

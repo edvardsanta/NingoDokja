@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-22",
+  "updated_on": "2026-10-23",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "09",
   "status_values": [
@@ -1132,6 +1132,11 @@
               "name": "native_operator_e2e_baseline",
               "status": "failed",
               "detail": "Initial pnpm test:e2e: 3 passed, 27 cancelled after parallel app-start failures. Sequential execution: 28 passed, 2 failed. Both failures were reproduced on feat/provider-catalog: communications native-confirmation fixture returns unexpected event communications.send; full smoke suite reproduces the Digest timeout (23 passed, 1 failed). The new provider registration is covered by component/IPC tests, not a dedicated Electron scenario."
+            },
+            {
+              "name": "tui_cli_chat_binding",
+              "status": "passed",
+              "detail": "go test -race ./... and go vet ./... passed in CLI and TUI. Covers confirmation/cancellation, stale writes without automatic retry, late inventory replies, disabled/undeclared model exclusion, controller errors and incompatible save receipts. No live provider invocation, Desktop rebuild or container changes."
             }
           ],
           "evidence": [
@@ -1142,7 +1147,8 @@
             "runtime.providers.configure accepts a known adapter ID, explicit enabled flag, up to 16 declared model names and the exact read revision. Disabled adapters are skipped by discovery. Declarations stay separate from observations and every row still reports inference_status=not_tested.",
             "CLI, TUI and desktop confirm edits, refuse old controllers without a revision and retain stale revisions rather than silently merging. A TUI regression covers a late inventory reply arriving during editing. Persistence survives reopen; conflicting writers cannot replace one another.",
             "No live registration, provider authentication, model inference, service recreation or production deployment was performed. Legacy inference consumers and capability bindings remain unchanged.",
-            "Chat consumer migration removes the dedicated language service and uses an explicit revisioned provider/model binding, host inference adapters and a private socket. Deterministic regression coverage is added; live authentication/inference and broader cognitive/OCR bindings remain unverified."
+            "Chat consumer migration removes the dedicated language service and uses an explicit revisioned provider/model binding, host inference adapters and a private socket. Deterministic regression coverage is added; live authentication/inference and broader cognitive/OCR bindings remain unverified.",
+            "TUI now shares explicit chat selection with Desktop and CLI. Selection reads runtime.chat, confirms runtime.chat.configure and retains the original revision. Choices are declarations rather than proof of availability; broader capability migration remains pending."
           ],
           "batches": [
             {
@@ -1179,6 +1185,15 @@
               "status": "pending",
               "deliverables": [
                 "Specific OCR options and evaluated legacy classifier/provider migration"
+              ]
+            },
+            {
+              "id": "tui_chat_binding",
+              "status": "completed",
+              "completed_on": "2026-10-23",
+              "deliverables": [
+                "Confirmed TUI selection from enabled registered model declarations through the existing shared chat actions",
+                "Reusable CLI client read/save methods validating exact revisions and matching save receipts"
               ]
             }
           ],
