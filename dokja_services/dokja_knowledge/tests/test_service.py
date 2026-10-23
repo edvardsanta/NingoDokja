@@ -253,3 +253,20 @@ def test_search_and_list_can_be_scoped_to_one_kind(service):
     assert listed["total"] == 1
     assert listed["documents"][0]["source_id"] == "meme-hashtag:cake"
     assert "carrot cake" in listed["documents"][0]["text"].lower()
+
+
+def test_list_can_leave_kinds_out_and_counts_what_it_shows(service):
+    add(service, CAKE, source_id="note:cake", kind="note")
+    add(service, ("#Cake", CAKE[1]), source_id="meme-hashtag:cake", kind="meme_hashtag")
+
+    listed = service.list_documents({"exclude_kinds": ["meme_hashtag"]})
+    assert [d["source_id"] for d in listed["documents"]] == ["note:cake"]
+    assert listed["total"] == 1
+    assert service.list_documents({})["total"] == 2
+
+
+@pytest.mark.parametrize("bad", ["meme_hashtag", ["Not A Kind"], ["x"] * 17, [1, "' OR 1=1 --"]])
+def test_list_refuses_kinds_to_leave_out_that_are_not_kinds(service, bad):
+    with pytest.raises(ValueError):
+        service.list_documents({"exclude_kinds": bad})
+

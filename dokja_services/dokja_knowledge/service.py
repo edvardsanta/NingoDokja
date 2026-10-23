@@ -59,6 +59,18 @@ def fold(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
+def _kinds(value: object) -> tuple[str, ...]:
+    """The kinds a listing leaves out: a short list of the same words a kind is made of."""
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > 16:
+        raise ValueError("exclude_kinds must be a list of at most 16 kinds")
+    kinds = tuple(str(item).strip().lower() for item in value)
+    if not all(KIND.match(kind) for kind in kinds):
+        raise ValueError("exclude_kinds must hold short lowercase words such as meme_hashtag")
+    return kinds
+
+
 def terms(text: str) -> list[str]:
     seen: dict[str, None] = {}
     for token in re.findall(r"\w+", fold(text)):
@@ -438,9 +450,10 @@ class KnowledgeService:
         kind = str(payload.get("kind") or "").strip().lower()
         if kind and not KIND.match(kind):
             raise ValueError("kind must be a short lowercase word such as note, article or book")
+        exclude = _kinds(payload.get("exclude_kinds"))
         include_text = payload.get("include_text") is True
         documents = []
-        for row in self.store.list_documents(limit, offset, kind):
+        for row in self.store.list_documents(limit, offset, kind, exclude):
             document = {
                 "source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
                 "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
@@ -450,7 +463,7 @@ class KnowledgeService:
             if include_text:
                 document["text"] = self.store.document_text(row["id"])
             documents.append(document)
-        return {"documents": documents, "total": self.store.document_count(kind),
+        return {"documents": documents, "total": self.store.document_count(kind, exclude),
                 "offset": offset}
 
     def delete(self, payload: dict) -> dict:
