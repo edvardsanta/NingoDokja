@@ -546,6 +546,25 @@ button:focus-visible {
   font-weight: 700;
 }
 
+/* The Library opens on finding: the search first, adding to the Library beside it, on demand. */
+.library-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.library-tools .search {
+  flex: 1 1 24rem;
+  margin-top: 0;
+}
+
+.library-add[aria-expanded="true"] {
+  background: var(--cyan);
+  color: var(--panel);
+}
+
 .search input {
   min-width: 0;
   padding: 0.35rem 0.6rem;

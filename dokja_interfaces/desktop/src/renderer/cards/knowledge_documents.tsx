@@ -7,6 +7,7 @@ import { useTranslate } from "../i18n/context.js";
 import { OffNotice, Problem } from "./card_frame.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
+import { useWorkspaceRefresh } from "./workspace_panel.js";
 
 const PAGE_SIZE = 20;
 const count = (value: unknown): number =>
@@ -32,7 +33,6 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number) => void;
 }) {
   const t = useTranslate();
-  const [opened, setOpened] = useState(false);
   const [offset, setOffset] = useState(0);
   const busy = useRef(false);
   const load = useCallback(async (at: number): Promise<LoadResult<KnowledgeDocuments | Off>> => {
@@ -61,18 +61,18 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   }, [transport, onChanged]);
   const deletion = useAction(remove);
   const removing = deletion.state.phase === "loading";
+  // The list is what the Library is for, so it is read when the view opens, and again with the
+  // panel's refresh.
   useEffect(() => {
-    if (opened) listing.start(offset);
-  }, [opened, offset, revision, listing.start]);
+    listing.start(offset);
+  }, [offset, revision, listing.start]);
+  const reread = useCallback(() => listing.start(offset), [listing.start, offset]);
+  useWorkspaceRefresh(reread, listing.state.phase === "loading");
   const page = listing.state.phase === "ready" ? listing.state.data : undefined;
 
   return (
     <section aria-label={t("documents_title")}>
       <h3>{t("documents_title")}</h3>
-      <button type="button" disabled={removing || listing.state.phase === "loading"} onClick={() => {
-        if (!opened) setOpened(true);
-        else listing.start(offset);
-      }}>{t("documents_load")}</button>
       {listing.state.phase === "loading" && <p role="status">{t("loading")}</p>}
       {listing.state.phase === "error" && <Problem error={listing.state.error} />}
       {page?.off && <OffNotice reason={page.reason} />}

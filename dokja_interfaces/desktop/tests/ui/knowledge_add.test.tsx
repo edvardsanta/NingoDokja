@@ -172,7 +172,7 @@ describe("adding to the research base", () => {
     type("Web address", " https://example.com/a ");
     send();
 
-    await screen.findByText("Already in the research base.");
+    await screen.findByText("Already in the Library.");
     expect(sent(calls)[0]?.payload).toEqual({ mode: "address", address: "https://example.com/a" });
     await waitFor(() => expect((screen.getByLabelText("Web address") as HTMLInputElement).value).toBe(""));
   });
@@ -308,7 +308,7 @@ describe("adding to the research base", () => {
     const { transport } = routedTransport({ "knowledge.ingest": ok(CREATED) });
     renderForm(transport, "pt");
 
-    screen.getByRole("heading", { name: "Adicionar à base de pesquisa" });
+    screen.getByRole("heading", { name: "Adicionar à Biblioteca" });
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     expect(screen.getByRole("alert").textContent).toBe("Uma nota precisa de um título.");
     fireEvent.change(screen.getByLabelText("Título"), { target: { value: "T" } });
@@ -316,6 +316,6 @@ describe("adding to the research base", () => {
     fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
 
     await screen.findByText("Adicionado. Trechos guardados: 2.");
-    within(screen.getByRole("group", { name: "Adicionar à base de pesquisa" })).getByRole("button", { name: "Endereço" });
+    within(screen.getByRole("group", { name: "Adicionar à Biblioteca" })).getByRole("button", { name: "Endereço" });
   });
 });

@@ -129,11 +129,14 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
     setCurrent((shown) => (shown === id ? BASE : shown));
   };
 
-  // A file dropped anywhere on the view goes to the form, as if it had been dropped on the form; the
-  // base's tab comes to the front so the form can be seen.
+  // Adding is one action of the view, not the view itself: the form opens on demand. A file dropped
+  // anywhere on the view opens it and goes to it, as if it had been dropped on the form; the
+  // Library's tab comes to the front so the form can be seen.
+  const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<Dropped>();
   const drop = useFileDrop((file) => {
     setCurrent(BASE);
+    setAdding(true);
     setDropped((previous) => ({ file, count: (previous?.count ?? 0) + 1 }));
   });
 
@@ -172,10 +175,15 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
         </div>
       )}
       <div hidden={current !== BASE}>
+        <div className="library-tools">
+          <SearchBox transport={transport} />
+          <button type="button" className="library-add" aria-expanded={adding} onClick={() => setAdding((value) => !value)}>
+            {t("add_title")}
+          </button>
+        </div>
+        {adding && <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />}
         <KnowledgeStatusLines status={status} />
         <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
-        <SearchBox transport={transport} />
-        <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />
         <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} onOpen={open} />
       </div>
       {documents.map((document) => (

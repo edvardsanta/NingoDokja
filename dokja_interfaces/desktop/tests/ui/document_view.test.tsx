@@ -19,7 +19,6 @@ function renderCard(transport: Transport) {
 }
 
 async function openSecond() {
-  fireEvent.click(await screen.findByRole("button", { name: "Load documents" }));
   fireEvent.click(await screen.findByRole("button", { name: "Open Title note:one" }));
 }
 
@@ -42,7 +41,7 @@ describe("a document opened from the research base", () => {
     const text = await screen.findByText(/first<\/b> passage/);
     expect(text.tagName).toBe("PRE");
     expect(view.container.querySelector(".document-text b")).toBeNull();
-    screen.getByText("Rebuilt from the passages the base stored: close to the original, not a faithful copy of it.");
+    screen.getByText("Rebuilt from the passages the Library stored: close to the original, not a faithful copy of it.");
     expect(current()).toEqual(["Title note:one"]);
     expect(calls.filter((call) => call.type === "knowledge.list").map((call) => call.payload)).toEqual([
       { limit: 20, offset: 0 },
@@ -58,10 +57,10 @@ describe("a document opened from the research base", () => {
     renderCard(transport);
     await openSecond();
     await screen.findByText("the text");
-    expect(screen.queryByRole("button", { name: "Load documents" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Documents" })).toBeNull();
 
-    fireEvent.click(within(tabs()).getByRole("button", { name: "Research base" }));
-    expect(current()).toEqual(["Research base"]);
+    fireEvent.click(within(tabs()).getByRole("button", { name: "Library" }));
+    expect(current()).toEqual(["Library"]);
     // the list is still there, and opening the same document again goes back to its tab
     fireEvent.click(screen.getByRole("button", { name: "Open Title note:one" }));
     expect(current()).toEqual(["Title note:one"]);
@@ -70,7 +69,7 @@ describe("a document opened from the research base", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close Title note:one" }));
     expect(screen.queryByRole("group", { name: "Open documents" })).toBeNull();
-    screen.getByRole("button", { name: "Load documents" });
+    screen.getByRole("heading", { name: "Documents" });
   });
 
   it("says so when another document sits where this one was, instead of showing it", async () => {
