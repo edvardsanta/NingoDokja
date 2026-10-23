@@ -118,3 +118,30 @@ func TestNullConfigurationValuesAreRejected(t *testing.T) {
 		t.Fatal("corrupt snapshot updated")
 	}
 }
+
+func TestProviderAndRuntimeSnapshotsHaveIndependentRevisions(t *testing.T) {
+	db := open(t)
+	runtime, err := db.InitializeRuntimeConfiguration(map[string]string{"discord.direct_messages": "open"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, err := db.InitializeProviderConfiguration(map[string]string{"codex.enabled": "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers, err = db.UpdateProviderConfiguration(providers.Revision, map[string]string{"codex.enabled": "false"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := db.RuntimeConfiguration()
+	if err != nil || got.Revision != runtime.Revision || got.Values["discord.direct_messages"] != "open" {
+		t.Fatal(got, err)
+	}
+	if _, err = db.UpdateProviderConfiguration(providers.Revision-1, map[string]string{"codex.enabled": "true"}); !errors.Is(err, ErrConfigurationConflict) {
+		t.Fatal(err)
+	}
+	again, err := db.InitializeProviderConfiguration(map[string]string{"codex.enabled": "true"})
+	if err != nil || again.Values["codex.enabled"] != "false" || again.Revision != providers.Revision {
+		t.Fatal(again, err)
+	}
+}

@@ -7,7 +7,7 @@ import (
 
 type providerFixture []ProviderObservation
 
-func (p providerFixture) Inspect(context.Context) []ProviderObservation { return p }
+func (p providerFixture) Inspect(context.Context, map[string]bool) []ProviderObservation { return p }
 
 func TestProviderInventoryCannotClaimSuccessfulInference(t *testing.T) {
 	d, f := fresh()

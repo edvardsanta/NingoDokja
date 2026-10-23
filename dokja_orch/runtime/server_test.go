@@ -247,3 +247,60 @@ func TestProviderInventoryIsReadOnlyAndSharedByLocalInterfaces(t *testing.T) {
 		t.Fatal("inventory started modules")
 	}
 }
+
+func TestProviderConfigurationIsSharedAndStaleRequestsAreRejected(t *testing.T) {
+	t.Setenv("DOKJA_DB_FILE", "")
+	settings, err := service.OpenDatabaseSettings(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer settings.Close()
+	backend := &fake{}
+	handler := Handler(domain.New(backend, domain.Journal{}, nil).WithProviderSettings(settings), "fixture")
+	ask := func(source, kind string, payload map[string]any) map[string]any {
+		t.Helper()
+		raw, _ := json.Marshal(Event{Source: source, Type: kind, Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var out map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	revision := float64(1)
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		payload := map[string]any{"configuration_revision": revision, "provider": "codex", "enabled": false, "models": []string{"fixture/model"}}
+		reply := ask(source, "runtime.providers.configure", payload)
+		if reply["status"] != "ok" {
+			t.Fatal(reply)
+		}
+		if got := ask(source, "runtime.providers.configure", payload); got["status"] != "error" {
+			t.Fatal("stale write accepted", got)
+		}
+		revision++
+	}
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		got := ask(source, "runtime.providers", nil)
+		result := got["result"].(map[string]any)["result"].(map[string]any)
+		row := result["providers"].([]any)[0].(map[string]any)
+		if result["configuration_revision"] != revision || row["enabled"] != false || row["declared_models"].([]any)[0] != "fixture/model" || row["inference_status"] != "not_tested" {
+			t.Fatal(result)
+		}
+	}
+	for _, bad := range []map[string]any{
+		{"configuration_revision": revision, "provider": "codex", "enabled": "false", "models": []string{}},
+		{"configuration_revision": 1.5, "provider": "codex", "enabled": true, "models": []string{}},
+		{"configuration_revision": revision, "provider": "codex", "enabled": true, "models": []any{1}},
+		{"configuration_revision": revision, "provider": "codex", "enabled": true},
+	} {
+		if got := ask("cli", "runtime.providers.configure", bad); got["status"] != "error" {
+			t.Fatal(got)
+		}
+	}
+	if backend.starts != 0 {
+		t.Fatal("registration started services")
+	}
+}

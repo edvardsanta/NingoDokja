@@ -122,11 +122,12 @@ type Domain struct {
 	lifecycle    sync.RWMutex
 	serviceLocks map[string]chan struct{}
 	// settings is where the stack's settings are kept; nil when this stack has none.
-	providers   ProviderInspector
-	settings    SettingsStore
-	settingsErr string
-	busy        bool
-	timeout     time.Duration
+	providerSettings ProviderSettingsStore
+	providers        ProviderInspector
+	settings         SettingsStore
+	settingsErr      string
+	busy             bool
+	timeout          time.Duration
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {

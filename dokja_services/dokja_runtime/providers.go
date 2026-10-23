@@ -16,18 +16,24 @@ type ProviderDiscovery struct {
 	LookPath func(string) (string, error)
 }
 
-func (p ProviderDiscovery) Inspect(ctx context.Context) []domain.ProviderObservation {
+func (p ProviderDiscovery) Inspect(ctx context.Context, enabled map[string]bool) []domain.ProviderObservation {
 	lookup := p.LookPath
 	if lookup == nil {
 		lookup = exec.LookPath
 	}
 	rows := []domain.ProviderObservation{}
 	for _, entry := range []struct{ id, binary string }{{"codex", "codex"}, {"claude_code", "claude"}} {
+		if !enabled[entry.id] {
+			continue
+		}
 		row := domain.ProviderObservation{ID: entry.id, State: "unavailable", Reason: "executable_missing"}
 		if _, err := lookup(entry.binary); err == nil {
 			row.State, row.Reason = "installed", ""
 		}
 		rows = append(rows, row)
+	}
+	if !enabled["ollama"] {
+		return rows
 	}
 	ollama := domain.ProviderObservation{ID: "ollama", State: "unavailable", Reason: "engine_unavailable"}
 	if p.Compose == nil {

@@ -33,7 +33,7 @@ func discovered(t *testing.T, running bool, output string, runErr error) ([]doma
 		}
 		return "", errors.New("missing")
 	}}
-	return p.Inspect(context.Background()), calls
+	return p.Inspect(context.Background(), map[string]bool{"codex": true, "claude_code": true, "ollama": true}), calls
 }
 func TestDiscoveryListsOnlyModelsInTheSelectedRunningStack(t *testing.T) {
 	rows, calls := discovered(t, true, "NAME ID SIZE MODIFIED\nbge-m3:latest 0123456789ab 1 GB today\nfixture/model:latest abcdef012345 2 GB today\n", nil)
@@ -86,7 +86,7 @@ func TestDiscoveryCancellationDoesNotExecuteModelListing(t *testing.T) {
 		}
 		return nil, ctx.Err()
 	}}}
-	rows := p.Inspect(ctx)
+	rows := p.Inspect(ctx, map[string]bool{"codex": true, "claude_code": true, "ollama": true})
 	if calls != 0 || rows[2].Reason != "timeout" {
 		t.Fatal(rows, calls)
 	}
