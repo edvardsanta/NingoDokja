@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { isRecord } from "../../shared/records.js";
 import type { MemoryExperience, MemoryExperienceDetail, MemoryExperiences, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
-import { useNumbers, useTranslate } from "../i18n/context.js";
+import { useNumbers, useTimes, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { ExperienceFeedback } from "./experience_feedback.js";
 import { useAction } from "./use_action.js";
@@ -60,15 +60,36 @@ export function MemoryExperiencesPanel({ transport, onChanged }: { transport: Tr
   </section>;
 }
 
+// What Ningo decided, said as a decision, and what came of it: experience is how he acted on what
+// he knew. The record's id and exact time stay for the operator, in the tooltip.
+const VERDICTS: Record<string, { id: MessageId; tone: string }> = {
+  accepted: { id: "experience_verdict_accepted", tone: "ok" },
+  kept: { id: "experience_verdict_kept", tone: "ok" },
+  ignored: { id: "experience_verdict_ignored", tone: "off" },
+  replaced: { id: "experience_verdict_replaced", tone: "unchecked" },
+  expired: { id: "experience_verdict_expired", tone: "off" },
+};
+
+function decisionOf(entry: MemoryExperience, t: ReturnType<typeof useTranslate>): string {
+  if (entry.action === "hashtag.suggest" && entry.detail) return t("experience_decision_hashtag", { tag: entry.detail });
+  return entry.detail ? `${entry.action}: ${entry.detail}` : entry.action;
+}
+
 function ExperienceRow({ entry, transport, onChanged }: { entry: MemoryExperience; transport: Transport; onChanged: () => void }) {
   const t = useTranslate();
+  const { ago } = useTimes();
   const [opened, setOpened] = useState(false);
-  return <li>
-    <p><strong>{entry.action}</strong> · {entry.outcome || t("experiences_pending")}</p>
-    <p>{entry.detail || t("experience_no_detail")}</p>
-    <p className="detail">{entry.ref} · {entry.createdAt}</p>
-    {entry.contextSnippet && <p>{entry.contextSnippet}</p>}
-    <button type="button" aria-expanded={opened} aria-label={t("experience_inspect_named", { ref: entry.ref })} onClick={() => setOpened((value) => !value)}>{t(opened ? "experience_close" : "experience_inspect")}</button>
+  const verdict = entry.outcome ? VERDICTS[entry.outcome] : undefined;
+  return <li className="decision">
+    <p className="decision-line">
+      <strong>{decisionOf(entry, t)}</strong>
+      <span className="decision-verdict" data-tone={verdict?.tone ?? (entry.outcome ? "other" : "unchecked")}>
+        {verdict ? t(verdict.id) : entry.outcome || t("experience_verdict_pending")}
+      </span>
+    </p>
+    <p className="detail" title={`${entry.ref} · ${entry.createdAt}`}>{entry.createdAt ? ago(entry.createdAt) : entry.ref}</p>
+    {entry.contextSnippet && <p className="decision-context">{t("experience_about", { context: entry.contextSnippet })}</p>}
+    <button type="button" className="quiet" aria-expanded={opened} aria-label={t("experience_inspect_named", { ref: entry.ref })} onClick={() => setOpened((value) => !value)}>{t(opened ? "experience_close" : "experience_inspect")}</button>
     {opened && <ExperienceDetail transport={transport} entry={entry} onChanged={onChanged} />}
   </li>;
 }
