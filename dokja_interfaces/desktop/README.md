@@ -27,7 +27,7 @@ owner has already moved. The sidebar asks nothing itself.
 | talk | `message.created` when something is sent | the conversation with Ningo: his opening line, beginnings of a question that fill the message (they never send by themselves), the transcript, and the message docked at the foot (Enter sends, Shift+Enter breaks the line); "Start a new conversation" gives it a new id. With the orchestrator down it says so and offers to open System |
 | notebook (memory) | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
 | library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its readings view | two views, as tabs (the arrows move between them). **Documents**: a search over the Library first, then its documents, listed as the view opens; **Add to the Library** beside the search opens the form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over and opens the form). **Readings**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |
-| messages (communications) | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord; **Load memes** shows the waiting memes as a grid of previews fetched by the shell, and a click attaches one (a second click takes it off) |
+| messages (communications) | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord; the conversation fills the workspace, its history scrolling above a one-row composer; the image button beside the field opens the waiting memes in a tray over the history (previews fetched by the shell), a click on a picture attaches it (a second click takes it off), and the attached meme stays in a chip with its own × and the force-send option. Without `DOKJA_COMMUNICATIONS_TOKEN` the workspace says messages are not set up and what to set |
 
 Ctrl+1 to Ctrl+5 open the workspaces in the sidebar's order (System is Ctrl+5), from anywhere, a field
 included; the up and down arrows (with Home and End) move through the sidebar when it has the focus. A
@@ -100,8 +100,8 @@ session. See [`dokja_docs/whatsapp-interface.md`](../../dokja_docs/whatsapp-inte
 The messages workspace centralizes the configured Discord channels. It lists 30 messages at a time,
 including messages written before the desktop started, with author, bot marker, time, edits,
 reply ids and attachment filenames. Older pages are read on demand. The latest page refreshes
-every 15 seconds only while the workspace and window document are visible; uncheck the refresh option
-to stop. An error pauses polling until a manual retry succeeds.
+every 15 seconds only while the workspace and window document are visible, and with the panel's
+refresh. An error pauses polling until a manual retry succeeds.
 
 The composer sends text (up to 2000 characters) and optionally a meme picked from the waiting
 queue's previews. The main process confirms the exact channel id, text and attachment address in a native

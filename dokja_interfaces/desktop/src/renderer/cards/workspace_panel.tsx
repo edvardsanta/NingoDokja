@@ -27,12 +27,15 @@ type WorkspacePanelProps = {
   actions?: ReactNode;
   // Pinned under the body, which scrolls on its own: a composer stays put while a list grows.
   dock?: ReactNode;
+  // The body does not scroll; what is inside it fills the height and scrolls its own parts (a
+  // conversation with its history above and its composer at the foot).
+  fill?: boolean;
   children: ReactNode;
 };
 
 // The one panel of a workspace. Its sections are not cards of their own: there is one legend, one
 // refresh for everything the workspace shows, and only the body scrolls.
-export function WorkspacePanel({ trail, views, actions, dock, children }: WorkspacePanelProps) {
+export function WorkspacePanel({ trail, views, actions, dock, fill = false, children }: WorkspacePanelProps) {
   const t = useTranslate();
   const reloads = useRef(new Set<() => void>());
   // How many sections can be read again: a workspace with none (the conversation) shows no refresh.
@@ -74,7 +77,7 @@ export function WorkspacePanel({ trail, views, actions, dock, children }: Worksp
             {actions}
           </div>
         </header>
-        <div className="wp-body">{children}</div>
+        <div className="wp-body" data-fill={fill ? "" : undefined}>{children}</div>
         {dock && <div className="wp-dock">{dock}</div>}
       </section>
     </PanelContext.Provider>
