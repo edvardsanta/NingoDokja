@@ -45,7 +45,7 @@ describe("the knowledge card", () => {
     screen.getByText("Similarity is on (model-1).");
     expect(calls.filter((call) => call.type === "knowledge.status")).toEqual([{ type: "knowledge.status", payload: {}, options: { timeoutMs: 15_000 } }]);
     // the documents are listed as the view opens, without a press
-    expect(calls.filter((call) => call.type === "knowledge.list")).toHaveLength(1);
+    await waitFor(() => expect(calls.filter((call) => call.type === "knowledge.list")).toHaveLength(1));
   });
 
   it("says an empty base is empty and where a file goes, instead of counting nothing", async () => {

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MemoryExperiencesPanel } from "../../src/renderer/cards/memory_experiences.js";
+import { WorkspacePanel } from "../../src/renderer/cards/workspace_panel.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { MemoryExperience } from "../../src/shared/replies.js";
 import { deferred, failure, ok, routedTransport } from "./support.js";
@@ -15,8 +16,9 @@ describe("saved experiences",()=>{
   const seven=Array.from({length:7},(_,i)=>({...entry,ref:`fixture:${i+1}`}));
   const {transport,calls}=routedTransport({"memory.list":page(seven),"memory.get":detail()});
   const view=show(transport);
-  expect(calls).toHaveLength(0);
-  fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  // listed as the view opens, without a press
+  await waitFor(()=>expect(calls.filter(c=>c.type==="memory.list")).toHaveLength(1));
+
   await screen.findByText("7 experiences match this filter.");
   expect(screen.getAllByRole("button",{name:/Inspect fixture:/})).toHaveLength(7);
   fireEvent.click(screen.getByRole("button",{name:"Inspect fixture:1"}));
@@ -32,17 +34,17 @@ describe("saved experiences",()=>{
   const first=Array.from({length:20},(_,i)=>({...entry,ref:`fixture:${i}`}));
   const {transport,calls}=routedTransport({"memory.list":[page(first,21),page([{...entry,ref:"fixture:20"}],21,20),page([],0)]});
   show(transport);
-  fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  
   await screen.findByText("21 experiences match this filter.");
   fireEvent.click(screen.getByRole("button",{name:"Next experiences"}));
   await screen.findByRole("button",{name:"Inspect fixture:20"});
-  fireEvent.change(screen.getByLabelText("Show"),{target:{value:"resolved"}});
+  fireEvent.click(screen.getByRole("button",{name:"Settled"}));
   await screen.findByText("No experiences match this filter.");
   expect(calls.map(c=>c.payload)).toEqual([{state:"all",limit:20,offset:0},{state:"all",limit:20,offset:20},{state:"resolved",limit:20,offset:0}]);
  });
  it("distinguishes missing predictions from zero and observed outcomes from pending",async()=>{
   const {transport}=routedTransport({"memory.list":page(),"memory.get":detail({predictedP:null,baselineP:null,outcome:"accepted",resolvedAt:"2026-10-22T00:00:00Z",feedback:{code:"recorded",message:""}})});
-  show(transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  show(transport);
   fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
   await screen.findByText("The outcome is already recorded. The first verdict is retained.");
   expect(screen.getAllByText("Not recorded")).toHaveLength(2);
@@ -51,8 +53,10 @@ describe("saved experiences",()=>{
  it("handles errors and a deleted record, and drops a late detail after closing",async()=>{
   const delayed=deferred<ReturnType<typeof ok>>();
   const {transport,calls}=routedTransport({"memory.list":[failure("timeout"),page()],"memory.get":[ok({found:false}),()=>delayed.promise]});
-  show(transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
-  await screen.findByRole("alert");fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  render(<I18nProvider locale="en"><WorkspacePanel trail={["Notebook"]}><MemoryExperiencesPanel transport={transport}/></WorkspacePanel></I18nProvider>);
+  await screen.findByRole("alert");
+  // a failed read is read again with the panel's refresh
+  fireEvent.click(screen.getByRole("button",{name:"Refresh"}));
   fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
   await screen.findByText("This experience is no longer available. Reload the list.");
   fireEvent.click(screen.getByRole("button",{name:"Inspect fixture:1"}));
@@ -67,7 +71,7 @@ describe("saved experiences",()=>{
 describe("explicit experience feedback",()=>{
  async function open(routes:Parameters<typeof routedTransport>[0]) {
   const test=routedTransport({"memory.list":page(),"memory.get":detail(),...routes});
-  show(test.transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  show(test.transport);
   fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
   await screen.findByRole("button",{name:"Accept result"});return test;
  }
@@ -109,7 +113,7 @@ describe("explicit experience feedback",()=>{
  });
  it("hides controls for a recorded verdict",async()=>{
   const test=routedTransport({"memory.list":page(),"memory.get":detail({outcome:"accepted",resolvedAt:"2026-10-21T01:00:00Z"})});
-  show(test.transport);fireEvent.click(screen.getByRole("button",{name:"Load experiences"}));
+  show(test.transport);
   fireEvent.click(await screen.findByRole("button",{name:"Inspect fixture:1"}));
   await screen.findByText("2026-10-21T01:00:00Z");
   expect(screen.queryByRole("button",{name:"Accept result"})).toBeNull();

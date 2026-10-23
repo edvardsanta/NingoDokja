@@ -17,9 +17,13 @@ function renderCard(transport: Transport, locale: Locale = "en") {
 
 const text = () => document.body.textContent ?? "";
 
+// The experiences are listed as the Notebook opens; these tests are about the rest of it.
+const NO_EXPERIENCES = ok({ experiences: [], total: 0, offset: 0 });
+const reads = <T extends { type: string }>(calls: T[]) => calls.filter((call) => call.type !== "memory.list");
+
 describe("the memory card", () => {
   it("reads the status, then the score, and shows both", async () => {
-    const { transport, calls } = routedTransport({
+    const { transport, calls } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok(MEMORY_SCORE),
     });
@@ -30,14 +34,14 @@ describe("the memory card", () => {
     screen.getByText("Similarity is on (model-1).");
     screen.getByText("31 scored, 4 not scored yet.");
     screen.getByText("Brier score, lower is better: prediction 0.081, baseline 0.270.");
-    expect(calls.map((call) => [call.type, call.options])).toEqual([
+    expect(reads(calls).map((call) => [call.type, call.options])).toEqual([
       ["memory.status", { timeoutMs: 15_000 }],
       ["memory.stats", { timeoutMs: 15_000 }],
     ]);
   });
 
   it("says when similarity is off or unreachable, and when experiences need embedding", async () => {
-    const off = routedTransport({
+    const off = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok({ ...MEMORY_STATUS, embeddings: false, embedderReachable: false }),
       "memory.stats": ok(MEMORY_SCORE),
     });
@@ -45,7 +49,7 @@ describe("the memory card", () => {
     await screen.findByText("Similarity is off: predictions are only the baseline.");
     view.unmount();
 
-    const down = routedTransport({
+    const down = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok({ ...MEMORY_STATUS, embedderReachable: false, needsReindex: 5 }),
       "memory.stats": ok(MEMORY_SCORE),
     });
@@ -55,7 +59,7 @@ describe("the memory card", () => {
   });
 
   it("gives no verdict while too few predictions are scored", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok({ ...MEMORY_SCORE, scored: 12, minScored: 30, enoughData: false, beatsBaseline: true }),
     });
@@ -68,7 +72,7 @@ describe("the memory card", () => {
   });
 
   it("says a prediction that does not beat the baseline does not", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok({ ...MEMORY_SCORE, skill: -0.2, beatsBaseline: false }),
     });
@@ -78,7 +82,7 @@ describe("the memory card", () => {
   });
 
   it("says nothing is scored yet", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok({ ...MEMORY_SCORE, scored: 0, enoughData: false }),
     });
@@ -88,7 +92,7 @@ describe("the memory card", () => {
   });
 
   it("does not ask for the score of a memory that is switched off", async () => {
-    const { transport, calls } = routedTransport({ "memory.status": ok(OFF) });
+    const { transport, calls } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok(OFF) });
     renderCard(transport);
 
     await screen.findByText("Switched off.");
@@ -97,7 +101,7 @@ describe("the memory card", () => {
   });
 
   it("keeps the status when only the score fails", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": failure("timeout", "no answer within 15000 ms"),
     });
@@ -113,7 +117,7 @@ describe("the memory card", () => {
     ["timeout", "The orchestrator took too long to answer."],
   ];
   it.each(failures)("explains a %s failure of the status and offers to try again", async (code, message) => {
-    const { transport } = routedTransport({ "memory.status": failure(code) });
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": failure(code) });
     renderCard(transport);
 
     expect((await screen.findByRole("alert")).textContent).toBe(message);
@@ -121,14 +125,14 @@ describe("the memory card", () => {
   });
 
   it("treats a status of the wrong shape as unexpected", async () => {
-    const { transport } = routedTransport({ "memory.status": ok({ nothing: "here" }) });
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok({ nothing: "here" }) });
     renderCard(transport);
 
     expect((await screen.findByRole("alert")).textContent).toBe("The reply was not what this card expects.");
   });
 
   it("refreshes both reads", async () => {
-    const { transport, calls } = routedTransport({
+    const { transport, calls } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok(MEMORY_SCORE),
     });
@@ -138,11 +142,11 @@ describe("the memory card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Loading…");
     await screen.findByText("Skill +0.70: beats the baseline.");
-    expect(calls.map((call) => call.type)).toEqual(["memory.status", "memory.stats", "memory.status", "memory.stats"]);
+    expect(reads(calls).map((call) => call.type)).toEqual(["memory.status", "memory.stats", "memory.status", "memory.stats"]);
   });
 
   it("speaks Portuguese when asked", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok({ ...MEMORY_SCORE, scored: 12, enoughData: false }),
     });
@@ -155,7 +159,7 @@ describe("the memory card", () => {
   });
 
   it("writes its decimals the way Portuguese does", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),
       "memory.stats": ok(MEMORY_SCORE),
     });
@@ -163,5 +167,34 @@ describe("the memory card", () => {
 
     await screen.findByText("Skill +0,70: supera o baseline.");
     screen.getByText("Brier, menor é melhor: previsão 0,081, baseline 0,270.");
+  });
+
+  it("speaks once, as Ningo, when something waits for the owner, and keeps the numbers plain", async () => {
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok(MEMORY_STATUS), "memory.stats": ok(MEMORY_SCORE) });
+    renderCard(transport);
+
+    const voice = await screen.findByText("Some of what I tried waits for your verdict.");
+    expect(voice.className).toBe("voice");
+    expect(voice.nextElementSibling?.textContent).toBe("40 experiences, 12 pending, 25 resolved, 3 expired");
+  });
+
+  it("says nothing was tried yet, and when experiences are recorded", async () => {
+    const { transport } = routedTransport({
+      "memory.list": NO_EXPERIENCES,
+      "memory.status": ok({ ...MEMORY_STATUS, experiences: 0, pending: 0, resolved: 0, expired: 0 }),
+      "memory.stats": ok(MEMORY_SCORE),
+    });
+    renderCard(transport);
+
+    await screen.findByText("Nothing recorded. I haven't tried anything yet.");
+    screen.getByText("Experiences are recorded when Ningo suggests something, such as a hashtag for a meme.");
+  });
+
+  it("has no voice line when nothing waits", async () => {
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok({ ...MEMORY_STATUS, pending: 0 }), "memory.stats": ok(MEMORY_SCORE) });
+    renderCard(transport);
+
+    await screen.findByText("40 experiences, 0 pending, 25 resolved, 3 expired");
+    expect(document.querySelector(".voice")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 
+import type { MemoryStatus } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { WorkspacePanel } from "./workspace_panel.js";
@@ -39,28 +40,49 @@ export function MemoryCard({ transport }: { transport: Transport }) {
   return (
     <WorkspacePanel trail={[t("nav_notebook")]}>
       <CardFrame title={t("memory_title")} state={state} onReload={reload}>
-        {(view) => <><MemoryBody view={view} />{!view.off && <MemoryExperiencesPanel transport={transport} onChanged={reload} />}</>}
+        {(view) => view.off ? <OffNotice reason={view.reason} /> : <>
+          <MemoryOpening status={view.status} />
+          <MemoryExperiencesPanel transport={transport} onChanged={reload} />
+          <MemoryBody view={view} />
+        </>}
       </CardFrame>
     </WorkspacePanel>
   );
 }
 
-function MemoryBody({ view }: { view: MemoryView }) {
+// What Ningo tried, said by him once, then plainly: a line in his voice only when something waits for
+// the owner or nothing was tried yet; the numbers stay in the plain line.
+function MemoryOpening({ status }: { status: MemoryStatus }) {
   const t = useTranslate();
-  if (view.off) return <OffNotice reason={view.reason} />;
+  const voice = status.experiences === 0 ? t("memory_voice_empty") : status.pending > 0 ? t("memory_voice_pending") : "";
+  return (
+    <div className="memory-opening">
+      {voice && <p className="voice">{voice}</p>}
+      <p className={voice ? "detail" : undefined}>
+        {status.experiences === 0
+          ? t("memory_empty_next")
+          : t("memory_counts", {
+              experiences: status.experiences,
+              pending: status.pending,
+              resolved: status.resolved,
+              expired: status.expired,
+            })}
+      </p>
+    </div>
+  );
+}
 
+// How the predictions fare, then what an operator needs to know about the memory itself.
+function MemoryBody({ view }: { view: Extract<MemoryView, { off: false }> }) {
+  const t = useTranslate();
   const { status } = view;
   const similarity = similarityOf(status);
   return (
     <>
-      <p>
-        {t("memory_counts", {
-          experiences: status.experiences,
-          pending: status.pending,
-          resolved: status.resolved,
-          expired: status.expired,
-        })}
-      </p>
+      <h3>{t("memory_score_title")}</h3>
+      <ScoreBody score={view.score} />
+      <details className="more">
+        <summary>{t("memory_about")}</summary>
       <p className="note" data-tone={similarity === "on" ? "ok" : "unchecked"}>
         {similarity === "on" && t("memory_similarity_on", { model: status.embedModel })}
         {similarity === "off" && t("memory_similarity_off")}
@@ -71,8 +93,7 @@ function MemoryBody({ view }: { view: MemoryView }) {
           {t("memory_needs_reindex", { count: status.needsReindex })}
         </p>
       )}
-      <h3>{t("memory_score_title")}</h3>
-      <ScoreBody score={view.score} />
+      </details>
     </>
   );
 }

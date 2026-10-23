@@ -9,8 +9,7 @@ describe("desktop experience feedback", { skip: hasDisplay ? false : "no display
  it("inspects an experience and offers controls without resolving it",async()=>{
   await page.waitFor("document.querySelectorAll('[role=tab]').length ? true : null");
   await page.evaluate("document.querySelectorAll('[role=tab]')[2].click()");
-  await page.waitFor("[...document.querySelectorAll('button')].some(b=>b.textContent==='Load experiences') ? true : null");
-  await page.evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Load experiences').click()");
+  await page.waitFor("document.querySelector('button[aria-label^=\"Inspect fixture:\"]') ? true : null");
   await page.waitFor("document.querySelector('button[aria-label=\"Inspect fixture:1\"]') ? true : null");
   await page.evaluate("document.querySelector('button[aria-label=\"Inspect fixture:1\"]').click()");
   await page.waitFor("[...document.querySelectorAll('button')].some(b=>b.textContent==='Accept result') ? true : null");

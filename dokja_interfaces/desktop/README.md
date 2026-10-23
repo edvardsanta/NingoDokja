@@ -264,9 +264,9 @@ detail contract remain separate follow-up work.
 
 ### Browsing experience memory
 
-In **memory**, select **Load experiences** to browse saved records, newest first,
-in pages of 20. Filter by all, pending or resolved (the service includes expired
-records among resolved). **Inspect** opens one record's action/detail, frozen
+The **Notebook** lists saved records as it opens, newest first, in pages of 20.
+Filter by All, Waiting or Settled (the service includes expired records among
+settled). **Inspect** opens one record's action/detail, frozen
 acceptance prediction and baseline, separate example-similarity score, observed
 outcome and timestamp, context, and domain-owned feedback guidance.
 
@@ -287,8 +287,7 @@ stored experiences untouched; no routes, schema, configuration or compose change
 
 ### Giving experience feedback (primary interface)
 
-Desktop is the primary interface for feedback. Open **memory → Load experiences
-→ Inspect** for the record you recognize, then choose:
+Desktop is the primary interface for feedback. Open **Notebook → Inspect** for the record you recognize, then choose:
 
 - **Accept result** when you actually kept the result.
 - **Save actual result** after entering what you used instead. Memory compares
