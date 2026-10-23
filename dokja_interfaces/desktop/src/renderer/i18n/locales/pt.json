@@ -206,7 +206,7 @@
   "communications_uncertain": "Sem resposta do envio. Confira as mensagens recentes antes de enviar novamente; a mensagem pode já ter chegado.",
   "communications_sent": "Mensagem enviada.",
   "communications_not_sent": "A mensagem não foi enviada.",
-  "interfaces_title": "Interfaces de conversa",
+  "interfaces_title": "Serviços de comunicação",
   "interfaces_hint": "Desligar uma interface a faz parar de responder e de receber entregas; a conexão continua.",
   "state_connected": "Conectada",
   "state_connecting": "Conectando",

@@ -206,7 +206,7 @@
   "communications_uncertain": "No delivery reply. Check the latest messages before sending again; it may already have arrived.",
   "communications_sent": "Message sent.",
   "communications_not_sent": "Message was not sent.",
-  "interfaces_title": "Chat interfaces",
+  "interfaces_title": "Communication services",
   "interfaces_hint": "Switching an interface off stops it answering and receiving deliveries; its connection stays up.",
   "state_connected": "Connected",
   "state_connecting": "Connecting",

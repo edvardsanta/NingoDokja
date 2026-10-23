@@ -353,7 +353,7 @@ the thread, no footer Refresh, no "Mensagens recentes" button (sending already r
 │  Orchestrator                ■ Stopped         —           [Start]  ⋯    │
 │  Memory                      ● Running       (on)          [Stop]   ⋯    │
 │  Knowledge  …                                                            │
-│ Chat interfaces                                                          │
+│ Communication services                                                   │
 │  Discord                     ● connected    (on)           [Stop]   ⋯    │
 │  WhatsApp                    (~) waiting for link (on)     [Link…] [Stop] ⋯ │
 │ Scheduled jobs                                                           │
@@ -447,7 +447,7 @@ V = Ningo's voice (Bodoni italic, one line per view). P = plain.
 | Meme button / picker | P | Meme · Pick a meme · No memes waiting. | Meme · Escolha um meme · Nenhum meme na fila. |
 | Live toggle | P | Live (every 15 s) | Ao vivo (a cada 15 s) |
 | Load earlier | P | Load earlier messages | Carregar mensagens anteriores |
-| System sections | P | Needs attention · Core · Chat interfaces · Scheduled jobs | Precisa de atenção · Núcleo · Interfaces de conversa · Tarefas agendadas |
+| System sections | P | Needs attention · Core · Communication services · Scheduled jobs | Precisa de atenção · Núcleo · Serviços de comunicação · Tarefas agendadas |
 | System states | P | Running · Starting · Stopped · Failed · Not answering · Paused · Not checked | Rodando · Iniciando · Parado · Falhou · Sem resposta · Pausado · Sem verificação |
 | System buttons | P | Start · Stop · Link… · Logs · Apply · Back to default | Iniciar · Parar · Vincular… · Logs · Aplicar · Voltar ao padrão |
 | Routing switch | P | Handle requests: On/Off. Off pauses request handling; the module keeps running. | Processar solicitações: Ligado/Desligado. Desligado pausa o processamento; o módulo continua rodando. |

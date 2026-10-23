@@ -133,14 +133,14 @@ func (a *App) printStatusPart(ctx context.Context, key string) error {
 func (a *App) newServicesCommand(ctx context.Context) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "services",
-		Short: "Switch services on or off in the orchestrator",
+		Short: "Switch application service routing on or off",
 		Long: "A switch is logical: while a service is off the orchestrator refuses its events " +
 			"(scheduled jobs included) and reports why. The container keeps running, and the setting survives restarts.",
 	}
 
 	list := &cobra.Command{
 		Use:   "list",
-		Short: "Show every service with its state (ningo.status)",
+		Short: "Show application service routing and health",
 		RunE:  func(cmd *cobra.Command, args []string) error { return a.printStatusPart(ctx, "services") },
 	}
 

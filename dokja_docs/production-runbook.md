@@ -519,7 +519,7 @@ No send is retried automatically. On timeout verify the channel before resending
 Compatibility: new routes, new optional environment settings and one internal service; no change
 to CLI/Discord commands, SQLite schemas, existing port mappings or existing HTTP contracts.
 
-## Optional WhatsApp interface
+## Optional WhatsApp communication service
 
 People can talk to Ningo in WhatsApp through a linked device (Baileys, an unofficial protocol: the
 account can be restricted or banned, so prefer a dedicated number). See
@@ -563,6 +563,19 @@ credential separate from `DOKJA_COMMUNICATIONS_TOKEN`, which controls operator
 communications actions. The Compose files project the gateway credential to
 each affected process.
 
+Generate a private value once and save it as `DOKJA_GATEWAY_INGRESS_TOKEN` in
+the stack's ignored `.env` or `.env.prod`. Keep the same value for the
+orchestrator and every enabled gateway in that stack:
+
+```sh
+printf '\nDOKJA_GATEWAY_INGRESS_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
+```
+
+For production, replace `.env` with `.env.prod`. Do not commit or paste the
+generated value into logs or chat. If the orchestrator says this variable is
+required, Compose did not pass it to the container; correct the ignored env file
+and recreate the orchestrator and enabled gateways together.
+
 The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
 `DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
 `DOKJA_WHATSAPP_ALLOW_FROM` and `DOKJA_WHATSAPP_ALLOWED_GROUPS` from the same
@@ -587,8 +600,8 @@ linking and synthetic inbound/outbound flows before reconnecting live sessions.
 
 ## Interfaces in the desktop
 
-The desktop's health tab lists the chat interfaces (Discord, WhatsApp) under their own
-heading, with their state and a switch each. See the interface docs for each state list.
+The desktop's System view lists Discord and WhatsApp under Communication services, with
+one row per adapter, its state and routing control. See the adapter docs for state details.
 
 - Each interface runs an internal listener that answers `GET /status` (Discord `8092`, WhatsApp
   `8094`). Neither port is published; the orchestrator reads them over the Compose network. A reply carries a level, a state from a closed list and a short sentence, never an id.

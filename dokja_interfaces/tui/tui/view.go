@@ -169,14 +169,19 @@ func (m *Model) viewPanel() string {
 	}
 	s := m.status
 
-	b.WriteString(styleTitle.Render(tr("services")) + styleDim.Render(tr("service_toggle_help")) + "\n")
-	for i, service := range s.Services {
-		b.WriteString(m.panelLine(first+i, checkbox(service.Enabled), fmt.Sprintf("%-9s %s", service.Name, m.serviceState(service))))
+	b.WriteString(styleTitle.Render(tr("services")+" · "+tr("application_routing")) + styleDim.Render(tr("service_toggle_help")) + "\n")
+	serviceRows := 0
+	for _, service := range s.Services {
+		if m.hasRuntimeModule(service.Name) {
+			continue
+		}
+		b.WriteString(m.panelLine(first+serviceRows, checkbox(service.Enabled), fmt.Sprintf("%-9s %s", service.Name, m.serviceState(service))))
+		serviceRows++
 	}
 
 	b.WriteString("\n" + styleTitle.Render("Jobs") + styleDim.Render(tr("space_pauses_resumes_x_runs_now_i_interval")) + "\n")
 	for i, job := range s.Jobs {
-		b.WriteString(m.panelLine(first+len(s.Services)+i, checkbox(job.Enabled), fmt.Sprintf("%-25s %s", job.Name, m.jobState(job))))
+		b.WriteString(m.panelLine(first+serviceRows+i, checkbox(job.Enabled), fmt.Sprintf("%-25s %s", job.Name, m.jobState(job))))
 	}
 	if hint := schedulerHint(s); hint != "" {
 		b.WriteString(styleWarn.Render("  "+hint) + "\n")
@@ -209,7 +214,17 @@ func (m *Model) viewModules(b *strings.Builder) int {
 	}
 	b.WriteString(styleTitle.Render(tr("modules")) + styleDim.Render(tr("module_toggle_help")) + "\n")
 	for i, module := range m.modules.Modules {
-		b.WriteString(m.panelLine(i, checkbox(!module.Stopped()), fmt.Sprintf("%-14s %s", module.Name, moduleState(module))))
+		state := moduleState(module)
+		if m.status != nil {
+			if service, ok := m.status.service(module.Name); ok {
+				routing := tr("routing_off")
+				if service.Enabled {
+					routing = tr("routing_on")
+				}
+				state += styleDim.Render(" · " + routing)
+			}
+		}
+		b.WriteString(m.panelLine(i, checkbox(!module.Stopped()), fmt.Sprintf("%-14s %s", module.Name, state)))
 	}
 	if m.modulesErr != "" {
 		b.WriteString(styleBad.Render("  "+tr("last_refresh_failed")+m.modulesErr) + "\n")
