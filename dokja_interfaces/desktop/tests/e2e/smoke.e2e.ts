@@ -42,6 +42,9 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     page.evaluate<unknown>(`window.dokja.request(${JSON.stringify(type)}, ${JSON.stringify(payload)})`);
 
   it("shows the health card from what the orchestrator reported", async () => {
+    // the screen opens on the conversation; the status is shown on System, the last workspace
+    await page.waitFor("document.querySelectorAll('[role=tab]').length === 5 ? true : null");
+    await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
     const rows = await page.waitFor<string[]>(
       "(() => { const rows = [...document.querySelectorAll('.services li')].map((row) => row.textContent); return rows.length ? rows : null; })()",
     );

@@ -4,7 +4,7 @@ import type { Transport } from "../shared/transport.js";
 import type { Tone } from "./cards/health_model.js";
 import type { CardEntry } from "./cards/registry.js";
 import { useTranslate } from "./i18n/context.js";
-import { usePulse, type Tones } from "./pulse.js";
+import { useStatus, type Tones } from "./status_context.js";
 
 // Worst first: the dot of a workspace shows the worst tone among the services behind it.
 const SEVERITY: readonly Tone[] = ["problem", "unchecked", "off", "ok", "other"];
@@ -19,6 +19,9 @@ type SidebarProps = {
   transport: Transport;
   // The workspace open when the screen starts; the first one when left out.
   start?: string;
+  // The workspace that opens instead when the status says nothing answers, as long as the owner has
+  // not moved yet: with the orchestrator down, the front door has nothing to say.
+  fallback?: string;
   // What sits on top of the sidebar, above the workspaces.
   header?: ReactNode;
 };
@@ -27,20 +30,31 @@ type SidebarProps = {
 // mounted the first time its workspace opens and then kept, hidden while another is open: it keeps
 // what it showed and is not asked for again, and the services behind a workspace nobody opened are
 // never asked at all (the orchestrator answers one request at a time).
-export function Sidebar({ entries, transport, start, header }: SidebarProps) {
+export function Sidebar({ entries, transport, start, fallback, header }: SidebarProps) {
   const t = useTranslate();
-  const { tones } = usePulse();
+  const { tones, pulse } = useStatus();
   const baseId = useId();
   const [selected, setSelected] = useState(start ?? entries[0]?.kind ?? "");
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(selected ? [selected] : []));
   const tabs = useRef(new Map<string, HTMLButtonElement>());
+  const moved = useRef(false);
   const problems = Object.values(tones).filter((tone) => tone === "problem").length;
+  const lost = pulse === "lost";
 
-  const select = (kind: string, focus = false) => {
+  const show = (kind: string) => {
+    moved.current = true;
     setSelected(kind);
     setOpened((previous) => (previous.has(kind) ? previous : new Set(previous).add(kind)));
+  };
+
+  const select = (kind: string, focus = false) => {
+    show(kind);
     if (focus) tabs.current.get(kind)?.focus();
   };
+
+  useEffect(() => {
+    if (lost && fallback && !moved.current) show(fallback);
+  }, [lost, fallback]);
 
   // The up and down arrows, Home and End move between workspaces and open the one they reach.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -118,7 +132,13 @@ export function Sidebar({ entries, transport, start, header }: SidebarProps) {
                 <span className="tab-label">{t(entry.labelId)}</span>
                 {/* the words for each state are on the System workspace; here they are a glance */}
                 {tone && <span className="tab-dot" data-tone={tone} aria-hidden="true" />}
-                {entry.foot && problems > 0 && (
+                {/* nothing answers: a count of the services would be a guess */}
+                {entry.foot && lost && (
+                  <span className="tab-count" data-tone="problem" aria-hidden="true">
+                    {t("status_offline")}
+                  </span>
+                )}
+                {entry.foot && !lost && problems > 0 && (
                   <span className="tab-count" data-tone="problem" aria-hidden="true">
                     {problems}
                   </span>

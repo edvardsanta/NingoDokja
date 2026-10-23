@@ -9,23 +9,20 @@ import { RuntimeEnabled } from "../runtime_context.js";
 import { RuntimeCard } from "./runtime.js";
 import { ProvidersCard } from "./providers.js";
 import { SettingsCard } from "./settings.js";
-import { usePulse } from "../pulse.js";
+import { useStatus } from "../status_context.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import {
   formatInterval,
   intervalFields,
   intervalOf,
-  parseHealth,
   parseLink,
-  pulseOf,
-  tonesOf,
   type Health,
   type LinkView,
   type IntervalUnit,
   type ServiceRow,
 } from "./health_model.js";
 import { useAction } from "./use_action.js";
-import { useCard, type LoadResult } from "./use_card.js";
+import type { LoadResult } from "./use_card.js";
 
 // Longer than the few seconds the orchestrator takes to give up on a stopped service.
 const TIMEOUT_MS = 15_000;
@@ -55,15 +52,6 @@ const STATE_IDS: Record<string, MessageId> = {
   not_configured: "state_not_configured",
 };
 
-export async function loadHealth(transport: Transport): Promise<LoadResult<Health>> {
-  const result = await transport.request("ningo.status", {}, { timeoutMs: TIMEOUT_MS });
-  if (!result.ok) return result;
-  const health = parseHealth(result.result);
-  return health
-    ? { ok: true, data: health }
-    : { ok: false, error: { code: "unexpected", message: "unexpected status reply" } };
-}
-
 // What the screen can ask the orchestrator to switch. A switch carries the flag and nothing else; an
 // interval carries the interval and nothing else, so changing one never touches the other.
 type Change =
@@ -84,18 +72,12 @@ const LINK_RESET_TIMEOUT_MS = 45_000;
 export function HealthCard({ transport }: { transport: Transport }) {
   const runtimeEnabled = useContext(RuntimeEnabled);
   const t = useTranslate();
-  const { report, reportTones } = usePulse();
-  const load = useCallback(() => loadHealth(transport), [transport]);
-  const { state, reload } = useCard(load);
+  // the status is the screen's own, read once at the top (status_context.tsx); System shows it
+  // and asks for it again after a change
+  const { state, reload } = useStatus();
   const run = useCallback((change: Change) => applyChange(transport, change), [transport]);
   const change = useAction(run);
   const [failure, setFailure] = useState<TransportError>();
-
-  useEffect(() => {
-    report(pulseOf(state));
-    // while a reload runs, the sidebar keeps the tones it has instead of blinking them away
-    if (state.phase !== "loading") reportTones(tonesOf(state));
-  }, [state, report, reportTones]);
 
   // The orchestrator's own state is read again after every change, whether or not it went through
   // (a timeout does not say what happened), so the screen never shows what it only hoped for. The

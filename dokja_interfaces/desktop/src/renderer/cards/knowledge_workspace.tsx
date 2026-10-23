@@ -25,7 +25,7 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
   };
   return (
     <>
-      <div className="scope knowledge-views" role="group" aria-label={t("kind_knowledge")}>
+      <div className="scope knowledge-views" role="group" aria-label={t("nav_library")}>
         {VIEWS.map((each) => (
           <button key={each.id} type="button" aria-pressed={view === each.id} onClick={() => show(each.id)}>
             {t(each.labelId)}

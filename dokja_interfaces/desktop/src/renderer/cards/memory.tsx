@@ -36,7 +36,7 @@ export function MemoryCard({ transport }: { transport: Transport }) {
   const { state, reload } = useCard(load);
 
   return (
-    <CardFrame kindLabel={t("kind_memory")} title={t("memory_title")} state={state} onReload={reload}>
+    <CardFrame kindLabel={t("nav_notebook")} title={t("memory_title")} state={state} onReload={reload}>
       {(view) => <><MemoryBody view={view} />{!view.off && <MemoryExperiencesPanel transport={transport} onChanged={reload} />}</>}
     </CardFrame>
   );

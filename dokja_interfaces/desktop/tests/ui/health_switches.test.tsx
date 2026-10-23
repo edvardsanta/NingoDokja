@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { HealthCard } from "../../src/renderer/cards/health.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
+import { StatusProvider } from "../../src/renderer/status_context.js";
 import type { JobState } from "../../src/shared/replies.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportResult } from "../../src/shared/transport.js";
@@ -12,9 +12,9 @@ import { deferred, failure, minutesAgo, ok, routedTransport } from "./support.js
 function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <StatusProvider transport={transport}>
         <HealthCard transport={transport} />
-      </PulseProvider>
+      </StatusProvider>
     </I18nProvider>,
   );
 }

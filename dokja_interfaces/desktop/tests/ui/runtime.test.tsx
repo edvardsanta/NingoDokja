@@ -84,6 +84,8 @@ it("shows one module row and separates lifecycle from optional request handling"
     "services.set": ok({ name: "memory", enabled: false }),
   });
   render(<App transport={transport} locale="en" runtimeControls />);
+  // the screen opens on Talk; the modules are on System
+  fireEvent.click(screen.getByRole("tab", { name: "System" }));
   await screen.findByText("Options for memory");
   expect(screen.getAllByText("memory", { selector: ".service-name" })).toHaveLength(1);
   expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules", "Settings", "Inference providers"]);
@@ -105,6 +107,8 @@ it("keeps WhatsApp setup in its module row without duplicating the interface", a
     "ningo.status": ok({ status: "ok", services: { whatsapp: { kind: "interface", status: "unchecked", state: "not_configured", configured: false, enabled: true } } }),
   });
   render(<App transport={transport} locale="en" runtimeControls />);
+  // the screen opens on Talk; the modules are on System
+  fireEvent.click(screen.getByRole("tab", { name: "System" }));
   const options = await screen.findByText("Options for whatsapp");
   expect(screen.getAllByText("whatsapp")).toHaveLength(1);
   fireEvent.click(options);
@@ -120,6 +124,8 @@ it("retains service visibility when the runtime controller is unavailable", asyn
     "ningo.status": ok({ status: "ok", services: { memory: { status: "ok", enabled: true } } }),
   });
   render(<App transport={transport} locale="en" runtimeControls />);
+  // the screen opens on Talk; the modules are on System
+  fireEvent.click(screen.getByRole("tab", { name: "System" }));
   expect(await screen.findByText("memory")).toBeTruthy();
   expect(screen.getByRole("switch", { name: "memory switch" })).toBeTruthy();
 });
