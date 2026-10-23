@@ -1,8 +1,8 @@
 # ADR 0012: platform gateways are communication services
 
 Date: 2026-10-22. Status: accepted responsibility classification (owner direction).
-Implementation: source audit and initial outbound policy extraction complete;
-inbound/linking policy and package migration pending in step 09.4. This refines the communication boundary without accepting
+Implementation: source audit, inbound/outbound/linking policy extraction and
+gateway package relocation complete in step 09.4. This refines the communication boundary without accepting
 all other proposals in [ADR 0010](0010-four-concepts.md).
 
 ## Decision
@@ -101,7 +101,7 @@ platform identities to operator renderers as part of the rename.
    deduplication/echo handling and uncertain delivery outcomes. Validate restart
    and rollback with synthetic sessions before any operator-data rollout.
 
-No physical relocation, new action, endpoint, environment setting or deployment
-change is introduced by this ADR. Canonical agent instructions continue to
-identify actual directories until implementation moves them. Test fixtures and
-local integration checks must precede any production migration.
+This ADR introduced no deployment by itself. The later gateway relocation changed
+package and Compose build paths while preserving module IDs, endpoints,
+environment names and volume identities. Integration and recovery validation
+remains a separate batch before any production migration.

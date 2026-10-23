@@ -573,6 +573,18 @@ commands remain available in allowed channels. Test with synthetic gateway
 requests before reconnecting live accounts. No credential or phone number is
 written to the repository.
 
+### Communication gateway package relocation
+
+The Discord and WhatsApp build contexts now use
+`dokja_services/dokja_discord/` and `dokja_services/dokja_whatsapp/`.
+Build and recreate the orchestrator and enabled gateways from the same revision
+after the inbound bridge migration above. Keep the existing Compose service
+names and named volumes; the WhatsApp profile remains opt-in. A rollback must
+restore the matching orchestrator and gateway revision together and retain the
+WhatsApp auth and history volumes. Runtime changes to inbound allowlists now
+recreate both the orchestrator and any running affected gateway. Check status,
+linking and synthetic inbound/outbound flows before reconnecting live sessions.
+
 ## Interfaces in the desktop
 
 The desktop's health tab lists the chat interfaces (Discord, WhatsApp) under their own

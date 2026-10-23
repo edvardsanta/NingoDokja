@@ -1,7 +1,7 @@
 name: dokja-discord
-description: Discord interface that converts Discord messages and interactions into orchestrator events
+description: Discord communication adapter for inbound events and requested delivery
 
-type: interface
+type: service
 language: typescript
 entrypoint: ./main.ts
 
@@ -21,7 +21,7 @@ tags:
 paths:
   source: ./
   tests: ./
-  docs: ./docs
+  docs: ../../dokja_docs/discord-interface.md
 
 runtime:
   containerized: true

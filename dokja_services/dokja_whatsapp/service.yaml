@@ -1,7 +1,7 @@
 name: dokja-whatsapp
-description: WhatsApp interface that forwards messages from a linked WhatsApp account to the orchestrator and posts the replies
+description: WhatsApp communication adapter for linked sessions, inbound events and requested text delivery
 
-type: interface
+type: service
 language: typescript
 entrypoint: ./main.ts
 

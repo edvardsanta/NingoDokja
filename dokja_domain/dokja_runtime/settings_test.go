@@ -57,11 +57,26 @@ func TestSettingsAreNormalizedAndOnlyRunningReadersAreRecreated(t *testing.T) {
 	if view.Error != "" || store.values["DISCORD_ALLOWED_CHANNELS"] != "7,8" || store.values["DOKJA_WHATSAPP_ALLOW_FROM"] != "5511912345678" {
 		t.Fatalf("%+v %v", view, store.values)
 	}
-	if got := f.trace()[before:]; !reflect.DeepEqual(got, []string{"recreate:discord"}) {
-		t.Fatal("only the running module that reads a changed setting is recreated:", got)
+	if got := f.trace()[before:]; !reflect.DeepEqual(got, []string{"recreate:orchestrator", "recreate:discord"}) {
+		t.Fatal("both running readers of an inbound setting must be recreated:", got)
 	}
 	if !reflect.DeepEqual(view.WebhookChannels, []string{"102"}) {
 		t.Fatal(view.WebhookChannels)
+	}
+}
+
+func TestWhatsAppInboundSettingsRecreateBothRunningReaders(t *testing.T) {
+	d, f, _ := withStore()
+	change(t, d, "whatsapp", true)
+	before := len(f.trace())
+	if _, err := d.SetSettings(map[string]string{"whatsapp.groups": "123@g.us"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := settleSettings(t, d); got.Error != "" {
+		t.Fatal(got.Error)
+	}
+	if got := f.trace()[before:]; !reflect.DeepEqual(got, []string{"recreate:orchestrator", "recreate:whatsapp"}) {
+		t.Fatal("both running readers of an inbound setting must be recreated:", got)
 	}
 }
 

@@ -315,9 +315,9 @@ services:
   dokja-whatsapp:
     build:
       context: .
-      dockerfile: dokja_interfaces/whatsapp/Dockerfile.dev
+      dockerfile: dokja_services/dokja_whatsapp/Dockerfile.dev
     profiles: [whatsapp]
-    working_dir: /workspace/dokja_interfaces/whatsapp
+    working_dir: /workspace/dokja_services/dokja_whatsapp
     command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
     environment:
       CI: "true"
@@ -347,8 +347,8 @@ services:
   dokja-discord:
     build:
       context: .
-      dockerfile: dokja_interfaces/discord/Dockerfile.dev
-    working_dir: /workspace/dokja_interfaces/discord
+      dockerfile: dokja_services/dokja_discord/Dockerfile.dev
+    working_dir: /workspace/dokja_services/dokja_discord
     command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
     environment:
       CI: "true"
