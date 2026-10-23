@@ -119,3 +119,22 @@ describe("explicit experience feedback",()=>{
   expect(screen.queryByRole("button",{name:"Accept result"})).toBeNull();
  });
 });
+
+describe("experiences read as decisions", () => {
+  it("says what Ningo decided and what came of it, and keeps the record's id in the tooltip", async () => {
+    const decided = [
+      { ...entry, ref: "fixture:1", action: "hashtag.suggest", detail: "#Reading", outcome: "accepted" },
+      { ...entry, ref: "fixture:2", action: "hashtag.suggest", detail: "#Waiting", outcome: "" },
+      { ...entry, ref: "fixture:3", action: "other.thing", detail: "x", outcome: "replaced" },
+    ];
+    const { transport } = routedTransport({ "memory.list": page(decided) });
+    show(transport);
+    await screen.findByText("Suggested #Reading for a meme");
+    expect(screen.getByText("you accepted").getAttribute("data-tone")).toBe("ok");
+    expect(screen.getByText("waiting for your verdict").getAttribute("data-tone")).toBe("unchecked");
+    screen.getByText("other.thing: x");
+    screen.getByText("you replaced it");
+    expect(screen.queryByText(/^fixture:1/)).toBeNull();
+  });
+});
+

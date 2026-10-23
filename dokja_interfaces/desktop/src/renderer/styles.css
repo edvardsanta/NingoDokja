@@ -1925,3 +1925,23 @@ button.icon-button[aria-expanded="true"] {
   grid-column: 1 / -1;
   margin-top: 0.5rem;
 }
+
+/* A decision in the Notebook: what Ningo did, and in its tone what came of it. */
+.decision-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.decision-verdict {
+  color: var(--tone-text, var(--ink-dim));
+}
+
+.decision-context {
+  overflow: hidden;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
