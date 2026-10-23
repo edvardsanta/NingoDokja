@@ -171,6 +171,7 @@ inference. See [provider inventory](../../dokja_docs/provider-inventory.md).
 
 `providers configure <provider> --enabled=false|true --models=<names> [--yes]`
 saves discovery eligibility and unverified declarations in the shared database.
+Supported provider IDs are `codex`, `claude_code` and `ollama`.
 Either option may be omitted to preserve that field; `--models=` clears the list.
 The command refuses stale revisions rather than overwriting another interface's
 edit. It does not change legacy inference consumers or the embedding profile.

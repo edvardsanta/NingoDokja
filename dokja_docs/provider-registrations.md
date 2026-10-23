@@ -73,6 +73,7 @@ those consumers have already migrated.
 
 ## CLI and TUI editing
 
+Supported provider IDs are `codex`, `claude_code` and `ollama`.
 Use `dokja-cli providers configure <provider> --enabled=false|true --models=<names>`
 (with `--yes` to skip confirmation). Omitted fields retain their saved value; an
 explicit empty `--models=` clears declarations. TUI settings → providers allows
@@ -90,3 +91,27 @@ Edit was selected; a stale write is not automatically retried or rebased. A
 successful save reloads the inventory. An error preserves the draft and requires
 operator-directed refresh/retry. No account credentials or executable paths are
 accepted by this form.
+
+## Verification evidence
+
+Go race tests and vet passed for the shared store, Runtime domain, infrastructure
+adapter, bootstrap orchestrator, CLI and TUI. A further TUI regression verifies
+that a late inventory reply cannot change an in-progress draft's original
+revision. Tests cover persistence after reopen, independent configuration keys,
+stale writers, corrupt/refused values, shared routes and disabled discovery.
+
+Desktop typecheck, 221 Node tests, 227 UI tests and production build passed.
+Component/IPC coverage includes recent-input gating, known-field projection,
+confirmation, cancellation, successful save/reload, old-controller refusal and
+conflict handling without automatic retry. The repository aggregate reports
+15 passed suites, zero failed and one skipped: the Python lab requires pytest,
+which is not installed. Store and TUI are verified separately.
+
+Native Electron remains non-green: the initial parallel run cancelled 27 tests
+after app-start failures (three passed). Sequential execution passes 28 and fails
+two existing scenarios. The parent branch reproduces the communications fixture
+error (`unexpected event communications.send`) and, when running the full smoke
+suite, the same Digest timeout (23 passed, one failed). No native registration
+scenario was added. These baseline gaps remain separate follow-up work; they are
+not counted as passing. Provider authentication/inference and operator data were
+not exercised.

@@ -737,3 +737,28 @@ Discovery does not start services, load/pull models or perform inference. Rebuil
 and restart the old controller once to enable the new action. Authentication,
 quota and capability/inference validation remain untested by this operation.
 See [provider inventory](provider-inventory.md) for bounds and pending bindings.
+
+## Persistent provider registrations
+
+The same local controller now stores discovery eligibility and up to 16 declared
+model names for each supported adapter in `runtime.providers.v1`, an independent
+revisioned key in the existing SQLite settings table. There is no schema-version,
+environment-variable, port, service or Compose change. Credentials and operational
+settings remain separate. Back up the shared database before rollout, rebuild the
+controller/interfaces and restart the old daemon once.
+
+Desktop: inspect providers, then Edit → Review → Save registration. CLI:
+`dokja-cli providers configure <provider> --enabled=false|true --models=<names>`
+(optionally `--yes`). TUI: settings (`c`) → providers (`p`), select and press `e`;
+Ctrl+T toggles discovery, Enter reviews, and confirmation saves. Explicit empty
+models clear declarations; omitted CLI flags retain saved values. An older
+controller without a configuration revision remains read-only to new clients.
+
+Disabling skips discovery for that adapter; it does not stop containers or change
+legacy inference consumers. Declared models remain unverified, and the fixed
+embedding profile stays unchanged. Concurrent edits refuse stale revisions; reload
+and explicitly retry. Database/corruption errors block editing and inventory
+rather than restoring enabled defaults. Older builds ignore the new key on
+rollback and resume their previous discovery behavior. See
+[provider registrations](provider-registrations.md) for contracts and remaining
+capability-binding work. No live operator configuration was changed in testing.
