@@ -38,14 +38,17 @@ Preserve `Interface -> Event/Request -> Orchestrator -> Domain -> Service`. The 
    - Claude Code: `--output-format stream-json`.
    - Codex: its `--json` event lines.
    - Ollama: the text `ollama run` prints as it goes.
-   - A new runtime endpoint, `/chat/stream`, answers with newline-delimited JSON chunks
-     (`{"seq": n, "text": "..."}`) and a final line carrying the whole reply. `/chat` stays as it is.
-   - Chunks are bounded: a maximum per chunk, a maximum total, and the same timeout as today.
+   - A new runtime endpoint, `/chat/stream`, answers with newline-delimited JSON:
+     `{"preview": "..."}` lines carrying **the text written so far** (each replaces the one before,
+     so a lost line costs nothing), then the reply `/chat` would give, or `{"error": ...}`.
+     `/chat` stays as it is.
+   - Previews are coalesced to at most one every 100 ms and bounded by the reply's own size limit
+     and timeout.
 2. **Orchestrator: publish partials, answer as before.**
    - The chat handler reads the stream. For a desktop request it publishes each chunk as an event,
      `chat.reply.partial`, with:
      - `event_id`: the request's own id;
-     - `payload`: `conversation_id`, `seq` and `text`.
+     - `payload`: `conversation_id` and `text` (the text so far).
    - It then answers the request with the final reply, exactly as now.
    - Other sources get no partials.
    - A failed stream falls back to `/chat`.
