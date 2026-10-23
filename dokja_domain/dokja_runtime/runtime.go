@@ -25,7 +25,6 @@ var inventory = []Module{
 	{Name: "embedding_init", Service: "dokja-embedding-init", Dependencies: []string{"embeddings"}, Internal: true},
 	{Name: "memory", Service: "dokja-memory", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5562},
 	{Name: "knowledge", Service: "dokja-knowledge", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5561},
-	{Name: "chat_ai", Service: "dokja-chat-ai", Dependencies: []string{"orchestrator"}, Port: 8080},
 	{Name: "feeds", Service: "dokja-feeds", Dependencies: []string{"orchestrator"}, Port: 5563},
 	{Name: "voice", Service: "dokja-voice", Dependencies: []string{"orchestrator"}, Port: 8081},
 	// Communications only reads channels and history for the desktop; it never sends.
@@ -122,6 +121,8 @@ type Domain struct {
 	lifecycle    sync.RWMutex
 	serviceLocks map[string]chan struct{}
 	// settings is where the stack's settings are kept; nil when this stack has none.
+	chatSettings     ChatSettingsStore
+	chatInference    ChatInference
 	providerSettings ProviderSettingsStore
 	providers        ProviderInspector
 	settings         SettingsStore

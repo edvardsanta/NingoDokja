@@ -52,7 +52,7 @@ Behavior:
 
 - moderation screens the incoming message
 - chat builds/continues the conversation session
-- chat forwards full message history to `dokja-chat-ai`
+- chat forwards full message history over a private socket to the explicitly selected registered provider/model
 - reply is normalized before returning to the interface
 
 ### Book
@@ -125,7 +125,7 @@ Route:
 
 Behavior:
 
-- checks `dokja-chat-ai` health
+- checks chat binding configuration through the host runtime (no inference during polling)
 - checks `dokja-meme` status
 - checks `dokja-book` health (`GET /health`), and `dokja-knowledge`, `dokja-memory` and `dokja-feeds` through their `*.status` events
 - `dokja-feeds` is `ok` with a `detail` note when no plugin is enabled or some of them are failing
@@ -184,8 +184,8 @@ Behavior:
   - HTTP bridge bind address
 - `VA_RESPONSE_MODE`
   - `compact` by default, `debug`/`verbose` for full envelopes
-- `CHAT_AI_SERVICE_ENDPOINT`
-  - downstream chat AI service base URL
+- `DOKJA_INFERENCE_SOCKET`
+  - private host-runtime inference socket; Compose mounts `/run/dokja-inference/chat.sock`
 - `MEME_SERVICE_ENDPOINT`
   - downstream ZeroMQ meme service endpoint
 - `BOOK_SERVICE_ENDPOINT`
@@ -246,7 +246,7 @@ Operator switches live in `VA_STATE_FILE` (a JSON file; `/data/dokja_state.json`
 orchestrator and scheduler share the `dokja-data` volume). They are read by all three ingresses, so access is
 guarded, and they survive restarts. A corrupt file starts every job paused rather than resuming posting.
 
-- `services.set` (`name`, `enabled`): `meme`, `chat_ai`, `book` or `scheduler` only. A disabled service makes the
+- `services.set` (`name`, `enabled`): `meme`, `chat`, `book` or `scheduler` only. A disabled service makes the
   orchestrator answer its events with `{"skipped": true, "reason": ...}` (not an error), never runs a
   handler for them, and does not probe them in `ningo.status`. `discord.send` also stops using the meme
   screen, so images bound for a safe-only channel are refused.

@@ -43,7 +43,7 @@ func TestTheMemoryServiceShowsInThePanelAndCanBeSwitched(t *testing.T) {
 		t.Fatalf("the memory service should be a row with no health probe, got %q in:\n%s", row, m.View())
 	}
 
-	press(m, "down", "down", "down", "space") // meme, chat_ai, book, then memory
+	press(m, "down", "down", "down", "space") // meme, chat, book, then memory
 	if req := fake.last("services.set"); req.payload["name"] != "memory" || req.payload["enabled"] != false {
 		t.Fatalf("expected memory to be switched off, got %#v", req.payload)
 	}
@@ -170,7 +170,7 @@ func TestAFailingMemoryServiceStaysInsideTheOverlay(t *testing.T) {
 	}
 
 	press(m, "esc", "r")
-	if m.overlay != overlayNone || !strings.Contains(m.View(), "chat_ai") {
+	if m.overlay != overlayNone || !strings.Contains(m.View(), "chat") {
 		t.Fatalf("the panel must keep working after a memory failure:\n%s", m.View())
 	}
 }

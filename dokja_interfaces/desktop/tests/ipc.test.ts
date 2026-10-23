@@ -238,7 +238,7 @@ test("end to end over a real socket, the renderer never sees channel IDs or prov
       domain: "system",
       result: {
         status: "degraded",
-        services: { chat_ai: { status: "error", error: "connection refused" } },
+        services: { chat: { status: "error", error: "connection refused" } },
         channels: { meme: ["channel-1"] },
         chat_profiles: { profiles: [{ name: "profile-1", base_url: "base-url-1" }] },
       },
@@ -252,7 +252,7 @@ test("end to end over a real socket, the renderer never sees channel IDs or prov
       ok: true,
       result: {
         status: "degraded",
-        services: { chat_ai: { status: "error", detail: "connection refused" } },
+        services: { chat: { status: "error", detail: "connection refused" } },
       },
     });
     assert.equal(server.requests[0]?.type, "ningo.status");

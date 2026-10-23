@@ -14,7 +14,7 @@ DISCORD_BOT_TOKEN=fixture-token-value
 DISCORD_SCHEDULED_MEME_CHANNEL_ID=101,102
 export DISCORD_DM_POLICY="open"
 DOKJA_DISCORD_WEBHOOKS=102=https://hooks.example/one,bad=https://hooks.example/two
-CHAT_AI_API_KEY=fixture-key
+UNMANAGED_API_KEY=fixture-key
 `
 
 func fixture(t *testing.T) EnvFile {

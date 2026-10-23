@@ -986,9 +986,9 @@ func TestJobsSetPausesResumesAndSetsIntervals(t *testing.T) {
 
 func TestStatusShowsSwitchesJobsAndDoesNotProbeDisabledServices(t *testing.T) {
 	handler, controls := controlledHandler(t)
-	health := handler.chatAI.(*countingHealth)
+	health := handler.chatProvider.(*countingHealth)
 	memeStatus := handler.memeStatus.(*countingMemeStatus)
-	_ = controls.SetService("chat_ai", false)
+	_ = controls.SetService("chat", false)
 	_ = controls.SetService("meme", false)
 	off := false
 	_ = controls.SetJob("meme.refresh", core.JobPatch{Enabled: &off})
@@ -1000,13 +1000,13 @@ func TestStatusShowsSwitchesJobsAndDoesNotProbeDisabledServices(t *testing.T) {
 	}
 
 	if health.calls != 0 || memeStatus.calls != 0 {
-		t.Fatalf("disabled services must not be probed (chat_ai=%d meme=%d)", health.calls, memeStatus.calls)
+		t.Fatalf("disabled services must not be probed (chat=%d meme=%d)", health.calls, memeStatus.calls)
 	}
 	if result["status"] != "ok" {
 		t.Fatalf("a switched-off service must not make the platform degraded, got %v", result["status"])
 	}
 	services := result["services"].(map[string]any)
-	chat := services["chat_ai"].(map[string]any)
+	chat := services["chat"].(map[string]any)
 	book := services["book"].(map[string]any)
 	if chat["status"] != "disabled" || chat["enabled"] != false || book["status"] != "unchecked" || book["enabled"] != true {
 		t.Fatalf("unexpected service view chat=%#v book=%#v", chat, book)
@@ -1031,7 +1031,7 @@ func TestStatusStillProbesEnabledServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	services := result["services"].(map[string]any)
-	if services["chat_ai"].(map[string]any)["status"] != "error" || services["meme"].(map[string]any)["status"] != "ok" {
+	if services["chat"].(map[string]any)["status"] != "error" || services["meme"].(map[string]any)["status"] != "ok" {
 		t.Fatalf("enabled services keep their real status: %#v", services)
 	}
 	if result["status"] != "degraded" {

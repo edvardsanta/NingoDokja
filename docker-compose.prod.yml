@@ -13,7 +13,7 @@ services:
       VA_HTTP_ENDPOINT: ${VA_HTTP_ENDPOINT}
       VA_RESPONSE_MODE: ${VA_RESPONSE_MODE}
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT}
-      CHAT_AI_SERVICE_ENDPOINT: ${CHAT_AI_SERVICE_ENDPOINT}
+      DOKJA_INFERENCE_SOCKET: /run/dokja-inference/chat.sock
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
@@ -27,6 +27,7 @@ services:
       VA_STATE_FILE: /data/dokja_state.json
       DOKJA_DB_FILE: /data/dokja.db
     volumes:
+      - ./.dokja/inference:/run/dokja-inference:ro
       - dokja-data:/data
     ports:
       - "5555:5555"
@@ -175,27 +176,6 @@ services:
     restart: unless-stopped
     volumes:
       - dokja-ollama:/root/.ollama
-    networks:
-      - dokja-net
-
-  dokja-chat-ai:
-    build:
-      context: .
-      dockerfile: dokja_services/dokja_chat_ai/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - .env.prod
-    environment:
-      CHAT_AI_SERVICE_HOST: ${CHAT_AI_SERVICE_HOST}
-      CHAT_AI_SERVICE_PORT: ${CHAT_AI_SERVICE_PORT}
-      CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
-      CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
-      CHAT_AI_MODEL: ${CHAT_AI_MODEL}
-      DOKJA_DB_FILE: /data/dokja.db
-    volumes:
-      - dokja-data:/data
-    ports:
-      - "8080:8080"
     networks:
       - dokja-net
 

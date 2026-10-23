@@ -10,7 +10,7 @@ Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 ## Context
 
 The current code is cut by feature: `dokja_book`, `dokja_meme`, `dokja_digest`
-and `dokja_chat_ai` each bundle reading, storage, judgment and output for one
+and the former language integration each bundle reading, storage, judgment and output for one
 product. ADR 0006 showed that Book is a reading plus stored knowledge plus an
 experience, not a capability of its own. The owner confirmed the same holds for
 Meme: it is not a macro-component.

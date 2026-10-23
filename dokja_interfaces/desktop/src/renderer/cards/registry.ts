@@ -26,7 +26,7 @@ export type CardEntry = {
 // no workspace: they are picked in Messages, where they are sent. Reading is how knowledge comes in,
 // so the sources it reads are a view of the Library rather than a workspace of their own.
 export const CARDS: readonly CardEntry[] = [
-  { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard, services: ["chat_ai"] },
+  { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard, services: ["chat"] },
   { kind: "knowledge", labelId: "nav_library", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
   { kind: "memory", labelId: "nav_notebook", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },

@@ -141,7 +141,6 @@
   "no_local_access_to_the_database_set_dokja_db_file_to_delete_profiles": "sem acesso local ao banco: defina DOKJA_DB_FILE para apagar perfis",
   "nsfw_bypass_summary": "; bloqueio NSFW ignorado",
   "no_preview": "(sem prévia: ",
-  "no_profiles_yet_chat_uses_the_chat_ai_environment_variables": "nenhum perfil ainda: o chat usa as variáveis CHAT_AI_* do ambiente.\n",
   "nothing_has_been_triggered_in_this_session_yet": "Nada foi disparado nesta sessão ainda.",
   "nothing_here": "Nada aqui.",
   "nsfw_filter_blocked": "Filtro NSFW: BARRADO — ",
@@ -156,7 +155,6 @@
   "pool_refreshed": "pool atualizado",
   "predicting_the_chance": "prevendo a chance",
   "profile_notice_prefix": "perfil ",
-  "profile_status_prefix": "  perfil ",
   "queued": "na fila",
   "ran": "rodou",
   "reading_the_experience_memory": "lendo a memória de experiência",
@@ -211,7 +209,7 @@
   "the_job_is_paused_a_manual_run_ignores_the_pause": "O job está pausado; a execução manual ignora a pausa.",
   "scheduler_missing_announcement": "o scheduler ainda não anunciou nada (parado?): intervalos e próximas execuções aparecem quando ele rodar",
   "the_token_is_never_shown_only_its_last_4_characters": "o token nunca é mostrado; só os 4 últimos caracteres",
-  "default_profile_warning": "É o perfil ATIVO: o chat volta a usar as variáveis CHAT_AI_* do ambiente.",
+  "default_profile_warning": "Este é o perfil antigo ativo. A seleção do provedor do chat é independente.",
   "this_really_posts_to_discord": "Isso posta no Discord de verdade.",
   "this_removes_the_token_from_the_local_database_it_cannot_be_undone": "Isso remove o token do banco local. Não dá pra desfazer.",
   "title": "  título: ",
@@ -318,5 +316,6 @@
   "provider_save_registration": "Salvar cadastro",
   "provider_registration_saved": "Cadastro do provedor salvo.",
   "provider_edit_help": "ctrl+t habilitar/desabilitar descoberta · enter revisar · esc cancelar",
-  "provider_models_hint": "Até 16 nomes de modelos separados por vírgula; deixe vazio para limpar."
+  "provider_models_hint": "Até 16 nomes de modelos separados por vírgula; deixe vazio para limpar.",
+  "legacy_profiles_do_not_select_chat": "Perfis antigos não selecionam o chat. Use providers chat <provedor> <modelo>.\n"
 }

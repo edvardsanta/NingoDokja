@@ -86,11 +86,12 @@ func readToken(source tokenSource, env func(string) string, stdin *os.File, prom
 
 func (a *App) newChatProfileCommand(ctx context.Context) *cobra.Command {
 	command := &cobra.Command{
-		Use:   "profile",
-		Short: "Chat provider profiles (base URL, model and token), switchable without a restart",
+		Use:        "profile",
+		Short:      "Manage archived provider profiles (chat uses providers chat instead)",
+		Deprecated: "use providers configure and providers chat to select chat inference",
 		Long: "Profiles live in the shared SQLite database. Creating or removing one writes the file " +
 			"directly on this machine: the token never travels through the orchestrator, which can only " +
-			"list profiles (masked) and select one. Selecting takes effect on the chat service's next request.",
+			"list profiles (masked) and select one. These archived profiles do not select chat inference.",
 	}
 
 	list := &cobra.Command{

@@ -106,7 +106,39 @@ func run() error {
 	defer settings.Close()
 	backend := service.New(root)
 	backend.Environment = settings.Environment
-	d := domain.New(backend, journal, save).WithSettings(settings).WithProviders(service.ProviderDiscovery{Compose: backend}).WithProviderSettings(settings)
+	d := domain.New(backend, journal, save).WithSettings(settings).WithProviders(service.ProviderDiscovery{Compose: backend}).WithProviderSettings(settings).WithChat(settings, service.ChatAdapters{Root: root, Environment: settings.Environment})
+	// Only the inference directory is mounted into application containers.
+	inferenceDir := filepath.Join(root, ".dokja", "inference")
+	if err := os.MkdirAll(inferenceDir, 0700); err != nil {
+		return err
+	}
+	inferenceSocket := filepath.Join(inferenceDir, "chat.sock")
+	if info, err := os.Lstat(inferenceSocket); err == nil {
+		if info.Mode()&os.ModeSocket == 0 {
+			return fmt.Errorf("invalid inference socket path")
+		}
+		if err := os.Remove(inferenceSocket); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	inferenceListener, err := net.Listen("unix", inferenceSocket)
+	if err != nil {
+		return err
+	}
+	defer inferenceListener.Close()
+	defer os.Remove(inferenceSocket)
+	if err := os.Chmod(inferenceSocket, 0600); err != nil {
+		return err
+	}
+	inferenceServer := &http.Server{Handler: orchestration.ChatHandler(d), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 95 * time.Second, IdleTimeout: 15 * time.Second}
+	defer inferenceServer.Close()
+	go func() {
+		if err := inferenceServer.Serve(inferenceListener); err != nil && err != http.ErrServerClosed {
+			log.Print("inference listener stopped")
+		}
+	}()
 	hash := sha256.Sum256([]byte(root))
 	project := hex.EncodeToString(hash[:])[:16]
 	server := &http.Server{Handler: orchestration.Handler(d, project), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 15 * time.Second}

@@ -265,11 +265,6 @@ func (m *Model) serviceState(service serviceRow) string {
 		return styleBad.Render("error") + styleDim.Render("  "+trunc(service.Detail, 60))
 	case service.Status == "stopped":
 		return styleWarn.Render(tr("stopped")) + styleDim.Render("  "+trunc(service.Detail, 60))
-	case service.Status == "ok" && service.Name == "chat_ai" && m.status != nil:
-		if profile, ok := m.status.activeProfile(); ok {
-			return styleOK.Render("ok") + styleDim.Render(tr("profile_status_prefix")+profile.Name+" "+profile.KeyHint)
-		}
-		return styleOK.Render("ok")
 	case service.Status == "ok":
 		if service.Detail != "" {
 			return styleOK.Render("ok") + styleDim.Render("  "+trunc(service.Detail, 50))
@@ -716,7 +711,7 @@ func (m *Model) viewProfiles() string {
 	b.WriteString(styleTitle.Render(tr("chat_profiles_provider_model_token")) + "\n")
 	b.WriteString(styleDim.Render(tr("the_token_is_never_shown_only_its_last_4_characters")) + "\n\n")
 	if len(m.status.Profiles) == 0 {
-		b.WriteString(styleDim.Render(tr("no_profiles_yet_chat_uses_the_chat_ai_environment_variables")) + tr("n_creates_the_first_one"))
+		b.WriteString(styleDim.Render(tr("legacy_profiles_do_not_select_chat")) + tr("n_creates_the_first_one"))
 	}
 	for i, row := range m.status.Profiles {
 		marker, active := "  ", "   "

@@ -9,7 +9,7 @@ const domainResult = {
   action: "inspect-ningo-platform",
   status: "degraded",
   services: {
-    chat_ai: { status: "error", error: "connection refused" },
+    chat: { status: "error", error: "connection refused" },
     meme: { status: "ok", unsent_count: 4, enabled: true },
     scheduler: { status: "stopped", detail: "never announced", enabled: false },
     knowledge: "not an object",
@@ -35,7 +35,7 @@ test("ningo.status keeps only what the health card reads", () => {
   assert.deepEqual(projected, {
     status: "degraded",
     services: {
-      chat_ai: { status: "error", detail: "connection refused" },
+      chat: { status: "error", detail: "connection refused" },
       meme: { status: "ok", detail: "", enabled: true },
       scheduler: { status: "stopped", detail: "never announced", enabled: false },
     },

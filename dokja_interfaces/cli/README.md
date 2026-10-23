@@ -107,7 +107,7 @@ Switches and jobs:
   running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a
   job. Starting `discord` or `scheduler` first prints what they will do with the saved switches and jobs
   (which jobs post and when, whether the bot answers) and asks; `--yes` skips the question. Run it on the host; inside a container it is refused.
-- `services list|enable|disable <meme|chat_ai|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`: a logical switch in the orchestrator. While a
+- `services list|enable|disable <meme|chat|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`: a logical switch in the orchestrator. While a
   service is off its events are refused (scheduled jobs included). The container is not touched.
 - `jobs list`: state, interval, last and next run of every scheduler job.
 - `jobs enable|disable <job>`: pauses or resumes the job's scheduled runs; persisted across restarts.
@@ -175,3 +175,8 @@ Supported provider IDs are `codex`, `claude_code` and `ollama`.
 Either option may be omitted to preserve that field; `--models=` clears the list.
 The command refuses stale revisions rather than overwriting another interface's
 edit. It does not change legacy inference consumers or the embedding profile.
+
+Chat requires an explicit enabled provider and declared model. Select it in Desktop
+System → Inference providers → Chat provider and model, or run
+`dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
+shows a setup error. Archived profile editing no longer selects live inference.

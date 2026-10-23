@@ -30,6 +30,7 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
   useEffect(() => { if (action.state.phase === "ready") reload(); }, [action.state, reload]);
   return <CardFrame title={t("providers_title")} state={state} onReload={reload}>
     {(data) => <>
+      {data.configurationRevision ? <ChatSelection transport={transport} providers={data.providers} /> : null}
       <p className="detail">{t("providers_discovery_only")}</p>
       {action.state.phase === "error" && <Problem error={action.state.error} />}
       {!data.configurationRevision && <p className="detail">{t("provider_configuration_unavailable")}</p>}
@@ -68,4 +69,35 @@ function ProviderPreferences({ row, revision, busy, onSave }: { row: ProviderRow
         <button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button>
       </div>}
   </form>;
+}
+
+function ChatSelection({transport,providers}:{transport:Transport;providers:ProviderRow[]}) {
+ const t=useTranslate();
+ const load=useCallback(async ():Promise<LoadResult<import("../../shared/runtime.js").ChatBinding>>=>{
+ const result=await transport.request("runtime.chat",{});if(!result.ok)return result;
+ return {ok:true,data:result.result as import("../../shared/runtime.js").ChatBinding};},[transport]);
+ const {state,reload}=useCard(load);
+ const [draft,setDraft]=useState<{revision:number;provider:string;model:string}>();
+ const save=useAction(useCallback(async (value:{revision:number;provider:string;model:string}):Promise<LoadResult<true>>=>{
+ const result=await transport.request("runtime.chat.configure",{configuration_revision:value.revision,provider:value.provider,model:value.model});if(!result.ok)return result;
+ if(!isRecord(result.result)||result.result.configurationRevision!==value.revision+1||result.result.provider!==value.provider||result.result.model!==value.model)return {ok:false,error:{code:"unexpected",message:"incompatible chat configuration response"}};
+ return {ok:true,data:true};},[transport]));
+ useEffect(()=>{if(save.state.phase==="ready"){setDraft(undefined);reload();}},[save.state,reload]);
+ return <section aria-label={t("chat_provider_title")}>
+ <h3>{t("chat_provider_title")}</h3><p>{t("chat_provider_hint")}</p>
+ {state.phase==="error"&&<Problem error={state.error}/>}
+ {save.state.phase==="error"&&<Problem error={save.state.error}/>}
+ {state.phase==="ready"&&<>
+ <p>{state.data.provider ? `${state.data.provider} / ${state.data.model}`:t("chat_provider_missing")}</p>
+ {!draft?<button type="button" onClick={()=>setDraft({revision:state.data.configurationRevision,provider:state.data.provider,model:state.data.model})}>{t("setting_edit")}</button>:
+ <form onSubmit={e=>{e.preventDefault();save.start(draft);}}>
+ <label>{t("chat_provider_title")}<select value={draft.provider+"|"+draft.model} disabled={save.state.phase==="loading"} onChange={e=>{const [provider,model]=e.target.value.split("|");setDraft({...draft,provider:provider??"",model:model??""});}}>
+ <option value="|">{t("chat_provider_missing")}</option>
+ {providers.filter(p=>p.enabled!==false).flatMap(p=>(p.declaredModels??[]).map(model=><option key={p.id+"|"+model} value={p.id+"|"+model}>{p.name} / {model}</option>))}
+ </select></label>
+ <button type="submit" disabled={!draft.provider||!draft.model||save.state.phase==="loading"}>{t("chat_provider_save")}</button>
+ <button type="button" disabled={save.state.phase==="loading"} onClick={()=>setDraft(undefined)}>{t("runtime_confirm_cancel")}</button>
+ </form>}
+ </>}
+ </section>;
 }

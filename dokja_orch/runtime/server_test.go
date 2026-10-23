@@ -304,3 +304,51 @@ func TestProviderConfigurationIsSharedAndStaleRequestsAreRejected(t *testing.T) 
 		t.Fatal("registration started services")
 	}
 }
+
+func TestChatSelectionRoutesPersistAndRefuseStaleOrNonControllerWrites(t *testing.T) {
+	t.Setenv("DOKJA_DB_FILE", "")
+	settings, err := service.OpenDatabaseSettings(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer settings.Close()
+	p, err := settings.ReadProviders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = settings.WriteProvider(p.Revision, domain.ProviderRegistration{ID: "codex", Enabled: true, Models: []string{"fixture/model"}}); err != nil {
+		t.Fatal(err)
+	}
+	h := Handler(domain.New(&fake{}, domain.Journal{}, nil).WithProviderSettings(settings).WithChat(settings, nil), "fixture")
+	ask := func(source, kind string, payload map[string]any) map[string]any {
+		t.Helper()
+		raw, _ := json.Marshal(Event{Source: source, Type: kind, Payload: payload})
+		r := httptest.NewRequest("POST", "/request", bytes.NewReader(raw))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var out map[string]any
+		json.Unmarshal(w.Body.Bytes(), &out)
+		return out
+	}
+	if got := ask("desktop", "runtime.chat", nil); got["status"] != "ok" {
+		t.Fatal(got)
+	}
+	payload := map[string]any{"configuration_revision": 1, "provider": "codex", "model": "fixture/model"}
+	if got := ask("orchestrator", "runtime.chat.configure", payload); got["status"] != "error" {
+		t.Fatal("inference caller changed configuration", got)
+	}
+	if got := ask("desktop", "runtime.chat.configure", payload); got["status"] != "ok" {
+		t.Fatal(got)
+	}
+	if got := ask("cli", "runtime.chat.configure", payload); got["status"] != "error" {
+		t.Fatal("stale selection accepted", got)
+	}
+	for _, source := range []string{"desktop", "cli", "tui"} {
+		got := ask(source, "runtime.chat", nil)
+		body := got["result"].(map[string]any)["result"].(map[string]any)
+		if body["provider"] != "codex" || body["model"] != "fixture/model" || body["configuration_revision"] != float64(2) {
+			t.Fatal(got)
+		}
+	}
+}

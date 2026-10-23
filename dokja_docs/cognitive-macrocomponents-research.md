@@ -85,7 +85,7 @@ justify that. The conceptual map does not prescribe one container per row.
 | Prediction | Memory prediction/scoring | Predictors with explicit targets and evaluators | Domain owns the target, evidence requirements, and permitted use. |
 | Moderation | Moderation domain, meme screening | Safety and content classifiers, platform rules | Decides admissibility: allow, reject, review, or constraints. |
 | Attention | Digest ranking, hashtag relevance threshold | Ranking and scoring strategies | Decides priority: score, rank, select; never overrides moderation. |
-| Language generation | Chat domain/handler and Chat AI | Model providers and structured-output adapters | Chat owns conversation and response policy. |
+| Language generation | Chat domain/handler and chat inference | Model providers and structured-output adapters | Chat owns conversation and response policy. |
 | Action and communication | Communications, media delivery, voice output | Platform and output adapters | Communications authorizes and executes actions; receipts go to Experience. |
 | Coordination and working memory | Orchestrator core | Typed Go workflows, later versioned recipes (ADR 0007) | Orchestrator sequences work; domains supply business decisions. |
 

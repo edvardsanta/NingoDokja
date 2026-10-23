@@ -200,7 +200,7 @@ Action:
 Purpose:
 
 - inspect orchestrated platform status in one request
-- aggregate service-level checks like chat AI and meme state
+- aggregate service-level checks like chat inference and meme state
 
 Current files:
 

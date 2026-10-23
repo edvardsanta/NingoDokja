@@ -70,6 +70,27 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			reply("ok", result, "")
+		case "runtime.chat":
+			result, err := d.ChatBinding()
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
+		case "runtime.chat.configure":
+			rev, ok := e.Payload["configuration_revision"].(float64)
+			p, pok := e.Payload["provider"].(string)
+			m, mok := e.Payload["model"].(string)
+			if !ok || rev < 1 || rev >= float64(domain.MaxProviderRevision) || math.Trunc(rev) != rev || !pok || !mok {
+				reply("error", nil, "invalid chat configuration request")
+				return
+			}
+			result, err := d.ConfigureChat(domain.ChatBinding{Revision: uint64(rev), Provider: p, Model: m})
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
 		case "runtime.providers":
 			view := d.Providers(r.Context())
 			if view.Error != "" {

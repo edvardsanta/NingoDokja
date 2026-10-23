@@ -141,7 +141,6 @@
   "no_local_access_to_the_database_set_dokja_db_file_to_delete_profiles": "no local access to the database: set DOKJA_DB_FILE to delete profiles",
   "nsfw_bypass_summary": "; NSFW blocking bypassed",
   "no_preview": "(no preview: ",
-  "no_profiles_yet_chat_uses_the_chat_ai_environment_variables": "no profiles yet: chat uses the CHAT_AI_* environment variables.\n",
   "nothing_has_been_triggered_in_this_session_yet": "Nothing has been triggered in this session yet.",
   "nothing_here": "Nothing here.",
   "nsfw_filter_blocked": "NSFW filter: BLOCKED — ",
@@ -156,7 +155,6 @@
   "pool_refreshed": "pool refreshed",
   "predicting_the_chance": "predicting the chance",
   "profile_notice_prefix": "profile ",
-  "profile_status_prefix": "  profile ",
   "queued": "queued",
   "ran": "ran",
   "reading_the_experience_memory": "reading the experience memory",
@@ -211,7 +209,7 @@
   "the_job_is_paused_a_manual_run_ignores_the_pause": "The job is paused; a manual run ignores the pause.",
   "scheduler_missing_announcement": "the scheduler has not announced anything yet (stopped?): intervals and next runs appear once it runs",
   "the_token_is_never_shown_only_its_last_4_characters": "the token is never shown; only its last 4 characters",
-  "default_profile_warning": "This is the ACTIVE profile: chat goes back to the CHAT_AI_* environment variables.",
+  "default_profile_warning": "This removes the active legacy profile. Chat provider selection is independent.",
   "this_really_posts_to_discord": "This really posts to Discord.",
   "this_removes_the_token_from_the_local_database_it_cannot_be_undone": "This removes the token from the local database. It cannot be undone.",
   "title": "  title: ",
@@ -318,5 +316,6 @@
   "provider_save_registration": "Save registration",
   "provider_registration_saved": "Provider registration saved.",
   "provider_edit_help": "ctrl+t enable/disable discovery · enter review · esc cancel",
-  "provider_models_hint": "Up to 16 comma-separated model names; leave empty to clear."
+  "provider_models_hint": "Up to 16 comma-separated model names; leave empty to clear.",
+  "legacy_profiles_do_not_select_chat": "Legacy profiles do not select chat inference. Use providers chat <provider> <model>.\n"
 }

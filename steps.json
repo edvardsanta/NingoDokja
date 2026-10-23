@@ -1015,7 +1015,7 @@
           ],
           "evidence": [
             "Implemented a host background bootstrap orchestrator, Runtime domain and stateless Compose adapter. Desktop starts only the daemon on a runtime read; explicit module actions start/stop only dependency closures. Readiness and background failures are visible even with the main orchestrator stopped.",
-            "Initial selectable lite modules: orchestrator, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice and WhatsApp. Shared and borrowed dependencies, recognized external consumers, data, auth and history volumes are preserved. One operation runs at a time; ownership survives daemon restart; application acknowledgements gate ready state.",
+            "Initial selectable lite modules: orchestrator, Memory, Knowledge, Meme, Book, Feeds, Voice and WhatsApp. Shared and borrowed dependencies, recognized external consumers, data, auth and history volumes are preserved. One operation runs at a time; ownership survives daemon restart; application acknowledgements gate ready state.",
             "Private Unix socket, OS instance lock, project-bound protocol responses and real-input IPC validation bound the local control surface. Existing routing switches stay separate. Windows, production and remote/custom orchestrator endpoints are outside the initial backend.",
             "System UI consolidates lifecycle and activity into one module row. Optional request handling and WhatsApp setup stay under module options; automation remains in the same card. Regression coverage includes controller-unavailable fallback.",
             "Provider inspection found that the local Docker-compatible CLI ignores DOCKER_HOST under Podman. The adapter bridges an explicit local Unix socket into CONTAINER_HOST when no Podman override is present, so it addresses the configured engine rather than an unrelated container context."
@@ -1141,7 +1141,8 @@
             "Provider configuration persists under the independent runtime.providers.v1 key without a table/schema-version change. Operational settings, profiles, credentials and embedding consumers are untouched; default registrations preserve previous discovery eligibility.",
             "runtime.providers.configure accepts a known adapter ID, explicit enabled flag, up to 16 declared model names and the exact read revision. Disabled adapters are skipped by discovery. Declarations stay separate from observations and every row still reports inference_status=not_tested.",
             "CLI, TUI and desktop confirm edits, refuse old controllers without a revision and retain stale revisions rather than silently merging. A TUI regression covers a late inventory reply arriving during editing. Persistence survives reopen; conflicting writers cannot replace one another.",
-            "No live registration, provider authentication, model inference, service recreation or production deployment was performed. Legacy inference consumers and capability bindings remain unchanged."
+            "No live registration, provider authentication, model inference, service recreation or production deployment was performed. Legacy inference consumers and capability bindings remain unchanged.",
+            "Chat consumer migration removes the dedicated language service and uses an explicit revisioned provider/model binding, host inference adapters and a private socket. Deterministic regression coverage is added; live authentication/inference and broader cognitive/OCR bindings remain unverified."
           ],
           "batches": [
             {
@@ -1181,7 +1182,7 @@
               ]
             }
           ],
-          "next_action": "Add capability-specific provider/model bindings using the registered declarations only after validating provider support and actual inference. Keep OCR/legacy-consumer migration pending. Repair the existing native communications/Digest E2E baseline separately; registrations alone do not complete step 11.4.",
+          "next_action": "Validate live chat provider/model inference; deterministic chat binding and adapter migration is implemented. Keep broader cognitive/OCR consumer migration pending. Repair the existing native communications/Digest E2E baseline separately; registrations alone do not complete step 11.4.",
           "references": [
             "dokja_docs/provider-inventory.md",
             "dokja_docs/decisions/0013-database-runtime-settings.md",

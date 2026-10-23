@@ -231,7 +231,7 @@ func TestShortKeysGetNoHint(t *testing.T) {
 }
 
 // The chat service (Python) reads these tables directly. If this test needs changing,
-// dokja_services/dokja_chat_ai/profiles.py needs the same change.
+// Legacy profile readers must preserve the same schema interpretation.
 func TestSchemaMatchesWhatTheChatServiceReads(t *testing.T) {
 	db := open(t)
 	_ = db.SaveProfile(good("hosted"))

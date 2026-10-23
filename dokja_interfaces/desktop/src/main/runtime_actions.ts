@@ -93,3 +93,12 @@ export function runtimeProviders(body: Record<string, unknown>): import("../shar
  }
  return { configurationRevision: revision, providers, checkedAt: text(body.checked_at).slice(0, 40) };
 }
+
+export function runtimeChat(raw: Record<string,unknown>): import("../shared/runtime.js").ChatBinding {
+ const revision=raw.configuration_revision;
+ if(typeof revision!=="number"||!Number.isSafeInteger(revision)||revision<1||typeof raw.provider!=="string"||typeof raw.model!=="string"||raw.provider!==""&&!PROVIDER_IDS.includes(raw.provider)||raw.model!==""&&!DECLARED_MODEL.test(raw.model)) throw new Error("invalid chat configuration");
+ return {configurationRevision:revision,provider:raw.provider,model:raw.model};
+}
+export function runtimeChatConfigure(raw: Record<string,unknown>):Record<string,unknown>|undefined {
+ try {const b=runtimeChat(raw);if(!b.provider||!b.model||b.configurationRevision>=Number.MAX_SAFE_INTEGER)return undefined;return {configuration_revision:b.configurationRevision,provider:b.provider,model:b.model};}catch{return undefined;}
+}

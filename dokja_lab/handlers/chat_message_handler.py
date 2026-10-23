@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 try:
     from bootstrap import ensure_repo_root
@@ -17,9 +17,12 @@ except ImportError:  # pragma: no cover
     from dokja_lab.logging_config import get_logger  # type: ignore[no-redef]
 
 from dokja_domain.dokja_chat import ChatDomain
-from dokja_services.dokja_chat_ai import OpenAIChatService
 
 logger = get_logger(__name__, level=logging.DEBUG)
+
+
+class ChatProvider(Protocol):
+    def send_message(self, message: str) -> Any: ...
 
 
 class MessageHandler(BaseHandler):
@@ -28,9 +31,7 @@ class MessageHandler(BaseHandler):
         self,
         storage: Any,
         publisher: Any,
-        ningo_token: str,
-        ningo_agent: str,
-        model: str = "n/a",
+        chat_provider: ChatProvider,
     ) -> None:
         """
         Initialize the MessageHandler with storage, publisher, and Ningo API details.
@@ -38,11 +39,7 @@ class MessageHandler(BaseHandler):
         super().__init__(storage, publisher)
         self.domain = ChatDomain(
             repository=SQLiteChatMessageRepository(storage),
-            ai_service=OpenAIChatService(
-                api_key=ningo_token,
-                base_url=ningo_agent,
-                model=model,
-            ),
+            ai_service=chat_provider,
         )
 
     def handle(self, payload: dict) -> Any:

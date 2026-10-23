@@ -106,10 +106,10 @@ func TestExtractBridgeReplyReturnsSystemReply(t *testing.T) {
 
 func TestExtractBridgeReplyExplainsAnEventTheOperatorSwitchedOff(t *testing.T) {
 	reply := extractBridgeReply(core.ProcessResult{
-		Result: map[string]any{"skipped": true, "reason": "service chat_ai is disabled"},
+		Result: map[string]any{"skipped": true, "reason": "service chat is disabled"},
 	})
 
-	if !strings.Contains(reply, "switched off") || !strings.Contains(reply, "service chat_ai is disabled") {
+	if !strings.Contains(reply, "switched off") || !strings.Contains(reply, "service chat is disabled") {
 		t.Fatalf("expected an explanation, got %q", reply)
 	}
 	if extractBridgeReply(core.ProcessResult{Result: map[string]any{}}) != "" {

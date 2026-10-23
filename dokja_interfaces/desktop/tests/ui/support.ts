@@ -65,7 +65,7 @@ export function deferred<T>() {
 // Hand-built replies, never captured ones.
 export const SERVICES: StatusReply["services"] = {
   meme: { status: "ok", detail: "" },
-  chat_ai: { status: "error", detail: "connection refused" },
+  chat: { status: "error", detail: "connection refused" },
   scheduler: { status: "stopped", detail: "never announced" },
   memory: { status: "disabled", detail: "", enabled: false },
   book: { status: "unchecked", detail: "" },
@@ -73,7 +73,7 @@ export const SERVICES: StatusReply["services"] = {
 
 export const ALL_UP: StatusReply["services"] = {
   meme: { status: "ok", detail: "" },
-  chat_ai: { status: "ok", detail: "" },
+  chat: { status: "ok", detail: "" },
 };
 
 export function statusReply(

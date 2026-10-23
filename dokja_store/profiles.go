@@ -110,7 +110,7 @@ func (d *DB) UseProfile(name string) error {
 }
 
 // DeleteProfile removes a profile. The active one needs force, because chat would then
-// fall back to the environment settings.
+// lose the archived selection. Live chat uses the runtime capability binding.
 func (d *DB) DeleteProfile(name string, force bool) error {
 	active, err := d.setting(activeProfileKey)
 	if err != nil {

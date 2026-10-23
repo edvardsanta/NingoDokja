@@ -83,3 +83,10 @@ models separately from these observations. Disabled adapters are skipped by
 discovery; declarations remain unverified. See
 [persistent provider registrations](provider-registrations.md) for the new action,
 revision checks and the unchanged legacy inference consumers.
+
+## Chat consumer migration
+
+The subsequent chat migration now uses an explicit `runtime.chat.v1` binding and
+`runtime.chat` / `runtime.chat.configure` actions. Enabled declarations are validated
+on selection and every generation call. Registration alone still does not select a
+model or prove inference. See [rollout and compatibility](production-runbook.md#chat-provider-migration).

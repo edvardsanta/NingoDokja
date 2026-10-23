@@ -60,7 +60,7 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 
 - `dokja_orch/`: Go orchestrator; entry point `cmd/va/`, code in `internal/` (core, ingress, handlers, clients).
 - `dokja_domain/`: one dir per domain. Go modules: `dokja_book`, `dokja_communications`, `dokja_digest`, `dokja_knowledge`, `dokja_meme`, `dokja_memory`, `dokja_moderation`. Python: `dokja_chat`.
-- `dokja_services/`: one dir per service, each with `service.yaml` and a Dockerfile. Go: `dokja_feeds`, `dokja_memory`, `dokja_scheduler`. Python: `dokja_book`, `dokja_chat_ai`, `dokja_communications`, `dokja_knowledge`, `dokja_meme`, `dokja_voice`, `dokja_prediction`.
+- `dokja_services/`: one dir per service, each with `service.yaml` and a Dockerfile. Go: `dokja_feeds`, `dokja_memory`, `dokja_scheduler`. Python: `dokja_book`, `dokja_communications`, `dokja_knowledge`, `dokja_meme`, `dokja_voice`, `dokja_prediction`.
 - `dokja_interfaces/`:
   - `discord/` and `teams/`: TypeScript bots, run with `tsx`.
   - `desktop/`: Electron + React + Vite.
@@ -158,7 +158,7 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 - `dokja_legacy/` and `dokja_lab/` are large. Search them by symbol rather than reading them whole.
 - `dokja_lab/config.py` is local to each machine and git-ignored, so a clean checkout has none.
 - The desktop suite is skipped unless `node_modules` exists. Desktop e2e builds the whole app first, which is slow.
-- Full runs need these services: Ollama (`dokja-ollama`, plus `dokja-embedding-init` in lite) for chat-ai and knowledge, and ZeroMQ between the orchestrator and the interfaces. Start them through the compose stacks.
+- Full runs need these services: Ollama (`dokja-ollama`, plus `dokja-embedding-init` in lite) for knowledge; chat uses an explicitly configured Runtime provider/model, and ZeroMQ between the orchestrator and the interfaces. Start them through the compose stacks.
 - Every commit is scanned by gitleaks, and the history is public. A value added and then removed in a later commit was still published, so fix it in the commit that introduced it.
 
 <!-- ai-memory:start -->

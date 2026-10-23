@@ -29,7 +29,7 @@ workers added by the prototype do not own conversation state or decide policy.
 | Semantic documents and indexes | Knowledge SQLite store | Continue through existing domain/service ports |
 | Experiences and outcomes | Memory SQLite store | Continue current recording/resolution contracts; do not change schema |
 | Feed observations | Host memory, last successful result per plugin | Keep rebuildable cache and explicit timestamps |
-| Provider profiles/settings | Shared SQLite accessed by local tools and Chat AI | Preserve existing local credential editing and masked orchestrator reads |
+| Provider profiles/settings | Shared SQLite accessed by local tools and chat inference | Preserve existing local credential editing and masked orchestrator reads |
 | Scheduler configuration | Orchestrator-owned state read by scheduler | Preserve current control and timer semantics |
 | Recipes | Existing registered workflow definitions | Versioned source/configuration, with no automatic promotion from recalled text |
 

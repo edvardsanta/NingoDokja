@@ -16,7 +16,6 @@ consumes:
   - zmq-reqrep
 
 depends_on:
-  - dokja-chat-ai
   - dokja-feeds
   - dokja-discord
 
