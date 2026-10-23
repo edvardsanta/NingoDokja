@@ -46,7 +46,50 @@ export function runtimeSettings(body:Record<string,unknown>):RuntimeSettings {
  for (const raw of body.settings.slice(0,64)) {
   if(!isRecord(raw)||!SETTING_ID.test(text(raw.id))) throw new Error("invalid runtime setting");
   settings.push({id:text(raw.id),group:text(raw.group).slice(0,20),kind:text(raw.kind).slice(0,10),options:strings(raw.options,8,20),
-   value:text(raw.value).slice(0,2000),affects:strings(raw.affects,12,40),note:text(raw.note).slice(0,20),default:text(raw.default).slice(0,200)});
+   value:text(raw.value).slice(0,2000),affects:strings(raw.affects,12,40),note:text(raw.note).slice(0,20),default:text(raw.default).slice(0,200),readOnly:raw.read_only===true});
  }
  return {settings,webhookChannels:strings(body.webhook_channels,64,20).filter(id=>/^[0-9]+$/.test(id)),busy:body.busy,error:text(body.error).slice(0,400)};
+}
+
+const PROVIDER_IDS = ["codex", "claude_code", "ollama"];
+const DECLARED_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+function declaredModels(raw: unknown): string[] | undefined {
+ if (!Array.isArray(raw) || raw.length > 16) return undefined;
+ if (!raw.every((name): name is string => typeof name === "string" && DECLARED_MODEL.test(name.trim()))) return undefined;
+ return raw.map((name) => name.trim());
+}
+
+export function runtimeProviderConfigure(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+ const revision = raw.configuration_revision;
+ if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 1 || revision >= Number.MAX_SAFE_INTEGER || typeof raw.provider !== "string" || !PROVIDER_IDS.includes(raw.provider) || typeof raw.enabled !== "boolean") return undefined;
+ const models = declaredModels(raw.models);
+ if (!models) return undefined;
+ return { configuration_revision: revision, provider: raw.provider, enabled: raw.enabled, models };
+}
+export function runtimeProviderSaved(raw: Record<string, unknown>): import("../shared/runtime.js").ProviderRegistrationSaved {
+ if (typeof raw.configuration_revision !== "number" || !Number.isSafeInteger(raw.configuration_revision) || raw.configuration_revision < 1 || typeof raw.provider !== "string" || !PROVIDER_IDS.includes(raw.provider)) throw new Error("invalid provider save response");
+ return { provider: String(raw.provider), configurationRevision: raw.configuration_revision };
+}
+
+export function runtimeProviders(body: Record<string, unknown>): import("../shared/runtime.js").ProvidersView {
+ if (!Array.isArray(body.providers)) throw new Error("invalid provider inventory");
+ const revision = body.configuration_revision ?? 0;
+ if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) throw new Error("invalid provider configuration revision");
+ const names: Record<string, string> = { codex: "Codex", claude_code: "Claude Code", ollama: "Ollama" };
+ const seen = new Set<string>();
+ const providers: import("../shared/runtime.js").ProviderRow[] = [];
+ for (const raw of body.providers.slice(0, 3)) {
+  if (!isRecord(raw) || typeof raw.id !== "string" || !Object.hasOwn(names, raw.id) || seen.has(raw.id)) continue;
+  seen.add(raw.id);
+  const declarations = declaredModels(raw.declared_models ?? []);
+  if (revision > 0 && (typeof raw.enabled !== "boolean" || !Array.isArray(raw.declared_models) || !declarations)) throw new Error("invalid provider registration");
+  const states = raw.id === "ollama" ? ["reachable", "unavailable"] : ["installed", "unavailable"];
+  if (!states.includes(String(raw.state))) throw new Error("invalid provider state");
+  const reasons = ["", "executable_missing", "service_stopped", "engine_unavailable", "inspection_failed", "invalid_response", "timeout", "inspection_unavailable", "disabled"];
+  providers.push({ enabled: raw.enabled !== false, declaredModels: declarations ?? [], id: raw.id, name: names[raw.id]!, state: String(raw.state), reason: reasons.includes(String(raw.reason ?? "")) ? String(raw.reason ?? "") : "inspection_unavailable",
+   models: raw.enabled !== false && raw.id === "ollama" && raw.state === "reachable" ? strings(raw.models, 64, 128).filter((name) => /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(name)) : [],
+   modelDiscovery: raw.enabled === false ? "unavailable" : raw.id !== "ollama" ? "unsupported" : raw.state === "reachable" && raw.model_discovery === "listed" ? "listed" : "unavailable",
+   inferenceStatus: "not_tested", truncated: raw.models_truncated === true });
+ }
+ return { configurationRevision: revision, providers, checkedAt: text(body.checked_at).slice(0, 40) };
 }

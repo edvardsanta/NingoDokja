@@ -356,3 +356,19 @@ window closes; no login/boot autostart is installed. See the
 Content providers appear under Knowledge → Sources as processing plugins. Runtime
 controls manage Feeds as their host; Book/Meme are not separate desktop modules.
 See the [plugin migration contract](../../dokja_docs/feeds-content-plugins.md).
+
+Operational settings are stored in the shared local database through the runtime
+controller, so CLI, TUI and desktop see the same values. Allowed legacy `.env`
+options are imported once; tokens and webhook addresses remain outside this API.
+The embedding profile is visible and fixed. Manual Compose still uses legacy
+environment configuration; see the [runbook](../../dokja_docs/production-runbook.md).
+
+System → Inference providers → Inspect providers reads the same inventory as
+CLI and TUI, only on demand. A CLI found on PATH is not proof of authentication
+or successful inference. See [provider inventory](../../dokja_docs/provider-inventory.md).
+
+After inspecting providers, Edit opens the selected registration. Review and save
+discovery eligibility and up to 16 unverified model declarations. The form keeps
+its original revision; concurrent edits require reload and explicit retry. Older
+controllers without a configuration revision remain read-only. Changes do not
+select a capability model or alter the fixed embedding profile.

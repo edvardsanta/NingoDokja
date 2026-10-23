@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -48,5 +51,51 @@ func TestEmptySettingsDisplayTheirEffectiveDefaults(t *testing.T) {
 		if got := SettingValueText(SettingsView{}, row); got != row.Default+" (default)" {
 			t.Fatal(got)
 		}
+	}
+}
+
+func TestCLIListsFixedProfileAndRejectsItsEditBeforeSending(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "docker-compose.lite.yml"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base, err := os.MkdirTemp("", "dokja-settings-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(base) })
+	t.Setenv("XDG_STATE_HOME", base)
+	markers := containerMarkers
+	containerMarkers = nil
+	t.Cleanup(func() { containerMarkers = markers })
+	var writes int
+	client := fakeDaemon(t, root, func(event map[string]any) map[string]any {
+		if event["type"] == "runtime.settings.set" {
+			writes++
+		}
+		return map[string]any{"version": 1, "project_id": RuntimeProjectID(root), "status": "ok", "result": map[string]any{"domain": "runtime", "result": map[string]any{"busy": false, "settings": []any{map[string]any{"id": "models.embedding", "group": "models", "default": "bge-m3", "value": "", "read_only": true}}}}}
+	})
+	state, err := RuntimeStateDir(root, os.Getenv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(client.StateDir, "control.sock"), filepath.Join(state, "control.sock")); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	view, err := client.Settings(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	printSettings(&out, view)
+	if !strings.Contains(out.String(), "bge-m3 (default) (fixed)") {
+		t.Fatal(out.String())
+	}
+	err = NewApp().Run(t.Context(), []string{"dokja-cli", "settings", "set", "models.embedding=example/model", "--yes", "--runtime-root", root})
+	if err == nil || !strings.Contains(err.Error(), "fixed for this version") || writes != 0 {
+		t.Fatal(err, writes)
 	}
 }

@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	service "read_books/dokja_services/dokja_runtime"
 	"sync"
 	"testing"
 	"time"
@@ -135,5 +138,169 @@ func TestSettingsAreRoutedAndRefusedValuesAnswerAnError(t *testing.T) {
 		if ask("runtime.settings.set", payload)["status"] != "error" {
 			t.Fatalf("%v must be refused (this stack has no settings store)", payload)
 		}
+	}
+}
+
+func TestDatabaseSettingsAreSharedByEveryInterfaceAndSurviveRestart(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DOKJA_DB_FILE", "")
+	t.Setenv("DISCORD_DM_POLICY", "open")
+	envPath := filepath.Join(root, ".env")
+	legacy := "DISCORD_DM_POLICY=open\nDISCORD_BOT_TOKEN=fixture-token\n"
+	if err := os.WriteFile(envPath, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := service.OpenDatabaseSettings(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { settings.Close() }()
+	backend := &fake{}
+	d := domain.New(backend, domain.Journal{}, nil).WithSettings(settings)
+	handler := Handler(d, "fixture")
+	ask := func(source, kind string, payload map[string]any) domain.SettingsView {
+		t.Helper()
+		raw, _ := json.Marshal(Event{Source: source, Type: kind, Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply struct {
+			Status string `json:"status"`
+			Error  string `json:"error"`
+			Result struct {
+				Result domain.SettingsView `json:"result"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" {
+			t.Fatal(w.Body.String(), err)
+		}
+		if bytes.Contains(w.Body.Bytes(), []byte("fixture-token")) {
+			t.Fatal("secret exposed")
+		}
+		return reply.Result.Result
+	}
+	ask("cli", "runtime.settings.set", map[string]any{"values": map[string]string{"discord.direct_messages": "closed"}})
+	deadline := time.Now().Add(time.Second)
+	for d.Settings().Busy {
+		if time.Now().After(deadline) {
+			t.Fatal("settings did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := d.Settings().Error; err != "" {
+		t.Fatal(err)
+	}
+	// Restart the persistence adapter and router, keeping the same database file.
+	if err := settings.Close(); err != nil {
+		t.Fatal(err)
+	}
+	settings, err = service.OpenDatabaseSettings(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = domain.New(backend, domain.Journal{}, nil).WithSettings(settings)
+	handler = Handler(d, "fixture")
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		view := ask(source, "runtime.settings", nil)
+		found := false
+		for _, row := range view.Settings {
+			if row.ID == "discord.direct_messages" {
+				found = row.Value == "closed"
+			}
+		}
+		if !found || view.Error != "" {
+			t.Fatal(source, view)
+		}
+	}
+	if raw, _ := os.ReadFile(envPath); string(raw) != legacy {
+		t.Fatal("legacy configuration changed")
+	}
+	if backend.starts != 0 {
+		t.Fatal("settings started stopped modules")
+	}
+}
+
+func TestProviderInventoryIsReadOnlyAndSharedByLocalInterfaces(t *testing.T) {
+	backend := &fake{}
+	handler := Handler(domain.New(backend, domain.Journal{}, nil), "fixture")
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		raw, _ := json.Marshal(Event{Source: source, Type: "runtime.providers", Payload: map[string]any{"command": "ignored"}})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply struct {
+			Status string
+			Result struct{ Result domain.ProvidersView }
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" || len(reply.Result.Result.Providers) != 3 {
+			t.Fatal(w.Body.String(), err)
+		}
+		for _, row := range reply.Result.Result.Providers {
+			if row.InferenceStatus != "not_tested" {
+				t.Fatal(row)
+			}
+		}
+	}
+	if backend.starts != 0 {
+		t.Fatal("inventory started modules")
+	}
+}
+
+func TestProviderConfigurationIsSharedAndStaleRequestsAreRejected(t *testing.T) {
+	t.Setenv("DOKJA_DB_FILE", "")
+	settings, err := service.OpenDatabaseSettings(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer settings.Close()
+	backend := &fake{}
+	handler := Handler(domain.New(backend, domain.Journal{}, nil).WithProviderSettings(settings), "fixture")
+	ask := func(source, kind string, payload map[string]any) map[string]any {
+		t.Helper()
+		raw, _ := json.Marshal(Event{Source: source, Type: kind, Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var out map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	revision := float64(1)
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		payload := map[string]any{"configuration_revision": revision, "provider": "codex", "enabled": false, "models": []string{"fixture/model"}}
+		reply := ask(source, "runtime.providers.configure", payload)
+		if reply["status"] != "ok" {
+			t.Fatal(reply)
+		}
+		if got := ask(source, "runtime.providers.configure", payload); got["status"] != "error" {
+			t.Fatal("stale write accepted", got)
+		}
+		revision++
+	}
+	for _, source := range []string{"cli", "tui", "desktop"} {
+		got := ask(source, "runtime.providers", nil)
+		result := got["result"].(map[string]any)["result"].(map[string]any)
+		row := result["providers"].([]any)[0].(map[string]any)
+		if result["configuration_revision"] != revision || row["enabled"] != false || row["declared_models"].([]any)[0] != "fixture/model" || row["inference_status"] != "not_tested" {
+			t.Fatal(result)
+		}
+	}
+	for _, bad := range []map[string]any{
+		{"configuration_revision": revision, "provider": "codex", "enabled": "false", "models": []string{}},
+		{"configuration_revision": 1.5, "provider": "codex", "enabled": true, "models": []string{}},
+		{"configuration_revision": revision, "provider": "codex", "enabled": true, "models": []any{1}},
+		{"configuration_revision": revision, "provider": "codex", "enabled": true},
+	} {
+		if got := ask("cli", "runtime.providers.configure", bad); got["status"] != "error" {
+			t.Fatal(got)
+		}
+	}
+	if backend.starts != 0 {
+		t.Fatal("registration started services")
 	}
 }

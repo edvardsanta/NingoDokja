@@ -14,7 +14,7 @@ import (
 type Setting struct {
 	ID    string
 	Group string
-	// Env is the variable the setting is kept in.
+	// Env is the compatibility variable consumed by existing Compose services.
 	Env  string
 	Kind string // list, enum, flag or text
 	// Options are the values an enum accepts.
@@ -24,8 +24,9 @@ type Setting struct {
 	// Note names a consequence the interfaces mention before saving (sessions, reindex).
 	Note string
 	// Default is what the stack uses while the setting is empty, as the compose file says.
-	Default string
-	parse   func(string) (string, error)
+	Default  string
+	ReadOnly bool
+	parse    func(string) (string, error)
 }
 
 var (
@@ -44,7 +45,7 @@ var settingsCatalog = []Setting{
 	{ID: "whatsapp.people", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOW_FROM", Kind: "list", Affects: []string{"whatsapp"}, parse: listOf(phoneNumber)},
 	{ID: "whatsapp.groups", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOWED_GROUPS", Kind: "list", Affects: []string{"whatsapp"}, parse: listOf(group)},
 	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"whatsapp"}, parse: oneOf("true", "false")},
-	{ID: "models.embedding", Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
+	{ID: "models.embedding", ReadOnly: true, Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
 	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"feeds"}, parse: model},
 	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"feeds"}, parse: model},
 	{ID: "models.speech_to_text", Group: "models", Env: "DOKJA_VOICE_STT_MODEL", Default: "openai/whisper-tiny", Kind: "text", Affects: []string{"voice"}, parse: model},
@@ -147,15 +148,16 @@ type SettingsStore interface {
 }
 
 type SettingRow struct {
-	ID      string   `json:"id"`
-	Group   string   `json:"group"`
-	Env     string   `json:"env"`
-	Kind    string   `json:"kind"`
-	Options []string `json:"options,omitempty"`
-	Value   string   `json:"value"`
-	Affects []string `json:"affects"`
-	Note    string   `json:"note,omitempty"`
-	Default string   `json:"default,omitempty"`
+	ID       string   `json:"id"`
+	Group    string   `json:"group"`
+	Env      string   `json:"env"`
+	Kind     string   `json:"kind"`
+	Options  []string `json:"options,omitempty"`
+	Value    string   `json:"value"`
+	Affects  []string `json:"affects"`
+	Note     string   `json:"note,omitempty"`
+	Default  string   `json:"default,omitempty"`
+	ReadOnly bool     `json:"read_only,omitempty"`
 }
 
 type SettingsView struct {
@@ -186,7 +188,7 @@ func (d *Domain) Settings() SettingsView {
 		return view
 	}
 	for _, s := range settingsCatalog {
-		view.Settings = append(view.Settings, SettingRow{ID: s.ID, Group: s.Group, Env: s.Env, Kind: s.Kind, Options: s.Options, Value: values[s.Env], Affects: s.Affects, Note: s.Note, Default: s.Default})
+		view.Settings = append(view.Settings, SettingRow{ID: s.ID, Group: s.Group, Env: s.Env, Kind: s.Kind, Options: s.Options, Value: values[s.Env], Affects: s.Affects, Note: s.Note, Default: s.Default, ReadOnly: s.ReadOnly})
 	}
 	if webhooks != nil {
 		view.WebhookChannels = webhooks
@@ -228,6 +230,9 @@ func (d *Domain) SetSettings(changes map[string]string) (SettingsView, error) {
 		s, ok := lookupSetting(id)
 		if !ok {
 			return SettingsView{}, fmt.Errorf("unknown setting %q", id)
+		}
+		if s.ReadOnly {
+			return SettingsView{}, fmt.Errorf("%s is fixed for this version", id)
 		}
 		value, err := s.parse(raw)
 		if err != nil {
@@ -316,4 +321,53 @@ func (d *Domain) setState(m Module, state, message string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.states[m.Name] = State{Name: m.Name, State: state, Error: message, Dependencies: m.Dependencies}
+}
+
+// ImportSettings maps only catalogued compatibility variables to stable IDs.
+// Empty values preserve Compose defaults. Invalid legacy input is never replaced
+// silently with a different model or permission policy.
+func ImportSettings(env map[string]string) (map[string]string, error) {
+	values := map[string]string{}
+	for _, s := range settingsCatalog {
+		raw := env[s.Env]
+		if raw == "" {
+			values[s.ID] = ""
+			continue
+		}
+		value, err := s.parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid legacy setting %s", s.ID)
+		}
+		if s.ReadOnly && value != s.Default {
+			return nil, fmt.Errorf("legacy %s differs from the approved fixed profile", s.ID)
+		}
+		values[s.ID] = value
+	}
+	return values, nil
+}
+
+// SettingsVariables validates stored values again before passing them to Compose.
+func SettingsVariables(values map[string]string) (map[string]string, error) {
+	env := map[string]string{}
+	for id := range values {
+		if _, ok := lookupSetting(id); !ok {
+			return nil, fmt.Errorf("unknown stored setting")
+		}
+	}
+	for _, s := range settingsCatalog {
+		id, raw := s.ID, values[s.ID]
+		value := raw
+		if raw != "" {
+			var err error
+			value, err = s.parse(raw)
+			if err != nil {
+				return nil, fmt.Errorf("invalid stored setting %s", id)
+			}
+		}
+		if s.ReadOnly && value != "" && value != s.Default {
+			return nil, fmt.Errorf("stored %s differs from the approved fixed profile", id)
+		}
+		env[s.Env] = value
+	}
+	return env, nil
 }

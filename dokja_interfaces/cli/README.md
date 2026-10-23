@@ -96,9 +96,12 @@ Switches and jobs:
   erases the saved session, after asking. Both need `DOKJA_COMMUNICATIONS_TOKEN`, the credential the
   orchestrator and the desktop share; it is sent only with `communications.*` requests and never printed.
 - `settings list` / `settings set <id>=<value>... [--yes]`: the stack's non-secret settings (Discord
-  channels and DMs, WhatsApp people and groups, models), saved in the checkout's `.env`. Setting saves
+  channels and DMs, WhatsApp people and groups, models), saved in the shared local database. Setting saves
   say which modules are recreated and ask first. Delivery channels show whether the bot or a webhook
-  delivers; webhooks and tokens are edited in `.env` by hand.
+  delivers; webhooks and tokens are edited in `.env` by hand. The embedding
+  profile is fixed and cannot be edited. Settings are shared with desktop and TUI
+  through the controller; its first read imports allowed legacy options once.
+  Manual Compose commands still use `.env`; see the production runbook.
 - `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
   containers through the local runtime controller the desktop and TUI also use (launched when none is
   running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a
@@ -161,3 +164,14 @@ it does not need the original file. Each explicit request runs inference again.
 User answers, source defaults and axes already awaiting user clarification stay
 unchanged. An uncertain new proposal becomes a question for `knowledge classify`.
 Conflicts are reported without automatic retries. No chunks or embeddings change.
+
+`dokja-cli providers` inspects host Codex/Claude Code executables and lists models
+in the selected running lite stack’s Ollama. It starts no service and runs no
+inference. See [provider inventory](../../dokja_docs/provider-inventory.md).
+
+`providers configure <provider> --enabled=false|true --models=<names> [--yes]`
+saves discovery eligibility and unverified declarations in the shared database.
+Supported provider IDs are `codex`, `claude_code` and `ollama`.
+Either option may be omitted to preserve that field; `--models=` clears the list.
+The command refuses stale revisions rather than overwriting another interface's
+edit. It does not change legacy inference consumers or the embedding profile.

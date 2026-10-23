@@ -141,36 +141,53 @@ func TestFailedRecreationKeepsEveryReaderStaleForRetry(t *testing.T) {
 	}
 }
 
-func TestEmbeddingModelChangeRunsInitializerBeforeRunningReaders(t *testing.T) {
-	d, f, _ := withStore()
-	f.containers["dokja-orchestrator"] = Container{Running: true}
-	f.containers["dokja-ollama"] = Container{Running: true}
-	f.containers["dokja-embedding-init"] = Container{Completed: true}
-	f.containers["dokja-memory"] = Container{Running: true}
-	if _, err := d.SetSettings(map[string]string{"models.embedding": "example/model"}); err != nil {
-		t.Fatal(err)
+func TestEmbeddingProfileIsVisibleButCannotBeChanged(t *testing.T) {
+	d, f, store := withStore()
+	for _, row := range d.Settings().Settings {
+		if row.ID == "models.embedding" && (!row.ReadOnly || row.Default != "bge-m3") {
+			t.Fatal(row)
+		}
 	}
-	if got := settleSettings(t, d); got.Error != "" {
-		t.Fatal(got.Error)
+	if _, err := d.SetSettings(map[string]string{"models.embedding": "example/model", "discord.direct_messages": "closed"}); err == nil {
+		t.Fatal("fixed profile accepted")
 	}
-	if got := f.trace(); !reflect.DeepEqual(got, []string{"recreate:embedding_init", "recreate:memory"}) {
-		t.Fatal(got)
-	}
-	if !d.isStale("dokja-knowledge") {
-		t.Fatal("stopped knowledge must adopt the model on its next start")
+	if store.writes != 0 || len(f.trace()) != 0 {
+		t.Fatal("rejected batch changed the stack")
 	}
 }
 
-func TestCompletedInitializerWithChangedSettingsIsRecreatedOnStart(t *testing.T) {
+func TestStaleCompletedInitializerIsRecreatedOnStart(t *testing.T) {
 	d, f, _ := withStore()
 	f.containers["dokja-embedding-init"] = Container{Completed: true}
-	if _, err := d.SetSettings(map[string]string{"models.embedding": "example/model"}); err != nil {
+	if err := d.markStale("dokja-embedding-init", true); err != nil {
 		t.Fatal(err)
 	}
-	settleSettings(t, d)
 	change(t, d, "memory", true)
 	if got := strings.Join(f.trace(), ","); !strings.Contains(got, "recreate:embedding_init") {
 		t.Fatal(got)
+	}
+}
+
+func TestSettingsImportNormalizesOnlyKnownVariables(t *testing.T) {
+	values, err := ImportSettings(map[string]string{"DISCORD_ALLOWED_CHANNELS": " 7,8,7 ", "DISCORD_BOT_TOKEN": "fixture-token"})
+	if err != nil || values["discord.answer_channels"] != "7,8" || len(values) != len(settingsCatalog) {
+		t.Fatal(values, err)
+	}
+	vars, err := SettingsVariables(values)
+	if err != nil || vars["DISCORD_ALLOWED_CHANNELS"] != "7,8" {
+		t.Fatal(vars, err)
+	}
+	if _, ok := vars["DISCORD_BOT_TOKEN"]; ok {
+		t.Fatal("credential imported")
+	}
+	for _, bad := range []map[string]string{{"DOKJA_EMBED_MODEL": "other/model"}, {"DISCORD_DM_POLICY": "invalid"}} {
+		if _, err := ImportSettings(bad); err == nil {
+			t.Fatal("invalid legacy configuration accepted")
+		}
+	}
+	values["unknown"] = "x"
+	if _, err := SettingsVariables(values); err == nil {
+		t.Fatal("unknown stored field accepted")
 	}
 }
 

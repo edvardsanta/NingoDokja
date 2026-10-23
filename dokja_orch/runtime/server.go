@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -64,6 +65,37 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			result, err := d.Set(name, enabled)
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
+		case "runtime.providers":
+			view := d.Providers(r.Context())
+			if view.Error != "" {
+				reply("error", nil, view.Error)
+				return
+			}
+			reply("ok", view, "")
+		case "runtime.providers.configure":
+			revision, valid := e.Payload["configuration_revision"].(float64)
+			id, idOK := e.Payload["provider"].(string)
+			enabled, enabledOK := e.Payload["enabled"].(bool)
+			raw, modelsOK := e.Payload["models"].([]any)
+			if !valid || revision < 1 || revision >= float64(domain.MaxProviderRevision) || math.Trunc(revision) != revision || !idOK || !enabledOK || !modelsOK || len(raw) > domain.MaxProviderModels {
+				reply("error", nil, "invalid provider configuration request")
+				return
+			}
+			models := []string{}
+			for _, v := range raw {
+				name, ok := v.(string)
+				if !ok {
+					reply("error", nil, "declared models must be names")
+					return
+				}
+				models = append(models, name)
+			}
+			result, err := d.ConfigureProvider(uint64(revision), domain.ProviderRegistration{ID: id, Enabled: enabled, Models: models})
 			if err != nil {
 				reply("error", nil, err.Error())
 				return

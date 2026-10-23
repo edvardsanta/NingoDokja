@@ -34,8 +34,11 @@ are rejected; input and output have bounds. There is no TCP listener or root
 helper. It runs with the same user and engine permissions as desktop.
 
 `runtime.settings` lists the stack settings the interfaces may change and
-`runtime.settings.set` (`values`: setting id → text) saves them to the checkout's
-`.env` and recreates the running modules that read them; see the runbook.
+`runtime.settings.set` (`values`: setting id → text) saves them to the shared local
+SQLite database and recreates the running modules that read them; see the runbook.
+The controller imports allowed legacy `.env` options once, then projects database
+values into Compose child environments. Credentials remain in `.env`; the embedding
+profile is fixed. See [ADR 0013](../../dokja_docs/decisions/0013-database-runtime-settings.md).
 
 `runtime.set` accepts a known `module` and boolean `enabled`. It acknowledges the
 operation immediately; desktop polls `runtime.modules` until ready, stopped or
@@ -62,3 +65,9 @@ leaves background work running, but no OS login/boot autostart is installed.
 Run `go test -race ./...` and `go vet ./...` in this nested Go module. The root
 orchestrator module's `go test ./...` does not traverse nested modules; CI and
 `scripts/test_all.sh` explicitly include it.
+
+`runtime.providers` is a read-only local-provider inventory for every operator
+interface. Infrastructure discovers host CLIs and queries only the selected
+stack’s running Ollama. The Runtime domain reports installation/listing separately
+from inference, which is never performed by discovery. See
+[provider inventory](../../dokja_docs/provider-inventory.md).

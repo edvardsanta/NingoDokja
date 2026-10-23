@@ -80,7 +80,10 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 ## Switches and jobs
 
 - `c` opens the settings (Discord channels and DMs, WhatsApp people and groups, models), saved in the
-  checkout's `.env`. Enter edits one; saving names the modules recreated and waits for y.
+  shared local database. The embedding profile is fixed. Enter edits other settings;
+  saving names the modules recreated and waits for y.
+  The controller imports allowed legacy options once; subsequent database changes are shared
+  with CLI and desktop. Credentials stay in `.env`. Manual Compose still uses legacy values.
 
 - `l` on the whatsapp row opens the link window: it draws the code to scan and refreshes every 2 s; `n` asks
   for a new code and `u` unlinks the account (erasing its saved session) after a confirmation. It needs
@@ -159,3 +162,12 @@ selects one through the orchestrator (name only). `n` creates one and `d` delete
 database directly: the token is typed masked, is cleared from the form once saved, and is never shown, logged
 in the history or sent to the orchestrator. Without local access to the database (`--db` / `DOKJA_DB_FILE`) you
 can still list and select, just not create or delete.
+
+From settings (`c`), press `p` to inspect inference providers; `r` refreshes and
+Esc returns. Discovery starts no service and runs no inference. See
+[provider inventory](../../dokja_docs/provider-inventory.md).
+
+In the providers view, select a row with ↑/↓ and press `e`. Edit comma-separated
+model declarations; Ctrl+T toggles discovery eligibility. Enter reviews the
+registration, then confirm to save. Esc cancels. Stale revisions require reload
+and explicit retry; older controllers without a revision remain read-only.

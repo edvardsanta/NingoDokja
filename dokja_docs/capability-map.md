@@ -318,6 +318,27 @@ controls remain separate. The first backend is the local lite stack on Unix;
 production, remote hosts and Windows are outside this initial implementation.
 See [runtime controller](../dokja_orch/runtime/README.md).
 
+Runtime operational settings are shared by Desktop, CLI and TUI through the
+bootstrap controller. The Runtime domain owns validation and apply policy; the
+runtime infrastructure adapter stores a revisioned snapshot in the shared
+`dokja_store` SQLite settings table and projects it into Compose child processes.
+Legacy `.env` values are imported once; credentials stay outside this API and the
+embedding profile is fixed. Provider inventory and registrations are available;
+model/capability bindings remain pending. See [ADR 0013](decisions/0013-database-runtime-settings.md).
+
+The bootstrap controller also routes read-only `runtime.providers` through the
+Runtime domain and provider-discovery infrastructure. Operator interfaces share
+the same inventory; discovery cannot infer, select a model, start a module or
+write memory. See [provider inventory](provider-inventory.md).
+
+Supported provider registrations now persist independently under
+`runtime.providers.v1`. `runtime.providers.configure` validates known adapter IDs,
+discovery eligibility, model declarations and the exact read revision before
+writing through the Runtime domain/infrastructure port. Desktop, CLI and TUI
+confirm edits and preserve stale revisions rather than merging them silently.
+Declared names remain unverified; inference bindings and the fixed embedding
+profile are unaffected. See [provider registrations](provider-registrations.md).
+
 ## Communication outbound policy update
 
 Step 09.4-b adds domain-owned [delivery ports and policy](../dokja_domain/dokja_communications/delivery.go).

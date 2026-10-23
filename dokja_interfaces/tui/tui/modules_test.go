@@ -11,9 +11,34 @@ import (
 )
 
 type fakeRuntime struct {
-	snapshot cli.RuntimeSnapshot
-	settings cli.SettingsView
-	calls    []call
+	snapshot    cli.RuntimeSnapshot
+	settings    cli.SettingsView
+	providers   cli.ProvidersView
+	providerErr error
+	calls       []call
+}
+
+func (f *fakeRuntime) ConfigureProvider(_ context.Context, revision uint64, p cli.ProviderRegistration) (cli.ProviderSaved, error) {
+	f.calls = append(f.calls, call{"runtime.providers.configure", map[string]any{"configuration_revision": revision, "provider": p.ID, "enabled": p.Enabled, "models": p.Models}})
+	if f.providerErr != nil {
+		return cli.ProviderSaved{}, f.providerErr
+	}
+	if revision != f.providers.Revision {
+		return cli.ProviderSaved{}, errors.New("provider configuration changed; reload before saving")
+	}
+	for i, row := range f.providers.Providers {
+		if row.ID == p.ID {
+			f.providers.Providers[i].Enabled = p.Enabled
+			f.providers.Providers[i].DeclaredModels = p.Models
+		}
+	}
+	f.providers.Revision++
+	return cli.ProviderSaved{Revision: f.providers.Revision, Provider: p.ID}, nil
+}
+
+func (f *fakeRuntime) Providers(context.Context) (cli.ProvidersView, error) {
+	f.calls = append(f.calls, call{"runtime.providers", nil})
+	return f.providers, nil
 }
 
 func (f *fakeRuntime) Settings(context.Context) (cli.SettingsView, error) {

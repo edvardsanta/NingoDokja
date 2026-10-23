@@ -23,6 +23,14 @@ func SettingName(id string) string {
 // SettingValueText shows a value for people: a channel says whether the bot or a webhook
 // delivers to it, an empty list what it means.
 func SettingValueText(view SettingsView, row SettingRow) string {
+	text := settingValueText(view, row)
+	if row.ReadOnly {
+		text += " (fixed)"
+	}
+	return text
+}
+
+func settingValueText(view SettingsView, row SettingRow) string {
 	if row.Value == "" {
 		switch {
 		case row.ID == "discord.answer_channels":
@@ -105,7 +113,7 @@ func (a *App) newSettingsCommand(ctx context.Context) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "settings",
 		Short: "Show or change the stack's settings (channels, people, models)",
-		Long: "The settings are kept in the checkout's .env, through the local runtime controller. Credentials " +
+		Long: "The settings are kept in the shared local database, through the runtime controller. Credentials " +
 			"are never settings: tokens and webhook addresses are edited in .env by hand.",
 	}
 	command.PersistentFlags().StringVar(&a.runtimeRoot, "runtime-root", "", "Checkout that holds docker-compose.lite.yml (default: found from the current directory)")
@@ -154,8 +162,12 @@ func (a *App) newSettingsCommand(ctx context.Context) *cobra.Command {
 				return err
 			}
 			for _, id := range ids {
-				if _, ok := view.Lookup(id); !ok {
+				row, ok := view.Lookup(id)
+				if !ok {
 					return fmt.Errorf("unknown setting %q (see `settings list`)", id)
+				}
+				if row.ReadOnly {
+					return fmt.Errorf("%s is fixed for this version", id)
 				}
 			}
 			running := map[string]bool{}
@@ -175,7 +187,7 @@ func (a *App) newSettingsCommand(ctx context.Context) *cobra.Command {
 				return err
 			}
 			if view.Error != "" {
-				return fmt.Errorf("saved, but recreating a module failed: %s", view.Error)
+				return fmt.Errorf("settings update failed: %s", view.Error)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), "Saved.")
 			return nil
