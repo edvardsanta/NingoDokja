@@ -122,7 +122,7 @@ describe("the screen", () => {
     fireEvent.click(tabNamed("Notebook"));
     await screen.findByRole("heading", { name: "Experience memory" });
     fireEvent.click(tabNamed("Library"));
-    await screen.findByRole("heading", { name: "Research base" });
+    await screen.findByRole("heading", { name: "Library" });
     fireEvent.click(screen.getByRole("tab", { name: "Readings" }));
     await screen.findByRole("heading", { name: "Reading digest" });
 

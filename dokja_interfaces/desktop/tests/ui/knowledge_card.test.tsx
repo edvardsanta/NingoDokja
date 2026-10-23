@@ -25,39 +25,44 @@ function renderCard(transport: Transport, locale: Locale = "en") {
 }
 
 async function ask(query: string) {
-  const input = (await screen.findByLabelText(/Ask the base|Perguntar à base/)) as HTMLInputElement;
+  const input = (await screen.findByLabelText(/Search the Library|Buscar na Biblioteca/)) as HTMLInputElement;
   fireEvent.change(input, { target: { value: query } });
   fireEvent.click(screen.getByRole("button", { name: /^(Search|Buscar)$/ }));
 }
+
+// The list of documents is read as the view opens; these tests are about the rest of it.
+const NO_DOCUMENTS = ok({ documents: [], total: 0, offset: 0 });
 
 const searches = (calls: Array<{ type: string; payload?: Record<string, unknown> }>) =>
   calls.filter((call) => call.type === "knowledge.search");
 
 describe("the knowledge card", () => {
   it("shows what the base holds and whether similarity works", async () => {
-    const { transport, calls } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+    const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
     renderCard(transport);
 
     await screen.findByText("6 documents in 52 passages");
     screen.getByText("Similarity is on (model-1).");
-    expect(calls).toEqual([{ type: "knowledge.status", payload: {}, options: { timeoutMs: 15_000 } }]);
+    expect(calls.filter((call) => call.type === "knowledge.status")).toEqual([{ type: "knowledge.status", payload: {}, options: { timeoutMs: 15_000 } }]);
+    // the documents are listed as the view opens, without a press
+    expect(calls.filter((call) => call.type === "knowledge.list")).toHaveLength(1);
   });
 
   it("says an empty base is empty and where a file goes, instead of counting nothing", async () => {
-    const { transport } = routedTransport({ "knowledge.status": ok({ ...KNOWLEDGE_STATUS, documents: 0, chunks: 0 }) });
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok({ ...KNOWLEDGE_STATUS, documents: 0, chunks: 0 }) });
     renderCard(transport);
 
-    await screen.findByText("The research base is empty: drop a file anywhere here, or add a note or a web address below.");
-    expect(screen.queryByText(/documents in/)).toBeNull();
+    await screen.findByText("The Library is empty: drop a file anywhere here, or add a note or a web address.");
+    expect(screen.queryByText(/documents in \d+ passages/)).toBeNull();
   });
 
   it("says when similarity is off or down and when passages wait for an embedding", async () => {
-    const off = routedTransport({ "knowledge.status": ok({ ...KNOWLEDGE_STATUS, embedderReachable: null }) });
+    const off = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok({ ...KNOWLEDGE_STATUS, embedderReachable: null }) });
     const view = renderCard(off.transport);
     await screen.findByText("Similarity is off: search matches words only.");
     view.unmount();
 
-    const down = routedTransport({
+    const down = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok({ ...KNOWLEDGE_STATUS, embedderReachable: false, pendingEmbeddings: 4 }),
     });
     renderCard(down.transport);
@@ -66,7 +71,7 @@ describe("the knowledge card", () => {
   });
 
   it("says a switched-off base is switched off, with no search box", async () => {
-    const { transport } = routedTransport({ "knowledge.status": ok(OFF) });
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(OFF) });
     renderCard(transport);
 
     await screen.findByText("Switched off.");
@@ -75,14 +80,14 @@ describe("the knowledge card", () => {
   });
 
   it("explains a failure of the status", async () => {
-    const { transport } = routedTransport({ "knowledge.status": failure("unavailable") });
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": failure("unavailable") });
     renderCard(transport);
 
     expect((await screen.findByRole("alert")).textContent).toBe("The orchestrator is not answering. Is it running?");
   });
 
   it("searches with the words typed, trimmed, and lists the passages", async () => {
-    const { transport, calls } = routedTransport({
+    const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": ok(
         search([
@@ -111,7 +116,7 @@ describe("the knowledge card", () => {
   });
 
   it("says when nothing is relevant, when nothing matches and when the search is keyword only", async () => {
-    const weak = routedTransport({
+    const weak = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": [
         ok(search([hit({ relevant: false })], { degraded: true, reason: "similarity is down" })),
@@ -130,9 +135,9 @@ describe("the knowledge card", () => {
   });
 
   it("does not search for an empty or blank question", async () => {
-    const { transport, calls } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+    const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
     renderCard(transport);
-    const input = (await screen.findByLabelText("Ask the base")) as HTMLInputElement;
+    const input = (await screen.findByLabelText("Search the Library")) as HTMLInputElement;
     const button = screen.getByRole("button", { name: "Search" }) as HTMLButtonElement;
 
     expect(button.disabled).toBe(true);
@@ -144,7 +149,7 @@ describe("the knowledge card", () => {
   });
 
   it("explains a failed search without losing the status", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": failure("timeout"),
     });
@@ -156,7 +161,7 @@ describe("the knowledge card", () => {
   });
 
   it("shows a search of a service that was switched off in the meantime", async () => {
-    const { transport } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.search": ok(OFF) });
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.search": ok(OFF) });
     renderCard(transport);
     await ask("free will");
 
@@ -165,7 +170,7 @@ describe("the knowledge card", () => {
 
   it("sends one search at a time and keeps the question while it runs", async () => {
     const slow = deferred<TransportResult>();
-    const { transport, calls } = routedTransport({
+    const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": () => slow.promise,
     });
@@ -173,7 +178,7 @@ describe("the knowledge card", () => {
 
     await ask("first");
     await screen.findByText("Searching…");
-    const input = screen.getByLabelText("Ask the base") as HTMLInputElement;
+    const input = screen.getByLabelText("Search the Library") as HTMLInputElement;
     expect((screen.getByRole("button", { name: "Search" }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.change(input, { target: { value: "second" } });
@@ -189,7 +194,7 @@ describe("the knowledge card", () => {
 
   it("shows text from a document as text, never as markup", async () => {
     const hostile = '<img src="x" onerror="window.__owned = true"><script>window.__owned = true</script>';
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": ok(search([hit({ title: hostile, text: hostile, heading: hostile, sourceRef: hostile })])),
     });
@@ -204,25 +209,31 @@ describe("the knowledge card", () => {
 
   describe("adding", () => {
     const fill = async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Add to the Library" }));
       fireEvent.change(await screen.findByLabelText("Title"), { target: { value: "A thought" } });
       fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Something to keep." } });
       fireEvent.click(screen.getByRole("button", { name: "Add" }));
     };
     const statuses = (calls: Array<{ type: string }>) => calls.filter((call) => call.type === "knowledge.status");
 
-    it("is offered under the search, and not when the service is switched off", async () => {
-      const on = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+    it("is offered beside the search and opens on demand, and not when the service is switched off", async () => {
+      const on = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
       const view = renderCard(on.transport);
-      await screen.findByRole("heading", { name: "Add to the research base" });
+      const button = await screen.findByRole("button", { name: "Add to the Library" });
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      expect(screen.queryByRole("heading", { name: "Add to the Library" })).toBeNull();
+      fireEvent.click(button);
+      expect(button.getAttribute("aria-expanded")).toBe("true");
+      screen.getByRole("heading", { name: "Add to the Library" });
       view.unmount();
 
-      renderCard(routedTransport({ "knowledge.status": ok(OFF) }).transport);
+      renderCard(routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(OFF) }).transport);
       await screen.findByText("Switched off.");
-      expect(screen.queryByRole("heading", { name: "Add to the research base" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Add to the Library" })).toBeNull();
     });
 
     it("reads the counts again, quietly, once something was added", async () => {
-      const { transport, calls } = routedTransport({
+      const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
         "knowledge.status": [ok(KNOWLEDGE_STATUS), ok({ ...KNOWLEDGE_STATUS, documents: 7, chunks: 55 })],
         "knowledge.ingest": ok({ count: 1, created: 1, updated: 0, unchanged: 0, chunks: 3, degraded: false, reason: "" }),
       });
@@ -237,7 +248,7 @@ describe("the knowledge card", () => {
     });
 
     it("leaves the counts alone when it was already there", async () => {
-      const { transport, calls } = routedTransport({
+      const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
         "knowledge.status": ok(KNOWLEDGE_STATUS),
         "knowledge.ingest": ok({ count: 1, created: 0, updated: 0, unchanged: 1, chunks: 0, degraded: false, reason: "" }),
       });
@@ -246,20 +257,20 @@ describe("the knowledge card", () => {
 
       await fill();
 
-      await screen.findByText("Already in the research base.");
+      await screen.findByText("Already in the Library.");
       expect(statuses(calls)).toHaveLength(1);
     });
   });
 
   it("speaks Portuguese when asked", async () => {
-    const { transport } = routedTransport({
+    const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": ok(search([hit({ relevant: false })])),
     });
     renderCard(transport, "pt");
 
     await screen.findByText("6 documentos em 52 trechos");
-    screen.getByRole("heading", { name: "Base de pesquisa" });
+    screen.getByRole("heading", { name: "Biblioteca" });
     await ask("livre-arbítrio");
     await screen.findByText("Nenhuma correspondência relevante. Estes são os trechos mais próximos.");
     screen.getByText("correspondência fraca, pontuação 0,61, note, a, b, ref-1");
@@ -269,14 +280,14 @@ describe("the knowledge card", () => {
     const files = (list: File[]) => ({ dataTransfer: { types: ["Files"], files: list } });
 
     it("lights the view while it is over it, and drops it into the form wherever it lands", async () => {
-      const { transport, calls } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.ingest": ok({ created: 1, updated: 0, skipped: 0, chunks: 2 }) });
+      const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.ingest": ok({ created: 1, updated: 0, skipped: 0, chunks: 2 }) });
       renderCard(transport);
       const counts = await screen.findByText("6 documents in 52 passages");
       const zone = counts.closest(".drop-zone") as HTMLElement;
 
       fireEvent.dragEnter(counts, files([]));
       expect(zone.hasAttribute("data-dragging")).toBe(true);
-      screen.getByText("Drop the file to add it to the research base.");
+      screen.getByText("Drop the file to add it to the Library.");
       // crossing into a child and out again keeps it lit until the drag leaves the view
       fireEvent.dragEnter(zone, files([]));
       fireEvent.dragLeave(counts, files([]));
@@ -291,7 +302,7 @@ describe("the knowledge card", () => {
     });
 
     it("leaves a drag that carries no file to the fields", async () => {
-      const { transport } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS) });
+      const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
       renderCard(transport);
       const counts = await screen.findByText("6 documents in 52 passages");
 

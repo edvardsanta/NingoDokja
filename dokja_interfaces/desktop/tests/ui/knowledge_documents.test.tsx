@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
 import { createFakeTransport } from "../../src/renderer/fake_transport.js";
 import { IndexPending, KnowledgeDocumentsPanel } from "../../src/renderer/cards/knowledge_documents.js";
+import { WorkspacePanel } from "../../src/renderer/cards/workspace_panel.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import { deferred, failure, KNOWLEDGE_STATUS, ok, OFF, routedTransport } from "./support.js";
 import type { TransportResult } from "../../src/shared/transport.js";
@@ -13,11 +14,9 @@ const page = (offset = 0, total = 21) => ({ documents: Array.from({ length: offs
 const wrap = (child: React.ReactNode) => <I18nProvider locale="en">{child}</I18nProvider>;
 
 describe("document management", () => {
-  it("loads only on demand and navigates pages", async () => {
+  it("lists the documents as it opens, without a press, and navigates pages", async () => {
     const { transport, calls } = routedTransport({ "knowledge.list": [ok(page()), ok(page(20)), ok(page())] });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={() => {}} />));
-    expect(calls).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Load documents" }));
     await screen.findByText("Title note:0");
     fireEvent.click(screen.getByRole("button", { name: "Next documents" }));
     await screen.findByText("Title note:20");
@@ -34,7 +33,6 @@ describe("document management", () => {
       "knowledge.delete": [failure("cancelled"), ok({ deleted: true })],
     });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={onChanged} />));
-    fireEvent.click(screen.getByRole("button", { name: "Load documents" }));
     const remove = await screen.findByRole("button", { name: "Delete Title note:0" });
     fireEvent.click(remove);
     await screen.findByRole("alert");
@@ -49,7 +47,6 @@ describe("document management", () => {
   it("reports a deletion timeout without retrying or removing the displayed document", async () => {
     const { transport, calls } = routedTransport({ "knowledge.list": ok(page()), "knowledge.delete": failure("timeout") });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={vi.fn()} />));
-    fireEvent.click(screen.getByRole("button", { name: "Load documents" }));
     fireEvent.click(await screen.findByRole("button", { name: "Delete Title note:0" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Reload documents to check");
     screen.getByText("Title note:0");
@@ -58,10 +55,9 @@ describe("document management", () => {
 
   it("handles an off service and a malformed list", async () => {
     const { transport } = routedTransport({ "knowledge.list": [ok(OFF), ok({ documents: "bad" })] });
-    render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={vi.fn()} />));
-    fireEvent.click(screen.getByRole("button", { name: "Load documents" }));
+    render(wrap(<WorkspacePanel trail={["Library"]}><KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={vi.fn()} /></WorkspacePanel>));
     await screen.findByText("Switched off.");
-    fireEvent.click(screen.getByRole("button", { name: "Load documents" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByRole("alert");
     expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
   });
@@ -92,7 +88,6 @@ describe("document management in the knowledge card", () => {
       "knowledge.delete": ok({ deleted: true }),
     });
     render(wrap(<KnowledgeCard transport={transport} />));
-    fireEvent.click(await screen.findByRole("button", { name: "Load documents" }));
     await screen.findByText("Title note:0");
     fireEvent.click(screen.getByRole("button", { name: "Next documents" }));
     fireEvent.click(await screen.findByRole("button", { name: "Delete Title note:20" }));
@@ -104,11 +99,10 @@ describe("document management in the knowledge card", () => {
 
   it("keeps the browser preview counts consistent with deletion and indexing", async () => {
     render(wrap(<KnowledgeCard transport={createFakeTransport(0)} />));
-    fireEvent.click(await screen.findByRole("button", { name: "Load documents" }));
     fireEvent.click(await screen.findByRole("button", { name: "Delete An example document, number 1" }));
     await screen.findByText("Document deleted.");
     await waitFor(() => expect(screen.queryByText("An example document, number 1")).toBeNull());
-    await screen.findByText("22 documents in the base.");
+    await screen.findByText("22 documents in the Library.");
     fireEvent.click(screen.getByRole("button", { name: "Index pending passages" }));
     await screen.findByText(/passages indexed; 0 still pending/);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Index pending passages" })).toBeNull());
