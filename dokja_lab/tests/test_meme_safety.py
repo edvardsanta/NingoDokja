@@ -499,37 +499,29 @@ def test_video_ocr_respects_download_limit(video_bytes):
     assert reader.calls == 0
 
 
-def test_video_hashtags_tag_suggest_list_and_remove(video_bytes):
-    service, classifier = _hashtag_service(text_reader_text="o tio pegou o pave")
+def test_video_text_dispatch_reads_sampled_frames(video_bytes):
+    service = _text_service("o tio pegou o pave")
     service.screen._session = FakeSession(video_bytes)
-    url = "https://x/clip.mp4"
-    tagged = service.dispatch(
-        {"type": "meme.hashtag.tag", "payload": {"url": url, "hashtag": "TioDoPave"}}
-    )
-    assert tagged["hashtag"] == "#TioDoPave"
-    suggestion = service.dispatch(
-        {"type": "meme.hashtag.suggest", "payload": {"url": url}}
-    )
-    assert suggestion["hashtag"] == "#TioDoPave"
-    assert suggestion["relevant"] is True
-    assert classifier.list_examples()["examples"][0]["source_url"] == url
-    assert service.untag_hashtag(url)["deleted"] is True
+    url = "https://media.example/clip.mp4"
+    assert service.dispatch({"type": "meme.text.read", "payload": {"url": url}}) == {
+        "url": url,
+        "text": "o tio pegou o pave",
+    }
 
 
 def test_video_without_text_requires_explicit_text(video_bytes):
-    service, _ = _hashtag_service()
+    service = _text_service()
     service.screen._session = FakeSession(video_bytes)
     with pytest.raises(ValueError, match="provide explicit text"):
-        service.tag_hashtag("https://x/a.mp4", "Teste")
-    assert (
-        service.tag_hashtag("https://x/a.mp4", "Teste", text="description")["text"]
-        == "description"
-    )
+        service.dispatch(
+            {
+                "type": "meme.text.read",
+                "payload": {"url": "https://media.example/a.mp4"},
+            }
+        )
 
 
 def _service_with_browser_download(monkeypatch, response):
-    from memes.hashtags import HashtagClassifier
-
     spec = importlib.util.spec_from_file_location(
         "meme_bootstrap_under_test", SERVICE_PATH.with_name("bootstrap.py")
     )
@@ -542,10 +534,6 @@ def _service_with_browser_download(monkeypatch, response):
     monkeypatch.setenv("MEME_ATTACHMENT_FETCH", "off")
     monkeypatch.setattr(bootstrap, "SQLiteStorage", lambda *_: FakeStorage([]))
     monkeypatch.setattr(bootstrap, "MemeWorker", lambda **_: None)
-    classifier = HashtagClassifier(
-        ":memory:", embedder=FakeHashtagEmbedder(), model="fake"
-    )
-    monkeypatch.setattr(bootstrap, "build_hashtag_classifier", lambda: classifier)
     monkeypatch.setattr(
         "memes.safety.build_text_reader_from_env", lambda: FakeReader("texto do meme")
     )
@@ -561,9 +549,7 @@ def _service_with_browser_download(monkeypatch, response):
 
 
 @pytest.mark.parametrize("media", ["image", "video"])
-def test_service_tags_and_suggests_using_browser_download(
-    monkeypatch, video_bytes, media
-):
+def test_service_reads_text_using_browser_download(monkeypatch, video_bytes, media):
     raw = video_bytes if media == "video" else _png_bytes()
     url = (
         "https://cdn.example/clip.mp4"
@@ -573,29 +559,20 @@ def test_service_tags_and_suggests_using_browser_download(
     response = Mock(status_code=200, headers={})
     response.iter_content.return_value = [raw]
     service, browser, plain_get = _service_with_browser_download(monkeypatch, response)
-    try:
-        assert service.attachments is None
-        tagged = service.dispatch(
-            {"type": "meme.hashtag.tag", "payload": {"url": url, "hashtag": "Teste"}}
-        )
-        suggestion = service.dispatch(
-            {"type": "meme.hashtag.suggest", "payload": {"url": url}}
-        )
-        assert tagged["text"] == "texto do meme"
-        assert suggestion["hashtag"] == "#Teste"
-        assert suggestion["relevant"] is True
-        browser.get.assert_called_with(
-            url, impersonate="chrome", timeout=15, stream=True
-        )
-        assert browser.get.call_count == 2
-        assert response.close.call_count == 2
-        plain_get.assert_not_called()
-    finally:
-        service.hashtags.close()
+    assert service.attachments is None
+    assert service.dispatch({"type": "meme.text.read", "payload": {"url": url}}) == {
+        "url": url,
+        "text": "texto do meme",
+    }
+    browser.get.assert_called_once_with(
+        url, impersonate="chrome", timeout=15, stream=True
+    )
+    response.close.assert_called_once()
+    plain_get.assert_not_called()
 
 
 @pytest.mark.parametrize("failure", ["http", "declared_size", "stream_size", "timeout"])
-def test_ocr_browser_download_errors_do_not_save_tags(monkeypatch, failure):
+def test_ocr_browser_download_errors_propagate(monkeypatch, failure):
     response = Mock(status_code=403 if failure == "http" else 200, headers={})
     response.iter_content.return_value = (
         [b"x" * 8_000_001] if failure == "stream_size" else []
@@ -605,20 +582,22 @@ def test_ocr_browser_download_errors_do_not_save_tags(monkeypatch, failure):
     service, browser, plain_get = _service_with_browser_download(monkeypatch, response)
     if failure == "timeout":
         browser.get.side_effect = TimeoutError("timed out")
-    try:
-        error = (
-            "403"
-            if failure == "http"
-            else "timed out" if failure == "timeout" else "file too large"
+    error = (
+        "403"
+        if failure == "http"
+        else "timed out" if failure == "timeout" else "file too large"
+    )
+    with pytest.raises(RuntimeError, match=error):
+        service.dispatch(
+            {
+                "type": "meme.text.read",
+                "payload": {"url": "https://cdn.example/clip.mp4"},
+            }
         )
-        with pytest.raises(RuntimeError, match=error):
-            service.tag_hashtag("https://cdn.example/clip.mp4", "Teste")
-        assert service.hashtags.list_examples()["total"] == 0
-        if failure != "timeout":
-            response.close.assert_called_once()
-        plain_get.assert_not_called()
-    finally:
-        service.hashtags.close()
+    assert service.storage.updates == []
+    if failure != "timeout":
+        response.close.assert_called_once()
+    plain_get.assert_not_called()
 
 
 def test_read_text_propagates_download_and_decode_failures():
@@ -844,155 +823,57 @@ def test_screen_url_applies_the_caption_to_the_blacklist():
     assert "blocked word" in blocked["reason"]
 
 
-# ---- meme.hashtag.* -----------------------------------------------------------------
+# Hashtag persistence and suggestion belong to the Knowledge workflow. Its
+# integration tests live in dokja_orch/internal/handlers/meme_hashtag_workflow_test.go.
+# This service supplies media text, without taking over those domain actions.
 
 
-class FakeHashtagEmbedder:
-    """Deterministic, offline, fixed-dimension: shared words make similar vectors
-    however many texts a call embeds (a real model's dimension never depends on its
-    input). Enough to prove the service wires suggest() end to end; the classifier's
-    own nearest-neighbour logic is exercised in tests/test_hashtags.py.
-    """
-
-    def embed(self, texts):
-        import zlib
-
-        import numpy as np
-
-        from memes.embedder import normalize
-
-        dimensions = 64
-        matrix = np.zeros((len(texts), dimensions), dtype=np.float32)
-        for row, text in enumerate(texts):
-            for word in text.lower().split():
-                matrix[row, zlib.crc32(word.encode()) % dimensions] += 1.0
-        return normalize(matrix)
-
-
-def _hashtag_service(text_reader_text="", hashtags="build"):
-    from memes.hashtags import HashtagClassifier
-
+def _text_service(text=""):
     module = _load_meme_service()
-    if hashtags == "build":
-        hashtags = HashtagClassifier(
-            ":memory:", embedder=FakeHashtagEmbedder(), model="fake"
-        )
-    meme_screen = ocr_screen(text_reader_text, session=FakeSession(_png_bytes()))
-    service = module.MemeService(
-        FakeStorage([]), [], None, screen=meme_screen, hashtags=hashtags
+    return module.MemeService(
+        FakeStorage([]),
+        [],
+        None,
+        screen=ocr_screen(text, session=FakeSession(_png_bytes())),
     )
-    return service, hashtags
 
 
-def test_tag_hashtag_reads_the_image_text_when_none_is_given():
-    service, hashtags = _hashtag_service(text_reader_text="o tio pegou o pave")
-
-    result = service.tag_hashtag("https://x/a.png", "TioDoPave")
-
-    assert result == {
-        "source_url": "https://x/a.png",
-        "hashtag": "#TioDoPave",
-        "text": "o tio pegou o pave",
-        "embedded": True,
+def test_text_dispatch_reads_image_without_screening():
+    service = _text_service("words from the image")
+    service.screen._detector = FakeDetector(error=AssertionError("must not screen"))
+    url = "https://media.example/a.png"
+    assert service.dispatch({"type": "meme.text.read", "payload": {"url": url}}) == {
+        "url": url,
+        "text": "words from the image",
     }
+    assert service.storage.updates == []
 
 
-def test_tag_hashtag_accepts_an_explicit_text_without_reading_the_image():
-    service, hashtags = _hashtag_service(
-        text_reader_text="ocr text that would be wrong here"
-    )
-
-    result = service.tag_hashtag(
-        "https://x/a.png", "TioDoPave", text="texto escolhido a mao"
-    )
-
-    assert result["text"] == "texto escolhido a mao"
-
-
-def test_tag_hashtag_fails_clearly_when_the_image_has_no_text():
-    service, _ = _hashtag_service(text_reader_text="")
+def test_text_dispatch_reports_empty_text():
     with pytest.raises(ValueError, match="no text was found"):
-        service.tag_hashtag("https://x/a.png", "TioDoPave")
+        _text_service().dispatch(
+            {
+                "type": "meme.text.read",
+                "payload": {"url": "https://media.example/a.png"},
+            }
+        )
 
 
-def test_tag_hashtag_requires_a_url():
-    service, _ = _hashtag_service()
-    with pytest.raises(ValueError, match="requires a url"):
-        service.tag_hashtag("", "TioDoPave", text="algo")
+def test_text_dispatch_refuses_disabled_reader():
+    service = _text_service()
+    service.screen = None
+    with pytest.raises(ValueError, match="disabled"):
+        service.dispatch(
+            {
+                "type": "meme.text.read",
+                "payload": {"url": "https://media.example/a.png"},
+            }
+        )
 
 
-def test_hashtag_events_are_refused_when_the_classifier_is_disabled():
-    service, _ = _hashtag_service(hashtags=None)
-    for event_type, payload in (
-        ("meme.hashtag.tag", {"url": "https://x/a.png", "hashtag": "T", "text": "x"}),
-        ("meme.hashtag.suggest", {"text": "x"}),
-        ("meme.hashtag.list", {}),
-        ("meme.hashtag.untag", {"url": "https://x/a.png"}),
-    ):
-        with pytest.raises(ValueError, match="disabled"):
-            service.dispatch({"type": event_type, "payload": payload})
-
-
-def test_suggest_hashtag_prefers_explicit_text_over_reading_the_image():
-    service, hashtags = _hashtag_service(text_reader_text="wrong text")
-    hashtags.tag("https://x/known.png", "TioDoPave", "o tio pegou o pave da geladeira")
-
-    result = service.suggest_hashtag(text="o tio comeu o pave escondido")
-
-    assert result["hashtag"] == "#TioDoPave" and result["relevant"] is True
-
-
-def test_suggest_hashtag_reads_the_image_when_no_text_is_given():
-    service, hashtags = _hashtag_service(
-        text_reader_text="o tio pegou o pave da geladeira"
-    )
-    hashtags.tag("https://x/known.png", "TioDoPave", "o tio pegou o pave da geladeira")
-
-    result = service.suggest_hashtag(url="https://x/new.png")
-
-    assert result["hashtag"] == "#TioDoPave"
-
-
-def test_suggest_hashtag_requires_a_url_or_a_text():
-    service, _ = _hashtag_service()
-    with pytest.raises(ValueError, match="requires a url or a text"):
-        service.suggest_hashtag()
-
-
-def test_untag_hashtag_removes_a_stored_example():
-    service, hashtags = _hashtag_service()
-    hashtags.tag("https://x/a.png", "TioDoPave", "texto")
-
-    assert service.untag_hashtag("https://x/a.png") == {
-        "source_url": "https://x/a.png",
-        "deleted": True,
-    }
-    assert service.untag_hashtag("https://x/a.png")["deleted"] is False
-
-
-def test_dispatch_routes_every_hashtag_event():
-    service, hashtags = _hashtag_service(text_reader_text="o tio pegou o pave")
-
-    tagged = service.dispatch(
-        {
-            "type": "meme.hashtag.tag",
-            "payload": {"url": "https://x/a.png", "hashtag": "TioDoPave"},
-        }
-    )
-    assert tagged["hashtag"] == "#TioDoPave"
-
-    listed = service.dispatch({"type": "meme.hashtag.list", "payload": {}})
-    assert listed["total"] == 1
-
-    suggested = service.dispatch(
-        {
-            "type": "meme.hashtag.suggest",
-            "payload": {"text": "o tio comeu o pave"},
-        }
-    )
-    assert suggested["hashtag"] == "#TioDoPave"
-
-    untagged = service.dispatch(
-        {"type": "meme.hashtag.untag", "payload": {"url": "https://x/a.png"}}
-    )
-    assert untagged["deleted"] is True
+@pytest.mark.parametrize("action", ["tag", "suggest", "list", "untag"])
+def test_hashtag_domain_events_are_not_service_actions(action):
+    service = _text_service("text")
+    with pytest.raises(ValueError, match="unsupported meme event type"):
+        service.dispatch({"type": f"meme.hashtag.{action}", "payload": {}})
+    assert service.storage.updates == []
