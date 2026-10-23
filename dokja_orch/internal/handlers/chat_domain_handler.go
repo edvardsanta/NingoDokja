@@ -18,6 +18,12 @@ type ChatConversationGenerator interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
 }
 
+// ChatStreamingGenerator can show the reply while it is written. It is used only when the requester
+// asked for a preview (core.WithReplyPreview); the reply it returns is handled as GenerateMessages'.
+type ChatStreamingGenerator interface {
+	GenerateMessagesStream(ctx context.Context, messages []map[string]string, onPreview func(string)) (map[string]any, error)
+}
+
 type ChatDomainHandler struct {
 	generator ChatGenerator
 	reading   func(context.Context, string) (digestdomain.Reference, error)
@@ -109,6 +115,11 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, h
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
 		if reference != "" {
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
+		}
+		if preview := core.ReplyPreview(ctx); preview != nil {
+			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
+				return streaming.GenerateMessagesStream(ctx, messages, preview)
+			}
 		}
 		return generator.GenerateMessages(ctx, messages)
 	}

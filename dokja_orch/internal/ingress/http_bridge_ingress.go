@@ -1,13 +1,18 @@
 package ingress
 
 import (
+	"bufio"
+	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"os"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -77,6 +82,7 @@ func (i *HTTPBridgeIngress) Start() error {
 
 	i.app = fiber.New()
 	i.app.Post("/orchestrator", i.handle)
+	i.app.Post("/orchestrator/chat/stream", i.handleChatStream)
 
 	go func() {
 		logger.Info(fmt.Sprintf("http bridge ingress listening endpoint=%s", i.endpoint))
@@ -118,16 +124,8 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 			Error:  "event type is not allowed for this interface",
 		})
 	}
-	if i.token == "" {
-		return c.SendStatus(fiber.StatusServiceUnavailable)
-	}
-	authorization := c.Get("Authorization")
-	if !strings.HasPrefix(authorization, "Bearer ") {
-		return c.SendStatus(fiber.StatusUnauthorized)
-	}
-	provided := strings.TrimPrefix(authorization, "Bearer ")
-	if len(provided) != len(i.token) || subtle.ConstantTimeCompare([]byte(provided), []byte(i.token)) != 1 {
-		return c.SendStatus(fiber.StatusUnauthorized)
+	if status := i.authorize(c); status != fiber.StatusOK {
+		return c.SendStatus(status)
 	}
 
 	logger.Info(fmt.Sprintf(
@@ -161,6 +159,68 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Status: "ok",
 		Reply:  reply,
 	})
+}
+
+// authorize checks the bearer token every bridge route requires; it answers the status to send when
+// the request may not go on.
+func (i *HTTPBridgeIngress) authorize(c *fiber.Ctx) int {
+	if i.token == "" {
+		return fiber.StatusServiceUnavailable
+	}
+	authorization := c.Get("Authorization")
+	if !strings.HasPrefix(authorization, "Bearer ") {
+		return fiber.StatusUnauthorized
+	}
+	provided := strings.TrimPrefix(authorization, "Bearer ")
+	if len(provided) != len(i.token) || subtle.ConstantTimeCompare([]byte(provided), []byte(i.token)) != 1 {
+		return fiber.StatusUnauthorized
+	}
+	return fiber.StatusOK
+}
+
+// chatStreamTimeout covers a whole chat turn: the runtime gives a provider 90 seconds.
+const chatStreamTimeout = 120 * time.Second
+
+// handleChatStream takes a desktop chat turn, the same envelope the request socket takes, and answers
+// it as newline-delimited JSON: {"preview": text so far} while Ningo writes, then the response the
+// request socket would give. Only the requester sees the previews; they are never the reply. Anything
+// but a desktop message.created is refused.
+func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
+	if status := i.authorize(c); status != fiber.StatusOK {
+		return c.SendStatus(status)
+	}
+	var event core.Event
+	if err := json.Unmarshal(c.Body(), &event); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(RequestResponse{Status: "error", Error: "decode request"})
+	}
+	if event.Type != "message.created" || event.Source != core.SourceDesktop {
+		return c.Status(fiber.StatusBadRequest).JSON(RequestResponse{Status: "error", Error: "only desktop chat turns are streamed"})
+	}
+	logger.Info(fmt.Sprintf("http bridge chat stream received event_id=%s user=%s channel=%s", event.EventID, event.User.ID, event.Channel.ID))
+	c.Set("Content-Type", "application/x-ndjson")
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		var mu sync.Mutex
+		write := func(v any) {
+			mu.Lock()
+			defer mu.Unlock()
+			if line, err := json.Marshal(v); err == nil {
+				w.Write(append(line, '\n'))
+				w.Flush()
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), chatStreamTimeout)
+		defer cancel()
+		result, err := i.service.ProcessWithResult(core.WithReplyPreview(ctx, func(text string) {
+			write(map[string]string{"preview": text})
+		}), event)
+		if err != nil {
+			logger.Error(fmt.Sprintf("http bridge chat stream failed event_id=%s", event.EventID), err)
+			write(RequestResponse{Status: "error", Error: err.Error()})
+			return
+		}
+		write(RequestResponse{Status: "ok", Result: buildResponsePayload(result)})
+	})
+	return nil
 }
 
 func extractBridgeReply(result core.ProcessResult) string {
