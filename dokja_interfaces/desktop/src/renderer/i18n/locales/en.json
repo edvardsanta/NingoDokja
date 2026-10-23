@@ -399,5 +399,15 @@
   "provider_models_unavailable": "Model catalog unavailable.",
   "provider_models_truncated": "Model list truncated.",
   "providers_inspect": "Inspect providers",
-  "provider_service_stopped": "Stack service is stopped"
+  "provider_service_stopped": "Stack service is stopped",
+  "provider_declared_models": "Declared models (unverified)",
+  "provider_no_declarations": "No declared models.",
+  "provider_discovery_enabled": "Discovery enabled",
+  "provider_disabled": "Disabled for discovery",
+  "provider_registration_notice": "Declarations remain unverified. Enabling permits discovery on refresh; existing inference settings stay in use.",
+  "provider_configuration_unavailable": "Editing requires an updated runtime controller. Rebuild and restart it.",
+  "provider_save_registration": "Save registration",
+  "provider_models_hint": "Up to 16 comma-separated model names; leave empty to clear.",
+  "provider_edit_named": "Edit {name} registration",
+  "provider_save_named": "Save {name} registration"
 }

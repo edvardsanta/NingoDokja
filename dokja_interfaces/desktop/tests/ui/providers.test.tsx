@@ -40,3 +40,49 @@ it("distinguishes a stopped stack from an empty reachable model catalog", async 
  expect(screen.queryByText("No local models.")).toBeNull();
  expect(calls.map((c) => c.type)).toEqual(["runtime.providers"]);
 });
+
+const editable = (revision = 7, enabled = true, declarations = ["fixture/old"]) => ok({ configurationRevision: revision, providers: [
+ { id: "codex", name: "Codex", state: "installed", reason: "", enabled, declaredModels: declarations, modelDiscovery: "unsupported", models: [], inferenceStatus: "not_tested" },
+] });
+
+it("reviews the registration and reloads saved declarations only after confirmation", async () => {
+ const { transport, calls } = routedTransport({ "runtime.providers": [editable(), editable(8, false, ["fixture/new"])], "runtime.providers.configure": ok({ provider: "codex", configurationRevision: 8 }) });
+ render(<I18nProvider locale="en"><ProvidersCard transport={transport} /></I18nProvider>);
+ fireEvent.click(screen.getByRole("button", { name: "Inspect providers" }));
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
+ fireEvent.click(screen.getByLabelText("Discovery enabled"));
+ fireEvent.change(screen.getByLabelText("Declared models (unverified)"), { target: { value: "fixture/new" } });
+ fireEvent.click(screen.getByRole("button", { name: "Review" }));
+ expect(screen.getByRole("alertdialog", { name: "Save Codex registration" })).toBeTruthy();
+ expect(calls.some((call) => call.type === "runtime.providers.configure")).toBe(false);
+ fireEvent.click(screen.getByRole("button", { name: "Save registration" }));
+ await waitFor(() => expect(calls.filter((call) => call.type === "runtime.providers")).toHaveLength(2));
+ expect(calls.filter((call) => call.type === "runtime.providers.configure").map((call) => call.payload)).toEqual([{ configuration_revision: 7, provider: "codex", enabled: false, models: ["fixture/new"] }]);
+ await screen.findByText("Disabled for discovery");
+ expect(screen.getByText("Declared models (unverified): fixture/new")).toBeTruthy();
+});
+
+it("cancels without saving and refuses edits against an older controller", async () => {
+ const { transport, calls } = routedTransport({ "runtime.providers": [editable(), editable(0)] });
+ render(<I18nProvider locale="en"><ProvidersCard transport={transport} /></I18nProvider>);
+ fireEvent.click(screen.getByRole("button", { name: "Inspect providers" }));
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
+ fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+ expect(calls.some((call) => call.type === "runtime.providers.configure")).toBe(false);
+ fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+ await screen.findByText("Editing requires an updated runtime controller. Rebuild and restart it.");
+ expect(screen.queryByRole("button", { name: "Edit Codex registration" })).toBeNull();
+});
+
+it("keeps a stale revision explicit without automatically retrying or rebasing the draft", async () => {
+ const { transport, calls } = routedTransport({ "runtime.providers": editable(), "runtime.providers.configure": { ok: false, error: { code: "orchestrator", message: "provider configuration changed; reload before saving" } } });
+ render(<I18nProvider locale="en"><ProvidersCard transport={transport} /></I18nProvider>);
+ fireEvent.click(screen.getByRole("button", { name: "Inspect providers" }));
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
+ fireEvent.click(screen.getByRole("button", { name: "Review" }));
+ fireEvent.click(screen.getByRole("button", { name: "Save registration" }));
+ await screen.findByRole("alert");
+ expect(calls.filter((call) => call.type === "runtime.providers.configure")).toHaveLength(1);
+ expect(calls.filter((call) => call.type === "runtime.providers")).toHaveLength(1);
+ expect(calls.every((call) => ["runtime.providers", "runtime.providers.configure"].includes(call.type))).toBe(true);
+});

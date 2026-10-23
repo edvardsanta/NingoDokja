@@ -399,5 +399,15 @@
   "provider_models_unavailable": "Catálogo de modelos indisponível.",
   "provider_models_truncated": "Lista de modelos truncada.",
   "providers_inspect": "Inspecionar provedores",
-  "provider_service_stopped": "Serviço da stack desligado"
+  "provider_service_stopped": "Serviço da stack desligado",
+  "provider_declared_models": "Modelos declarados (não verificados)",
+  "provider_no_declarations": "Nenhum modelo declarado.",
+  "provider_discovery_enabled": "Descoberta habilitada",
+  "provider_disabled": "Desabilitado para descoberta",
+  "provider_registration_notice": "Declarações continuam não verificadas. Habilitar permite descoberta ao atualizar; as configurações atuais de inferência continuam em uso.",
+  "provider_configuration_unavailable": "A edição exige um controlador atualizado. Recompile e reinicie o controlador.",
+  "provider_save_registration": "Salvar cadastro",
+  "provider_models_hint": "Até 16 nomes de modelos separados por vírgula; deixe vazio para limpar.",
+  "provider_edit_named": "Editar cadastro de {name}",
+  "provider_save_named": "Salvar cadastro de {name}"
 }
