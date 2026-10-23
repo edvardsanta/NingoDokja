@@ -351,3 +351,16 @@ it("shows processing plugins with their errors even without configured sources",
   expect(await screen.findByText(/cache unavailable/)).toBeTruthy();
   expect(itemCalls(calls)).toEqual([]);
 });
+
+it("saves a reading to the Library by its id alone, and says what happened", async () => {
+  const { transport, calls } = routedTransport({
+    "digest.status": ok(DIGEST_STATUS),
+    "digest.items": ok(digestPage([digestItem(1)])),
+    "knowledge.ingest": ok({ count: 1, created: 1, updated: 0, unchanged: 0, chunks: 4, degraded: false, reason: "" }),
+  });
+  renderCard(transport);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Save to the Library: Entry 1" }));
+  await screen.findByText(/^Added/);
+  expect(calls.filter((call) => call.type === "knowledge.ingest").map((call) => call.payload)).toEqual([{ mode: "reading", reading: "item-1" }]);
+});

@@ -18,6 +18,8 @@ import {
 import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { AssistantConversation } from "./assistant_conversation.js";
+import { Outcome, addToBase } from "./knowledge_add.js";
+import { useAction } from "./use_action.js";
 
 const TIMEOUT_MS = 20_000;
 
@@ -173,12 +175,32 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
               onClick={() => setSelected((current) => current === discussionId ? undefined : discussionId)}>
               {selected === discussionId ? t("assistant_close") : t("assistant_continue")}
             </button>
+            {item.id && <SaveReading transport={transport} id={item.id} title={item.title} />}
             {selected === discussionId && item.id && <AssistantConversation key={item.id} transport={transport}
               reading={{ id: item.id, title: item.title, source: item.source }} /> }
           </li>
         );
       })}
     </ul>
+  );
+}
+
+// What the world brought in becomes knowledge on a press: the reading's page is added to the
+// Library, read by the knowledge service from its address. The screen names the reading by id; the
+// shell holds the address. Adding it again refreshes that page.
+function SaveReading({ transport, id, title }: { transport: Transport; id: string; title: string }) {
+  const t = useTranslate();
+  const run = useCallback(() => addToBase(transport, { mode: "reading", reading: id }), [transport, id]);
+  const { state, start } = useAction(run);
+  return (
+    <div className="reading-save">
+      <button type="button" aria-label={t("reading_save_named", { title })} disabled={state.phase === "loading"} onClick={() => start(undefined)}>
+        {t("reading_save")}
+      </button>
+      {state.phase === "loading" && <p role="status">{t("reading_saving")}</p>}
+      {state.phase === "error" && <Problem error={state.error} />}
+      {state.phase === "ready" && <Outcome result={state.data} />}
+    </div>
   );
 }
 
