@@ -1,6 +1,6 @@
 import { ACTION_TYPES, isWriteAction, needsConfirmation, type ActionType } from "../shared/actions.js";
 import { isRecord } from "../shared/records.js";
-import type { TransportErrorCode, TransportResult } from "../shared/transport.js";
+import type { ChatPreview, TransportErrorCode, TransportResult } from "../shared/transport.js";
 import { ACTIONS } from "./actions.js";
 import { OrchestratorError, type OrchestratorReply } from "./orchestrator_client.js";
 import type { Confirm } from "./dialogs.js";
@@ -12,7 +12,10 @@ type Orchestrator = {
     payload: Record<string, unknown>,
     timeoutMs: number,
   ): Promise<OrchestratorReply>;
+  // A Talk turn that shows its reply while it is written; absent when the bridge is not configured.
+  streamChat?(payload: Record<string, unknown>, timeoutMs: number, onPreview: (text: string) => void): Promise<OrchestratorReply>;
 };
+
 
 // Remembers the image addresses the orchestrator handed out, so the shell previews only those.
 export type MediaGate = { remember(urls: string[]): void; has?(url: string): boolean };
@@ -45,6 +48,7 @@ export async function handleRequest(
   media?: MediaGate,
   presence?: Pick<Presence, "recent">,
   confirm?: Confirm,
+  onPreview?: (preview: ChatPreview) => void,
 ): Promise<TransportResult> {
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
@@ -76,7 +80,12 @@ export async function handleRequest(
   }
 
   try {
-    const reply = await orchestrator.request(type, wire, pickTimeout(raw.options, limits));
+    const timeoutMs = pickTimeout(raw.options, limits);
+    const conversationId = typeof wire.conversation_id === "string" ? wire.conversation_id : "";
+    const reply =
+      type === "message.created" && orchestrator.streamChat && onPreview && conversationId
+        ? await orchestrator.streamChat(wire, timeoutMs, (text) => onPreview({ conversationId, text }))
+        : await orchestrator.request(type, wire, timeoutMs);
     if (reply.status !== "ok") {
       if ((type === "knowledge.ingest" || type === "knowledge.reindex") && reply.error?.includes("knowledge_write_outcome_unknown:")) {
         return fail("timeout", "Knowledge did not confirm the write in time; its outcome is unknown.");

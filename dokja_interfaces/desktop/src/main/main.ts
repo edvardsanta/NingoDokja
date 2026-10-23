@@ -16,6 +16,7 @@ import { isTrustedSender } from "./guards.js";
 import { fetchMedia } from "./media_fetch.js";
 import { MediaGate } from "./media_gate.js";
 import { createPreviewer } from "./media_preview.js";
+import { BridgeChat, BridgeMissing } from "./chat_stream.js";
 import { handleRequest, isAllowedAction } from "./ipc.js";
 import { OrchestratorClient } from "./orchestrator_client.js";
 import { installPermissionPolicy } from "./permissions.js";
@@ -40,8 +41,20 @@ async function main(): Promise<void> {
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
   const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
   const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:runtimeStateHome(process.env, app.getPath("home")), legacyStateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
-  const client = { request:(type:string,payload:Record<string,unknown>,timeout:number) =>
-    type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout) };
+  // A Talk turn is streamed through the orchestrator's bridge when its address and credential are set;
+  // otherwise it goes over the request socket like every other request.
+  const bridgeToken = process.env.DOKJA_GATEWAY_INGRESS_TOKEN?.trim() ?? "";
+  const bridge = config.bridgeEndpoint && bridgeToken ? new BridgeChat({ endpoint: config.bridgeEndpoint, token: bridgeToken }) : undefined;
+  const client = {
+    request:(type:string,payload:Record<string,unknown>,timeout:number) =>
+      type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout),
+    // A bridge that never saw the turn (not listening, or too old to stream) leaves it to the socket.
+    ...(bridge ? { streamChat:(payload:Record<string,unknown>,timeout:number,onPreview:(text:string)=>void) =>
+      bridge.stream(payload,timeout,onPreview).catch((error:unknown) => {
+        if (error instanceof BridgeMissing) return orchestrator.request("message.created",payload,timeout);
+        throw error;
+      }) } : {}),
+  };
   const limits = { defaultTimeoutMs: config.defaultTimeoutMs, maxTimeoutMs: config.maxTimeoutMs };
   const untrusted = { ok: false, error: { code: "denied", message: "this page is not the app" } } as const;
   const media = new MediaGate();
@@ -72,7 +85,9 @@ async function main(): Promise<void> {
     if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
 
     const started = Date.now();
-    const result = await handleRequest(raw, client, limits, media, presence, confirm);
+    const result = await handleRequest(raw, client, limits, media, presence, confirm, (preview) => {
+      if (!event.sender.isDestroyed()) event.sender.send(CHANNELS.chatPreview, preview);
+    });
     // Only the action name and the outcome are logged, never a payload or a reply.
     const type = isRecord(raw) && isAllowedAction(raw.type) ? raw.type : "(refused)";
     console.log(

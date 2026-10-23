@@ -34,7 +34,13 @@ export type Transport = {
   ): Promise<TransportResult>;
   // Only an image address the orchestrator itself listed can be previewed.
   preview(url: string): Promise<PreviewResult>;
+  // Listens for the reply of a Talk turn written so far; gives back the way to stop listening. Absent
+  // where nothing can stream (a test, a browser).
+  onChatPreview?(listener: (preview: ChatPreview) => void): () => void;
 };
+
+// The reply of a Talk turn written so far, for the conversation that asked. Never the reply.
+export type ChatPreview = { conversationId: string; text: string };
 
 export type Bootstrap = { locale: Locale; runtimeControls?: boolean };
 
@@ -42,4 +48,5 @@ export const CHANNELS = {
   bootstrap: "dokja:bootstrap",
   request: "dokja:request",
   preview: "dokja:preview",
+  chatPreview: "dokja:chat-preview",
 } as const;

@@ -1945,3 +1945,6 @@ button.icon-button[aria-expanded="true"] {
   text-overflow: ellipsis;
 }
 
+
+/* The reply while Ningo writes it: an assistant turn, provisional, its edge dashed until it lands. */
+.assistant-turns li.assistant-preview { border-left-style: dashed; margin-top: .7rem; }

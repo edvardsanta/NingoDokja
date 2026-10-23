@@ -126,7 +126,7 @@ export class OrchestratorClient {
   }
 }
 
-function buildEnvelope(type: string, payload: Record<string, unknown>, token: string) {
+export function buildEnvelope(type: string, payload: Record<string, unknown>, token: string) {
   return {
     event_id: randomUUID(),
     timestamp: new Date().toISOString(),

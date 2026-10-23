@@ -19,7 +19,7 @@ import type {
   MemoryExperience,
   StatusReply,
 } from "../shared/replies.js";
-import type { PreviewResult, Transport, TransportResult } from "../shared/transport.js";
+import type { ChatPreview, PreviewResult, Transport, TransportResult } from "../shared/transport.js";
 
 // Made-up data for `pnpm dev:web`, where there is no orchestrator and no shell. It exists only in
 // development: the built page never includes it.
@@ -249,12 +249,29 @@ export function createFakeTransport(delayMs = 400): Transport {
   const classifications = new Map<string, KnowledgeClassification>();
   // Switches stay where they were put, as the orchestrator keeps them.
   let status = structuredClone(STATUS);
+  const previewListeners = new Set<(preview: ChatPreview) => void>();
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
+    onChatPreview(listener) {
+      previewListeners.add(listener);
+      return () => {
+        previewListeners.delete(listener);
+      };
+    },
     async request(type, payload) {
       await sleep(delayMs);
       switch (type) {
-        case "message.created": return ok({reply:"Let us look at that together.",sessionNotice:""});
+        case "message.created": {
+          // The reply arrives a few words at a time, as the shell's stream would hand it over.
+          const reply = "Let us look at that together, since you insist on asking.";
+          const conversationId = String(payload?.conversation_id ?? "");
+          const words = reply.split(" ");
+          for (let count = 1; count < words.length; count++) {
+            await sleep(120);
+            for (const listener of previewListeners) listener({ conversationId, text: words.slice(0, count).join(" ") });
+          }
+          return ok({reply,sessionNotice:""});
+        }
         case "runtime.logs": return ok({module:payload?.module,text:"[demo] Module output appears here."});
         case "runtime.modules":return ok({modules:structuredClone(modules),busy:false,error:""});
         case "runtime.set": {
