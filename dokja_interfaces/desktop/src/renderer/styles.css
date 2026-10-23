@@ -16,6 +16,7 @@
   --magenta-text: #ff6aa5;
   --amber: #ffb22e;
   --off: #62768a;
+  --rule: color-mix(in srgb, var(--edge) 45%, transparent);
 
   --cut: 12px;
   --chamfer: polygon(
@@ -795,15 +796,6 @@ button[aria-pressed="true"] {
   color: var(--panel);
 }
 
-.memes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
-  gap: 1rem;
-  margin: 1rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
 .preview {
   display: grid;
   place-items: center;
@@ -822,59 +814,6 @@ button[aria-pressed="true"] {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-
-.memes p {
-  margin: 0.4rem 0 0;
-  overflow-wrap: anywhere;
-}
-
-.meme-tag-form {
-  display: grid;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--edge);
-  background: var(--panel);
-}
-
-.meme-tag-form label {
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--ink-dim);
-}
-
-.meme-tag-form input {
-  width: 100%;
-  min-width: 0;
-}
-
-.meme-tag-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  color: var(--ink-dim);
-}
-
-.meme-tag-suggestions button {
-  width: auto;
-  padding: 0.15rem 0.4rem;
-}
-
-.meme-tag-form button {
-  width: 100%;
-}
-
-.meme-tag-form span {
-  overflow-wrap: anywhere;
-  font-size: 0.75rem;
-}
-
-.meme-title {
-  font-size: 0.875rem;
 }
 
 /*
@@ -1035,57 +974,76 @@ button[aria-pressed="true"] {
   outline-offset: 3px;
 }
 
-/* A meme in the grid is a button that attaches it. The global button look is turned off for it, and
-   what is inside does not take the click away from the button. The attached one is lit. */
-.preview.preview-open,
-.preview.preview-open:hover:not(:disabled) {
+/*
+ * A meme in the grid: the picture is the button that attaches it, a small corner button shows it
+ * large. The attached one has a cyan frame and says so in a badge; nothing else is a button.
+ */
+.meme-tile {
+  position: relative;
+}
+
+.preview.meme-pick,
+.preview.meme-pick:hover:not(:disabled) {
   width: 100%;
   padding: 0.25rem;
   border: 1px solid var(--edge);
   background: var(--static);
-  color: inherit;
+  color: var(--ink-dim);
   cursor: pointer;
 }
 
-.preview.preview-open[aria-pressed="true"] {
+.preview.meme-pick:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+
+.preview.meme-pick[aria-pressed="true"] {
   border-color: var(--cyan);
   box-shadow: 0 0 0 1px var(--cyan), 0 0 0.8rem color-mix(in srgb, var(--cyan) 45%, transparent);
 }
 
-.preview.preview-open:hover:not(:disabled) {
-  border-color: var(--cyan);
-}
-
-.preview.preview-open > * {
+.preview.meme-pick > * {
   pointer-events: none;
 }
 
-.preview.preview-open:focus-visible {
+.preview.meme-pick:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
 
-.meme-tile {
-  display: grid;
-  gap: 0.4rem;
+.meme-badge {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  padding: 0 0.35rem;
+  background: var(--cyan);
+  color: var(--panel);
+  font-size: 0.75rem;
+  font-weight: 700;
+  pointer-events: none;
 }
 
-.meme-attach {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  padding: 0.25rem;
+button.meme-zoom,
+button.meme-zoom:hover:not(:disabled) {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  padding: 0 0.35rem;
   border: 1px solid var(--edge);
-  background: var(--static);
-  color: inherit;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
-.meme-attach img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+button.meme-zoom:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* A clip in a small frame is a picture of it: its own controls would only be in the way. */
+.meme-tile video::-webkit-media-controls,
+.attached-thumb video::-webkit-media-controls {
+  display: none !important;
 }
 
 .media-viewer-backdrop {
@@ -1288,26 +1246,121 @@ button[aria-pressed="true"] {
   margin: 0;
 }
 
-/* Messages: the conversations on the left, the chosen one on the right. The chosen one is lit like the
-   open workspace in the sidebar. */
+/*
+ * Messages. A panel that fills: the body does not scroll, the messenger takes its height, the
+ * conversations are a rail on the left and the chosen one is a column on the right: a line saying who
+ * speaks, the history (the only part that scrolls) and the composer at the foot. Memes open as a tray
+ * over the history, never in the flow, so the history keeps its room.
+ */
+.sr-only,
+.channel-sep,
+.wp-body[data-fill] > .wp-section > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* One component per weight. Primary: the one thing the view is for. Quiet: a way around, not a goal. */
+button.primary {
+  background: color-mix(in srgb, var(--cyan) 16%, transparent);
+  box-shadow: 0 0 0.8rem color-mix(in srgb, var(--cyan) 28%, transparent);
+  font-weight: 700;
+}
+
+button.primary:disabled {
+  box-shadow: none;
+}
+
+button.quiet,
+button.quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+button.quiet:hover:not(:disabled) {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+
+/* An icon alone, square, with its name in the label. Open, it is lit like any selected thing. */
+button.icon-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+button.icon-button[aria-expanded="true"] {
+  background: var(--cyan);
+  color: var(--panel);
+}
+
 .messenger {
   display: grid;
-  grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
-  gap: 1.5rem;
-  margin-top: 0.5rem;
+  grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+/* One conversation, or a narrow window: the rail becomes a strip above the thread. */
+.messenger[data-single] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.messenger[data-single] .channels ul {
+  display: flex;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.messenger[data-single] .channels button,
+.messenger[data-single] .channels button:hover:not(:disabled) {
+  width: auto;
+  border-left: 0;
+  border-bottom: 3px solid transparent;
+}
+
+/* In the strip the name and its identifier share a line, and the separator is seen. */
+.messenger[data-single] .channel-name,
+.messenger[data-single] .channel-id {
+  display: inline;
+}
+
+.messenger[data-single] .channel-sep {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: pre;
+}
+
+.messenger[data-single] .channels button[aria-current="true"] {
+  border-bottom-color: var(--cyan);
 }
 
 .channels ul {
   margin: 0;
   padding: 0;
-  border-right: 1px solid var(--edge);
+  border-right: 1px solid var(--rule);
   list-style: none;
 }
 
+/* A conversation: its name, and under it, dimmer, what identifies it. The open one is lit like the
+   open workspace in the sidebar. */
 .channels button,
 .channels button:hover:not(:disabled) {
+  display: block;
   width: 100%;
-  padding: 0.45rem 0.75rem;
+  padding: 0.4rem 0.75rem;
   border: 0;
   border-left: 3px solid transparent;
   background: transparent;
@@ -1325,39 +1378,149 @@ button[aria-pressed="true"] {
   color: var(--cyan);
 }
 
-.thread > .note:first-child {
+.channel-name,
+.channel-id {
+  display: block;
+}
+
+.channel-id {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.wp-body[data-fill] .channels {
+  min-height: 0;
+  overflow: auto;
+}
+
+.wp-body[data-fill] > .wp-section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wp-body[data-fill] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wp-body[data-fill] .messenger {
+  flex: 1;
+  min-height: 0;
   margin-top: 0;
 }
 
-@media (max-width: 48rem) {
-  .messenger {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.thread {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 
-  .channels ul {
-    border-right: 0;
-    border-bottom: 1px solid var(--edge);
-  }
+/* Who speaks, in a quiet line: it is chrome, and the conversation under it is the thing. */
+.thread-head {
+  padding-bottom: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--ink-dim);
+}
+
+.thread-head p + p {
+  margin-top: 0.15rem;
+}
+
+/* With the rail, a rule closes the line; with the strip, the strip's own rule already does. */
+.messenger:not([data-single]) .thread-head {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.thread-history,
+.memes,
+.wp-body[data-fill] .channels {
+  scrollbar-color: var(--edge) transparent;
+  scrollbar-width: thin;
+}
+
+/* The history reads from its foot, where the composer is: a short one sits against it. */
+.thread-history {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 8rem;
+  overflow: auto;
+  padding: 0.5rem 0.5rem 0.5rem 0;
+}
+
+.thread-history > :first-child {
+  margin-top: auto;
+}
+
+.history-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.history-top button {
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8125rem;
 }
 
 .conversation {
-  list-style: none;
+  margin: 0.25rem 0 0;
   padding: 0;
-  margin: 1rem 0;
-  max-height: 28rem;
-  overflow-y: auto;
+  list-style: none;
   overflow-wrap: anywhere;
 }
+
 .conversation li {
-  padding: 0.7rem 0.8rem;
+  max-width: 72ch;
+  margin: 0 0 0.6rem;
+  padding: 0.25rem 0.75rem;
   border-left: 2px solid var(--edge);
-  margin-bottom: 0.75rem;
 }
-.conversation li[data-bot="true"] { border-color: var(--cyan); }
-.conversation time { font-size: 0.75rem; color: var(--ink-dim); }
-.message-content { white-space: pre-wrap; }
-.message-compose { display: grid; gap: 0.6rem; margin-top: 1.5rem; }
-.message-compose textarea, .wp select {
+
+.conversation li[data-bot="true"] {
+  border-color: var(--cyan);
+}
+
+.message-meta {
+  font-size: 0.8125rem;
+}
+
+.conversation time {
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.message-content {
+  white-space: pre-wrap;
+}
+
+/* The composer: what is attached, the row to write in, what became of the send. */
+.message-compose {
+  position: relative;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.compose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.compose-row > button {
+  min-height: 2.6rem;
+}
+
+.wp select {
   min-width: 0;
   max-width: 100%;
   background: var(--static);
@@ -1366,12 +1529,290 @@ button[aria-pressed="true"] {
   padding: 0.5rem;
   font: inherit;
 }
-.message-compose textarea { resize: vertical; }
-.message-compose textarea:focus-visible, .wp select:focus-visible {
+
+/* The field grows with what is written, up to a limit, and sits in the row beside its buttons. */
+.message-compose textarea {
+  flex: 1 1 14rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.6rem;
+  max-height: 9rem;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+  resize: none;
+  field-sizing: content;
+}
+
+/* One line, however narrow: the hint must not make the field taller than what is written in it. */
+.message-compose textarea::placeholder {
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-compose textarea:focus-visible,
+.wp select:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
 
+/* What the message carries: a state (attached), so it has the left bar a state has. */
+.attached-meme {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "thumb title remove" "thumb force remove";
+  align-items: center;
+  gap: 0.05rem 0.75rem;
+  max-width: 30rem;
+  margin-bottom: 0.6rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.5rem;
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--cyan);
+  background: var(--static);
+}
+
+.attached-thumb {
+  grid-area: thumb;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 2.6rem;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.attached-thumb img,
+.attached-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.attached-title {
+  grid-area: title;
+  overflow: hidden;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.attached-force {
+  grid-area: force;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.attached-force input {
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
+.attached-remove {
+  grid-area: remove;
+  align-self: center;
+  padding: 0 0.55rem;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.compose-status:empty {
+  display: none;
+}
+
+.compose-status {
+  margin-top: 0.4rem;
+  font-size: 0.8125rem;
+}
+
+.compose-status p:not([role="alert"]) {
+  color: var(--tone-text, var(--ink-dim));
+}
+
+/*
+ * The tray of memes: above the composer, over the history, with a height of its own. The pager is
+ * above, the grid scrolls and the tagging row stays at the foot. Opaque, so the history under it does
+ * not read through; a shadow lifts it, nothing glows.
+ */
+.meme-tray {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  max-height: min(27rem, calc(100vh - 23rem));
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  box-shadow: 0 -0.5rem 1.5rem rgb(0 0 0 / 55%);
+}
+
+.meme-tray-note {
+  margin: 0;
+  padding: 0.75rem 1rem;
+}
+
+.meme-picker {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.meme-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+}
+
+.meme-picker-pager {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.meme-picker-pager button {
+  padding: 0 0.6rem;
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.memes {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(7.25rem, 1fr));
+  align-content: start;
+  gap: 0.6rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow: auto;
+  list-style: none;
+}
+
+.meme-title {
+  margin: 0.25rem 0 0;
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Tagging the attached meme: one row at the foot of the tray. */
+.meme-tag-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--static) 70%, transparent);
+  font-size: 0.75rem;
+}
+
+.meme-tag-form label {
+  display: flex;
+  flex: 0 1 26rem;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-dim);
+}
+
+.meme-tag-form input {
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.meme-tag-form input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.meme-tag-form > button {
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.meme-tag-status {
+  color: var(--tone-text, var(--ink-dim));
+  overflow-wrap: anywhere;
+}
+
+.meme-tag-suggestions {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.25rem;
+  max-height: 3.4rem;
+  overflow: auto;
+  color: var(--ink-dim);
+}
+
+.meme-tag-suggestions button {
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 48rem) {
+  .messenger {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .channels ul {
+    display: flex;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .channels button,
+  .channels button:hover:not(:disabled) {
+    width: auto;
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+  }
+
+  .channels button[aria-current="true"] {
+    border-bottom-color: var(--cyan);
+  }
+
+  .channel-name,
+  .channel-id {
+    display: inline;
+  }
+
+  .channel-sep {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: pre;
+  }
+}
 
 .classification-panel {
   margin: 1rem 0;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
 import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -9,7 +9,8 @@ import type { LoadResult } from "./use_card.js";
 
 // The memes waiting in the queue, as a grid to attach one from when writing a message. A meme is
 // not a workspace of its own: it is something Ningo sends, so it is picked where messages are
-// written. A click attaches a meme, a click on the attached one takes it off again.
+// written. A click attaches a meme, a click on the attached one takes it off again. The picker has
+// three parts: the page of memes with its pager above, the grid, and the tagging row at the foot.
 export function MemePicker({
   transport,
   memes,
@@ -20,16 +21,19 @@ export function MemePicker({
   onPage,
   onPrepareTagged,
   onClearPreparedTag,
+  onClose,
 }: {
   transport: Transport;
   memes: readonly MemeItem[];
   page: { total: number; offset: number };
   selected: string;
   disabled: boolean;
-  onSelect: (url: string) => void;
+  onSelect: (meme: MemeItem | undefined) => void;
   onPage: (offset: number) => void;
-  onPrepareTagged: (hashtag: string, url: string) => void;
+  onPrepareTagged: (hashtag: string) => void;
   onClearPreparedTag: () => void;
+  // Escape, with nothing larger open over it, closes the picker.
+  onClose?: () => void;
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
@@ -64,7 +68,7 @@ export function MemePicker({
     if (answer.result.off === true) return { ok: true, data: { off: true, reason: text(answer.result.reason) } };
     const value = text(answer.result.hashtag);
     if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
-    onPrepareTagged(value, selectedMeme.url);
+    onPrepareTagged(value);
     setHashtag("");
     await loadCreatedTags();
     return { ok: true, data: { hashtag: value } };
@@ -75,6 +79,11 @@ export function MemePicker({
   }, [selected]);
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
+  const root = useRef<HTMLDivElement>(null);
+  // Opened from the keyboard or the mouse, the picker takes the focus to its first meme.
+  useEffect(() => {
+    root.current?.querySelector<HTMLElement>("button.meme-pick:not(:disabled)")?.focus();
+  }, []);
 
   useEffect(() => {
     void loadCreatedTags();
@@ -97,70 +106,118 @@ export function MemePicker({
     );
   }
 
+  const busy = tag.state.phase === "loading";
+  const from = page.offset + 1;
+  const to = page.offset + memes.length;
   return (
-    <>
-    <ul className="memes" aria-label={t("communications_meme")}>
-      {attachable.map((meme) => (
-        <li key={meme.url}>
-          <MemeTile
-            transport={transport}
-            meme={meme}
-            attached={selected === meme.url}
-            disabled={disabled}
-            onToggle={() => onSelect(selected === meme.url ? "" : meme.url)}
-            onOpen={(dataUrl) => setViewer({ dataUrl, title: meme.title || t("memes_untitled") })}
-          />
-          <p className="meme-title">{meme.title || t("memes_untitled")}</p>
-          {selected === meme.url && <div className="meme-tag-form">
-            <label>
-              {t("memes_tag")}
-              <input list="meme-tag-suggestions" value={hashtag} disabled={tag.state.phase === "loading"}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setHashtag(value);
-                  if (!value.trim()) onClearPreparedTag();
-                }} placeholder="#tag" />
-            </label>
-            {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
-              <span>{t("memes_tag_suggestions")}</span>
-              {suggestions.map((suggestion) => <button key={suggestion} type="button"
-                onClick={() => { setHashtag(suggestion); onPrepareTagged(suggestion, meme.url); }}
-                disabled={tag.state.phase === "loading"}>{suggestion}</button>)}
-            </div>}
-            <button type="button" disabled={tag.state.phase === "loading" || !hashtag.trim()}
-              onClick={() => tag.start(undefined)}>
-              {t("memes_create_tag")}
-            </button>
-            {tag.state.phase === "loading" && <span role="status">{t("memes_creating_tag")}</span>}
-            {tag.state.phase === "ready" && ("off" in tag.state.data
-              ? <span>{tag.state.data.reason}</span>
-              : <span>{t("memes_tagged_ready", { tag: tag.state.data.hashtag })}</span>)}
-            {tag.state.phase === "error" && <span role="alert">{tag.state.error.message}</span>}
-          </div>}
-        </li>
-      ))}
-    </ul>
-    <datalist id="meme-tag-suggestions">
-        {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
-    </datalist>
-    <div className="pager">
-      <button type="button" disabled={disabled || page.offset === 0} onClick={() => onPage(Math.max(0, page.offset - memes.length))}>
-        {t("memes_previous")}
-      </button>
-      <button type="button" disabled={disabled || page.offset + memes.length >= page.total || memes.length === 0} onClick={() => onPage(page.offset + memes.length)}>
-        {t("memes_next")}
-      </button>
-    </div>
-    {viewer && <div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) setViewer(undefined);
+    <div className="meme-picker" ref={root} onKeyDown={(event) => {
+      // Escape closes the large view first (its own listener); the typed tag is not thrown away by it
+      if (event.key !== "Escape" || viewer || event.target instanceof HTMLInputElement) return;
+      onClose?.();
     }}>
-      <section className="media-viewer" role="dialog" aria-modal="true" aria-label={viewer.title}>
-        <button type="button" className="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</button>
-        <Media dataUrl={viewer.dataUrl} label={viewer.title} expanded />
-      </section>
-    </div>}
-    </>
+      <div className="meme-picker-head">
+        <span>{t("memes_range", { from, to, total: Math.max(page.total, to) })}</span>
+        <div className="meme-picker-pager">
+          <button type="button" className="quiet" aria-label={t("memes_previous")} title={t("memes_previous")}
+            disabled={disabled || page.offset === 0} onClick={() => onPage(Math.max(0, page.offset - memes.length))}>
+            <span aria-hidden="true">‹</span>
+          </button>
+          <button type="button" className="quiet" aria-label={t("memes_next")} title={t("memes_next")}
+            disabled={disabled || page.offset + memes.length >= page.total || memes.length === 0} onClick={() => onPage(page.offset + memes.length)}>
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
+      </div>
+      <ul className="memes" aria-label={t("communications_meme")}>
+        {attachable.map((meme) => (
+          <li key={meme.url}>
+            <MemeTile
+              transport={transport}
+              meme={meme}
+              attached={selected === meme.url}
+              disabled={disabled}
+              onToggle={() => onSelect(selected === meme.url ? undefined : meme)}
+              onOpen={(dataUrl) => setViewer({ dataUrl, title: meme.title || t("memes_untitled") })}
+            />
+            <p className="meme-title" title={meme.title || t("memes_untitled")}>{meme.title || t("memes_untitled")}</p>
+          </li>
+        ))}
+      </ul>
+      {selectedMeme && <div className="meme-tag-form">
+        <label>
+          <span>{t("memes_tag")}</span>
+          <input list="meme-tag-suggestions" value={hashtag} disabled={busy}
+            onChange={(event) => {
+              const value = event.target.value;
+              setHashtag(value);
+              if (!value.trim()) onClearPreparedTag();
+            }} placeholder="#tag" />
+        </label>
+        <button type="button" disabled={busy || !hashtag.trim()} onClick={() => tag.start(undefined)}>
+          {t("memes_create_tag")}
+        </button>
+        {busy && <span className="meme-tag-status" role="status">{t("memes_creating_tag")}</span>}
+        {tag.state.phase === "ready" && ("off" in tag.state.data
+          ? <span className="meme-tag-status" data-tone="off">{tag.state.data.reason}</span>
+          : <span className="meme-tag-status" data-tone="ok">{t("memes_tagged_ready", { tag: tag.state.data.hashtag })}</span>)}
+        {tag.state.phase === "error" && <span className="meme-tag-status" data-tone="problem" role="alert">{tag.state.error.message}</span>}
+        {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
+          <span>{t("memes_tag_suggestions")}</span>
+          {suggestions.map((suggestion) => <button key={suggestion} type="button" className="quiet"
+            onClick={() => { setHashtag(suggestion); onPrepareTagged(suggestion); }}
+            disabled={busy}>{suggestion}</button>)}
+        </div>}
+      </div>}
+      <datalist id="meme-tag-suggestions">
+        {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+      </datalist>
+      {viewer && <div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
+        if (event.target === event.currentTarget) setViewer(undefined);
+      }}>
+        <section className="media-viewer" role="dialog" aria-modal="true" aria-label={viewer.title}>
+          <button type="button" className="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</button>
+          <Media dataUrl={viewer.dataUrl} label={viewer.title} expanded />
+        </section>
+      </div>}
+    </div>
   );
+}
+
+// The meme about to go out with the message, shown where it is written: the picture small, its name,
+// the one option that is about it (sending past the media screening) and a way to take it off. It
+// stays when the picker is closed, so the message always says what it carries.
+export function AttachedMeme({
+  transport,
+  meme,
+  force,
+  disabled,
+  onForce,
+  onRemove,
+}: {
+  transport: Transport;
+  meme: MemeItem;
+  force: boolean;
+  disabled: boolean;
+  onForce: (force: boolean) => void;
+  onRemove: () => void;
+}) {
+  const t = useTranslate();
+  const preview = usePreview(transport, meme.url, true);
+  const title = meme.title || t("memes_untitled");
+  return <div className="attached-meme">
+    <span className="attached-thumb" aria-hidden="true">
+      {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} />}
+    </span>
+    <span className="attached-title" title={title}>{title}</span>
+    <label className="attached-force">
+      <input type="checkbox" checked={force} disabled={disabled} onChange={(event) => onForce(event.target.checked)} />
+      {t("communications_force_send")}
+    </label>
+    <button type="button" className="quiet attached-remove" aria-label={t("memes_detach", { title })} title={t("memes_detach", { title })}
+      disabled={disabled} onClick={onRemove}>
+      <span aria-hidden="true">×</span>
+    </button>
+  </div>;
 }
 
 // A meme is a picture or a short video; the shell says which by the type of the data it hands back.
@@ -174,6 +231,8 @@ function Media({ dataUrl, label, expanded = false }: { dataUrl: string; label: s
     onClick={(event) => event.stopPropagation()} />;
 }
 
+// A meme in the grid: the picture itself attaches it (and a second press takes it off), a small
+// corner button shows it large. The attached one is lit and says so.
 function MemeTile({
   transport,
   meme,
@@ -192,27 +251,16 @@ function MemeTile({
   const t = useTranslate();
   const preview = usePreview(transport, meme.url, true);
   const title = meme.title || t("memes_untitled");
-  const attach = <button type="button" className="meme-attach" aria-label={t("memes_attach", { title })}
-    aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled}
-    onClick={onToggle}>{attached ? t("memes_attached") : t("memes_attach_short")}</button>;
-  if (preview.phase === "ready" && preview.dataUrl.startsWith("data:video/")) {
-    return <div className="meme-tile">
-      <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
-        onClick={() => onOpen(preview.dataUrl)}>
-        <Media dataUrl={preview.dataUrl} label={title} />
-      </button>
-      {attach}
-    </div>;
-  }
-  return <div className="meme-tile">
-    {preview.phase === "ready" ? <>
-      <button type="button" className="preview preview-open" aria-label={title} disabled={disabled}
-        onClick={() => onOpen(preview.dataUrl)}>
-        <img src={preview.dataUrl} alt="" />
-      </button>
-      {attach}
-    </> : <button type="button" className="preview preview-open"
-      aria-label={t("memes_attach", { title })} aria-busy={preview.phase === "loading"} disabled={disabled}
-      onClick={onToggle}>{preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}</button>}
+  return <div className="meme-tile" data-attached={attached ? "" : undefined}>
+    <button type="button" className="preview meme-pick" aria-label={t("memes_attach", { title })}
+      aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled} onClick={onToggle}>
+      {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} />}
+      {preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}
+    </button>
+    {attached && <span className="meme-badge" aria-hidden="true">{t("memes_attached")}</span>}
+    {preview.phase === "ready" && <button type="button" className="meme-zoom" aria-label={t("memes_view_named", { title })}
+      title={t("memes_view_named", { title })} disabled={disabled} onClick={() => onOpen(preview.dataUrl)}>
+      <span aria-hidden="true">⤢</span>
+    </button>}
   </div>;
 }

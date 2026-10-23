@@ -61,7 +61,7 @@ describe("a WhatsApp conversation in Messages", () => {
     await screen.findByText("are you coming?");
 
     expect(screen.getByRole("textbox")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Load memes" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Attach a meme" })).toBeNull();
     expect(screen.queryByRole("combobox", { name: /meme/i })).toBeNull();
     expect(screen.getByText(/go out from your own account, as you/)).toBeTruthy();
   });
