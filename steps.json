@@ -760,18 +760,24 @@
               "evidence": [
                 "Communications owns typed delivery ports, send planning, configured/disabled destinations, explicit bypass and shared safe-only eligibility; named text-conversation validation is domain-owned.",
                 "Existing handler/client port names remain compatible aliases. Ingress credentials, public events, response/error shapes and gateway transport restrictions are preserved.",
-                "Linking authorization now uses Communications.LinkPolicy before the System handler invokes a registered adapter. Only available registered platforms and the existing status/start/reset actions are accepted; domain and handler refusal tests keep rejected requests from reaching the adapter."
+                "Linking authorization now uses Communications.LinkPolicy before the System handler invokes a registered adapter. Only available registered platforms and the existing status/start/reset actions are accepted; domain and handler refusal tests keep rejected requests from reaching the adapter.",
+                "Named conversation routing enablement is checked by Communications.DeliveryPolicy before an adapter list or send; the existing configured-adapter error and off-state refusal remain unchanged."
               ],
               "checks": [
                 {
                   "name": "link_authorization",
                   "status": "passed",
                   "detail": "Communications domain go test -race ./... and go vet ./...; orchestrator handler go test -race ./internal/handlers and go vet ./internal/handlers; orchestrator go test ./... passed. Fake linkers only; no platform session or account was touched."
+                },
+                {
+                  "name": "named_conversation_routing",
+                  "status": "passed",
+                  "detail": "Communications domain go test -race ./... and named-conversation orchestrator handler go test -race passed. Fake sender only; disabled routing still refuses before list or delivery."
                 }
               ],
               "remaining": [
                 "Extract inbound gateway eligibility with parity tests before relocating gateways.",
-                "Review any remaining delivery-policy decisions in handlers."
+                "Finish reviewing any remaining delivery-policy decisions in handlers."
               ]
             },
             {

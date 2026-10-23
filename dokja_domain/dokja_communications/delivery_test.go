@@ -90,3 +90,17 @@ func TestNamedTextIntentRestrictions(t *testing.T) {
 		t.Fatal("unknown alias accepted")
 	}
 }
+
+func TestConversationAuthorizationRespectsRoutingState(t *testing.T) {
+	p := DeliveryPolicy{Disabled: map[string]bool{"whatsapp": true}}
+	if err := p.AuthorizeConversation("whatsapp:friend"); err == nil || !strings.Contains(err.Error(), "switched off") {
+		t.Fatalf("disabled conversation was authorized: %v", err)
+	}
+	p.Disabled["whatsapp"] = false
+	if err := p.AuthorizeConversation("whatsapp:friend"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.AuthorizeConversation("discord-channel"); err == nil {
+		t.Fatal("a channel was authorized as a conversation")
+	}
+}

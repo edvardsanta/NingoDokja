@@ -134,6 +134,19 @@ func ValidateConversationSend(r SendRequest) (SendPlan, error) {
 	}
 	return SendPlan{Content: content, Targets: append([]string{}, r.Targets...)}, nil
 }
+
+// AuthorizeConversation keeps routing enablement with the other domain delivery
+// decisions. The caller still checks that a sender adapter is configured first.
+func (p DeliveryPolicy) AuthorizeConversation(target string) error {
+	if PlatformOf(target) != "whatsapp" {
+		return fmt.Errorf("channel %s is not a named WhatsApp conversation", target)
+	}
+	if p.Disabled["whatsapp"] {
+		return fmt.Errorf("nothing sent: whatsapp is switched off")
+	}
+	return nil
+}
+
 func NamedConversation(target string, conversations []Conversation) (string, error) {
 	if PlatformOf(target) != "whatsapp" {
 		return "", fmt.Errorf("channel %s is not a named WhatsApp conversation", target)

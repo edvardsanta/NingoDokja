@@ -36,8 +36,8 @@ func (h *SystemDomainHandler) handleWhatsAppSend(
 	if h.whatsapp == nil {
 		return nil, fmt.Errorf("the WhatsApp interface is not configured")
 	}
-	if !h.serviceEnabled("whatsapp") {
-		return nil, fmt.Errorf("nothing sent: whatsapp is switched off")
+	if err := h.deliveryPolicy().AuthorizeConversation(plan.Targets[0]); err != nil {
+		return nil, err
 	}
 
 	channel := channels[0]
