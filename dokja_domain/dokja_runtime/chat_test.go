@@ -118,3 +118,22 @@ func TestChatIsACapabilityRatherThanStandaloneRuntimeModule(t *testing.T) {
 		t.Fatal("chat capability must not be a container module")
 	}
 }
+
+type cancelledChatProvider struct{ cancel context.CancelFunc }
+
+func (f cancelledChatProvider) Generate(context.Context, ChatBinding, []ChatMessage) (string, error) {
+	f.cancel()
+	return "late answer", nil
+}
+
+func TestChatRejectsSuccessReturnedAfterCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	s := &chatStore{b: ChatBinding{Revision: 1, Provider: "codex", Model: "fixture"}}
+	p := &chatRegistrations{p: ProviderPreferences{Providers: []ProviderRegistration{{ID: "codex", Enabled: true, Models: []string{"fixture"}}}}}
+	d := New(nil, Journal{}, nil).WithChat(s, cancelledChatProvider{cancel}).WithProviderSettings(p)
+	got, err := d.Chat(ctx, []ChatMessage{{Role: "user", Content: "question"}})
+	if !errors.Is(err, context.Canceled) || got.Reply != "" {
+		t.Fatalf("late success accepted: %+v %v", got, err)
+	}
+}

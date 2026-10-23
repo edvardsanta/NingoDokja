@@ -1104,6 +1104,11 @@
           ],
           "checks": [
             {
+              "name": "bounded_chat_inference_follow_up",
+              "status": "partial",
+              "detail": "Runtime domain, runtime adapter and bootstrap go test -race ./... and go vet ./... passed. Opt-in real Codex/gpt-6-luna: four-message exact marker, one call, 2737 ms, disabled-registration control passed. Claude Code/sonnet failed; Ollama generation was not run because only the embedding model was observed. See dokja_docs/chat-inference-validation.md."
+            },
+            {
               "name": "provider_discovery_and_operator_contracts",
               "status": "passed",
               "detail": "go test -race ./... and go vet ./... passed in Runtime domain, service adapter, bootstrap orchestrator, CLI and TUI. Fixtures cover stopped services, malformed/bounded model listings, cancellation, private-field omission, shared routes and explicit refresh without lifecycle operations."
@@ -1140,6 +1145,7 @@
             }
           ],
           "evidence": [
+            "Reproduced and fixed accepting a cancelled inference late reply and a tool-bearing trace with a final file. CLI isolation and completed-event acceptance now match bounded chat intent. A separate opt-in live harness uses only synthetic history and in-memory settings; saved operator bindings and application services remain unchanged.",
             "Discovery batch adds runtime.providers through bootstrap orchestration, Runtime domain interpretation and bounded infrastructure inspection. CLI, TUI and desktop share this read-only inventory.",
             "Codex and Claude Code report only executable discovery; model catalog, authentication, quota and inference are not inferred. Ollama lists models only inside the selected running lite-stack container; a stopped service is not started and is distinct from an empty reachable catalog.",
             "Discovery runs on explicit operator input with a three-second context budget, bounded model output, static provider identities and no raw paths/commands/credentials in responses. Every row explicitly reports inference_status=not_tested. Observations are ephemeral, not database registrations or capability bindings.",
@@ -1151,6 +1157,15 @@
             "TUI now shares explicit chat selection with Desktop and CLI. Selection reads runtime.chat, confirms runtime.chat.configure and retains the original revision. Choices are declarations rather than proof of availability; broader capability migration remains pending."
           ],
           "batches": [
+            {
+              "id": "bounded_chat_validation",
+              "status": "in_progress",
+              "deliverables": [
+                "Completed-inference trace gate, cancellation and actual executable regressions",
+                "Opt-in synthetic live chat test and explicit provider results"
+              ],
+              "next_action": "Diagnose Claude failure and evaluate an installed Ollama generation model; one successful Codex fixture is not cross-provider or cognitive-loop validation."
+            },
             {
               "id": "discovery",
               "status": "completed",
@@ -1197,8 +1212,9 @@
               ]
             }
           ],
-          "next_action": "Validate live chat provider/model inference; deterministic chat binding and adapter migration is implemented. Keep broader cognitive/OCR consumer migration pending. Repair the existing native communications/Digest E2E baseline separately; registrations alone do not complete step 11.4.",
+          "next_action": "Continue live provider comparison: Codex passed the synthetic chat fixture, Claude failed and Ollama generation remains untested. Diagnose failures and establish actual answering-model provenance before general cognitive bindings. Keep OCR/legacy migration, durable conversation history and native baseline repairs separate.",
           "references": [
+            "dokja_docs/chat-inference-validation.md",
             "dokja_docs/provider-inventory.md",
             "dokja_docs/decisions/0013-database-runtime-settings.md",
             "dokja_docs/decisions/0011-inference-provider-boundaries.md",
@@ -1206,7 +1222,7 @@
           ],
           "verification_gaps": [
             "Existing native communications confirmation fixture and Digest smoke timeout remain non-green on the parent branch; parallel Electron startup is also unstable. No failure is reported as passing.",
-            "Live provider authentication, quota and inference validation remain unperformed; no capability binding is selected by this lot."
+            "Live Codex synthetic chat passed with an ephemeral fixture binding; selected Claude failed and Ollama generation was not run. Authentication/quota diagnosis, cross-provider parity and actual answering-model provenance remain unverified."
           ]
         }
       ]

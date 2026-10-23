@@ -115,6 +115,9 @@ func (d *Domain) Chat(ctx context.Context, messages []ChatMessage) (ChatReply, e
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	reply, err := d.chatInference.Generate(ctx, b, messages)
+	if ctx.Err() != nil {
+		return ChatReply{}, ctx.Err()
+	}
 	if err != nil {
 		return ChatReply{}, err
 	}

@@ -781,6 +781,10 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
    chat refuses inference; re-enable and retry. Authentication/quota errors stay explicit.
    History, reading reference and Knowledge citations continue through the same chat handler.
 
+Bounded adapter regressions and opt-in synthetic live checks are documented in
+[chat inference validation](chat-inference-validation.md). A healthy configuration
+only establishes registration validity; it does not prove authenticated inference.
+
 CLI adapters use installed host executables and their existing authentication. Each call runs
 from an empty temporary directory with tools disabled, bounded input/output and a 90-second
 budget; cancellation kills the process group. The local-model adapter uses the selected lite
