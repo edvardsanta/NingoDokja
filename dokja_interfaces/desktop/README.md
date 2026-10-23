@@ -366,3 +366,9 @@ environment configuration; see the [runbook](../../dokja_docs/production-runbook
 System → Inference providers → Inspect providers reads the same inventory as
 CLI and TUI, only on demand. A CLI found on PATH is not proof of authentication
 or successful inference. See [provider inventory](../../dokja_docs/provider-inventory.md).
+
+After inspecting providers, Edit opens the selected registration. Review and save
+discovery eligibility and up to 16 unverified model declarations. The form keeps
+its original revision; concurrent edits require reload and explicit retry. Older
+controllers without a configuration revision remain read-only. Changes do not
+select a capability model or alter the fixed embedding profile.

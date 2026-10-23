@@ -28,6 +28,29 @@ func (m *Model) cmdProviders() tea.Cmd {
 }
 func (m *Model) keyProviders(key string) (tea.Model, tea.Cmd) {
 	switch key {
+	case "up", "k":
+		m.providersCursor = max(0, m.providersCursor-1)
+	case "down", "j":
+		if m.providers != nil {
+			m.providersCursor = min(len(m.providers.Providers)-1, m.providersCursor+1)
+		}
+	case "e", "enter":
+		if m.providers == nil || len(m.providers.Providers) == 0 {
+			return m, nil
+		}
+		if m.providers.Revision == 0 {
+			m.setNotice(tr("provider_configuration_unavailable"), true)
+			return m, nil
+		}
+		row := m.providers.Providers[m.providersCursor]
+		m.providerEditingRevision = m.providers.Revision
+		m.providerEditing = cli.ProviderRegistration{ID: row.ID, Enabled: row.Enabled, Models: row.DeclaredModels}
+		m.settingInput.CharLimit = 2200
+		m.settingInput.SetValue(strings.Join(row.DeclaredModels, ", "))
+		m.settingInput.CursorEnd()
+		m.settingInput.Focus()
+		m.overlay = overlayProviderEdit
+
 	case "esc", "q":
 		m.overlay = overlaySettings
 	case "r":
@@ -44,7 +67,7 @@ func (m *Model) viewProviders() string {
 	if m.providers == nil {
 		return b.String() + tr("loading")
 	}
-	for _, row := range m.providers.Providers {
+	for i, row := range m.providers.Providers {
 		state := tr("provider_unavailable")
 		switch row.State {
 		case "installed":
@@ -55,7 +78,22 @@ func (m *Model) viewProviders() string {
 		if row.Reason == "service_stopped" {
 			state = tr("provider_service_stopped")
 		}
-		b.WriteString("\n" + row.Name + ": " + state + "\n")
+		if row.Reason == "disabled" {
+			state = tr("provider_disabled")
+		}
+		marker := "  "
+		if i == m.providersCursor {
+			marker = "▸ "
+		}
+		b.WriteString("\n" + marker + row.Name + ": " + state + "\n")
+		if m.providers.Revision != 0 {
+			if len(row.DeclaredModels) == 0 {
+				b.WriteString(tr("provider_no_declarations") + "\n")
+			} else {
+				b.WriteString(tr("provider_declared_models") + ": " + strings.Join(row.DeclaredModels, ", ") + "\n")
+			}
+		}
+
 		if row.ModelDiscovery == "listed" {
 			if len(row.Models) == 0 {
 				b.WriteString(tr("provider_no_models"))

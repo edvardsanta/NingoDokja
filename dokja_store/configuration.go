@@ -8,6 +8,7 @@ import (
 )
 
 const runtimeConfigurationKey = "runtime.configuration.v1"
+const providerConfigurationKey = "runtime.providers.v1"
 
 var ErrConfigurationConflict = errors.New("configuration changed; reload before saving")
 
@@ -43,11 +44,11 @@ func decodeConfiguration(raw string) (Configuration, error) {
 	return c, nil
 }
 
-// RuntimeConfiguration reads only the dedicated key, never profiles or secrets.
+// configuration reads only the dedicated key, never profiles or secrets.
 // The existing settings table and user_version remain unchanged.
-func (d *DB) RuntimeConfiguration() (Configuration, bool, error) {
+func (d *DB) configuration(key string) (Configuration, bool, error) {
 	var raw string
-	err := d.db.QueryRow(`SELECT value FROM settings WHERE key=?`, runtimeConfigurationKey).Scan(&raw)
+	err := d.db.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&raw)
 	if err == sql.ErrNoRows {
 		return Configuration{}, false, nil
 	}
@@ -58,22 +59,22 @@ func (d *DB) RuntimeConfiguration() (Configuration, bool, error) {
 	return c, true, err
 }
 
-// InitializeRuntimeConfiguration is insert-once: a later import cannot overwrite
+// initializeConfiguration is insert-once: a later import cannot overwrite
 // edits made by another controller/process or replace the first snapshot.
-func (d *DB) InitializeRuntimeConfiguration(values map[string]string) (Configuration, error) {
+func (d *DB) initializeConfiguration(key string, values map[string]string) (Configuration, error) {
 	raw, err := configurationJSON(Configuration{Version: 1, Revision: 1, Values: values})
 	if err != nil {
 		return Configuration{}, err
 	}
-	if _, err = d.db.Exec(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, runtimeConfigurationKey, raw, now()); err != nil {
+	if _, err = d.db.Exec(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO NOTHING`, key, raw, now()); err != nil {
 		return Configuration{}, err
 	}
-	c, _, err := d.RuntimeConfiguration()
+	c, _, err := d.configuration(key)
 	return c, err
 }
-func (d *DB) UpdateRuntimeConfiguration(revision uint64, changes map[string]string) (Configuration, error) {
+func (d *DB) updateConfiguration(key string, revision uint64, changes map[string]string) (Configuration, error) {
 	var old string
-	if err := d.db.QueryRow(`SELECT value FROM settings WHERE key=?`, runtimeConfigurationKey).Scan(&old); err != nil {
+	if err := d.db.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&old); err != nil {
 		return Configuration{}, err
 	}
 	c, err := decodeConfiguration(old)
@@ -91,7 +92,7 @@ func (d *DB) UpdateRuntimeConfiguration(revision uint64, changes map[string]stri
 	if err != nil {
 		return Configuration{}, err
 	}
-	result, err := d.db.Exec(`UPDATE settings SET value=?,updated_at=? WHERE key=? AND value=?`, raw, now(), runtimeConfigurationKey, old)
+	result, err := d.db.Exec(`UPDATE settings SET value=?,updated_at=? WHERE key=? AND value=?`, raw, now(), key, old)
 	if err != nil {
 		return Configuration{}, err
 	}
@@ -103,4 +104,27 @@ func (d *DB) UpdateRuntimeConfiguration(revision uint64, changes map[string]stri
 		return Configuration{}, ErrConfigurationConflict
 	}
 	return c, nil
+}
+
+// RuntimeConfiguration reads only runtime settings, never profiles or secrets.
+func (d *DB) RuntimeConfiguration() (Configuration, bool, error) {
+	return d.configuration(runtimeConfigurationKey)
+}
+func (d *DB) InitializeRuntimeConfiguration(values map[string]string) (Configuration, error) {
+	return d.initializeConfiguration(runtimeConfigurationKey, values)
+}
+func (d *DB) UpdateRuntimeConfiguration(revision uint64, changes map[string]string) (Configuration, error) {
+	return d.updateConfiguration(runtimeConfigurationKey, revision, changes)
+}
+
+// ProviderConfiguration uses an independent key and revision in the same table.
+// It contains declarations, not observations or inference results.
+func (d *DB) ProviderConfiguration() (Configuration, bool, error) {
+	return d.configuration(providerConfigurationKey)
+}
+func (d *DB) InitializeProviderConfiguration(values map[string]string) (Configuration, error) {
+	return d.initializeConfiguration(providerConfigurationKey, values)
+}
+func (d *DB) UpdateProviderConfiguration(revision uint64, changes map[string]string) (Configuration, error) {
+	return d.updateConfiguration(providerConfigurationKey, revision, changes)
 }

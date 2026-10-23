@@ -330,3 +330,11 @@ The bootstrap controller also routes read-only `runtime.providers` through the
 Runtime domain and provider-discovery infrastructure. Operator interfaces share
 the same inventory; discovery cannot infer, select a model, start a module or
 write memory. See [provider inventory](provider-inventory.md).
+
+Supported provider registrations now persist independently under
+`runtime.providers.v1`. `runtime.providers.configure` validates known adapter IDs,
+discovery eligibility, model declarations and the exact read revision before
+writing through the Runtime domain/infrastructure port. Desktop, CLI and TUI
+confirm edits and preserve stale revisions rather than merging them silently.
+Declared names remain unverified; inference bindings and the fixed embedding
+profile are unaffected. See [provider registrations](provider-registrations.md).

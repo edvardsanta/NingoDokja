@@ -121,6 +121,7 @@ func (m *Model) keySettings(key string) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.settingEditing = row.ID
+			m.settingInput.CharLimit = 2000
 			m.settingInput.SetValue(row.Value)
 			m.settingInput.CursorEnd()
 			m.settingInput.Focus()

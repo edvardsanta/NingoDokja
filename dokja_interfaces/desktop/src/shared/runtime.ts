@@ -11,6 +11,10 @@ export type RuntimeSnapshot = { modules: { name: RuntimeModule; state: RuntimeSt
 
 export type ProviderRow = {
   id: string; name: string; state: string; reason: string; models: string[];
+  enabled?: boolean; declaredModels?: string[];
   modelDiscovery: string; inferenceStatus: "not_tested"; truncated: boolean;
 };
-export type ProvidersView = { providers: ProviderRow[]; checkedAt: string };
+export type ProvidersView = { configurationRevision?: number; providers: ProviderRow[]; checkedAt: string };
+
+export type ProviderRegistrationChange = { provider: string; configurationRevision: number; enabled: boolean; models: string[] };
+export type ProviderRegistrationSaved = { provider: string; configurationRevision: number };

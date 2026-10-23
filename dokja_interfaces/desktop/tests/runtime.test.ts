@@ -108,3 +108,30 @@ test("provider discovery is read-only, bounded and cannot claim verified inferen
  assert.equal((await handleRequest({type:"runtime.providers",payload:{command:"drop"}},client,{defaultTimeoutMs:15000,maxTimeoutMs:120000})).ok,true);
  assert.deepEqual(calls,[{type:"runtime.providers",payload:{}}]);
 });
+
+test("provider configuration requires presence, validates declarations and drops extra fields", async () => {
+ const { runtimeProviderConfigure, runtimeProviders } = await import("../src/main/runtime_actions.js");
+ const change = { configuration_revision: 7, provider: "codex", enabled: false, models: ["fixture/model"], command: "drop" };
+ const wire = { configuration_revision: 7, provider: "codex", enabled: false, models: ["fixture/model"] };
+ assert.deepEqual(runtimeProviderConfigure(change), wire);
+ for (const bad of [
+  {...change, configuration_revision: 0}, {...change, configuration_revision: 1.5}, {...change, provider: "unknown"},
+  {...change, enabled: "false"}, {...change, models: ["bad\nTOKEN=x"]}, {...change, models: null},
+  {...change, models: Array.from({length: 17}, () => "fixture/model")},
+ ]) assert.equal(runtimeProviderConfigure(bad), undefined);
+ const calls: unknown[]=[];
+ const client={ async request(type:string,payload:Record<string,unknown>) {calls.push({type,payload});return {status:"ok",result:wrap({configuration_revision:8,provider:"codex",private:"drop"})};}};
+ const limits={defaultTimeoutMs:15000,maxTimeoutMs:120000};
+ assert.equal((await handleRequest({type:"runtime.providers.configure",payload:change},client,limits)).ok,false);
+ assert.equal(calls.length,0);
+ const response=await handleRequest({type:"runtime.providers.configure",payload:change},client,limits,undefined,{recent:()=>true});
+ assert.deepEqual(response,{ok:true,result:{configurationRevision:8,provider:"codex"}});
+ assert.deepEqual(calls,[{type:"runtime.providers.configure",payload:wire}]);
+ const view=runtimeProviders({configuration_revision:8,providers:[{id:"codex",state:"unavailable",reason:"disabled",enabled:false,declared_models:["fixture/model"],inference_status:"success"}]});
+ assert.equal(view.configurationRevision,8);
+ assert.equal(view.providers[0]?.enabled,false);
+ assert.deepEqual(view.providers[0]?.declaredModels,["fixture/model"]);
+ assert.equal(view.providers[0]?.inferenceStatus,"not_tested");
+ assert.equal(runtimeProviders({providers:[]}).configurationRevision,0);
+ assert.throws(()=>runtimeProviders({configuration_revision:1,providers:[{id:"codex",state:"installed"}]}));
+});

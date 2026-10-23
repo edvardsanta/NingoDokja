@@ -2,7 +2,8 @@
 
 Date: 2026-10-22. Status: accepted operational configuration direction (owner
 request); first compatibility implementation delivered in step 11.3. Provider
-inventory, model discovery and capability bindings remain pending.
+inventory/discovery and persistent registrations are documented in the follow-up
+guides; capability bindings remain pending.
 
 ## Responsibility and scope
 
@@ -89,3 +90,8 @@ projection and refusal to launch without a valid database. A bootstrap-router
 test writes from CLI, reopens persistence and reads the same value from all three
 interface sources. Interface tests verify the fixed embedding profile and refuse
 its edit. See step 11.3 for the executed suites and remaining work.
+
+The follow-up [registration batch](../provider-registrations.md) uses an
+independent `runtime.providers.v1` snapshot in the same table. Operator-declared
+models and discovery eligibility remain separate from observed availability and
+inference results; no legacy inference consumer changes its binding yet.

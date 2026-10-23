@@ -75,3 +75,11 @@ Still pending in step 11.4:
 4. Live provider/model validation with explicit unavailable, quota, unsupported
    and inference-failure results. No automatic fallback may expand permissions
    or reset a cognitive task's budgets.
+
+## Provider registrations
+
+The following configuration batch persists enabled flags and operator-declared
+models separately from these observations. Disabled adapters are skipped by
+discovery; declarations remain unverified. See
+[persistent provider registrations](provider-registrations.md) for the new action,
+revision checks and the unchanged legacy inference consumers.

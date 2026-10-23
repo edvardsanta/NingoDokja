@@ -17,10 +17,12 @@ type ProviderObservation struct {
 }
 
 type ProviderInspector interface {
-	Inspect(context.Context) []ProviderObservation
+	Inspect(context.Context, map[string]bool) []ProviderObservation
 }
 
 type ProviderRow struct {
+	Enabled         bool     `json:"enabled"`
+	DeclaredModels  []string `json:"declared_models"`
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	State           string   `json:"state"`
@@ -32,6 +34,8 @@ type ProviderRow struct {
 }
 
 type ProvidersView struct {
+	Revision  uint64        `json:"configuration_revision,omitempty"`
+	Error     string        `json:"error,omitempty"`
 	Providers []ProviderRow `json:"providers"`
 	CheckedAt time.Time     `json:"checked_at"`
 }
@@ -46,16 +50,36 @@ func (d *Domain) WithProviders(inspector ProviderInspector) *Domain {
 func (d *Domain) Providers(ctx context.Context) ProvidersView {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
+	preferences, _ := DecodeProviderPreferences(1, DefaultProviderValues())
+	revision := uint64(0)
+	if d.providerSettings != nil {
+		var err error
+		preferences, err = d.providerSettings.ReadProviders()
+		if err != nil {
+			return ProvidersView{Providers: []ProviderRow{}, Error: "cannot read provider configuration", CheckedAt: time.Now().UTC()}
+		}
+		revision = preferences.Revision
+	}
+	configured := map[string]ProviderRegistration{}
+	enabled := map[string]bool{}
+	for _, p := range preferences.Providers {
+		configured[p.ID] = p
+		enabled[p.ID] = p.Enabled
+	}
 	observations := map[string]ProviderObservation{}
 	if d.providers != nil {
-		for _, o := range d.providers.Inspect(ctx) {
+		for _, o := range d.providers.Inspect(ctx, enabled) {
 			observations[o.ID] = o
 		}
 	}
-	view := ProvidersView{Providers: []ProviderRow{}, CheckedAt: time.Now().UTC()}
-	for _, spec := range []struct{ id, name string }{{"codex", "Codex"}, {"claude_code", "Claude Code"}, {"ollama", "Ollama"}} {
-		row := ProviderRow{ID: spec.id, Name: spec.name, State: "unavailable", Reason: "inspection_unavailable", Models: []string{}, ModelDiscovery: "unavailable", InferenceStatus: "not_tested"}
+	view := ProvidersView{Revision: revision, Providers: []ProviderRow{}, CheckedAt: time.Now().UTC()}
+	for _, spec := range providerSpecs {
+		row := ProviderRow{Enabled: configured[spec.id].Enabled, DeclaredModels: configured[spec.id].Models, ID: spec.id, Name: spec.name, State: "unavailable", Reason: "inspection_unavailable", Models: []string{}, ModelDiscovery: "unavailable", InferenceStatus: "not_tested"}
 		o, ok := observations[spec.id]
+		if !row.Enabled {
+			row.Reason = "disabled"
+			ok = false
+		}
 		if ok {
 			allowedReason := map[string]bool{"executable_missing": true, "service_stopped": true, "engine_unavailable": true, "inspection_failed": true, "invalid_response": true, "timeout": true}
 			if allowedReason[o.Reason] {
