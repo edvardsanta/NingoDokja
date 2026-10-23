@@ -122,3 +122,12 @@ The subsequent chat migration now uses an explicit `runtime.chat.v1` binding and
 `runtime.chat` / `runtime.chat.configure` actions. Enabled declarations are validated
 on selection and every generation call. Registration alone still does not select a
 model or prove inference. See [rollout and compatibility](production-runbook.md#chat-provider-migration).
+
+The TUI also selects chat through settings (`c`) → providers (`p`) → chat (`c`).
+It offers enabled declarations, reads the separate chat revision and reviews the
+selected pair before saving. A stale save is refused without automatic retry;
+late inventory replies cannot change the selected draft or its revision. No
+provider call occurs during selection. The shared CLI client validates the save
+receipt's revision, provider and model. CLI/TUI `go test -race ./...` and
+`go vet ./...` passed for this batch; live inference and native Desktop tests were
+not run because neither behavior is changed by this interface parity update.
