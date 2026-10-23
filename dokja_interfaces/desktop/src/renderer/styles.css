@@ -1286,12 +1286,31 @@ button[aria-pressed="true"] {
 .runtime-logs pre { max-height: 18rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; padding: .8rem; background: var(--static); }
 
 .assistant-conversation { display: grid; gap: .75rem; min-width: 0; margin-block: 1rem; }
-.assistant-prompts, .assistant-turns li { padding: .85rem; border-left: 3px solid var(--cyan); background: rgb(39 215 228 / 6%); }
+.assistant-prompts, .assistant-turns li { padding: .85rem; border-left: 3px solid var(--cyan); background: color-mix(in srgb, var(--cyan) 6%, transparent); }
 .assistant-prompts { display: grid; gap: .5rem; }
 .assistant-prompt { justify-self: start; text-align: left; }
-.assistant-turns { list-style: none; padding: 0; display: grid; gap: .7rem; }
-.assistant-turns li { padding: .85rem; border-left: 3px solid var(--muted); overflow-wrap: anywhere; }
+.assistant-turns { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+.assistant-turns li { padding: .85rem; border-left: 3px solid var(--edge); overflow-wrap: anywhere; }
 .assistant-turns li[data-role="assistant"] { border-left-color: var(--cyan); }
 .assistant-turns p { white-space: pre-wrap; margin-bottom: 0; }
-.assistant-conversation form { display: grid; gap: .5rem; }
-.assistant-conversation textarea { width: 100%; resize: vertical; font: inherit; color: inherit; background: var(--static); border: 1px solid var(--muted); padding: .7rem; }
+.composer { display: grid; gap: .5rem; }
+.composer textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: inherit; background: var(--static); border: 1px solid var(--edge); padding: .7rem; }
+.composer textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/*
+ * Ningo's own voice: one line, in the face of his name, set apart from what the screen reports. It is
+ * always followed by a plain sentence that says what to do.
+ */
+.voice { margin: 0 0 .35rem; font: italic 700 1.25rem/1.35 var(--serif); color: var(--ink); }
+
+/* The conversation reads at the width of a page; the composer stays docked under it. */
+.talk { display: grid; gap: .9rem; max-width: 72ch; }
+.talk-opening { display: grid; gap: .5rem; }
+.talk-starts { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .25rem; }
+.talk .note { display: grid; gap: .5rem; justify-items: start; }
+.wp-dock .composer { grid-template-columns: minmax(0, 1fr) auto; align-items: end; max-width: 72ch; }
+.wp-dock .composer textarea { grid-column: 1; }
+.wp-dock .composer button { grid-column: 2; }
+.wp-dock .composer-hint { grid-column: 1 / -1; margin: 0; font-size: .8125rem; }
+/* The label is for screen readers here: the docked field says what it is by its place and hint. */
+.wp-dock .composer label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
