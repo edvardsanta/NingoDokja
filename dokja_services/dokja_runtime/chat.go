@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -65,7 +66,11 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 		return "", ctx.Err()
 	}
 	if err != nil {
-		return "", fmt.Errorf("selected chat provider unavailable or inference failed (%s)", b.Provider)
+		var failure *domain.ChatProviderFailure
+		if errors.As(err, &failure) {
+			return "", failure
+		}
+		return "", &domain.ChatProviderFailure{Code: domain.ChatUnavailable}
 	}
 	switch b.Provider {
 	case "claude_code":
@@ -73,8 +78,11 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 			Result  string `json:"result"`
 			IsError bool   `json:"is_error"`
 		}
-		if json.Unmarshal(output, &v) != nil || v.IsError {
+		if json.Unmarshal(output, &v) != nil {
 			return "", fmt.Errorf("invalid chat provider response")
+		}
+		if v.IsError {
+			return "", classifyChatFailure(output, nil)
 		}
 		return v.Result, nil
 	case "codex":
@@ -136,7 +144,8 @@ func (a ChatAdapters) run(ctx context.Context, binary string, args []string, pro
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = dir
 	cmd.Stdin = bytes.NewBufferString(prompt)
-	cmd.Stderr = io.Discard
+	stderr := &chatOutput{}
+	cmd.Stderr = stderr
 	if binary == "docker" {
 		if err := localEngine(os.Environ()); err != nil {
 			return nil, err
@@ -161,22 +170,29 @@ func (a ChatAdapters) run(ctx context.Context, binary string, args []string, pro
 	out := &chatOutput{}
 	cmd.Stdout = out
 	err := cmd.Run()
-	if err != nil || out.overflow {
-		return nil, fmt.Errorf("inference process failed")
+	if out.overflow || stderr.overflow {
+		return nil, &domain.ChatProviderFailure{Code: domain.ChatOutputLimit}
+	}
+	if err != nil {
+		return nil, classifyChatFailure(out.Bytes(), stderr.Bytes())
 	}
 	return out.Bytes(), nil
 }
 
+// Keep the buffer named: embedding bytes.Buffer promotes ReadFrom, allowing
+// io.Copy in os/exec to bypass this writer's output limit.
 type chatOutput struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	overflow bool
 }
 
+func (b *chatOutput) Bytes() []byte { return b.buffer.Bytes() }
+
 func (b *chatOutput) Write(p []byte) (int, error) {
 	n := len(p)
-	if b.Len()+n > 65536 {
+	if b.buffer.Len()+n > 65536 {
 		b.overflow = true
-		return n, fmt.Errorf("output limit")
+		return 0, fmt.Errorf("output limit")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
