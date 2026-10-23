@@ -249,6 +249,25 @@ body {
   border-top: 1px solid color-mix(in srgb, var(--edge) 45%, transparent);
 }
 
+/* What is not well, listed first on System, each with its state in its tone and why. */
+.attention-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attention-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 0.45rem 0.75rem;
+  border-left: 3px solid var(--tone);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 70%);
+}
+
 /* A section of the panel is not a card: a heading, and a rule between it and the one before. */
 .wp-section + .wp-section {
   margin-top: 2rem;

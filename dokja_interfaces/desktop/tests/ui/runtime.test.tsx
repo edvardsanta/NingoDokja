@@ -88,7 +88,9 @@ it("shows one module row and separates lifecycle from optional request handling"
   fireEvent.click(screen.getByRole("tab", { name: "System" }));
   await screen.findByText("Options for Memory");
   expect(screen.getAllByText("Memory", { selector: ".service-name" })).toHaveLength(1);
-  expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules", "Settings", "Inference providers"]);
+  // settings and providers are views of System of their own, opened from its tabs
+  expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules"]);
+  expect(screen.getAllByRole("tab", { name: /^(Status|Settings|Providers)$/ }).map((tab) => tab.textContent)).toEqual(["Status", "Settings", "Providers"]);
   expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
   expect(screen.getByText("Options for Memory").closest("details")?.open).toBe(false);
   fireEvent.click(screen.getByText("Options for Memory"));
@@ -110,7 +112,7 @@ it("keeps WhatsApp setup in its module row without duplicating the interface", a
   // the screen opens on Talk; the modules are on System
   fireEvent.click(screen.getByRole("tab", { name: "System" }));
   const options = await screen.findByText("Options for WhatsApp");
-  expect(screen.getAllByText("WhatsApp")).toHaveLength(1);
+  expect(screen.getAllByText("WhatsApp", { selector: ".services .service-name" })).toHaveLength(1);
   fireEvent.click(options);
   expect(screen.getByText(/WhatsApp has not been set up/)).toBeTruthy();
   expect(screen.getByRole("button", { name: "Start WhatsApp" })).toBeTruthy();
@@ -142,4 +144,28 @@ it("shows logs on demand while other modules remain usable", async () => {
  fireEvent.click(screen.getByRole("button",{name:"Start Feeds"}));
  await waitFor(()=>expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"feeds",enabled:true}]));
  expect(screen.getByText("embedding model: downloading")).toBeTruthy();
+});
+
+it("splits System into Status, Settings and Providers, and asks for a view only when it opens", async () => {
+  const { App } = await import("../../src/renderer/app.js");
+  const { transport, calls } = routedTransport({
+    "runtime.modules": page("ready"),
+    "ningo.status": ok({ status: "ok", services: { memory: { status: "ok", enabled: true } } }),
+    "runtime.settings": ok({ busy: false, error: "", webhookChannels: [], settings: [] }),
+    "runtime.providers": ok({ providers: [] }),
+  });
+  render(<App transport={transport} locale="en" runtimeControls />);
+  fireEvent.click(screen.getByRole("tab", { name: "System" }));
+  await screen.findByText("Options for Memory");
+
+  expect(screen.getByRole("region", { name: "System › Status" })).toBeTruthy();
+  expect(calls.some((call) => call.type === "runtime.settings" || call.type === "runtime.providers")).toBe(false);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Providers" }));
+  await waitFor(() => expect(calls.filter((call) => call.type === "runtime.providers")).toHaveLength(1));
+  expect(screen.getByRole("region", { name: "System › Providers" })).toBeTruthy();
+  expect(calls.some((call) => call.type === "runtime.settings")).toBe(false);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+  await waitFor(() => expect(calls.filter((call) => call.type === "runtime.settings")).toHaveLength(1));
 });
