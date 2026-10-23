@@ -45,6 +45,23 @@ describe("the settings card", () => {
     expect(calls.some((call) => call.type === "runtime.settings.set")).toBe(false);
   });
 
+  it("adds and removes list entries before reviewing a settings save", async () => {
+    const { transport, calls } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules, "runtime.settings.set": settings() });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Meme delivery channels" }));
+    const list = screen.getByLabelText("Meme delivery channels").closest(".list-editor");
+    fireEvent.click(screen.getByRole("button", { name: "Remove 101" }));
+    fireEvent.change(screen.getByLabelText("Meme delivery channels"), { target: { value: "103" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(list.textContent).toContain("102");
+    expect(list.textContent).toContain("103");
+    expect(list.textContent).not.toContain("101");
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    expect(calls.some((call) => call.type === "runtime.settings.set")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Save and recreate" }));
+    await waitFor(() => expect(calls.filter((call) => call.type === "runtime.settings.set").map((call) => call.payload)).toEqual([{ values: { "discord.meme_channels": "102,103" } }]));
+  });
+
   it("warns that recreating the orchestrator ends chat sessions", () => {
     const impact = impactOf({ id: "discord.meme_channels", group: "discord", kind: "list", options: [], value: "", affects: ["orchestrator", "communications"], note: "sessions", default: "" }, ["orchestrator"]);
     expect(impact).toEqual({ now: ["orchestrator"], later: ["communications"], sessions: true, reindex: false });

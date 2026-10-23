@@ -373,6 +373,8 @@ See the [plugin migration contract](../../dokja_docs/feeds-content-plugins.md).
 Operational settings are stored in the shared local database through the runtime
 controller, so CLI, TUI and desktop see the same values. Allowed legacy `.env`
 options are imported once; tokens and webhook addresses remain outside this API.
+List settings use separate add/remove entries; their changes are reviewed before
+saving.
 The embedding profile is visible and fixed. Manual Compose still uses legacy
 environment configuration; see the [runbook](../../dokja_docs/production-runbook.md).
 
@@ -381,9 +383,10 @@ never before. A CLI found on PATH is not proof of authentication
 or successful inference. See [provider inventory](../../dokja_docs/provider-inventory.md).
 
 In that view, Edit opens the selected registration. Review and save
-discovery eligibility and up to 16 unverified model declarations. The form keeps
-its original revision; concurrent edits require reload and explicit retry. Older
-controllers without a configuration revision remain read-only. Changes do not
+discovery eligibility and up to 16 unverified model declarations, each with its
+own add/remove control. The form keeps its original revision; concurrent edits
+require reload and explicit retry. Older controllers without a configuration
+revision remain read-only. Changes do not
 select a capability model or alter the fixed embedding profile.
 
 Chat requires an explicit enabled provider and declared model. Select it in Desktop

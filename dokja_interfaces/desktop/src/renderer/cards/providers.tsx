@@ -4,6 +4,7 @@ import type { Transport } from "../../shared/transport.js";
 import { isRecord } from "../../shared/records.js";
 import { useTranslate } from "../i18n/context.js";
 import { CardFrame, Problem } from "./card_frame.js";
+import { ListEditor } from "./list_editor.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
@@ -34,7 +35,7 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
       <p className="detail">{t("providers_discovery_only")}</p>
       {action.state.phase === "error" && <Problem error={action.state.error} />}
       {!data.configurationRevision && <p className="detail">{t("provider_configuration_unavailable")}</p>}
-      <ul className="services">{data.providers.map((row) => <li key={row.id}>
+      <ul className="services provider-list">{data.providers.map((row) => <li key={row.id}>
         <span className="service-name">{row.name}</span>
         <span className="service-status">{t(row.enabled === false ? "provider_disabled" : row.reason === "service_stopped" ? "provider_service_stopped" : row.state === "installed" ? "provider_installed" : row.state === "reachable" ? "provider_reachable" : "provider_unavailable")}</span>
         <span className="detail">{row.modelDiscovery === "listed"
@@ -51,21 +52,20 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
 function ProviderPreferences({ row, revision, busy, onSave }: { row: ProviderRow; revision: number; busy: boolean; onSave: (change: ProviderRegistrationChange) => void }) {
   const t = useTranslate();
   const id = useId();
-  const [draft, setDraft] = useState<{ revision: number; enabled: boolean; models: string }>();
+  const [draft, setDraft] = useState<{ revision: number; enabled: boolean; models: string[] }>();
   const [reviewing, setReviewing] = useState(false);
   if (!revision) return null;
   const close = () => { setDraft(undefined); setReviewing(false); };
-  if (!draft) return <button type="button" disabled={busy} onClick={() => setDraft({ revision, enabled: row.enabled !== false, models: (row.declaredModels ?? []).join(", ") })} aria-label={t("provider_edit_named", { name: row.name })}>{t("setting_edit")}</button>;
+  if (!draft) return <button type="button" disabled={busy} onClick={() => setDraft({ revision, enabled: row.enabled !== false, models: row.declaredModels ?? [] })} aria-label={t("provider_edit_named", { name: row.name })}>{t("setting_edit")}</button>;
   return <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
     <label htmlFor={`${id}-enabled`}><input id={`${id}-enabled`} type="checkbox" checked={draft.enabled} disabled={busy} onChange={(event) => { setDraft({ ...draft, enabled: event.target.checked }); setReviewing(false); }} /> {t("provider_discovery_enabled")}</label>
-    <label htmlFor={`${id}-models`}>{t("provider_declared_models")}</label>
-    <input id={`${id}-models`} value={draft.models} maxLength={2200} autoComplete="off" disabled={busy} onChange={(event) => { setDraft({ ...draft, models: event.target.value }); setReviewing(false); }} />
+    <ListEditor label={t("provider_declared_models")} values={draft.models} maxItems={16} disabled={busy} onChange={(models) => { setDraft({ ...draft, models }); setReviewing(false); }} />
     <p className="detail">{t("provider_models_hint")}</p>
     {!reviewing ? <><button type="submit" disabled={busy}>{t("setting_review")}</button><button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button></>
       : <div className="module-confirm" role="alertdialog" aria-label={t("provider_save_named", { name: row.name })}>
         <p>{t("provider_registration_notice")}</p>
-        <p>{t(draft.enabled ? "provider_discovery_enabled" : "provider_disabled")}: {draft.models || t("provider_no_declarations")}</p>
-        <button type="button" disabled={busy} onClick={() => onSave({ provider: row.id, configurationRevision: draft.revision, enabled: draft.enabled, models: draft.models.split(",").map((name) => name.trim()).filter(Boolean) })}>{t("provider_save_registration")}</button>
+        <p>{t(draft.enabled ? "provider_discovery_enabled" : "provider_disabled")}: {draft.models.join(", ") || t("provider_no_declarations")}</p>
+        <button type="button" disabled={busy} onClick={() => onSave({ provider: row.id, configurationRevision: draft.revision, enabled: draft.enabled, models: draft.models })}>{t("provider_save_registration")}</button>
         <button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button>
       </div>}
   </form>;
