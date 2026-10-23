@@ -4,7 +4,7 @@ import type { Transport } from "../../shared/transport.js";
 import { isRecord } from "../../shared/records.js";
 import { useTranslate } from "../i18n/context.js";
 import { CardFrame, Problem } from "./card_frame.js";
-import { ListEditor } from "./list_editor.js";
+import { availableProviderModels } from "./provider_model_catalog.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
@@ -54,13 +54,28 @@ function ProviderPreferences({ row, revision, busy, onSave }: { row: ProviderRow
   const id = useId();
   const [draft, setDraft] = useState<{ revision: number; enabled: boolean; models: string[] }>();
   const [reviewing, setReviewing] = useState(false);
+  const [candidate, setCandidate] = useState("");
+  const available = availableProviderModels(row).filter((model) => !draft?.models.includes(model));
   if (!revision) return null;
   const close = () => { setDraft(undefined); setReviewing(false); };
   if (!draft) return <button type="button" disabled={busy} onClick={() => setDraft({ revision, enabled: row.enabled !== false, models: row.declaredModels ?? [] })} aria-label={t("provider_edit_named", { name: row.name })}>{t("setting_edit")}</button>;
   return <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
     <label htmlFor={`${id}-enabled`}><input id={`${id}-enabled`} type="checkbox" checked={draft.enabled} disabled={busy} onChange={(event) => { setDraft({ ...draft, enabled: event.target.checked }); setReviewing(false); }} /> {t("provider_discovery_enabled")}</label>
-    <ListEditor label={t("provider_declared_models")} values={draft.models} maxItems={16} disabled={busy} onChange={(models) => { setDraft({ ...draft, models }); setReviewing(false); }} />
-    <p className="detail">{t("provider_models_hint")}</p>
+    <div className="list-editor">
+      <label htmlFor={`${id}-model`}>{t("provider_declared_models")}</label>
+      {draft.models.length ? <ul className="list-editor-items">{draft.models.map((model) => <li key={model}>
+        <span>{model}</span>
+        <button type="button" disabled={busy} aria-label={t("list_remove_named", { name: model })} onClick={() => { setDraft({ ...draft, models: draft.models.filter((item) => item !== model) }); setReviewing(false); }}>{t("list_remove")}</button>
+      </li>)}</ul> : <p className="detail list-editor-empty">{t("setting_none")}</p>}
+      <div className="list-editor-add">
+        <select id={`${id}-model`} value={candidate} disabled={busy || available.length === 0 || draft.models.length >= 16} onChange={(event) => setCandidate(event.target.value)}>
+          <option value="">{t("provider_choose_model")}</option>
+          {available.map((model) => <option key={model} value={model}>{model}</option>)}
+        </select>
+        <button type="button" disabled={busy || !candidate || !available.includes(candidate) || draft.models.length >= 16} onClick={() => { setDraft({ ...draft, models: [...draft.models, candidate] }); setCandidate(""); setReviewing(false); }}>{t("list_add")}</button>
+      </div>
+    </div>
+    <p className="detail">{t(row.id === "ollama" ? "provider_models_ollama_hint" : "provider_models_cli_hint")}</p>
     {!reviewing ? <><button type="submit" disabled={busy}>{t("setting_review")}</button><button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button></>
       : <div className="module-confirm" role="alertdialog" aria-label={t("provider_save_named", { name: row.name })}>
         <p>{t("provider_registration_notice")}</p>

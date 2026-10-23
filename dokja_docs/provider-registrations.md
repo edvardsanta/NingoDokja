@@ -84,8 +84,11 @@ writes without retry. An older controller without a revision remains read-only.
 ## Desktop editing
 
 After System → Inference providers → Inspect providers, select Edit for a
-registration. Change discovery eligibility or comma-separated declarations,
-review the effect and confirm Save registration. The shell requires recent real
+registration. Change discovery eligibility or choose model declarations from a
+dropdown, review the effect and confirm Save registration. Codex offers a small
+documented model ID list, Claude Code offers CLI aliases, and Ollama offers only
+models reported by the running service. Existing declarations remain visible for
+removal. These choices are not account or inference validation. The shell requires recent real
 input and projects only known fields. The draft retains the revision at the time
 Edit was selected; a stale write is not automatically retried or rebased. A
 successful save reloads the inventory. An error preserves the draft and requires

@@ -50,6 +50,7 @@ describe("the settings card", () => {
     show(transport);
     fireEvent.click(await screen.findByRole("button", { name: "Edit Meme delivery channels" }));
     const list = screen.getByLabelText("Meme delivery channels").closest(".list-editor");
+    if (!list) throw new Error("Meme delivery channels editor missing");
     fireEvent.click(screen.getByRole("button", { name: "Remove 101" }));
     fireEvent.change(screen.getByLabelText("Meme delivery channels"), { target: { value: "103" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
