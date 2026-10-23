@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { HealthCard } from "../../src/renderer/cards/health.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
+import { StatusProvider } from "../../src/renderer/status_context.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportErrorCode, TransportResult } from "../../src/shared/transport.js";
 import { ALL_UP, SERVICES, deferred, failure, scriptedTransport, statusReply } from "./support.js";
@@ -11,9 +11,9 @@ import { ALL_UP, SERVICES, deferred, failure, scriptedTransport, statusReply } f
 function Card({ transport, locale }: { transport: Transport; locale: Locale }) {
   return (
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <StatusProvider transport={transport}>
         <HealthCard transport={transport} />
-      </PulseProvider>
+      </StatusProvider>
     </I18nProvider>
   );
 }
@@ -145,7 +145,7 @@ describe("the health card", () => {
 
     await screen.findByText("1 no ar, 2 com problemas, 1 desligados, 1 sem verificação");
     screen.getByRole("heading", { name: "Serviços" });
-    screen.getByText("sistema");
+    screen.getByText("Sistema");
     within(row("scheduler")).getByText("parado");
     screen.getByRole("button", { name: "Atualizar" });
   });
