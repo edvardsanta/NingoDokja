@@ -38,18 +38,18 @@ func (f *fakeProfileStore) DeleteProfile(name string, force bool) error {
 func profileTUI(t *testing.T) (*Model, *fakeClient, *fakeProfileStore) {
 	t.Helper()
 	m, fake := panelModel(t)
-	fake.responses["ningo.status"]["services"].(map[string]any)["chat_ai"] = map[string]any{"status": "ok", "enabled": true}
+	fake.responses["ningo.status"]["services"].(map[string]any)["chat"] = map[string]any{"status": "ok", "enabled": true}
 	press(m, "r")
 	writer := &fakeProfileStore{}
 	m.SetProfileStore(writer)
 	return m, fake, writer
 }
 
-func TestPanelShowsTheActiveChatProfileNextToChatAI(t *testing.T) {
+func TestPanelDoesNotPresentLegacyProfileAsChatBinding(t *testing.T) {
 	m, _, _ := profileTUI(t)
 	view := m.View()
-	if !strings.Contains(view, "perfil hosted") || !strings.Contains(view, "…aaaa") {
-		t.Fatalf("the chat_ai row should name the active profile:\n%s", view)
+	if strings.Contains(view, "perfil hosted") || strings.Contains(view, "…aaaa") {
+		t.Fatalf("the chat row must not claim the legacy profile is its binding:\n%s", view)
 	}
 	if strings.Contains(view, "SUPERSECRET") {
 		t.Fatal("no token may appear in the panel")
@@ -170,7 +170,7 @@ func TestDeletingAProfileAsksFirstAndWarnsWhenItIsTheActiveOne(t *testing.T) {
 
 	press(m, "p", "d") // the cursor starts on the active profile (hosted)
 	view := m.View()
-	if !strings.Contains(view, "Apagar o perfil hosted") || !strings.Contains(view, "ATIVO") || strings.Contains(view, "posta no Discord") {
+	if !strings.Contains(view, "Apagar o perfil hosted") || !strings.Contains(view, "perfil antigo ativo") || strings.Contains(view, "posta no Discord") {
 		t.Fatalf("unexpected confirmation:\n%s", view)
 	}
 	if len(writer.deleted) != 0 {

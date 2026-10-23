@@ -38,6 +38,6 @@ describe("loadSession", () => {
 
     const status = await session.transport.request("ningo.status", {});
     expect(status.ok).toBe(true);
-    expect(JSON.stringify(status)).toContain("chat_ai");
+    expect(JSON.stringify(status)).toContain("chat");
   });
 });

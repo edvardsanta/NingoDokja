@@ -36,8 +36,8 @@ func main() {
 		logger.Error("controls state", errors.New(note))
 	}
 
-	// The shared database (chat provider profiles). Optional: without it the chat service
-	// keeps using its environment settings.
+	// Archived profiles remain readable for compatibility; live chat selection
+	// belongs to the host runtime provider configuration.
 	var profiles handlers.ChatProfiles
 	if path := os.Getenv("DOKJA_DB_FILE"); path != "" {
 		db, err := store.Open(path)
@@ -121,7 +121,7 @@ func main() {
 	service := core.DefaultService(
 		communicationsHandler,
 		handlers.NewSystemDomainHandler(
-			clients.NewChatAIServiceClient(""),
+			clients.NewChatProviderClient(""),
 			memeClient,
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
@@ -137,7 +137,7 @@ func main() {
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatAIServiceClient("")).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

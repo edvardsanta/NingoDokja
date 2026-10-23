@@ -32,7 +32,7 @@ changes are never retried automatically. Adding, indexing and deleting refresh t
 document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link.
 
 System is also where things are switched on and off. Each service the orchestrator can switch
-(`feeds`, `chat_ai`, `knowledge`, `memory`, `scheduler`; legacy mode also lists `meme` and `book`) has a switch, and each scheduled job has a
+(`feeds`, `chat`, `knowledge`, `memory`, `scheduler`; legacy mode also lists `meme` and `book`) has a switch, and each scheduled job has a
 switch and an interval (minutes or hours, between one minute and thirty days; "Back to default" drops a
 custom one). Switching `scheduler` off pauses every job. A switch needs a real click or key press just
 before it, like any change, and asks for no window, because the operator can switch it back at once. The
@@ -315,7 +315,7 @@ required dependencies, waits for application readiness, and reports progress or
 an actionable failure. **Stop** retains data and shared dependencies. Closing
 desktop leaves accepted operations and containers running.
 
-The initial inventory is orchestrator, Memory, Knowledge, Meme, Book, Chat AI,
+The initial inventory is orchestrator, Memory, Knowledge, Meme, Book, chat inference,
 Feeds, Voice, Communications, WhatsApp, Discord and the scheduler in `docker-compose.lite.yml`. Memory/Knowledge also need local
 embeddings and successful model initialization. Discord and the scheduler answer or post once running, so their
 Start first shows, inside the row, what they will do with the switches and jobs already saved, and asks. WhatsApp
@@ -372,3 +372,8 @@ discovery eligibility and up to 16 unverified model declarations. The form keeps
 its original revision; concurrent edits require reload and explicit retry. Older
 controllers without a configuration revision remain read-only. Changes do not
 select a capability model or alter the fixed embedding profile.
+
+Chat requires an explicit enabled provider and declared model. Select it in Desktop
+System → Inference providers → Chat provider and model, or run
+`dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
+shows a setup error. Archived profile editing no longer selects live inference.

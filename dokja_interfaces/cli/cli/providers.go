@@ -82,6 +82,6 @@ func (a *App) newProvidersCommand(ctx context.Context) *cobra.Command {
 		return nil
 	}}
 	cmd.PersistentFlags().StringVar(&a.runtimeRoot, "runtime-root", "", "Checkout that holds docker-compose.lite.yml")
-	cmd.AddCommand(a.newProviderConfigurationCommand(ctx))
+	cmd.AddCommand(a.newProviderConfigurationCommand(ctx), a.newChatBindingCommand(ctx))
 	return cmd
 }

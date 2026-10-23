@@ -14,7 +14,7 @@ import (
 // KnownServices are the only services that can be switched off. Anything else is
 // rejected, so an unauthenticated caller cannot invent keys.
 // "scheduler" is special: switching it off pauses every scheduled run at once.
-var KnownServices = []string{"meme", "chat_ai", "book", "knowledge", "memory", "feeds", "scheduler"}
+var KnownServices = []string{"meme", "chat", "book", "knowledge", "memory", "feeds", "scheduler"}
 
 // KnownInterfaces are the interfaces people talk to Ningo through. They are switched like
 // services, but are shown in their own catalog, including before setup. Off means it neither answers nor receives deliveries, and says nothing about
@@ -59,7 +59,7 @@ func ServiceForEvent(eventType string) string {
 	case strings.HasPrefix(eventType, "digest."):
 		return "feeds"
 	case strings.HasPrefix(eventType, "message."):
-		return "chat_ai"
+		return "chat"
 	}
 	return ""
 }
@@ -147,6 +147,10 @@ func NewControls(path string) (*Controls, error) {
 	}
 	if loaded.Services != nil {
 		c.state.Services = loaded.Services
+		if loaded.Services["chat_ai"] {
+			c.state.Services["chat"] = true
+		}
+		delete(c.state.Services, "chat_ai")
 	}
 	if loaded.Jobs != nil {
 		c.state.Jobs = loaded.Jobs

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type ChatAIHealthChecker interface {
+type ChatProviderHealthChecker interface {
 	Health(ctx context.Context) error
 }
 
@@ -59,7 +59,7 @@ type MemeAttachmentFetcher interface {
 
 type SystemDomainHandler struct {
 	contentPlugins   bool
-	chatAI           ChatAIHealthChecker
+	chatProvider     ChatProviderHealthChecker
 	memeStatus       MemeStatusReader
 	memeFetch        MemeFetcher
 	memeHashtags     MemeHashtagSuggester
@@ -81,14 +81,14 @@ type SystemDomainHandler struct {
 }
 
 func NewSystemDomainHandler(
-	chatAI ChatAIHealthChecker,
+	chatProvider ChatProviderHealthChecker,
 	memeStatus MemeStatusReader,
 	memeFetch MemeFetcher,
 	discord DiscordMessageDeliverer,
 	deliveryChannels string,
 ) *SystemDomainHandler {
 	return &SystemDomainHandler{
-		chatAI:           chatAI,
+		chatProvider:     chatProvider,
 		memeStatus:       memeStatus,
 		memeFetch:        memeFetch,
 		discord:          discord,
@@ -225,15 +225,15 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 	overallStatus := "ok"
 
 	// A switched-off service is not probed and never counts as degraded.
-	if h.chatAI != nil && h.serviceEnabled("chat_ai") {
-		if err := h.chatAI.Health(ctx); err != nil {
+	if h.chatProvider != nil && h.serviceEnabled("chat") {
+		if err := h.chatProvider.Health(ctx); err != nil {
 			overallStatus = "degraded"
-			services["chat_ai"] = map[string]any{
+			services["chat"] = map[string]any{
 				"status": "error",
 				"error":  err.Error(),
 			}
 		} else {
-			services["chat_ai"] = map[string]any{
+			services["chat"] = map[string]any{
 				"status": "ok",
 			}
 		}

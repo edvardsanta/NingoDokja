@@ -1,4 +1,4 @@
-import { runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
+import { runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryResolvePayload, memoryResolution } from "./memory_experiences.js";
@@ -521,6 +521,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "message.created": { payload: chatPayload, project: chatReply },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },
+  "runtime.chat": {payload:noPayload,project:(result)=>inDomain(result,"runtime",runtimeChat)},
+  "runtime.chat.configure": {payload:runtimeChatConfigure,project:(result)=>inDomain(result,"runtime",runtimeChat)},
   "runtime.providers": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeProviders) },
   "runtime.settings": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSettings) },
   "runtime.settings.set": { payload: runtimeSettingsSet, project: (result) => inDomain(result,"runtime",runtimeSettings) },

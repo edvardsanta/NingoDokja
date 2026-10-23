@@ -128,3 +128,14 @@ func (d *DB) InitializeProviderConfiguration(values map[string]string) (Configur
 func (d *DB) UpdateProviderConfiguration(revision uint64, changes map[string]string) (Configuration, error) {
 	return d.updateConfiguration(providerConfigurationKey, revision, changes)
 }
+
+// Chat binding is independent of operational settings and discovery registrations.
+func (d *DB) ChatConfiguration() (Configuration, bool, error) {
+	return d.configuration("runtime.chat.v1")
+}
+func (d *DB) InitializeChatConfiguration(v map[string]string) (Configuration, error) {
+	return d.initializeConfiguration("runtime.chat.v1", v)
+}
+func (d *DB) UpdateChatConfiguration(rev uint64, v map[string]string) (Configuration, error) {
+	return d.updateConfiguration("runtime.chat.v1", rev, v)
+}

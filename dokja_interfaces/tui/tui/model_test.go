@@ -62,7 +62,7 @@ func newFake() *fakeClient {
 			"ningo.status": {
 				"services": map[string]any{
 					"meme":      map[string]any{"status": "ok", "enabled": true},
-					"chat_ai":   map[string]any{"status": "error", "enabled": true, "error": "connection refused"},
+					"chat":      map[string]any{"status": "error", "enabled": true, "error": "connection refused"},
 					"book":      map[string]any{"status": "disabled", "enabled": false},
 					"scheduler": map[string]any{"status": "ok", "enabled": true},
 				},
@@ -170,7 +170,7 @@ func TestPanelLoadsStatusAndMarksTheSafeOnlyChannel(t *testing.T) {
 	m, _ := started(t)
 
 	view := m.View()
-	for _, want := range []string{"42 na fila", "394 já enviados", "chat_ai", "hook-chan", "só seguro"} {
+	for _, want := range []string{"42 na fila", "394 já enviados", "chat", "hook-chan", "só seguro"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("panel is missing %q:\n%s", want, view)
 		}

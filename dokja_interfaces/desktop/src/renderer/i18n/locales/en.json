@@ -409,5 +409,9 @@
   "provider_save_registration": "Save registration",
   "provider_models_hint": "Up to 16 comma-separated model names; leave empty to clear.",
   "provider_edit_named": "Edit {name} registration",
-  "provider_save_named": "Save {name} registration"
+  "provider_save_named": "Save {name} registration",
+  "chat_provider_title": "Chat provider and model",
+  "chat_provider_hint": "Declare a model above, then select it for chat. Selection does not test inference.",
+  "chat_provider_missing": "Select a provider and model",
+  "chat_provider_save": "Save chat selection"
 }

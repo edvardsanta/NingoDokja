@@ -5,7 +5,7 @@ import type { CardState } from "./use_card.js";
 
 // The services the TUI lists, in its order. Any other service the orchestrator reports comes after
 // them, by name, so a service added later still shows up.
-export const SERVICE_ORDER = ["meme", "chat_ai", "book", "knowledge", "memory", "scheduler"];
+export const SERVICE_ORDER = ["meme", "chat", "book", "knowledge", "memory", "scheduler"];
 
 export type Tone = "ok" | "problem" | "off" | "unchecked" | "other";
 

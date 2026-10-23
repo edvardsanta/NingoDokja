@@ -6,7 +6,7 @@ order, state transitions, explicit root selection and shared dependency ownershi
 It calls only an injected stateless backend; it contains no process execution,
 filesystem, HTTP or container integration.
 
-Selectable modules: orchestrator, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice and
+Selectable modules: orchestrator, Memory, Knowledge, Meme, Book, Feeds, Voice and
 WhatsApp. Memory and Knowledge require Ollama plus successful embedding initialization;
 application modules require the main orchestrator. Only an explicit WhatsApp selection starts its gateway. No selection starts Discord
 or the scheduler. Their running containers, and running CLI/TUI instances,

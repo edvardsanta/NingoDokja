@@ -93,7 +93,7 @@ func TestStatusKeepsAServiceThatCannotEmbedOkWithANote(t *testing.T) {
 		t.Fatalf("unexpected memory entry %#v", memory)
 	}
 	if result["status"] != "degraded" {
-		// chat_ai in controlledHandler always fails; the embedder notes alone must not add to it.
+		// chat in controlledHandler always fails; the embedder notes alone must not add to it.
 		t.Fatalf("unexpected platform status %v", result["status"])
 	}
 }
@@ -110,7 +110,7 @@ func TestStatusDoesNotProbeASwitchedOffService(t *testing.T) {
 	if err := controls.SetService("book", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := controls.SetService("chat_ai", false); err != nil {
+	if err := controls.SetService("chat", false); err != nil {
 		t.Fatal(err)
 	}
 

@@ -147,7 +147,7 @@ func TestHTTPProbeDoesNotFollowRedirects(t *testing.T) {
 	defer server.Close()
 	u, _ := url.Parse(server.URL)
 	port, _ := strconv.Atoi(u.Port())
-	if err := probe(context.Background(), domain.Module{Name: "chat_ai", Port: port}); err == nil {
+	if err := probe(context.Background(), domain.Module{Name: "voice", Port: port}); err == nil {
 		t.Fatal("redirect must not count as ready")
 	}
 }

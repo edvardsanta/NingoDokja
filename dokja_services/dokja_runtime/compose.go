@@ -306,7 +306,7 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 }
 
 func probe(parent context.Context, m domain.Module) error {
-	if m.Name == "chat_ai" || m.Name == "voice" {
+	if m.Name == "voice" {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
 		defer cancel()
 		endpoint := url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(m.Port), Path: "/health"}

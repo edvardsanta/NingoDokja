@@ -1,12 +1,18 @@
-try:
-    from bootstrap import ensure_repo_root
-except ImportError:  # pragma: no cover
-    from dokja_lab.bootstrap import ensure_repo_root  # type: ignore[no-redef]
+"""Compatibility wrapper around an injected chat provider."""
 
-ensure_repo_root()
+from __future__ import annotations
 
-from dokja_services.dokja_chat_ai import OpenAIChatService
+from typing import Any
 
 
-class ChatAgent(OpenAIChatService):
-    pass
+class ChatAgent:
+    """Forward messages to an explicitly supplied provider adapter."""
+
+    def __init__(self, provider: Any):
+        self.provider = provider
+
+    def send_message(self, message: str, temperature: float = 0) -> Any:
+        return self.provider.send_message(message, temperature=temperature)
+
+    def send_messages(self, messages: list[dict[str, str]], temperature: float = 0) -> Any:
+        return self.provider.send_messages(messages, temperature=temperature)

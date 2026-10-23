@@ -135,3 +135,16 @@ test("provider configuration requires presence, validates declarations and drops
  assert.equal(runtimeProviders({providers:[]}).configurationRevision,0);
  assert.throws(()=>runtimeProviders({configuration_revision:1,providers:[{id:"codex",state:"installed"}]}));
 });
+
+test("chat selection requires recent input, strips extras and rejects incomplete bindings",async()=>{
+ const calls:unknown[]=[];
+ const binding={configuration_revision:4,provider:"codex",model:"fixture/model"};
+ const client={async request(type:string,payload:Record<string,unknown>){calls.push({type,payload});return {status:"ok",result:wrap({...binding,configuration_revision:5})};}};
+ const limits={defaultTimeoutMs:15000,maxTimeoutMs:120000};
+ assert.equal((await handleRequest({type:"runtime.chat.configure",payload:binding},client,limits)).ok,false);
+ assert.equal(calls.length,0);
+ assert.equal((await handleRequest({type:"runtime.chat.configure",payload:{...binding,command:"untrusted",path:"private"}},client,limits,undefined,{recent:()=>true})).ok,true);
+ assert.deepEqual(calls,[{type:"runtime.chat.configure",payload:binding}]);
+ for(const payload of [{...binding,provider:""},{...binding,model:""},{...binding,model:"--tools"},{...binding,configuration_revision:0}])assert.equal(ACTIONS["runtime.chat.configure"].payload(payload),undefined);
+ assert.deepEqual(ACTIONS["runtime.chat"].project(wrap({configuration_revision:1,provider:"",model:"",secret:"drop"})),{configurationRevision:1,provider:"",model:""});
+});

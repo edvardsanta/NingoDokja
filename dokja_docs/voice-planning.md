@@ -39,7 +39,7 @@ This is the smallest step that:
 
 Recommended flow for voice output:
 
-`Discord -> Orchestrator -> Chat Domain -> Chat AI -> Voice Service -> Discord Voice`
+`Discord -> Orchestrator -> Chat Domain -> chat inference -> Voice Service -> Discord Voice`
 
 Important rules:
 
@@ -156,7 +156,7 @@ Main goals:
 
 Suggested flow:
 
-`Discord Voice Input -> STT -> Orchestrator -> Chat Domain -> Chat AI -> TTS -> Discord Voice`
+`Discord Voice Input -> STT -> Orchestrator -> Chat Domain -> chat inference -> TTS -> Discord Voice`
 
 Important note:
 

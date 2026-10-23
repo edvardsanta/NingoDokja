@@ -115,3 +115,10 @@ suite, the same Digest timeout (23 passed, one failed). No native registration
 scenario was added. These baseline gaps remain separate follow-up work; they are
 not counted as passing. Provider authentication/inference and operator data were
 not exercised.
+
+## Chat consumer migration
+
+The subsequent chat migration now uses an explicit `runtime.chat.v1` binding and
+`runtime.chat` / `runtime.chat.configure` actions. Enabled declarations are validated
+on selection and every generation call. Registration alone still does not select a
+model or prove inference. See [rollout and compatibility](production-runbook.md#chat-provider-migration).

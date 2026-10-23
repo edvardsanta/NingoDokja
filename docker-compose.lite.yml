@@ -15,7 +15,7 @@ services:
       VA_RESPONSE_MODE: debug
       MEME_SERVICE_ENDPOINT: ${MEME_SERVICE_ENDPOINT:-tcp://dokja-meme:5557}
       BOOK_SERVICE_ENDPOINT: http://dokja-book:8083
-      CHAT_AI_SERVICE_ENDPOINT: http://dokja-chat-ai:8080
+      DOKJA_INFERENCE_SOCKET: /run/dokja-inference/chat.sock
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
@@ -38,14 +38,13 @@ services:
       DOKJA_DB_FILE: /workspace/.dokja/dokja.db
       GOCACHE: /tmp/go-build
     volumes:
+      - ./.dokja/inference:/run/dokja-inference:ro
       - ./:/workspace
     ports:
       - "5555:5555"
       - "5558:5558"
       - "8091:8091"
       - "40000:40000"
-    depends_on:
-      - dokja-chat-ai
     networks:
       - dokja-net
 
@@ -237,26 +236,6 @@ services:
       dokja-ollama:
         condition: service_healthy
     restart: "no"
-    networks:
-      - dokja-net
-
-  dokja-chat-ai:
-    build:
-      context: .
-      dockerfile: dokja_services/dokja_chat_ai/Dockerfile.dev
-    working_dir: /workspace
-    command: python dokja_services/dokja_chat_ai/main.py
-    environment:
-      CHAT_AI_SERVICE_HOST: 0.0.0.0
-      CHAT_AI_SERVICE_PORT: 8080
-      CHAT_AI_API_KEY: ${CHAT_AI_API_KEY}
-      CHAT_AI_BASE_URL: ${CHAT_AI_BASE_URL}
-      CHAT_AI_MODEL: ${CHAT_AI_MODEL}
-      DOKJA_DB_FILE: /workspace/.dokja/dokja.db
-    volumes:
-      - ./:/workspace
-    ports:
-      - "8080:8080"
     networks:
       - dokja-net
 

@@ -57,14 +57,14 @@ a cognitive macro-component.
 | Semantic knowledge | `dokja_domain/dokja_knowledge`; consuming workflows decide when to use it | `dokja_services/dokja_knowledge` | Chat retrieves context; hashtag workflow ingests explicit labels and searches them; Knowledge commands manage documents | General facts, models and methods with provenance; current document retrieval is the starting mechanism |
 | Experience | `dokja_domain/dokja_memory` currently interprets episodes and outcomes | `dokja_services/dokja_memory` | Hashtag experience records suggestions and resolves explicit feedback; Memory commands inspect experiences | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; current episodic storage does not implement the complete target |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
-| Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_chat_ai` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
+| Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_runtime/chat.go` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
 | Media perception and meme pool | `dokja_domain/dokja_meme`; orchestration handlers currently also enforce delivery decisions | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | A workflow, not a concept (ADR 0010, proposed): scrapers, OCR and attachments move to Knowledge intake (Feeds plugins) with the pool as an intake cache, screening and the relevance threshold to Rules, sent receipts to Memory; meme events kept as a facade |
 | Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | Feeds `document.process.v1` compatibility plugin; legacy HTTP transport opt-in | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
 | Communications and delivery | Communications domain owns read eligibility; System handler currently owns much sending/linking behavior | Communications HTTP service; Discord and WhatsApp interface clients | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and action adapters behind explicit eligibility and delivery policy |
 | Voice/audio | Provider selection currently in Voice service; no Voice domain binding found in inspected orchestrator entry point | `dokja_services/dokja_voice` | Service exposes synthesis, transcription, wakeword, and streaming APIs; full runtime consumer wiring is not established by this review | Audio perception/output providers, pending orchestration integration review |
 | Scheduling | Orchestrator controls decide whether a scheduled operation runs | `dokja_services/dokja_scheduler` emits events | Meme refresh and dispatch schedules | Trigger acquisition; workflow execution remains orchestrated |
 | Working context/coordination | Orchestrator core; chat lifecycle is currently in handlers | Router, context builder, workflow engine, dispatcher | Every registered route; chat sessions are separate volatile state | Bounded task workspace with domain decisions and explicit transitions |
-| Administrative configuration | Controls/System handler and shared profile store | `dokja_store`; Chat AI reads selected provider profiles | CLI/TUI profile administration; orchestrator lists/selects profiles | Configuration with deliberate local credential-management boundary |
+| Administrative configuration | Controls/System handler and shared profile store | `dokja_store`; host runtime validates explicit provider/model bindings | CLI/TUI profile administration; orchestrator lists/selects profiles | Configuration with deliberate local credential-management boundary |
 
 ### Source anchors
 
@@ -85,7 +85,7 @@ a cognitive macro-component.
   [session state](../dokja_orch/internal/handlers/chat_session_manager.go),
   [retrieval integration](../dokja_orch/internal/handlers/chat_knowledge.go),
   [Python domain](../dokja_domain/dokja_chat/domain.py),
-  [Chat AI HTTP contract](../dokja_services/dokja_chat_ai/server.py).
+  [Private inference contract](../dokja_orch/runtime/chat.go).
 - Book: [domain](../dokja_domain/dokja_book/domain.go),
   [HTTP contract](../dokja_services/dokja_book/server.py),
   [summary implementation](../dokja_services/dokja_book/book_summary_service.py).
@@ -103,7 +103,7 @@ a cognitive macro-component.
 | Feeds (reading host) | ZeroMQ `feeds.status` / `feeds.items` (cached), `feeds.extract` (on demand, step `07`), `feeds.classify` (on demand, step `09`), `feeds.refresh` and bounded `feeds.invoke` content providers; status/result response | Last successful result per collector and last result per extractor in process memory; readings keep nothing | Strict `plugin.json`, legacy or `plugin_api: 1`; collectors print items, `document.extract.v1` extractors read a JSON request on stdin and print Knowledge's `Extracted` contract; a `document.classify.v1` classifier reads documents and prints one proposal per document |
 | Knowledge | ZeroMQ `knowledge.*`; typed-by-operation payload represented as dictionaries/maps | Own SQLite documents, schema-2 structured metadata, chunks, keyword index, and model-tagged embeddings | Python `register(registry)` adds extractors/fetchers; plugins execute inside the host |
 | Memory | ZeroMQ service requests for record, resolve, recall, listing and status; prediction/stats handled by the domain | Own SQLite experiences, original probabilities, outcomes, and embeddings | Injected embedder; no general runtime predictor plugin protocol in inspected code |
-| Chat AI | HTTP `POST /chat`, `GET /health` | Provider/client cache; reads selected profile from shared SQLite; conversation history supplied by caller | Provider abstraction/configuration; not the Feeds manifest protocol |
+| Chat inference | Private Unix socket `POST /chat`, `GET /health`; bootstrap `runtime.chat`, `runtime.chat.configure` | Explicit registered provider/model in host SQLite; bounded single inference; history supplied by caller | Host adapters, no implicit fallback or generation credential env |
 | Book | `book.*` facade over Feeds `document.process.v1`; legacy HTTP classify/summarize/health endpoints remain opt-in | Per-request processing; no durable book repository established in inspected request path | Classifier/overview/extraction implementations; preserve request fields and response envelopes |
 | Meme | `meme.*` facade over Feeds collection/library/perception plugins; legacy ZeroMQ transport remains opt-in | Legacy pool/sent state in SQLite | Existing Lab scraper/provider mechanisms; extraction boundary is still coupled to Lab |
 | Communications | Authenticated HTTP dispatch for reads; interface clients for delivery/linking/history | Read service is an adapter; platform/interface state varies | Platform-specific adapters; preserve configured-channel and conversation-alias eligibility |
@@ -127,7 +127,7 @@ Relevant implementation contracts:
 `message.* -> conversation route -> moderation:screen-event -> chat action`
 
 The chat handler opens/touches a session, retrieves optional Knowledge context,
-calls Chat AI, records reply history in memory, and composes the response. The
+calls chat inference, records reply history in memory, and composes the response. The
 generic dispatcher does not currently interpret a successful moderation result
 as a stop instruction. This is a workflow transition gap, not evidence that every
 deployment currently has an active blocking policy.

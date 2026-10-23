@@ -511,3 +511,27 @@ func TestContentPluginsUseFeedsGateWithoutResumingDisabledWorkflows(t *testing.T
 		t.Fatal("individual workflow state was lost")
 	}
 }
+
+func TestRetiredChatSwitchPreservesDisabledIntent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, []byte(`{"services":{"chat_ai":true}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	controls, err := NewControls(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controls.ServiceEnabled("chat") {
+		t.Fatal("disabled chat became enabled")
+	}
+	if ServiceForEvent("message.created") != "chat" {
+		t.Fatal("chat still gates on a retired service")
+	}
+	if err := controls.SetService("chat", true); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := NewControls(path)
+	if err != nil || !loaded.ServiceEnabled("chat") {
+		t.Fatal(err)
+	}
+}

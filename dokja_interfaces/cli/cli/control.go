@@ -25,7 +25,7 @@ var JobNames = []string{
 // ServiceNames are the services and interfaces that can be switched off, as the orchestrator
 // knows them. "scheduler" pauses every scheduled run at once (the container itself is not
 // touched); an interface switched off neither answers nor receives deliveries.
-var ServiceNames = []string{"meme", "chat_ai", "book", "knowledge", "memory", "feeds", "scheduler", "discord", "whatsapp"}
+var ServiceNames = []string{"meme", "chat", "book", "knowledge", "memory", "feeds", "scheduler", "discord", "whatsapp"}
 
 // JobEvent is the event that runs a job right now. Manual runs carry no schedule
 // stamp, so a paused job does not block them; a disabled service still does.

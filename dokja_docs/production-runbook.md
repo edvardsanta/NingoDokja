@@ -13,7 +13,6 @@ Production stack:
 
 - `dokja-orchestrator`
 - `dokja-meme`
-- `dokja-chat-ai`
 - `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
 - `dokja-feeds` (follows the sources the owner chooses, as plugins kept outside the repository)
@@ -24,8 +23,6 @@ Production stack:
 
 Before starting production, replace placeholder values in [.env.prod](../.env.prod):
 
-- `CHAT_AI_API_KEY`
-- `CHAT_AI_BASE_URL`
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
 
@@ -74,7 +71,6 @@ Watch logs:
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f dokja-orchestrator
 docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f dokja-discord
-docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f dokja-chat-ai
 docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f dokja-scheduler
 docker compose -f docker-compose.prod.yml --env-file .env.prod logs -f dokja-meme
 ```
@@ -83,7 +79,7 @@ Things to confirm:
 
 - orchestrator starts both ZeroMQ and HTTP ingress
 - Discord bot logs in successfully
-- chat AI `/health` responds internally
+- the host runtime is running and the explicitly selected chat provider/model answers a manual conversation
 - `dokja-cli status` (or the TUI panel) shows `ok` for every service you deployed
 - meme service starts and opens SQLite
 - scheduler emits bootstrap refresh and scheduled dispatch
@@ -114,7 +110,7 @@ The orchestrator owns the delivery workflow.
 
 ## Operator State and Shared Database
 
-The orchestrator, scheduler and chat service share the `dokja-data` volume, mounted at `/data`:
+The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`:
 
 - `/data/dokja_state.json` (`VA_STATE_FILE` in the orchestrator, `DOKJA_STATE_FILE` in the scheduler):
   which services and scheduler jobs an operator switched off and any job interval overrides. The
@@ -128,14 +124,13 @@ Startup still emits every scheduled job once, but the orchestrator skips the one
 restart never posts something that was switched off. `dokja-cli services list` and `dokja-cli jobs list` show
 the current state.
 
-The status probe covers `chat_ai`, `meme`, `book`, `knowledge` and `memory`. A stack that does not run one of
+The status probe covers `chat`, `meme`, `book`, `knowledge` and `memory`. A stack that does not run one of
 them (`docker-compose.prod.yml` has no book service) shows it as `error` and the platform as `degraded` until you switch it off (`dokja-cli services disable <name>` or
 `space` in the TUI); a switched-off service is not probed.
 
 Chat profiles are created and removed on the machine that holds the database (`dokja-cli chat profile add`
 with `DOKJA_DB_FILE` pointing at it, or `p` in the TUI panel), never through the orchestrator. The
-orchestrator can only list them (masked) and select one, and the chat service picks the selection up on its
-next request.
+orchestrator can only list them (masked) and select one, these archived profiles no longer control inference. Use the explicit provider/model binding below.
 
 ## Research Knowledge Base
 
@@ -453,15 +448,13 @@ Check:
 - `DISCORD_ALLOWED_CHANNELS`
 - `DISCORD_SCHEDULED_MEME_CHANNEL_ID`
 
-### Chat AI issues
+### Chat inference issues
 
-Check:
-
-- `CHAT_AI_API_KEY`
-- `CHAT_AI_BASE_URL`
-- `CHAT_AI_MODEL`
-- the selected chat provider profile (see "Operator state and shared database"); it wins over the
-  `CHAT_AI_*` variables, and `GET /health` on the chat service reports which one is in use
+Check that the host runtime controller is running, the selected registration is enabled and
+its model remains declared. Use System → Inference providers → Chat provider and model,
+or `dokja-cli providers chat <provider> <model>`. A missing selection is a setup error;
+there is no environment credential fallback or automatic provider fallback.
+The chat health row checks configuration, not authentication, quota or live inference.
 
 ### Scheduled delivery issues
 
@@ -625,7 +618,7 @@ stateless Compose adapter. Normal feature requests still use the main
 orchestrator. Existing `services.set` controls only routing and remains unchanged;
 container startup does not silently enable a capability the owner disabled.
 
-The inventory covers the core, Memory, Knowledge, Meme, Book, Chat AI, Feeds, Voice,
+The inventory covers the core, Memory, Knowledge, Meme, Book, Feeds, Voice,
 Communications, WhatsApp, Discord and the scheduler. Communications only reads channels and history; it never sends. Embeddings/model initialization start only when required by Memory or
 Knowledge. Only an explicit WhatsApp selection starts its gateway. No module implicitly
 starts Discord or scheduled delivery: Discord (with Voice) and the scheduler start only when
@@ -762,3 +755,45 @@ rather than restoring enabled defaults. Older builds ignore the new key on
 rollback and resume their previous discovery behavior. See
 [provider registrations](provider-registrations.md) for contracts and remaining
 capability-binding work. No live operator configuration was changed in testing.
+
+## Chat provider migration
+
+The dedicated language-generation container and its environment-based configuration are removed.
+The conversational orchestrator sends bounded history to the host runtime's private inference
+socket; the Runtime domain validates the saved provider/model against enabled registrations,
+and infrastructure invokes only that adapter. No model is chosen from inventory automatically.
+
+1. Back up the shared settings database. Rebuild the host runtime controller and interfaces
+   using their existing build commands, and restart the controller as described above.
+2. Register an enabled adapter and declare a model in System → Inference providers, or
+   `dokja-cli providers configure <provider> --models=<model>`.
+3. Select the pair under Chat provider and model, or
+   `dokja-cli providers chat <provider> <model>`. Selection is stored in `runtime.chat.v1`
+   with a separate compare-and-swap revision. No database table/schema migration is required.
+4. Recreate the orchestrator from the updated Compose definition. Every stack mounts only
+   `./.dokja/inference` read-only at `/run/dokja-inference` and sets
+   `DOKJA_INFERENCE_SOCKET=/run/dokja-inference/chat.sock`. The controller creates the
+   directory/socket privately; the container user must have permission to connect.
+   The lifecycle control socket is never mounted. Native orchestrators may set the socket path
+   directly; provider/model selection always comes from the host database.
+5. Send a manual chat message and verify a reply. Disable the registration and verify that
+   chat refuses inference; re-enable and retry. Authentication/quota errors stay explicit.
+   History, reading reference and Knowledge citations continue through the same chat handler.
+
+CLI adapters use installed host executables and their existing authentication. Each call runs
+from an empty temporary directory with tools disabled, bounded input/output and a 90-second
+budget; cancellation kills the process group. The local-model adapter uses the selected lite
+stack and requires an already installed model. It does not start the model server or pull models.
+The socket exposes only generation and configuration health, never lifecycle or settings writes.
+
+Compatibility: the envelope and `message.*` actions are unchanged. The logical service switch
+is now `chat`; saved disabled state from the retired switch is retained on load. Old clients
+must be rebuilt to use the new status key. The obsolete standalone runtime module is removed.
+Archived profile rows/commands are preserved for operator-data compatibility but cannot choose
+live inference. Existing generation environment settings are ignored. Recreate containers to
+apply service removal and the socket mount; stop/remove any obsolete container during rollout.
+This development change does not perform a production deployment or live provider invocation.
+
+Rollback: restore the prior application/controller builds and Compose files. The separate chat
+binding key is ignored by older builds. Preserve the existing database and auth stores; do not
+restore a database backup over newer operator changes without reviewing them.

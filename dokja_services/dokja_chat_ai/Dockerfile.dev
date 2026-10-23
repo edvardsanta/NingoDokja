@@ -1,9 +1,0 @@
-FROM python:3.13-slim
-
-WORKDIR /workspace
-
-RUN pip install --no-cache-dir fastapi openai uvicorn
-
-EXPOSE 8080
-
-CMD ["python", "dokja_services/dokja_chat_ai/main.py"]

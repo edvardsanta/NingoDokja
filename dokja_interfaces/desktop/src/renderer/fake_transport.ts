@@ -28,7 +28,7 @@ const STATUS: StatusReply = {
   status: "degraded",
   services: {
     meme: { status: "ok", detail: "", enabled: true },
-    chat_ai: { status: "error", detail: "connection refused", enabled: true },
+    chat: { status: "error", detail: "connection refused", enabled: true },
     book: { status: "unchecked", detail: "", enabled: true },
     memory: { status: "ok", detail: "", enabled: true },
     scheduler: { status: "stopped", detail: "no announce for 12m (stopped?)", enabled: true },

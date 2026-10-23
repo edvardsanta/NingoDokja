@@ -113,7 +113,7 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 - The safe-only rule is enforced by the orchestrator, not the TUI: an image bound for a safe-only channel
   is screened server-side and skipped if flagged. Sending a picked meme from the queue also marks it as
   sent so the scheduler does not repeat it.
-- `chat_ai` shows `error` when that service is not running; the meme features do not depend on it.
+- `chat` shows `error` when that service is not running; the meme features do not depend on it.
 
 ## Experience memory
 
@@ -157,7 +157,7 @@ behalf, rather than the expected human feedback interface. See
 
 ## Chat profiles
 
-`p` on the Painel opens the chat provider profiles (the active one is also shown next to `chat_ai`). `enter`
+`p` on the Painel opens the chat provider profiles (the active one is also shown next to `chat`). `enter`
 selects one through the orchestrator (name only). `n` creates one and `d` deletes one, both written to the local
 database directly: the token is typed masked, is cleared from the form once saved, and is never shown, logged
 in the history or sent to the orchestrator. Without local access to the database (`--db` / `DOKJA_DB_FILE`) you
@@ -171,3 +171,8 @@ In the providers view, select a row with ↑/↓ and press `e`. Edit comma-separ
 model declarations; Ctrl+T toggles discovery eligibility. Enter reviews the
 registration, then confirm to save. Esc cancels. Stale revisions require reload
 and explicit retry; older controllers without a revision remain read-only.
+
+Chat requires an explicit enabled provider and declared model. Select it in Desktop
+System → Inference providers → Chat provider and model, or run
+`dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
+shows a setup error. Archived profile editing no longer selects live inference.

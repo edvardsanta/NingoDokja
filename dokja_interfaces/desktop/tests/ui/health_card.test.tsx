@@ -39,8 +39,8 @@ describe("the health card", () => {
     await screen.findByText("1 up, 2 with problems, 1 switched off, 1 not checked");
 
     expect(calls).toEqual([{ type: "ningo.status", payload: {}, options: { timeoutMs: 15_000 } }]);
-    within(row("chat_ai")).getByText("error");
-    within(row("chat_ai")).getByText("connection refused");
+    within(row("chat")).getByText("error");
+    within(row("chat")).getByText("connection refused");
     within(row("scheduler")).getByText("stopped");
     within(row("memory")).getByText("switched off");
     within(row("book")).getByText("not checked");
@@ -52,7 +52,7 @@ describe("the health card", () => {
     renderCard(transport);
     await screen.findByText("meme");
 
-    expect(names()).toEqual(["meme", "chat_ai", "book", "memory", "scheduler"]);
+    expect(names()).toEqual(["meme", "chat", "book", "memory", "scheduler"]);
   });
 
   it("draws one segment per service, coloured by its state", async () => {

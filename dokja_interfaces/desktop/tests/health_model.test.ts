@@ -31,14 +31,14 @@ test("services come in the TUI's order, then any other by name", () => {
     health?.rows.map((row) => row.name),
     ["meme", "knowledge", "scheduler", "alpha", "zeta"],
   );
-  assert.deepEqual(SERVICE_ORDER, ["meme", "chat_ai", "book", "knowledge", "memory", "scheduler"]);
+  assert.deepEqual(SERVICE_ORDER, ["meme", "chat", "book", "knowledge", "memory", "scheduler"]);
 });
 
 test("every status has a tone and the counts add up", () => {
   const health = parseHealth({
     services: {
       meme: entry("ok"),
-      chat_ai: entry("error", "refused"),
+      chat: entry("error", "refused"),
       book: entry("unchecked"),
       knowledge: entry("degraded"),
       memory: entry("disabled"),
@@ -51,8 +51,8 @@ test("every status has a tone and the counts add up", () => {
   assert.deepEqual(health.counts, { ok: 1, problem: 3, off: 1, unchecked: 1, other: 1 });
   assert.equal(health.rows.length, 7);
   assert.deepEqual(
-    health.rows.find((row) => row.name === "chat_ai"),
-    { name: "chat_ai", status: "error", detail: "refused", tone: "problem" },
+    health.rows.find((row) => row.name === "chat"),
+    { name: "chat", status: "error", detail: "refused", tone: "problem" },
   );
   // a status the screen does not know is kept as it came
   assert.equal(health.rows.find((row) => row.name === "extra")?.status, "something new");

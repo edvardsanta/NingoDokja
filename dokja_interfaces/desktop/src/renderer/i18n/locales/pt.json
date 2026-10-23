@@ -409,5 +409,9 @@
   "provider_save_registration": "Salvar cadastro",
   "provider_models_hint": "Até 16 nomes de modelos separados por vírgula; deixe vazio para limpar.",
   "provider_edit_named": "Editar cadastro de {name}",
-  "provider_save_named": "Salvar cadastro de {name}"
+  "provider_save_named": "Salvar cadastro de {name}",
+  "chat_provider_title": "Provedor e modelo do chat",
+  "chat_provider_hint": "Declare um modelo acima e selecione-o para conversar. A seleção não testa o provedor.",
+  "chat_provider_missing": "Selecione um provedor e modelo",
+  "chat_provider_save": "Salvar seleção do chat"
 }

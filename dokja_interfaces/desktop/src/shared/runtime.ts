@@ -1,5 +1,5 @@
 // Book and Meme are Feeds plugins, not standalone desktop runtime modules.
-export const RUNTIME_MODULES = ["orchestrator", "memory", "knowledge", "chat_ai", "feeds", "voice", "communications", "whatsapp", "discord", "scheduler"] as const;
+export const RUNTIME_MODULES = ["orchestrator", "memory", "knowledge", "feeds", "voice", "communications", "whatsapp", "discord", "scheduler"] as const;
 export type RuntimeSetting = { readOnly?: boolean; id: string; group: string; kind: string; options: string[]; value: string; affects: string[]; note: string; default: string };
 export type RuntimeSettings = { settings: RuntimeSetting[]; webhookChannels: string[]; busy: boolean; error: string };
 
@@ -18,3 +18,5 @@ export type ProvidersView = { configurationRevision?: number; providers: Provide
 
 export type ProviderRegistrationChange = { provider: string; configurationRevision: number; enabled: boolean; models: string[] };
 export type ProviderRegistrationSaved = { provider: string; configurationRevision: number };
+
+export type ChatBinding = { configurationRevision: number; provider: string; model: string };

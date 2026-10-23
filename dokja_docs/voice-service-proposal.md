@@ -54,7 +54,7 @@ Discord playback remains an interface concern.
 
 Recommended first flow:
 
-`Discord -> Orchestrator -> Chat Domain -> Chat AI -> Voice Service -> Discord Voice`
+`Discord -> Orchestrator -> Chat Domain -> chat inference -> Voice Service -> Discord Voice`
 
 For direct TTS commands:
 

@@ -352,9 +352,9 @@ func formatSystemReply(result map[string]any) string {
 	lines := []string{fmt.Sprintf("ningo status: %s", status)}
 	services, _ := result["services"].(map[string]any)
 
-	if chatAI, ok := services["chat_ai"].(map[string]any); ok {
-		line := fmt.Sprintf("chat ai: %s", strings.TrimSpace(stringValue(chatAI["status"])))
-		if err := strings.TrimSpace(stringValue(chatAI["error"])); err != "" {
+	if chatProvider, ok := services["chat"].(map[string]any); ok {
+		line := fmt.Sprintf("chat: %s", strings.TrimSpace(stringValue(chatProvider["status"])))
+		if err := strings.TrimSpace(stringValue(chatProvider["error"])); err != "" {
 			line = fmt.Sprintf("%s (%s)", line, err)
 		}
 		lines = append(lines, line)

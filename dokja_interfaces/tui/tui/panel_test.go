@@ -22,7 +22,7 @@ func TestPanelListsServicesAndJobsWithTheirState(t *testing.T) {
 	view := m.View()
 
 	for _, want := range []string{
-		"chat_ai", "connection refused", // a real error stays an error
+		"chat", "connection refused", // a real error stays an error
 		"desligado", // the switched-off book service
 		"meme.dispatch", "pausado", "a cada 2h0m0s (alterado)",
 		"a cada 45m0s", "rodou", "pulado",
