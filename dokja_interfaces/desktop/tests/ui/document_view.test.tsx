@@ -44,8 +44,9 @@ describe("a document opened from the research base", () => {
     screen.getByText("Rebuilt from the passages the Library stored: close to the original, not a faithful copy of it.");
     expect(current()).toEqual(["Title note:one"]);
     expect(calls.filter((call) => call.type === "knowledge.list").map((call) => call.payload)).toEqual([
-      { limit: 20, offset: 0 },
-      { limit: 1, offset: 1, include_text: true },
+      // the Library lists what came from outside, and a document is asked for among the same
+      { limit: 20, offset: 0, external: true },
+      { limit: 1, offset: 1, include_text: true, external: true },
     ]);
   });
 

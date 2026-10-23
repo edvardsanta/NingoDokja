@@ -68,7 +68,7 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
 // The base's own view, always the first tab.
 const BASE = "";
 const MAX_OPEN_DOCUMENTS = 8;
-type OpenDocument = { id: string; title: string; at: number };
+type OpenDocument = { id: string; title: string; at: number; external: boolean };
 
 // Lights the view while files are dragged over it and hands over the first file dropped. Entering and
 // leaving fire for every child crossed, so they are counted rather than trusted one by one. Only a
@@ -116,11 +116,11 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
   // back to its tab; the oldest goes first past the limit.
   const [documents, setDocuments] = useState<OpenDocument[]>([]);
   const [current, setCurrent] = useState(BASE);
-  const open = useCallback((document: KnowledgeDocument, at: number) => {
+  const open = useCallback((document: KnowledgeDocument, at: number, external: boolean) => {
     setDocuments((previous) =>
       previous.some((each) => each.id === document.id)
         ? previous
-        : [...previous, { id: document.id, title: document.title || document.id, at }].slice(-MAX_OPEN_DOCUMENTS),
+        : [...previous, { id: document.id, title: document.title || document.id, at, external }].slice(-MAX_OPEN_DOCUMENTS),
     );
     setCurrent(document.id);
   }, []);
@@ -188,7 +188,7 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
       </div>
       {documents.map((document) => (
         <div key={document.id} hidden={current !== document.id}>
-          <DocumentView transport={transport} id={document.id} at={document.at} />
+          <DocumentView transport={transport} id={document.id} at={document.at} external={document.external} />
         </div>
       ))}
     </div>

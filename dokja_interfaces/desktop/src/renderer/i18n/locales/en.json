@@ -157,6 +157,7 @@
   "add_ref_too_long": "The reference is longer than {max} characters.",
   "add_bad_id": "An id uses letters, digits and . _ : / # @ - (up to {max} characters).",
   "error_cancelled": "Cancelled.",
+  "documents_show_internal": "Show what Ningo keeps for himself",
   "documents_title": "Documents",
   "documents_total": "{count} documents in the Library.",
   "documents_empty": "No documents on this page.",

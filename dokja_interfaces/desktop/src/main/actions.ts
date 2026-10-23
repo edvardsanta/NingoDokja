@@ -449,6 +449,10 @@ function reindexResult(body: Record<string, unknown>): ReindexResult {
   };
 }
 
+// The kinds of documents Ningo writes for his own use, not what the owner brought in: a meme's
+// hashtag is one.
+const INTERNAL_KINDS = ["meme_hashtag"] as const;
+
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "communications.channels": {
     payload: noPayload,
@@ -629,6 +633,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
         limit,
         offset: clampInt(raw.offset, 0, 100_000, 0),
         ...(raw.include_text === true && limit === 1 ? { include_text: true } : {}),
+        // what came from outside only: the documents Ningo keeps for itself are left out
+        ...(raw.external === true ? { exclude_kinds: [...INTERNAL_KINDS] } : {}),
       };
     },
     project: (result) => inDomain(result, "knowledge", knowledgeDocuments),
