@@ -166,6 +166,9 @@ func (s *Service) ProcessWithResult(ctx context.Context, event Event) (ProcessRe
 	))
 
 	dispatchResult, err := s.dispatcher.Dispatch(ctx, event, workflow)
+	if errors.Is(err, ErrInboundDenied) {
+		return ProcessResult{Event: event, Workflow: route.Workflow, Domains: domainsToStrings(route.Domains), Result: map[string]any{"skipped": true, "silent": true}}, nil
+	}
 	s.recordRun(event, err)
 	if err != nil {
 		return ProcessResult{}, fmt.Errorf("dispatch workflow: %w", err)

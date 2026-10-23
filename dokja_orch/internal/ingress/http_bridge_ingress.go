@@ -1,6 +1,7 @@
 package ingress
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"os"
 	"read_books/internal/core"
@@ -16,6 +17,7 @@ const defaultHTTPBridgeEndpoint = ":8091"
 type HTTPBridgeIngress struct {
 	service  *core.Service
 	endpoint string
+	token    string
 	app      *fiber.App
 }
 
@@ -25,16 +27,22 @@ type BridgeRequest struct {
 	// what every existing client sends; only the values in bridgeInterfaces are accepted.
 	Interface string `json:"interface"`
 	Payload   struct {
-		Content    string `json:"content"`
-		Limit      *int   `json:"limit"`
-		MaxItems   *int   `json:"maxItemsPerScraper"`
-		UserID     string `json:"userId"`
-		ChannelID  string `json:"channelId"`
-		MessageID  string `json:"messageId"`
-		GuildID    string `json:"guildId"`
-		SessionKey string `json:"sessionKey"`
-		StartChat  bool   `json:"startSession"`
-		AccountID  string `json:"accountId"`
+		Content    string   `json:"content"`
+		Limit      *int     `json:"limit"`
+		MaxItems   *int     `json:"maxItemsPerScraper"`
+		UserID     string   `json:"userId"`
+		ChannelID  string   `json:"channelId"`
+		MessageID  string   `json:"messageId"`
+		GuildID    string   `json:"guildId"`
+		SessionKey string   `json:"sessionKey"`
+		StartChat  bool     `json:"startSession"`
+		AccountID  string   `json:"accountId"`
+		EntryKind  string   `json:"entryKind"`
+		Direct     *bool    `json:"isDirectMessage"`
+		Mentioned  *bool    `json:"mentionsBot"`
+		ChatKind   string   `json:"chatKind"`
+		SelfChat   *bool    `json:"isSelfChat"`
+		Numbers    []string `json:"senderNumbers"`
 	} `json:"payload"`
 }
 
@@ -48,6 +56,7 @@ func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIng
 	return &HTTPBridgeIngress{
 		service:  service,
 		endpoint: firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
+		token:    os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
 	}
 }
 
@@ -61,6 +70,9 @@ func (i *HTTPBridgeIngress) Start() error {
 	}
 	if i.service == nil {
 		return fmt.Errorf("orchestrator service is not configured")
+	}
+	if i.token == "" {
+		return fmt.Errorf("DOKJA_GATEWAY_INGRESS_TOKEN is required")
 	}
 
 	i.app = fiber.New()
@@ -105,6 +117,17 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 			Status: "error",
 			Error:  "event type is not allowed for this interface",
 		})
+	}
+	if i.token == "" {
+		return c.SendStatus(fiber.StatusServiceUnavailable)
+	}
+	authorization := c.Get("Authorization")
+	if !strings.HasPrefix(authorization, "Bearer ") {
+		return c.SendStatus(fiber.StatusUnauthorized)
+	}
+	provided := strings.TrimPrefix(authorization, "Bearer ")
+	if len(provided) != len(i.token) || subtle.ConstantTimeCompare([]byte(provided), []byte(i.token)) != 1 {
+		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
 	logger.Info(fmt.Sprintf(
@@ -211,13 +234,30 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 		eventType, payload = "message.created", map[string]any{"content": content}
 	}
 	context := map[string]any{
+		"gateway_inbound":   true,
 		"interface":         interfaceName,
+		"entry_kind":        strings.TrimSpace(request.Payload.EntryKind),
 		"message_id":        strings.TrimSpace(request.Payload.MessageID),
 		"guild_id":          strings.TrimSpace(request.Payload.GuildID),
 		"session_key":       strings.TrimSpace(request.Payload.SessionKey),
 		"force_new_session": request.Payload.StartChat,
 		"account_id":        strings.TrimSpace(request.Payload.AccountID),
 		"event_type":        strings.TrimSpace(request.EventType),
+	}
+	if request.Payload.Direct != nil {
+		context["is_direct_message"] = *request.Payload.Direct
+	}
+	if request.Payload.Mentioned != nil {
+		context["mentions_bot"] = *request.Payload.Mentioned
+	}
+	if request.Payload.SelfChat != nil {
+		context["is_self_chat"] = *request.Payload.SelfChat
+	}
+	if request.Payload.ChatKind != "" {
+		context["chat_kind"] = request.Payload.ChatKind
+	}
+	if request.Payload.Numbers != nil {
+		context["sender_numbers"] = request.Payload.Numbers
 	}
 	if eventType == "message.created" {
 		context["content"] = content

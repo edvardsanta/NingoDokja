@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	bookdomain "read_books/dokja_domain/dokja_book"
+	communications "read_books/dokja_domain/dokja_communications"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	memedomain "read_books/dokja_domain/dokja_meme"
 	store "read_books/dokja_store"
@@ -107,10 +108,23 @@ func main() {
 
 	// The conversations the owner named on the WhatsApp interface are listed and read next to the
 	// Discord channels, and only when the interface's address is set.
+	inboundPolicy, err := communications.ParseInboundPolicy(map[string]string{
+		"DISCORD_GUILD_ID":              os.Getenv("DISCORD_GUILD_ID"),
+		"DISCORD_ALLOWED_CHANNELS":      os.Getenv("DISCORD_ALLOWED_CHANNELS"),
+		"DISCORD_DM_POLICY":             os.Getenv("DISCORD_DM_POLICY"),
+		"DISCORD_REQUIRE_MENTION":       os.Getenv("DISCORD_REQUIRE_MENTION"),
+		"DOKJA_WHATSAPP_SELF_CHAT":      os.Getenv("DOKJA_WHATSAPP_SELF_CHAT"),
+		"DOKJA_WHATSAPP_ALLOW_FROM":     os.Getenv("DOKJA_WHATSAPP_ALLOW_FROM"),
+		"DOKJA_WHATSAPP_ALLOWED_GROUPS": os.Getenv("DOKJA_WHATSAPP_ALLOWED_GROUPS"),
+	})
+	if err != nil {
+		logger.Error("inbound communications policy", err)
+		os.Exit(1)
+	}
 	communicationsHandler := handlers.NewCommunicationsDomainHandler(
 		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
 		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-	)
+	).WithInboundPolicy(inboundPolicy)
 	// A nil client must stay a nil interface, so "not configured" is still seen as such.
 	var whatsappSender handlers.WhatsAppSender
 	if whatsappConversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); whatsappConversations != nil {

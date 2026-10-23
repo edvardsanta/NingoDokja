@@ -1,4 +1,4 @@
-import { numberAllowed, type WhatsAppConfig } from "../config.js";
+import type { WhatsAppConfig } from "../config.js";
 import { buildWhatsAppBridgeRequest, dispatchToOrchestrator } from "../transport/bridge.js";
 import { RecentKeys } from "./recent_keys.js";
 
@@ -62,27 +62,20 @@ export function createWhatsAppMessageHandler(
   const reportedGroups = new Set<string>();
 
   return async (context) => {
-    const ignored = ignoreReason(context, config, now());
+    const ignored = ignoreReason(context, now());
     if (ignored) {
       // Ignored messages are most of what a personal account receives, so they are not logged
       // one by one, and a phone number never reaches the log.
-      if (ignored === "policy" && context.chatKind === "group" && !reportedGroups.has(context.chatId)) {
-        reportedGroups.add(context.chatId);
-        deps.log?.(JSON.stringify({ message: "ignored", reason: "policy", conversation: context.chatId }));
-      }
       return;
+    }
+    if (context.chatKind === "group" && !config.allowedGroups.includes(context.chatId) && !reportedGroups.has(context.chatId)) {
+      reportedGroups.add(context.chatId);
+      deps.log?.(JSON.stringify({ message: "ignored", reason: "policy", conversation: context.chatId }));
     }
     if (recent.seen(`${context.chatId}:${context.messageId}`)) {
       deps.log?.(JSON.stringify({ message: "ignored", reason: "duplicate", messageId: context.messageId }));
       return;
     }
-
-    deps.log?.(JSON.stringify({
-      message: "dispatch",
-      messageId: context.messageId,
-      chatKind: context.isSelfChat ? "self" : context.chatKind,
-      contentLength: context.text.length,
-    }));
 
     let reply: string;
     let typing = false;
@@ -105,6 +98,10 @@ export function createWhatsAppMessageHandler(
           userId: context.senderId,
           chatId: context.chatId,
           messageId: context.messageId,
+          chatKind: context.chatKind,
+          senderNumbers: context.senderNumbers,
+          isSelfChat: context.isSelfChat,
+          mentionsBot: context.mentionsBot,
         }),
       );
     } catch (error) {
@@ -129,7 +126,7 @@ export function createWhatsAppMessageHandler(
 }
 
 // Returns why a message is not for the bot, or null when it is.
-function ignoreReason(context: WhatsAppMessageContext, config: WhatsAppMessageConfig, now: number): string | null {
+function ignoreReason(context: WhatsAppMessageContext, now: number): string | null {
   if (context.chatKind === "other") {
     return "not-chat";
   }
@@ -139,23 +136,6 @@ function ignoreReason(context: WhatsAppMessageContext, config: WhatsAppMessageCo
   }
   if (now - context.timestampMs > maxMessageAgeMs) {
     return "stale";
-  }
-
-  if (context.isSelfChat) {
-    if (!config.selfChat) {
-      return "policy";
-    }
-  } else if (context.chatKind === "direct") {
-    if (!numberAllowed(config.allowedNumbers, context.senderNumbers)) {
-      return "policy";
-    }
-  } else {
-    if (!config.allowedGroups.includes(context.chatId)) {
-      return "policy";
-    }
-    if (!context.mentionsBot) {
-      return "not-mentioned";
-    }
   }
 
   if (!context.text.trim()) {

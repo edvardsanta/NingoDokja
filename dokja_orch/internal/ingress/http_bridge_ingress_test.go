@@ -21,6 +21,12 @@ func TestBridgeEventFromRequestMapsDiscordChat(t *testing.T) {
 			SessionKey string "json:\"sessionKey\""
 			StartChat  bool   "json:\"startSession\""
 			AccountID  string "json:\"accountId\""
+			EntryKind  string   "json:\"entryKind\""
+			Direct     *bool    "json:\"isDirectMessage\""
+			Mentioned  *bool    "json:\"mentionsBot\""
+			ChatKind   string   "json:\"chatKind\""
+			SelfChat   *bool    "json:\"isSelfChat\""
+			Numbers    []string "json:\"senderNumbers\""
 		}{
 			Content:   "hello dokja",
 			UserID:    "u1",
@@ -57,6 +63,12 @@ func TestBridgeEventFromRequestMapsMemeFetch(t *testing.T) {
 			SessionKey string "json:\"sessionKey\""
 			StartChat  bool   "json:\"startSession\""
 			AccountID  string "json:\"accountId\""
+			EntryKind  string   "json:\"entryKind\""
+			Direct     *bool    "json:\"isDirectMessage\""
+			Mentioned  *bool    "json:\"mentionsBot\""
+			ChatKind   string   "json:\"chatKind\""
+			SelfChat   *bool    "json:\"isSelfChat\""
+			Numbers    []string "json:\"senderNumbers\""
 		}{
 			Content: "meme fetch 3",
 		},

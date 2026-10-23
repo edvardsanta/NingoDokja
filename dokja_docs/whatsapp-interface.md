@@ -27,8 +27,9 @@ Settings > Linked devices.
 - linking is done once by scanning a QR code printed in the service log
 - the keys of the linked device are saved in a session folder (a Compose volume) and the service
   reconnects from them on every start; the QR code is not needed again
-- what it receives is every message the account receives: the interface drops what is not allowed
-  before anything is logged, stored or sent to the orchestrator
+- what it receives is every message the account receives: the interface suppresses echoes,
+  duplicates, stale messages and empty text; the Communications domain in the orchestrator decides
+  which normalized chats are eligible before chat processing
 
 **Risk.** This protocol is unofficial and outside WhatsApp's terms of use, so the account can be
 restricted or banned. Use a dedicated number when you can. Linking your own number works, and the
@@ -66,7 +67,7 @@ both forms. WhatsApp also identifies some senders only by an anonymous id: the n
 from the one that arrives with the message or from the mapping Baileys keeps. When neither is known
 the sender cannot be matched and is ignored.
 
-An ignored message leaves no trace in the log, and a phone number never reaches it. The one
+An ineligible message receives no reply, and a phone number never reaches the log. The one
 exception helps with setup: a group the bot is not allowed in is reported **once** with its id and
 the reason `policy`, so the id can be copied into `DOKJA_WHATSAPP_ALLOWED_GROUPS`.
 
@@ -84,10 +85,11 @@ A failing orchestrator is answered with a short apology.
 | Variable | Where | Purpose |
 | --- | --- | --- |
 | `DOKJA_WHATSAPP_AUTH_DIR` | WhatsApp interface | Folder of the linked-device session. **Secret.** Required; `/auth/default` in Compose |
-| `DOKJA_WHATSAPP_SELF_CHAT` | WhatsApp interface | Answer the account's own chat, default `true` |
-| `DOKJA_WHATSAPP_ALLOW_FROM` | WhatsApp interface | Phone numbers whose direct messages are answered, comma-separated |
-| `DOKJA_WHATSAPP_ALLOWED_GROUPS` | WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated |
+| `DOKJA_WHATSAPP_SELF_CHAT` | Orchestrator and WhatsApp interface | Answer the account's own chat, default `true` |
+| `DOKJA_WHATSAPP_ALLOW_FROM` | Orchestrator and WhatsApp interface | Phone numbers whose direct messages are answered, comma-separated |
+| `DOKJA_WHATSAPP_ALLOWED_GROUPS` | Orchestrator and WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated |
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
+| `DOKJA_GATEWAY_INGRESS_TOKEN` | Orchestrator and WhatsApp interface | Dedicated bearer credential for the HTTP bridge. Required. |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
 | `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing |
 | `DOKJA_WHATSAPP_HISTORY_DIR` | WhatsApp interface | Folder of the recorded text. Required when a conversation is named; `/history` (its own volume) in Compose |
@@ -289,9 +291,11 @@ never deleted by the service.
   The QR code goes to the service log only.
 - Baileys logs ids, keys and message details; the interface replaces its logger with one that keeps
   only warnings and errors as short text.
-- The orchestrator receives only allowed messages. For those, the chat session key and the
-  orchestrator log carry the WhatsApp id, which for a one-to-one chat is the sender's phone number.
-- Allowed numbers and group ids live in the ignored environment file, never in Git, tests or docs.
+- The orchestrator receives normalized candidates and checks eligibility before chat processing.
+  The bridge requires `DOKJA_GATEWAY_INGRESS_TOKEN`; metadata and the configured allowlists stay
+  inside the stack. The chat session key and orchestrator log may carry a WhatsApp id, which for a
+  one-to-one chat is the sender's phone number. Sender-number candidates are not logged.
+- Real allowed numbers and group ids live in the ignored environment file, never in Git, tests or docs.
 
 ## Important Constraints
 

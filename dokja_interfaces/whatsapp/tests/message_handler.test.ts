@@ -113,26 +113,27 @@ test("a number the owner typed with the ninth digit still matches the account's 
   assert.equal(dispatched.length, 1);
 });
 
-test("a number that is not allowed is ignored without a trace", async () => {
+test("direct sender numbers are forwarded for domain authorization", async () => {
   const { handler, dispatched, replies, logs, context } = setup();
 
   await handler(context({ senderNumbers: ["5511911111111"] }));
   await handler(context({ senderNumbers: [], messageId: "m2" }));
 
-  assert.equal(dispatched.length, 0);
-  assert.deepEqual(replies, []);
-  assert.deepEqual(logs, []);
+  assert.equal(dispatched.length, 2);
+  assert.deepEqual(dispatched.map((request) => request.payload.senderNumbers), [["5511911111111"], []]);
+  assert.equal(replies.length, 2);
+  assert.ok(logs.every((line) => !line.includes("5511911111111")));
 });
 
-test("nobody is answered when the allow list is empty", async () => {
+test("the gateway forwards direct messages even with an empty local allowlist", async () => {
   const { handler, dispatched, context } = setup({ allowedNumbers: [] });
 
   await handler(context());
 
-  assert.equal(dispatched.length, 0);
+  assert.equal(dispatched.length, 1);
 });
 
-test("the account's own chat is answered, and only when self chat is on", async () => {
+test("self-chat identity is sent to the domain regardless of local policy", async () => {
   const on = setup();
   await on.handler(on.selfChat());
   assert.equal(on.dispatched.length, 1);
@@ -140,7 +141,8 @@ test("the account's own chat is answered, and only when self chat is on", async 
 
   const off = setup({ selfChat: false });
   await off.handler(off.selfChat());
-  assert.equal(off.dispatched.length, 0);
+  assert.equal(off.dispatched.length, 1);
+  assert.equal(off.dispatched[0].payload.isSelfChat, true);
 });
 
 test("the echo of the bot's own reply is not answered again", async () => {
@@ -176,17 +178,18 @@ test("a late message is not answered", async () => {
   assert.equal(dispatched.length, 1);
 });
 
-test("a group is answered only when it is allowed and the bot is mentioned", async () => {
+test("group id and mention state are forwarded for domain authorization", async () => {
   const { handler, dispatched, replies, group } = setup();
 
   await handler(group());
   await handler(group({ mentionsBot: false, messageId: "m2" }));
   await handler(group({ chatId: "120363000000000009@g.us", messageId: "m3" }));
 
-  assert.equal(dispatched.length, 1);
+  assert.equal(dispatched.length, 3);
   assert.equal(dispatched[0].payload.channelId, "120363000000000001@g.us");
   assert.equal(dispatched[0].payload.userId, "5511955555555@s.whatsapp.net");
-  assert.deepEqual(replies, ["Hello there."]);
+  assert.deepEqual(dispatched.map((request) => request.payload.mentionsBot), [true, false, true]);
+  assert.equal(replies.length, 3);
 });
 
 test("a group that is not allowed is reported once so its id can be copied", async () => {
@@ -196,8 +199,9 @@ test("a group that is not allowed is reported once so its id can be copied", asy
   await handler(group({ chatId: other, messageId: "m1" }));
   await handler(group({ chatId: other, messageId: "m2" }));
 
-  assert.equal(logs.length, 1);
-  assert.deepEqual(JSON.parse(logs[0]), { message: "ignored", reason: "policy", conversation: other });
+  const notices = logs.map((line) => JSON.parse(line)).filter((line) => line.reason === "policy");
+  assert.equal(notices.length, 1);
+  assert.deepEqual(notices[0], { message: "ignored", reason: "policy", conversation: other });
 });
 
 test("an empty message is ignored", async () => {

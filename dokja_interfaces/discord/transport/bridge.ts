@@ -11,6 +11,9 @@ export type BridgeRequest = {
     sessionKey: string;
     startSession?: boolean;
     accountId: string;
+    entryKind: "message" | "command";
+    isDirectMessage: boolean;
+    mentionsBot: boolean;
   };
 };
 
@@ -45,7 +48,7 @@ export async function dispatchToOrchestrator(
     );
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}` },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -110,6 +113,9 @@ export function buildBridgePayload(params: {
   guildId?: string;
   accountId?: string;
   sessionKey?: string;
+  entryKind?: "message" | "command";
+  isDirectMessage?: boolean;
+  mentionsBot?: boolean;
 }): BridgeRequest {
   const accountId = params.accountId?.trim() || "default";
   return {
@@ -125,6 +131,9 @@ export function buildBridgePayload(params: {
       sessionKey: params.sessionKey?.trim() || `discord:${params.channelId}:${params.userId}`,
       startSession: params.startSession,
       accountId,
+      entryKind: params.entryKind ?? "command",
+      isDirectMessage: params.isDirectMessage ?? !params.guildId,
+      mentionsBot: params.mentionsBot ?? false,
     },
   };
 }

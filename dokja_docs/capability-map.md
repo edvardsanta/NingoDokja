@@ -343,10 +343,14 @@ confirm edits and preserve stale revisions rather than merging them silently.
 Declared names remain unverified; inference bindings and the fixed embedding
 profile are unaffected. See [provider registrations](provider-registrations.md).
 
-## Communication outbound policy update
+## Communication policy update
 
 Step 09.4-b adds domain-owned [delivery ports and policy](../dokja_domain/dokja_communications/delivery.go).
 System handlers continue to sequence I/O but delegate target validation,
 disabled-platform selection, explicit bypass permission, safe-only decisions and
-named-conversation restrictions. [Evidence and remaining boundaries](communication-boundaries.md#outbound-policy-extraction-step-094-b-partial)
-separate this delivered slice from pending inbound/linking policy and relocation.
+named-conversation restrictions. [Link authorization](../dokja_domain/dokja_communications/link.go)
+and [inbound eligibility](../dokja_domain/dokja_communications/inbound.go)
+now belong to Communications. The orchestrator runs inbound authorization before
+the existing chat or command workflow; gateways keep protocol filtering. The
+[migration record](communication-boundaries.md) covers the coordinated bridge
+contract change and remaining relocation work.

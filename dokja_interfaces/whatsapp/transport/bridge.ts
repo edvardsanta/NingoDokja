@@ -8,6 +8,11 @@ export type WhatsAppBridgeRequest = {
     messageId: string;
     sessionKey: string;
     accountId: string;
+    entryKind: "message";
+    chatKind: "direct" | "group" | "other";
+    senderNumbers: string[];
+    isSelfChat: boolean;
+    mentionsBot: boolean;
   };
 };
 
@@ -29,6 +34,10 @@ export function buildWhatsAppBridgeRequest(params: {
   userId: string;
   chatId: string;
   messageId: string;
+  chatKind: "direct" | "group" | "other";
+  senderNumbers: string[];
+  isSelfChat: boolean;
+  mentionsBot: boolean;
 }): WhatsAppBridgeRequest {
   return {
     event_type: "message.created",
@@ -40,6 +49,11 @@ export function buildWhatsAppBridgeRequest(params: {
       messageId: params.messageId,
       sessionKey: `whatsapp:${params.chatId}:${params.userId}`,
       accountId: "default",
+      entryKind: "message",
+      chatKind: params.chatKind,
+      senderNumbers: params.senderNumbers,
+      isSelfChat: params.isSelfChat,
+      mentionsBot: params.mentionsBot,
     },
   };
 }
@@ -55,7 +69,7 @@ export async function dispatchToOrchestrator(
   try {
     const response = await fetchImpl(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}` },
       body: JSON.stringify(body),
       signal: controller.signal,
     });

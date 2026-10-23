@@ -2,8 +2,13 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
+
+// ErrInboundDenied is returned by an authorization step before a workflow can
+// reach any effectful domain. The service turns it into a silent bridge reply.
+var ErrInboundDenied = errors.New("inbound communication is not eligible")
 
 type DomainHandler interface {
 	Domain() Domain

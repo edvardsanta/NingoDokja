@@ -23,6 +23,14 @@ services:
       KNOWLEDGE_SERVICE_ENDPOINT: tcp://dokja-knowledge:5561
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
+      DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}
+      DISCORD_DM_POLICY: ${DISCORD_DM_POLICY:-open}
+      DISCORD_REQUIRE_MENTION: ${DISCORD_REQUIRE_MENTION:-false}
+      DOKJA_WHATSAPP_SELF_CHAT: ${DOKJA_WHATSAPP_SELF_CHAT:-true}
+      DOKJA_WHATSAPP_ALLOW_FROM: ${DOKJA_WHATSAPP_ALLOW_FROM:-}
+      DOKJA_WHATSAPP_ALLOWED_GROUPS: ${DOKJA_WHATSAPP_ALLOWED_GROUPS:-}
       DISCORD_INTERFACE_ENDPOINT: http://dokja-discord:8092/deliver
       # Where each interface answers its state. The desktop probes it only when its
       # address is set; otherwise its catalog row remains visible as unconfigured.
@@ -323,6 +331,7 @@ services:
       DOKJA_WHATSAPP_HISTORY_DIR: /history
       DOKJA_WHATSAPP_HISTORY_DAYS: ${DOKJA_WHATSAPP_HISTORY_DAYS:-30}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
+      DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
     volumes:
       - ./:/workspace
       # The linked-device session. It lives in a named volume so it never lands in the repository.
@@ -346,6 +355,7 @@ services:
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
+      DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
       DOKJA_VOICE_HTTP_ENDPOINT: http://dokja-voice:8081
       DOKJA_DISCORD_DELIVERY_PORT: 8092
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
