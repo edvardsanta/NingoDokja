@@ -7,6 +7,7 @@ import { displayName } from "../display_names.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { CardFrame, Problem } from "./card_frame.js";
+import { ListEditor } from "./list_editor.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
@@ -121,8 +122,10 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
     {row.readOnly ? <span className="detail">{t("setting_fixed_profile")}</span> : draft === undefined
       ? <button type="button" disabled={busy} aria-label={t("setting_edit_named", { name: label })} onClick={() => setDraft(row.value || (row.options.length ? row.default : ""))}>{t("setting_edit")}</button>
       : <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
-        <label htmlFor={id}>{label}</label>
-        {row.options.length > 0
+        {row.kind !== "list" && <label htmlFor={id}>{label}</label>}
+        {row.kind === "list"
+          ? <ListEditor label={label} values={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy} onChange={(values) => { setDraft(values.join(",")); setReviewing(false); }} />
+          : row.options.length > 0
           ? <select id={id} value={draft} onChange={(event) => { setDraft(event.target.value); setReviewing(false); }}>
             {row.options.map((option) => <option key={option} value={option}>{optionText(option, t)}</option>)}
           </select>

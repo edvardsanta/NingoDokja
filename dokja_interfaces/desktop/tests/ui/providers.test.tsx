@@ -47,7 +47,9 @@ it("reviews the registration and reloads saved declarations only after confirmat
  render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
  fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
  fireEvent.click(screen.getByLabelText("Discovery enabled"));
+ fireEvent.click(screen.getByRole("button", { name: "Remove fixture/old" }));
  fireEvent.change(screen.getByLabelText("Declared models (unverified)"), { target: { value: "fixture/new" } });
+ fireEvent.click(screen.getByRole("button", { name: "Add" }));
  fireEvent.click(screen.getByRole("button", { name: "Review" }));
  expect(screen.getByRole("alertdialog", { name: "Save Codex registration" })).toBeTruthy();
  expect(calls.some((call) => call.type === "runtime.providers.configure")).toBe(false);
@@ -84,7 +86,6 @@ it("keeps a stale revision explicit without automatically retrying or rebasing t
 it("requires an explicit declared chat model and preserves a failed selection draft",async()=>{
  const {transport,calls}=routedTransport({"runtime.providers":editable(),"runtime.chat":ok({configurationRevision:3,provider:"",model:""}),"runtime.chat.configure":failure("unavailable")});
  render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport}/></WorkspacePanel></I18nProvider>);
- fireEvent.click(screen.getByRole("button",{name:"Inspect providers"}));
  const selection=await screen.findByRole("region",{name:"Chat provider and model"});
  await waitFor(()=>expect(selection.querySelector("button")).toBeTruthy());
  fireEvent.click(selection.querySelector("button")!);

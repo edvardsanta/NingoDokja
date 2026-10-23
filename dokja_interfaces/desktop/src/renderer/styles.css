@@ -639,6 +639,111 @@ button:focus-visible {
   margin-top: 0.5rem;
 }
 
+.settings-group,
+.provider-list {
+  max-width: 72rem;
+}
+
+.settings > li > button,
+.provider-list > li > button {
+  grid-column: 4;
+  justify-self: end;
+}
+
+.provider-list > li > p,
+.provider-list > li > form {
+  grid-column: 1 / -1;
+}
+
+.setting-edit > label:not(:has(input)) {
+  font-weight: 700;
+}
+
+.setting-edit > input,
+.setting-edit > select,
+.setting-edit input:not([type="checkbox"]) {
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.setting-edit input:focus-visible,
+.setting-edit select:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.setting-edit > .detail {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.list-editor {
+  flex-basis: 100%;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 42rem;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--static) 75%, transparent);
+}
+
+.list-editor > label {
+  font-weight: 700;
+}
+
+.list-editor-items {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.services .list-editor-items li,
+.list-editor-items li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.25rem;
+  background: var(--panel);
+  animation: none;
+}
+
+.list-editor-items span {
+  overflow-wrap: anywhere;
+}
+
+.list-editor-items button {
+  flex-shrink: 0;
+}
+
+.list-editor-empty {
+  margin: 0;
+}
+
+.list-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.list-editor-add input {
+  flex: 1 1 12rem;
+}
+
 /* Starting a module that answers or posts outside asks first, inside its row. */
 .module-confirm {
   grid-column: 1 / -1;
