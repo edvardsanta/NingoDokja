@@ -90,13 +90,29 @@ describe("the screen", () => {
     fireEvent.click(tabNamed("Library"));
     const field = (await screen.findByRole("searchbox")) as HTMLInputElement;
     fireEvent.change(field, { target: { value: "stoics" } });
-    fireEvent.click(screen.getByRole("button", { name: "sources" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Readings" }));
     await screen.findByRole("heading", { name: "Reading digest" });
-    fireEvent.click(screen.getByRole("button", { name: "documents" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Documents" }));
 
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("stoics");
     expect(calls.filter((call) => call.type === "knowledge.status")).toHaveLength(1);
     expect(calls.filter((call) => call.type === "digest.status")).toHaveLength(1);
+  });
+
+  it("gives the Library its views as tabs the arrows move between", async () => {
+    const { transport } = screenTransport(statusReply(ALL_UP));
+    render(<App transport={transport} locale="en" />);
+
+    fireEvent.click(tabNamed("Library"));
+    const views = screen.getByRole("tablist", { name: "Library" });
+    const documents = screen.getByRole("tab", { name: "Documents" });
+    expect(documents.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(views, { key: "ArrowRight" });
+    const readings = screen.getByRole("tab", { name: "Readings" });
+    expect(readings.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(readings);
+    await screen.findByRole("heading", { name: "Reading digest" });
+    expect(screen.getByRole("region", { name: "Library › Readings" })).toBeTruthy();
   });
 
   it("opens each workspace from the sidebar", async () => {
@@ -107,7 +123,7 @@ describe("the screen", () => {
     await screen.findByRole("heading", { name: "Experience memory" });
     fireEvent.click(tabNamed("Library"));
     await screen.findByRole("heading", { name: "Research base" });
-    fireEvent.click(screen.getByRole("button", { name: "sources" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Readings" }));
     await screen.findByRole("heading", { name: "Reading digest" });
 
     await waitFor(() =>
@@ -181,7 +197,7 @@ describe("the screen", () => {
       render(<App transport={transport} locale={locale} />);
       // every card, not only the open one: a closed workspace keeps its text in the page
       for (const tab of screen.getAllByRole("tab")) fireEvent.click(tab);
-      await screen.findByText("meme");
+      await screen.findByText("Memes");
       await waitFor(() => expect(screen.queryAllByRole("status", { hidden: true })).toHaveLength(0));
       return document.body.textContent ?? "";
     };

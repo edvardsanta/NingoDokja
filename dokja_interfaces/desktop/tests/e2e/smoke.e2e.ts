@@ -48,13 +48,13 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     const rows = await page.waitFor<string[]>(
       "(() => { const rows = [...document.querySelectorAll('.services li')].map((row) => row.textContent); return rows.length ? rows : null; })()",
     );
-    assert.ok(rows.some((row) => row.startsWith("meme")), JSON.stringify(rows));
-    assert.ok(rows.some((row) => row.startsWith("feeds") && row.includes("no plugins enabled")), JSON.stringify(rows));
+    assert.ok(rows.some((row) => row.startsWith("Memes")), JSON.stringify(rows));
+    assert.ok(rows.some((row) => row.startsWith("Feeds") && row.includes("no plugins enabled")), JSON.stringify(rows));
   });
 
   it("keeps WhatsApp visible before configuration without requesting a link code",async()=>{
     const text=await page.waitFor<string>("document.querySelector('.interfaces')?.textContent || null");
-    assert.match(text,/whatsapp/);assert.match(text,/not configured/);
+    assert.match(text,/WhatsApp/);assert.match(text,/Not configured/);
     assert.equal(await page.evaluate("[...document.querySelectorAll('.interfaces button')].some(b=>b.textContent==='Link')"),false);
     assert.equal(orchestrator.seen.some(e=>e.type.startsWith('communications.link.')),false);
   });
@@ -236,7 +236,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     it("goes through from the card's own switch right after a real press, with the flag alone", async () => {
       // other tests have opened other workspaces; the switch is on System
       await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
-      const button = "document.querySelector('button[role=switch][aria-label=\"meme switch\"]')";
+      const button = "document.querySelector('button[role=switch][aria-label=\"Memes switch\"]')";
       await page.waitFor(`${button} !== null`);
       // The press is what the shell counts. The button itself is pressed by the script here: in the
       // hidden display the rows' entrance animation never advances, and a row that is still clipped

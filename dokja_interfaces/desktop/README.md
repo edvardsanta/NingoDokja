@@ -9,7 +9,10 @@ redesign under way is in [`dokja_docs/desktop-ux/`](../../dokja_docs/desktop-ux/
 left lists five workspaces, Talk, Library, Notebook, Messages and, at the foot, System; the open one
 fills the rest of the window as one panel: a legend that says where the owner is (workspace › view),
 a header with the views on the left and one refresh plus the workspace's actions on the right, and a
-body that is the only thing that scrolls. Each workspace asks its service only when it is first
+body that is the only thing that scrolls. Modules, services, interfaces and jobs are named in words
+(Chat, Scheduler, Post memes); the id the orchestrator reports stays in the tooltip. A module is
+started and stopped (a verb, a button); a switch is on or off (a state). A sidebar entry says its state
+in a word only when something behind it is not well. Each workspace asks its service only when it is first
 opened, and then keeps what it showed. The screen opens on Talk, the conversation with Ningo. The status
 (`ningo.status`) is read once, at the top of the screen, when it starts (and again when System asks
 for it): the name's pulse, the dot next to a workspace (the worst state among the services behind
@@ -23,7 +26,7 @@ owner has already moved. The sidebar asks nothing itself.
 | system (health) | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | talk | `message.created` when something is sent | the conversation with Ningo |
 | notebook (memory) | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
-| library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its sources view | two views. **Documents**: the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over). **Sources**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |
+| library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its readings view | two views, as tabs (the arrows move between them). **Documents**: the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over). **Readings**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |
 | messages (communications) | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord; **Load memes** shows the waiting memes as a grid of previews fetched by the shell, and a click attaches one (a second click takes it off) |
 
 Ctrl+1 to Ctrl+5 open the workspaces in the sidebar's order (System is Ctrl+5), from anywhere, a field

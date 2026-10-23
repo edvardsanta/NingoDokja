@@ -277,6 +277,27 @@ describe("the sidebar", () => {
       expect(tab("System").hasAttribute("data-foot")).toBe(true);
     });
 
+    it("says the state in a word only when something is not well, and describes it to a screen reader", async () => {
+      renderWith({
+        knowledge: { status: "ok", detail: "" },
+        discord: { status: "unchecked", detail: "", kind: "interface" },
+        whatsapp: { status: "error", detail: "", kind: "interface" },
+      });
+
+      await waitFor(() => expect(tab("Messages").getAttribute("aria-description")).toBe("needs attention"));
+      expect(tab("Messages").querySelector(".tab-word")?.textContent).toBe("needs attention");
+      expect(tab("Library").hasAttribute("aria-description")).toBe(false);
+      expect(tab("Library").querySelector(".tab-word")).toBeNull();
+      expect(tab("System").getAttribute("aria-description")).toBe("need attention");
+    });
+
+    it("says not checked when the worst behind a workspace has not been checked", async () => {
+      renderWith({ knowledge: { status: "unchecked", detail: "" } });
+
+      await waitFor(() => expect(tab("Library").getAttribute("aria-description")).toBe("not checked"));
+      expect(tab("System").hasAttribute("aria-description")).toBe(false);
+    });
+
     it("says offline at the foot, and shows no dot, when nothing answers", async () => {
       renderWith();
 
