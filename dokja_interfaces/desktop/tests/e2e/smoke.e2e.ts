@@ -324,8 +324,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
   it("browses experience context and feedback as text without writing", async () => {
     await page.evaluate("document.querySelectorAll('[role=tab]')[2].click()");
-    await page.waitFor("[...document.querySelectorAll('button')].find(b=>b.textContent==='Load experiences') ? true : null");
-    await page.evaluate("[...document.querySelectorAll('button')].find(b=>b.textContent==='Load experiences').click()");
+    await page.waitFor("document.querySelector('button[aria-label^=\"Inspect fixture:\"]') ? true : null");
     await page.waitFor("document.querySelectorAll('button[aria-label^=\"Inspect fixture:\"]').length === 7 ? true : null");
     await page.evaluate("document.querySelector('button[aria-label=\"Inspect fixture:1\"]').click()");
     const context = await page.waitFor<string>("document.querySelector('.experience-detail pre')?.textContent || null");

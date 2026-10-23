@@ -6,14 +6,23 @@ import { useNumbers, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { ExperienceFeedback } from "./experience_feedback.js";
 import { useAction } from "./use_action.js";
+import type { MessageId } from "../i18n/i18n.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { useWorkspaceRefresh } from "./workspace_panel.js";
+
+type Filter = "all" | "pending" | "resolved";
+
+const FILTERS: readonly { id: Filter; labelId: MessageId }[] = [
+  { id: "all", labelId: "experiences_all" },
+  { id: "pending", labelId: "experiences_filter_waiting" },
+  { id: "resolved", labelId: "experiences_filter_settled" },
+];
 
 export function MemoryExperiencesPanel({ transport, onChanged }: { transport: Transport; onChanged?: () => void }) {
   const t = useTranslate();
   const [revision, setRevision] = useState(0);
   const changed = () => { setRevision((value) => value + 1); onChanged?.(); };
-  const [opened, setOpened] = useState(false);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState<Filter>("all");
   const [offset, setOffset] = useState(0);
   const load = useCallback(async (at: number): Promise<LoadResult<MemoryExperiences | Off>> => {
     const answer = await transport.request("memory.list", { state: filter, limit: 20, offset: at }, { timeoutMs: 15_000 });
@@ -22,18 +31,20 @@ export function MemoryExperiencesPanel({ transport, onChanged }: { transport: Tr
     return { ok: true, data: answer.result as MemoryExperiences | Off };
   }, [transport, filter]);
   const listing = useAction(load);
-  useEffect(() => { if (opened) listing.start(offset); }, [opened, offset, revision, listing.start]);
+  // What was tried is what the Notebook is for, so it is read when the view opens, again when the
+  // filter or the page changes, and with the panel's refresh.
+  useEffect(() => { listing.start(offset); }, [offset, revision, listing.start]);
+  const reread = useCallback(() => listing.start(offset), [listing.start, offset]);
+  useWorkspaceRefresh(reread, listing.state.phase === "loading");
   const page = listing.state.phase === "ready" ? listing.state.data : undefined;
   return <section aria-label={t("experiences_title")}>
     <h3>{t("experiences_title")}</h3>
-    <label>{t("experiences_filter")}{" "}
-      <select value={filter} onChange={(event) => { setFilter(event.target.value); setOffset(0); }}>
-        <option value="all">{t("experiences_all")}</option>
-        <option value="pending">{t("experiences_pending")}</option>
-        <option value="resolved">{t("experiences_resolved")}</option>
-      </select>
-    </label>{" "}
-    <button type="button" disabled={listing.state.phase === "loading"} onClick={() => { if (!opened) setOpened(true); else listing.start(offset); }}>{t("experiences_load")}</button>
+    {/* a filter is a mode of the list, so it is a set of pressed buttons, never a switch */}
+    <div className="seg" role="group" aria-label={t("experiences_filter")}>
+      {FILTERS.map(({ id, labelId }) => (
+        <button key={id} type="button" aria-pressed={filter === id} onClick={() => { setFilter(id); setOffset(0); }}>{t(labelId)}</button>
+      ))}
+    </div>
     {listing.state.phase === "loading" && <Pending />}
     {listing.state.phase === "error" && <Problem error={listing.state.error} />}
     {page?.off && <OffNotice reason={page.reason} />}

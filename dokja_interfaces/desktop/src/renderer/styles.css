@@ -249,6 +249,17 @@ body {
   border-top: 1px solid color-mix(in srgb, var(--edge) 45%, transparent);
 }
 
+/* A set of pressed buttons for a mode of a list (a filter): joined, one of them pressed. */
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.seg button + button {
+  border-left: 0;
+}
+
 /* What is not well, listed first on System, each with its state in its tone and why. */
 .attention-list {
   display: grid;
