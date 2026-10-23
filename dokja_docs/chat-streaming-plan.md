@@ -44,19 +44,22 @@ Preserve `Interface -> Event/Request -> Orchestrator -> Domain -> Service`. The 
      `/chat` stays as it is.
    - Previews are coalesced to at most one every 100 ms and bounded by the reply's own size limit
      and timeout.
-2. **Orchestrator: publish partials, answer as before.**
-   - The chat handler reads the stream. For a desktop request it publishes each chunk as an event,
-     `chat.reply.partial`, with:
-     - `event_id`: the request's own id;
-     - `payload`: `conversation_id` and `text` (the text so far).
-   - It then answers the request with the final reply, exactly as now.
-   - Other sources get no partials.
-   - A failed stream falls back to `/chat`.
-3. **Desktop: subscribe and render.**
-   - The shell subscribes to `chat.reply.partial` only. It drops a partial whose `event_id` is not one
-     of its own requests in flight, and hands the rest to the renderer over a new IPC channel.
-   - The transcript shows the partial text in place of "thinking", as plain text. When the request
-     answers, the final reply replaces the preview.
+2. **Orchestrator: a streamed response on the HTTP bridge.**
+   - The orchestrator has no outbound pub/sub channel: its publisher is never wired, and its request
+     socket answers one request at a time. So the owner chose a streamed response on the existing
+     authenticated HTTP bridge, where previews reach only the caller.
+   - `POST /orchestrator/chat/stream` takes the envelope the request socket takes, a desktop
+     `message.created` only, with the bridge's bearer credential. It answers newline-delimited JSON:
+     `{"preview": ...}` lines, then the response the request socket would give.
+   - The preview travels in the request's context. The chat handler streams only when asked and when
+     its generator can; every other path is unchanged.
+   - An older runtime without `/chat/stream` is asked through `/chat`.
+3. **Desktop: send chat turns to the stream and render.**
+   - The shell sends a Talk turn to the bridge stream when it has the bridge address and credential,
+     and over the request socket otherwise, as today. It hands the previews to the renderer over an IPC
+     channel.
+   - The transcript shows the partial text in place of "thinking", as plain text. When the response
+     arrives, the final reply replaces the preview.
 4. **Later, optional:** Discord could show "typing…" while partials flow. Editing messages as they grow
    is out of scope.
 
@@ -64,17 +67,18 @@ Preserve `Interface -> Event/Request -> Orchestrator -> Domain -> Service`. The 
 
 - No change to the envelope, to `message.created` or to its reply.
 - New, additive pieces:
-  - the event type `chat.reply.partial`;
   - the runtime endpoint `/chat/stream`;
-  - the desktop's subscription and its IPC channel (the allow-list grows by one event type, and no
-    action is added).
-- A desktop without the subscription, or a runtime without `/chat/stream`, behaves as today.
+  - the bridge route `/orchestrator/chat/stream`;
+  - the desktop's IPC channel for previews.
+- The desktop needs the bridge credential (`DOKJA_GATEWAY_INGRESS_TOKEN`) and address to stream.
+- A desktop without them, or a runtime without `/chat/stream`, behaves as today.
 
 ## Phases (one PR each)
 
 1. Runtime streaming adapters and `/chat/stream`, tested with stand-in binaries that print in pieces.
-2. Orchestrator: partial events for desktop requests, with the fallback to `/chat`.
-3. Desktop: the shell's subscription, its filter by request id and the transcript preview.
+2. Orchestrator: the bridge stream route, previews through the request context, and the fallback to
+   `/chat`.
+3. Desktop: the shell sends Talk turns to the stream when configured, and the transcript previews.
 
 ## Risks and open questions
 
