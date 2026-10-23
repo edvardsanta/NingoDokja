@@ -1104,6 +1104,11 @@
           ],
           "checks": [
             {
+              "name": "safe_chat_failure_diagnostics",
+              "status": "partial",
+              "detail": "Runtime domain, adapter and bootstrap go test -race ./... and go vet ./... passed; orchestrator chat client regressions passed. Actual child-process stdout/stderr overflow and safe HTTP propagation verified. Real Claude/sonnet still failed with provider-reported session-limit wording; Codex synthetic regression passed in 2651 ms. No successful Claude or Ollama-generation validation is claimed."
+            },
+            {
               "name": "bounded_chat_inference_follow_up",
               "status": "partial",
               "detail": "Runtime domain, runtime adapter and bootstrap go test -race ./... and go vet ./... passed. Opt-in real Codex/gpt-6-luna: four-message exact marker, one call, 2737 ms, disabled-registration control passed. Claude Code/sonnet failed; Ollama generation was not run because only the embedding model was observed. See dokja_docs/chat-inference-validation.md."
@@ -1145,6 +1150,7 @@
             }
           ],
           "evidence": [
+            "Mapped bounded private failure diagnostics to domain-owned fixed messages without changing the HTTP error envelope. Confirmed the selected provider reports a session limit. Corrected bytes.Buffer embedding that allowed io.Copy to bypass the intended process-output size check; no raw provider diagnostics are returned or stored.",
             "Reproduced and fixed accepting a cancelled inference late reply and a tool-bearing trace with a final file. CLI isolation and completed-event acceptance now match bounded chat intent. A separate opt-in live harness uses only synthetic history and in-memory settings; saved operator bindings and application services remain unchanged.",
             "Discovery batch adds runtime.providers through bootstrap orchestration, Runtime domain interpretation and bounded infrastructure inspection. CLI, TUI and desktop share this read-only inventory.",
             "Codex and Claude Code report only executable discovery; model catalog, authentication, quota and inference are not inferred. Ollama lists models only inside the selected running lite-stack container; a stopped service is not started and is distinct from an empty reachable catalog.",
@@ -1158,13 +1164,22 @@
           ],
           "batches": [
             {
+              "id": "provider_failure_diagnostics",
+              "status": "completed",
+              "completed_on": "2026-10-23",
+              "deliverables": [
+                "Domain-owned safe failure categories and bounded infrastructure classification",
+                "Regression coverage for real process output limits, failure exits and HTTP propagation"
+              ]
+            },
+            {
               "id": "bounded_chat_validation",
               "status": "in_progress",
               "deliverables": [
                 "Completed-inference trace gate, cancellation and actual executable regressions",
                 "Opt-in synthetic live chat test and explicit provider results"
               ],
-              "next_action": "Diagnose Claude failure and evaluate an installed Ollama generation model; one successful Codex fixture is not cross-provider or cognitive-loop validation."
+              "next_action": "Successful Claude validation remains blocked by a provider-reported session limit. Recheck only through an explicit bounded test when allowance is available, evaluate an installed Ollama generation model and retain the provenance/cross-provider gaps."
             },
             {
               "id": "discovery",
@@ -1212,7 +1227,7 @@
               ]
             }
           ],
-          "next_action": "Continue live provider comparison: Codex passed the synthetic chat fixture, Claude failed and Ollama generation remains untested. Diagnose failures and establish actual answering-model provenance before general cognitive bindings. Keep OCR/legacy migration, durable conversation history and native baseline repairs separate.",
+          "next_action": "Continue provider validation when the selected provider session allowance permits; Claude failure now has a safe category, but successful inference remains unvalidated. Evaluate an installed Ollama generation model and answering-model provenance before broader cognitive/OCR bindings. Keep durable history and native baseline work separate.",
           "references": [
             "dokja_docs/chat-inference-validation.md",
             "dokja_docs/provider-inventory.md",

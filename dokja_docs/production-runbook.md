@@ -784,6 +784,11 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
 Bounded adapter regressions and opt-in synthetic live checks are documented in
 [chat inference validation](chat-inference-validation.md). A healthy configuration
 only establishes registration validity; it does not prove authenticated inference.
+Provider errors return fixed messages for recognized session/usage limits,
+authentication, unavailable models and incompatible CLIs; unknown failures stay
+generic. Check the selected provider's allowance or host authentication before an
+explicit retry. The runtime never changes the selected provider automatically or
+returns raw provider diagnostics. Rebuild/restart it to adopt diagnostic fixes.
 
 CLI adapters use installed host executables and their existing authentication. Each call runs
 from an empty temporary directory with tools disabled, bounded input/output and a 90-second
