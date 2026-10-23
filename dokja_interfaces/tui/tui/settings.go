@@ -100,6 +100,9 @@ func (m *Model) cmdSettings() tea.Cmd {
 func (m *Model) keySettings(key string) (tea.Model, tea.Cmd) {
 	rows := m.settingRows()
 	switch key {
+	case "p":
+		m.providers, m.providersErr, m.overlay = nil, "", overlayProviders
+		return m, m.cmdProviders()
 	case "esc", "q":
 		m.overlay = overlayNone
 	case "up", "k":

@@ -86,7 +86,7 @@ it("shows one module row and separates lifecycle from optional request handling"
   render(<App transport={transport} locale="en" runtimeControls />);
   await screen.findByText("Options for memory");
   expect(screen.getAllByText("memory", { selector: ".service-name" })).toHaveLength(1);
-  expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules", "Settings"]);
+  expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules", "Settings", "Inference providers"]);
   expect(screen.queryByRole("heading", { name: "Services" })).toBeNull();
   expect(screen.getByText("Options for memory").closest("details")?.open).toBe(false);
   fireEvent.click(screen.getByText("Options for memory"));

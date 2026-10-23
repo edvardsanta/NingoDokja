@@ -11,9 +11,15 @@ import (
 )
 
 type fakeRuntime struct {
-	snapshot cli.RuntimeSnapshot
-	settings cli.SettingsView
-	calls    []call
+	snapshot  cli.RuntimeSnapshot
+	settings  cli.SettingsView
+	providers cli.ProvidersView
+	calls     []call
+}
+
+func (f *fakeRuntime) Providers(context.Context) (cli.ProvidersView, error) {
+	f.calls = append(f.calls, call{"runtime.providers", nil})
+	return f.providers, nil
 }
 
 func (f *fakeRuntime) Settings(context.Context) (cli.SettingsView, error) {

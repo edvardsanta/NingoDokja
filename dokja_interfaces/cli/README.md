@@ -164,3 +164,7 @@ it does not need the original file. Each explicit request runs inference again.
 User answers, source defaults and axes already awaiting user clarification stay
 unchanged. An uncertain new proposal becomes a question for `knowledge classify`.
 Conflicts are reported without automatic retries. No chunks or embeddings change.
+
+`dokja-cli providers` inspects host Codex/Claude Code executables and lists models
+in the selected running lite stack’s Ollama. It starts no service and runs no
+inference. See [provider inventory](../../dokja_docs/provider-inventory.md).

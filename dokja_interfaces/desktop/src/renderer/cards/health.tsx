@@ -7,6 +7,7 @@ import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { RuntimeEnabled } from "../runtime_context.js";
 import { RuntimeCard } from "./runtime.js";
+import { ProvidersCard } from "./providers.js";
 import { SettingsCard } from "./settings.js";
 import { usePulse } from "../pulse.js";
 import { CardFrame, Problem } from "./card_frame.js";
@@ -133,7 +134,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
       {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
       {health && <HealthBody health={health} busy={change.state.phase === "loading"}
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
-    </>} /><SettingsCard transport={transport} /></>;
+    </>} /><SettingsCard transport={transport} /><ProvidersCard transport={transport} /></>;
   }
 
   return (

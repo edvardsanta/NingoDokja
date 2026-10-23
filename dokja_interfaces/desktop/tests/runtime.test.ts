@@ -91,3 +91,20 @@ test("settings projection preserves the server's fixed-profile flag", () => {
  const view = runtimeSettings({ busy: false, settings: [{ id: "models.embedding", group: "models", kind: "text", value: "", default: "bge-m3", read_only: true }], webhook_channels: [] });
  assert.equal((view as { settings: { readOnly: boolean }[] }).settings[0]?.readOnly, true);
 });
+
+test("provider discovery is read-only, bounded and cannot claim verified inference", async () => {
+ const { runtimeProviders } = await import("../src/main/runtime_actions.js");
+ const view=runtimeProviders({ providers: [
+  { id: "codex", name: "private path", state: "installed", models: ["invented/model"], inference_status: "success" },
+  { id: "ollama", state: "reachable", model_discovery: "listed", models: ["fixture/model:latest"], private: "drop" },
+ ] });
+ assert.equal(view.providers[0]?.name,"Codex");
+ assert.deepEqual(view.providers[0]?.models,[]);
+ assert.equal(view.providers[0]?.inferenceStatus,"not_tested");
+ assert.equal(JSON.stringify(view).includes("private"),false);
+ assert.throws(()=>runtimeProviders({providers:[{id:"codex",state:"authenticated"}]}));
+ const calls: unknown[]=[];
+ const client={async request(type:string,payload:Record<string,unknown>){calls.push({type,payload});return {status:"ok",result:wrap({providers:[]})};}};
+ assert.equal((await handleRequest({type:"runtime.providers",payload:{command:"drop"}},client,{defaultTimeoutMs:15000,maxTimeoutMs:120000})).ok,true);
+ assert.deepEqual(calls,[{type:"runtime.providers",payload:{}}]);
+});

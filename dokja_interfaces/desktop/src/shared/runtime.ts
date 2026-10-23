@@ -8,3 +8,9 @@ export const DELIVERY_MODULES: readonly string[] = ["discord", "scheduler"];
 export type RuntimeModule = (typeof RUNTIME_MODULES)[number];
 export type RuntimeState = "starting" | "ready" | "running" | "stopping" | "stopped" | "failed";
 export type RuntimeSnapshot = { modules: { name: RuntimeModule; state: RuntimeState; error: string; dependencies: string[]; progress?: string }[]; busy: boolean; error: string };
+
+export type ProviderRow = {
+  id: string; name: string; state: string; reason: string; models: string[];
+  modelDiscovery: string; inferenceStatus: "not_tested"; truncated: boolean;
+};
+export type ProvidersView = { providers: ProviderRow[]; checkedAt: string };
