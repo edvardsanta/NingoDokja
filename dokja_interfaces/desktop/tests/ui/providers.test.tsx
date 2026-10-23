@@ -43,21 +43,41 @@ const editable = (revision = 7, enabled = true, declarations = ["fixture/old"]) 
 ] });
 
 it("reviews the registration and reloads saved declarations only after confirmation", async () => {
- const { transport, calls } = routedTransport({ "runtime.chat": ok({configurationRevision:1,provider:"",model:""}), "runtime.providers": [editable(), editable(8, false, ["fixture/new"])], "runtime.providers.configure": ok({ provider: "codex", configurationRevision: 8 }) });
+ const { transport, calls } = routedTransport({ "runtime.chat": ok({configurationRevision:1,provider:"",model:""}), "runtime.providers": [editable(7, true, ["gpt-6-luna"]), editable(8, false, ["gpt-6.1-sol"])], "runtime.providers.configure": ok({ provider: "codex", configurationRevision: 8 }) });
  render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
  fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
  fireEvent.click(screen.getByLabelText("Discovery enabled"));
- fireEvent.click(screen.getByRole("button", { name: "Remove fixture/old" }));
- fireEvent.change(screen.getByLabelText("Declared models (unverified)"), { target: { value: "fixture/new" } });
+ fireEvent.click(screen.getByRole("button", { name: "Remove gpt-6-luna" }));
+ fireEvent.change(screen.getByRole("combobox", { name: "Declared models (unverified)" }), { target: { value: "gpt-6.1-sol" } });
  fireEvent.click(screen.getByRole("button", { name: "Add" }));
  fireEvent.click(screen.getByRole("button", { name: "Review" }));
  expect(screen.getByRole("alertdialog", { name: "Save Codex registration" })).toBeTruthy();
  expect(calls.some((call) => call.type === "runtime.providers.configure")).toBe(false);
  fireEvent.click(screen.getByRole("button", { name: "Save registration" }));
  await waitFor(() => expect(calls.filter((call) => call.type === "runtime.providers")).toHaveLength(2));
- expect(calls.filter((call) => call.type === "runtime.providers.configure").map((call) => call.payload)).toEqual([{ configuration_revision: 7, provider: "codex", enabled: false, models: ["fixture/new"] }]);
+ expect(calls.filter((call) => call.type === "runtime.providers.configure").map((call) => call.payload)).toEqual([{ configuration_revision: 7, provider: "codex", enabled: false, models: ["gpt-6.1-sol"] }]);
  await screen.findByText("Disabled for discovery");
- expect(screen.getByText("Declared models (unverified): fixture/new")).toBeTruthy();
+ expect(screen.getByText("Declared models (unverified): gpt-6.1-sol")).toBeTruthy();
+});
+
+it("offers documented Codex models and preserves old declarations for removal", async () => {
+ const { transport } = routedTransport({ "runtime.chat": ok({ configurationRevision: 1, provider: "codex", model: "6" }), "runtime.providers": editable(7, true, ["6"]) });
+ render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Codex registration" }));
+ const select = screen.getByRole("combobox", { name: "Declared models (unverified)" }) as HTMLSelectElement;
+ expect(Array.from(select.options).map((option) => option.value)).toEqual(["", "gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"]);
+ expect(screen.getByRole("button", { name: "Remove 6" })).toBeTruthy();
+ expect(screen.queryByRole("textbox", { name: "Declared models (unverified)" })).toBeNull();
+});
+
+it("offers only observed Ollama models in its registration picker", async () => {
+ const { transport } = routedTransport({ "runtime.chat": ok({ configurationRevision: 1, provider: "", model: "" }), "runtime.providers": ok({ configurationRevision: 2, providers: [
+  { id: "ollama", name: "Ollama", state: "reachable", reason: "", enabled: true, declaredModels: [], modelDiscovery: "listed", models: ["local-chat:latest"], inferenceStatus: "not_tested" },
+ ] }) });
+ render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Ollama registration" }));
+ const select = screen.getByRole("combobox", { name: "Declared models (unverified)" }) as HTMLSelectElement;
+ expect(Array.from(select.options).map((option) => option.value)).toEqual(["", "local-chat:latest"]);
 });
 
 it("cancels without saving and refuses edits against an older controller", async () => {
