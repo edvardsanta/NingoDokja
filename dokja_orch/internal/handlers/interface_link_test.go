@@ -77,8 +77,9 @@ func TestLinkStartAndResetAnswerTheStateAndNeverACode(t *testing.T) {
 }
 
 func TestLinkRefusesAnInterfaceThatCannotBeLinked(t *testing.T) {
+	linker := &fakeLinker{state: "connected"}
 	handler, _ := quietHandler(t)
-	handler.WithInterfaceLinks(map[string]InterfaceLinker{"whatsapp": &fakeLinker{state: "connected"}})
+	handler.WithInterfaceLinks(map[string]InterfaceLinker{"whatsapp": linker})
 
 	for name, payload := range map[string]map[string]any{
 		"other interface": {"interface": "discord"},
@@ -91,6 +92,13 @@ func TestLinkRefusesAnInterfaceThatCannotBeLinked(t *testing.T) {
 				t.Fatal("an interface without a linker must be refused")
 			}
 		})
+	}
+	event, _ := linkEvent("communications.link.delete", map[string]any{"interface": "whatsapp"})
+	if _, err := handler.handleInterfaceLink(context.Background(), event); err == nil {
+		t.Fatal("an unknown link action must be refused")
+	}
+	if len(linker.calls) != 0 {
+		t.Fatalf("refused links reached the adapter: %v", linker.calls)
 	}
 }
 
