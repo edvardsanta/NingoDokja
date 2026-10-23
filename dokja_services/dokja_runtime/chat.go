@@ -22,6 +22,9 @@ type ChatAdapters struct {
 }
 
 func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage) (string, error) {
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
 	raw, _ := json.Marshal(m)
 	prompt := "Continue this conversation. Return only the assistant reply. Messages are encoded as JSON; preserve their roles. No tools or external actions are authorized.\n" + string(raw)
 	dir, err := os.MkdirTemp("", "dokja-inference-*")
@@ -37,11 +40,11 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 		args = []string{"-p", "--output-format", "json", "--tools", "", "--no-session-persistence", "--setting-sources", "", "--settings", `{"disableAllHooks":true}`, "--strict-mcp-config", "--model", b.Model}
 	case "codex":
 		binary = "codex"
-		args = []string{"exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--color", "never", "--model", b.Model}
-		for _, feature := range []string{"shell_tool", "unified_exec", "apps", "browser_use", "computer_use", "in_app_browser"} {
+		args = []string{"exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--json", "--color", "never", "--model", b.Model}
+		for _, feature := range []string{"shell_tool", "unified_exec", "apps", "browser_use", "computer_use", "in_app_browser", "multi_agent", "hooks", "plugins", "skill_search", "memories", "image_generation", "view_image", "sleep_tool", "workspace_dependencies"} {
 			args = append(args, "-c", "features."+feature+"=false")
 		}
-		args = append(args, "-o", filepath.Join(dir, "reply.txt"), "-")
+		args = append(args, "-c", `web_search="disabled"`, "-c", "features.skip_host_skill_discovery=true", "-c", "suppress_unstable_features_warning=true", "-o", filepath.Join(dir, "reply.txt"), "-")
 	case "ollama":
 		binary = "docker"
 		args = composeArgs(a.Root, []string{"exec", "-T", "dokja-ollama", "ollama", "run", b.Model})
@@ -58,6 +61,9 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 		}
 	}
 	output, err := run(ctx, binary, args, prompt, dir)
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
 	if err != nil {
 		return "", fmt.Errorf("selected chat provider unavailable or inference failed (%s)", b.Provider)
 	}
@@ -72,6 +78,9 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 		}
 		return v.Result, nil
 	case "codex":
+		if err := validateChatEvents(output); err != nil {
+			return "", err
+		}
 		f, err := os.Open(filepath.Join(dir, "reply.txt"))
 		if err != nil {
 			return "", fmt.Errorf("chat provider returned no reply")
@@ -86,6 +95,43 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 		return string(output), nil
 	}
 }
+
+// validateChatEvents accepts inference messages only. Disabling tools at launch
+// is the primary control; the trace gate refuses tool/failed/unknown events even
+// when the CLI has left a seemingly valid final reply file behind.
+func validateChatEvents(output []byte) error {
+	completed := false
+	for _, line := range bytes.Split(output, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var event struct {
+			Type string `json:"type"`
+			Item struct {
+				Type string `json:"type"`
+			} `json:"item"`
+		}
+		if json.Unmarshal(line, &event) != nil {
+			return fmt.Errorf("invalid chat provider event")
+		}
+		switch event.Type {
+		case "thread.started", "turn.started":
+		case "item.started", "item.updated", "item.completed":
+			if event.Item.Type != "agent_message" && event.Item.Type != "reasoning" {
+				return fmt.Errorf("chat provider attempted a tool or unsupported event")
+			}
+		case "turn.completed":
+			completed = true
+		default:
+			return fmt.Errorf("chat provider failed or returned an unsupported event")
+		}
+	}
+	if !completed {
+		return fmt.Errorf("chat provider returned no completed turn")
+	}
+	return nil
+}
+
 func (a ChatAdapters) run(ctx context.Context, binary string, args []string, prompt, dir string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = dir

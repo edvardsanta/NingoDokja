@@ -69,7 +69,7 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 					if !strings.Contains(command, "features.shell_tool=false") || !strings.Contains(command, "--ignore-user-config") {
 						t.Fatal("isolation flags missing")
 					}
-					return nil, os.WriteFile(filepath.Join(dir, "reply.txt"), []byte("answer"), 0600)
+					return []byte("{\"type\":\"turn.completed\"}\n"), os.WriteFile(filepath.Join(dir, "reply.txt"), []byte("answer"), 0600)
 				}
 				if id == "claude_code" {
 					if !strings.Contains(command, "--strict-mcp-config") || !strings.Contains(command, "--tools ") {
@@ -112,5 +112,41 @@ func TestMissingLocalModelDoesNotPullOrGenerate(t *testing.T) {
 	}}
 	if _, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "ollama", Model: "fixture"}, nil); err == nil || calls != 1 {
 		t.Fatal(err, calls)
+	}
+}
+
+func TestChatAdaptersRejectCodexToolEventsEvenWithReplyFile(t *testing.T) {
+	a := ChatAdapters{Run: func(_ context.Context, _ string, _ []string, _ string, dir string) ([]byte, error) {
+		if err := os.WriteFile(filepath.Join(dir, "reply.txt"), []byte("answer"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return []byte("{\"type\":\"item.completed\",\"item\":{\"type\":\"command_execution\"}}\n{\"type\":\"turn.completed\"}\n"), nil
+	}}
+	if reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "codex", Model: "fixture"}, nil); err == nil || reply != "" {
+		t.Fatal("accepted tool output", reply, err)
+	}
+}
+func TestChatAdaptersRejectLateReplies(t *testing.T) {
+	for _, provider := range []string{"codex", "claude_code", "ollama"} {
+		t.Run(provider, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			calls := 0
+			a := ChatAdapters{Root: t.TempDir(), Run: func(_ context.Context, _ string, args []string, _ string, dir string) ([]byte, error) {
+				calls++
+				if provider == "ollama" && strings.Contains(strings.Join(args, " "), " show ") {
+					return []byte("installed"), nil
+				}
+				cancel()
+				os.WriteFile(filepath.Join(dir, "reply.txt"), []byte("late"), 0600)
+				if provider == "claude_code" {
+					return []byte(`{"result":"late"}`), nil
+				}
+				return []byte("late"), nil
+			}}
+			if reply, err := a.Generate(ctx, domain.ChatBinding{Provider: provider, Model: "fixture"}, nil); err == nil || reply != "" {
+				t.Fatal("late success accepted", reply, err, calls)
+			}
+		})
 	}
 }
