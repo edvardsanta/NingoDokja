@@ -4,6 +4,7 @@ import { isRecord } from "../../shared/records.js";
 import type { CommunicationChannel, CommunicationHistory, CommunicationSend, MemePage, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
+import { WorkspacePanel } from "./workspace_panel.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
 import { MemePicker } from "./memes.js";
 import { parseMemePage } from "./memes_model.js";
@@ -21,9 +22,11 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
     return { ok: true, data: answer.result.channels.filter((row): row is CommunicationChannel => isRecord(row) && typeof row.id === "string" && typeof row.name === "string") };
   }, [transport]);
   const { state, reload } = useCard(load);
-  return <CardFrame kindLabel={t("nav_messages")} title={t("communications_title")} state={state} onReload={reload}>
-    {(channels) => channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={channels} transport={transport} active={active} />}
-  </CardFrame>;
+  return <WorkspacePanel trail={[t("nav_messages")]}>
+    <CardFrame title={t("communications_title")} state={state} onReload={reload}>
+      {(channels) => channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={channels} transport={transport} active={active} />}
+    </CardFrame>
+  </WorkspacePanel>;
 }
 
 // A conversation an interface keeps the text of is told apart by its id, which carries the platform.

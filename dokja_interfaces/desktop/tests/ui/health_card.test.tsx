@@ -85,7 +85,7 @@ describe("the health card", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(message);
-    expect(screen.getByRole("button").textContent).toBe("Try again");
+    screen.getByRole("button", { name: "Try again" });
   });
 
   it("treats an answer of the wrong shape as unexpected", async () => {
@@ -114,7 +114,7 @@ describe("the health card", () => {
     const { transport } = scriptedTransport(() => gate.promise);
     renderCard(transport);
 
-    const button = screen.getByRole("button") as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
     gate.resolve(statusReply(ALL_UP));

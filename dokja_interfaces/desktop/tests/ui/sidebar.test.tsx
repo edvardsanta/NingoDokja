@@ -30,7 +30,7 @@ function entries(mounted: string[]): CardEntry[] {
       );
     };
   return [
-    { kind: "a", labelId: "kind_digest", Card: card("a") },
+    { kind: "a", labelId: "nav_assistant", Card: card("a") },
     { kind: "b", labelId: "nav_notebook", Card: card("b") },
     { kind: "c", labelId: "nav_library", Card: card("c") },
   ];
@@ -58,8 +58,8 @@ describe("the sidebar", () => {
 
     const list = screen.getByRole("tablist", { name: "Workspaces" });
     expect(list.getAttribute("aria-orientation")).toBe("vertical");
-    expect(screen.getAllByRole("tab").map((each) => each.textContent)).toEqual(["digest", "Notebook", "Library"]);
-    expect(selected()).toEqual(["digest"]);
+    expect(screen.getAllByRole("tab").map((each) => each.textContent)).toEqual(["Talk", "Notebook", "Library"]);
+    expect(selected()).toEqual(["Talk"]);
     screen.getByText("card a");
     expect(screen.queryByText("card b")).toBeNull();
     expect(new Set(mounted)).toEqual(new Set(["a"]));
@@ -78,7 +78,7 @@ describe("the sidebar", () => {
     renderTabs();
     fireEvent.click(screen.getByRole("button", { name: "count a: 0" }));
     fireEvent.click(tab("Notebook"));
-    fireEvent.click(tab("digest"));
+    fireEvent.click(tab("Talk"));
 
     screen.getByRole("button", { name: "count a: 1" });
     // every tab has its panel; the open one is the only one exposed, and the card of a tab that was
@@ -88,7 +88,7 @@ describe("the sidebar", () => {
     expect(document.body.textContent).toContain("card b");
     fireEvent.click(tab("Notebook"));
     fireEvent.click(screen.getByRole("button", { name: "count b: 0" }));
-    fireEvent.click(tab("digest"));
+    fireEvent.click(tab("Talk"));
     fireEvent.click(tab("Notebook"));
     screen.getByRole("button", { name: "count b: 1" });
   });
@@ -124,14 +124,14 @@ describe("the sidebar", () => {
 
     it("moves with the up and down arrows, wrapping at both ends, and focuses the entry they open", () => {
       renderTabs();
-      tab("digest").focus();
+      tab("Talk").focus();
 
       press("ArrowDown");
       expect(selected()).toEqual(["Notebook"]);
       expect(document.activeElement).toBe(tab("Notebook"));
       press("ArrowDown");
       press("ArrowDown");
-      expect(selected()).toEqual(["digest"]);
+      expect(selected()).toEqual(["Talk"]);
       press("ArrowUp");
       expect(selected()).toEqual(["Library"]);
       expect(document.activeElement).toBe(tab("Library"));
@@ -139,17 +139,17 @@ describe("the sidebar", () => {
 
     it("jumps to the first and last entry with Home and End", () => {
       renderTabs();
-      tab("digest").focus();
+      tab("Talk").focus();
 
       press("End");
       expect(selected()).toEqual(["Library"]);
       press("Home");
-      expect(selected()).toEqual(["digest"]);
+      expect(selected()).toEqual(["Talk"]);
     });
 
     it("keeps the page from scrolling on the keys it uses, and leaves the other keys alone", () => {
       renderTabs();
-      tab("digest").focus();
+      tab("Talk").focus();
 
       // fireEvent answers false when the event was cancelled
       for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
@@ -171,7 +171,7 @@ describe("the sidebar", () => {
       fireEvent.keyDown(document.body, { key: "3", ctrlKey: true });
       expect(selected()).toEqual(["Library"]);
       fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
-      expect(selected()).toEqual(["digest"]);
+      expect(selected()).toEqual(["Talk"]);
     });
 
     it("leaves alone a bare digit, a digit with no workspace, a zero, and other modifiers", () => {
@@ -201,7 +201,7 @@ describe("the sidebar", () => {
         dialog.remove();
       }
       fireEvent.keyDown(document.body, { key: "1", ctrlKey: true });
-      expect(selected()).toEqual(["digest"]);
+      expect(selected()).toEqual(["Talk"]);
     });
 
     it("types a bare digit into a field, and still opens a workspace on Ctrl and a digit from it", () => {
@@ -227,7 +227,7 @@ describe("the sidebar", () => {
     const withServices: CardEntry[] = [
       { kind: "a", labelId: "nav_library", Card: stand, services: ["knowledge"] },
       { kind: "b", labelId: "nav_messages", Card: stand, services: ["discord", "whatsapp"] },
-      { kind: "c", labelId: "kind_digest", Card: stand },
+      { kind: "c", labelId: "nav_assistant", Card: stand },
       { kind: "d", labelId: "nav_system", Card: stand, foot: true },
     ];
 
@@ -255,7 +255,7 @@ describe("the sidebar", () => {
 
       await waitFor(() => expect(dotOf("Library")).toBe("ok"));
       expect(dotOf("Messages")).toBe("problem");
-      expect(dotOf("digest")).toBeUndefined();
+      expect(dotOf("Talk")).toBeUndefined();
       expect(dotOf("System")).toBeUndefined();
     });
 

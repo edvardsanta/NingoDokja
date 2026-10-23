@@ -69,7 +69,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
     return () => clearTimeout(timer);
   }, [snapshot, poll]);
 
-  return <CardFrame kindLabel={t("nav_system")} title={t("runtime_title")} state={state} onReload={refresh} supplement={renderActivity?.(state.phase !== "error")}>
+  return <CardFrame title={t("runtime_title")} state={state} onReload={refresh} supplement={renderActivity?.(state.phase !== "error")}>
     {(view) => <>
       <p className="detail">{t("runtime_intro")}</p>
       {view.error && <p role="alert">{view.error}</p>}

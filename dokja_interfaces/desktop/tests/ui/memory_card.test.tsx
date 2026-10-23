@@ -117,7 +117,7 @@ describe("the memory card", () => {
     renderCard(transport);
 
     expect((await screen.findByRole("alert")).textContent).toBe(message);
-    expect(screen.getByRole("button").textContent).toBe("Try again");
+    screen.getByRole("button", { name: "Try again" });
   });
 
   it("treats a status of the wrong shape as unexpected", async () => {

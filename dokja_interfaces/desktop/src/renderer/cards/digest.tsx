@@ -64,7 +64,7 @@ export function DigestCard({ transport }: { transport: Transport }) {
   const { state, reload } = useCard(load);
 
   return (
-    <CardFrame kindLabel={t("kind_digest")} title={t("digest_title")} state={state} onReload={reload}>
+    <CardFrame title={t("digest_title")} state={state} onReload={reload}>
       {(status) =>
         status.off ? <OffNotice reason={status.reason} /> : <DigestBody transport={transport} status={status} />
       }

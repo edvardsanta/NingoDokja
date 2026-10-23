@@ -4,6 +4,7 @@ import type { TransportError, TransportErrorCode } from "../../shared/transport.
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId, Translate } from "../i18n/i18n.js";
 import type { CardState } from "./use_card.js";
+import { useWorkspaceRefresh } from "./workspace_panel.js";
 
 const ERROR_IDS: Record<TransportErrorCode, MessageId> = {
   unavailable: "error_unavailable",
@@ -42,7 +43,6 @@ export function OffNotice({ reason }: { reason: string }) {
 }
 
 type CardFrameProps<T> = {
-  kindLabel: string;
   title: string;
   state: CardState<T>;
   onReload: () => void;
@@ -50,23 +50,27 @@ type CardFrameProps<T> = {
   supplement?: ReactNode;
 };
 
-// The anatomy every card shares: what kind it is, its title, then its body or why there is none.
-export function CardFrame<T>({ kindLabel, title, state, onReload, children, supplement }: CardFrameProps<T>) {
+// The anatomy every section of a workspace shares: its title, then its body or why there is none.
+// It is not a card of its own: the workspace's panel frames it and its one refresh reads this
+// section again too. When the read failed, the section offers to try again where the failure is.
+export function CardFrame<T>({ title, state, onReload, children, supplement }: CardFrameProps<T>) {
   const t = useTranslate();
   const titleId = useId();
+  useWorkspaceRefresh(onReload, state.phase === "loading");
   return (
-    <section className="card" aria-labelledby={titleId} aria-busy={state.phase === "loading"}>
-      <span className="card-kind">{kindLabel}</span>
+    <section className="wp-section" aria-labelledby={titleId} aria-busy={state.phase === "loading"}>
       <h2 id={titleId}>{title}</h2>
       {state.phase === "loading" && <Pending />}
-      {state.phase === "error" && <Problem error={state.error} />}
+      {state.phase === "error" && (
+        <>
+          <Problem error={state.error} />
+          <button type="button" className="retry" onClick={onReload}>
+            {t("retry")}
+          </button>
+        </>
+      )}
       {state.phase === "ready" && children(state.data)}
       {supplement}
-      <footer>
-        <button type="button" onClick={onReload} disabled={state.phase === "loading"}>
-          {state.phase === "error" ? t("retry") : t("refresh")}
-        </button>
-      </footer>
     </section>
   );
 }

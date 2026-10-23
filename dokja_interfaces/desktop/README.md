@@ -7,8 +7,10 @@ decisions and the Phase 0 results are in [`dokja_docs/desktop-app-plan.md`](../.
 Status: v1 without voice, laid out as a workspace (Phase A of the workspace replan in the plan; the
 redesign under way is in [`dokja_docs/desktop-ux/`](../../dokja_docs/desktop-ux/)). A sidebar on the
 left lists five workspaces, Talk, Library, Notebook, Messages and, at the foot, System; the open one
-fills the rest of the window. Each is a card that asks its service only when it is first opened, and
-then keeps what it showed. The screen opens on Talk, the conversation with Ningo. The status
+fills the rest of the window as one panel: a legend that says where the owner is (workspace › view),
+a header with the views on the left and one refresh plus the workspace's actions on the right, and a
+body that is the only thing that scrolls. Each workspace asks its service only when it is first
+opened, and then keeps what it showed. The screen opens on Talk, the conversation with Ningo. The status
 (`ningo.status`) is read once, at the top of the screen, when it starts (and again when System asks
 for it): the name's pulse, the dot next to a workspace (the worst state among the services behind
 it) and the number at the foot (the services with a problem) all show that one answer. When the
@@ -214,7 +216,9 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
    `src/main/actions.ts`, with tests that show what it leaves out. Only add an action the orchestrator
    really routes: it sends an event it does not know to the chat domain.
 2. Write the card in `src/renderer/cards/` with `useCard` and `CardFrame`, and its strings in both
-   catalogs, the name of its workspace included.
+   catalogs, the name of its workspace included. A workspace wraps its sections in one
+   `WorkspacePanel` (`src/renderer/cards/workspace_panel.tsx`); a `CardFrame` is a section of it, not
+   a card of its own, and registers its reload with the panel's one refresh.
 3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`: its kind, the id of its name in the
    sidebar, the component and, for its dot, the names of the services behind it as the status reports
    them. The order of the lines is the order of the sidebar; keep health last, at the foot. The screen
