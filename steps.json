@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-22",
+  "updated_on": "2026-10-23",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "09",
   "status_values": [
@@ -794,6 +794,34 @@
             "Complete inbound/linking and remaining handler policy extraction before physical relocation; outbound validation/ports are implemented.",
             "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
           ]
+        },
+        {
+          "id": "09.5",
+          "title": "Persist and resume Ningo conversation history across operator interfaces",
+          "status": "pending",
+          "depends_on": [
+            "09.4"
+          ],
+          "deliverables": [
+            "dokja_docs/conversation-history-plan.md",
+            "Domain-owned scoped conversation/turn lifecycle and shared durable storage",
+            "Desktop history and resume flow with CLI/TUI parity through the orchestrator"
+          ],
+          "acceptance_criteria": [
+            "Persist transcripts across interface and orchestrator restart, with stable conversation/send identities, explicit failed/interrupted states and bounded pagination.",
+            "Isolate owner/scope and reading discussions on every operation; prevent duplicate turns after retries and cross-conversation late replies.",
+            "Keep archive retention distinct from bounded model context, provider sessions, Knowledge and Experience; archiving replies does not establish learning or resolve experiences.",
+            "Review schema and additive route contracts before implementing; test restart, concurrency, idempotency, delete/retention and shared interface access."
+          ],
+          "evidence": [
+            "Owner requested planning conversation history. Current desktop transcript is component-local and orchestrator sessions are ephemeral; this scheduling entry does not claim persistence is implemented."
+          ],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/conversation-history-plan.md"
+          ],
+          "next_action": "Review H1 domain/storage contracts and migration compatibility, then implement and verify the incremental H1-H5 batches. No history behavior is delivered by this planning change."
         }
       ],
       "references": [
