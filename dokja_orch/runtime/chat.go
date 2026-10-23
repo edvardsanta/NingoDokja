@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	domain "read_books/dokja_domain/dokja_runtime"
+	"sync"
+	"time"
 )
 
 func ChatHandler(d *domain.Domain) http.Handler {
@@ -25,7 +27,7 @@ func ChatHandler(d *domain.Domain) http.Handler {
 			json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
 			return
 		}
-		if r.Method != "POST" || r.URL.Path != "/chat" {
+		if r.Method != "POST" || (r.URL.Path != "/chat" && r.URL.Path != "/chat/stream") {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -36,6 +38,10 @@ func ChatHandler(d *domain.Domain) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		if r.URL.Path == "/chat/stream" {
+			streamChat(w, r, d, body.Messages, fail)
+			return
+		}
 		result, err := d.Chat(r.Context(), body.Messages)
 		if err != nil {
 			fail(err)
@@ -43,4 +49,46 @@ func ChatHandler(d *domain.Domain) http.Handler {
 		}
 		json.NewEncoder(w).Encode(result)
 	})
+}
+
+// previewEvery is the least time between two previews: what the reader sees grows smoothly, and the
+// line is not flooded token by token.
+const previewEvery = 100 * time.Millisecond
+
+// streamChat answers with one JSON object per line: {"preview": text so far} while the provider
+// writes, then the reply as /chat gives it, or {"error": ...}. A failure before any preview is
+// answered as /chat answers it. The previews are provisional; the last line is the answer.
+func streamChat(w http.ResponseWriter, r *http.Request, d *domain.Domain, messages []domain.ChatMessage, fail func(error)) {
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	flusher, _ := w.(http.Flusher)
+	var mu sync.Mutex
+	started := false
+	var last time.Time
+	send := func(v any) {
+		json.NewEncoder(w).Encode(v)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	result, err := d.ChatStream(r.Context(), messages, func(text string) {
+		mu.Lock()
+		defer mu.Unlock()
+		if now := time.Now(); now.Sub(last) >= previewEvery {
+			last = now
+			started = true
+			send(map[string]string{"preview": text})
+		}
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if err != nil {
+		if !started {
+			w.Header().Set("Content-Type", "application/json")
+			fail(err)
+			return
+		}
+		send(map[string]string{"error": err.Error()})
+		return
+	}
+	send(result)
 }
