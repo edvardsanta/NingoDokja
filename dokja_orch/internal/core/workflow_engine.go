@@ -25,9 +25,13 @@ func NewDefaultWorkflowEngine() *DefaultWorkflowEngine {
 func (e *DefaultWorkflowEngine) Plan(_ context.Context, event Event, route Route) (Workflow, error) {
 	steps := make([]WorkflowStep, 0, len(route.Domains))
 	for _, domain := range route.Domains {
+		action := actionFor(domain, event.Type)
+		if inbound, _ := event.Context["gateway_inbound"].(bool); inbound && domain == DomainCommunications {
+			action = "authorize-inbound"
+		}
 		steps = append(steps, WorkflowStep{
 			Domain: domain,
-			Action: actionFor(domain, event.Type),
+			Action: action,
 		})
 	}
 

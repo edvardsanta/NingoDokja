@@ -545,6 +545,34 @@ additive value for the optional `interface` field of the HTTP bridge request (th
 source already existed); no change to the event envelope, existing ports, CLI/Discord commands or
 HTTP contracts.
 
+### Inbound eligibility migration (breaking)
+
+Discord and WhatsApp gateways now send normalized entry metadata to the HTTP
+bridge. The Communications domain in the orchestrator decides guild/channel/DM,
+named phone/self-chat and group mention eligibility before any chat or command
+step runs. Gateways still suppress bot echoes, duplicate messages, stale WhatsApp
+messages and empty text. The existing event envelope and reply format are intact,
+but older gateway bridge requests without eligibility metadata are silently
+refused. Recreate the orchestrator and both gateways from the same revision;
+rollback must restore all of them together.
+
+Set the same nonempty `DOKJA_GATEWAY_INGRESS_TOKEN` in the ignored environment
+file for the orchestrator and gateways. The HTTP bridge refuses requests without
+the bearer credential and will not start without a configured token. Keep this
+credential separate from `DOKJA_COMMUNICATIONS_TOKEN`, which controls operator
+communications actions. The Compose files project the gateway credential to
+each affected process.
+
+The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
+`DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
+`DOKJA_WHATSAPP_ALLOW_FROM` and `DOKJA_WHATSAPP_ALLOWED_GROUPS` from the same
+ignored environment as the gateways. `DISCORD_REQUIRE_MENTION` is optional and
+defaults to false, matching the previous running Discord listener. Set it to
+true only when ordinary guild messages should require a bot mention; slash
+commands remain available in allowed channels. Test with synthetic gateway
+requests before reconnecting live accounts. No credential or phone number is
+written to the repository.
+
 ## Interfaces in the desktop
 
 The desktop's health tab lists the chat interfaces (Discord, WhatsApp) under their own

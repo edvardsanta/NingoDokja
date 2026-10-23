@@ -3,14 +3,17 @@ import assert from "node:assert/strict";
 
 import { createDiscordMessageHandler } from "../messages/message_listener.js";
 
-test("message handler ignores non-mentioned guild messages outside DM when bot id is configured", async () => {
+test("message handler forwards mention facts for domain authorization", async () => {
+  const originalFetch = globalThis.fetch;
+  let metadata: Record<string, unknown> = {};
+  globalThis.fetch = (async (_input, init) => {
+    metadata = JSON.parse(String(init?.body ?? "{}")).payload;
+    return new Response(JSON.stringify({ status: "ok", reply: "" }), { status: 200 });
+  }) as typeof fetch;
+  try {
   const handler = createDiscordMessageHandler({
-    botUserId: "bot-1",
     orchestratorEndpoint: "http://orch",
     orchestratorTimeoutMs: 1000,
-    allowedGuildId: "guild-1",
-    allowedChannelIds: ["channel-1"],
-    dmPolicy: "open",
   });
 
   let replied = false;
@@ -29,6 +32,10 @@ test("message handler ignores non-mentioned guild messages outside DM when bot i
   });
 
   assert.equal(replied, false);
+  assert.equal(metadata.entryKind, "message");
+  assert.equal(metadata.isDirectMessage, false);
+  assert.equal(metadata.mentionsBot, false);
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test("message handler forwards allowed message and replies with orchestrator output", async () => {
@@ -46,12 +53,8 @@ test("message handler forwards allowed message and replies with orchestrator out
 
   try {
     const handler = createDiscordMessageHandler({
-      botUserId: "bot-1",
       orchestratorEndpoint: "http://orch",
       orchestratorTimeoutMs: 1000,
-      allowedGuildId: "guild-1",
-      allowedChannelIds: ["channel-1"],
-      dmPolicy: "open",
     });
 
     let replyText = "";

@@ -1,10 +1,6 @@
 export type DiscordMessageConfig = {
-  botUserId?: string;
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
-  allowedGuildId?: string;
-  allowedChannelIds: string[];
-  dmPolicy: string;
 };
 
 import { buildBridgePayload, dispatchToOrchestrator } from "../transport/bridge.js";
@@ -14,18 +10,6 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
   return async (context: DiscordMessageContext) => {
     if (context.isBot) {
       console.log("[dokja-discord] message ignored", JSON.stringify({ reason: "bot", messageId: context.messageId }));
-      return;
-    }
-    if (!shouldHandleMessage(context, config)) {
-      console.log(
-        "[dokja-discord] message ignored",
-        JSON.stringify({
-          reason: "policy",
-          messageId: context.messageId,
-          channelId: context.channelId,
-          guildId: context.guildId,
-        }),
-      );
       return;
     }
     if (!context.content) {
@@ -55,6 +39,9 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           channelId: context.channelId,
           messageId: context.messageId,
           guildId: context.guildId,
+          entryKind: "message",
+          isDirectMessage: context.isDirectMessage,
+          mentionsBot: context.mentionsBot,
         }),
       );
       if (!reply.trim()) {
@@ -81,20 +68,4 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
       throw error;
     }
   };
-}
-
-function shouldHandleMessage(context: DiscordMessageContext, config: DiscordMessageConfig): boolean {
-  if (context.isDirectMessage) {
-    return config.dmPolicy === "open";
-  }
-  if (config.allowedGuildId && context.guildId !== config.allowedGuildId) {
-    return false;
-  }
-  if (config.allowedChannelIds.length > 0 && !config.allowedChannelIds.includes(context.channelId)) {
-    return false;
-  }
-  if (!config.botUserId) {
-    return true;
-  }
-  return context.mentionsBot;
 }

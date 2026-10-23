@@ -722,7 +722,8 @@
           "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
           "status": "in_progress",
           "evidence": [
-            "Owner accepted classifying Discord and WhatsApp gateways as communication-service adapters, while Desktop/CLI/TUI remain operator interfaces. ADR 0012 records inbound/outbound roles and preserved contracts; source audit completed, no code or deployment moved."
+            "Owner accepted classifying Discord and WhatsApp gateways as communication-service adapters, while Desktop/CLI/TUI remain operator interfaces. ADR 0012 records inbound/outbound roles and preserved contracts; source audit completed, no code or deployment moved.",
+            "2026-10-23: owner approved a breaking inbound bridge migration without a legacy gateway path. Communications now decides inbound application eligibility before chat or command steps; gateways retain protocol filtering. A dedicated bearer credential protects the bridge metadata. No live account or production rollout was performed."
           ],
           "checks": [
             {
@@ -752,16 +753,17 @@
             {
               "id": "09.4-b",
               "title": "Extract normalized communication ports and domain eligibility/authorization",
-              "status": "in_progress",
+              "status": "completed",
               "acceptance_criteria": [
-                "Preserve read/send/link contracts and current stricter transport restrictions.",
+                "Preserve read/send/link contracts and current stricter transport restrictions; the owner approved a coordinated breaking inbound bridge contract with no legacy gateway path.",
                 "Test destination eligibility, disabled routing, partial/unknown delivery and explicit authorization before moving gateways."
               ],
               "evidence": [
                 "Communications owns typed delivery ports, send planning, configured/disabled destinations, explicit bypass and shared safe-only eligibility; named text-conversation validation is domain-owned.",
                 "Existing handler/client port names remain compatible aliases. Ingress credentials, public events, response/error shapes and gateway transport restrictions are preserved.",
                 "Linking authorization now uses Communications.LinkPolicy before the System handler invokes a registered adapter. Only available registered platforms and the existing status/start/reset actions are accepted; domain and handler refusal tests keep rejected requests from reaching the adapter.",
-                "Named conversation routing enablement is checked by Communications.DeliveryPolicy before an adapter list or send; the existing configured-adapter error and off-state refusal remain unchanged."
+                "Named conversation routing enablement is checked by Communications.DeliveryPolicy before an adapter list or send; the existing configured-adapter error and off-state refusal remain unchanged.",
+                "Communications.InboundPolicy now decides Discord guild/channel/DM and WhatsApp self/direct/group eligibility from normalized, authenticated gateway metadata before the existing workflow. Missing metadata is denied silently; gateways retain echo, duplicate, stale-message and empty-text checks. Compose projects the application allowlists to the orchestrator and a dedicated bearer credential to the bridge and gateways."
               ],
               "checks": [
                 {
@@ -773,12 +775,19 @@
                   "name": "named_conversation_routing",
                   "status": "passed",
                   "detail": "Communications domain go test -race ./... and named-conversation orchestrator handler go test -race passed. Fake sender only; disabled routing still refuses before list or delivery."
+                },
+                {
+                  "name": "inbound_eligibility",
+                  "status": "passed",
+                  "detail": "Communications domain and orchestrator go test -race ./... and go vet ./... passed; Discord pnpm test 30 passed; WhatsApp pnpm test 141 passed. Dev and lite Compose config passed. Fixtures cover policy denials before downstream effects, bridge authentication, command/message metadata, phone equivalence, transport echo/duplicate/age behavior and unchanged send/link regressions. Synthetic data only."
+                },
+                {
+                  "name": "production_config",
+                  "status": "blocked",
+                  "detail": "Production Compose config could not run in this clean worktree because DOKJA_MODELS_DIR and the ignored .env.prod are unavailable. YAML edits and runbook were reviewed; no production configuration or live account was changed."
                 }
               ],
-              "remaining": [
-                "Extract inbound gateway eligibility with parity tests before relocating gateways.",
-                "Finish reviewing any remaining delivery-policy decisions in handlers."
-              ]
+              "completed_on": "2026-10-23"
             },
             {
               "id": "09.4-c",

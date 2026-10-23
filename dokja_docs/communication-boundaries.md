@@ -89,7 +89,17 @@ adapter session state and the reply contract are unchanged. Domain and handler
 tests cover refusal before an adapter call. This does not make a source label an
 authentication credential.
 
-Still pending within 09.4-b: inbound gateway eligibility and a final review of
-delivery-policy decisions in handlers. Gateway relocation stays
-pending until those boundaries have parity coverage. This extraction does not
-move platform code, change public actions or introduce a new delivery guarantee.
+The outbound and link policy extraction completed without moving platform code
+or introducing a new delivery guarantee. Gateway relocation is the next batch.
+
+## Inbound eligibility migration (breaking, step 09.4-b)
+
+The gateway bridge now carries normalized message or command kind, Discord DM
+and mention facts, or WhatsApp chat kind, self-chat, sender-number and mention
+facts. Communications owns the allow/deny policy; orchestration runs it before
+the existing workflow and answers denied input silently. Old requests without
+the fields are denied. Adapters retain echo, duplicate, stale-message and empty
+text checks, while the bridge requires a separate gateway bearer credential so
+untrusted callers cannot claim eligible sender facts. Compose passes the same
+application allowlists to the orchestrator. This is a coordinated gateway and
+orchestrator rollout, with no mixed-version compatibility promise.

@@ -16,7 +16,20 @@ func NewRuleBasedEventRouter() *RuleBasedEventRouter {
 	return &RuleBasedEventRouter{}
 }
 
-func (r *RuleBasedEventRouter) Route(_ context.Context, event Event) (Route, error) {
+func (r *RuleBasedEventRouter) Route(ctx context.Context, event Event) (Route, error) {
+	route, err := r.route(ctx, event)
+	if err != nil {
+		return Route{}, err
+	}
+	if inbound, _ := event.Context["gateway_inbound"].(bool); inbound {
+		// The bridge marks its own events. Authorization must precede chat and
+		// fixed command workflows, including messages that map to meme actions.
+		route.Domains = append([]Domain{DomainCommunications}, route.Domains...)
+	}
+	return route, nil
+}
+
+func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, error) {
 	eventType := strings.TrimSpace(event.Type)
 	if eventType == "" {
 		return Route{}, fmt.Errorf("event type is required")

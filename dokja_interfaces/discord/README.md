@@ -7,10 +7,14 @@ Environment variables:
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID` optional override if automatic app-id probe fails
 - `DOKJA_ORCH_HTTP_ENDPOINT`
+- `DOKJA_GATEWAY_INGRESS_TOKEN` required gateway credential; set the same value on the orchestrator
 - `DOKJA_ORCHESTRATOR_TIMEOUT_MS`
 - `DISCORD_GUILD_ID`
 - `DISCORD_ALLOWED_CHANNELS`
 - `DISCORD_DM_POLICY`
+- `DISCORD_REQUIRE_MENTION` optional orchestrator policy setting; defaults to `false`
+
+The orchestrator's Communications domain reads the guild, channel, DM and mention settings and decides which inbound messages or commands may run. The gateway sends normalized facts and still suppresses bot echoes. Deploy matching gateway and orchestrator revisions together; bridge requests without the new metadata are refused.
 - `DOKJA_DISCORD_MODE` (`full` or `voice`)
 - `DOKJA_DISCORD_DELIVERY_PORT`
 - `DOKJA_DISCORD_API_BASE_URL`

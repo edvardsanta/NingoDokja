@@ -90,9 +90,6 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
       ? createDiscordMessageHandler({
           orchestratorEndpoint: cfg.orchestratorEndpoint,
           orchestratorTimeoutMs: cfg.orchestratorTimeoutMs,
-          allowedGuildId: cfg.allowedGuildId,
-          allowedChannelIds: cfg.allowedChannelIds,
-          dmPolicy: cfg.dmPolicy,
         })
       : async () => {},
   });

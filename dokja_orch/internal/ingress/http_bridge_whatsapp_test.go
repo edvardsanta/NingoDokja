@@ -16,7 +16,8 @@ func TestBridgeEventFromRequestMapsWhatsAppChat(t *testing.T) {
 		"event_type": "message.created",
 		"interface": "whatsapp",
 		"payload": {"content": "hello dokja", "userId": "u1@s.whatsapp.net", "channelId": "chat1", "messageId": "m1",
-			"sessionKey": "whatsapp:chat1:u1@s.whatsapp.net"}
+			"sessionKey": "whatsapp:chat1:u1@s.whatsapp.net", "entryKind": "message", "chatKind": "direct",
+			"senderNumbers": ["5511987654321"], "isSelfChat": false, "mentionsBot": false}
 	}`))
 
 	if event.Source != core.SourceWhatsApp {
@@ -27,6 +28,12 @@ func TestBridgeEventFromRequestMapsWhatsAppChat(t *testing.T) {
 	}
 	if event.Context["interface"] != "whatsapp" || event.Context["session_key"] != "whatsapp:chat1:u1@s.whatsapp.net" {
 		t.Fatalf("unexpected context %#v", event.Context)
+	}
+	if event.Context["gateway_inbound"] != true || event.Context["entry_kind"] != "message" || event.Context["chat_kind"] != "direct" {
+		t.Fatalf("missing eligibility metadata %#v", event.Context)
+	}
+	if numbers, ok := event.Context["sender_numbers"].([]string); !ok || len(numbers) != 1 || numbers[0] != "5511987654321" {
+		t.Fatalf("sender numbers were not preserved: %#v", event.Context["sender_numbers"])
 	}
 }
 
@@ -39,6 +46,25 @@ func TestBridgeInterfaceResolvesWhatsApp(t *testing.T) {
 	for _, name := range []string{"whats", "whatsapp2", "wa"} {
 		if _, _, ok := bridgeInterface(name); ok {
 			t.Fatalf("%q must not be accepted", name)
+		}
+	}
+}
+
+func TestBridgeRefusesMissingOrWrongGatewayCredential(t *testing.T) {
+	app := fiber.New()
+	app.Post("/orchestrator", (&HTTPBridgeIngress{token: "fixture-gateway-secret"}).handle)
+	for _, credential := range []string{"", "wrong", "Bearer wrong", "fixture-gateway-secret"} {
+		request := httptest.NewRequest("POST", "/orchestrator", strings.NewReader(`{"event_type":"message.created","interface":"whatsapp","payload":{"content":"hello"}}`))
+		request.Header.Set("Content-Type", "application/json")
+		if credential != "" {
+			request.Header.Set("Authorization", credential)
+		}
+		response, err := app.Test(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != fiber.StatusUnauthorized {
+			t.Fatalf("credential %q returned %d", credential, response.StatusCode)
 		}
 	}
 }
