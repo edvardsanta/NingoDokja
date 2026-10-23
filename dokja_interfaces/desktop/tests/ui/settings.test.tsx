@@ -31,7 +31,7 @@ describe("the settings card", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Edit Direct messages" }));
     fireEvent.change(screen.getByLabelText("Direct messages"), { target: { value: "closed" } });
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
-    await screen.findByText("Recreated now: discord.");
+    await screen.findByText("Recreated now: Discord.");
     expect(calls.some((call) => call.type === "runtime.settings.set")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Save and recreate" }));
     await waitFor(() => expect(calls.filter((call) => call.type === "runtime.settings.set").map((call) => call.payload)).toEqual([{ values: { "discord.direct_messages": "closed" } }]));
@@ -77,4 +77,14 @@ it("shows the fixed embedding profile without an edit action", async () => {
   expect(screen.getByText("Fixed for this version.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
   expect(calls.some((call) => call.type === "runtime.settings.set")).toBe(false);
+});
+
+it("shows a value from a closed set in words, never as the raw option", async () => {
+  const { transport } = routedTransport({ "runtime.settings": settings("open"), "runtime.modules": modules });
+  show(transport);
+  await screen.findByText("Open");
+  expect(screen.queryByText("open")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Edit Direct messages" }));
+  const options = [...(screen.getByLabelText("Direct messages") as HTMLSelectElement).options];
+  expect(options.map((option) => [option.value, option.textContent])).toEqual([["open", "Open"], ["closed", "Closed"]]);
 });

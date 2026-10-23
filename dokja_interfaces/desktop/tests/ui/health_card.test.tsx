@@ -39,26 +39,26 @@ describe("the health card", () => {
     await screen.findByText("1 up, 2 with problems, 1 switched off, 1 not checked");
 
     expect(calls).toEqual([{ type: "ningo.status", payload: {}, options: { timeoutMs: 15_000 } }]);
-    within(row("chat_ai")).getByText("error");
-    within(row("chat_ai")).getByText("connection refused");
-    within(row("scheduler")).getByText("stopped");
-    within(row("memory")).getByText("switched off");
-    within(row("book")).getByText("not checked");
-    within(row("meme")).getByText("up");
+    within(row("Chat")).getByText("Error");
+    within(row("Chat")).getByText("connection refused");
+    within(row("Scheduler")).getByText("Not answering");
+    within(row("Memory")).getByText("Paused");
+    within(row("Books")).getByText("Not checked");
+    within(row("Memes")).getByText("Working");
   });
 
   it("lists the services in the TUI's order", async () => {
     const { transport } = scriptedTransport(statusReply(SERVICES));
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    expect(names()).toEqual(["meme", "chat_ai", "book", "memory", "scheduler"]);
+    expect(names()).toEqual(["Memes", "Chat", "Books", "Memory", "Scheduler"]);
   });
 
   it("draws one segment per service, coloured by its state", async () => {
     const { transport } = scriptedTransport(statusReply(SERVICES));
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     const tones = [...document.querySelectorAll(".strip span")].map((node) => node.getAttribute("data-tone"));
     expect(tones).toEqual(["ok", "problem", "unchecked", "off", "problem"]);
@@ -146,7 +146,17 @@ describe("the health card", () => {
     await screen.findByText("1 no ar, 2 com problemas, 1 desligados, 1 sem verificação");
     screen.getByRole("heading", { name: "Serviços" });
     screen.getByText("Sistema");
-    within(row("scheduler")).getByText("parado");
+    within(row("Agendador")).getByText("Sem resposta");
     screen.getByRole("button", { name: "Atualizar" });
+  });
+
+  it("names each service in words, keeps its id for the operator, and shows an unknown one as it came", async () => {
+    const { transport } = scriptedTransport(statusReply({ chat_ai: { status: "ok", detail: "" }, mystery_service: { status: "ok", detail: "" } }));
+    renderCard(transport);
+
+    const chat = await screen.findByText("Chat");
+    expect(chat.getAttribute("title")).toBe("chat_ai");
+    expect(screen.queryByText("chat_ai")).toBeNull();
+    screen.getByText("mystery_service");
   });
 });

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { isRecord } from "../../shared/records.js";
 import { DELIVERY_MODULES, RUNTIME_MODULES, type RuntimeModule, type RuntimeSnapshot, type RuntimeState } from "../../shared/runtime.js";
 import type { Transport } from "../../shared/transport.js";
+import { displayName } from "../display_names.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { CardFrame, Problem } from "./card_frame.js";
@@ -77,28 +78,29 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
       <ul className="services runtime-modules">{view.modules.filter((module) => RUNTIME_MODULES.includes(module.name)).map((module) => {
         const start = module.state === "stopped" || module.state === "failed";
         const details = moduleDetails?.(module.name);
+        const label = displayName(module.name, t);
         return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : "ok"}>
-          <span className="service-name">{module.name}</span>
+          <span className="service-name" title={module.name}>{label}</span>
           <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
           <button type="button" className="switch" disabled={!!busy || !!view.error || module.state === "starting" || module.state === "stopping"}
-            aria-label={t(start ? "runtime_start_named" : "runtime_stop_named", { name: module.name })}
+            aria-label={t(start ? "runtime_start_named" : "runtime_stop_named", { name: label })}
             onClick={() => start && DELIVERY_MODULES.includes(module.name) ? setAsking(module.name) : action.start({ module: module.name, enabled: start })}>
             {t(start ? "runtime_start" : "runtime_stop")}
           </button>
           {module.progress && <p className="module-progress">{progressText(module.progress, t)}</p>}
-          <RuntimeLogs transport={transport} name={module.name} />
-          {asking === module.name && start && <div className="module-confirm" role="alertdialog" aria-label={t("runtime_confirm_title", { name: module.name })}>
-            <p>{t("runtime_confirm_title", { name: module.name })}</p>
+          <RuntimeLogs transport={transport} name={module.name} label={label} />
+          {asking === module.name && start && <div className="module-confirm" role="alertdialog" aria-label={t("runtime_confirm_title", { name: label })}>
+            <p>{t("runtime_confirm_title", { name: label })}</p>
             <ul>{(startNotice?.(module.name) ?? [t("delivery_status_unknown")]).map((line) => <li key={line}>{line}</li>)}</ul>
             <button type="button" disabled={!!busy || !!view.error} onClick={() => { setAsking(undefined); action.start({ module: module.name, enabled: true }); }}>{t("runtime_confirm_start")}</button>
             <button type="button" onClick={() => setAsking(undefined)}>{t("runtime_confirm_cancel")}</button>
           </div>}
           {module.error && <p className="module-error" role="alert">{module.error}</p>}
           {(details || module.state === "failed") && <details className="module-options">
-            <summary>{t("runtime_options", { name: module.name })}</summary>
+            <summary>{t("runtime_options", { name: label })}</summary>
             {details}
             {module.state === "failed" && <button type="button" disabled={!!busy || !!view.error}
-              aria-label={t("runtime_stop_named", { name: module.name })}
+              aria-label={t("runtime_stop_named", { name: label })}
               onClick={() => action.start({ module: module.name, enabled: false })}>{t("runtime_stop")}</button>}
           </details>}
         </li>;
@@ -118,7 +120,7 @@ function progressText(progress: string, t: ReturnType<typeof useTranslate>): str
   return t(messages[stage ?? "queued"] ?? "runtime_queued", { name: name ?? "" });
 }
 
-function RuntimeLogs({ transport, name }: { transport: Transport; name: RuntimeModule }) {
+function RuntimeLogs({ transport, name, label }: { transport: Transport; name: RuntimeModule; label: string }) {
   const t = useTranslate();
   const [open, setOpen] = useState(false);
   const [output, setOutput] = useState("");
@@ -147,11 +149,11 @@ function RuntimeLogs({ transport, name }: { transport: Transport; name: RuntimeM
     if (follow.current && box.current) box.current.scrollTop = box.current.scrollHeight;
   }, [output]);
   return <details className="runtime-logs" onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary>{t("runtime_logs", { name })}</summary>
+    <summary>{t("runtime_logs", { name: label })}</summary>
     {open && <>
       <p className="detail">{t("runtime_logs_hint")}</p>
       {error && <p role="status">{t("runtime_logs_error")}</p>}
-      <pre ref={box} tabIndex={0} aria-label={t("runtime_logs", { name })}
+      <pre ref={box} tabIndex={0} aria-label={t("runtime_logs", { name: label })}
         onScroll={() => { const node = box.current; if (node) follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40; }}>
         {output || t("runtime_logs_empty")}
       </pre>

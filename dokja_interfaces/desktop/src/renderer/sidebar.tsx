@@ -111,6 +111,10 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
         >
           {entries.map((entry, position) => {
             const tone = toneFor(entry, tones);
+            // A word only when something is not well; when it is, the dot is enough.
+            const word = entry.foot
+              ? lost ? undefined : problems > 0 ? t("tab_need_attention") : undefined
+              : tone === "problem" ? t("tab_needs_attention") : tone === "unchecked" ? t("tab_not_checked") : undefined;
             return (
               <button
                 key={entry.kind}
@@ -126,10 +130,18 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
                 aria-selected={selected === entry.kind}
                 aria-controls={`${baseId}-panel-${entry.kind}`}
                 aria-keyshortcuts={`Control+${position + 1}`}
+                aria-description={word}
                 tabIndex={selected === entry.kind ? 0 : -1}
                 onClick={() => select(entry.kind)}
               >
-                <span className="tab-label">{t(entry.labelId)}</span>
+                <span className="tab-label">
+                  {t(entry.labelId)}
+                  {word && (
+                    <span className="tab-word" data-tone={entry.foot ? "problem" : tone} aria-hidden="true">
+                      {word}
+                    </span>
+                  )}
+                </span>
                 {/* the words for each state are on the System workspace; here they are a glance */}
                 {tone && <span className="tab-dot" data-tone={tone} aria-hidden="true" />}
                 {/* nothing answers: a count of the services would be a guess */}

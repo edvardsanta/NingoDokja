@@ -41,7 +41,9 @@ describe("the catalogs", () => {
   });
 
   // Words that are the same in both languages by nature, not because a message was forgotten.
-  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant"]);
+  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant",
+    // product names
+    "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme"]);
 
   it("translate every message, so none was left in English", () => {
     const same = Object.keys(en).filter(
@@ -66,7 +68,7 @@ describe("the translator", () => {
 
   it("speaks Portuguese when asked", () => {
     const t = createTranslator("pt");
-    expect(t("status_ok")).toBe("no ar");
+    expect(t("status_ok")).toBe("Funcionando");
     expect(t("health_title")).toBe("Serviços");
   });
 

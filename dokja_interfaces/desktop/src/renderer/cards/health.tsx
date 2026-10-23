@@ -3,6 +3,7 @@ import { useCallback, useContext, useEffect, useRef, useState, type CSSPropertie
 import { RUNTIME_MODULES } from "../../shared/runtime.js";
 import type { JobState } from "../../shared/replies.js";
 import type { Transport, TransportError, TransportResult } from "../../shared/transport.js";
+import { displayName } from "../display_names.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { RuntimeEnabled } from "../runtime_context.js";
@@ -105,7 +106,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
-        {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name })}
+        {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name: displayName(name, t) })}
           on={row.enabled} busy={change.state.phase === "loading" || row.configured === false}
           onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
         {row.enabled !== undefined && <p className="detail">{t("runtime_routing_hint")}</p>}
@@ -227,12 +228,12 @@ function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
   const label = stateId ?? STATUS_IDS[row.status];
   return (
     <li data-tone={row.tone} data-kind={row.kind} style={{ "--i": index } as CSSProperties}>
-      <span className="service-name">{row.name}</span>
+      <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
       <span className="service-status">{label ? t(label) : row.state || row.status}</span>
       {row.detail && <span className="service-detail">{row.detail}</span>}
       {row.enabled !== undefined && (
         <Switch
-          label={t("switch_for", { name: row.name })}
+          label={t("switch_for", { name: displayName(row.name, t) })}
           on={row.enabled}
           busy={busy || row.configured === false}
           onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
@@ -397,9 +398,9 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
 
   return (
     <li data-enabled={job.enabled}>
-      <span className="service-name">{job.name}</span>
+      <span className="service-name" title={job.name}>{displayName(job.name, t)}</span>
       <Switch
-        label={t("switch_for", { name: job.name })}
+        label={t("switch_for", { name: displayName(job.name, t) })}
         on={job.enabled}
         busy={busy}
         onToggle={() => onChange({ type: "scheduler.jobs.set", payload: { name: job.name, enabled: !job.enabled } })}
@@ -419,12 +420,12 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
           type="number"
           inputMode="numeric"
           min={1}
-          aria-label={t("job_interval_label", { name: job.name })}
+          aria-label={t("job_interval_label", { name: displayName(job.name, t) })}
           value={amount}
           disabled={busy}
           onChange={(event) => setAmount(event.target.value)}
         />
-        <select aria-label={t("job_unit_label", { name: job.name })} value={unit} disabled={busy} onChange={(event) => setUnit(event.target.value as IntervalUnit)}>
+        <select aria-label={t("job_unit_label", { name: displayName(job.name, t) })} value={unit} disabled={busy} onChange={(event) => setUnit(event.target.value as IntervalUnit)}>
           <option value="m">{t("unit_minutes")}</option>
           <option value="h">{t("unit_hours")}</option>
         </select>
@@ -455,6 +456,6 @@ export function deliveryNotice(name: string, health: Health, t: ReturnType<typeo
   if (!on("scheduler")) return [t("delivery_scheduler_switch_off")];
   const lines = health.jobs.filter((job) => job.enabled).map((job) =>
     t(job.name === "meme.dispatch" ? "delivery_job_posts" : job.name === "meme.refresh" ? "delivery_job_refreshes" : "delivery_job_runs",
-      { name: job.name, interval: formatInterval(job.interval) }));
+      { name: displayName(job.name, t), interval: formatInterval(job.interval) }));
   return lines.length > 0 ? lines : [t("delivery_scheduler_all_paused")];
 }
