@@ -24,6 +24,12 @@ The brief says a change of palette meaning, fonts or the wordmark is the owner's
 changes a colour's meaning, a font or the wordmark. These do change how the identity is *applied*, and
 the mockup is built with them, so each one is listed to be accepted or reverted.
 
+**Owner's decision (2026-10-23).** Accepted: P2 (the voice line in Bodoni italic), P4 and P6 (a quiet
+legend; the sidebar says a word only when something is not well) and P7 (plain copy says "Biblioteca",
+which follows from the owner's names). Not taken: P1, P3 and P5. P8 and P9 are not decided yet. The owner likes the
+cyberpunk look as it is, so buttons stay cyan, the glow stays, and a state keeps its coloured square
+without a shape of its own. The mockup still shows the rejected proposals; the app does not.
+
 | # | Proposal | Why | What reverting costs |
 |---|---|---|---|
 | P1 | **Buttons are neutral.** Secondary = ink text on an `--edge` border, primary = `--ink` fill with panel-coloured text. Cyan leaves buttons. | Today every button is cyan outline and a pressed tab or mode paints like a switch that is on. The identity rule "neon only means a state" is broken by the buttons themselves. | Cyan buttons make "primary" impossible to tell from "on". |
