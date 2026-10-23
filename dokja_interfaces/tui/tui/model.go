@@ -45,6 +45,7 @@ const (
 	overlayMemoryFeedback
 	overlayLink
 	overlayProviders
+	overlayProviderEdit
 	overlaySettings
 	overlaySettingEdit
 )
@@ -69,6 +70,7 @@ type statusMsg struct {
 // Runtime is the local runtime controller: it starts and stops the lite stack's containers.
 type Runtime interface {
 	Providers(context.Context) (cli.ProvidersView, error)
+	ConfigureProvider(context.Context, uint64, cli.ProviderRegistration) (cli.ProviderSaved, error)
 	Request(ctx context.Context, eventType string, payload map[string]any) (cli.RuntimeSnapshot, error)
 	Settings(ctx context.Context) (cli.SettingsView, error)
 	SetSettings(ctx context.Context, values map[string]string) (cli.SettingsView, error)
@@ -177,15 +179,17 @@ type Model struct {
 	linkOpen bool
 
 	// The settings window: what the controller last said, the selected row and the one edited.
-	providers      *cli.ProvidersView
-	providersErr   string
-	settings       *cli.SettingsView
-	settingsErr    string
-	settingsCursor int
-	settingEditing string
-	settingInput   textinput.Model
-	memes          memeList
-	screen         *screenData
+	providers       *cli.ProvidersView
+	providersErr    string
+	providersCursor int
+	providerEditing cli.ProviderRegistration
+	settings        *cli.SettingsView
+	settingsErr     string
+	settingsCursor  int
+	settingEditing  string
+	settingInput    textinput.Model
+	memes           memeList
+	screen          *screenData
 	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
 	suggestion *suggestionEvidence
 	form       discordForm
@@ -531,6 +535,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.providers, m.providersErr = &msg.view, ""
+		m.providersCursor = max(0, min(m.providersCursor, len(msg.view.Providers)-1))
 		return m, nil
 	case settingsMsg:
 		m.busy = false
@@ -696,6 +701,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.keyMemoryPredict(msg)
 	case overlayLink:
 		return m.keyLink(key)
+	case overlayProviderEdit:
+		return m.keyProviderEdit(msg)
 	case overlayProviders:
 		return m.keyProviders(key)
 	case overlaySettings:

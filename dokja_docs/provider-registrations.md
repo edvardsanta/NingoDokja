@@ -70,3 +70,12 @@ Capability-specific bindings, validation using real inference providers, richer
 OCR configuration and migration of legacy inference consumers remain separate
 batches. This configuration is an explicit input to that work, not evidence that
 those consumers have already migrated.
+
+## CLI and TUI editing
+
+Use `dokja-cli providers configure <provider> --enabled=false|true --models=<names>`
+(with `--yes` to skip confirmation). Omitted fields retain their saved value; an
+explicit empty `--models=` clears declarations. TUI settings → providers allows
+row selection and `e` to edit; Ctrl+T toggles discovery, Enter reviews, and a
+confirmation saves. Both interfaces retain the read revision and refuse stale
+writes without retry. An older controller without a revision remains read-only.

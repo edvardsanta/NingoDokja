@@ -11,6 +11,8 @@ import (
 )
 
 type ProviderRow struct {
+	Enabled         bool     `json:"enabled"`
+	DeclaredModels  []string `json:"declared_models"`
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	State           string   `json:"state"`
@@ -21,6 +23,7 @@ type ProviderRow struct {
 	Truncated       bool     `json:"models_truncated"`
 }
 type ProvidersView struct {
+	Revision  uint64        `json:"configuration_revision"`
 	Providers []ProviderRow `json:"providers"`
 	CheckedAt time.Time     `json:"checked_at"`
 }
@@ -43,6 +46,14 @@ func printProviders(out io.Writer, v ProvidersView) {
 			fmt.Fprintf(out, " (%s)", row.Reason)
 		}
 		fmt.Fprintln(out)
+		if v.Revision != 0 {
+			fmt.Fprintf(out, "  Discovery enabled: %t.\n", row.Enabled)
+			if len(row.DeclaredModels) == 0 {
+				fmt.Fprintln(out, "  No declared models.")
+			} else {
+				fmt.Fprintln(out, "  Declared models (unverified): "+strings.Join(row.DeclaredModels, ", "))
+			}
+		}
 		if row.ModelDiscovery == "listed" {
 			if len(row.Models) == 0 {
 				fmt.Fprintln(out, "  No local models.")
@@ -70,6 +81,7 @@ func (a *App) newProvidersCommand(ctx context.Context) *cobra.Command {
 		printProviders(cmd.OutOrStdout(), view)
 		return nil
 	}}
-	cmd.Flags().StringVar(&a.runtimeRoot, "runtime-root", "", "Checkout that holds docker-compose.lite.yml")
+	cmd.PersistentFlags().StringVar(&a.runtimeRoot, "runtime-root", "", "Checkout that holds docker-compose.lite.yml")
+	cmd.AddCommand(a.newProviderConfigurationCommand(ctx))
 	return cmd
 }

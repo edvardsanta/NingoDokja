@@ -166,3 +166,8 @@ can still list and select, just not create or delete.
 From settings (`c`), press `p` to inspect inference providers; `r` refreshes and
 Esc returns. Discovery starts no service and runs no inference. See
 [provider inventory](../../dokja_docs/provider-inventory.md).
+
+In the providers view, select a row with ↑/↓ and press `e`. Edit comma-separated
+model declarations; Ctrl+T toggles discovery eligibility. Enter reviews the
+registration, then confirm to save. Esc cancels. Stale revisions require reload
+and explicit retry; older controllers without a revision remain read-only.
