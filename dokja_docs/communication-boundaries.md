@@ -9,11 +9,11 @@ The outbound policy extraction below has automated domain/orchestrator coverage.
 
 | Area | Current implementation | Responsibility and migration concern |
 | --- | --- | --- |
-| Discord inbound | [message listener](../dokja_interfaces/discord/messages/message_listener.ts), [interactions](../dokja_interfaces/discord/commands/interactions.ts), [bridge](../dokja_interfaces/discord/transport/bridge.ts) | SDK input, guild/channel/DM filters, normalized messages/commands, HTTP request to orchestration, reply delivery. Separate application eligibility from protocol handling. |
-| Discord outbound/status | [delivery server](../dokja_interfaces/discord/delivery/delivery_server.ts), [client](../dokja_orch/internal/clients/discord_interface_client.go) | Internal `/deliver` and `/status`, bot/webhook delivery and attachments. Preserve contract and receipt semantics; classification alone does not unify this with the read service. |
-| WhatsApp inbound/replies | [inbound normalization](../dokja_interfaces/whatsapp/runtime/inbound.ts), [message handler](../dokja_interfaces/whatsapp/messages/message_handler.ts), [bridge](../dokja_interfaces/whatsapp/transport/bridge.ts) | Normalizes linked-device messages, isolates sessions by chat/sender, filters eligibility, suppresses duplicates/echoes and dispatches fixed message events. Preserve identity and response correlation. |
-| WhatsApp platform state | [runtime](../dokja_interfaces/whatsapp/runtime/whatsapp_runtime.ts), [history](../dokja_interfaces/whatsapp/history/store.ts) | Linking/auth state, reconnect and configured local history. Keep auth/history volumes, aliases and retention unchanged during relocation. |
-| WhatsApp control/output | [listener](../dokja_interfaces/whatsapp/runtime/status_server.ts), [sender](../dokja_interfaces/whatsapp/messages/desk_sender.ts), [send limits](../dokja_interfaces/whatsapp/runtime/send_limit.ts) | Status, linking, history and bounded text delivery to named conversations. Retain transport caps; application authorization belongs to domain policy. |
+| Discord inbound | [message listener](../dokja_services/dokja_discord/messages/message_listener.ts), [interactions](../dokja_services/dokja_discord/commands/interactions.ts), [bridge](../dokja_services/dokja_discord/transport/bridge.ts) | SDK input, guild/channel/DM filters, normalized messages/commands, HTTP request to orchestration, reply delivery. Separate application eligibility from protocol handling. |
+| Discord outbound/status | [delivery server](../dokja_services/dokja_discord/delivery/delivery_server.ts), [client](../dokja_orch/internal/clients/discord_interface_client.go) | Internal `/deliver` and `/status`, bot/webhook delivery and attachments. Preserve contract and receipt semantics; classification alone does not unify this with the read service. |
+| WhatsApp inbound/replies | [inbound normalization](../dokja_services/dokja_whatsapp/runtime/inbound.ts), [message handler](../dokja_services/dokja_whatsapp/messages/message_handler.ts), [bridge](../dokja_services/dokja_whatsapp/transport/bridge.ts) | Normalizes linked-device messages, isolates sessions by chat/sender, filters eligibility, suppresses duplicates/echoes and dispatches fixed message events. Preserve identity and response correlation. |
+| WhatsApp platform state | [runtime](../dokja_services/dokja_whatsapp/runtime/whatsapp_runtime.ts), [history](../dokja_services/dokja_whatsapp/history/store.ts) | Linking/auth state, reconnect and configured local history. Keep auth/history volumes, aliases and retention unchanged during relocation. |
+| WhatsApp control/output | [listener](../dokja_services/dokja_whatsapp/runtime/status_server.ts), [sender](../dokja_services/dokja_whatsapp/messages/desk_sender.ts), [send limits](../dokja_services/dokja_whatsapp/runtime/send_limit.ts) | Status, linking, history and bounded text delivery to named conversations. Retain transport caps; application authorization belongs to domain policy. |
 | Communications domain | [domain.go](../dokja_domain/dokja_communications/domain.go) | Currently owns configured read eligibility and merges named conversations; it does not yet own all send/link policy. Extend through normalized ports. |
 | Communications read service | [server.py](../dokja_services/dokja_communications/server.py) | Authenticated Discord channel/history reads; no message sends. Keep its current role while migration evaluates reuse. |
 | Orchestration | [routes](../dokja_orch/internal/core/router.go), [System handler](../dokja_orch/internal/handlers/system_domain_handler.go), [Communications handler](../dokja_orch/internal/handlers/communications_domain_handler.go) | Reads route to Communications; `communications.send`, legacy `discord.send` and linking still pass through System. This split is an extraction target, not evidence that delivery policy is already consolidated. |
@@ -89,8 +89,8 @@ adapter session state and the reply contract are unchanged. Domain and handler
 tests cover refusal before an adapter call. This does not make a source label an
 authentication credential.
 
-The outbound and link policy extraction completed without moving platform code
-or introducing a new delivery guarantee. Gateway relocation is the next batch.
+The outbound and link policy extraction completed without introducing a new
+delivery guarantee. Gateway relocation followed in step 09.4-c.
 
 ## Inbound eligibility migration (breaking, step 09.4-b)
 
@@ -103,3 +103,14 @@ text checks, while the bridge requires a separate gateway bearer credential so
 untrusted callers cannot claim eligible sender facts. Compose passes the same
 application allowlists to the orchestrator. This is a coordinated gateway and
 orchestrator rollout, with no mixed-version compatibility promise.
+
+## Gateway relocation (step 09.4-c)
+
+Discord and WhatsApp gateway packages now live in `dokja_services/` as separate
+communication adapters. The development, lite and production Docker build paths,
+development working directories, package test script and service manifests point
+to the new paths. Runtime module IDs and Compose service names stay the same;
+WhatsApp remains an explicit opt-in profile. Source identifiers, bridge and
+delivery contracts, environment names, auth/history volumes and session keys are
+unchanged. Runtime settings now recreate the orchestrator along with a running
+gateway when an inbound allowlist changes, so both read the same policy.

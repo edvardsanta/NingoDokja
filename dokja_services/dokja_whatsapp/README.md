@@ -1,6 +1,6 @@
 # Dokja WhatsApp Interface
 
-TypeScript WhatsApp interface for Dokja. It links to a WhatsApp account as a linked device (Baileys), forwards normalized messages to the orchestrator and sends eligible replies. The Communications domain decides which chats may be answered. Full description, setup and limits: [dokja_docs/whatsapp-interface.md](../../dokja_docs/whatsapp-interface.md).
+TypeScript WhatsApp communication adapter for Dokja. It links to a WhatsApp account as a linked device (Baileys), forwards normalized messages to the orchestrator and sends eligible replies. The Communications domain decides which chats may be answered. Full description, setup and limits: [dokja_docs/whatsapp-interface.md](../../dokja_docs/whatsapp-interface.md).
 
 The protocol is unofficial: the account can be restricted or banned. Prefer a dedicated number. Nothing is answered unless it is listed.
 

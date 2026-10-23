@@ -22,7 +22,7 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0011](./0011-inference-provider-boundaries.md) | Domain-owned inference contracts, interchangeable infrastructure providers and Dokja-owned cognitive orchestration | Accepted responsibility boundary; general inference integration pending |
 
-| [0012](./0012-communication-services.md) | Platform gateways are communication-service adapters; operator interfaces remain Desktop/CLI/TUI | Classification accepted; policy extraction and relocation pending |
+| [0012](./0012-communication-services.md) | Platform gateways are communication-service adapters; operator interfaces remain Desktop/CLI/TUI | Policy extraction and gateway relocation complete; operator flow validation pending |
 
 | [0013](./0013-database-runtime-settings.md) | Shared database-backed operational settings, fixed embedding profile and transitional Compose projection | First local lot implemented; provider catalog and durable apply recovery pending |
 

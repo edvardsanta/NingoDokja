@@ -230,10 +230,17 @@ if [ "$INCLUDE_LEGACY" = "1" ]; then
 fi
 
 run_suite \
-  "dokja_interfaces/discord" \
+  "dokja_services/dokja_discord" \
   "pnpm test" \
-  "$ROOT_DIR/dokja_interfaces/discord" \
-  "command -v pnpm >/dev/null 2>&1 && [ -f '$ROOT_DIR/dokja_interfaces/discord/package.json' ]" \
+  "$ROOT_DIR/dokja_services/dokja_discord" \
+  "command -v pnpm >/dev/null 2>&1 && [ -f '$ROOT_DIR/dokja_services/dokja_discord/package.json' ]" \
+  "pnpm not installed or missing package.json"
+
+run_suite \
+  "dokja_services/dokja_whatsapp" \
+  "pnpm test" \
+  "$ROOT_DIR/dokja_services/dokja_whatsapp" \
+  "command -v pnpm >/dev/null 2>&1 && [ -f '$ROOT_DIR/dokja_services/dokja_whatsapp/package.json' ]" \
   "pnpm not installed or missing package.json"
 
 run_suite \

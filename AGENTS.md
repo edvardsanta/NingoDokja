@@ -60,9 +60,8 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 
 - `dokja_orch/`: Go orchestrator; entry point `cmd/va/`, code in `internal/` (core, ingress, handlers, clients).
 - `dokja_domain/`: one dir per domain. Go modules: `dokja_book`, `dokja_communications`, `dokja_digest`, `dokja_knowledge`, `dokja_meme`, `dokja_memory`, `dokja_moderation`. Python: `dokja_chat`.
-- `dokja_services/`: one dir per service, each with `service.yaml` and a Dockerfile. Go: `dokja_feeds`, `dokja_memory`, `dokja_scheduler`. Python: `dokja_book`, `dokja_communications`, `dokja_knowledge`, `dokja_meme`, `dokja_voice`, `dokja_prediction`.
+- `dokja_services/`: one dir per service, each with `service.yaml` and a Dockerfile. Go: `dokja_feeds`, `dokja_memory`, `dokja_scheduler`. Python: `dokja_book`, `dokja_communications`, `dokja_knowledge`, `dokja_meme`, `dokja_voice`, `dokja_prediction`. TypeScript communication adapters: `dokja_discord`, `dokja_whatsapp`.
 - `dokja_interfaces/`:
-  - `discord/` and `teams/`: TypeScript bots, run with `tsx`.
   - `desktop/`: Electron + React + Vite.
   - `cli/` and `tui/`: Go.
 - `dokja_store/`: shared Go persistence module.
@@ -76,10 +75,10 @@ The only allowed flow is `Interface → Event → Orchestrator → Domain → Se
 
 - Tool versions are in `.tool-versions`: Go 1.25.0, Node 24.12.0, Python 3.12.2. CI's Python job uses 3.13.
 - Every Go module has its own `go.mod`. Run commands inside the module you changed.
-- JS interfaces use pnpm (`pnpm-lock.yaml` in `discord/`, `teams/`, `desktop/`). Install with `pnpm install` in the interface dir.
-- **Everything:** `scripts/test_all.sh` runs the Go modules, `dokja_services/dokja_communications`, discord, desktop and `dokja_lab`. It writes a report to `test_reports/<run>/` and `test_reports/latest`. Optional suites: `INCLUDE_LEGACY=1` and `INCLUDE_OPENCLAW=1`.
+- TypeScript adapters and desktop use pnpm (each has a `pnpm-lock.yaml`). Install with `pnpm install` in the package directory.
+- **Everything:** `scripts/test_all.sh` runs the Go modules, `dokja_services/dokja_communications`, Discord, WhatsApp, desktop and `dokja_lab`. It writes a report to `test_reports/<run>/` and `test_reports/latest`. Optional suites: `INCLUDE_LEGACY=1` and `INCLUDE_OPENCLAW=1`.
 - **Go:** `go test ./...` inside the module. For a single test (the fast path), run `go test ./internal/core -run TestName` in `dokja_orch`.
-- **Discord / Teams:** `pnpm test` (`node --import tsx --test ./tests/*.test.ts`). Run with `pnpm start`. Teams also has `pnpm package`, which builds the app package.
+- **Discord / WhatsApp:** `pnpm test` (`node --import tsx --test ./tests/*.test.ts`). Run with `pnpm start`.
 - **Desktop:**
   - `pnpm test`: node tests plus `vitest run`.
   - `pnpm test:e2e`

@@ -1,12 +1,12 @@
 # WhatsApp communication adapter
 
 WhatsApp is classified as a communication-service adapter with inbound and outbound
-roles ([ADR 0012](decisions/0012-communication-services.md)). Source relocation is
-pending; the current path and legacy interface identifiers remain compatible.
+roles ([ADR 0012](decisions/0012-communication-services.md)). Its source lives
+under `dokja_services/dokja_whatsapp`; legacy interface identifiers remain compatible.
 
 The WhatsApp adapter is currently implemented in:
 
-- [dokja_interfaces/whatsapp](../dokja_interfaces/whatsapp)
+- [dokja_services/dokja_whatsapp](../dokja_services/dokja_whatsapp)
 
 Inbound flow (talking to Ningo in WhatsApp):
 

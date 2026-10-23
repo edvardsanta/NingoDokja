@@ -2,13 +2,13 @@
 
 Discord is classified as a communication-service adapter with inbound and outbound
 roles ([ADR 0012](decisions/0012-communication-services.md)). The implementation
-remains under `dokja_interfaces/discord` pending policy extraction and relocation.
+lives under `dokja_services/dokja_discord`; Communications owns inbound application eligibility.
 This guide describes its current contracts; legacy interface identifiers remain
 compatible.
 
 The Discord adapter is currently implemented in:
 
-- [dokja_interfaces/discord](../dokja_interfaces/discord)
+- [dokja_services/dokja_discord](../dokja_services/dokja_discord)
 
 Primary flow:
 
@@ -42,12 +42,14 @@ While Discord is off, a plain message gets no reply at all. A slash command is a
 
 ### Plain Messages
 
-The interface receives a Discord message, applies channel/DM filters, and forwards the content to the orchestrator as `message.created`.
+The adapter receives a Discord message, normalizes its channel, DM and mention
+facts, and forwards the content to the orchestrator as `message.created`.
+Communications decides application eligibility before the chat workflow runs.
 
 Relevant files:
 
-- [message_listener.ts](../dokja_interfaces/discord/messages/message_listener.ts)
-- [bridge.ts](../dokja_interfaces/discord/transport/bridge.ts)
+- [message_listener.ts](../dokja_services/dokja_discord/messages/message_listener.ts)
+- [bridge.ts](../dokja_services/dokja_discord/transport/bridge.ts)
 
 ### Slash Commands
 
@@ -62,8 +64,8 @@ Current commands:
 
 Relevant files:
 
-- [commands.ts](../dokja_interfaces/discord/commands/commands.ts)
-- [interactions.ts](../dokja_interfaces/discord/commands/interactions.ts)
+- [commands.ts](../dokja_services/dokja_discord/commands/commands.ts)
+- [interactions.ts](../dokja_services/dokja_discord/commands/interactions.ts)
 
 ### Rich Interactions
 
@@ -83,8 +85,8 @@ Examples:
 
 Relevant files:
 
-- [interactions.ts](../dokja_interfaces/discord/commands/interactions.ts)
-- [carbon_runtime.ts](../dokja_interfaces/discord/runtime/carbon_runtime.ts)
+- [interactions.ts](../dokja_services/dokja_discord/commands/interactions.ts)
+- [carbon_runtime.ts](../dokja_services/dokja_discord/runtime/carbon_runtime.ts)
 
 ## Outbound Delivery
 
@@ -132,7 +134,7 @@ Response:
 
 Relevant files:
 
-- [delivery_server.ts](../dokja_interfaces/discord/delivery/delivery_server.ts)
+- [delivery_server.ts](../dokja_services/dokja_discord/delivery/delivery_server.ts)
 - [discord_interface_client.go](../dokja_orch/internal/clients/discord_interface_client.go)
 
 ## Runtime Boundaries
@@ -141,9 +143,9 @@ Dokja-specific app code uses local runtime abstractions instead of depending on 
 
 Main local boundaries:
 
-- [types.ts](../dokja_interfaces/discord/types.ts)
-- [carbon_runtime.ts](../dokja_interfaces/discord/runtime/carbon_runtime.ts)
-- [app.ts](../dokja_interfaces/discord/app.ts)
+- [types.ts](../dokja_services/dokja_discord/types.ts)
+- [carbon_runtime.ts](../dokja_services/dokja_discord/runtime/carbon_runtime.ts)
+- [app.ts](../dokja_services/dokja_discord/app.ts)
 
 This keeps Carbon as a transport/runtime dependency, not the owner of Dokja application structure.
 

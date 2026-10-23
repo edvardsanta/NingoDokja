@@ -31,9 +31,9 @@ For a new cross-layer operation:
 
 [ADR 0012](decisions/0012-communication-services.md) classifies Discord and
 WhatsApp gateways as communication-service adapters, with inbound ingress and
-outbound transport roles. Desktop, CLI and TUI are operator interfaces. Current
-gateways still live under `dokja_interfaces/`; outbound policy extraction has begun and relocation
-remains pending in step 09.4. The [source audit](communication-boundaries.md) identifies
+outbound transport roles. Desktop, CLI and TUI are operator interfaces. The
+gateways live under `dokja_services/dokja_discord/` and
+`dokja_services/dokja_whatsapp/`. The [source audit](communication-boundaries.md) identifies
 existing read, send, linking and session ownership without changing contracts.
 Gateway ingress still submits the existing event/request to orchestration;
 reclassification does not permit service-to-domain or operator-to-service bypasses.
@@ -60,7 +60,7 @@ a cognitive macro-component.
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_runtime/chat.go` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
 | Media perception and meme pool | `dokja_domain/dokja_meme`; orchestration handlers currently also enforce delivery decisions | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | A workflow, not a concept (ADR 0010, proposed): scrapers, OCR and attachments move to Knowledge intake (Feeds plugins) with the pool as an intake cache, screening and the relevance threshold to Rules, sent receipts to Memory; meme events kept as a facade |
 | Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | Feeds `document.process.v1` compatibility plugin; legacy HTTP transport opt-in | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
-| Communications and delivery | Communications domain owns read eligibility; System handler currently owns much sending/linking behavior | Communications HTTP service; Discord and WhatsApp interface clients | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and action adapters behind explicit eligibility and delivery policy |
+| Communications and delivery | Communications domain owns read and inbound eligibility, delivery planning and linking authorization | Communications HTTP read service; Discord and WhatsApp gateway clients | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and transport adapters behind explicit eligibility and delivery policy |
 | Voice/audio | Provider selection currently in Voice service; no Voice domain binding found in inspected orchestrator entry point | `dokja_services/dokja_voice` | Service exposes synthesis, transcription, wakeword, and streaming APIs; full runtime consumer wiring is not established by this review | Audio perception/output providers, pending orchestration integration review |
 | Scheduling | Orchestrator controls decide whether a scheduled operation runs | `dokja_services/dokja_scheduler` emits events | Meme refresh and dispatch schedules | Trigger acquisition; workflow execution remains orchestrated |
 | Working context/coordination | Orchestrator core; chat lifecycle is currently in handlers | Router, context builder, workflow engine, dispatcher | Every registered route; chat sessions are separate volatile state | Bounded task workspace with domain decisions and explicit transitions |

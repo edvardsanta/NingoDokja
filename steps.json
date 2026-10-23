@@ -723,7 +723,8 @@
           "status": "in_progress",
           "evidence": [
             "Owner accepted classifying Discord and WhatsApp gateways as communication-service adapters, while Desktop/CLI/TUI remain operator interfaces. ADR 0012 records inbound/outbound roles and preserved contracts; source audit completed, no code or deployment moved.",
-            "2026-10-23: owner approved a breaking inbound bridge migration without a legacy gateway path. Communications now decides inbound application eligibility before chat or command steps; gateways retain protocol filtering. A dedicated bearer credential protects the bridge metadata. No live account or production rollout was performed."
+            "2026-10-23: owner approved a breaking inbound bridge migration without a legacy gateway path. Communications now decides inbound application eligibility before chat or command steps; gateways retain protocol filtering. A dedicated bearer credential protects the bridge metadata. No live account or production rollout was performed.",
+            "2026-10-23: Discord and WhatsApp gateways moved into separate communication service packages. Compose build paths, package tests, service manifests and runbook follow the move; module IDs, environment names, source identifiers and volume identities remain stable."
           ],
           "checks": [
             {
@@ -792,14 +793,31 @@
             {
               "id": "09.4-c",
               "title": "Relocate platform gateways as communication infrastructure",
-              "status": "pending",
+              "status": "completed",
               "depends_on": [
                 "09.4-b"
               ],
               "acceptance_criteria": [
                 "Update package imports, scripts, Dockerfiles, all affected Compose stacks, runtime discovery and runbook together.",
                 "Keep current module IDs, environment names, session keys, source identifiers, volumes and rollback compatibility. No implicit platform startup."
-              ]
+              ],
+              "evidence": [
+                "Moved Discord and WhatsApp packages to dokja_services without altering runtime IDs, gateway contracts or WhatsApp opt-in profile. Updated Dockerfiles, all affected Compose build paths, service manifests, package test script, architecture docs and runbook.",
+                "Runtime settings now recreate orchestrator and running gateway together after an inbound allowlist change; regression tests cover Discord and WhatsApp readers."
+              ],
+              "checks": [
+                {
+                  "name": "relocation_regression",
+                  "status": "passed",
+                  "detail": "Discord pnpm test: 30 passed; WhatsApp pnpm test: 141 passed; Runtime domain, Runtime service and orchestrator go test ./... passed; Runtime domain go test -race ./... and go vet ./... passed. Dev and lite Compose config --quiet, bash -n scripts/test_all.sh and git diff --check passed. Synthetic fixtures only."
+                },
+                {
+                  "name": "production_config",
+                  "status": "blocked",
+                  "detail": "Production Compose config requires ignored .env.prod and DOKJA_MODELS_DIR unavailable in the clean worktree. Build path was reviewed; no live account, volume or production stack was touched."
+                }
+              ],
+              "completed_on": "2026-10-23"
             },
             {
               "id": "09.4-d",
@@ -815,7 +833,7 @@
             }
           ],
           "remaining": [
-            "Complete inbound/linking and remaining handler policy extraction before physical relocation; outbound validation/ports are implemented.",
+            "Validate operator terminology and platform communication flows in step 09.4-d; gateway relocation and inbound/linking policy extraction are complete.",
             "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
           ]
         }
