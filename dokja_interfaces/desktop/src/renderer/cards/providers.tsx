@@ -12,8 +12,7 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
   const id = useId();
   const [inspecting, setInspecting] = useState(false);
   if (inspecting) return <ProviderInventory transport={transport} />;
-  return <section className="card" aria-labelledby={id}>
-    <span className="card-kind">{t("nav_system")}</span>
+  return <section className="wp-section" aria-labelledby={id}>
     <h2 id={id}>{t("providers_title")}</h2>
     <p className="detail">{t("providers_discovery_only")}</p>
     <button type="button" onClick={() => setInspecting(true)}>{t("providers_inspect")}</button>
@@ -39,7 +38,7 @@ function ProviderInventory({ transport }: { transport: Transport }) {
   }, [transport]);
   const action = useAction(save);
   useEffect(() => { if (action.state.phase === "ready") reload(); }, [action.state, reload]);
-  return <CardFrame kindLabel={t("nav_system")} title={t("providers_title")} state={state} onReload={reload}>
+  return <CardFrame title={t("providers_title")} state={state} onReload={reload}>
     {(data) => <>
       {data.configurationRevision ? <ChatSelection transport={transport} providers={data.providers} /> : null}
       <p className="detail">{t("providers_discovery_only")}</p>

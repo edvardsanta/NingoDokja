@@ -1,0 +1,1891 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ningo: mockup do desktop (alta fidelidade)</title>
+<!--
+  Static mockup for the Ningo desktop redesign. Design reference only: it is not wired to the app.
+  - Self-contained: inline CSS and a little JS (workspace and sub-view switching). No files, no network.
+  - Fonts are named, never loaded: "B612 Mono" (400, 700) and "Bodoni Moda" (700 italic only). Without
+    them installed the browser falls back to a monospace and a serif.
+  - Made-up data only. Hosts are example.com. Nothing here is a real name, id or address.
+  - Open it directly. Routes by hash: #conversa, #conversa-vazia, #conversa-offline, #biblioteca,
+    #biblioteca-leituras, #biblioteca-documento, #biblioteca-adicionar, #biblioteca-vazia,
+    #leituras-vazia, #caderno, #mensagens, #mensagens-whatsapp, #mensagens-meme, #sistema,
+    #sistema-detalhe, #sistema-configuracoes, #sistema-provedores, #componentes (component catalog).
+  - Keys: Ctrl+1..5 switch workspace, arrows move inside tab lists, Esc closes a menu or the aside.
+-->
+<style>
+/* ==========================================================================
+   1. TOKENS
+   Kept = already in dokja_interfaces/desktop/src/renderer/styles.css.
+   NEW  = proposed here, flagged in ui-system.md.
+   ========================================================================== */
+:root {
+  color-scheme: dark;
+
+  /* kept: colour. Neon only ever means a state. */
+  --static: #101b25;
+  --panel: #0a1119;
+  --edge: #456a80;
+  --ink: #d6e6f3;
+  --ink-dim: #8ea3b5;
+  --cyan: #3be8f5;
+  --magenta: #ff3d8b;
+  --magenta-text: #ff6aa5;
+  --amber: #ffb22e;
+  --off: #62768a;
+
+  /* kept: structure and type */
+  --cut: 12px;
+  --chamfer: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+  --mono: "B612 Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  --serif: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
+  --scanlines: repeating-linear-gradient(to bottom, transparent 0 3px, rgb(0 0 0 / 0.16) 3px 4px);
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .75 0 0 0 0 .88 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* NEW: derived surfaces (no new hue) */
+  --rule: color-mix(in srgb, var(--edge) 45%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 6%, transparent);
+  --wash-strong: color-mix(in srgb, var(--ink) 12%, transparent);
+  --focus: var(--ink);
+
+  /* NEW: type scale. B612 Mono 400/700; Bodoni Moda 700 italic for the voice line only. */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.375rem;
+  --fs-voice: 1.25rem;
+  --measure: 68ch;
+
+  /* NEW: spacing, a 4 px grid */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --row-h: 2.25rem;
+}
+
+/* kept: a state sets its colour, the component reads it. NEW: progress, ink and not neon. */
+[data-tone="ok"] { --tone: var(--cyan); --tone-text: var(--cyan); }
+[data-tone="problem"] { --tone: var(--magenta); --tone-text: var(--magenta-text); }
+[data-tone="unchecked"] { --tone: var(--amber); --tone-text: var(--amber); }
+[data-tone="off"], [data-tone="other"] { --tone: var(--off); --tone-text: var(--ink-dim); }
+[data-tone="progress"] { --tone: var(--ink); --tone-text: var(--ink); }
+
+/* ==========================================================================
+   2. BASE
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--static); }
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  color: var(--ink);
+  font: 400 var(--fs-base) / 1.6 var(--mono);
+  background-color: var(--static);
+  /* fixed: the legend patches reuse the same layers and line up with the page exactly */
+  background-image: var(--scanlines), var(--noise);
+  background-attachment: fixed;
+}
+[hidden] { display: none !important; }
+button, input, textarea, select { font: inherit; color: inherit; }
+p, ul, ol, dl, h1, h2, h3, h4, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.skip {
+  position: absolute; left: var(--s-2); top: -4rem; z-index: 50; padding: var(--s-2) var(--s-3);
+  background: var(--ink); color: var(--panel); font-size: var(--fs-sm);
+}
+.skip:focus { top: var(--s-2); }
+
+/* One focus ring for everything: ink, 2 px. Focus is not a state, so it is never neon. */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible,
+.is-focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+
+/* ==========================================================================
+   3. SHELL: sidebar panel + work area. The page itself never scrolls.
+   ========================================================================== */
+.app {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  gap: var(--s-4);
+  height: 100vh;
+  padding: var(--s-4);
+}
+
+/* The chamfered panel. One layer: the clip cuts two corners and the diagonals are drawn just inside. */
+.panel { position: relative; isolation: isolate; clip-path: var(--chamfer); }
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1.42px), var(--edge) calc(50% - 1.42px) 50%, transparent 50%)
+      top right / var(--cut) var(--cut) no-repeat border-box,
+    linear-gradient(to top right, transparent 50%, var(--edge) 50% calc(50% + 1.42px), transparent calc(50% + 1.42px))
+      bottom left / var(--cut) var(--cut) no-repeat border-box,
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    var(--edge) border-box;
+}
+
+.sidebar { display: flex; flex-direction: column; min-height: 0; padding: var(--s-5) 0 var(--s-2); }
+
+/* The name: the one memorable thing. Ghosts drift out of register as health worsens. */
+.wordmark {
+  --ghost: 3;
+  display: block;
+  width: max-content;
+  margin: 0 var(--s-4) var(--s-5) var(--s-4);
+  font: italic 700 3rem / 1 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  text-shadow: calc(var(--ghost) * -1px) 0 var(--cyan), calc(var(--ghost) * 1px) 0 var(--magenta);
+}
+.wordmark[data-pulse="calm"] { --ghost: 0; }
+.wordmark[data-pulse="tuning"] { --ghost: 3; }
+.wordmark[data-pulse="unwell"] { --ghost: 6; }
+.wordmark[data-pulse="lost"] { --ghost: 9; }
+.wordmark[data-pulse="stale"] { --ghost: 3; opacity: 0.6; }
+
+/* Sidebar entries: a shape, a name, and a word only when something is not well. */
+.workspaces { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.tab {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: var(--s-3);
+  min-height: var(--row-h);
+  padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) - 3px);
+  border: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: var(--fs-base);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.tab:where(:hover, .is-hover) { color: var(--ink); background: var(--wash); }
+.tab[aria-selected="true"] {
+  border-left-color: var(--cyan);
+  background: linear-gradient(to right, color-mix(in srgb, var(--cyan) 10%, transparent), transparent);
+  color: var(--cyan);
+}
+.tab:focus-visible, .tab.is-focus { outline-offset: -2px; }
+.tab-word { grid-column: 1 / -1; font-size: var(--fs-xs); line-height: 1.3; color: var(--tone-text); }
+.tab[data-tone="ok"] .tab-word { display: none; }
+.tab[data-foot] { margin-top: auto; padding-top: var(--s-3); padding-bottom: var(--s-3); border-top: 1px solid var(--rule); }
+.tab-count {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0 0.4rem;
+  background: var(--tone); color: var(--static); font: 700 var(--fs-xs) / 1.5 var(--mono);
+}
+.tab-count .dot { background: var(--static); }
+
+/* The state shape. Colour and silhouette both carry it; the word is always in the accessible name. */
+.dot { display: inline-block; flex: none; width: 0.5rem; height: 0.5rem; background: var(--tone, var(--off)); }
+.dot[data-shape="triangle"] { width: 0.625rem; height: 0.55rem; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.dot[data-shape="diamond"] {
+  width: 0.42rem; height: 0.42rem; margin: 0 0.07rem; background: transparent;
+  border: 2px solid var(--tone); transform: rotate(45deg);
+}
+.dot[data-shape="dash"] { width: 0.625rem; height: 2px; }
+.dot[data-shape="blink"] { animation: blink 1s steps(2, jump-none) infinite; }
+
+/* ==========================================================================
+   4. WORKSPACE PANEL (the shared template)
+   legend, header (tabs + actions), voice, toolbar, body + aside, dock
+   ========================================================================== */
+.frame { position: relative; display: flex; min-width: 0; min-height: 0; container: ws / inline-size; }
+.legend {
+  position: absolute; top: -0.65rem; left: var(--s-5); z-index: 5; padding: 0 var(--s-2);
+  background-color: var(--static); background-image: var(--scanlines), var(--noise); background-attachment: fixed;
+  font-size: var(--fs-sm); line-height: 1.3; color: var(--ink-dim);
+}
+.legend i { font-style: normal; color: var(--edge); padding: 0 0.25ch; }
+.legend b { font-weight: 400; color: var(--ink); }
+
+.wp { position: relative; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.wp-head {
+  display: flex; align-items: flex-end; gap: var(--s-4); min-height: 3.25rem;
+  padding: var(--s-4) 13rem 0 var(--s-5); border-bottom: 1px solid var(--rule);
+}
+.wp-head.plain { padding-right: 6rem; padding-bottom: var(--s-3); align-items: center; color: var(--ink-dim); font-size: var(--fs-xs); }
+.wp-actions { position: absolute; top: 0.6rem; right: var(--s-5); z-index: 4; display: flex; align-items: center; gap: var(--s-2); }
+.view { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.view-enter { animation: print 0.6s steps(24) both; }
+
+/* View tabs: places. Underline in cyan; open items follow a separator and can be closed. */
+.vtabs { display: flex; align-items: flex-end; gap: var(--s-5); min-width: 0; }
+.vt {
+  margin-bottom: -1px; padding: 0.55rem 0.1rem 0.6rem; border: 0; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--ink-dim); font-size: var(--fs-base); line-height: 1.3; white-space: nowrap; cursor: pointer;
+}
+.vt:where(:hover, .is-hover) { color: var(--ink); }
+.vt[aria-selected="true"] { color: var(--cyan); border-bottom-color: var(--cyan); }
+.vt-sep { align-self: center; width: 1px; height: 1.25rem; margin-inline: calc(var(--s-2) * -1); background: var(--edge); }
+.vt-pair { display: inline-flex; align-items: flex-end; min-width: 0; max-width: 24rem; }
+.vt-pair .vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vt-close {
+  align-self: center; display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; margin: 0 0 0.1rem 0.25rem;
+  border: 0; background: transparent; color: var(--ink-dim); cursor: pointer;
+}
+.vt-close:where(:hover, .is-hover) { color: var(--ink); background: var(--wash-strong); }
+
+/* Voice line: Ningo's one line per view. Bodoni italic, ink, plain B612 sentence under it. */
+.voice-block { padding: var(--s-5) var(--s-5) 0; }
+.voice { max-width: 44rem; font: italic 700 var(--fs-voice) / 1.3 var(--serif); color: var(--ink); animation: print 0.8s steps(32) both; }
+.voice-next { max-width: var(--measure); margin-top: var(--s-2); font-size: var(--fs-sm); color: var(--ink-dim); }
+
+.wp-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4);
+  padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule);
+}
+.wp-tools .grow { flex: 1 1 18rem; }
+.wp-main { position: relative; display: flex; flex: 1; min-height: 0; }
+.wp-body { flex: 1; min-width: 0; overflow: auto; padding: var(--s-5); }
+.wp-body.flush { padding: 0; }
+.wp-aside {
+  display: none; flex: none; flex-direction: column; width: 22rem; min-height: 0;
+  border-left: 1px solid var(--rule); background: var(--panel);
+}
+.view[data-aside="open"] .wp-aside { display: flex; }
+.aside-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--rule); }
+.aside-head h3 { font-size: var(--fs-md); line-height: 1.3; }
+.aside-body { flex: 1; overflow: auto; padding: var(--s-4); }
+.wp-dock { flex: none; padding: var(--s-4) var(--s-5); border-top: 1px solid var(--rule); }
+
+/* Aside: inline when the panel is wide enough for it, an overlay otherwise. The query is on the panel, not the window. */
+@container ws (max-width: 61.99rem) {
+  .wp-main { position: static; }
+  .wp-aside {
+    position: absolute; inset: 3.25rem 0 0 auto; z-index: 6; width: min(22rem, 100%);
+    border-left: 1px solid var(--edge); box-shadow: -1.5rem 0 1.5rem rgb(0 0 0 / 0.5);
+  }
+}
+
+/* ==========================================================================
+   5. CONTROLS
+   switch = a persistent state, button = a verb, segmented = a mode, tab = a place
+   ========================================================================== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); min-height: 2rem;
+  padding: 0 0.9rem; border: 1px solid var(--edge); background: transparent; color: var(--ink);
+  font-size: var(--fs-sm); line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.btn:where(:hover, .is-hover):not(:disabled) { border-color: var(--ink); background: var(--wash); }
+.btn:where(:active, .is-active):not(:disabled) { background: var(--wash-strong); }
+.btn-primary { border-color: var(--ink); background: var(--ink); color: var(--panel); font-weight: 700; }
+.btn-primary:where(:hover, .is-hover):not(:disabled) { background: var(--ink); filter: brightness(1.12); }
+.btn-primary:where(:active, .is-active):not(:disabled) { background: var(--ink); filter: brightness(0.88); }
+/* While its own aside is open the opener steps down, so the aside's button is the one primary. */
+.view[data-aside="open"] .btn-primary[data-opens-aside] { background: transparent; color: var(--ink); font-weight: 400; border-color: var(--edge); }
+.btn-quiet { border-color: transparent; padding: 0 var(--s-2); color: var(--ink-dim); }
+.btn-quiet:where(:hover, .is-hover):not(:disabled) { border-color: transparent; background: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.btn-icon { width: 2rem; padding: 0; border-color: transparent; color: var(--ink-dim); }
+.btn-icon:where(:hover, .is-hover):not(:disabled) { border-color: transparent; color: var(--ink); background: var(--wash-strong); }
+.btn-sm { min-height: 1.75rem; padding: 0 0.65rem; font-size: var(--fs-xs); }
+.btn-confirm { border-color: var(--magenta); color: var(--magenta-text); }
+.btn-confirm:where(:hover, .is-hover):not(:disabled) { border-color: var(--magenta); background: color-mix(in srgb, var(--magenta) 14%, transparent); }
+.btn:disabled, .btn.is-disabled { border-style: dashed; color: var(--ink-dim); opacity: 0.7; cursor: not-allowed; }
+.btn-primary:disabled, .btn-primary.is-disabled { background: transparent; border-color: var(--edge); }
+.btn[aria-busy="true"] { pointer-events: none; }
+.btn[aria-busy="true"]::after, .cursor {
+  content: ""; display: inline-block; width: 0.55ch; height: 1.05em; margin-left: 0.25ch; vertical-align: text-bottom;
+  background: currentColor; animation: blink 1s steps(2, jump-none) infinite;
+}
+.cursor { display: inline-block; }
+.icon { width: 1rem; height: 1rem; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; }
+.icon.solid { fill: currentColor; stroke: none; }
+
+/* Switch: track and thumb, with the word beside it. Cyan only when it is on. */
+.switch {
+  display: inline-flex; align-items: center; gap: var(--s-2); padding: var(--s-1) 0; border: 0;
+  background: transparent; color: var(--ink-dim); font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
+}
+.sw-track {
+  position: relative; flex: none; width: 2.25rem; height: 1.125rem; border: 1px solid var(--off); background: transparent;
+}
+.sw-thumb { position: absolute; top: 2px; left: 2px; width: 0.75rem; height: calc(100% - 4px); background: var(--off); }
+.switch[aria-checked="true"] { color: var(--cyan); }
+.switch[aria-checked="true"] .sw-track { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 18%, transparent); }
+.switch[aria-checked="true"] .sw-thumb { left: auto; right: 2px; background: var(--cyan); }
+.switch[aria-checked="mixed"] { color: var(--amber); }
+.switch[aria-checked="mixed"] .sw-track { border-style: dashed; border-color: var(--amber); }
+.switch[aria-checked="mixed"] .sw-thumb { left: calc(50% - 0.375rem); background: transparent; border: 2px solid var(--amber); }
+.switch:where(:hover, .is-hover):not(:disabled) .sw-track { border-color: var(--ink); }
+.switch[aria-checked="true"]:where(:hover, .is-hover):not(:disabled) .sw-track { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 30%, transparent); }
+.switch:disabled, .switch.is-disabled { opacity: 0.6; cursor: not-allowed; }
+.switch:disabled .sw-track, .switch.is-disabled .sw-track { border-style: dashed; }
+.switch[aria-busy="true"] { pointer-events: none; }
+.switch[aria-busy="true"] .sw-thumb { left: calc(50% - 0.375rem); animation: blink 1s steps(2, jump-none) infinite; }
+
+/* Segmented control: a mode or a filter. The selected segment is outlined in cyan, never filled. */
+.seg { display: inline-flex; }
+.seg button {
+  display: inline-flex; align-items: center; gap: var(--s-2); min-height: 2rem; margin-left: -1px; padding: 0 var(--s-3);
+  border: 1px solid var(--edge); background: transparent; color: var(--ink-dim); font-size: var(--fs-sm); cursor: pointer;
+}
+.seg button:first-child { margin-left: 0; }
+.seg button:where(:hover, .is-hover):not(:disabled) { color: var(--ink); background: var(--wash); }
+.seg button[aria-checked="true"] {
+  position: relative; z-index: 1; border-color: var(--cyan); color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+}
+.seg button:disabled { border-style: dashed; opacity: 0.7; cursor: not-allowed; }
+.seg .count { color: var(--ink-dim); font-size: var(--fs-xs); }
+.seg button[aria-checked="true"] .count { color: var(--cyan); }
+.seg button:focus-visible, .seg button.is-focus { z-index: 2; }
+
+/* Fields */
+.input {
+  width: 100%; min-height: 2rem; padding: 0.35rem 0.65rem; border: 1px solid var(--edge);
+  background: var(--static); color: var(--ink); font-size: var(--fs-sm);
+}
+.input::placeholder { color: var(--ink-dim); opacity: 1; }
+.input:where(:hover, .is-hover):not(:disabled) { border-color: var(--ink-dim); }
+.input:focus-visible, .input.is-focus { outline-offset: 1px; border-color: var(--ink); }
+.input[aria-invalid="true"] { border-color: var(--magenta); }
+.input:disabled { border-style: dashed; opacity: 0.7; cursor: not-allowed; }
+textarea.input { min-height: 3.5rem; line-height: 1.5; resize: vertical; }
+.input-wrap { position: relative; flex: 1 1 14rem; min-width: 0; }
+.input-wrap .icon { position: absolute; left: 0.6rem; top: 50%; translate: 0 -50%; color: var(--ink-dim); pointer-events: none; }
+.input-wrap .input { padding-left: 2rem; }
+.field-label { display: block; margin-bottom: var(--s-1); font-size: var(--fs-xs); color: var(--ink-dim); }
+.field-help { margin-top: var(--s-1); font-size: var(--fs-xs); color: var(--ink-dim); }
+.field-error { margin-top: var(--s-1); font-size: var(--fs-xs); color: var(--magenta-text); }
+select.input { appearance: none; padding-right: 1.75rem; background-image: linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%), linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%); background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+/* State word: shape + word. Neon sits on the shape; the word is ink unless it is a problem. */
+.sw { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); white-space: nowrap; }
+.sw[data-tone="problem"] { color: var(--magenta-text); }
+.sw[data-tone="unchecked"] { color: var(--amber); }
+.sw[data-tone="off"] { color: var(--ink-dim); }
+.sw[data-tone="ok"] { color: var(--ink); }
+.sw[data-tone="progress"] { color: var(--ink); }
+
+/* Chip */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--s-2); min-height: 1.625rem; padding: 0 var(--s-2);
+  border: 1px solid var(--edge); font-size: var(--fs-xs); color: var(--ink-dim); white-space: nowrap;
+}
+.chip.removable { padding-right: 0; }
+.chip .x { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 0; background: transparent; color: var(--ink-dim); cursor: pointer; }
+.chip .x:where(:hover, .is-hover) { color: var(--ink); background: var(--wash-strong); }
+.chip[data-tone="unchecked"] { border-color: color-mix(in srgb, var(--amber) 55%, var(--edge)); color: var(--ink); }
+.chip.disabled { border-style: dashed; opacity: 0.7; }
+
+/* Notice: a plain sentence with its state in the left bar. */
+.notice {
+  display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-2) var(--s-3);
+  border-left: 3px solid var(--tone, var(--off)); font-size: var(--fs-sm);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone, var(--off)) 12%, transparent), transparent 70%);
+}
+.notice .dot { margin-top: 0.4rem; }
+.notice strong { color: var(--tone-text); font-weight: 700; }
+.notice .actions { margin-left: auto; display: flex; gap: var(--s-2); flex: none; }
+.notice p + p { margin-top: var(--s-1); }
+
+/* Disclosure */
+details > summary { cursor: pointer; color: var(--ink-dim); font-size: var(--fs-sm); list-style: none; padding: var(--s-1) 0; width: max-content; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: ""; display: inline-block; width: 0.45rem; height: 0.45rem; margin-right: 0.6rem; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-0.12rem) rotate(-45deg); }
+details[open] > summary::before { transform: translateY(-0.2rem) rotate(45deg); }
+details > summary:hover { color: var(--ink); }
+
+/* ==========================================================================
+   6. DATA: tables, rows, menus, pager
+   ========================================================================== */
+.tbl { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--fs-sm); }
+.tbl th {
+  position: sticky; top: 0; z-index: 2; padding: var(--s-2) var(--s-3); background: var(--panel); border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-xs); font-weight: 400; text-align: left; color: var(--ink-dim);
+}
+.tbl th:first-child, .tbl td:first-child { padding-left: var(--s-5); }
+.tbl td {
+  height: var(--row-h); padding: 0 var(--s-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-bottom: 1px solid color-mix(in srgb, var(--edge) 22%, transparent);
+}
+.tbl td.dim { color: var(--ink-dim); }
+.tbl td.num, .tbl th.num { text-align: right; }
+.tbl tbody tr:where(:hover, .is-hover) td { background: var(--wash); }
+.tbl tr[aria-selected="true"] td { background: color-mix(in srgb, var(--cyan) 9%, transparent); }
+.tbl tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--cyan); }
+.tbl td:last-child, .tbl th:last-child { padding-right: var(--s-5); text-align: right; }
+.tbl tbody td { animation: print 0.5s steps(24) both; animation-delay: calc(var(--i, 0) * 35ms); }
+.row-link {
+  max-width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: pointer;
+}
+.row-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.row-link:focus-visible { outline-offset: 1px; }
+.row-menu { color: var(--ink-dim); }
+.indexed { display: inline-flex; align-items: center; gap: var(--s-2); }
+
+.menu {
+  position: absolute; z-index: 20; min-width: 13rem; padding: var(--s-1); background: var(--panel);
+  border: 1px solid var(--edge); box-shadow: 0 0.75rem 1.5rem rgb(0 0 0 / 0.55);
+}
+.menu button {
+  display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--s-4); padding: 0.45rem var(--s-3);
+  border: 0; background: transparent; color: var(--ink); font-size: var(--fs-sm); text-align: left; cursor: pointer;
+}
+.menu button:where(:hover, .is-hover), .menu button:focus-visible { background: var(--wash-strong); outline-offset: -2px; }
+.menu button:disabled { color: var(--ink-dim); opacity: 0.7; cursor: not-allowed; }
+.menu button kbd { font: inherit; font-size: var(--fs-xs); color: var(--ink-dim); }
+.menu hr { margin: var(--s-1) 0; border: 0; border-top: 1px solid var(--rule); }
+.menu-anchor { position: relative; display: inline-block; }
+.menu-anchor > .menu { top: calc(100% + 0.25rem); right: 0; }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) var(--s-5); font-size: var(--fs-xs); color: var(--ink-dim); }
+.pager .btns { display: flex; gap: var(--s-1); }
+
+.section-title { display: flex; align-items: baseline; gap: var(--s-3); margin: 0 0 var(--s-2); font-size: var(--fs-sm); font-weight: 700; color: var(--ink); }
+.section-title .n { font-weight: 400; color: var(--ink-dim); }
+.section-title .note { margin-left: auto; font-weight: 400; font-size: var(--fs-xs); color: var(--ink-dim); }
+
+/* ==========================================================================
+   7. ANIMATION: one print, one blinking cursor. Both stop under reduced motion.
+   ========================================================================== */
+@keyframes print { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (forced-colors: active) {
+  /* Shapes keep their colour (it is the state); the count badge falls back to system colours. */
+  .dot, .sw-thumb, .sw-track { forced-color-adjust: none; }
+  .tab-count { border: 1px solid ButtonText; }
+  .tab-count .dot { forced-color-adjust: auto; background: ButtonText; }
+}
+/* ==========================================================================
+   8. CONVERSA: transcript and composer
+   Ningo's replies are not voice lines: they stay in B612 for reading, set apart by label and hairline.
+   ========================================================================== */
+.transcript { display: grid; gap: var(--s-5); max-width: calc(var(--measure) + 3rem); margin: 0 auto; }
+.turn { display: grid; gap: var(--s-1); }
+.turn-meta { display: flex; gap: var(--s-3); align-items: baseline; font-size: var(--fs-xs); color: var(--ink-dim); }
+.turn-meta b { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-dim); }
+.turn-text { max-width: var(--measure); line-height: 1.65; overflow-wrap: anywhere; }
+.turn-text p + p { margin-top: var(--s-3); }
+.turn[data-from="you"] .turn-text { color: var(--ink-dim); }
+.turn[data-from="ningo"] { padding-left: var(--s-4); border-left: 2px solid var(--edge); }
+.turn[data-from="ningo"] .turn-meta b { color: var(--ink); }
+.turn[data-from="ningo"] .turn-text { color: var(--ink); }
+.divider { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-xs); color: var(--ink-dim); }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.divider + .quiet-note { margin-top: calc(var(--s-3) * -1); text-align: center; font-size: var(--fs-xs); color: var(--ink-dim); }
+.thinking { color: var(--ink-dim); font-size: var(--fs-sm); }
+
+.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--s-3); max-width: calc(var(--measure) + 3rem); margin: 0 auto; }
+.composer .input { min-height: 3.5rem; resize: none; }
+.composer .btn-primary { min-height: 2.5rem; padding: 0 var(--s-5); }
+.composer-top { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.composer-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: var(--s-3); font-size: var(--fs-xs); color: var(--ink-dim); }
+.starts { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
+
+/* ==========================================================================
+   9. BIBLIOTECA: readings, sources, document text
+   ========================================================================== */
+.sources-strip { margin: 0 var(--s-5); border: 1px solid var(--rule); }
+.sources-strip li { display: grid; grid-template-columns: minmax(0, 1.6fr) 9.5rem 5rem 13rem minmax(0, 1fr); align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); font-size: var(--fs-sm); border-top: 1px solid var(--rule); }
+.sources-strip li:first-child { border-top: 0; }
+.sources-strip .dim { color: var(--ink-dim); white-space: nowrap; }
+.sources-strip .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sources-strip .reason { font-size: var(--fs-xs); color: var(--ink-dim); overflow-wrap: anywhere; }
+.readings { display: grid; gap: var(--s-5); max-width: calc(var(--measure) + 1rem); }
+.reading h3 { font-size: var(--fs-md); line-height: 1.35; }
+.reading .meta { margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-dim); }
+.reading .summary { margin-top: var(--s-1); color: var(--ink-dim); font-size: var(--fs-sm); line-height: 1.6; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.reading .btn-quiet { margin: var(--s-1) 0 0 calc(var(--s-2) * -1); }
+.more-line { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-5); font-size: var(--fs-xs); color: var(--ink-dim); }
+
+.doc-title { font-size: var(--fs-lg); line-height: 1.3; font-weight: 700; }
+.doc-meta { margin-top: var(--s-1); font-size: var(--fs-sm); color: var(--ink-dim); }
+.doc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-4); margin-top: var(--s-4); }
+.doc-text { max-width: var(--measure); margin-top: var(--s-5); line-height: 1.75; }
+.doc-text p + p { margin-top: var(--s-4); }
+.doc-note { max-width: var(--measure); margin-top: var(--s-5); font-size: var(--fs-xs); color: var(--ink-dim); }
+
+.empty { max-width: 46rem; padding: var(--s-6) 0; }
+.empty .drop { margin-top: var(--s-5); padding: var(--s-5); border: 1px dashed var(--edge); color: var(--ink-dim); font-size: var(--fs-sm); max-width: 38rem; }
+.empty .actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
+
+.add-form { display: grid; gap: var(--s-4); }
+.add-form .actions { display: flex; gap: var(--s-2); align-items: center; }
+.add-form .actions .btn-primary { flex: 1; }
+
+/* ==========================================================================
+   10. CADERNO: track record, experiences, detail
+   ========================================================================== */
+.record { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-1) var(--s-5); margin: var(--s-4) var(--s-5) 0; font-size: var(--fs-sm); }
+.record dt { color: var(--ink-dim); }
+.record dd b { font-weight: 700; }
+.record dd .sep { margin: 0 1ch; color: var(--edge); }
+.exp { display: grid; grid-template-columns: 1rem minmax(0, 1fr) auto; align-items: center; gap: 0 var(--s-3); width: 100%; padding: var(--s-2) var(--s-5); border: 0; border-bottom: 1px solid color-mix(in srgb, var(--edge) 22%, transparent); background: transparent; text-align: left; cursor: pointer; animation: print 0.5s steps(24) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.exp:where(:hover, .is-hover) { background: var(--wash); }
+.exp[aria-selected="true"] { background: color-mix(in srgb, var(--cyan) 9%, transparent); box-shadow: inset 3px 0 0 var(--cyan); }
+.exp:focus-visible { outline-offset: -2px; }
+.exp .t { color: var(--ink); font-size: var(--fs-sm); }
+.exp .s { grid-column: 2; font-size: var(--fs-xs); color: var(--ink-dim); }
+.exp .ago { grid-column: 3; grid-row: 1 / span 2; font-size: var(--fs-xs); color: var(--ink-dim); }
+.exp .dot { grid-row: 1 / span 2; justify-self: center; }
+.facts { display: grid; grid-template-columns: 1fr auto; gap: var(--s-2) var(--s-4); margin-top: var(--s-4); font-size: var(--fs-sm); }
+.facts dt { color: var(--ink-dim); }
+.facts dd { text-align: right; font-weight: 700; }
+.facts .why { grid-column: 1 / -1; margin-top: calc(var(--s-1) * -1); font-size: var(--fs-xs); color: var(--ink-dim); font-weight: 400; text-align: left; }
+.verdict { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--rule); }
+.verdict h4 { font-size: var(--fs-sm); }
+.verdict .row { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); }
+.verdict .rule { margin-top: var(--s-3); font-size: var(--fs-xs); color: var(--ink-dim); }
+
+/* ==========================================================================
+   11. MENSAGENS: channels, thread, dock
+   ========================================================================== */
+.messenger { display: grid; grid-template-columns: 13rem minmax(0, 1fr); flex: 1; min-height: 0; }
+.rail { padding: var(--s-3) 0; border-right: 1px solid var(--rule); overflow: auto; }
+.rail h3 { padding: 0 var(--s-4); margin-bottom: var(--s-2); font-size: var(--fs-xs); font-weight: 400; color: var(--ink-dim); }
+.rail button { display: grid; grid-template-columns: 1fr auto; align-items: center; width: 100%; padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) - 3px); border: 0; border-left: 3px solid transparent; background: transparent; color: var(--ink-dim); font-size: var(--fs-sm); text-align: left; cursor: pointer; }
+.rail button small { display: block; font-size: var(--fs-xs); color: var(--ink-dim); }
+.rail button small.state, .rail button[aria-current="true"] small.state { color: var(--tone-text); }
+.rail button:where(:hover, .is-hover) { color: var(--ink); background: var(--wash); }
+.rail button[aria-current="true"] { border-left-color: var(--cyan); color: var(--cyan); background: linear-gradient(to right, color-mix(in srgb, var(--cyan) 10%, transparent), transparent); }
+.rail button[aria-current="true"] small { color: var(--ink-dim); }
+.rail button:focus-visible { outline-offset: -2px; }
+.thread { display: flex; min-width: 0; min-height: 0; flex-direction: column; }
+.thread-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-1) var(--s-4); padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--rule); }
+.thread-head h3 { font-size: var(--fs-md); line-height: 1.3; }
+.thread-head .as { font-size: var(--fs-xs); color: var(--ink-dim); }
+.msgs { display: grid; gap: var(--s-4); max-width: calc(var(--measure) + 2rem); }
+.msg { display: grid; gap: 2px; }
+.msg .who { display: flex; gap: var(--s-3); align-items: baseline; font-size: var(--fs-xs); color: var(--ink-dim); }
+.msg .who b { font-size: var(--fs-sm); color: var(--ink); }
+.msg[data-from="ningo"] { padding-left: var(--s-4); border-left: 2px solid var(--edge); }
+.msg-text { max-width: var(--measure); }
+.msg .tag { padding: 0 0.4rem; border: 1px solid var(--edge); font-size: var(--fs-xs); color: var(--ink-dim); }
+.dock-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-3); align-items: end; }
+.dock-grid .stack { display: grid; gap: var(--s-2); min-width: 0; }
+.dock-grid .input { resize: none; }
+.dock-grid .btns { display: flex; gap: var(--s-2); }
+.dock-grid .btns .btn { min-height: 2.5rem; }
+.dock-foot { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--ink-dim); }
+.popover { position: absolute; right: var(--s-5); bottom: calc(100% - 0.5rem); z-index: 20; width: min(27rem, calc(100% - 3rem)); padding: var(--s-3); background: var(--panel); border: 1px solid var(--edge); box-shadow: 0 0.75rem 1.5rem rgb(0 0 0 / 0.55); }
+.popover h4 { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s-3); font-size: var(--fs-sm); }
+.memes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
+.meme { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; padding: 0; border: 1px solid var(--edge); color: var(--ink-dim); font-size: var(--fs-xs); cursor: pointer; background: repeating-linear-gradient(135deg, var(--static) 0 6px, color-mix(in srgb, var(--edge) 28%, var(--static)) 6px 12px); }
+.meme:where(:hover, .is-hover) { border-color: var(--ink); }
+.meme[aria-pressed="true"] { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+.meme[aria-pressed="true"]::after { content: ""; position: absolute; top: 4px; right: 4px; width: 1.1rem; height: 1.1rem; background: var(--cyan) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.5 3.5L13 4.5' fill='none' stroke='%230a1119' stroke-width='2'/%3E%3C/svg%3E") center / 80% no-repeat; }
+.meme:disabled { border-style: dashed; opacity: 0.6; cursor: not-allowed; }
+.meme-wrap { position: relative; }
+.meme-cap { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popover .foot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-3); font-size: var(--fs-xs); color: var(--ink-dim); }
+
+/* ==========================================================================
+   12. SISTEMA: status, settings, providers (plain, never voice)
+   ========================================================================== */
+.attn { display: grid; gap: var(--s-1); }
+.attn li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-left: 3px solid var(--tone); background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 70%); animation: print 0.5s steps(24) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.attn .name { font-size: var(--fs-sm); font-weight: 700; }
+.attn .why { font-size: var(--fs-xs); color: var(--ink-dim); }
+.attn .why strong { color: var(--tone-text); font-weight: 700; }
+.attn .actions { display: flex; gap: var(--s-2); }
+.sys-group + .sys-group { margin-top: var(--s-5); }
+.tbl.parts th, .tbl.parts td { padding-left: 0; padding-right: var(--s-3); }
+.tbl.parts th:first-child, .tbl.parts td:first-child { padding-left: 0; }
+.tbl.parts td:last-child, .tbl.parts th:last-child { padding-right: 0; }
+.tbl.parts .name { color: var(--ink); }
+.tbl.parts td.na { color: var(--ink-dim); }
+.interval { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--ink-dim); }
+.interval .input { width: 4rem; min-height: 1.75rem; text-align: center; }
+.interval select.input { width: 6.5rem; padding-left: 0.5rem; }
+.jobs { display: grid; gap: var(--s-1); }
+.job { display: grid; grid-template-columns: minmax(8rem, 1fr) auto auto; align-items: center; gap: var(--s-2) var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid color-mix(in srgb, var(--edge) 22%, transparent); font-size: var(--fs-sm); }
+.job .last { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--ink-dim); }
+.job .custom { font-size: var(--fs-xs); color: var(--amber); }
+.foot-note { margin-top: var(--s-5); max-width: var(--measure); font-size: var(--fs-xs); color: var(--ink-dim); }
+
+.fields { display: grid; grid-template-columns: minmax(10rem, 1.1fr) minmax(8rem, 1.5fr) auto; max-width: 52rem; }
+.fields > .f { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; gap: var(--s-2) var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid color-mix(in srgb, var(--edge) 22%, transparent); font-size: var(--fs-sm); }
+.f .label { color: var(--ink-dim); }
+.f .value { color: var(--ink); overflow-wrap: anywhere; }
+.f .value.fixed { color: var(--ink-dim); }
+.f .edit { grid-column: 1 / -1; display: grid; gap: var(--s-2); padding: var(--s-2) 0 var(--s-3); }
+.f .edit .row { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.f[data-mode="editing"] { background: var(--wash); margin-inline: calc(var(--s-3) * -1); padding-inline: var(--s-3); }
+.group-title { margin: var(--s-5) 0 var(--s-1); font-size: var(--fs-sm); font-weight: 700; }
+.group-title:first-of-type { margin-top: 0; }
+.log { margin: var(--s-3) 0 0; padding: var(--s-3); background: var(--static); font-size: var(--fs-xs); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-dim); border-left: 2px solid var(--edge); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-1) var(--s-4); margin-top: var(--s-3); font-size: var(--fs-xs); }
+.kv dt { color: var(--ink-dim); }
+.providers { display: grid; gap: var(--s-1); max-width: 52rem; margin-top: var(--s-4); }
+.providers li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-4); padding: var(--s-2) var(--s-3); border-bottom: 1px solid color-mix(in srgb, var(--edge) 22%, transparent); font-size: var(--fs-sm); }
+.providers .host { font-size: var(--fs-xs); color: var(--ink-dim); }
+
+/* ==========================================================================
+   13. COMPONENT SHEET (mockup only, reached with #componentes)
+   ========================================================================== */
+.sheet h2 { margin: var(--s-6) 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 1px solid var(--rule); font-size: var(--fs-md); }
+.sheet h2:first-child { margin-top: 0; }
+.specs { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: var(--s-4) var(--s-4); align-items: start; }
+.specs.wide { grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); }
+.spec { display: grid; gap: var(--s-2); justify-items: start; min-width: 0; }
+.spec > small { font-size: var(--fs-xs); color: var(--ink-dim); }
+.spec .notice, .spec .composer, .spec .turn { width: 100%; }
+.spec-wm { font-size: 2rem; margin: 0; }
+.spec.span2 { grid-column: span 2; }
+.spec-frame { position: relative; width: 100%; min-height: 9rem; padding: var(--s-3); border: 1px solid var(--rule); }
+.sheet .menu { position: static; box-shadow: none; }
+.sheet .popover { position: static; width: 100%; box-shadow: none; }
+.sheet .tab { width: 13rem; }
+.sheet .tab-box { width: 13.5rem; border: 1px solid var(--rule); padding: var(--s-1) 0; }
+.sheet .voice { animation: none; }
+
+/* ==========================================================================
+   14. LAYOUT GLUE
+   ========================================================================== */
+main { display: flex; min-width: 0; min-height: 0; }
+main:focus { outline: none; }
+.frame { flex: 1; }
+.wp-head .vtabs { flex: 1; }
+.wp-dock { position: relative; }
+.pad { padding: var(--s-5); }
+/* The body is its own container: a table drops its least useful column when the aside takes the room. */
+.wp-body { container: body / inline-size; }
+@container body (max-width: 46rem) {
+  .tbl.docs :is(th, td):nth-child(3), .tbl.docs col:nth-child(3) { display: none; }
+}
+.searchbar { display: flex; flex: 1 1 20rem; gap: var(--s-2); min-width: 0; }
+.wp-tools.quiet { padding-block: var(--s-2); border-bottom: 1px solid var(--rule); font-size: var(--fs-xs); }
+.quiet-text { font-size: var(--fs-xs); color: var(--ink-dim); }
+.sources-strip { margin: 0; }
+.tbl tbody tr:where(:hover, .is-hover) td { background: var(--wash); }
+.tbl tr[data-selected] td { background: color-mix(in srgb, var(--cyan) 9%, transparent); }
+.tbl tr[data-selected] td:first-child { box-shadow: inset 3px 0 0 var(--cyan); }
+.exp[aria-current="true"] { background: color-mix(in srgb, var(--cyan) 9%, transparent); box-shadow: inset 3px 0 0 var(--cyan); }
+.job .custom { color: var(--ink-dim); }
+.btn .chev { width: 0.8rem; height: 0.8rem; }
+.btn[aria-expanded="true"] .chev { transform: rotate(180deg); }
+/* Offline: the status read failed, so nothing is claimed. Every entry says so; the name loses its register. */
+.tab-off { display: none; grid-column: 1 / -1; font-size: var(--fs-xs); line-height: 1.3; color: var(--ink-dim); }
+.app[data-offline] .tab { --tone: var(--off); --tone-text: var(--ink-dim); }
+.app[data-offline] .tab .dot { width: 0.625rem; height: 2px; margin: 0; border: 0; background: var(--off); transform: none; clip-path: none; }
+.app[data-offline] .tab-word, .app[data-offline] .tab-count { display: none; }
+.app[data-offline] .tab .tab-off { display: block; }
+/* Rows that hold controls are not washed on hover: a control border on the wash drops under 3:1. */
+.tbl.parts tbody tr:where(:hover, .is-hover) td { background: transparent; }
+.sheet .tbl td { animation: none; }
+.sheet .tbl td:last-child { text-align: left; }
+.sheet .specs .menu { width: 100%; }
+
+@container ws (max-width: 50rem) {
+  .dock-grid { grid-template-columns: minmax(0, 1fr); }
+  .dock-grid .btns { justify-content: flex-end; }
+  .messenger { grid-template-columns: 12rem minmax(0, 1fr); }
+  .sources-strip li { grid-template-columns: minmax(0, 1fr) 9rem 4.5rem; }
+  .sources-strip li > :nth-child(4), .sources-strip li > :nth-child(5) { grid-column: 1 / -1; }
+  .sources-strip li > :nth-child(5):empty { display: none; }
+  .job { grid-template-columns: minmax(0, 1fr) auto; }
+  .job .interval { grid-column: 1 / -1; grid-row: 2; }
+  .job .last { grid-row: 3; }
+}
+</style>
+</head>
+<body>
+<!-- Icons: drawn, not glyphs (the bundled font is a latin subset). Every icon-only button carries an aria-label. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1"/><path d="M13.5 1.8v3.4h-3.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 16 16"><path class="solid" d="M2 7h2.4v2H2zM6.8 7h2.4v2H6.8zM11.6 7H14v2h-2.4z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><path d="M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.4 10.4L14 14"/></symbol>
+  <symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2.5v10M3.5 8L8 12.5 12.5 8"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M3.5 6l4.5 4.5L12.5 6"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 16 16"><path d="M10 3.5L5.5 8l4.5 4.5"/></symbol>
+  <symbol id="i-next" viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5"/></symbol>
+</svg>
+
+<a class="skip" href="#conteudo">Ir para o conteúdo</a>
+
+<div class="app">
+
+  <!-- ===================== SIDEBAR: the same kind of panel as the work area ===================== -->
+  <aside class="sidebar panel" aria-label="Ningo">
+    <a class="wordmark" href="#conversa" data-pulse="unwell" aria-label="Ningo, abrir Conversa">Ningo</a>
+    <!-- roving tabindex: one stop in the tab order, arrows move inside -->
+    <div class="workspaces" role="tablist" aria-orientation="vertical" aria-label="Espaços de trabalho">
+      <button class="tab" role="tab" id="tab-conversa" data-ws="conversa" data-tone="ok" aria-selected="true" aria-controls="ws-conversa" aria-label="Conversa, funcionando" title="Conversa (Ctrl+1)">
+        <span>Conversa</span><i class="dot" data-shape="square"></i><span class="tab-off">sem conexão</span>
+      </button>
+      <button class="tab" role="tab" id="tab-biblioteca" data-ws="biblioteca" data-tone="ok" aria-selected="false" tabindex="-1" aria-controls="ws-biblioteca" aria-label="Biblioteca, funcionando" title="Biblioteca (Ctrl+2)">
+        <span>Biblioteca</span><i class="dot" data-shape="square"></i><span class="tab-off">sem conexão</span>
+      </button>
+      <button class="tab" role="tab" id="tab-caderno" data-ws="caderno" data-tone="ok" aria-selected="false" tabindex="-1" aria-controls="ws-caderno" aria-label="Caderno, funcionando" title="Caderno (Ctrl+3)">
+        <span>Caderno</span><i class="dot" data-shape="square"></i><span class="tab-off">sem conexão</span>
+      </button>
+      <button class="tab" role="tab" id="tab-mensagens" data-ws="mensagens" data-tone="unchecked" aria-selected="false" tabindex="-1" aria-controls="ws-mensagens" aria-label="Mensagens, aguardando vínculo do WhatsApp" title="Mensagens (Ctrl+4)">
+        <span>Mensagens</span><i class="dot" data-shape="diamond"></i>
+        <span class="tab-word">aguardando vínculo</span><span class="tab-off">sem conexão</span>
+      </button>
+      <button class="tab" role="tab" id="tab-sistema" data-ws="sistema" data-foot data-tone="problem" aria-selected="false" tabindex="-1" aria-controls="ws-sistema" aria-label="Sistema, 3 precisam de atenção" title="Sistema (Ctrl+5)">
+        <span>Sistema</span><span class="tab-count"><i class="dot" data-shape="triangle"></i>3</span>
+        <span class="tab-word">precisam de atenção</span><span class="tab-off">sem conexão</span>
+      </button>
+    </div>
+  </aside>
+
+  <main id="conteudo">
+
+    <!-- ===================== CONVERSA ===================== -->
+    <div class="frame" id="ws-conversa" role="tabpanel" aria-labelledby="tab-conversa" data-ws="conversa" data-default="chat">
+      <span class="legend" aria-hidden="true"><b>conversa</b></span>
+      <section class="panel wp" aria-label="Conversa">
+        <!-- a conversation under way: no voice line, the transcript is the content -->
+        <div class="view" data-view="chat" data-legend="conversa">
+          <header class="wp-head plain"><span>Conversa iniciada às 14:02, sobre uma leitura</span></header>
+          <div class="wp-actions">
+            <span class="menu-anchor">
+              <button class="btn btn-icon" aria-label="Mais ações da conversa" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-conversa" data-menu="menu-conversa"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button>
+              <ul class="menu" id="menu-conversa" role="menu" hidden>
+                <li role="none"><button role="menuitem" data-action="new-chat">Começar nova conversa</button></li>
+              </ul>
+            </span>
+          </div>
+          <div class="wp-main">
+            <div class="wp-body" role="region" aria-label="Transcrição da conversa" tabindex="0">
+              <div class="transcript" role="log" aria-live="polite">
+                <div class="divider">Conversando sobre: Uma breve história do tédio</div>
+                <p class="quiet-note">O Ningo só tem o resumo do feed desta leitura, não o artigo inteiro, e avisa quando precisar de mais.</p>
+                <article class="turn" data-from="you">
+                  <div class="turn-meta"><b>Você</b><time>14:02</time></div>
+                  <div class="turn-text"><p>Argumente contra a tese central.</p></div>
+                </article>
+                <article class="turn" data-from="ningo">
+                  <div class="turn-meta"><b>Ningo</b><time>14:02</time></div>
+                  <div class="turn-text">
+                    <p>A tese diz que o tédio é invenção moderna. É elegante e frágil: os estoicos já tratavam o taedium, e Sêneca o descreve com precisão clínica. O autor chama de novidade o que a Antiguidade chamava de náusea do repetido.</p>
+                    <p>Só tenho o resumo do feed. Dou a objeção, não a prova; para a prova, traga o texto inteiro.</p>
+                  </div>
+                </article>
+                <article class="turn" data-from="you">
+                  <div class="turn-meta"><b>Você</b><time>14:04</time></div>
+                  <div class="turn-text"><p>E se ele falar só do tédio das multidões modernas?</p></div>
+                </article>
+                <article class="turn" data-from="ningo">
+                  <div class="turn-meta"><b>Ningo</b><time>14:04</time></div>
+                  <div class="turn-text">
+                    <p>Então a tese encolhe até virar truísmo: toda época tem o tédio que a sua organização do tempo permite. Defender uma tese menor e anunciá-la como a maior é um vício antigo.</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+          <div class="wp-dock">
+            <form class="composer" onsubmit="return false">
+              <div class="composer-top">
+                <span class="chip removable"><span>Conversando sobre: Uma breve história do tédio</span><button type="button" class="x" aria-label="Encerrar o contexto: Uma breve história do tédio"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></span>
+              </div>
+              <label class="sr-only" for="msg-conversa">Mensagem para o Ningo</label>
+              <textarea class="input" id="msg-conversa" rows="2" placeholder="Pergunte ao Ningo…"></textarea>
+              <button class="btn btn-primary" type="submit">Enviar</button>
+              <p class="composer-foot"><span>Enter envia · Shift+Enter quebra a linha</span></p>
+            </form>
+          </div>
+        </div>
+
+        <!-- a new conversation: the one voice line, a plain next step, chips that fill the composer -->
+        <div class="view" data-view="vazia" data-legend="conversa" hidden>
+          <header class="wp-head plain"><span>Nova conversa</span></header>
+          <div class="wp-main">
+            <div class="wp-body" role="region" aria-label="Nova conversa" tabindex="0">
+              <div class="empty" style="padding-top:var(--s-4);margin:0 auto;max-width:calc(var(--measure) + 3rem)">
+                <p class="voice"><span class="sr-only">Ningo: </span>Li mais do que você imagina. Pergunte.</p>
+                <p class="voice-next">Escreva abaixo, ou comece por uma destas aberturas.</p>
+                <div class="starts" role="group" aria-label="Aberturas">
+                  <button class="btn" data-fill="Argumente contra: ">Argumente contra:</button>
+                  <button class="btn" data-fill="O que estou deixando passar sobre: ">O que estou deixando passar sobre:</button>
+                  <button class="btn" data-fill="Resuma e julgue: ">Resuma e julgue:</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="wp-dock">
+            <form class="composer" onsubmit="return false">
+              <label class="sr-only" for="msg-vazia">Mensagem para o Ningo</label>
+              <textarea class="input" id="msg-vazia" rows="2" placeholder="Pergunte ao Ningo…"></textarea>
+              <button class="btn btn-primary" type="submit">Enviar</button>
+              <p class="composer-foot"><span>Enter envia · Shift+Enter quebra a linha</span></p>
+            </form>
+          </div>
+        </div>
+
+        <!-- the orchestrator cannot be reached: plain, with the way out; the composer stays and says why it is off -->
+        <div class="view" data-view="offline" data-legend="conversa" hidden>
+          <header class="wp-head plain"><span>Sem conexão com o orquestrador</span></header>
+          <div class="wp-main">
+            <div class="wp-body" role="region" aria-label="Conversa indisponível" tabindex="0">
+              <div class="notice" data-tone="problem" role="alert" style="max-width:46rem">
+                <i class="dot" data-shape="triangle"></i>
+                <div><p><strong>O Ningo não está respondendo.</strong></p><p>O orquestrador não está rodando ou não pode ser alcançado.</p></div>
+                <div class="actions"><button class="btn" data-goto="sistema">Abrir Sistema</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="wp-dock">
+            <form class="composer" onsubmit="return false">
+              <label class="sr-only" for="msg-offline">Mensagem para o Ningo</label>
+              <textarea class="input" id="msg-offline" rows="2" placeholder="Pergunte ao Ningo…" disabled aria-describedby="why-offline"></textarea>
+              <button class="btn btn-primary" type="submit" disabled aria-describedby="why-offline">Enviar</button>
+              <p class="composer-foot" id="why-offline"><span>Indisponível enquanto o Ningo não responde.</span></p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== BIBLIOTECA ===================== -->
+    <div class="frame" id="ws-biblioteca" role="tabpanel" aria-labelledby="tab-biblioteca" data-ws="biblioteca" data-default="documentos" hidden>
+      <span class="legend" aria-hidden="true"><b>biblioteca</b></span>
+      <section class="panel wp" aria-label="Biblioteca">
+        <header class="wp-head">
+          <div class="vtabs" role="tablist" aria-label="Visões da Biblioteca">
+            <button class="vt" role="tab" data-view-tab="documentos" aria-selected="true">Documentos</button>
+            <button class="vt" role="tab" data-view-tab="leituras" aria-selected="false" tabindex="-1">Leituras</button>
+            <span class="vt-sep" aria-hidden="true"></span>
+            <span class="vt-pair" id="doc-pair">
+              <button class="vt" role="tab" data-view-tab="documento" aria-selected="false" tabindex="-1" title="Sobre a liberdade de escolher">Sobre a liberdade de escolher</button>
+              <button class="vt-close" data-close-doc aria-label="Fechar o documento Sobre a liberdade de escolher"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+            </span>
+          </div>
+        </header>
+
+        <!-- Documentos: the shelf first. Search, quiet counts, one table. -->
+        <div class="view" data-view="documentos" data-tab="documentos" data-legend="biblioteca|documentos" data-aside="closed">
+          <div class="wp-actions">
+            <button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+            <button class="btn btn-primary" data-opens-aside="aside-add" aria-expanded="false" aria-controls="aside-add"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Adicionar</button>
+          </div>
+          <div class="wp-tools">
+            <form class="searchbar" role="search" onsubmit="return false">
+              <span class="input-wrap"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><input class="input" type="search" aria-label="Buscar na Biblioteca" placeholder="Buscar na Biblioteca…"></span>
+              <button class="btn" type="submit">Buscar</button>
+            </form>
+          </div>
+          <div class="wp-tools quiet">
+            <span class="quiet-text">23 documentos · 69 trechos</span>
+            <span class="chip" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>10 trechos sem índice</span>
+            <button class="btn btn-sm">Indexar agora</button>
+            <span class="chip" data-tone="ok"><i class="dot" data-shape="square"></i>similaridade: ligada</span>
+          </div>
+          <div class="wp-main">
+            <div class="wp-body flush" role="region" aria-label="Documentos" tabindex="0">
+              <table class="tbl docs" data-roving=".row-link">
+                <colgroup><col style="width:34%"><col style="width:10%"><col style="width:21%"><col style="width:11%"><col style="width:14%"><col style="width:4.5rem"></colgroup>
+                <thead><tr><th scope="col">Título</th><th scope="col">Tipo</th><th scope="col">Origem</th><th scope="col">Indexado</th><th scope="col">Atualizado</th><th scope="col"><span class="sr-only">Ações</span></th></tr></thead>
+                <tbody>
+                  <tr style="--i:0"><td><button class="row-link" data-open-doc>Sobre a liberdade de escolher</button></td><td class="dim">nota</td><td class="dim">notas/liberdade.md</td><td><span class="indexed"><span aria-hidden="true">2/2</span><span class="sr-only">2 de 2 trechos indexados</span></span></td><td class="dim">há 2 h</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Sobre a liberdade de escolher"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:1"><td><button class="row-link" data-open-doc>Uma breve história do tédio</button></td><td class="dim">artigo</td><td class="dim">example.com/tedio</td><td><span class="indexed" data-tone="unchecked"><i class="dot" data-shape="diamond"></i><span aria-hidden="true">0/3</span><span class="sr-only">0 de 3 trechos indexados</span></span></td><td class="dim">há 3 h</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Uma breve história do tédio"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:2"><td><button class="row-link" data-open-doc>Cartas a um leitor ausente</button></td><td class="dim">livro</td><td class="dim">p. 12</td><td><span class="indexed"><span aria-hidden="true">4/4</span><span class="sr-only">4 de 4 trechos indexados</span></span></td><td class="dim">ontem</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Cartas a um leitor ausente"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:3"><td><button class="row-link" data-open-doc>Taxonomia das dúvidas</button></td><td class="dim">estudo</td><td class="dim">example.com/duvidas</td><td><span class="indexed"><span aria-hidden="true">5/5</span><span class="sr-only">5 de 5 trechos indexados</span></span></td><td class="dim">ontem</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Taxonomia das dúvidas"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:4"><td><button class="row-link" data-open-doc>Notas sobre o ressentimento</button></td><td class="dim">nota</td><td class="dim">notas/ressentimento.md</td><td><span class="indexed"><span aria-hidden="true">2/2</span><span class="sr-only">2 de 2 trechos indexados</span></span></td><td class="dim">há 2 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Notas sobre o ressentimento"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:5"><td><button class="row-link" data-open-doc>O custo de ter razão</button></td><td class="dim">artigo</td><td class="dim">example.com/razao</td><td><span class="indexed"><span aria-hidden="true">3/3</span><span class="sr-only">3 de 3 trechos indexados</span></span></td><td class="dim">há 2 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: O custo de ter razão"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:6"><td><button class="row-link" data-open-doc>Pequeno manual de objeções</button></td><td class="dim">livro</td><td class="dim">cap. 1</td><td><span class="indexed"><span aria-hidden="true">4/4</span><span class="sr-only">4 de 4 trechos indexados</span></span></td><td class="dim">há 3 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Pequeno manual de objeções"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:7"><td><button class="row-link" data-open-doc>Tratado do silêncio útil</button></td><td class="dim">livro</td><td class="dim">—</td><td><span class="indexed" data-tone="unchecked"><i class="dot" data-shape="diamond"></i><span aria-hidden="true">0/4</span><span class="sr-only">0 de 4 trechos indexados</span></span></td><td class="dim">há 3 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Tratado do silêncio útil"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:8"><td><button class="row-link" data-open-doc>Ensaio sobre a pressa</button></td><td class="dim">estudo</td><td class="dim">example.com/pressa</td><td><span class="indexed"><span aria-hidden="true">5/5</span><span class="sr-only">5 de 5 trechos indexados</span></span></td><td class="dim">há 4 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Ensaio sobre a pressa"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:9"><td><button class="row-link" data-open-doc>Meia-noite no catálogo</button></td><td class="dim">nota</td><td class="dim">notas/catalogo.md</td><td><span class="indexed"><span aria-hidden="true">1/1</span><span class="sr-only">1 de 1 trechos indexados</span></span></td><td class="dim">há 5 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Meia-noite no catálogo"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:10"><td><button class="row-link" data-open-doc>Glossário de termos fora de uso</button></td><td class="dim">documento</td><td class="dim">example.com/glossario</td><td><span class="indexed" data-tone="unchecked"><i class="dot" data-shape="diamond"></i><span aria-hidden="true">0/3</span><span class="sr-only">0 de 3 trechos indexados</span></span></td><td class="dim">há 6 dias</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Glossário de termos fora de uso"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:11"><td><button class="row-link" data-open-doc>Fragmentos de uma biblioteca imaginária</button></td><td class="dim">livro</td><td class="dim">p. 140</td><td><span class="indexed"><span aria-hidden="true">4/4</span><span class="sr-only">4 de 4 trechos indexados</span></span></td><td class="dim">há 1 semana</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Fragmentos de uma biblioteca imaginária"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:12"><td><button class="row-link" data-open-doc>Quase uma defesa da procrastinação</button></td><td class="dim">artigo</td><td class="dim">example.com/depois</td><td><span class="indexed"><span aria-hidden="true">2/2</span><span class="sr-only">2 de 2 trechos indexados</span></span></td><td class="dim">há 1 semana</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Quase uma defesa da procrastinação"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  <tr style="--i:13"><td><button class="row-link" data-open-doc>Dicionário de perguntas sem resposta</button></td><td class="dim">livro</td><td class="dim">verbete 3</td><td><span class="indexed"><span aria-hidden="true">6/6</span><span class="sr-only">6 de 6 trechos indexados</span></span></td><td class="dim">há 2 semanas</td><td><button class="btn btn-icon btn-sm row-menu" data-menu="menu-row" aria-haspopup="menu" aria-expanded="false" aria-label="Ações: Dicionário de perguntas sem resposta"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                </tbody>
+              </table>
+              <div class="pager"><span>1–14 de 23</span><span class="btns"><button class="btn btn-icon btn-sm" disabled aria-label="Página anterior"><svg class="icon" aria-hidden="true"><use href="#i-prev"/></svg></button><button class="btn btn-icon btn-sm" aria-label="Próxima página"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button></span></div>
+            </div>
+
+            <ul class="menu" id="menu-row" role="menu" aria-label="Ações do documento" hidden>
+              <li role="none"><button role="menuitem">Abrir <kbd>Enter</kbd></button></li>
+              <li role="none"><button role="menuitem">Classificar…</button></li>
+              <li role="none"><hr></li>
+              <li role="none"><button role="menuitem">Apagar…</button></li>
+            </ul>
+
+            <!-- the Add drawer: an aside, not a section of the page -->
+            <aside class="wp-aside" id="aside-add" aria-label="Adicionar à Biblioteca">
+              <div class="aside-head"><h3>Adicionar à Biblioteca</h3><button class="btn btn-icon" data-close-aside aria-label="Fechar"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+              <div class="aside-body">
+                <form class="add-form" onsubmit="return false">
+                  <div class="seg" role="radiogroup" aria-label="Tipo de entrada">
+                    <button type="button" role="radio" aria-checked="true">Nota</button>
+                    <button type="button" role="radio" aria-checked="false" tabindex="-1">Endereço</button>
+                    <button type="button" role="radio" aria-checked="false" tabindex="-1">Arquivo</button>
+                  </div>
+                  <div><label class="field-label" for="add-title">Título</label><input class="input" id="add-title" type="text"></div>
+                  <div><label class="field-label" for="add-text">Texto</label><textarea class="input" id="add-text" rows="7"></textarea></div>
+                  <details>
+                    <summary>Detalhes</summary>
+                    <div style="display:grid;gap:var(--s-3);margin-top:var(--s-2)">
+                      <div><label class="field-label" for="add-kind">Tipo</label><input class="input" id="add-kind" type="text" placeholder="nota"></div>
+                      <div><label class="field-label" for="add-source">De onde veio</label><input class="input" id="add-source" type="text" placeholder="um endereço da web, ou um livro e a página"></div>
+                    </div>
+                  </details>
+                  <div class="actions"><button class="btn btn-primary" type="submit">Adicionar</button><button class="btn btn-quiet" type="button" data-close-aside>Cancelar</button></div>
+                </form>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- Documentos, empty shelf: the voice line, a plain next step, the drop target -->
+        <div class="view" data-view="vazia" data-tab="documentos" data-legend="biblioteca|documentos" hidden>
+          <div class="wp-actions">
+            <button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+            <button class="btn btn-primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Adicionar</button>
+          </div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Biblioteca vazia" tabindex="0">
+            <div class="empty" style="padding-top:0">
+              <p class="voice"><span class="sr-only">Ningo: </span>A estante está vazia. Não julgo o que não li.</p>
+              <p class="voice-next">Solte um arquivo aqui, ou use Adicionar para colar uma nota ou um endereço da web.</p>
+              <div class="drop">Solte um arquivo em qualquer ponto desta área.</div>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- Leituras: what the feeds brought. Sources are a strip that opens by itself when one fails. -->
+        <div class="view" data-view="leituras" data-tab="leituras" data-legend="biblioteca|leituras" hidden>
+          <div class="wp-actions">
+            <button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          </div>
+          <div class="wp-tools">
+            <span class="quiet-text">2 fontes funcionando · 1 com falha · 1 desativada</span>
+            <button class="btn btn-sm" aria-expanded="true" aria-controls="sources-strip" data-toggle="sources-strip">Fontes<svg class="icon chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          </div>
+          <div class="wp-main"><div class="wp-body flush" role="region" aria-label="Leituras" tabindex="0">
+            <div class="pad" id="sources-strip" style="padding-bottom:0">
+              <ul class="sources-strip">
+                <li style="--i:0" data-tone="ok"><span class="nm">Feed de exemplo <span class="dim">(example.com/feed)</span></span><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span><span class="dim">12 itens</span><span class="dim">atualizada há 7 min</span><span class="reason"></span></li>
+                <li style="--i:1" data-tone="ok"><span class="nm">Arquivo local de exemplo</span><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span><span class="dim">6 itens</span><span class="dim">atualizada há 12 min</span><span class="reason"></span></li>
+                <li style="--i:2" data-tone="problem"><span class="nm">Mural de exemplo <span class="dim">(example.com/mural)</span></span><span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Com falha</span><span class="dim">4 itens</span><span class="dim">última leitura há 2 dias</span><span class="reason">connection refused</span></li>
+                <li style="--i:3" data-tone="off"><span class="nm">Fonte antiga de exemplo</span><span class="sw" data-tone="off"><i class="dot" data-shape="dash"></i>Desativada</span><span class="dim">0 itens</span><span class="dim">—</span><span class="reason"></span></li>
+              </ul>
+            </div>
+            <div class="pad">
+              <div class="readings">
+                <article class="reading"><h3>Uma breve história do tédio</h3><p class="meta">Feed de exemplo · há 47 min</p><p class="summary">Argumenta que o tédio é uma invenção moderna, ligada à divisão do tempo em trabalho e descanso. Reúne três exemplos do século XIX e conclui que a Antiguidade não tinha a palavra, logo não tinha a coisa.</p><button class="btn btn-quiet btn-sm" data-goto="conversa">Conversar com o Ningo</button></article>
+                <article class="reading"><h3>Sobre a utilidade de não ler tudo</h3><p class="meta">Feed de exemplo · há 1 h</p><p class="summary">Defende a leitura seletiva como disciplina, não como preguiça: o critério de descarte é o que revela o leitor. Três regras práticas e uma ressalva sobre bibliotecas pessoais grandes demais.</p><button class="btn btn-quiet btn-sm" data-goto="conversa">Conversar com o Ningo</button></article>
+                <article class="reading"><h3>Notas de leitura: a ironia como método</h3><p class="meta">Arquivo local de exemplo · há 3 h</p><p class="summary">Anotações soltas sobre a ironia como forma de argumento, com dois contraexemplos e uma lista de leituras para depois.</p><button class="btn btn-quiet btn-sm" data-goto="conversa">Conversar com o Ningo</button></article>
+                <article class="reading"><h3>O catálogo como forma de autobiografia</h3><p class="meta">Feed de exemplo · há 5 h</p><p class="summary">Um ensaio curto sobre o que a ordem de uma estante diz de quem a arrumou. Termina com uma pergunta, não com uma tese.</p><button class="btn btn-quiet btn-sm" data-goto="conversa">Conversar com o Ningo</button></article>
+              </div>
+              <div class="more-line"><button class="btn btn-sm">Mostrar mais 8</button><span>atualizado há 6 min</span></div>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- Leituras, nothing followed -->
+        <div class="view" data-view="leituras-vazia" data-tab="leituras" data-legend="biblioteca|leituras" hidden>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Leituras vazias" tabindex="0">
+            <div class="empty" style="padding-top:0">
+              <p class="voice"><span class="sr-only">Ningo: </span>Nada está me alimentando agora.</p>
+              <p class="voice-next">Nenhuma fonte é seguida. Adicione um plugin ao serviço de feeds e os itens aparecem aqui.</p>
+            </div>
+          </div></div>
+        </div>
+
+        <!-- An open document: a tab after the separator, text set to be read -->
+        <div class="view" data-view="documento" data-tab="documento" data-legend="biblioteca|documentos|Sobre a liberdade de escolher" hidden>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Documento" tabindex="0">
+            <h2 class="doc-title">Sobre a liberdade de escolher</h2>
+            <p class="doc-meta">nota · notas/liberdade.md</p>
+            <div class="doc-bar">
+              <span class="indexed sw" data-tone="ok"><i class="dot" data-shape="square"></i>2 de 2 trechos indexados</span>
+              <button class="btn btn-sm">Classificar</button>
+            </div>
+            <div class="doc-text">
+              <p>Escolher é renunciar, e quase ninguém admite o preço. Quem diz amar a liberdade de escolher costuma amar, na verdade, a possibilidade de não ter escolhido ainda.</p>
+              <p>Há um erro simétrico: tratar toda restrição como ofensa. Um soneto é livre de outro modo que um rascunho, e ninguém chamaria o soneto de prisão por causa das catorze linhas.</p>
+              <p>Nota de leitura, pendente: relacionar com o ensaio sobre a pressa.</p>
+            </div>
+            <p class="doc-note">Texto reconstruído a partir dos trechos guardados.</p>
+          </div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== CADERNO ===================== -->
+    <div class="frame" id="ws-caderno" role="tabpanel" aria-labelledby="tab-caderno" data-ws="caderno" data-default="lista" hidden>
+      <span class="legend" aria-hidden="true"><b>caderno</b></span>
+      <section class="panel wp" aria-label="Caderno">
+        <header class="wp-head plain"><span>atualizado há 1 min</span></header>
+        <div class="view" data-view="lista" data-legend="caderno" data-aside="open" data-aside-auto>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="voice-block">
+            <p class="voice"><span class="sr-only">Ningo: </span>Parte do que tentei aguarda seu veredito.</p>
+            <p class="voice-next">Escolha uma experiência aguardando para dar o veredito.</p>
+          </div>
+          <dl class="record">
+            <dt>Histórico</dt>
+            <dd><b>7</b> registradas<span class="sep">·</span><b>4</b> aguardando<span class="sep">·</span><b>3</b> resolvidas<span class="sep">·</span><b>0</b> expiradas</dd>
+            <dt>Calibração</dt>
+            <dd>Poucas resolvidas para julgar: 3 de 30. Previsão 0,081 · referência 0,270 <span style="color:var(--ink-dim)">(menor é melhor)</span></dd>
+          </dl>
+          <div class="wp-tools quiet" style="margin-top:var(--s-4);border-top:1px solid var(--rule)">
+            <div class="seg" role="radiogroup" aria-label="Filtrar experiências">
+              <button type="button" role="radio" aria-checked="true">Todas <span class="count">7</span></button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1">Aguardando <span class="count">4</span></button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1">Resolvidas <span class="count">3</span></button>
+            </div>
+            <span class="chip" data-tone="ok"><i class="dot" data-shape="square"></i>similaridade: ligada</span>
+          </div>
+          <div class="wp-main">
+            <div class="wp-body flush" role="region" aria-label="Experiências" tabindex="0">
+              <ul data-roving=".exp">
+                <li><button class="exp" style="--i:0" aria-selected="true" data-tone="unchecked" data-opens-aside="aside-exp"><i class="dot" data-shape="diamond"></i><span class="t">Sugeriu #Leitura para um meme</span><span class="ago">há 2 dias</span><span class="s">aguardando seu veredito</span></button></li>
+                <li><button class="exp" style="--i:1" aria-selected="false" data-tone="ok" data-opens-aside="aside-exp"><i class="dot" data-shape="square"></i><span class="t">Sugeriu #Gatos para um meme</span><span class="ago">há 5 dias</span><span class="s">resolvida: aceita</span></button></li>
+                <li><button class="exp" style="--i:2" aria-selected="false" data-tone="unchecked" data-opens-aside="aside-exp"><i class="dot" data-shape="diamond"></i><span class="t">Sugeriu #Segunda para um meme</span><span class="ago">há 5 dias</span><span class="s">aguardando seu veredito</span></button></li>
+                <li><button class="exp" style="--i:3" aria-selected="false" data-tone="off" data-opens-aside="aside-exp"><i class="dot" data-shape="dash"></i><span class="t">Sugeriu #Filosofia para um meme</span><span class="ago">há 6 dias</span><span class="s">resolvida: não usada</span></button></li>
+                <li><button class="exp" style="--i:4" aria-selected="false" data-tone="unchecked" data-opens-aside="aside-exp"><i class="dot" data-shape="diamond"></i><span class="t">Sugeriu #Café para um meme</span><span class="ago">há 1 semana</span><span class="s">aguardando seu veredito</span></button></li>
+                <li><button class="exp" style="--i:5" aria-selected="false" data-tone="ok" data-opens-aside="aside-exp"><i class="dot" data-shape="square"></i><span class="t">Sugeriu #Livros para um meme</span><span class="ago">há 1 semana</span><span class="s">resolvida: aceita</span></button></li>
+                <li><button class="exp" style="--i:6" aria-selected="false" data-tone="unchecked" data-opens-aside="aside-exp"><i class="dot" data-shape="diamond"></i><span class="t">Sugeriu #Silêncio para um meme</span><span class="ago">há 8 dias</span><span class="s">aguardando seu veredito</span></button></li>
+              </ul>
+              <div class="pager"><span>1–7 de 7</span></div>
+            </div>
+
+            <aside class="wp-aside" id="aside-exp" aria-label="Experiência">
+              <div class="aside-head"><h3>Sugeriu #Leitura para um meme</h3><button class="btn btn-icon" data-close-aside aria-label="Fechar"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+              <div class="aside-body">
+                <span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Aguardando seu veredito</span>
+                <dl class="facts">
+                  <dt>Aceitação prevista</dt><dd>60%</dd>
+                  <dt>Referência (baseline)</dt><dd>50%</dd>
+                  <dt>Caso anterior parecido</dt><dd>80%</dd>
+                  <dd class="why">Semelhança com o exemplo anterior, não é probabilidade de aceitação.</dd>
+                </dl>
+                <details style="margin-top:var(--s-4)"><summary>Contexto</summary><p class="field-help" style="margin-top:var(--s-2)">Exemplo 1: uma piada sobre leitura. Conteúdo de demonstração.</p></details>
+                <details><summary>Exemplo anterior</summary><p class="field-help" style="margin-top:var(--s-2)">Uma piada anterior sobre leitura.</p></details>
+                <div class="verdict">
+                  <h4>Seu veredito</h4>
+                  <div class="row">
+                    <button class="btn">Aceitar</button>
+                    <button class="btn">Não usado</button>
+                    <button class="btn">Outro resultado…</button>
+                  </div>
+                  <p class="rule">O primeiro veredito é mantido. Sem veredito não é rejeição.</p>
+                  <details style="margin-top:var(--s-2)"><summary>Mais</summary><p class="field-help" style="margin-top:var(--s-2)">O veredito registra o resultado desta experiência. Ele não adiciona nem altera exemplos de treinamento de hashtag.</p></details>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== MENSAGENS ===================== -->
+    <div class="frame" id="ws-mensagens" role="tabpanel" aria-labelledby="tab-mensagens" data-ws="mensagens" data-default="canal" hidden>
+      <span class="legend" aria-hidden="true"><b>mensagens</b></span>
+      <section class="panel wp" aria-label="Mensagens">
+        <header class="wp-head plain"><span>atualizado há 12 s</span></header>
+
+        <div class="view" data-view="canal" data-legend="mensagens|#sala-de-leitura">
+          <div class="wp-actions">
+            <button class="switch" role="switch" aria-checked="true" data-on="Ao vivo (a cada 15 s)" data-off="Pausado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ao vivo (a cada 15 s)</span></button>
+          </div>
+          <div class="messenger">
+            <nav class="rail" aria-label="Canais">
+              <h3>Canais</h3>
+              <button aria-current="true" data-goto-view="canal"><span>#sala-de-leitura<small>Discord</small></span></button>
+              <button aria-current="false" data-goto-view="whatsapp" data-tone="unchecked"><span>Clube do livro<small>WhatsApp</small><small class="state">aguardando vínculo</small></span><i class="dot" data-shape="diamond"></i></button>
+            </nav>
+            <div class="thread">
+              <div class="thread-head"><h3>#sala-de-leitura</h3><span class="as">enviada como Ningo</span></div>
+              <div class="wp-main">
+                <div class="wp-body" role="region" aria-label="Mensagens do canal" tabindex="0">
+                  <div style="margin:0 0 var(--s-4)"><button class="btn btn-quiet btn-sm">Carregar mensagens anteriores</button></div>
+                  <div class="msgs" role="log" aria-live="polite">
+                    <article class="msg"><div class="who"><b>Leitora A</b><time>há 4 min</time></div><p class="msg-text">O que vocês andam lendo?</p></article>
+                    <article class="msg"><div class="who"><b>Leitor B</b><time>há 3 min</time></div><p class="msg-text">Releio Cartas a um leitor ausente. Continua insuportável, e continuo relendo.</p></article>
+                    <article class="msg" data-from="ningo"><div class="who"><b>Ningo</b><time>há 2 min</time></div><p class="msg-text">Insuportável é elogio quando o livro merece a releitura.</p></article>
+                    <article class="msg"><div class="who"><b>Leitora A</b><time>há 1 minuto</time></div><p class="msg-text">Alguém tem um meme sobre prazos de entrega?</p></article>
+                  </div>
+                </div>
+              </div>
+              <div class="wp-dock" style="position:relative">
+                <div class="popover" id="memes-pop" role="dialog" aria-label="Escolha um meme" hidden>
+                  <h4>Escolha um meme <button class="btn btn-icon btn-sm" data-close-pop aria-label="Fechar"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></h4>
+                  <div class="memes">
+                    <div class="meme-wrap"><button class="meme" aria-pressed="false" aria-label="Meme exemplo 1">exemplo 1</button><span class="meme-cap">Prazos, parte 1</span></div>
+                    <div class="meme-wrap"><button class="meme" aria-pressed="false" aria-label="Meme exemplo 2">exemplo 2</button><span class="meme-cap">Segunda-feira</span></div>
+                    <div class="meme-wrap"><button class="meme" aria-pressed="false" aria-label="Meme exemplo 3">exemplo 3</button><span class="meme-cap">Estante cheia</span></div>
+                    <div class="meme-wrap"><button class="meme" aria-pressed="true" aria-label="Meme exemplo 4, anexado">exemplo 4</button><span class="meme-cap">Prazos, parte 2</span></div>
+                    <div class="meme-wrap"><button class="meme" aria-pressed="false" aria-label="Meme exemplo 5">exemplo 5</button><span class="meme-cap">Café frio</span></div>
+                    <div class="meme-wrap"><button class="meme" disabled aria-label="Meme exemplo 6, prévia indisponível">sem prévia</button><span class="meme-cap">Vídeo curto</span></div>
+                  </div>
+                  <div class="foot"><span>1–6 de 9</span><span class="btns"><button class="btn btn-icon btn-sm" disabled aria-label="Anterior"><svg class="icon" aria-hidden="true"><use href="#i-prev"/></svg></button><button class="btn btn-icon btn-sm" aria-label="Próximos"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button></span></div>
+                </div>
+                <form class="dock-grid" onsubmit="return false">
+                  <div class="stack">
+                    <div class="composer-top"><span class="chip removable"><span>Meme exemplo 4</span><button type="button" class="x" aria-label="Remover o meme anexado"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></span></div>
+                    <label class="sr-only" for="msg-canal">Mensagem para #sala-de-leitura</label>
+                    <textarea class="input" id="msg-canal" rows="2" placeholder="Mensagem para #sala-de-leitura, enviada como Ningo…"></textarea>
+                  </div>
+                  <div class="btns">
+                    <button class="btn" type="button" data-toggle-pop="memes-pop" aria-haspopup="dialog" aria-expanded="false" aria-controls="memes-pop">Meme</button>
+                    <button class="btn btn-primary" type="submit">Enviar como Ningo</button>
+                  </div>
+                  <p class="dock-foot">Enter envia · Shift+Enter quebra a linha</p>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- the WhatsApp channel is not linked yet: off, with the way out; the composer says why it is off -->
+        <div class="view" data-view="whatsapp" data-legend="mensagens|Clube do livro" hidden>
+          <div class="wp-actions">
+            <button class="switch" role="switch" aria-checked="true" data-on="Ao vivo (a cada 15 s)" data-off="Pausado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ao vivo (a cada 15 s)</span></button>
+          </div>
+          <div class="messenger">
+            <nav class="rail" aria-label="Canais">
+              <h3>Canais</h3>
+              <button aria-current="false" data-goto-view="canal"><span>#sala-de-leitura<small>Discord</small></span></button>
+              <button aria-current="true" data-goto-view="whatsapp" data-tone="unchecked"><span>Clube do livro<small>WhatsApp</small><small class="state">aguardando vínculo</small></span><i class="dot" data-shape="diamond"></i></button>
+            </nav>
+            <div class="thread">
+              <div class="thread-head"><h3>Clube do livro</h3><span class="as">enviada como você</span></div>
+              <div class="wp-main">
+                <div class="wp-body" role="region" aria-label="Clube do livro" tabindex="0">
+                  <div class="notice" data-tone="unchecked" style="max-width:40rem">
+                    <i class="dot" data-shape="diamond"></i>
+                    <div><p><strong>Aguardando vínculo.</strong></p><p>Esta conta do WhatsApp ainda não foi vinculada, então não há conversa para mostrar.</p></div>
+                    <div class="actions"><button class="btn" data-goto="sistema">Abrir Sistema</button></div>
+                  </div>
+                </div>
+              </div>
+              <div class="wp-dock">
+                <form class="dock-grid" onsubmit="return false">
+                  <div class="stack">
+                    <label class="sr-only" for="msg-wa">Mensagem para Clube do livro</label>
+                    <textarea class="input" id="msg-wa" rows="2" placeholder="Mensagem para Clube do livro, enviada como você…" disabled aria-describedby="why-wa"></textarea>
+                  </div>
+                  <div class="btns"><button class="btn btn-primary" type="submit" disabled aria-describedby="why-wa">Enviar como você</button></div>
+                  <p class="dock-foot" id="why-wa">Sai da sua própria conta, como você. Só texto, no máximo algumas por minuto. Indisponível até vincular a conta.</p>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- an empty channel: the one voice line Mensagens has -->
+        <div class="view" data-view="silencio" data-legend="mensagens|#oficina-de-ensaios" hidden>
+          <div class="wp-actions">
+            <button class="switch" role="switch" aria-checked="true" data-on="Ao vivo (a cada 15 s)" data-off="Pausado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ao vivo (a cada 15 s)</span></button>
+          </div>
+          <div class="messenger">
+            <nav class="rail" aria-label="Canais">
+              <h3>Canais</h3>
+              <button aria-current="false" data-goto-view="canal"><span>#sala-de-leitura<small>Discord</small></span></button>
+              <button aria-current="true"><span>#oficina-de-ensaios<small>Discord</small></span></button>
+            </nav>
+            <div class="thread">
+              <div class="thread-head"><h3>#oficina-de-ensaios</h3><span class="as">enviada como Ningo</span></div>
+              <div class="wp-main"><div class="wp-body" role="region" aria-label="Canal vazio" tabindex="0">
+                <p class="voice"><span class="sr-only">Ningo: </span>Silêncio por aqui.</p>
+                <p class="voice-next">Ainda não há mensagens neste canal.</p>
+              </div></div>
+              <div class="wp-dock">
+                <form class="dock-grid" onsubmit="return false">
+                  <div class="stack"><label class="sr-only" for="msg-oficina">Mensagem para #oficina-de-ensaios</label><textarea class="input" id="msg-oficina" rows="2" placeholder="Mensagem para #oficina-de-ensaios, enviada como Ningo…"></textarea></div>
+                  <div class="btns"><button class="btn" type="button">Meme</button><button class="btn btn-primary" type="submit">Enviar como Ningo</button></div>
+                  <p class="dock-foot">Enter envia · Shift+Enter quebra a linha</p>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== SISTEMA (plain, never voice) ===================== -->
+    <div class="frame" id="ws-sistema" role="tabpanel" aria-labelledby="tab-sistema" data-ws="sistema" data-default="status" hidden>
+      <span class="legend" aria-hidden="true"><b>sistema</b></span>
+      <section class="panel wp" aria-label="Sistema">
+        <header class="wp-head">
+          <div class="vtabs" role="tablist" aria-label="Visões do Sistema">
+            <button class="vt" role="tab" data-view-tab="status" aria-selected="true">Status</button>
+            <button class="vt" role="tab" data-view-tab="configuracoes" aria-selected="false" tabindex="-1">Configurações</button>
+            <button class="vt" role="tab" data-view-tab="provedores" aria-selected="false" tabindex="-1">Provedores</button>
+          </div>
+        </header>
+
+        <!-- Status: what needs attention first, each with its fix; then every part in one table -->
+        <div class="view" data-view="status" data-tab="status" data-legend="sistema|status" data-aside="closed">
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main">
+            <div class="wp-body" role="region" aria-label="Status do sistema" tabindex="0">
+              <section class="sys-group" aria-labelledby="h-attn">
+                <h3 class="section-title" id="h-attn">Precisa de atenção <span class="n">3</span></h3>
+                <ul class="attn">
+                  <li style="--i:0" data-tone="problem"><i class="dot" data-shape="triangle"></i><div><p class="name">Agendador</p><p class="why"><strong>Sem resposta.</strong> Sem anúncio há 12 min.</p></div><div class="actions"><button class="btn btn-sm" data-opens-aside="aside-detail">Logs</button><button class="btn btn-sm">Parar</button></div></li>
+                  <li style="--i:1" data-tone="problem"><i class="dot" data-shape="triangle"></i><div><p class="name">Voz</p><p class="why"><strong>Falhou.</strong> Dispositivo de áudio não encontrado.</p></div><div class="actions"><button class="btn btn-sm" data-opens-aside="aside-detail">Logs</button><button class="btn btn-sm">Iniciar</button></div></li>
+                  <li style="--i:2" data-tone="unchecked"><i class="dot" data-shape="diamond"></i><div><p class="name">WhatsApp</p><p class="why"><strong>Aguardando vínculo.</strong> A conta ainda não foi vinculada.</p></div><div class="actions"><button class="btn btn-sm">Vincular…</button></div></li>
+                </ul>
+              </section>
+
+              <section class="sys-group" aria-labelledby="h-core">
+                <h3 class="section-title" id="h-core">Núcleo</h3>
+                <table class="tbl parts" role="grid" data-grid aria-label="Partes do sistema">
+                  <colgroup><col style="width:25%"><col style="width:24%"><col style="width:27%"><col style="width:14%"><col style="width:10%"></colgroup>
+                  <thead><tr><th scope="col">Parte</th><th scope="col">Estado</th><th scope="col">Processar solicitações</th><th scope="col">Módulo</th><th scope="col"><span class="sr-only">Detalhes</span></th></tr></thead>
+                  <tbody>
+                    <tr><td class="name">Orquestrador</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td class="na">—</td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Orquestrador"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Memória</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Memória" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Memória"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Conhecimento</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Conhecimento" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Conhecimento"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Chat</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Chat" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Chat"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Feeds</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Feeds" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Feeds"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Voz</td><td><span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Falhou</span></td><td><button class="switch" role="switch" aria-checked="false" aria-label="Processar solicitações: Voz" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Desligado</span></button></td><td><button class="btn btn-sm">Iniciar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Voz"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Comunicações</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Comunicações" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Comunicações"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">Agendador</td><td><span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Sem resposta</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Agendador" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Agendador"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  </tbody>
+                </table>
+              </section>
+
+              <section class="sys-group" aria-labelledby="h-chat">
+                <h3 class="section-title" id="h-chat">Interfaces de conversa</h3>
+                <table class="tbl parts" role="grid" data-grid aria-label="Partes do sistema">
+                  <colgroup><col style="width:25%"><col style="width:24%"><col style="width:27%"><col style="width:14%"><col style="width:10%"></colgroup>
+                  <thead class="sr-only"><tr><th scope="col">Parte</th><th scope="col">Estado</th><th scope="col">Processar solicitações</th><th scope="col">Módulo</th><th scope="col">Detalhes</th></tr></thead>
+                  <tbody>
+                    <tr><td class="name">Discord</td><td><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: Discord" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: Discord"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                    <tr><td class="name">WhatsApp</td><td><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Aguardando vínculo</span></td><td><button class="switch" role="switch" aria-checked="true" aria-label="Processar solicitações: WhatsApp" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></td><td><button class="btn btn-sm">Parar</button></td><td><button class="btn btn-icon btn-sm row-menu" data-opens-aside="aside-detail" aria-label="Detalhes: WhatsApp"><svg class="icon solid" aria-hidden="true"><use href="#i-dots"/></svg></button></td></tr>
+                  </tbody>
+                </table>
+              </section>
+
+              <section class="sys-group" aria-labelledby="h-jobs">
+                <h3 class="section-title" id="h-jobs">Tarefas agendadas</h3>
+                <div class="jobs">
+                  <div class="job">
+                    <span>Atualizar memes</span>
+                    <span class="interval">A cada <input class="input" type="number" min="1" value="6" aria-label="Intervalo de Atualizar memes"><select class="input" aria-label="Unidade do intervalo de Atualizar memes"><option>horas</option><option>minutos</option></select></span>
+                    <button class="switch" role="switch" aria-checked="true" aria-label="Atualizar memes" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button>
+                    <span class="last">última execução: nunca</span>
+                  </div>
+                  <div class="job">
+                    <span>Postar memes</span>
+                    <span class="interval">A cada <input class="input" type="number" min="1" value="2" aria-label="Intervalo de Postar memes"><select class="input" aria-label="Unidade do intervalo de Postar memes"><option>horas</option><option>minutos</option></select> <button class="btn btn-sm">Aplicar</button></span>
+                    <button class="switch" role="switch" aria-checked="true" aria-label="Postar memes" data-on="Ligado" data-off="Desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button>
+                    <span class="last"><span class="chip">personalizado</span> <button class="btn btn-quiet btn-sm">Voltar ao padrão</button> última execução: ignorada</span>
+                  </div>
+                </div>
+              </section>
+              <p class="foot-note">Os módulos continuam funcionando ao fechar o desktop. Parar preserva os dados.</p>
+            </div>
+
+            <aside class="wp-aside" id="aside-detail" aria-label="Detalhes do módulo">
+              <div class="aside-head"><h3>Agendador</h3><button class="btn btn-icon" data-close-aside aria-label="Fechar"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+              <div class="aside-body">
+                <span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Sem resposta</span>
+                <dl class="kv">
+                  <dt>Módulo</dt><dd>rodando</dd>
+                  <dt>Saúde</dt><dd>sem anúncio há 12 min</dd>
+                  <dt>Nome técnico</dt><dd>scheduler</dd>
+                </dl>
+                <h4 style="margin-top:var(--s-5);font-size:var(--fs-sm)">Logs</h4>
+                <pre class="log">10:41:02 scheduler: ciclo concluído (2 tarefas)
+10:41:02 scheduler: próximo ciclo em 5 min
+10:46:07 scheduler: aguardando orquestrador
+10:51:07 scheduler: aguardando orquestrador (tentativa 2)
+10:56:12 scheduler: aguardando orquestrador (tentativa 3)</pre>
+                <p class="field-help" style="margin-top:var(--s-4)">Processar solicitações: Desligado pausa o processamento; o módulo continua rodando.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- Status when the orchestrator cannot be reached: the screen the app opens on, saying what is wrong -->
+        <div class="view" data-view="status-offline" data-tab="status" data-legend="sistema|status" hidden>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Status do sistema" tabindex="0">
+            <div class="notice" data-tone="problem" role="alert" style="max-width:56rem">
+              <i class="dot" data-shape="triangle"></i>
+              <div><p><strong>O Ningo não está respondendo.</strong></p><p>Não foi possível ler o estado do sistema. O orquestrador não está rodando ou não pode ser alcançado.</p></div>
+              <div class="actions"><button class="btn">Tentar de novo</button><button class="btn btn-primary">Iniciar orquestrador</button></div>
+            </div>
+            <section class="sys-group" aria-labelledby="h-core-off">
+              <h3 class="section-title" id="h-core-off">Núcleo</h3>
+              <table class="tbl parts" role="grid" data-grid aria-label="Partes do sistema">
+                <colgroup><col style="width:25%"><col style="width:24%"><col style="width:27%"><col style="width:14%"><col style="width:10%"></colgroup>
+                <thead><tr><th scope="col">Parte</th><th scope="col">Estado</th><th scope="col">Processar solicitações</th><th scope="col">Módulo</th><th scope="col"><span class="sr-only">Detalhes</span></th></tr></thead>
+                <tbody>
+                  <tr><td class="name">Orquestrador</td><td><span class="sw" data-tone="off"><i class="dot" data-shape="dash"></i>Parado</span></td><td class="na">—</td><td><button class="btn btn-sm">Iniciar</button></td><td></td></tr>
+                  <tr><td class="name">Memória</td><td><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></td><td class="na">—</td><td class="na">—</td><td></td></tr>
+                  <tr><td class="name">Conhecimento</td><td><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></td><td class="na">—</td><td class="na">—</td><td></td></tr>
+                  <tr><td class="name">Chat</td><td><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></td><td class="na">—</td><td class="na">—</td><td></td></tr>
+                  <tr><td class="name">Feeds</td><td><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></td><td class="na">—</td><td class="na">—</td><td></td></tr>
+                </tbody>
+              </table>
+              <p class="foot-note">As dependências necessárias iniciam junto com o módulo.</p>
+            </section>
+          </div></div>
+        </div>
+
+        <!-- Configurações: one two-column grid, values said in words -->
+        <div class="view" data-view="configuracoes" data-tab="configuracoes" data-legend="sistema|configurações" hidden>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Configurações" tabindex="0">
+            <p class="field-help" style="max-width:var(--measure);margin:0 0 var(--s-5);font-size:var(--fs-sm)">Com quem o Ningo conversa e os modelos que usa. Salvo no banco local compartilhado com CLI e TUI; os módulos afetados são recriados.</p>
+
+            <h3 class="group-title">Discord</h3>
+            <div class="fields">
+              <div class="f"><span class="label">Canais de entrega de memes</span><span class="value">#sala-de-leitura</span><button class="btn btn-sm" aria-label="Editar Canais de entrega de memes">Editar</button></div>
+              <div class="f"><span class="label">Canais só seguros</span><span class="value">#sala-de-leitura</span><button class="btn btn-sm" aria-label="Editar Canais só seguros">Editar</button></div>
+              <div class="f" data-mode="editing">
+                <span class="label">Canais onde o Ningo responde</span><span class="value">todos os canais</span><span></span>
+                <div class="edit">
+                  <label class="sr-only" for="set-answer">Canais onde o Ningo responde</label>
+                  <input class="input" id="set-answer" type="text" value="#sala-de-leitura, #oficina-de-ensaios">
+                  <p class="field-help">Separados por vírgula; vazio limpa.</p>
+                  <div class="row"><button class="btn btn-primary btn-sm">Revisar</button><button class="btn btn-quiet btn-sm">Cancelar</button></div>
+                </div>
+              </div>
+              <div class="f"><span class="label">Mensagens diretas</span><span class="value">Abertas</span><button class="btn btn-sm" aria-label="Editar Mensagens diretas">Editar</button></div>
+            </div>
+
+            <h3 class="group-title">WhatsApp</h3>
+            <div class="fields">
+              <div class="f"><span class="label">Pessoas</span><span class="value">nenhuma</span><button class="btn btn-sm" aria-label="Editar Pessoas">Editar</button></div>
+              <div class="f"><span class="label">Grupos</span><span class="value">Clube do livro</span><button class="btn btn-sm" aria-label="Editar Grupos">Editar</button></div>
+              <div class="f"><span class="label">Responder o próprio chat</span><span class="value">Sim</span><button class="btn btn-sm" aria-label="Editar Responder o próprio chat">Editar</button></div>
+            </div>
+
+            <h3 class="group-title">Modelos</h3>
+            <div class="fields">
+              <div class="f"><span class="label">Modelo de similaridade</span><span class="value">padrão</span><button class="btn btn-sm" aria-label="Editar Modelo de similaridade">Editar</button></div>
+              <div class="f"><span class="label">Modelo classificador de livros</span><span class="value">padrão</span><button class="btn btn-sm" aria-label="Editar Modelo classificador de livros">Editar</button></div>
+              <div class="f"><span class="label">Modelo de fala para texto</span><span class="value fixed">Fixado para esta versão.</span><span></span></div>
+            </div>
+            <p class="foot-note">Canais por webhook se definem à mão no arquivo .env: os endereços são credenciais.</p>
+          </div></div>
+        </div>
+
+        <!-- Provedores: loaded when this view opens, with its caveat in plain words -->
+        <div class="view" data-view="provedores" data-tab="provedores" data-legend="sistema|provedores" hidden>
+          <div class="wp-actions"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></div>
+          <div class="wp-main"><div class="wp-body" role="region" aria-label="Provedores" tabindex="0">
+            <div class="notice" data-tone="other" style="max-width:52rem"><i class="dot" data-shape="dash"></i><p>Só descoberta: autenticação, cota e inferência não foram testadas. Listar um modelo não o seleciona.</p></div>
+            <ul class="providers">
+              <li><div><p>Provedor local de exemplo</p><p class="host">localhost</p></div><span class="dim" style="color:var(--ink-dim)">3 modelos</span><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Encontrado</span></li>
+              <li><div><p>Provedor remoto de exemplo</p><p class="host">api.example.com</p></div><span class="dim" style="color:var(--ink-dim)">—</span><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></li>
+              <li><div><p>Provedor antigo de exemplo</p><p class="host">legado.example.com</p></div><span class="dim" style="color:var(--ink-dim)">—</span><span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Sem resposta</span></li>
+            </ul>
+          </div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================== COMPONENT SHEET (mockup only; reach it with #componentes) ===================== -->
+    <div class="frame" id="ws-componentes" role="tabpanel" aria-label="Catálogo de componentes" data-ws="componentes" data-default="catalogo" hidden>
+      <span class="legend" aria-hidden="true"><b>componentes</b><i>›</i>só no mockup</span>
+      <section class="panel wp" aria-label="Catálogo de componentes">
+        <div class="view" data-view="catalogo" data-legend="componentes|só no mockup">
+          <div class="wp-main"><div class="wp-body sheet" role="region" aria-label="Componentes e estados" tabindex="0">
+
+            <h2>Voz e texto</h2>
+            <div class="specs wide">
+              <div class="spec"><small>voz do Ningo (Bodoni itálico 700, ink, uma por visão) + frase simples (B612)</small>
+                <p class="voice"><span class="sr-only">Ningo: </span>Parte do que tentei aguarda seu veredito.</p>
+                <p class="voice-next">Escolha uma experiência aguardando para dar o veredito.</p></div>
+              <div class="spec"><small>voz, duas linhas (quebra em 44rem)</small>
+                <p class="voice" style="max-width:20rem"><span class="sr-only">Ningo: </span>A estante está vazia. Não julgo o que não li.</p>
+                <p class="voice-next">Solte um arquivo aqui, ou use Adicionar.</p></div>
+              <div class="spec"><small>texto do sistema, para contraste: nunca em Bodoni</small>
+                <p style="font-size:var(--fs-sm)">Sem resposta. Sem anúncio há 12 min.</p>
+                <p style="font-size:var(--fs-xs);color:var(--ink-dim)">atualizada há 7 min · 12 itens</p></div>
+              <div class="spec"><small>escala: xs 12 · sm 13 · base 15 · md 17 · lg 22 · voz 20 · marca 48</small>
+                <p style="font-size:var(--fs-xs)">xs: meta, contagens</p><p style="font-size:var(--fs-sm)">sm: tabelas, botões</p><p>base: leitura, abas</p><p style="font-size:var(--fs-md);font-weight:700">md: título de item</p><p style="font-size:var(--fs-lg);font-weight:700">lg: título de documento</p></div>
+            </div>
+
+            <h2>Botões</h2>
+            <div class="specs">
+              <div class="spec"><small>primário · padrão</small><button class="btn btn-primary">Adicionar</button></div>
+              <div class="spec"><small>primário · hover</small><button class="btn btn-primary is-hover">Adicionar</button></div>
+              <div class="spec"><small>primário · foco</small><button class="btn btn-primary is-focus">Adicionar</button></div>
+              <div class="spec"><small>primário · ocupado</small><button class="btn btn-primary" aria-busy="true">Adicionando</button></div>
+              <div class="spec"><small>primário · desabilitado</small><button class="btn btn-primary" disabled>Adicionar</button></div>
+              <div class="spec"><small>secundário · padrão</small><button class="btn">Buscar</button></div>
+              <div class="spec"><small>secundário · hover</small><button class="btn is-hover">Buscar</button></div>
+              <div class="spec"><small>secundário · ativo</small><button class="btn is-active">Buscar</button></div>
+              <div class="spec"><small>secundário · foco</small><button class="btn is-focus">Buscar</button></div>
+              <div class="spec"><small>secundário · desabilitado</small><button class="btn" disabled title="Indisponível: nada para indexar">Indexar agora</button></div>
+              <div class="spec span2"><small>discreto · padrão / hover</small><span style="display:flex;gap:var(--s-2)"><button class="btn btn-quiet">Carregar anteriores</button><button class="btn btn-quiet is-hover">Carregar anteriores</button></span></div>
+              <div class="spec span2"><small>ícone · padrão / hover / foco</small><span style="display:flex;gap:var(--s-2)"><button class="btn btn-icon" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button><button class="btn btn-icon is-hover" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button><button class="btn btn-icon is-focus" aria-label="Atualizar"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button></span></div>
+              <div class="spec span2"><small>destrutivo · pedindo confirmação (única cor magenta de botão)</small><span style="display:flex;gap:var(--s-2)"><button class="btn btn-confirm">Apagar documento?</button><button class="btn">Cancelar</button></span></div>
+            </div>
+
+            <h2>Interruptor (estado persistente que vale na hora)</h2>
+            <div class="specs">
+              <div class="spec"><small>ligado</small><button class="switch" role="switch" aria-checked="true" aria-label="Exemplo ligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></div>
+              <div class="spec"><small>desligado</small><button class="switch" role="switch" aria-checked="false" aria-label="Exemplo desligado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Desligado</span></button></div>
+              <div class="spec"><small>hover (desligado)</small><button class="switch is-hover" role="switch" aria-checked="false" aria-label="Exemplo hover"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Desligado</span></button></div>
+              <div class="spec"><small>foco</small><button class="switch is-focus" role="switch" aria-checked="true" aria-label="Exemplo foco"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></div>
+              <div class="spec"><small>aplicando</small><button class="switch" role="switch" aria-checked="false" aria-busy="true" aria-label="Exemplo aplicando"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Aplicando…</span></button></div>
+              <div class="spec"><small>desabilitado</small><button class="switch" role="switch" aria-checked="true" disabled aria-label="Exemplo desabilitado"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Ligado</span></button></div>
+              <div class="spec"><small>sem verificação (status não lido)</small><button class="switch" role="switch" aria-checked="mixed" aria-label="Exemplo sem verificação"><span class="sw-track"><span class="sw-thumb"></span></span><span class="sw-word">Sem verificação</span></button></div>
+            </div>
+
+            <h2>Controle segmentado (um modo ou um filtro)</h2>
+            <div class="specs">
+              <div class="spec"><small>padrão, um selecionado, com contagens</small><div class="seg" role="radiogroup" aria-label="Exemplo"><button type="button" role="radio" aria-checked="true">Todas <span class="count">7</span></button><button type="button" role="radio" aria-checked="false">Aguardando <span class="count">4</span></button></div></div>
+              <div class="spec"><small>hover</small><div class="seg"><button type="button" class="is-hover" aria-checked="false">Aguardando <span class="count">4</span></button></div></div>
+              <div class="spec"><small>foco</small><div class="seg"><button type="button" class="is-focus" aria-checked="false">Resolvidas <span class="count">3</span></button></div></div>
+              <div class="spec"><small>desabilitado</small><div class="seg"><button type="button" disabled>Endereço</button></div></div>
+            </div>
+
+            <h2>Abas de visão (um lugar)</h2>
+            <div class="specs">
+              <div class="spec"><small>padrão · hover · selecionada</small><div class="vtabs"><button class="vt">Leituras</button><button class="vt is-hover">Leituras</button><button class="vt" aria-selected="true">Documentos</button></div></div>
+              <div class="spec"><small>foco</small><div class="vtabs"><button class="vt is-focus">Leituras</button></div></div>
+              <div class="spec"><small>item aberto, fechável (× com hover e foco)</small><div class="vtabs"><span class="vt-pair"><button class="vt" aria-selected="true">Sobre a liberdade de escolher</button><button class="vt-close is-hover" aria-label="Fechar"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></span></div></div>
+              <div class="spec"><small>carregando</small><div class="vtabs"><button class="vt">Provedores <span class="cursor" aria-hidden="true"></span></button></div></div>
+            </div>
+
+            <h2>Palavra de estado (forma + palavra)</h2>
+            <div class="specs">
+              <div class="spec"><small>funcionando · ok</small><span class="sw" data-tone="ok"><i class="dot" data-shape="square"></i>Funcionando</span></div>
+              <div class="spec"><small>problema</small><span class="sw" data-tone="problem"><i class="dot" data-shape="triangle"></i>Sem resposta</span></div>
+              <div class="spec"><small>sem verificação · aguardando</small><span class="sw" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>Sem verificação</span></div>
+              <div class="spec"><small>desligado · pausado</small><span class="sw" data-tone="off"><i class="dot" data-shape="dash"></i>Desligado</span></div>
+              <div class="spec"><small>em andamento</small><span class="sw" data-tone="progress"><i class="dot" data-shape="blink"></i>Iniciando…</span></div>
+              <div class="spec"><small>desconhecido</small><span class="sw" data-tone="off">—</span></div>
+            </div>
+
+            <h2>Item da barra lateral</h2>
+            <div class="specs">
+              <div class="spec"><small>padrão (calmo: só a forma)</small><div class="tab-box"><button class="tab" data-tone="ok" aria-label="Biblioteca, funcionando"><span>Biblioteca</span><i class="dot" data-shape="square"></i></button></div></div>
+              <div class="spec"><small>hover</small><div class="tab-box"><button class="tab is-hover" data-tone="ok" aria-label="Biblioteca, funcionando"><span>Biblioteca</span><i class="dot" data-shape="square"></i></button></div></div>
+              <div class="spec"><small>selecionado</small><div class="tab-box"><button class="tab" aria-selected="true" data-tone="ok" aria-label="Biblioteca, funcionando"><span>Biblioteca</span><i class="dot" data-shape="square"></i></button></div></div>
+              <div class="spec"><small>foco</small><div class="tab-box"><button class="tab is-focus" data-tone="ok" aria-label="Biblioteca, funcionando"><span>Biblioteca</span><i class="dot" data-shape="square"></i></button></div></div>
+              <div class="spec"><small>sem verificação (a palavra aparece)</small><div class="tab-box"><button class="tab" data-tone="unchecked"><span>Mensagens</span><i class="dot" data-shape="diamond"></i><span class="tab-word">aguardando vínculo</span></button></div></div>
+              <div class="spec"><small>com problemas (contagem + forma)</small><div class="tab-box"><button class="tab" data-tone="problem"><span>Sistema</span><span class="tab-count"><i class="dot" data-shape="triangle"></i>3</span><span class="tab-word">precisam de atenção</span></button></div></div>
+              <div class="spec"><small>sem conexão (a leitura do status falhou)</small><div class="tab-box"><button class="tab" data-tone="other"><span>Sistema</span><span class="tab-count" style="background:transparent;border:1px solid var(--off);color:var(--ink-dim)"><i class="dot" data-shape="dash" style="background:var(--ink-dim)"></i>sem conexão</span></button></div></div>
+              <div class="spec"><small>desatualizado (última leitura mantida)</small><div class="tab-box"><button class="tab" data-tone="ok"><span>Caderno</span><i class="dot" data-shape="square" style="opacity:.5"></i><span class="tab-word" style="display:block;color:var(--ink-dim)">desatualizado</span></button></div></div>
+            </div>
+
+            <h2>Marca (a única coisa memorável)</h2>
+            <div class="specs">
+              <div class="spec"><small>calma: alinhada</small><span class="wordmark spec-wm" data-pulse="calm" style="margin:0">Ningo</span></div>
+              <div class="spec"><small>sintonizando (sem leitura ainda)</small><span class="wordmark spec-wm" data-pulse="tuning" style="margin:0">Ningo</span></div>
+              <div class="spec"><small>mal: 3 problemas</small><span class="wordmark spec-wm" data-pulse="unwell" style="margin:0">Ningo</span></div>
+              <div class="spec"><small>perdido</small><span class="wordmark spec-wm" data-pulse="lost" style="margin:0">Ningo</span></div>
+              <div class="spec"><small>desatualizado (última leitura)</small><span class="wordmark spec-wm" data-pulse="stale" style="margin:0">Ningo</span></div>
+            </div>
+
+            <h2>Chip e aviso</h2>
+            <div class="specs">
+              <div class="spec"><small>contexto, removível</small><span class="chip removable"><span>Conversando sobre: Uma breve história do tédio</span><button class="x" aria-label="Remover"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></span></div>
+              <div class="spec"><small>discreto de estado (ok · aviso)</small><span style="display:flex;gap:var(--s-2);flex-wrap:wrap"><span class="chip" data-tone="ok"><i class="dot" data-shape="square"></i>similaridade: ligada</span><span class="chip" data-tone="unchecked"><i class="dot" data-shape="diamond"></i>10 trechos sem índice</span></span></div>
+              <div class="spec"><small>desabilitado</small><span class="chip disabled">Meme exemplo 4</span></div>
+            </div>
+            <div class="specs wide" style="margin-top:var(--s-4)">
+              <div class="spec"><small>aviso · ok</small><div class="notice" data-tone="ok"><i class="dot" data-shape="square"></i><p><strong>Adicionado.</strong> 3 trechos guardados.</p></div></div>
+              <div class="spec"><small>aviso · informação</small><div class="notice" data-tone="other"><i class="dot" data-shape="dash"></i><p>Só descoberta: nada foi testado.</p></div></div>
+              <div class="spec"><small>aviso · sem verificação</small><div class="notice" data-tone="unchecked"><i class="dot" data-shape="diamond"></i><p><strong>Aguardando vínculo.</strong> A conta ainda não foi vinculada.</p><span class="actions"><button class="btn btn-sm">Vincular…</button></span></div></div>
+              <div class="spec"><small>aviso · problema (role=alert)</small><div class="notice" data-tone="problem" role="alert"><i class="dot" data-shape="triangle"></i><p><strong>Falhou.</strong> A resposta não é a que esta tela espera.</p><span class="actions"><button class="btn btn-sm">Tentar de novo</button></span></div></div>
+            </div>
+
+            <h2>Campos</h2>
+            <div class="specs">
+              <div class="spec" style="width:100%"><small>padrão (com valor e dica)</small><div style="width:100%"><label class="field-label" for="s1">Título</label><input class="input" id="s1" value="Sobre a liberdade de escolher"><p class="field-help">Aparece na lista.</p></div></div>
+              <div class="spec" style="width:100%"><small>hover</small><div style="width:100%"><label class="field-label" for="s2">Título</label><input class="input is-hover" id="s2" placeholder="Digite um título"></div></div>
+              <div class="spec" style="width:100%"><small>foco</small><div style="width:100%"><label class="field-label" for="s3">Título</label><input class="input is-focus" id="s3" value="Sobre a liberdade"></div></div>
+              <div class="spec" style="width:100%"><small>inválido</small><div style="width:100%"><label class="field-label" for="s4">Intervalo</label><input class="input" id="s4" value="0" aria-invalid="true" aria-describedby="s4e"><p class="field-error" id="s4e">Use um número maior que zero.</p></div></div>
+              <div class="spec" style="width:100%"><small>desabilitado</small><div style="width:100%"><label class="field-label" for="s5">Mensagem</label><input class="input" id="s5" placeholder="Pergunte ao Ningo…" disabled></div></div>
+            </div>
+
+            <h2>Linha, menu de contexto e paginação</h2>
+            <div class="specs wide">
+              <div class="spec"><small>linha: padrão · hover · selecionada (cada uma abaixo)</small>
+                <div style="width:100%;border:1px solid var(--rule)">
+                  <table class="tbl"><tbody>
+                    <tr><td><span class="row-link">Taxonomia das dúvidas</span></td><td class="dim">estudo</td></tr>
+                    <tr class="is-hover"><td><span class="row-link">Taxonomia das dúvidas</span></td><td class="dim">estudo</td></tr>
+                    <tr data-selected><td><span class="row-link">Taxonomia das dúvidas</span></td><td class="dim">estudo</td></tr>
+                  </tbody></table></div></div>
+              <div class="spec"><small>menu de contexto aberto (Esc fecha, o foco volta à linha)</small>
+                <ul class="menu" role="menu" style="width:100%"><li role="none"><button role="menuitem" class="is-hover">Abrir <kbd>Enter</kbd></button></li><li role="none"><button role="menuitem">Classificar…</button></li><li role="none"><button role="menuitem" disabled>Indexar (já indexado)</button></li><li role="none"><hr></li><li role="none"><button role="menuitem">Apagar…</button></li></ul></div>
+              <div class="spec"><small>paginação: primeira · no meio · carregando</small><div style="width:100%"><div class="pager" style="padding:0"><span>1–14 de 23</span><span class="btns"><button class="btn btn-icon btn-sm" disabled aria-label="Anterior"><svg class="icon" aria-hidden="true"><use href="#i-prev"/></svg></button><button class="btn btn-icon btn-sm" aria-label="Próxima"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button></span></div>
+                <div class="pager" style="padding:var(--s-2) 0 0"><span>15–23 de 23</span><span class="btns"><button class="btn btn-icon btn-sm" aria-label="Anterior"><svg class="icon" aria-hidden="true"><use href="#i-prev"/></svg></button><button class="btn btn-icon btn-sm" disabled aria-label="Próxima"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button></span></div>
+                <div class="pager" style="padding:var(--s-2) 0 0"><span>Carregando <span class="cursor" aria-hidden="true"></span></span></div></div></div>
+            </div>
+
+            <h2>Transcrição e compositor</h2>
+            <div class="specs wide">
+              <div class="spec"><small>sua fala · fala do Ningo (B612, linha em --edge)</small>
+                <div style="display:grid;gap:var(--s-4);width:100%"><article class="turn" data-from="you"><div class="turn-meta"><b>Você</b><time>14:02</time></div><div class="turn-text"><p>O que você acha do ressentimento?</p></div></article><article class="turn" data-from="ningo"><div class="turn-meta"><b>Ningo</b><time>14:02</time></div><div class="turn-text"><p>Que o diagnóstico é bom e a cura é pior.</p></div></article></div></div>
+              <div class="spec"><small>pensando · erro</small>
+                <div style="display:grid;gap:var(--s-3);width:100%"><p class="thinking">Pensando… <span class="cursor" aria-hidden="true"></span></p>
+                <div class="notice" data-tone="problem" role="alert"><i class="dot" data-shape="triangle"></i><p><strong>Falhou.</strong> O Ningo não respondeu a tempo.</p><span class="actions"><button class="btn btn-sm">Tentar de novo</button></span></div></div></div>
+              <div class="spec"><small>compositor · digitando · enviando · desabilitado</small>
+                <div style="display:grid;gap:var(--s-3);width:100%">
+                  <form class="composer" onsubmit="return false" style="margin:0"><textarea class="input" rows="2" aria-label="Exemplo digitando">Argumente contra: a tese do tédio</textarea><button class="btn btn-primary" type="button">Enviar</button></form>
+                  <form class="composer" onsubmit="return false" style="margin:0"><textarea class="input" rows="2" aria-label="Exemplo enviando" disabled>Argumente contra: a tese do tédio</textarea><button class="btn btn-primary" type="button" aria-busy="true">Enviando</button></form>
+                  <form class="composer" onsubmit="return false" style="margin:0"><textarea class="input" rows="2" aria-label="Exemplo desabilitado" disabled placeholder="Pergunte ao Ningo…"></textarea><button class="btn btn-primary" type="button" disabled>Enviar</button><p class="composer-foot"><span>Indisponível enquanto o Ningo não responde.</span></p></form></div></div>
+            </div>
+
+            <h2>Estados de uma visão</h2>
+            <div class="specs wide">
+              <div class="spec"><small>carregando (a única animação, parada com movimento reduzido)</small><p class="thinking">Carregando documentos <span class="cursor" aria-hidden="true"></span></p></div>
+              <div class="spec"><small>vazio: voz + passo seguinte</small><div><p class="voice"><span class="sr-only">Ningo: </span>Não tenho nada sobre isso ainda.</p><p class="voice-next">Adicione um documento ou tente outras palavras.</p></div></div>
+              <div class="spec"><small>erro: simples + tentar de novo</small><div class="notice" data-tone="problem" role="alert"><i class="dot" data-shape="triangle"></i><p><strong>Falhou.</strong> A resposta não é a que esta tela espera.</p><span class="actions"><button class="btn btn-sm">Tentar de novo</button></span></div></div>
+              <div class="spec"><small>desligado: simples + onde ligar</small><div class="notice" data-tone="off"><i class="dot" data-shape="dash"></i><p><strong>Conhecimento está desligado.</strong> Ligue o módulo para ver os documentos.</p><span class="actions"><button class="btn btn-sm">Abrir Sistema</button></span></div></div>
+              <div class="spec"><small>sem conexão: simples + onde olhar</small><div class="notice" data-tone="problem"><i class="dot" data-shape="triangle"></i><p><strong>O Ningo não está respondendo.</strong> O orquestrador não está rodando ou não pode ser alcançado.</p><span class="actions"><button class="btn btn-sm">Abrir Sistema</button></span></div></div>
+            </div>
+
+            <h2>Miniaturas de meme</h2>
+            <div class="specs">
+              <div class="spec"><small>padrão</small><div class="meme-wrap" style="width:100%"><button class="meme" style="width:100%" aria-label="Meme exemplo">exemplo</button></div></div>
+              <div class="spec"><small>hover</small><div class="meme-wrap" style="width:100%"><button class="meme is-hover" style="width:100%" aria-label="Meme exemplo">exemplo</button></div></div>
+              <div class="spec"><small>anexado</small><div class="meme-wrap" style="width:100%"><button class="meme" style="width:100%" aria-pressed="true" aria-label="Meme exemplo, anexado">exemplo</button></div></div>
+              <div class="spec"><small>foco</small><div class="meme-wrap" style="width:100%"><button class="meme is-focus" style="width:100%" aria-label="Meme exemplo">exemplo</button></div></div>
+              <div class="spec"><small>prévia indisponível</small><div class="meme-wrap" style="width:100%"><button class="meme" style="width:100%" disabled aria-label="Sem prévia">sem prévia</button></div></div>
+            </div>
+          </div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const NAMES = ['conversa', 'biblioteca', 'caderno', 'mensagens', 'sistema'];
+  const SPECIAL = {
+    'biblioteca-adicionar': ['biblioteca', 'documentos', { aside: true }],
+    'leituras-vazia': ['biblioteca', 'leituras-vazia'],
+    'mensagens-meme': ['mensagens', 'canal', { pop: 'memes-pop' }],
+    'sistema-detalhe': ['sistema', 'status', { aside: true }],
+    'sistema-offline': ['sistema', 'status-offline'],
+    'caderno-detalhe': ['caderno', 'lista', { aside: true }],
+  };
+  let lastTrigger = null;
+  let docOpen = true;
+  $$('.workspaces .tab').forEach((t) => { t.dataset.label = t.getAttribute('aria-label'); });
+
+  const frameOf = (ws) => $(`.frame[data-ws="${ws}"]`);
+  const currentFrame = () => $$('.frame[data-ws]').find((f) => !f.hidden);
+  const currentView = () => { const f = currentFrame(); return f && $$('.view', f).find((v) => !v.hidden); };
+
+  function setAside(v, open) {
+    v.dataset.aside = open ? 'open' : 'closed';
+    $$('[data-opens-aside][aria-expanded]', v).forEach((b) => b.setAttribute('aria-expanded', String(open)));
+  }
+
+  function show(ws, view, extra = {}) {
+    const frame = frameOf(ws);
+    if (!frame) return;
+    $$('.frame[data-ws]').forEach((f) => { f.hidden = f !== frame; });
+    const tabs = $$('.workspaces [role="tab"]');
+    let any = false;
+    tabs.forEach((t) => {
+      const sel = t.dataset.ws === ws;
+      any = any || sel;
+      t.setAttribute('aria-selected', String(sel));
+      t.tabIndex = sel ? 0 : -1;
+    });
+    if (!any) tabs[0].tabIndex = 0;
+    view = view || frame.dataset.default;
+    let v = $(`.view[data-view="${view}"]`, frame);
+    if (!v) { view = frame.dataset.default; v = $(`.view[data-view="${view}"]`, frame); }
+    $$('.view', frame).forEach((x) => { x.hidden = x !== v; });
+    const tabName = v.dataset.tab || view;
+    $$('[data-view-tab]', frame).forEach((b) => {
+      const s = b.dataset.viewTab === tabName;
+      b.setAttribute('aria-selected', String(s));
+      b.tabIndex = s ? 0 : -1;
+    });
+    // Offline views: the sidebar says nothing is known and the name loses its register.
+    const off = /offline/.test(view);
+    $('.app').toggleAttribute('data-offline', off);
+    $('.wordmark').dataset.pulse = off ? 'lost' : 'unwell';
+    tabs.forEach((t) => t.setAttribute('aria-label', off ? `${$('span', t).textContent}, sem conexão` : t.dataset.label));
+    // An empty shelf has no open document.
+    const pair = $('#doc-pair');
+    if (pair) { pair.hidden = !docOpen || (ws === 'biblioteca' && view === 'vazia'); $('.vt-sep', frameOf('biblioteca')).hidden = pair.hidden; }
+    const parts = (v.dataset.legend || ws).split('|');
+    $('.legend', frame).innerHTML = parts
+      .map((p, i) => (i === parts.length - 1 ? `<b>${p}</b>` : `<span>${p}</span>`))
+      .join('<i>›</i>');
+    // The aside is inline only when the panel is wide enough; otherwise it starts closed (an overlay).
+    if (v.hasAttribute('data-aside-auto')) setAside(v, frame.getBoundingClientRect().width >= 62 * 16);
+    else setAside(v, false);
+    closeFloating();
+    // a transcript opens anchored at its latest turn
+    const log = $('.transcript', v);
+    if (log) log.parentElement.scrollTop = log.parentElement.scrollHeight;
+    if (extra.aside) setAside(v, true);
+    if (extra.pop) togglePop(extra.pop, true);
+    const hash = view === frame.dataset.default ? ws : `${ws}-${view}`;
+    history.replaceState(null, '', `#${hash}`);
+  }
+
+  function route() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (SPECIAL[h]) return show(...SPECIAL[h]);
+    const [ws, ...rest] = h.split('-');
+    if (frameOf(ws)) return show(ws, rest.join('-') || undefined);
+    show('conversa');
+  }
+
+  /* ---- floating things: menus, popover ---- */
+  function closeFloating(returnFocus) {
+    $$('.menu:not([hidden])').forEach((m) => {
+      if (m.closest('.sheet')) return;
+      m.hidden = true;
+      const t = $(`[data-menu="${m.id}"]`);
+      if (t) { t.setAttribute('aria-expanded', 'false'); if (returnFocus && lastTrigger === t) t.focus(); }
+    });
+    const p = $('.popover:not([hidden])');
+    if (p && !p.closest('.sheet')) togglePop(p.id, false, returnFocus);
+  }
+
+  function togglePop(id, open, returnFocus) {
+    const p = document.getElementById(id);
+    if (!p) return;
+    p.hidden = !open;
+    $$(`[data-toggle-pop="${id}"]`).forEach((b) => b.setAttribute('aria-expanded', String(open)));
+    if (!open && returnFocus) $(`[data-toggle-pop="${id}"]`)?.focus();
+  }
+
+  function openMenu(btn, at) {
+    const menu = document.getElementById(btn.dataset.menu);
+    const wasOpen = !menu.hidden;
+    closeFloating();
+    if (wasOpen && !at) return;
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    lastTrigger = btn;
+    if (!menu.closest('.menu-anchor')) {
+      const host = menu.offsetParent.getBoundingClientRect();
+      const r = btn.getBoundingClientRect();
+      const x = at ? at.x : r.right - menu.offsetWidth;
+      const y = at ? at.y : r.bottom + 4;
+      menu.style.left = `${Math.max(4, Math.min(x - host.left, host.width - menu.offsetWidth - 4))}px`;
+      menu.style.top = `${Math.max(4, Math.min(y - host.top, host.height - menu.offsetHeight - 4))}px`;
+    }
+    if (!at) $('[role="menuitem"]:not(:disabled)', menu)?.focus();
+  }
+
+  /* ---- delegated clicks ---- */
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button, a');
+    const inFloating = e.target.closest('.menu, .popover');
+    if (!t) { if (!inFloating) closeFloating(); return; }
+
+    if (t.matches('.skip')) { e.preventDefault(); const m = $('main'); m.tabIndex = -1; m.focus(); return; }
+    if (t.matches('.wordmark')) { e.preventDefault(); show('conversa'); return; }
+    if (t.matches('.workspaces [role="tab"]')) { show(t.dataset.ws); return; }
+    if (t.matches('[data-view-tab]')) { show(currentFrame().dataset.ws, t.dataset.viewTab); return; }
+    if (t.dataset.goto) { show(t.dataset.goto); return; }
+    if (t.dataset.gotoView) { show(currentFrame().dataset.ws, t.dataset.gotoView); return; }
+
+    if (t.matches('[data-menu]')) { e.stopPropagation(); openMenu(t); return; }
+    if (t.matches('[role="menuitem"]')) {
+      const action = t.dataset.action;
+      closeFloating(true);
+      if (action === 'new-chat') show('conversa', 'vazia');
+      return;
+    }
+    if (!inFloating) closeFloating();
+
+    if (t.matches('[data-open-doc]')) { docOpen = true; show('biblioteca', 'documento'); return; }
+    if (t.matches('[data-close-doc]')) {
+      docOpen = false;
+      show('biblioteca', 'documentos');
+      $('[data-view-tab="documentos"]')?.focus();
+      return;
+    }
+    if (t.matches('[data-fill]')) { const ta = $('textarea', t.closest('.view')); ta.value = t.dataset.fill; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); return; }
+    if (t.matches('[data-toggle]')) { const el = document.getElementById(t.dataset.toggle); el.hidden = !el.hidden; t.setAttribute('aria-expanded', String(!el.hidden)); return; }
+    if (t.matches('[data-toggle-pop]')) { const p = document.getElementById(t.dataset.togglePop); togglePop(p.id, p.hidden); if (!p.hidden) { lastTrigger = t; $('.meme:not(:disabled)', p)?.focus(); } return; }
+    if (t.matches('[data-close-pop]')) { togglePop(t.closest('.popover').id, false, true); return; }
+    if (t.matches('.meme[aria-pressed]')) { t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true')); return; }
+
+    if (t.matches('[data-opens-aside]')) {
+      const v = t.closest('.view');
+      if (t.matches('.exp')) { $$('.exp', v).forEach((x) => x.removeAttribute('aria-current')); t.setAttribute('aria-current', 'true'); setAside(v, true); return; }
+      const opening = v.dataset.aside !== 'open' || !t.matches('.btn-primary');
+      if (t.closest('tr, li')) fillDetail(t);
+      setAside(v, opening);
+      lastTrigger = t;
+      if (opening) $('[data-close-aside]', v)?.focus();
+      return;
+    }
+    if (t.matches('[data-close-aside]')) { const v = t.closest('.view'); setAside(v, false); (lastTrigger && lastTrigger.isConnected ? lastTrigger : null)?.focus(); return; }
+
+    if (t.matches('[role="switch"]') && !t.disabled && t.getAttribute('aria-busy') !== 'true') {
+      const on = t.getAttribute('aria-checked') !== 'true';
+      t.setAttribute('aria-checked', String(on));
+      const w = $('.sw-word', t);
+      if (w) w.textContent = (on ? t.dataset.on : t.dataset.off) || (on ? 'Ligado' : 'Desligado');
+      return;
+    }
+    if (t.matches('[role="radio"]')) {
+      const g = t.closest('[role="radiogroup"]');
+      $$('[role="radio"]', g).forEach((r) => { const s = r === t; r.setAttribute('aria-checked', String(s)); r.tabIndex = s ? 0 : -1; });
+    }
+  });
+
+  document.addEventListener('contextmenu', (e) => {
+    const tr = e.target.closest('.tbl tbody tr');
+    const btn = tr && $('[data-menu]', tr);
+    if (!btn || tr.closest('.sheet')) return;
+    e.preventDefault();
+    openMenu(btn, { x: e.clientX, y: e.clientY });
+  });
+
+  /* ---- the Sistema detail aside names the row it was opened from ---- */
+  let detailOriginal = null;
+  function fillDetail(btn) {
+    const aside = $('#aside-detail');
+    detailOriginal = detailOriginal || $('.aside-body', aside).innerHTML;
+    const row = btn.closest('tr, li');
+    const name = $('.name', row).textContent;
+    $('h3', aside).textContent = name;
+    const body = $('.aside-body', aside);
+    if (name === 'Agendador') { body.innerHTML = detailOriginal; return; }
+    const sw = $('.sw', row);
+    body.innerHTML = `${sw ? sw.outerHTML : ''}<p class="field-help" style="margin-top:var(--s-4)">Os logs de ${name} apareceriam aqui. Este mockup mostra os do Agendador.</p>`;
+  }
+
+  /* ---- keyboard ---- */
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && /^[1-5]$/.test(e.key)) { e.preventDefault(); show(NAMES[Number(e.key) - 1]); return; }
+
+    if (e.key === 'Escape') {
+      if ($$('.menu:not([hidden]), .popover:not([hidden])').some((el) => !el.closest('.sheet'))) { closeFloating(true); return; }
+      const v = currentView();
+      if (v && v.dataset.aside === 'open') {
+        setAside(v, false);
+        (lastTrigger && lastTrigger.isConnected ? lastTrigger : null)?.focus();
+      }
+      return;
+    }
+
+    const menu = e.target.closest('.menu');
+    if (menu && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+      e.preventDefault();
+      const items = $$('[role="menuitem"]:not(:disabled)', menu);
+      const i = items.indexOf(document.activeElement);
+      const n = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items[n].focus();
+      return;
+    }
+
+    // Menu key / Shift+F10 on a row: the same menu as the right click.
+    const row = e.target.closest('.tbl tbody tr');
+    if (row && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && !row.closest('.sheet')) {
+      e.preventDefault();
+      const b = $('[data-menu]', row);
+      if (b) openMenu(b);
+      return;
+    }
+
+    // Tab lists and radio groups: arrows move and select, Home/End jump; one tab stop per list.
+    const list = e.target.closest('[role="tablist"], [role="radiogroup"]');
+    if (list && !e.target.closest('.sheet')) {
+      const vertical = list.getAttribute('aria-orientation') === 'vertical';
+      const next = vertical ? 'ArrowDown' : 'ArrowRight';
+      const prev = vertical ? 'ArrowUp' : 'ArrowLeft';
+      if (![next, prev, 'Home', 'End'].includes(e.key)) return;
+      const items = $$('[role="tab"], [role="radio"]', list).filter((x) => x.offsetParent !== null && !x.disabled);
+      const i = items.indexOf(document.activeElement);
+      if (i < 0) return;
+      e.preventDefault();
+      const n = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === next ? 1 : -1) + items.length) % items.length;
+      items[n].focus();
+      items[n].click();
+    }
+  });
+
+  /* ---- lists: one tab stop, arrows move between rows (Enter opens, Menu key opens the row menu) ---- */
+  const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary';
+  $$('[data-roving]').forEach((group) => {
+    const items = $$(group.dataset.roving, group);
+    const extrasOf = (it) => $$('.row-menu', it.closest('tr') || it);
+    const setActive = (it) => items.forEach((i) => {
+      const on = i === it;
+      i.tabIndex = on ? 0 : -1;
+      extrasOf(i).forEach((x) => { if (x !== i) x.tabIndex = on ? 0 : -1; });
+    });
+    setActive(items[0]);
+    group.addEventListener('focusin', (e) => {
+      const it = items.find((i) => i === e.target || extrasOf(i).includes(e.target));
+      if (it) setActive(it);
+    });
+    group.addEventListener('keydown', (e) => {
+      const i = items.indexOf(e.target);
+      if (i < 0 || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault();
+      const n = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+      items[n].focus();
+    });
+  });
+  // Tables of controls: one tab stop, arrows move between cells and rows (grid pattern, roving tabindex).
+  $$('[data-grid]').forEach((tbl) => {
+    const rows = $$('tbody tr', tbl).map((tr) => $$(FOCUSABLE, tr).map((el) => ({ el, col: el.closest('td').cellIndex })));
+    let cur = [0, 0];
+    const apply = () => rows.forEach((cells, r) => cells.forEach((c, i) => { c.el.tabIndex = r === cur[0] && i === cur[1] ? 0 : -1; }));
+    apply();
+    const find = (el) => { for (let r = 0; r < rows.length; r++) { const i = rows[r].findIndex((c) => c.el === el); if (i >= 0) return [r, i]; } return null; };
+    tbl.addEventListener('focusin', (e) => { const p = find(e.target); if (p) { cur = p; apply(); } });
+    tbl.addEventListener('keydown', (e) => {
+      const p = find(e.target);
+      if (!p || !['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+      e.preventDefault();
+      let [r, i] = p;
+      const col = rows[r][i].col;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        r = Math.max(0, Math.min(rows.length - 1, r + (e.key === 'ArrowDown' ? 1 : -1)));
+        const same = rows[r].findIndex((c) => c.col === col);
+        i = same >= 0 ? same : Math.min(i, rows[r].length - 1);
+      } else if (e.key === 'ArrowRight') i = Math.min(rows[r].length - 1, i + 1);
+      else if (e.key === 'ArrowLeft') i = Math.max(0, i - 1);
+      else if (e.key === 'Home') i = 0;
+      else i = rows[r].length - 1;
+      rows[r][i].el.focus();
+    });
+  });
+  // A scroll region is a tab stop only when it holds nothing focusable (so it can still be scrolled by keyboard).
+  $$('.wp-body[tabindex="0"]').forEach((b) => { if ($(FOCUSABLE, b)) b.removeAttribute('tabindex'); });
+
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>

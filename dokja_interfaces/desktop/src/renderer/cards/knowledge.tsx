@@ -53,7 +53,7 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
   const { state, reload } = useCard(load);
 
   return (
-    <CardFrame kindLabel={t("kind_knowledge")} title={t("knowledge_title")} state={state} onReload={reload}>
+    <CardFrame title={t("knowledge_title")} state={state} onReload={reload}>
       {(status) =>
         status.off ? (
           <OffNotice reason={status.reason} />

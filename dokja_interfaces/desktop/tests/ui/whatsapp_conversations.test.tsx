@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport } from "../../src/shared/transport.js";
 import { ok, routedTransport } from "./support.js";
@@ -11,9 +10,7 @@ import { ok, routedTransport } from "./support.js";
 function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
-      <PulseProvider>
         <CommunicationsCard transport={transport} />
-      </PulseProvider>
     </I18nProvider>,
   );
 }

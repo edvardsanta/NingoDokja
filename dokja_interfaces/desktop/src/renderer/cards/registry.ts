@@ -21,16 +21,17 @@ export type CardEntry = {
 };
 
 // Every workspace the screen knows, in the order of the sidebar. Adding one is adding a line here
-// (and its action to the allow-list in src/shared/actions.ts). System holds the switches and is the
-// one that reads the status, so the screen opens on it. Memes have no workspace: they are picked in
-// Messages, where they are sent. Reading is how knowledge comes in, so the sources it reads are a
-// view of Knowledge rather than a workspace of their own.
+// (and its action to the allow-list in src/shared/actions.ts). The conversation with Ningo is the
+// front door; System, the back room, opens instead when the orchestrator does not answer. Memes have
+// no workspace: they are picked in Messages, where they are sent. Reading is how knowledge comes in,
+// so the sources it reads are a view of the Library rather than a workspace of their own.
 export const CARDS: readonly CardEntry[] = [
-  { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard },
-  { kind: "knowledge", labelId: "kind_knowledge", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
-  { kind: "memory", labelId: "kind_memory", Card: MemoryCard, services: ["memory"] },
+  { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard, services: ["chat"] },
+  { kind: "knowledge", labelId: "nav_library", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
+  { kind: "memory", labelId: "nav_notebook", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
   { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },
 ];
 
-export const START = "health";
+export const START = "assistant";
+export const FALLBACK = "health";

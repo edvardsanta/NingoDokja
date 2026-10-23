@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { HealthCard } from "../../src/renderer/cards/health.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
+import { StatusProvider } from "../../src/renderer/status_context.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportErrorCode, TransportResult } from "../../src/shared/transport.js";
 import { ALL_UP, SERVICES, deferred, failure, scriptedTransport, statusReply } from "./support.js";
@@ -11,9 +11,9 @@ import { ALL_UP, SERVICES, deferred, failure, scriptedTransport, statusReply } f
 function Card({ transport, locale }: { transport: Transport; locale: Locale }) {
   return (
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <StatusProvider transport={transport}>
         <HealthCard transport={transport} />
-      </PulseProvider>
+      </StatusProvider>
     </I18nProvider>
   );
 }
@@ -39,26 +39,26 @@ describe("the health card", () => {
     await screen.findByText("1 up, 2 with problems, 1 switched off, 1 not checked");
 
     expect(calls).toEqual([{ type: "ningo.status", payload: {}, options: { timeoutMs: 15_000 } }]);
-    within(row("chat")).getByText("error");
-    within(row("chat")).getByText("connection refused");
-    within(row("scheduler")).getByText("stopped");
-    within(row("memory")).getByText("switched off");
-    within(row("book")).getByText("not checked");
-    within(row("meme")).getByText("up");
+    within(row("Chat")).getByText("Error");
+    within(row("Chat")).getByText("connection refused");
+    within(row("Scheduler")).getByText("Not answering");
+    within(row("Memory")).getByText("Paused");
+    within(row("Books")).getByText("Not checked");
+    within(row("Memes")).getByText("Working");
   });
 
   it("lists the services in the TUI's order", async () => {
     const { transport } = scriptedTransport(statusReply(SERVICES));
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    expect(names()).toEqual(["meme", "chat", "book", "memory", "scheduler"]);
+    expect(names()).toEqual(["Memes", "Chat", "Books", "Memory", "Scheduler"]);
   });
 
   it("draws one segment per service, coloured by its state", async () => {
     const { transport } = scriptedTransport(statusReply(SERVICES));
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     const tones = [...document.querySelectorAll(".strip span")].map((node) => node.getAttribute("data-tone"));
     expect(tones).toEqual(["ok", "problem", "unchecked", "off", "problem"]);
@@ -85,7 +85,7 @@ describe("the health card", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe(message);
-    expect(screen.getByRole("button").textContent).toBe("Try again");
+    screen.getByRole("button", { name: "Try again" });
   });
 
   it("treats an answer of the wrong shape as unexpected", async () => {
@@ -114,7 +114,7 @@ describe("the health card", () => {
     const { transport } = scriptedTransport(() => gate.promise);
     renderCard(transport);
 
-    const button = screen.getByRole("button") as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
     gate.resolve(statusReply(ALL_UP));
@@ -145,8 +145,18 @@ describe("the health card", () => {
 
     await screen.findByText("1 no ar, 2 com problemas, 1 desligados, 1 sem verificação");
     screen.getByRole("heading", { name: "Serviços" });
-    screen.getByText("sistema");
-    within(row("scheduler")).getByText("parado");
+    screen.getByText("Sistema");
+    within(row("Agendador")).getByText("Sem resposta");
     screen.getByRole("button", { name: "Atualizar" });
+  });
+
+  it("names each service in words, keeps its id for the operator, and shows an unknown one as it came", async () => {
+    const { transport } = scriptedTransport(statusReply({ chat_ai: { status: "ok", detail: "" }, mystery_service: { status: "ok", detail: "" } }));
+    renderCard(transport);
+
+    const chat = await screen.findByText("Chat");
+    expect(chat.getAttribute("title")).toBe("chat_ai");
+    expect(screen.queryByText("chat_ai")).toBeNull();
+    screen.getByText("mystery_service");
   });
 });

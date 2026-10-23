@@ -1,6 +1,6 @@
 import { isRecord, text } from "../../shared/records.js";
 import type { JobState } from "../../shared/replies.js";
-import type { Pulse } from "../pulse.js";
+import type { Pulse } from "../status_context.js";
 import type { CardState } from "./use_card.js";
 
 // The services the TUI lists, in its order. Any other service the orchestrator reports comes after

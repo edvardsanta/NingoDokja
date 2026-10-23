@@ -4,22 +4,32 @@ Desktop interface for Ningo. It is an interface adapter like the CLI, the TUI an
 talks to the orchestrator over ZeroMQ request/reply and holds no business logic. The plan, the
 decisions and the Phase 0 results are in [`dokja_docs/desktop-app-plan.md`](../../dokja_docs/desktop-app-plan.md).
 
-Status: v1 without voice, laid out as a workspace (Phase A of the workspace replan in the plan). A
-sidebar on the left lists four workspaces; the open one fills the rest of the window. Each is a card
-that asks its service only when it is first opened, and then keeps what it showed. The screen opens
-on System, which reads the status: the dot next to a workspace is the worst state among the services
-behind it, and the number at the foot counts the services with a problem. The sidebar asks nothing
-itself.
+Status: v1 without voice, laid out as a workspace (Phase A of the workspace replan in the plan; the
+redesign under way is in [`dokja_docs/desktop-ux/`](../../dokja_docs/desktop-ux/)). A sidebar on the
+left lists five workspaces, Talk, Library, Notebook, Messages and, at the foot, System; the open one
+fills the rest of the window as one panel: a legend that says where the owner is (workspace › view),
+a header with the views on the left and one refresh plus the workspace's actions on the right, and a
+body that is the only thing that scrolls. Modules, services, interfaces and jobs are named in words
+(Chat, Scheduler, Post memes); the id the orchestrator reports stays in the tooltip. A module is
+started and stopped (a verb, a button); a switch is on or off (a state). A sidebar entry says its state
+in a word only when something behind it is not well. Each workspace asks its service only when it is first
+opened, and then keeps what it showed. The screen opens on Talk, the conversation with Ningo. The status
+(`ningo.status`) is read once, at the top of the screen, when it starts (and again when System asks
+for it): the name's pulse, the dot next to a workspace (the worst state among the services behind
+it) and the number at the foot (the services with a problem) all show that one answer. When the
+orchestrator does not answer, the foot says `offline` and System opens instead of Talk, unless the
+owner has already moved. The sidebar asks nothing itself.
 
 | Workspace | Asks | Shows |
 |---|---|---|
 | system (settings) | `runtime.settings`, `runtime.settings.set` | below the modules: Discord channels (each delivery channel marked bot or webhook) and DMs, WhatsApp people and groups, and models; editing one shows which modules are recreated and asks |
 | system (health) | `ningo.status`, `services.set`, `scheduler.jobs.set` | how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
-| memory | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
-| knowledge | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its sources view | two views. **Documents**: the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over). **Sources**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |
+| talk | `message.created` when something is sent | the conversation with Ningo |
+| notebook (memory) | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
+| library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its readings view | two views, as tabs (the arrows move between them). **Documents**: the research base, a search over it, and a form to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over). **Readings**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened |
 | messages (communications) | `communications.channels`, `communications.history`, `communications.send` | configured Discord channels and the WhatsApp conversations the owner named, paginated history, text and meme delivery through Ningo to Discord; **Load memes** shows the waiting memes as a grid of previews fetched by the shell, and a click attaches one (a second click takes it off) |
 
-Ctrl+1 to Ctrl+4 open the workspaces in the sidebar's order (System is Ctrl+4), from anywhere, a field
+Ctrl+1 to Ctrl+5 open the workspaces in the sidebar's order (System is Ctrl+5), from anywhere, a field
 included; the up and down arrows (with Home and End) move through the sidebar when it has the focus. A
 bare digit is always typed, never taken as a shortcut. Memes have no workspace of their own: Ningo
 sends them, so they are picked in Messages. Changes to the research base require a real click or key press in the window (see
@@ -209,11 +219,15 @@ src/renderer        src/preload                    src/main          ZeroMQ REQ
    `src/main/actions.ts`, with tests that show what it leaves out. Only add an action the orchestrator
    really routes: it sends an event it does not know to the chat domain.
 2. Write the card in `src/renderer/cards/` with `useCard` and `CardFrame`, and its strings in both
-   catalogs, the name of its workspace included.
+   catalogs, the name of its workspace included. A workspace wraps its sections in one
+   `WorkspacePanel` (`src/renderer/cards/workspace_panel.tsx`); a `CardFrame` is a section of it, not
+   a card of its own, and registers its reload with the panel's one refresh.
 3. Add one line to `CARDS` in `src/renderer/cards/registry.ts`: its kind, the id of its name in the
    sidebar, the component and, for its dot, the names of the services behind it as the status reports
-   them. The order of the lines is the order of the sidebar; keep health last, at the foot, and the one
-   the screen starts on (`START`), because its answer drives the name's pulse and the dots.
+   them. The order of the lines is the order of the sidebar; keep health last, at the foot. The screen
+   starts on `START` (Talk) and falls back to `FALLBACK` (System) when the orchestrator does not
+   answer; the status itself is read by `StatusProvider` in `src/renderer/status_context.tsx`, not by
+   a card.
 
 ## Look
 

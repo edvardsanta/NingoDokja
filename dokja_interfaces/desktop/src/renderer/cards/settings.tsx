@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { isRecord } from "../../shared/records.js";
 import type { RuntimeSetting, RuntimeSettings, RuntimeSnapshot } from "../../shared/runtime.js";
 import type { Transport } from "../../shared/transport.js";
+import { displayName } from "../display_names.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { CardFrame, Problem } from "./card_frame.js";
@@ -30,6 +31,19 @@ const LABELS: Record<string, MessageId> = {
   "models.speech_to_text": "setting_model_speech_to_text",
   "models.ocr": "setting_model_ocr",
 };
+
+// The words for a closed set of values; a value outside it is shown as it came.
+const OPTIONS: Record<string, MessageId> = {
+  open: "setting_option_open",
+  closed: "setting_option_closed",
+  true: "setting_option_true",
+  false: "setting_option_false",
+};
+
+function optionText(option: string, t: ReturnType<typeof useTranslate>): string {
+  const id = OPTIONS[option];
+  return id ? t(id) : option;
+}
 
 type View = RuntimeSettings & { running: string[] };
 
@@ -78,7 +92,7 @@ export function SettingsCard({ transport }: { transport: Transport }) {
     return () => clearTimeout(timer);
   }, [view, poll]);
 
-  return <CardFrame kindLabel={t("nav_system")} title={t("settings_title")} state={state} onReload={reload}>
+  return <CardFrame title={t("settings_title")} state={state} onReload={reload}>
     {(data) => <>
       <p className="detail">{t("settings_intro")}</p>
       {data.error && <p role="alert">{t("settings_last_change", { message: data.error })}</p>}
@@ -110,7 +124,7 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
         <label htmlFor={id}>{label}</label>
         {row.options.length > 0
           ? <select id={id} value={draft} onChange={(event) => { setDraft(event.target.value); setReviewing(false); }}>
-            {row.options.map((option) => <option key={option} value={option}>{option}</option>)}
+            {row.options.map((option) => <option key={option} value={option}>{optionText(option, t)}</option>)}
           </select>
           : <input id={id} value={draft} maxLength={2000} autoComplete="off" onChange={(event) => { setDraft(event.target.value); setReviewing(false); }} />}
         <p className="detail">{t(row.kind === "list" ? "setting_hint_list" : row.kind === "text" ? "setting_hint_model" : "setting_hint_options")}</p>
@@ -118,8 +132,8 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
           ? <><button type="submit">{t("setting_review")}</button><button type="button" onClick={close}>{t("runtime_confirm_cancel")}</button></>
           : <div className="module-confirm" role="alertdialog" aria-label={t("setting_save_named", { name: label })}>
             <ul>
-              {impact.now.length > 0 && <li>{t("setting_recreated_now", { names: impact.now.join(", ") })}</li>}
-              {impact.later.length > 0 && <li>{t("setting_recreated_later", { names: impact.later.join(", ") })}</li>}
+              {impact.now.length > 0 && <li>{t("setting_recreated_now", { names: impact.now.map((name) => displayName(name, t)).join(", ") })}</li>}
+              {impact.later.length > 0 && <li>{t("setting_recreated_later", { names: impact.later.map((name) => displayName(name, t)).join(", ") })}</li>}
               {impact.sessions && <li>{t("setting_sessions_end")}</li>}
               {impact.reindex && <li>{t("setting_reindex")}</li>}
             </ul>
@@ -133,9 +147,10 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
 function valueText(row: RuntimeSetting, view: View, t: ReturnType<typeof useTranslate>): string {
   if (row.value === "") {
     if (row.id === "discord.answer_channels") return t("setting_every_channel");
-    if (row.default) return `${row.default} (${t("setting_default")})`;
+    if (row.default) return `${row.options.length ? optionText(row.default, t) : row.default} (${t("setting_default")})`;
     return t(row.kind === "text" ? "setting_default" : "setting_none");
   }
+  if (row.options.includes(row.value)) return optionText(row.value, t);
   if (row.id !== "discord.meme_channels") return row.value.split(",").join(", ");
   return row.value.split(",").map((channel) => `${channel} (${view.webhookChannels.includes(channel) ? "webhook" : "bot"})`).join(", ");
 }

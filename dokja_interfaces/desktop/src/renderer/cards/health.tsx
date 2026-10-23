@@ -3,29 +3,28 @@ import { useCallback, useContext, useEffect, useRef, useState, type CSSPropertie
 import { RUNTIME_MODULES } from "../../shared/runtime.js";
 import type { JobState } from "../../shared/replies.js";
 import type { Transport, TransportError, TransportResult } from "../../shared/transport.js";
+import { displayName } from "../display_names.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { RuntimeEnabled } from "../runtime_context.js";
 import { RuntimeCard } from "./runtime.js";
 import { ProvidersCard } from "./providers.js";
 import { SettingsCard } from "./settings.js";
-import { usePulse } from "../pulse.js";
+import { useStatus } from "../status_context.js";
 import { CardFrame, Problem } from "./card_frame.js";
+import { WorkspacePanel } from "./workspace_panel.js";
 import {
   formatInterval,
   intervalFields,
   intervalOf,
-  parseHealth,
   parseLink,
-  pulseOf,
-  tonesOf,
   type Health,
   type LinkView,
   type IntervalUnit,
   type ServiceRow,
 } from "./health_model.js";
 import { useAction } from "./use_action.js";
-import { useCard, type LoadResult } from "./use_card.js";
+import type { LoadResult } from "./use_card.js";
 
 // Longer than the few seconds the orchestrator takes to give up on a stopped service.
 const TIMEOUT_MS = 15_000;
@@ -55,15 +54,6 @@ const STATE_IDS: Record<string, MessageId> = {
   not_configured: "state_not_configured",
 };
 
-export async function loadHealth(transport: Transport): Promise<LoadResult<Health>> {
-  const result = await transport.request("ningo.status", {}, { timeoutMs: TIMEOUT_MS });
-  if (!result.ok) return result;
-  const health = parseHealth(result.result);
-  return health
-    ? { ok: true, data: health }
-    : { ok: false, error: { code: "unexpected", message: "unexpected status reply" } };
-}
-
 // What the screen can ask the orchestrator to switch. A switch carries the flag and nothing else; an
 // interval carries the interval and nothing else, so changing one never touches the other.
 type Change =
@@ -84,18 +74,12 @@ const LINK_RESET_TIMEOUT_MS = 45_000;
 export function HealthCard({ transport }: { transport: Transport }) {
   const runtimeEnabled = useContext(RuntimeEnabled);
   const t = useTranslate();
-  const { report, reportTones } = usePulse();
-  const load = useCallback(() => loadHealth(transport), [transport]);
-  const { state, reload } = useCard(load);
+  // the status is the screen's own, read once at the top (status_context.tsx); System shows it
+  // and asks for it again after a change
+  const { state, reload } = useStatus();
   const run = useCallback((change: Change) => applyChange(transport, change), [transport]);
   const change = useAction(run);
   const [failure, setFailure] = useState<TransportError>();
-
-  useEffect(() => {
-    report(pulseOf(state));
-    // while a reload runs, the sidebar keeps the tones it has instead of blinking them away
-    if (state.phase !== "loading") reportTones(tonesOf(state));
-  }, [state, report, reportTones]);
 
   // The orchestrator's own state is read again after every change, whether or not it went through
   // (a timeout does not say what happened), so the screen never shows what it only hoped for. The
@@ -118,11 +102,11 @@ export function HealthCard({ transport }: { transport: Transport }) {
 
   if (runtimeEnabled) {
     const health = state.phase === "ready" ? state.data : undefined;
-    return <><RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
+    return <WorkspacePanel trail={[t("nav_system")]}><RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
-        {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name })}
+        {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name: displayName(name, t) })}
           on={row.enabled} busy={change.state.phase === "loading" || row.configured === false}
           onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
         {row.enabled !== undefined && <p className="detail">{t("runtime_routing_hint")}</p>}
@@ -134,21 +118,23 @@ export function HealthCard({ transport }: { transport: Transport }) {
       {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
       {health && <HealthBody health={health} busy={change.state.phase === "loading"}
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
-    </>} /><SettingsCard transport={transport} /><ProvidersCard transport={transport} /></>;
+    </>} /><SettingsCard transport={transport} /><ProvidersCard transport={transport} /></WorkspacePanel>;
   }
 
   return (
-    <CardFrame kindLabel={t("nav_system")} title={t("health_title")} state={state} onReload={refresh}>
-      {(health) => (
-        <HealthBody
-          health={health}
-          busy={change.state.phase === "loading"}
-          failure={failure}
-          onChange={change.start}
-          link={link}
-        />
-      )}
-    </CardFrame>
+    <WorkspacePanel trail={[t("nav_system")]}>
+      <CardFrame title={t("health_title")} state={state} onReload={refresh}>
+        {(health) => (
+          <HealthBody
+            health={health}
+            busy={change.state.phase === "loading"}
+            failure={failure}
+            onChange={change.start}
+            link={link}
+          />
+        )}
+      </CardFrame>
+    </WorkspacePanel>
   );
 }
 
@@ -242,12 +228,12 @@ function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
   const label = stateId ?? STATUS_IDS[row.status];
   return (
     <li data-tone={row.tone} data-kind={row.kind} style={{ "--i": index } as CSSProperties}>
-      <span className="service-name">{row.name}</span>
+      <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
       <span className="service-status">{label ? t(label) : row.state || row.status}</span>
       {row.detail && <span className="service-detail">{row.detail}</span>}
       {row.enabled !== undefined && (
         <Switch
-          label={t("switch_for", { name: row.name })}
+          label={t("switch_for", { name: displayName(row.name, t) })}
           on={row.enabled}
           busy={busy || row.configured === false}
           onToggle={() => onChange({ type: "services.set", payload: { name: row.name, enabled: !row.enabled } })}
@@ -412,9 +398,9 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
 
   return (
     <li data-enabled={job.enabled}>
-      <span className="service-name">{job.name}</span>
+      <span className="service-name" title={job.name}>{displayName(job.name, t)}</span>
       <Switch
-        label={t("switch_for", { name: job.name })}
+        label={t("switch_for", { name: displayName(job.name, t) })}
         on={job.enabled}
         busy={busy}
         onToggle={() => onChange({ type: "scheduler.jobs.set", payload: { name: job.name, enabled: !job.enabled } })}
@@ -434,12 +420,12 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
           type="number"
           inputMode="numeric"
           min={1}
-          aria-label={t("job_interval_label", { name: job.name })}
+          aria-label={t("job_interval_label", { name: displayName(job.name, t) })}
           value={amount}
           disabled={busy}
           onChange={(event) => setAmount(event.target.value)}
         />
-        <select aria-label={t("job_unit_label", { name: job.name })} value={unit} disabled={busy} onChange={(event) => setUnit(event.target.value as IntervalUnit)}>
+        <select aria-label={t("job_unit_label", { name: displayName(job.name, t) })} value={unit} disabled={busy} onChange={(event) => setUnit(event.target.value as IntervalUnit)}>
           <option value="m">{t("unit_minutes")}</option>
           <option value="h">{t("unit_hours")}</option>
         </select>
@@ -470,6 +456,6 @@ export function deliveryNotice(name: string, health: Health, t: ReturnType<typeo
   if (!on("scheduler")) return [t("delivery_scheduler_switch_off")];
   const lines = health.jobs.filter((job) => job.enabled).map((job) =>
     t(job.name === "meme.dispatch" ? "delivery_job_posts" : job.name === "meme.refresh" ? "delivery_job_refreshes" : "delivery_job_runs",
-      { name: job.name, interval: formatInterval(job.interval) }));
+      { name: displayName(job.name, t), interval: formatInterval(job.interval) }));
   return lines.length > 0 ? lines : [t("delivery_scheduler_all_paused")];
 }

@@ -117,7 +117,7 @@ describe("the memory card", () => {
     renderCard(transport);
 
     expect((await screen.findByRole("alert")).textContent).toBe(message);
-    expect(screen.getByRole("button").textContent).toBe("Try again");
+    screen.getByRole("button", { name: "Try again" });
   });
 
   it("treats a status of the wrong shape as unexpected", async () => {
@@ -151,7 +151,7 @@ describe("the memory card", () => {
     await screen.findByText("40 experiências, 12 pendentes, 25 resolvidas, 3 expiradas");
     screen.getByText("Poucas para julgar: 12 pontuadas, 30 necessárias.");
     screen.getByRole("heading", { name: "Memória de experiências" });
-    screen.getByText("memória");
+    screen.getByText("Caderno");
   });
 
   it("writes its decimals the way Portuguese does", async () => {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HealthCard } from "../../src/renderer/cards/health.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
+import { StatusProvider } from "../../src/renderer/status_context.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport } from "../../src/shared/transport.js";
 import { failure, ok, routedTransport } from "./support.js";
@@ -13,9 +13,9 @@ const IMAGE = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=";
 function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <StatusProvider transport={transport}>
         <HealthCard transport={transport} />
-      </PulseProvider>
+      </StatusProvider>
     </I18nProvider>,
   );
 }
@@ -42,7 +42,7 @@ describe("linking WhatsApp from the health card", () => {
   it("offers the link on the WhatsApp row only, and shows nothing until it is opened", async () => {
     const { transport, calls: seen } = routedTransport({ "ningo.status": status("waiting_for_link") });
     renderCard(transport);
-    await screen.findByText("whatsapp");
+    await screen.findByText("WhatsApp");
 
     expect(screen.getAllByRole("button", { name: "Link" })).toHaveLength(1);
     expect(screen.queryByRole("heading", { name: "Link WhatsApp" })).toBeNull();
@@ -183,9 +183,9 @@ describe("the link panel while it stays open", () => {
 it("keeps an unconfigured WhatsApp visible without pretending that it can link",async()=>{
  const {transport,calls:seen}=routedTransport({"ningo.status":status("not_configured",{status:"unchecked",configured:false})});
  renderCard(transport);
- await screen.findByText("whatsapp");
- screen.getByText("not configured");screen.getByText(/Configure the local WhatsApp gateway/);
+ await screen.findByText("WhatsApp");
+ screen.getByText("Not configured");screen.getByText(/Configure the local WhatsApp gateway/);
  expect(screen.queryByRole("button",{name:"Link"})).toBeNull();
- expect((screen.getByRole("switch",{name:"whatsapp switch"}) as HTMLButtonElement).disabled).toBe(true);
+ expect((screen.getByRole("switch",{name:"WhatsApp switch"}) as HTMLButtonElement).disabled).toBe(true);
  expect(calls(seen,"communications.link.status")).toHaveLength(0);
 });

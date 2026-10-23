@@ -204,6 +204,7 @@ test("the scheduler notice names the enabled jobs and what they do", async () =>
     { name: "meme.dispatch", enabled: true, interval: "2h0m0s" }, { name: "meme.refresh", enabled: false, interval: "45m0s" }] } as never;
   const lines = deliveryNotice("scheduler", health, t);
   assert.equal(lines.length, 1);
-  assert.match(lines[0] ?? "", /^delivery_job_posts:meme.dispatch,/);
+  // the job is named in words: the stand-in translator echoes the id of its name
+  assert.match(lines[0] ?? "", /^delivery_job_posts:name_meme_dispatch:,2h$/);
   assert.deepEqual(deliveryNotice("discord", health, t), ["delivery_discord_voice:", "delivery_discord_switch_off:"]);
 });

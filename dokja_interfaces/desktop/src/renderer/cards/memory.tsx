@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
+import { WorkspacePanel } from "./workspace_panel.js";
 import { CardFrame, OffNotice } from "./card_frame.js";
 import {
   parseMemoryStatus,
@@ -36,9 +37,11 @@ export function MemoryCard({ transport }: { transport: Transport }) {
   const { state, reload } = useCard(load);
 
   return (
-    <CardFrame kindLabel={t("kind_memory")} title={t("memory_title")} state={state} onReload={reload}>
-      {(view) => <><MemoryBody view={view} />{!view.off && <MemoryExperiencesPanel transport={transport} onChanged={reload} />}</>}
-    </CardFrame>
+    <WorkspacePanel trail={[t("nav_notebook")]}>
+      <CardFrame title={t("memory_title")} state={state} onReload={reload}>
+        {(view) => <><MemoryBody view={view} />{!view.off && <MemoryExperiencesPanel transport={transport} onChanged={reload} />}</>}
+      </CardFrame>
+    </WorkspacePanel>
   );
 }
 

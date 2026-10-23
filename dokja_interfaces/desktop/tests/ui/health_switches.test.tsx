@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { HealthCard } from "../../src/renderer/cards/health.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import { PulseProvider } from "../../src/renderer/pulse.js";
+import { StatusProvider } from "../../src/renderer/status_context.js";
 import type { JobState } from "../../src/shared/replies.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportResult } from "../../src/shared/transport.js";
@@ -12,9 +12,9 @@ import { deferred, failure, minutesAgo, ok, routedTransport } from "./support.js
 function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
-      <PulseProvider>
+      <StatusProvider transport={transport}>
         <HealthCard transport={transport} />
-      </PulseProvider>
+      </StatusProvider>
     </I18nProvider>,
   );
 }
@@ -39,20 +39,20 @@ describe("the switches on the health card", () => {
   it("gives a switch to each service the orchestrator can switch, and none to the rest", async () => {
     const { transport } = routedTransport({ "ningo.status": status(UP) });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    expect(screen.getAllByRole("switch").map((node) => node.getAttribute("aria-label"))).toEqual(["meme switch", "scheduler switch"]);
-    expect(switchOf("meme").getAttribute("aria-checked")).toBe("true");
-    expect(switchOf("meme").textContent).toBe("on");
+    expect(screen.getAllByRole("switch").map((node) => node.getAttribute("aria-label"))).toEqual(["Memes switch", "Scheduler switch"]);
+    expect(switchOf("Memes").getAttribute("aria-checked")).toBe("true");
+    expect(switchOf("Memes").textContent).toBe("On");
   });
 
   it("shows a switched-off service as off", async () => {
     const { transport } = routedTransport({ "ningo.status": status(MEME_OFF) });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    expect(switchOf("meme").getAttribute("aria-checked")).toBe("false");
-    expect(switchOf("meme").textContent).toBe("off");
+    expect(switchOf("Memes").getAttribute("aria-checked")).toBe("false");
+    expect(switchOf("Memes").textContent).toBe("Off");
   });
 
   it("asks for the opposite of what it shows, then reads the status again instead of trusting its own guess", async () => {
@@ -61,11 +61,11 @@ describe("the switches on the health card", () => {
       "services.set": ok({ name: "meme", enabled: false }),
     });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    fireEvent.click(switchOf("meme"));
+    fireEvent.click(switchOf("Memes"));
 
-    await waitFor(() => expect(switchOf("meme").getAttribute("aria-checked")).toBe("false"));
+    await waitFor(() => expect(switchOf("Memes").getAttribute("aria-checked")).toBe("false"));
     expect(calls.map((call) => call.type)).toEqual(["ningo.status", "services.set", "ningo.status"]);
     expect(changes(calls)).toEqual([["services.set", { name: "meme", enabled: false }]]);
   });
@@ -76,12 +76,12 @@ describe("the switches on the health card", () => {
       "services.set": ok({ name: "meme", enabled: false }),
     });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    fireEvent.click(switchOf("meme"));
+    fireEvent.click(switchOf("Memes"));
 
     await waitFor(() => expect(calls.filter((call) => call.type === "ningo.status")).toHaveLength(2));
-    await waitFor(() => expect(switchOf("meme").getAttribute("aria-checked")).toBe("true"));
+    await waitFor(() => expect(switchOf("Memes").getAttribute("aria-checked")).toBe("true"));
   });
 
   it("makes every switch wait while a change is on its way", async () => {
@@ -91,17 +91,17 @@ describe("the switches on the health card", () => {
       "services.set": () => gate.promise,
     });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    fireEvent.click(switchOf("meme"));
+    fireEvent.click(switchOf("Memes"));
 
-    await waitFor(() => expect(switchOf("scheduler").disabled).toBe(true));
-    expect(switchOf("meme").disabled).toBe(true);
+    await waitFor(() => expect(switchOf("Scheduler").disabled).toBe(true));
+    expect(switchOf("Memes").disabled).toBe(true);
 
     gate.resolve(ok({ name: "meme", enabled: false }));
-    await waitFor(() => expect(switchOf("meme").getAttribute("aria-checked")).toBe("false"));
-    expect(switchOf("meme").disabled).toBe(false);
-    expect(switchOf("scheduler").disabled).toBe(false);
+    await waitFor(() => expect(switchOf("Memes").getAttribute("aria-checked")).toBe("false"));
+    expect(switchOf("Memes").disabled).toBe(false);
+    expect(switchOf("Scheduler").disabled).toBe(false);
   });
 
   it("says why a change was refused and still reads the status again", async () => {
@@ -110,14 +110,14 @@ describe("the switches on the health card", () => {
       "services.set": failure("orchestrator", "unknown service"),
     });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
-    fireEvent.click(switchOf("meme"));
+    fireEvent.click(switchOf("Memes"));
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("The orchestrator answered with an error: unknown service");
     await waitFor(() => expect(calls.filter((call) => call.type === "ningo.status")).toHaveLength(2));
-    expect(switchOf("meme").getAttribute("aria-checked")).toBe("true");
+    expect(switchOf("Memes").getAttribute("aria-checked")).toBe("true");
   });
 
   it("forgets an old failure when the person refreshes", async () => {
@@ -126,27 +126,27 @@ describe("the switches on the health card", () => {
       "services.set": failure("timeout"),
     });
     renderCard(transport);
-    await screen.findByText("meme");
-    fireEvent.click(switchOf("meme"));
+    await screen.findByText("Memes");
+    fireEvent.click(switchOf("Memes"));
     await screen.findByRole("alert");
     await screen.findByRole("button", { name: "Refresh" });
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("warns that the scheduler switch pauses every job, only when it is there", async () => {
     const withSwitch = routedTransport({ "ningo.status": status(UP) });
     const view = renderCard(withSwitch.transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
     screen.getByText("Switching the scheduler off pauses every scheduled job.");
     view.unmount();
 
     const without = routedTransport({ "ningo.status": status({ scheduler: { status: "ok", detail: "" } }) });
     renderCard(without.transport);
-    await screen.findByText("scheduler");
+    await screen.findByText("Scheduler");
     expect(screen.queryByText(/pauses every scheduled job/)).toBeNull();
     expect(screen.queryAllByRole("switch")).toEqual([]);
   });
@@ -168,14 +168,14 @@ describe("the scheduled jobs on the health card", () => {
     screen.getByText(/every 6h · last run 2 hours ago: ran/);
     screen.getByText(/every 45m · custom · has not run yet/);
     screen.getByText("channel unreachable");
-    expect(switchOf("meme.refresh").getAttribute("aria-checked")).toBe("true");
-    expect(switchOf("meme.dispatch").getAttribute("aria-checked")).toBe("false");
+    expect(switchOf("Refresh memes").getAttribute("aria-checked")).toBe("true");
+    expect(switchOf("Post memes").getAttribute("aria-checked")).toBe("false");
   });
 
   it("has no jobs section when the orchestrator reports no jobs", async () => {
     const { transport } = routedTransport({ "ningo.status": status(UP) });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     expect(screen.queryByText("Scheduled jobs")).toBeNull();
   });
@@ -185,7 +185,7 @@ describe("the scheduled jobs on the health card", () => {
     renderCard(transport);
     await screen.findByText("Scheduled jobs");
 
-    fireEvent.click(switchOf("meme.dispatch"));
+    fireEvent.click(switchOf("Post memes"));
 
     await waitFor(() => expect(changes(calls)).toHaveLength(1));
     expect(changes(calls)).toEqual([["scheduler.jobs.set", { name: "meme.dispatch", enabled: true }]]);
@@ -196,10 +196,10 @@ describe("the scheduled jobs on the health card", () => {
     renderCard(transport);
     await screen.findByText("Scheduled jobs");
 
-    expect((screen.getByLabelText("meme.refresh interval") as HTMLInputElement).value).toBe("6");
-    expect((screen.getByLabelText("meme.refresh interval unit") as HTMLSelectElement).value).toBe("h");
-    fireEvent.change(screen.getByLabelText("meme.refresh interval"), { target: { value: "45" } });
-    fireEvent.change(screen.getByLabelText("meme.refresh interval unit"), { target: { value: "m" } });
+    expect((screen.getByLabelText("Refresh memes interval") as HTMLInputElement).value).toBe("6");
+    expect((screen.getByLabelText("Refresh memes interval unit") as HTMLSelectElement).value).toBe("h");
+    fireEvent.change(screen.getByLabelText("Refresh memes interval"), { target: { value: "45" } });
+    fireEvent.change(screen.getByLabelText("Refresh memes interval unit"), { target: { value: "m" } });
     const set = screen.getAllByRole("button", { name: "Set" })[0] as HTMLButtonElement;
     fireEvent.click(set);
 
@@ -214,10 +214,10 @@ describe("the scheduled jobs on the health card", () => {
     const set = screen.getAllByRole("button", { name: "Set" })[0] as HTMLButtonElement;
 
     for (const value of ["", "0", "721"]) {
-      fireEvent.change(screen.getByLabelText("meme.refresh interval"), { target: { value } });
+      fireEvent.change(screen.getByLabelText("Refresh memes interval"), { target: { value } });
       expect(set.disabled, `${value}h`).toBe(true);
     }
-    fireEvent.change(screen.getByLabelText("meme.refresh interval"), { target: { value: "720" } });
+    fireEvent.change(screen.getByLabelText("Refresh memes interval"), { target: { value: "720" } });
     expect(set.disabled).toBe(false);
     expect(changes(calls)).toEqual([]);
   });
@@ -240,8 +240,8 @@ describe("the scheduled jobs on the health card", () => {
     renderCard(transport, "pt");
     await screen.findByText("Jobs agendados");
 
-    expect(screen.getByRole("switch", { name: "chave de meme" }).textContent).toBe("ligado");
-    expect(screen.getByRole("switch", { name: "chave de meme.dispatch" }).textContent).toBe("desligado");
+    expect(screen.getByRole("switch", { name: "chave de Memes" }).textContent).toBe("Ligado");
+    expect(screen.getByRole("switch", { name: "chave de Postar memes" }).textContent).toBe("Desligado");
     screen.getByText(/a cada 6h · última execução há 2 horas: ran/);
   });
 });
@@ -257,13 +257,13 @@ describe("the interfaces on the health card", () => {
   it("lists them under their own heading with their state in words, not the status", async () => {
     const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     expect(screen.getByRole("heading", { name: "Chat interfaces" })).toBeTruthy();
     const items = [...document.querySelectorAll("ul.interfaces li")];
-    expect(items.map((item) => item.querySelector(".service-name")?.textContent)).toEqual(["discord", "whatsapp"]);
-    expect(items[0]?.querySelector(".service-status")?.textContent).toBe("connected");
-    expect(items[1]?.querySelector(".service-status")?.textContent).toBe("logged out");
+    expect(items.map((item) => item.querySelector(".service-name")?.textContent)).toEqual(["Discord", "WhatsApp"]);
+    expect(items[0]?.querySelector(".service-status")?.textContent).toBe("Connected");
+    expect(items[1]?.querySelector(".service-status")?.textContent).toBe("Logged out");
     expect(items[1]?.textContent).toContain("remove the saved session and link again");
     expect(items[1]?.getAttribute("data-tone")).toBe("problem");
   });
@@ -271,10 +271,10 @@ describe("the interfaces on the health card", () => {
   it("says the state in Portuguese too", async () => {
     const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });
     renderCard(transport, "pt");
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     expect(screen.getByRole("heading", { name: "Interfaces de conversa" })).toBeTruthy();
-    expect(document.querySelector("ul.interfaces li .service-status")?.textContent).toBe("conectada");
+    expect(document.querySelector("ul.interfaces li .service-status")?.textContent).toBe("Conectada");
   });
 
   it("switches an interface with the same request as a service and reads the status again", async () => {
@@ -283,20 +283,20 @@ describe("the interfaces on the health card", () => {
       "services.set": ok({ name: "whatsapp", enabled: false }),
     });
     renderCard(transport);
-    await screen.findByText("whatsapp");
+    await screen.findByText("WhatsApp");
 
-    fireEvent.click(switchOf("whatsapp"));
+    fireEvent.click(switchOf("WhatsApp"));
 
-    await waitFor(() => expect(switchOf("whatsapp").getAttribute("aria-checked")).toBe("false"));
+    await waitFor(() => expect(switchOf("WhatsApp").getAttribute("aria-checked")).toBe("false"));
     expect(changes(calls)).toEqual([["services.set", { name: "whatsapp", enabled: false }]]);
     const off = [...document.querySelectorAll("ul.interfaces li")][1];
-    expect(off?.querySelector(".service-status")?.textContent).toBe("switched off");
+    expect(off?.querySelector(".service-status")?.textContent).toBe("Paused");
   });
 
   it("shows no heading when the orchestrator reports no interface", async () => {
     const { transport } = routedTransport({ "ningo.status": status({ meme: { status: "ok", detail: "" } }) });
     renderCard(transport);
-    await screen.findByText("meme");
+    await screen.findByText("Memes");
 
     expect(screen.queryByRole("heading", { name: "Chat interfaces" })).toBeNull();
   });
