@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { describe, expect, it } from "vitest";
 
 import { DigestCard } from "../../src/renderer/cards/digest.js";
+import { WorkspacePanel } from "../../src/renderer/cards/workspace_panel.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { DigestStatus } from "../../src/shared/replies.js";
 import type { Locale } from "../../src/shared/locale.js";
@@ -22,7 +23,10 @@ import {
 function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
-      <DigestCard transport={transport} />
+      {/* the readings are a view of the Library, whose panel holds the refresh */}
+      <WorkspacePanel trail={["Library"]}>
+        <DigestCard transport={transport} />
+      </WorkspacePanel>
     </I18nProvider>,
   );
 }
@@ -297,7 +301,6 @@ describe("the digest card", () => {
 
     await screen.findByText("2 funcionando, 1 com falha, 0 iniciando, 1 desligadas, 0 inválidas");
     screen.getByRole("heading", { name: "Resumo de leituras" });
-    screen.getByText("leituras");
     await screen.findByText("Alpha source, há 2 horas");
     screen.getByRole("button", { name: "Mostrar mais 5" });
     screen.getByText("atualizado há 10 minutos");

@@ -78,7 +78,7 @@ export function SettingsCard({ transport }: { transport: Transport }) {
     return () => clearTimeout(timer);
   }, [view, poll]);
 
-  return <CardFrame kindLabel={t("nav_system")} title={t("settings_title")} state={state} onReload={reload}>
+  return <CardFrame title={t("settings_title")} state={state} onReload={reload}>
     {(data) => <>
       <p className="detail">{t("settings_intro")}</p>
       {data.error && <p role="alert">{t("settings_last_change", { message: data.error })}</p>}
