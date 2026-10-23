@@ -14,5 +14,7 @@ class ChatAgent:
     def send_message(self, message: str, temperature: float = 0) -> Any:
         return self.provider.send_message(message, temperature=temperature)
 
-    def send_messages(self, messages: list[dict[str, str]], temperature: float = 0) -> Any:
+    def send_messages(
+        self, messages: list[dict[str, str]], temperature: float = 0
+    ) -> Any:
         return self.provider.send_messages(messages, temperature=temperature)

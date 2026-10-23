@@ -14,9 +14,14 @@ class ChatProviderFixture:
 class ChatAgentAdapterTest(unittest.TestCase):
     def test_forwards_single_message_to_injected_provider(self):
         agent = ChatAgent(ChatProviderFixture())
-        self.assertEqual(agent.send_message("hello", temperature=0.2), {"message": "hello", "temperature": 0.2})
+        self.assertEqual(
+            agent.send_message("hello", temperature=0.2),
+            {"message": "hello", "temperature": 0.2},
+        )
 
     def test_forwards_history_to_injected_provider(self):
         messages = [{"role": "user", "content": "hello"}]
         agent = ChatAgent(ChatProviderFixture())
-        self.assertEqual(agent.send_messages(messages), {"messages": messages, "temperature": 0})
+        self.assertEqual(
+            agent.send_messages(messages), {"messages": messages, "temperature": 0}
+        )
