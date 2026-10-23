@@ -42,7 +42,7 @@ describe("linking WhatsApp from the health card", () => {
   it("offers the link on the WhatsApp row only, and shows nothing until it is opened", async () => {
     const { transport, calls: seen } = routedTransport({ "ningo.status": status("waiting_for_link") });
     renderCard(transport);
-    await screen.findByText("WhatsApp");
+    await screen.findByText("WhatsApp", { selector: ".services .service-name" });
 
     expect(screen.getAllByRole("button", { name: "Link" })).toHaveLength(1);
     expect(screen.queryByRole("heading", { name: "Link WhatsApp" })).toBeNull();
@@ -183,8 +183,8 @@ describe("the link panel while it stays open", () => {
 it("keeps an unconfigured WhatsApp visible without pretending that it can link",async()=>{
  const {transport,calls:seen}=routedTransport({"ningo.status":status("not_configured",{status:"unchecked",configured:false})});
  renderCard(transport);
- await screen.findByText("WhatsApp");
- screen.getByText("Not configured");screen.getByText(/Configure the local WhatsApp gateway/);
+ await screen.findByText("WhatsApp", { selector: ".services .service-name" });
+ screen.getByText("Not configured", { selector: ".services .service-status" });screen.getByText(/Configure the local WhatsApp gateway/);
  expect(screen.queryByRole("button",{name:"Link"})).toBeNull();
  expect((screen.getByRole("switch",{name:"WhatsApp switch"}) as HTMLButtonElement).disabled).toBe(true);
  expect(calls(seen,"communications.link.status")).toHaveLength(0);

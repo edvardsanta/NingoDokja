@@ -22,13 +22,14 @@ function renderCard(transport: Transport, locale: Locale = "en") {
   return render(<Card transport={transport} locale={locale} />);
 }
 
+// A service's row in the list of services; the list of what needs attention repeats some names.
 function row(name: string): HTMLElement {
-  const item = screen.getByText(name).closest("li");
+  const item = screen.getAllByText(name).map((node) => node.closest<HTMLElement>(".services li")).find((node) => node);
   if (!item) throw new Error(`no row for ${name}`);
   return item;
 }
 
-const names = () => [...document.querySelectorAll(".service-name")].map((node) => node.textContent);
+const names = () => [...document.querySelectorAll(".services .service-name")].map((node) => node.textContent);
 
 describe("the health card", () => {
   it("asks for the status and shows each service with its state", async () => {
@@ -158,5 +159,31 @@ describe("the health card", () => {
     expect(chat.getAttribute("title")).toBe("chat_ai");
     expect(screen.queryByText("chat_ai")).toBeNull();
     screen.getByText("mystery_service");
+  });
+
+  it("lists what needs attention first, with its state and why, and nothing when all is well", async () => {
+    const { transport } = scriptedTransport(statusReply(SERVICES));
+    renderCard(transport);
+
+    const heading = await screen.findByRole("heading", { name: "Needs attention" });
+    const items = [...(heading.closest("section")?.querySelectorAll("li") ?? [])].map((item) => [
+      item.querySelector(".service-name")?.textContent,
+      item.querySelector(".service-status")?.textContent,
+      item.getAttribute("data-tone"),
+    ]);
+    expect(items).toEqual([
+      ["Chat", "Error", "problem"],
+      ["Books", "Not checked", "unchecked"],
+      ["Scheduler", "Not answering", "problem"],
+    ]);
+    expect(heading.closest("section")?.textContent).toContain("connection refused");
+  });
+
+  it("shows no attention list when everything answers", async () => {
+    const { transport } = scriptedTransport(statusReply(ALL_UP));
+    renderCard(transport);
+
+    await screen.findByText("2 up, 0 with problems, 0 switched off");
+    expect(screen.queryByRole("heading", { name: /Needs attention/ })).toBeNull();
   });
 });

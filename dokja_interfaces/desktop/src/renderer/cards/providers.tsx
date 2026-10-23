@@ -7,19 +7,9 @@ import { CardFrame, Problem } from "./card_frame.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
+// What inference the machine could offer, asked when the view opens (never before): discovery only,
+// nothing is selected or started.
 export function ProvidersCard({ transport }: { transport: Transport }) {
-  const t = useTranslate();
-  const id = useId();
-  const [inspecting, setInspecting] = useState(false);
-  if (inspecting) return <ProviderInventory transport={transport} />;
-  return <section className="wp-section" aria-labelledby={id}>
-    <h2 id={id}>{t("providers_title")}</h2>
-    <p className="detail">{t("providers_discovery_only")}</p>
-    <button type="button" onClick={() => setInspecting(true)}>{t("providers_inspect")}</button>
-  </section>;
-}
-
-function ProviderInventory({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const load = useCallback(async (): Promise<LoadResult<ProvidersView>> => {
     const answer = await transport.request("runtime.providers", {}, { timeoutMs: 15_000 });

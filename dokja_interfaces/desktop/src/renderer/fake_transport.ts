@@ -263,6 +263,10 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok({modules:structuredClone(modules),busy:false,error:""});
         }
         case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
+        case "runtime.providers": return ok({ checkedAt: new Date().toISOString(), providers: [
+          { id: "local", name: "Local models", state: "reachable", reason: "", models: ["demo/small:latest", "demo/embed:latest"], modelDiscovery: "listed", inferenceStatus: "not_tested", truncated: false },
+          { id: "cli", name: "Command-line tool", state: "installed", reason: "", models: [], modelDiscovery: "unsupported", inferenceStatus: "not_tested", truncated: false },
+        ] });
         case "runtime.settings.set": {
           for (const [id,value] of Object.entries((payload?.values ?? {}) as Record<string,string>)) {
             const row=settings.find(s=>s.id===id); if(row)row.value=value;

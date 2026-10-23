@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
 import { RUNTIME_MODULES } from "../../shared/runtime.js";
 import type { JobState } from "../../shared/replies.js";
@@ -12,6 +12,7 @@ import { ProvidersCard } from "./providers.js";
 import { SettingsCard } from "./settings.js";
 import { useStatus } from "../status_context.js";
 import { CardFrame, Problem } from "./card_frame.js";
+import { useViewTabs } from "./view_tabs.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 import {
   formatInterval,
@@ -99,10 +100,17 @@ export function HealthCard({ transport }: { transport: Transport }) {
     reload();
   }, [reload]);
   const link = useLink(transport, reload);
+  const health = state.phase === "ready" ? state.data : undefined;
+  // Settings and providers belong to the runtime controller; without it System is its status alone.
+  const { tabs, panels, currentLabel } = useViewTabs(t("nav_system"), runtimeEnabled ? [
+    { id: "status", label: t("system_view_status") },
+    { id: "settings", label: t("system_view_settings") },
+    { id: "providers", label: t("system_view_providers") },
+  ] : [{ id: "status", label: t("system_view_status") }]);
+  const trail = tabs ? [t("nav_system"), currentLabel] : [t("nav_system")];
 
   if (runtimeEnabled) {
-    const health = state.phase === "ready" ? state.data : undefined;
-    return <WorkspacePanel trail={[t("nav_system")]}><RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
+    const status = <>{health && <NeedsAttention health={health} />}<RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
         <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
@@ -118,11 +126,15 @@ export function HealthCard({ transport }: { transport: Transport }) {
       {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
       {health && <HealthBody health={health} busy={change.state.phase === "loading"}
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
-    </>} /><SettingsCard transport={transport} /><ProvidersCard transport={transport} /></WorkspacePanel>;
+    </>} /></>;
+    return <WorkspacePanel trail={trail} views={tabs}>
+      {panels((id) => id === "status" ? status : id === "settings" ? <SettingsCard transport={transport} /> : <ProvidersCard transport={transport} />)}
+    </WorkspacePanel>;
   }
 
   return (
-    <WorkspacePanel trail={[t("nav_system")]}>
+    <WorkspacePanel trail={trail} views={tabs}>
+      {health && <NeedsAttention health={health} />}
       <CardFrame title={t("health_title")} state={state} onReload={refresh}>
         {(health) => (
           <HealthBody
@@ -221,15 +233,42 @@ type RowProps = {
   extra?: ReactNode;
 };
 
+// An interface says its state; a switched-off one has none and says only that it is off. A state
+// this screen does not know is shown as it came.
+function stateWord(row: ServiceRow, t: ReturnType<typeof useTranslate>): string {
+  const id = (row.state ? STATE_IDS[row.state] : undefined) ?? STATUS_IDS[row.status];
+  return id ? t(id) : row.state || row.status;
+}
+
+// What is not well, first and in full: a problem or an unchecked part never hides in a closed row.
+function NeedsAttention({ health }: { health: Health }) {
+  const t = useTranslate();
+  const titleId = useId();
+  const rows = [...health.rows, ...health.interfaces].filter((row) => row.tone === "problem" || row.tone === "unchecked");
+  if (rows.length === 0) return null;
+  return (
+    <section className="wp-section attention" aria-labelledby={titleId}>
+      {/* no count: the sidebar counts the problems, and this list holds the unchecked too */}
+      <h2 id={titleId}>{t("attention_title")}</h2>
+      <ul className="attention-list">
+        {rows.map((row) => (
+          <li key={row.name} data-tone={row.tone}>
+            <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
+            <span className="service-status">{stateWord(row, t)}</span>
+            {row.detail && <span className="service-detail">{row.detail}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
   const t = useTranslate();
-  // An interface says its state; a switched-off one has none and says only that it is off.
-  const stateId = row.state ? STATE_IDS[row.state] : undefined;
-  const label = stateId ?? STATUS_IDS[row.status];
   return (
     <li data-tone={row.tone} data-kind={row.kind} style={{ "--i": index } as CSSProperties}>
       <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
-      <span className="service-status">{label ? t(label) : row.state || row.status}</span>
+      <span className="service-status">{stateWord(row, t)}</span>
       {row.detail && <span className="service-detail">{row.detail}</span>}
       {row.enabled !== undefined && (
         <Switch

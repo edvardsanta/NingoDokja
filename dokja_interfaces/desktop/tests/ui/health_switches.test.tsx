@@ -283,7 +283,7 @@ describe("the interfaces on the health card", () => {
       "services.set": ok({ name: "whatsapp", enabled: false }),
     });
     renderCard(transport);
-    await screen.findByText("WhatsApp");
+    await screen.findByText("WhatsApp", { selector: ".services .service-name" });
 
     fireEvent.click(switchOf("WhatsApp"));
 
