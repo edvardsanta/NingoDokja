@@ -582,3 +582,11 @@ test("a reading is added to the Library by its id, from the page the shell kept,
     "an address from the screen is ignored",
   );
 });
+
+test("knowledge.list leaves out what Ningo keeps for himself only when asked, and the kinds are the shell's", () => {
+  const payload = ACTIONS["knowledge.list"].payload;
+  assert.deepEqual(payload({ limit: 20, offset: 0 }), { limit: 20, offset: 0 });
+  assert.deepEqual(payload({ limit: 20, offset: 0, external: true }), { limit: 20, offset: 0, exclude_kinds: ["meme_hashtag"] });
+  assert.deepEqual(payload({ limit: 20, offset: 0, exclude_kinds: ["note"] }), { limit: 20, offset: 0 }, "the screen cannot name kinds");
+});
+

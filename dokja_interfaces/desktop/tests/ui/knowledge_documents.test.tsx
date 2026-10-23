@@ -108,3 +108,21 @@ describe("document management in the knowledge card", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Index pending passages" })).toBeNull());
   });
 });
+
+describe("what the Library lists", () => {
+  it("lists what came from outside, and what Ningo keeps for himself on request, from the first page", async () => {
+    const { transport, calls } = routedTransport({ "knowledge.list": ok(page()) });
+    render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={() => {}} />));
+    await screen.findByText("Title note:0");
+    const toggle = screen.getByRole("button", { name: "Show what Ningo keeps for himself" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls.map((call) => call.payload)).toEqual([{ limit: 20, offset: 0, external: true }, { limit: 20, offset: 0 }]);
+    // the id is the operator's: in the tooltip, not in the row
+    const detail = screen.getAllByText("note")[0];
+    expect(detail?.getAttribute("title")).toBe("note:0");
+    expect(screen.queryByText(/note:0 ·/)).toBeNull();
+  });
+});
+

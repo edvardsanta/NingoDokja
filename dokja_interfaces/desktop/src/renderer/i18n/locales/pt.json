@@ -157,6 +157,7 @@
   "add_ref_too_long": "A referência passa de {max} caracteres.",
   "add_bad_id": "Um id usa letras, números e . _ : / # @ - (até {max} caracteres).",
   "error_cancelled": "Cancelado.",
+  "documents_show_internal": "Mostrar o que o Ningo guarda para si",
   "documents_title": "Documentos",
   "documents_total": "{count} documentos na Biblioteca.",
   "documents_empty": "Nenhum documento nesta página.",

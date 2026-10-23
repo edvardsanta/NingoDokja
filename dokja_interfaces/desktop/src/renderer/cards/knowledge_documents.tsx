@@ -30,17 +30,19 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
 // `onOpen` opens a document in a tab of its own, given where it sits in the list: its text is asked
 // for there, one document at a time.
 export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen }: {
-  transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number) => void;
+  transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number, external: boolean) => void;
 }) {
   const t = useTranslate();
   const [offset, setOffset] = useState(0);
+  // What Ningo keeps for himself (a meme's hashtag) is left out unless the owner asks to see it.
+  const [internal, setInternal] = useState(false);
   const busy = useRef(false);
   const load = useCallback(async (at: number): Promise<LoadResult<KnowledgeDocuments | Off>> => {
-    const answer = await transport.request("knowledge.list", { limit: PAGE_SIZE, offset: at }, { timeoutMs: 15_000 });
+    const answer = await transport.request("knowledge.list", { limit: PAGE_SIZE, offset: at, ...(internal ? {} : { external: true }) }, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
     const page = parseDocuments(answer.result);
     return page ? { ok: true, data: page } : unexpected();
-  }, [transport]);
+  }, [transport, internal]);
   const listing = useAction(load);
   const remove = useCallback(async (id: string): Promise<LoadResult<{ deleted: boolean } | Off>> => {
     if (busy.current) return unexpected();
@@ -65,7 +67,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   // panel's refresh.
   useEffect(() => {
     listing.start(offset);
-  }, [offset, revision, listing.start]);
+  }, [offset, revision, internal, listing.start]);
   const reread = useCallback(() => listing.start(offset), [listing.start, offset]);
   useWorkspaceRefresh(reread, listing.state.phase === "loading");
   const page = listing.state.phase === "ready" ? listing.state.data : undefined;
@@ -73,6 +75,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   return (
     <section aria-label={t("documents_title")}>
       <h3>{t("documents_title")}</h3>
+      <button type="button" className="quiet" aria-pressed={internal} onClick={() => { setInternal((value) => !value); setOffset(0); }}>{t("documents_show_internal")}</button>
       {listing.state.phase === "loading" && <p role="status">{t("loading")}</p>}
       {listing.state.phase === "error" && <Problem error={listing.state.error} />}
       {page?.off && <OffNotice reason={page.reason} />}
@@ -82,10 +85,10 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
         <ul className="hits">
           {page.documents.map((document, index) => <li key={document.id}>
             <p><strong>{document.title || document.id}</strong></p>
-            <p className="detail">{[document.id, document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}</p>
+            <p className="detail" title={document.id}>{[document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}</p>
             <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
             {onOpen && <button type="button" aria-label={t("documents_open_named", { title: document.title || document.id })}
-              onClick={() => onOpen(document, page.offset + index)}>{t("documents_open")}</button>}{" "}
+              onClick={() => onOpen(document, page.offset + index, !internal)}>{t("documents_open")}</button>}{" "}
             <button type="button" disabled={removing} aria-label={t("documents_delete_named", { title: document.title || document.id })}
               onClick={() => { if (!removing) deletion.start(document.id); }}>{t("documents_delete")}</button>
           </li>)}

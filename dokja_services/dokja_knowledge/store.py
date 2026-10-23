@@ -242,7 +242,11 @@ class Store:
         self.version += 1
         return True
 
-    def list_documents(self, limit: int, offset: int, kind: str = "") -> list[sqlite3.Row]:
+    def list_documents(
+        self, limit: int, offset: int, kind: str = "", exclude: tuple[str, ...] = ()
+    ) -> list[sqlite3.Row]:
+        # The kinds to leave out travel as one JSON array, so the query stays a fixed text with
+        # every value bound.
         return self.conn.execute(
             """
             SELECT d.*, COALESCE(m.metadata, '{}') AS metadata, COUNT(c.id) AS chunks,
@@ -251,17 +255,21 @@ class Store:
             LEFT JOIN chunks c ON c.document_id = d.id
             LEFT JOIN document_metadata m ON m.document_id = d.id
             WHERE (? = '' OR d.kind = ?)
+              AND d.kind NOT IN (SELECT value FROM json_each(?))
             GROUP BY d.id
             ORDER BY d.updated_at DESC, d.id DESC
             LIMIT ? OFFSET ?
             """,
-            (kind, kind, limit, offset),
+            (kind, kind, json.dumps(list(exclude)), limit, offset),
         ).fetchall()
 
-    def document_count(self, kind: str = "") -> int:
+    def document_count(self, kind: str = "", exclude: tuple[str, ...] = ()) -> int:
         return self.conn.execute(
-            "SELECT COUNT(*) FROM documents WHERE (? = '' OR kind = ?)",
-            (kind, kind),
+            """
+            SELECT COUNT(*) FROM documents
+            WHERE (? = '' OR kind = ?) AND kind NOT IN (SELECT value FROM json_each(?))
+            """,
+            (kind, kind, json.dumps(list(exclude))),
         ).fetchone()[0]
 
     def document_text(self, document_id: int) -> str:
