@@ -295,15 +295,52 @@ function digestStatus(body: Record<string, unknown>): DigestStatus {
   };
 }
 
+// A web address the Library can read, or nothing: only http and https, and not absurdly long.
+function webAddress(raw: string): string {
+  if (raw.length > 2000) return "";
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? raw : "";
+  } catch {
+    return "";
+  }
+}
+
+// The pages of the readings last handed to the screen, by id. The screen never holds an address:
+// saving a reading to the Library names it by id, and the shell finds its page here.
+const READING_ADDRESSES = new Map<string, string>();
+const MAX_READINGS = 500;
+
+function rememberReading(id: string, address: string): void {
+  if (id === "" || address === "") return;
+  READING_ADDRESSES.delete(id);
+  READING_ADDRESSES.set(id, address);
+  while (READING_ADDRESSES.size > MAX_READINGS) {
+    const oldest = READING_ADDRESSES.keys().next().value;
+    if (oldest === undefined) break;
+    READING_ADDRESSES.delete(oldest);
+  }
+}
+
+// A reading is added by its page, as an address would be; one the shell never handed over, or one
+// without a page, is refused.
+function readingIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const address = READING_ADDRESSES.get(text(raw.reading));
+  return address === undefined ? undefined : buildIngest({ mode: "address", address });
+}
+
 function digestPage(body: Record<string, unknown>): DigestPage {
   return {
-    items: records(body.items, (item) => ({
+    items: records(body.items, (item) => {
+      rememberReading(shorten(text(item.id), 120), webAddress(text(item.url)));
+      return {
       id: shorten(text(item.id), 120),
       title: shorten(text(item.title), 300),
       summary: shorten(text(item.summary), 600),
       source: shorten(text(item.source), 80),
       published: text(item.published),
-    })),
+      };
+    }),
     total: count(body.total),
     offset: count(body.offset),
     more: count(body.more),
@@ -580,7 +617,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "knowledge.ingest": {
     // A file travels as base64 text: the cap is the largest file, a third more.
     maxPayloadChars: 12_000_000,
-    payload: buildIngest,
+    payload: (raw) => (raw.mode === "reading" ? readingIngest(raw) : buildIngest(raw)),
     project: (result) => inDomain(result, "knowledge", ingestResult),
   },
   "knowledge.list": {

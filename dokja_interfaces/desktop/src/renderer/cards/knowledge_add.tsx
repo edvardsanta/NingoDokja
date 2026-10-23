@@ -273,7 +273,7 @@ export function AddToBase({ transport, onAdded, dropped }: { transport: Transpor
   );
 }
 
-function Outcome({ result }: { result: IngestResult | Off }) {
+export function Outcome({ result }: { result: IngestResult | Off }) {
   const t = useTranslate();
   if (result.off) return <OffNotice reason={result.reason} />;
   const outcome = outcomeOf(result);

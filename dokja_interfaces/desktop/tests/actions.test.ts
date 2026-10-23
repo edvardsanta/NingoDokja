@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ACTIONS } from "../src/main/actions.js";
+import { buildIngest } from "../src/main/ingest.js";
 
 // Hand-built replies in the shapes the orchestrator uses, never a captured one: a real reply
 // carries channel IDs and provider profiles.
@@ -559,4 +560,25 @@ test("digest.status exposes processing state without plugin commands or environm
   }]);
   assert.equal(JSON.stringify(result).includes("private-command"), false);
   assert.equal(JSON.stringify(result).includes("PRIVATE_SETTING"), false);
+});
+
+test("a reading is added to the Library by its id, from the page the shell kept, never from the screen", () => {
+  ACTIONS["digest.items"].project(compactOf("digest", {
+    items: [
+      { id: "kept-1", title: "Kept", url: "https://example.com/kept" },
+      { id: "odd-1", title: "Odd", url: "javascript:alert(1)" },
+      { id: "none-1", title: "No page" },
+    ],
+    total: 3, offset: 0, more: 0, updated: "",
+  }));
+  const payload = ACTIONS["knowledge.ingest"].payload;
+  assert.deepEqual(payload({ mode: "reading", reading: "kept-1" }), buildIngest({ mode: "address", address: "https://example.com/kept" }));
+  assert.equal(payload({ mode: "reading", reading: "odd-1" }), undefined, "only a web page is kept");
+  assert.equal(payload({ mode: "reading", reading: "none-1" }), undefined);
+  assert.equal(payload({ mode: "reading", reading: "never-shown" }), undefined);
+  assert.deepEqual(
+    payload({ mode: "reading", reading: "kept-1", address: "https://example.com/other" }),
+    payload({ mode: "reading", reading: "kept-1" }),
+    "an address from the screen is ignored",
+  );
 });
