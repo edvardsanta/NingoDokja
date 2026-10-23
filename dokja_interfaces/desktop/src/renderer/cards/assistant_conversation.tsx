@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
 import { isRecord } from "../../shared/records.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -7,11 +7,27 @@ import { useTranslate } from "../i18n/context.js";
 import { Problem } from "./card_frame.js";
 
 type Turn = { role: "user" | "assistant"; text: string };
-type Props = { transport: Transport; reading?: { id: string; title: string; source: string } };
+type Reading = { id: string; title: string; source: string };
 
-export function AssistantConversation({ transport, reading }: Props) {
+export type Conversation = {
+  id: string;
+  turns: readonly Turn[];
+  draft: string;
+  setDraft: (draft: string) => void;
+  busy: boolean;
+  error: TransportError | undefined;
+  notice: string;
+  field: RefObject<HTMLTextAreaElement | null>;
+  send: (content: string) => Promise<void>;
+  retry: () => void;
+};
+
+// One conversation with Ningo: what was said, what is being written, and the one request on its way.
+// The id is the screen's own, so the orchestrator keeps this conversation's history apart from any
+// other (a reading's discussion, a new conversation).
+export function useConversation(transport: Transport, reading?: Reading): Conversation {
   const t = useTranslate();
-  const conversationId = useRef(globalThis.crypto?.randomUUID?.() ?? `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const id = useRef(globalThis.crypto?.randomUUID?.() ?? `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -26,7 +42,7 @@ export function AssistantConversation({ transport, reading }: Props) {
     try {
       const answer = await transport.request("message.created", {
         content: message,
-        conversation_id: conversationId.current,
+        conversation_id: id.current,
         ...(reading ? { reading_id: reading.id } : {}),
       }, { timeoutMs: 120_000 });
       if (!answer.ok) { setError(answer.error); return; }
@@ -40,24 +56,62 @@ export function AssistantConversation({ transport, reading }: Props) {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
     } finally { setBusy(false); field.current?.focus(); }
   };
-  const submit = (event: FormEvent) => { event.preventDefault(); void send(draft); };
-  const prompts: MessageId[] = reading
-    ? ["assistant_prompt_summary", "assistant_prompt_question", "assistant_prompt_critique"]
-    : ["assistant_prompt_open", "assistant_prompt_plan", "assistant_prompt_idea"];
-  return <section className="assistant-conversation" aria-label={t("assistant_title")}>
-    {reading && <><p className="note">{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</p><p className="detail">{t("assistant_excerpt_limit")}</p></>}
-    {turns.length === 0 && <div className="assistant-prompts">
-      <p>{t(reading ? "assistant_reading_intro" : "assistant_intro")}</p>
-      {prompts.map((id) => <button key={id} type="button" className="assistant-prompt" disabled={busy} onClick={() => void send(t(id))}>{t(id)}</button>)}
-    </div>}
+  const retry = () => void send(turns.at(-1)?.role === "user" ? turns.at(-1)!.text : draft);
+  return { id: id.current, turns, draft, setDraft, busy, error, notice, field, send, retry };
+}
+
+// What was said, newest at the bottom, and what is happening now. The end is kept in view as the
+// conversation grows.
+export function Transcript({ conversation }: { conversation: Conversation }) {
+  const t = useTranslate();
+  const { turns, busy, notice, error } = conversation;
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    end.current?.scrollIntoView?.({ block: "end" });
+  }, [turns.length, busy, error]);
+  return <>
     <ol className="assistant-turns" aria-live="polite">{turns.map((turn, index) => <li key={index} data-role={turn.role}><strong>{t(turn.role === "user" ? "assistant_you" : "assistant_name")}</strong><p>{turn.text}</p></li>)}</ol>
     {busy && <p role="status">{t("assistant_thinking")}</p>}
     {notice && <p role="status">{notice}</p>}
-    {error && <><Problem error={error}/><button type="button" disabled={busy} onClick={() => void send(turns.at(-1)?.role === "user" ? turns.at(-1)!.text : draft)}>{t("assistant_retry")}</button></>}
-    <form onSubmit={submit}>
-      <label htmlFor={`assistant-prompt-${conversationId.current}`}>{t("assistant_input_label")}</label>
-      <textarea id={`assistant-prompt-${conversationId.current}`} ref={field} value={draft} maxLength={2000} rows={3} disabled={busy} onChange={(event) => setDraft(event.target.value)} placeholder={t("assistant_placeholder")}/>
-      <button type="submit" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
-    </form>
+    {error && <><Problem error={error}/><button type="button" disabled={busy} onClick={conversation.retry}>{t("assistant_retry")}</button></>}
+    <div ref={end} />
+  </>;
+}
+
+// Where the owner writes. Enter sends and Shift+Enter breaks the line.
+export function Composer({ conversation, placeholder, hint }: { conversation: Conversation; placeholder: string; hint?: string }) {
+  const t = useTranslate();
+  const { id, draft, setDraft, busy, field, send } = conversation;
+  const fieldId = `assistant-prompt-${id}`;
+  const hintId = `${fieldId}-hint`;
+  const submit = (event: FormEvent) => { event.preventDefault(); void send(draft); };
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    void send(draft);
+  };
+  return <form className="composer" onSubmit={submit}>
+    <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
+    <textarea id={fieldId} ref={field} value={draft} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
+      onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
+    <button type="submit" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
+    {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
+  </form>;
+}
+
+// A conversation about one reading, inline under it: the reading's own suggestions send at once.
+export function AssistantConversation({ transport, reading }: { transport: Transport; reading: Reading }) {
+  const t = useTranslate();
+  const conversation = useConversation(transport, reading);
+  const prompts: MessageId[] = ["assistant_prompt_summary", "assistant_prompt_question", "assistant_prompt_critique"];
+  return <section className="assistant-conversation" aria-label={t("assistant_title")}>
+    <p className="note">{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</p>
+    <p className="detail">{t("assistant_excerpt_limit")}</p>
+    {conversation.turns.length === 0 && <div className="assistant-prompts">
+      <p>{t("assistant_reading_intro")}</p>
+      {prompts.map((id) => <button key={id} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(t(id))}>{t(id)}</button>)}
+    </div>}
+    <Transcript conversation={conversation} />
+    <Composer conversation={conversation} placeholder={t("assistant_placeholder")} />
   </section>;
 }

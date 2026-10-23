@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { Transport } from "../shared/transport.js";
 import type { Tone } from "./cards/health_model.js";
@@ -12,6 +12,14 @@ const SEVERITY: readonly Tone[] = ["problem", "unchecked", "off", "ok", "other"]
 function toneFor(entry: CardEntry, tones: Tones): Tone | undefined {
   const known = (entry.services ?? []).map((name) => tones[name]).filter((tone) => tone !== undefined);
   return SEVERITY.find((tone) => known.includes(tone));
+}
+
+// Opens a workspace by its kind, as a click on its entry would, and gives its entry the focus. A
+// workspace uses it to send the owner where something is done (the conversation sends to System).
+const OpenWorkspace = createContext<(kind: string) => void>(() => {});
+
+export function useOpenWorkspace(): (kind: string) => void {
+  return useContext(OpenWorkspace);
 }
 
 type SidebarProps = {
@@ -161,6 +169,7 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
         </div>
       </aside>
       <div className="work-area">
+        <OpenWorkspace.Provider value={(kind) => select(kind, true)}>
         {entries.map(({ kind, Card }) => (
           <div
             key={kind}
@@ -172,6 +181,7 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
             {opened.has(kind) && <Card transport={transport} active={selected === kind} />}
           </div>
         ))}
+        </OpenWorkspace.Provider>
       </div>
     </div>
   );
