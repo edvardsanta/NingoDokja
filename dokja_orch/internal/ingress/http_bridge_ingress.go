@@ -199,17 +199,25 @@ func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
 	logger.Info(fmt.Sprintf("http bridge chat stream received event_id=%s user=%s channel=%s", event.EventID, event.User.ID, event.Channel.ID))
 	c.Set("Content-Type", "application/x-ndjson")
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		ctx, cancel := context.WithTimeout(context.Background(), chatStreamTimeout)
+		defer cancel()
 		var mu sync.Mutex
+		// A caller that went away is not written to again, and its turn stops.
 		write := func(v any) {
 			mu.Lock()
 			defer mu.Unlock()
-			if line, err := json.Marshal(v); err == nil {
-				w.Write(append(line, '\n'))
-				w.Flush()
+			line, err := json.Marshal(v)
+			if err != nil || ctx.Err() != nil {
+				return
+			}
+			if _, err := w.Write(append(line, '\n')); err != nil {
+				cancel()
+				return
+			}
+			if err := w.Flush(); err != nil {
+				cancel()
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), chatStreamTimeout)
-		defer cancel()
 		result, err := i.service.ProcessWithResult(core.WithReplyPreview(ctx, func(text string) {
 			write(map[string]string{"preview": text})
 		}), event)

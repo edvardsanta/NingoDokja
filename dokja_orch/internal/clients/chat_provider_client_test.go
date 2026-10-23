@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -92,5 +93,21 @@ func TestChatStreamFallsBackToChatOnAnOlderRuntime(t *testing.T) {
 	reply, err := c.GenerateMessagesStream(context.Background(), []map[string]string{{"role": "user", "content": "q"}}, func(string) { previews++ })
 	if err != nil || reply["reply"] != "whole" || previews != 0 {
 		t.Fatal(reply, err, previews)
+	}
+}
+
+// Each preview repeats the text so far: a long, slow reply streams many times its own size.
+func TestChatStreamReturnsALongReplyWhosePreviewsAddUpPastMegabytes(t *testing.T) {
+	text := strings.Repeat("word ", 2000)
+	c := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		for end := 10; end <= len(text); end += 10 {
+			fmt.Fprintf(w, "{\"preview\":%q}\n", text[:end])
+		}
+		fmt.Fprintf(w, "{\"reply\":%q,\"provider\":\"fixture\"}\n", text)
+	})
+	previews := 0
+	reply, err := c.GenerateMessagesStream(context.Background(), []map[string]string{{"role": "user", "content": "q"}}, func(string) { previews++ })
+	if err != nil || reply["reply"] != text || previews != 1000 {
+		t.Fatal(err, previews)
 	}
 }

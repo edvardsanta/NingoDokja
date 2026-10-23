@@ -99,7 +99,9 @@ func (c *ChatProviderClient) GenerateMessagesStream(ctx context.Context, message
 		}
 		return nil, fmt.Errorf("chat inference failed")
 	}
-	lines := bufio.NewScanner(io.LimitReader(resp.Body, 4<<20))
+	// Each preview repeats the text so far, so a long reply streams far more than its own size: lines
+	// are bounded, and the request's deadline bounds the stream.
+	lines := bufio.NewScanner(resp.Body)
 	lines.Buffer(make([]byte, 0, 64<<10), 524288)
 	for lines.Scan() {
 		var line map[string]any
