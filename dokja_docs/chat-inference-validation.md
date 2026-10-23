@@ -82,3 +82,39 @@ consumers, native interface baselines and durable conversation history.
 There are no event-envelope, route, HTTP response, schema, environment, Compose or
 volume changes. Rebuild/restart the host runtime to use the corrected adapter;
 no production rollout or operator configuration change was performed here.
+
+## Provider diagnostics follow-up
+
+A subsequent real Claude/sonnet probe still failed, but the bounded diagnostic
+now identifies provider-reported session-limit wording. The runtime returns a
+fixed explanation to check that provider's session allowance before retrying.
+This is not a claim about the account's remaining quota, reset time or whether
+closing another session would resolve the limit. No automatic retry, provider
+switch or operator-setting change is made.
+
+The Runtime domain defines safe failure categories: session limit, usage/rate
+limit, authentication required, model unavailable, incompatible CLI, output limit
+and generic unavailable. Infrastructure recognizes a small allowlist of failure
+phrases only after an explicit failed exit or error envelope. Unknown diagnostics
+remain generic. Matching words in a successful assistant answer do not turn it
+into an error. This is a diagnostic hint, not an authentication or quota probe.
+
+Only fixed messages cross the existing HTTP error envelope. Private stdout and
+stderr are bounded independently and are never included in an error, logged or
+persisted by the adapter. The process buffer now uses a named bytes.Buffer;
+embedding it promoted ReadFrom and let io.Copy bypass the intended Write limit.
+An actual overflowing child process and a reader without WriterTo reproduce that
+case and verify the corrected bound. Temporary buffers are discarded after
+classification. No diagnostic transcript is stored in Knowledge or Experience.
+
+Runtime domain, adapter and bootstrap race tests and vet passed, including
+non-zero exits, error envelopes, stderr overflow and HTTP propagation without a
+reply or retry. Existing orchestrator chat client regressions passed. A second
+Codex synthetic run passed with the corrected buffer: one inference call,
+four-message exact marker, disabled-registration control, 2,651 ms.
+
+Claude remains unvalidated for successful inference; its real failure is not
+counted as a pass. Ollama generation remains unrun. Desktop/Electron and aggregate
+suites were not rerun for this backend-only diagnostic update. The HTTP status
+and JSON error shape, domain chat port, schemas and operational configuration
+remain unchanged; rebuilding/restarting the host runtime adopts the fix.
