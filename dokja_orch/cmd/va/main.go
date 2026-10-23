@@ -145,6 +145,11 @@ func main() {
 				return digestdomain.Reference{}, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).Reference(ctx, id)
+		}).WithRecentReadings(func(ctx context.Context, question string, limit int) ([]digestdomain.Reference, error) {
+			if controls != nil && !controls.ServiceEnabled("feeds") {
+				return nil, fmt.Errorf("reading sources are disabled")
+			}
+			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
 		}),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),

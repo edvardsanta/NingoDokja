@@ -127,7 +127,11 @@ Relevant implementation contracts:
 `message.* -> conversation route -> moderation:screen-event -> chat action`
 
 The chat handler opens/touches a session, retrieves optional Knowledge context,
-calls chat inference, records reply history in memory, and composes the response. The
+and resolves article requests through the Digest domain's cached Feeds items. A
+named source is selected from configured plugin or source names; at most eight
+title, date, and summary excerpts enter chat inference. This path does not run a
+collector or read a full article. The handler calls chat inference, records reply
+history in memory, and composes the response. The
 generic dispatcher does not currently interpret a successful moderation result
 as a stop instruction. This is a workflow transition gap, not evidence that every
 deployment currently has an active blocking policy.

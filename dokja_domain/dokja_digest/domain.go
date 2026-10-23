@@ -167,10 +167,74 @@ func wholeNumber(payload map[string]any, name string, fallback, low, high int) (
 // Reference resolves a selected cached reading by identity. The caller supplies no article
 // text: the domain takes it from the same feeds cache used to build the reading list.
 type Reference struct {
-	ID      string
-	Title   string
-	Summary string
-	Source  string
+	ID        string
+	Title     string
+	Summary   string
+	Source    string
+	Published string
+}
+
+// RecentReferences returns bounded excerpts from the sources already collected by
+// Feeds. A named source in the question takes priority over other subscriptions.
+func (d *Domain) RecentReferences(ctx context.Context, question string, limit int) ([]Reference, error) {
+	if d == nil || d.service == nil {
+		return nil, fmt.Errorf("reading sources are not configured")
+	}
+	if limit < 1 || limit > 20 {
+		return nil, fmt.Errorf("recent reading limit must be between 1 and 20")
+	}
+	reply, err := d.service.Dispatch(ctx, "feeds.items", nil)
+	if err != nil {
+		return nil, err
+	}
+	items, err := itemsFrom(reply)
+	if err != nil {
+		return nil, err
+	}
+	query := strings.ToLower(question)
+	selected := ""
+	for _, item := range items {
+		for _, name := range []string{item.plugin, item.source} {
+			name = strings.ToLower(strings.TrimSpace(name))
+			if len(name) >= 5 && strings.Contains(query, name) && len(name) > len(selected) {
+				selected = name
+			}
+		}
+	}
+	if selected != "" {
+		matched := make([]item, 0, len(items))
+		for _, candidate := range items {
+			if strings.ToLower(candidate.plugin) == selected || strings.ToLower(candidate.source) == selected {
+				matched = append(matched, candidate)
+			}
+		}
+		items = matched
+	}
+	// The digest already defines ordering and duplicate handling. Use a generous
+	// freshness window so an infrequently updated source still has recent items.
+	ordered := compose(items, policy{limit: len(items), perSource: len(items), maxAge: 100 * 365 * 24 * time.Hour}, d.now()).items
+	result := make([]Reference, 0, limit)
+	for _, item := range ordered {
+		bound := func(s string, n int) string {
+			if utf8.RuneCountInString(s) > n {
+				return string([]rune(s)[:n])
+			}
+			return s
+		}
+		source := item.source
+		if source == "" {
+			source = item.plugin
+		}
+		published := ""
+		if !item.published.IsZero() {
+			published = item.published.UTC().Format(time.RFC3339)
+		}
+		result = append(result, Reference{ID: item.id, Title: bound(item.title, 300), Summary: bound(item.summary, 1000), Source: bound(source, 100), Published: published})
+		if len(result) == limit {
+			break
+		}
+	}
+	return result, nil
 }
 
 func (d *Domain) Reference(ctx context.Context, id string) (Reference, error) {

@@ -100,6 +100,25 @@ func TestEachActionAsksTheFeedsServiceForItsEvent(t *testing.T) {
 	}
 }
 
+func TestRecentReferencesUsesNamedCachedSource(t *testing.T) {
+	other := entry("other", "Other", "Shared article title about Go", 1, "https://example.com/shared")
+	wantedOld := entry("old", "AkitaOnRails", "Older article", 24*30, "https://example.com/old")
+	wantedNew := entry("new", "AkitaOnRails", "Shared article title about Go", 2, "https://example.com/shared")
+	wantedOld["plugin"] = "akitaonrails"
+	wantedNew["plugin"] = "akitaonrails"
+	service := &fakeService{reply: itemsReply(t, other, wantedOld, wantedNew)}
+	got, err := New(service).WithClock(func() time.Time { return now }).RecentReferences(context.Background(), "Resuma os últimos artigos do akitaonrails", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != "new" || got[1].ID != "old" {
+		t.Fatalf("recent source articles = %#v", got)
+	}
+	if !reflect.DeepEqual(service.types, []string{"feeds.items"}) {
+		t.Fatalf("service calls = %v", service.types)
+	}
+}
+
 func TestTheDomainRefusesWhatItCannotDo(t *testing.T) {
 	if _, err := (*Domain)(nil).Handle(context.Background(), Request{Action: ActionReadDigest}); err == nil {
 		t.Error("a nil domain answered")
