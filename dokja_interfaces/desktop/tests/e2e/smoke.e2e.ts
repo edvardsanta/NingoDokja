@@ -55,7 +55,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   it("keeps WhatsApp visible before configuration without requesting a link code",async()=>{
     const text=await page.waitFor<string>("document.querySelector('.interfaces')?.textContent || null");
     assert.match(text,/WhatsApp/);assert.match(text,/Not configured/);
-    assert.equal(await page.evaluate("[...document.querySelectorAll('.interfaces button')].some(b=>b.textContent==='Link')"),false);
+    assert.equal(await page.evaluate("[...document.querySelectorAll('.interfaces button')].some(b=>b.textContent==='Link WhatsApp')"),false);
     assert.equal(orchestrator.seen.some(e=>e.type.startsWith('communications.link.')),false);
   });
 

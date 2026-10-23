@@ -33,18 +33,21 @@ const waiting = ok({ state: "waiting_for_link", image: IMAGE });
 const calls = (list: Array<{ type: string }>, type: string) => list.filter((call) => call.type === type);
 
 async function openPanel() {
-  const button = await screen.findByRole("button", { name: /^(Link|Vincular)$/ });
+  const button = await screen.findByRole("button", { name: /^(Link WhatsApp|Vincular WhatsApp)$/ });
   fireEvent.click(button);
   return button;
 }
 
 describe("linking WhatsApp from the health card", () => {
-  it("offers the link on the WhatsApp row only, and shows nothing until it is opened", async () => {
+  it("offers the link once, where WhatsApp needs attention, and shows nothing until it is opened", async () => {
     const { transport, calls: seen } = routedTransport({ "ningo.status": status("waiting_for_link") });
     renderCard(transport);
     await screen.findByText("WhatsApp", { selector: ".services .service-name" });
 
-    expect(screen.getAllByRole("button", { name: "Link" })).toHaveLength(1);
+    const buttons = screen.getAllByRole("button", { name: "Link WhatsApp" });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.closest(".attention")).not.toBeNull();
+    screen.getByText("Linking is offered above, under Needs attention.");
     expect(screen.queryByRole("heading", { name: "Link WhatsApp" })).toBeNull();
     expect(calls(seen, "communications.link.status")).toHaveLength(0);
   });
@@ -185,7 +188,26 @@ it("keeps an unconfigured WhatsApp visible without pretending that it can link",
  renderCard(transport);
  await screen.findByText("WhatsApp", { selector: ".services .service-name" });
  screen.getByText("Not configured", { selector: ".services .service-status" });screen.getByText(/Configure the local WhatsApp gateway/);
- expect(screen.queryByRole("button",{name:"Link"})).toBeNull();
+ expect(screen.queryByRole("button",{name:"Link WhatsApp"})).toBeNull();
  expect((screen.getByRole("switch",{name:"WhatsApp switch"}) as HTMLButtonElement).disabled).toBe(true);
  expect(calls(seen,"communications.link.status")).toHaveLength(0);
+});
+
+it("says plainly that linking needs the messages set up, instead of the raw error", async () => {
+  const { transport } = routedTransport({
+    "ningo.status": status("waiting_for_link"),
+    "communications.link.status": failure("orchestrator", "Communications access is not configured."),
+  });
+  renderCard(transport);
+  await openPanel();
+  await screen.findByText("Linking needs the messages to be set up first.");
+  screen.getByText(/DOKJA_COMMUNICATIONS_TOKEN/);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("keeps the link on the row, not under Needs attention, once WhatsApp is connected", async () => {
+  const { transport } = routedTransport({ "ningo.status": status("connected") });
+  renderCard(transport);
+  const button = await screen.findByRole("button", { name: "Link WhatsApp" });
+  expect(button.closest(".attention")).toBeNull();
 });
