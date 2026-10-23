@@ -79,9 +79,10 @@ Services should not:
 ### Communication adapters and policy
 
 Communications domain policy owns eligible conversations/destinations and is the
-target owner for application send authorization. The current implementation owns
-reads; System handlers and platform gateways still hold parts of delivery policy.
-This is pending extraction, not a completed consolidation.
+target owner for application send authorization. The implementation owns reads and typed outbound eligibility/safety policy; System
+handlers still execute delivery workflows, and gateway/linking policies remain
+partially distributed. See the [outbound extraction](communication-boundaries.md#outbound-policy-extraction-step-094-b-partial).
+This is a partial extraction, not a completed consolidation.
 
 Adapters own SDK protocols, authentication/linking, connection state, transport
 limits and identity translation. Session/auth files and configured history retain

@@ -1,8 +1,8 @@
 # ADR 0012: platform gateways are communication services
 
 Date: 2026-10-22. Status: accepted responsibility classification (owner direction).
-Implementation: source audit complete; policy extraction and package migration
-pending in step 09.4. This refines the communication boundary without accepting
+Implementation: source audit and initial outbound policy extraction complete;
+inbound/linking policy and package migration pending in step 09.4. This refines the communication boundary without accepting
 all other proposals in [ADR 0010](0010-four-concepts.md).
 
 ## Decision
