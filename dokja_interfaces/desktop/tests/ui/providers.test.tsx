@@ -117,3 +117,33 @@ it("requires an explicit declared chat model and preserves a failed selection dr
  expect(calls.filter(c=>c.type==="runtime.chat.configure").map(c=>c.payload)).toEqual([{configuration_revision:3,provider:"codex",model:"fixture/old"}]);
  expect((select as HTMLSelectElement).value).toBe("codex|fixture/old");
 });
+
+const ollama = (revision: number, declared: string[]) => ok({ configurationRevision: revision, providers: [
+ { id: "ollama", name: "Ollama", state: "reachable", reason: "", enabled: true, declaredModels: declared, modelDiscovery: "listed", models: ["local-chat:latest"], inferenceStatus: "not_tested" },
+] });
+
+it("uses a found model for chat in one press: declares it, reads the revision again, then selects it", async () => {
+ const { transport, calls } = routedTransport({
+  "runtime.providers": [ollama(4, []), ollama(6, ["local-chat:latest"])],
+  "runtime.providers.configure": ok({ provider: "ollama", configurationRevision: 5 }),
+  "runtime.chat": [ok({ configurationRevision: 4, provider: "", model: "" }), ok({ configurationRevision: 5, provider: "", model: "" }), ok({ configurationRevision: 6, provider: "ollama", model: "local-chat:latest" })],
+  "runtime.chat.configure": ok({ configurationRevision: 6, provider: "ollama", model: "local-chat:latest" }),
+ });
+ render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
+ fireEvent.click(await screen.findByRole("button", { name: "Use local-chat:latest of Ollama for chat" }));
+ await screen.findByText("In use for chat");
+ expect(calls.filter((c) => c.type === "runtime.providers.configure").map((c) => c.payload)).toEqual([{ configuration_revision: 4, provider: "ollama", enabled: true, models: ["local-chat:latest"] }]);
+ expect(calls.filter((c) => c.type === "runtime.chat.configure").map((c) => c.payload)).toEqual([{ configuration_revision: 5, provider: "ollama", model: "local-chat:latest" }]);
+});
+
+it("selects a model already declared without writing its registration again", async () => {
+ const { transport, calls } = routedTransport({
+  "runtime.providers": ollama(4, ["local-chat:latest"]),
+  "runtime.chat": ok({ configurationRevision: 4, provider: "", model: "" }),
+  "runtime.chat.configure": ok({ configurationRevision: 5, provider: "ollama", model: "local-chat:latest" }),
+ });
+ render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
+ fireEvent.click(await screen.findByRole("button", { name: "Use local-chat:latest of Ollama for chat" }));
+ await waitFor(() => expect(calls.filter((c) => c.type === "runtime.chat.configure")).toHaveLength(1));
+ expect(calls.some((c) => c.type === "runtime.providers.configure")).toBe(false);
+});

@@ -1895,3 +1895,33 @@ button.icon-button[aria-expanded="true"] {
 .wp-dock .composer-hint { grid-column: 1 / -1; margin: 0; font-size: .8125rem; }
 /* The label is for screen readers here: the docked field says what it is by its place and hint. */
 .wp-dock .composer label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* A provider's models, each with the one thing to do with it: use it for chat. */
+.provider-models {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 2px;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-models li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.35rem 0.75rem;
+  border-left: 2px solid color-mix(in srgb, var(--edge) 60%, transparent);
+}
+
+.provider-in-use {
+  color: var(--cyan);
+  font-size: 0.875rem;
+}
+
+.provider-advanced {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
