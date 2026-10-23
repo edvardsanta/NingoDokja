@@ -179,17 +179,18 @@ type Model struct {
 	linkOpen bool
 
 	// The settings window: what the controller last said, the selected row and the one edited.
-	providers       *cli.ProvidersView
-	providersErr    string
-	providersCursor int
-	providerEditing cli.ProviderRegistration
-	settings        *cli.SettingsView
-	settingsErr     string
-	settingsCursor  int
-	settingEditing  string
-	settingInput    textinput.Model
-	memes           memeList
-	screen          *screenData
+	providers               *cli.ProvidersView
+	providersErr            string
+	providersCursor         int
+	providerEditing         cli.ProviderRegistration
+	providerEditingRevision uint64
+	settings                *cli.SettingsView
+	settingsErr             string
+	settingsCursor          int
+	settingEditing          string
+	settingInput            textinput.Model
+	memes                   memeList
+	screen                  *screenData
 	// suggestion is the last hashtag suggestion asked for with g; it is shown with the meme it is about.
 	suggestion *suggestionEvidence
 	form       discordForm

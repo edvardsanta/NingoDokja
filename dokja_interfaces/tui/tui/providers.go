@@ -43,6 +43,7 @@ func (m *Model) keyProviders(key string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		row := m.providers.Providers[m.providersCursor]
+		m.providerEditingRevision = m.providers.Revision
 		m.providerEditing = cli.ProviderRegistration{ID: row.ID, Enabled: row.Enabled, Models: row.DeclaredModels}
 		m.settingInput.CharLimit = 2200
 		m.settingInput.SetValue(strings.Join(row.DeclaredModels, ", "))

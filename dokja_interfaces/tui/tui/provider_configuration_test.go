@@ -63,3 +63,17 @@ func TestOldControllerProviderInventoryStaysReadOnly(t *testing.T) {
 		t.Fatal(m.overlay, r.calls)
 	}
 }
+
+func TestProviderDraftKeepsItsOriginalRevisionAfterLateRefresh(t *testing.T) {
+	m, r := editableProviders(t)
+	press(m, "e")
+	m.settingInput.SetValue("fixture/draft")
+	r.providers.Revision++
+	_, cmd := m.Update(providersMsg{view: r.providers})
+	pump(m, cmd)
+	press(m, "enter", "y")
+	writes := providerWriteCalls(r)
+	if len(writes) != 1 || writes[0].payload["configuration_revision"] != uint64(4) || !m.noticeErr {
+		t.Fatal(writes, m.notice)
+	}
+}

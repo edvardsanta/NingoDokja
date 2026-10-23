@@ -33,11 +33,11 @@ func (m *Model) viewProviderEdit() string {
 	return styleBox.Render(styleTitle.Render(m.providerEditing.ID) + "\n\n" + state + "\n" + tr("provider_declared_models") + "\n" + m.settingInput.View() + "\n" + tr("provider_models_hint") + "\n\n" + tr("provider_registration_notice"))
 }
 func (m *Model) askSaveProvider() {
-	if m.providers == nil || m.providers.Revision == 0 {
+	if m.providers == nil || m.providerEditingRevision == 0 {
 		m.setNotice(tr("provider_configuration_unavailable"), true)
 		return
 	}
-	revision, registration, runtime := m.providers.Revision, m.providerEditing, m.runtime
+	revision, registration, runtime := m.providerEditingRevision, m.providerEditing, m.runtime
 	names := strings.Join(registration.Models, ", ")
 	if names == "" {
 		names = tr("provider_no_declarations")
