@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	inference "read_books/dokja_domain/dokja_inference"
 	"reflect"
 	"sync"
 
@@ -79,7 +80,7 @@ func (m *Memory) Record(ctx context.Context, e Episode) error {
 	return nil
 }
 func recordable(e Episode) bool {
-	return e.ID != "" && e.Scope != "" && e.Context != "" && e.Simulation && (e.Outcome == "success" || e.Outcome == "failed") && (e.Action == "fast" || e.Action == "normalize") && len(e.Evidence) > 0
+	return inference.ValidDiagnostic(e.Outcome, e.Diagnostic) && e.ID != "" && e.Scope != "" && e.Context != "" && e.Simulation && (e.Outcome == "success" || e.Outcome == "failed") && (e.Action == "fast" || e.Action == "normalize") && len(e.Evidence) > 0
 }
 
 // Postgres uses connection-local temporary tables. Existing application tables
