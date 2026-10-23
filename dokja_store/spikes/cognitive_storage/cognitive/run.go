@@ -3,10 +3,12 @@ package cognitive
 import (
 	"context"
 	"fmt"
+	inference "read_books/dokja_domain/dokja_inference"
 	"time"
 )
 
 type Config struct {
+	Inference                        inference.Provider
 	Mode                             string // single, bounded, iterative
 	MaxHops, MaxIterations, MaxCalls int
 	Deadline                         time.Duration
@@ -143,7 +145,37 @@ func Run(parent context.Context, store Store, c Config) (s State) {
 			if !call() {
 				return finish("budget_exhausted", "deadline or call limit")
 			}
-			s.Prediction = Predict(s)
+			if c.Inference == nil {
+				s.Prediction = Predict(s)
+			} else {
+				request := inferenceRequest(s, c)
+				if err := inference.ValidateRequest(request); err != nil {
+					return finish("inference_rejected", "invalid inference input")
+				}
+				result, err := c.Inference.Infer(ctx, clone(request))
+				s.Inferences = append(s.Inferences, clone(result))
+				if len(result.Attempts) > 0 {
+					s.Calls += len(result.Attempts) - 1
+				}
+				if ctx.Err() != nil {
+					return finish("budget_exhausted", "late inference discarded")
+				}
+				if err != nil {
+					return finish("inference_failed", "configured inference unavailable; no deterministic fallback")
+				}
+				if len(result.Attempts) == 0 || len(result.Attempts) > request.RemainingCalls || inference.Validate(request, result.Proposal) != nil {
+					return finish("inference_rejected", "invalid or stale inference result")
+				}
+				p := result.Proposal
+				s.Prediction = Prediction{Status: p.Status, Model: result.Attempts[len(result.Attempts)-1].Model, Action: p.Action, Missing: p.Missing, Probability: p.Probability, Hypothetical: true, Episodes: append([]string(nil), p.Experiences...)}
+				for _, id := range p.Evidence {
+					for _, ref := range s.refs() {
+						if ref.ID == id {
+							s.Prediction.Inputs = append(s.Prediction.Inputs, ref)
+						}
+					}
+				}
+			}
 			s.transition("predict", d.Reason)
 		case "ready":
 			s.Action = d.Target
@@ -154,12 +186,12 @@ func Run(parent context.Context, store Store, c Config) (s State) {
 			if !call() {
 				return finish("budget_exhausted", "deadline or call limit")
 			}
-			s.Observed = Simulate(d.Target, c.Tokens, c.Expected)
+			s.Observed, s.Diagnostic = ObserveSimulation(d.Target, c.Tokens, c.Expected)
 			s.transition("simulate", "observed local computation; not production feedback")
 			if s.Observed == "unknown" {
 				return finish("outcome_unknown", "no resolved experience")
 			}
-			e := Episode{ID: c.Attempt, Scope: c.Scope, Context: c.Context, Action: s.Action, Outcome: s.Observed, Simulation: true, Evidence: s.refs(), Predicted: s.Prediction.Probability}
+			e := Episode{ID: c.Attempt, Scope: c.Scope, Context: c.Context, Action: s.Action, Outcome: s.Observed, Diagnostic: s.Diagnostic, Simulation: true, Evidence: s.refs(), Predicted: s.Prediction.Probability}
 			if !call() {
 				return finish("record_failed", "action observed but recording budget exhausted")
 			}

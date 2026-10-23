@@ -48,12 +48,7 @@ type MemeHashtagSuggester interface {
 	SuggestHashtag(ctx context.Context, url, text string, minScore *float64) (map[string]any, error)
 }
 
-type DiscordMessageDeliverer interface {
-	Deliver(ctx context.Context, channelID, content, attachmentURL string) error
-	// DeliverAttachment posts content with attachment bytes already in hand, for hosts
-	// a plain HTTP client cannot fetch directly (Cloudflare and similar bot checks).
-	DeliverAttachment(ctx context.Context, channelID, content string, data []byte, contentType, attachmentURL string) error
-}
+type DiscordMessageDeliverer = communications.ChannelSender
 
 // MemeAttachmentFetcher downloads a pooled meme's raw bytes when the origin host blocks
 // a plain HTTP client (Cloudflare and similar bot checks) but the meme service's own
@@ -111,13 +106,13 @@ func (h *SystemDomainHandler) WithSafeOnlyChannels(channels string) *SystemDomai
 	return h
 }
 
-// interfaceOfChannel names the interface a delivery channel belongs to. A channel without a
-// prefix is a Discord channel id.
-func interfaceOfChannel(channelID string) string {
-	if strings.HasPrefix(channelID, communications.WhatsAppPrefix) {
-		return "whatsapp"
-	}
-	return "discord"
+func communicationSendRequest(event core.Event) communications.SendRequest {
+	all, _ := event.Payload["all"].(bool)
+	force, _ := event.Payload["force_nsfw"].(bool)
+	return communications.SendRequest{Action: event.Type, Source: string(event.Source), Interface: resultString(event.Context, "interface"), Content: resultString(event.Payload, "content"), AttachmentURL: resultString(event.Payload, "attachment_url"), Targets: stringSlice(event.Payload["channel_ids"]), All: all, ForceNSFW: force}
+}
+func (h *SystemDomainHandler) deliveryPolicy() communications.DeliveryPolicy {
+	return communications.DeliveryPolicy{Channels: h.deliveryChannels, SafeOnly: h.safeOnlyChannels, Disabled: map[string]bool{"discord": !h.serviceEnabled("discord"), "whatsapp": !h.serviceEnabled("whatsapp")}}
 }
 
 func sortedKeys(set map[string]struct{}) []string {
@@ -334,11 +329,12 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 			if _, skip := failed[channelID]; skip {
 				continue
 			}
-			if !h.serviceEnabled(interfaceOfChannel(channelID)) {
+			policy := h.deliveryPolicy()
+			if policy.Disabled[communications.PlatformOf(channelID)] {
 				switchedOff[channelID] = struct{}{}
 				continue
 			}
-			if _, safeOnly := h.safeOnlyChannels[channelID]; safeOnly && !safe {
+			if !policy.Eligible(channelID, safe, false) {
 				skippedUnsafe[channelID]++
 				logger.Info(fmt.Sprintf(
 					"system handler meme skipped for safe-only channel event_id=%s channel_id=%s reason=%s",
@@ -479,60 +475,20 @@ func (h *SystemDomainHandler) deliverAttachment(ctx context.Context, channelID, 
 // accepts channels the orchestrator already delivers to, so the request port cannot
 // be used to post anywhere the bot can reach.
 func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
-	if channels := stringSlice(event.Payload["channel_ids"]); anyWhatsApp(channels) {
+	if channels := stringSlice(event.Payload["channel_ids"]); communications.HasConversationTarget(channels) {
 		return h.handleWhatsAppSend(ctx, event, workflow, channels)
 	}
 	if h.discord == nil {
 		return nil, fmt.Errorf("discord deliverer is not configured")
 	}
 
-	content := strings.TrimSpace(resultString(event.Payload, "content"))
-	attachmentURL := strings.TrimSpace(resultString(event.Payload, "attachment_url"))
-	if content == "" && attachmentURL == "" {
-		return nil, fmt.Errorf("discord send requires content or attachment_url")
+	policy := h.deliveryPolicy()
+	plan, err := policy.PlanChannelSend(communicationSendRequest(event))
+	if err != nil {
+		return nil, err
 	}
-	forceNSFW, _ := event.Payload["force_nsfw"].(bool)
-	if forceNSFW && attachmentURL == "" {
-		return nil, fmt.Errorf("force_nsfw requires attachment_url")
-	}
-	if forceNSFW && !explicitNSFWBypassAllowed(event) {
-		return nil, fmt.Errorf("force_nsfw is only allowed for explicit desktop or TUI sends")
-	}
-
-	var targets []string
-	if all, _ := event.Payload["all"].(bool); all {
-		targets = h.deliveryChannels
-	} else {
-		targets = uniqueStrings(stringSlice(event.Payload["channel_ids"]))
-	}
-	if len(targets) == 0 {
-		return nil, fmt.Errorf("discord send requires channel_ids or all")
-	}
-
-	allowed := map[string]struct{}{}
-	for _, channelID := range h.deliveryChannels {
-		allowed[channelID] = struct{}{}
-	}
-	for _, channelID := range targets {
-		if _, ok := allowed[channelID]; !ok {
-			return nil, fmt.Errorf("channel %s is not a configured delivery channel", channelID)
-		}
-	}
-
-	// A channel of an interface that is switched off is left out and reported, not failed.
-	var switchedOff []string
-	live := make([]string, 0, len(targets))
-	for _, channelID := range targets {
-		if h.serviceEnabled(interfaceOfChannel(channelID)) {
-			live = append(live, channelID)
-			continue
-		}
-		switchedOff = append(switchedOff, channelID)
-	}
-	if len(live) == 0 {
-		return nil, fmt.Errorf("nothing sent: %s is switched off", strings.Join(switchedOff, ","))
-	}
-	targets = live
+	content, attachmentURL, forceNSFW := plan.Content, plan.AttachmentURL, plan.ForceNSFW
+	targets, switchedOff := plan.Targets, plan.SwitchedOff
 	var attempt *HashtagAttempt
 	if skip, _ := event.Payload["skip_hashtag"].(bool); !skip {
 		content, attempt = h.appendLearnedHashtag(ctx, event, content, attachmentURL)
@@ -545,14 +501,15 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	restricted := []string{}
 	if attachmentURL != "" {
 		for _, channelID := range targets {
-			if _, ok := h.safeOnlyChannels[channelID]; ok {
+			if policy.RequiresSafe(channelID) {
 				restricted = append(restricted, channelID)
 			}
 		}
 		if len(restricted) > 0 && !forceNSFW {
-			if safe, reason := h.screenAttachment(ctx, attachmentURL, content); !safe {
-				blockReason = reason
-				for _, channelID := range restricted {
+			safe, reason := h.screenAttachment(ctx, attachmentURL, content)
+			for _, channelID := range restricted {
+				if !policy.Eligible(channelID, safe, forceNSFW) {
+					blockReason = reason
 					blocked[channelID] = struct{}{}
 				}
 			}
@@ -615,15 +572,6 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		response["marked_sent"] = err == nil
 	}
 	return response, nil
-}
-
-func explicitNSFWBypassAllowed(event core.Event) bool {
-	if event.Source == core.SourceCLI && event.Type == "discord.send" &&
-		strings.TrimSpace(resultString(event.Context, "interface")) == "tui" {
-		return true
-	}
-	return event.Source == core.SourceDesktop && event.Type == "communications.send" &&
-		strings.TrimSpace(resultString(event.Context, "interface")) == "desktop"
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {

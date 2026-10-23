@@ -32,8 +32,8 @@ For a new cross-layer operation:
 [ADR 0012](decisions/0012-communication-services.md) classifies Discord and
 WhatsApp gateways as communication-service adapters, with inbound ingress and
 outbound transport roles. Desktop, CLI and TUI are operator interfaces. Current
-gateways still live under `dokja_interfaces/`; policy extraction and relocation
-are pending in step 09.4. The [source audit](communication-boundaries.md) identifies
+gateways still live under `dokja_interfaces/`; outbound policy extraction has begun and relocation
+remains pending in step 09.4. The [source audit](communication-boundaries.md) identifies
 existing read, send, linking and session ownership without changing contracts.
 Gateway ingress still submits the existing event/request to orchestration;
 reclassification does not permit service-to-domain or operator-to-service bypasses.
@@ -323,8 +323,8 @@ bootstrap controller. The Runtime domain owns validation and apply policy; the
 runtime infrastructure adapter stores a revisioned snapshot in the shared
 `dokja_store` SQLite settings table and projects it into Compose child processes.
 Legacy `.env` values are imported once; credentials stay outside this API and the
-embedding profile is fixed. Provider inventory and model/capability bindings remain
-pending. See [ADR 0013](decisions/0013-database-runtime-settings.md).
+embedding profile is fixed. Provider inventory and registrations are available;
+model/capability bindings remain pending. See [ADR 0013](decisions/0013-database-runtime-settings.md).
 
 The bootstrap controller also routes read-only `runtime.providers` through the
 Runtime domain and provider-discovery infrastructure. Operator interfaces share
@@ -338,3 +338,11 @@ writing through the Runtime domain/infrastructure port. Desktop, CLI and TUI
 confirm edits and preserve stale revisions rather than merging them silently.
 Declared names remain unverified; inference bindings and the fixed embedding
 profile are unaffected. See [provider registrations](provider-registrations.md).
+
+## Communication outbound policy update
+
+Step 09.4-b adds domain-owned [delivery ports and policy](../dokja_domain/dokja_communications/delivery.go).
+System handlers continue to sequence I/O but delegate target validation,
+disabled-platform selection, explicit bypass permission, safe-only decisions and
+named-conversation restrictions. [Evidence and remaining boundaries](communication-boundaries.md#outbound-policy-extraction-step-094-b-partial)
+separate this delivered slice from pending inbound/linking policy and relocation.
