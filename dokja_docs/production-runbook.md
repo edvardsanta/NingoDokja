@@ -821,6 +821,11 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
    chat refuses inference; re-enable and retry. Authentication/quota errors stay explicit.
    History, reading reference and Knowledge citations continue through the same chat handler.
 
+The same socket also answers `POST /chat/stream`: newline-delimited JSON with
+`{"preview": ...}` lines (the text written so far, at most every 100 ms) and a last line that is
+the reply `/chat` would give, or `{"error": ...}`. Ollama and Codex give previews; Claude Code gives
+only the last line for now. A preview is never the reply and is not stored.
+
 Bounded adapter regressions and opt-in synthetic live checks are documented in
 [chat inference validation](chat-inference-validation.md). A healthy configuration
 only establishes registration validity; it does not prove authenticated inference.

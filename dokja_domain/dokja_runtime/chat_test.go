@@ -137,3 +137,62 @@ func TestChatRejectsSuccessReturnedAfterCancellation(t *testing.T) {
 		t.Fatalf("late success accepted: %+v %v", got, err)
 	}
 }
+
+type streamingChat struct {
+	previews []string
+	reply    string
+}
+
+func (s *streamingChat) Generate(context.Context, ChatBinding, []ChatMessage) (string, error) {
+	return "whole", nil
+}
+
+func (s *streamingChat) GenerateStream(_ context.Context, _ ChatBinding, _ []ChatMessage, onPreview func(string)) (string, error) {
+	for _, preview := range s.previews {
+		onPreview(preview)
+	}
+	return s.reply, nil
+}
+
+func streamingDomain(inference ChatInference) *Domain {
+	s := &chatStore{b: ChatBinding{Revision: 2, Provider: "codex", Model: "fixture/model"}}
+	p := &chatRegistrations{p: ProviderPreferences{Providers: []ProviderRegistration{{ID: "codex", Enabled: true, Models: []string{"fixture/model"}}}}}
+	return New(nil, Journal{}, nil).WithChat(s, inference).WithProviderSettings(p)
+}
+
+func TestChatStreamPreviewsWhileWritingAndReturnsTheReply(t *testing.T) {
+	d := streamingDomain(&streamingChat{previews: []string{"Th", "The ans"}, reply: "The answer"})
+	var seen []string
+	reply, err := d.ChatStream(t.Context(), []ChatMessage{{Role: "user", Content: "question"}}, func(text string) { seen = append(seen, text) })
+	if err != nil || reply.Reply != "The answer" {
+		t.Fatal(reply, err)
+	}
+	if strings.Join(seen, "|") != "Th|The ans" {
+		t.Fatal(seen)
+	}
+}
+
+func TestChatStreamStillRefusesAnInvalidReplyAfterAPreview(t *testing.T) {
+	d := streamingDomain(&streamingChat{previews: []string{"something"}, reply: "   "})
+	if _, err := d.ChatStream(t.Context(), []ChatMessage{{Role: "user", Content: "question"}}, func(string) {}); err == nil {
+		t.Fatal("a blank reply must be refused even after a preview")
+	}
+}
+
+func TestChatStreamGivesNoPreviewWhenTheInferenceCannotStream(t *testing.T) {
+	d := streamingDomain(&chatFake{})
+	previews := 0
+	reply, err := d.ChatStream(t.Context(), []ChatMessage{{Role: "user", Content: "question"}}, func(string) { previews++ })
+	if err != nil || reply.Reply != "answer" || previews != 0 {
+		t.Fatal(reply, err, previews)
+	}
+}
+
+func TestChatStreamValidatesBeforeAnyPreview(t *testing.T) {
+	inference := &streamingChat{previews: []string{"leak"}, reply: "ok"}
+	d := streamingDomain(inference)
+	previews := 0
+	if _, err := d.ChatStream(t.Context(), []ChatMessage{{Role: "tool", Content: "x"}}, func(string) { previews++ }); err == nil || previews != 0 {
+		t.Fatal("an invalid history must be refused before the provider is asked", err, previews)
+	}
+}
