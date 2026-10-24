@@ -12,6 +12,7 @@ import {
 import { RuntimeClient, runtimeRoot, runtimeStateHome } from "./runtime_client.js";
 import { DEFAULT_ENDPOINT } from "./config.js";
 import { parseConfig } from "./config.js";
+import { communicationsToken } from "./communications_config.js";
 import { isTrustedSender } from "./guards.js";
 import { fetchMedia } from "./media_fetch.js";
 import { MediaGate } from "./media_gate.js";
@@ -36,8 +37,9 @@ async function main(): Promise<void> {
   installPermissionPolicy(session.defaultSession);
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
-  const orchestrator = new OrchestratorClient({ endpoint: config.endpoint, communicationsToken: process.env.DOKJA_COMMUNICATIONS_TOKEN });
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
+  const orchestrator = new OrchestratorClient({ endpoint: config.endpoint,
+    communicationsToken: communicationsToken(process.env, root, config.envFile) });
   const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
   const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:runtimeStateHome(process.env, app.getPath("home")), legacyStateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
   const client = { request:(type:string,payload:Record<string,unknown>,timeout:number) =>

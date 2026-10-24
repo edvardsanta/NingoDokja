@@ -177,12 +177,14 @@ async function startHiddenDisplay(): Promise<{ socket: string; stop(): Promise<v
 
 // Starts the built app (run `pnpm build` first) with its own profile, against the fake
 // orchestrator, and waits for the debugging port Chromium reports.
-export async function launchApp(endpoint: string, communicationsToken = ""): Promise<RunningApp> {
+export async function launchApp(endpoint: string, communicationsToken = "", envFile?: string): Promise<RunningApp> {
   const profile = await mkdtemp(join(tmpdir(), "dokja-desktop-e2e-"));
   const hidden = await startHiddenDisplay();
   const env = hidden
     ? { ...process.env, WAYLAND_DISPLAY: hidden.socket, DISPLAY: "" }
     : process.env;
+  const childEnv: NodeJS.ProcessEnv = { ...env, DOKJA_COMMUNICATIONS_TOKEN: communicationsToken };
+  if (envFile) delete childEnv.DOKJA_COMMUNICATIONS_TOKEN;
   const child: ChildProcess = spawn(
     join(ROOT, "node_modules", ".bin", "electron"),
     [
@@ -191,9 +193,10 @@ export async function launchApp(endpoint: string, communicationsToken = ""): Pro
       "--remote-debugging-port=0",
       `--user-data-dir=${profile}`,
       `--request-endpoint=${endpoint}`,
+      ...(envFile ? [`--env-file=${envFile}`] : []),
       "--lang=en",
     ],
-    { cwd: ROOT, env: { ...env, DOKJA_COMMUNICATIONS_TOKEN: communicationsToken }, detached: true, stdio: ["ignore", "ignore", "ignore"] },
+    { cwd: ROOT, env: childEnv, detached: true, stdio: ["ignore", "ignore", "ignore"] },
   );
 
   const stop = async () => {

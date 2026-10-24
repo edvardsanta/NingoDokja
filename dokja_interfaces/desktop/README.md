@@ -57,6 +57,22 @@ pnpm install
 pnpm start     # builds, then opens the window
 ```
 
+The Desktop reads `DOKJA_COMMUNICATIONS_TOKEN` from the checkout's ignored `.env`
+when it is absent from the process environment. An exported value takes precedence,
+including an explicitly blank value. Only this credential is read; other entries
+are not imported and shell expressions are never executed. The value stays in the
+main process. Restart Desktop after changing the file.
+
+If your Compose stack uses `.env.prod`, select the same file from this directory:
+
+```sh
+pnpm start --env-file=../../.env.prod
+```
+
+An explicit file path is relative to the launch directory. Without a discoverable
+checkout, use `--runtime-root` or an explicit `--env-file`; the Desktop does not
+guess a production file or generate another token.
+
 It needs a running orchestrator. By default it asks `tcp://127.0.0.1:5558`, the port the compose
 stacks publish. Without one the card says so after about three seconds. Each workspace needs the service
 behind it: a service that is stopped or switched off is said so on its workspace, and the others keep working.
@@ -70,8 +86,8 @@ none enabled) instead of showing an empty list. A source that fails is listed wi
 list opens by itself when one does.
 
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
-`--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
-15 s). Pass them after `--`, for example `pnpm start -- --lang=pt`.
+`--env-file` (communications credential file), `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
+15 s). For example: `pnpm start --lang=pt`.
 
 ## WhatsApp conversations
 
@@ -89,8 +105,8 @@ WhatsApp shows **not configured** and setup guidance, without querying a link
 code or offering an unusable routing toggle. Once configured, the WhatsApp row
 has a **Link** button. It shows the code to scan while the
 account waits for a link, and **New code** and **Unlink and start over**. It needs the
-communications credential in the environment of the desktop (`DOKJA_COMMUNICATIONS_TOKEN`, the same
-one the orchestrator has) and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` set on the orchestrator. The shell
+communications credential (`DOKJA_COMMUNICATIONS_TOKEN`, loaded from the environment or selected
+env file, with the same value the orchestrator has) and `WHATSAPP_INTERFACE_STATUS_ENDPOINT` set on the orchestrator. The shell
 draws the code from rows of modules it validated, so the page gets a picture and never the code as
 text. Starting over is asked in a window the shell owns, because it unlinks the device and erases the
 session. See [`dokja_docs/whatsapp-interface.md`](../../dokja_docs/whatsapp-interface.md).
@@ -115,8 +131,9 @@ Setup:
 1. Run an orchestrator built with the `communications.*` routes and the new
    [`dokja_communications` service](../../dokja_services/dokja_communications/README.md).
 2. Configure `DOKJA_COMMUNICATIONS_TOKEN` with the same random value of at least 32 characters
-   in the desktop shell, orchestrator and service. It is separate from the bot token and never
-   enters the renderer. Missing credentials leave the other cards usable.
+   for the orchestrator and service. The Desktop reads it from the checkout's `.env`, or the
+   file selected by `--env-file`; an exported value overrides the file. It is separate from the
+   bot token and never enters the renderer. Missing credentials leave the other cards usable.
 3. Use a loopback or IPC request endpoint. For a remote orchestrator use a secure local tunnel;
    the desktop refuses to send this credential directly to a remote ZeroMQ address.
 4. Keep `DISCORD_SCHEDULED_MEME_CHANNEL_ID` consistent between orchestrator and service. These

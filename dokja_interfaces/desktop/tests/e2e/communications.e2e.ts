@@ -27,9 +27,9 @@ describe("built communications tab", { skip: hasDisplay ? false : "no display" }
     assert.equal(result.ok, false);
     assert.equal(orchestrator.seen.filter((item) => item.type === "communications.send").length, 0);
   });
-  it("holds a real-input send for native confirmation before touching the orchestrator", async () => {
+  it("holds a forced real-input send for native confirmation before touching the orchestrator", async () => {
     await page.click(5, 5);
-    await page.evaluate("(window.__sent = false, window.dokja.request('communications.send', { channel_id: '123', content: 'hello' }).then(answer => window.__sent = answer), 'started')");
+    await page.evaluate("(window.__sent = false, window.dokja.request('communications.send', { channel_id: '123', content: 'hello', force_nsfw: true }).then(answer => window.__sent = answer), 'started')");
     await sleep(1800);
     assert.equal(await page.evaluate("window.__sent"), false);
     assert.equal(orchestrator.seen.filter((item) => item.type === "communications.send").length, 0);

@@ -9,6 +9,7 @@ export const DEFAULT_MAX_TIMEOUT_MS = 120_000;
 export type DesktopConfig = {
   endpoint: string;
   runtimeRoot?: string;
+  envFile?: string;
   locale: Locale;
   defaultTimeoutMs: number;
   maxTimeoutMs: number;
@@ -51,6 +52,7 @@ export function parseConfig(
     options: {
       "request-endpoint": { type: "string" },
       "runtime-root": { type: "string" },
+      "env-file": { type: "string" },
       lang: { type: "string" },
       timeout: { type: "string" },
     },
@@ -76,6 +78,7 @@ export function parseConfig(
 
   return {
     ...(flag("runtime-root") ? { runtimeRoot: flag("runtime-root") } : {}),
+    ...(flag("env-file") ? { envFile: flag("env-file") } : {}),
     endpoint: flag("request-endpoint") ?? variable("DOKJA_ORCH_REQUEST_ENDPOINT") ?? DEFAULT_ENDPOINT,
     locale: localeFromTag(localeTag),
     defaultTimeoutMs: Math.min(DEFAULT_REQUEST_TIMEOUT_MS, maxTimeoutMs),
