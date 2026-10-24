@@ -84,6 +84,7 @@ export type KnowledgeHit = {
   heading: string;
   kind: string;
   sourceRef: string;
+  sourceId: string;
   tags: string[];
   text: string;
   score: number | null;

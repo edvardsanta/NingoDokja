@@ -19,7 +19,7 @@ meaning and by keyword, with a citable source.
 | `knowledge.metadata.get` (internal) | `source_id` | stored `metadata`, title and revision |
 | `knowledge.metadata.patch` (internal) | `source_id`, `revision`, validated `patch` | effective metadata, new revision, `metadata_changed`; content `changed: false` |
 | `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
-| `knowledge.list` | `limit?`, `offset?`, `kind?`, `include_text?` | `documents[]`, `total` |
+| `knowledge.list` | `limit?`, `offset?`, `kind?`, `exclude_kinds?`, `include_text?`, `source_id?` (narrows the list to that one document) | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
 | `knowledge.status` | none | counts, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |

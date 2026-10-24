@@ -270,3 +270,20 @@ def test_list_refuses_kinds_to_leave_out_that_are_not_kinds(service, bad):
     with pytest.raises(ValueError):
         service.list_documents({"exclude_kinds": bad})
 
+
+
+def test_list_narrows_to_one_document_by_its_id(service):
+    add(service, CAKE, source_id="note:cake", kind="note")
+    add(service, ("#Cake", CAKE[1]), source_id="meme-hashtag:cake", kind="meme_hashtag")
+
+    listed = service.list_documents({"source_id": "note:cake", "limit": 1, "include_text": True})
+    assert [d["source_id"] for d in listed["documents"]] == ["note:cake"]
+    assert listed["total"] == 1
+    assert "carrot cake" in listed["documents"][0]["text"].lower()
+    assert service.list_documents({"source_id": "note:missing"})["documents"] == []
+
+
+@pytest.mark.parametrize("bad", ["", "a b", "x" * 201, 7, "' OR 1=1 --"])
+def test_list_refuses_an_id_that_is_not_one(service, bad):
+    with pytest.raises(ValueError):
+        service.list_documents({"source_id": bad})

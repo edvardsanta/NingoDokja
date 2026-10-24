@@ -6,7 +6,7 @@ import { AssistantCard } from "../../src/renderer/cards/assistant.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { ChatPreview, Transport, TransportResult } from "../../src/shared/transport.js";
-import { failure, ok, routedTransport } from "./support.js";
+import { deferred, failure, ok, routedTransport } from "./support.js";
 
 const reply = (text: string) => ok({ reply: text, sessionNotice: "" });
 
@@ -100,6 +100,20 @@ describe("the conversation", () => {
     await screen.findByText("The answer.");
     expect(screen.queryByText("The ans")).toBeNull();
     expect(listener).toBeUndefined();
+  });
+
+  it("drops a reply still on its way when a new conversation starts", async () => {
+    const late = deferred<TransportResult>();
+    const { transport } = routedTransport({ "message.created": () => late.promise });
+    renderTalk(transport);
+    fireEvent.change(field(), { target: { value: "first" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Ningo is thinking…");
+    fireEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
+    await act(async () => late.resolve(reply("A reply to the old conversation.")));
+    expect(screen.queryByText("A reply to the old conversation.")).toBeNull();
+    expect(screen.queryByText("first")).toBeNull();
+    screen.getByText("I've read more than you'd guess. Ask.");
   });
 
   it("starts a new conversation with a new id and an empty transcript", async () => {

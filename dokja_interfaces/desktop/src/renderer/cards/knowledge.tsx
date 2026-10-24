@@ -1,6 +1,6 @@
 import { useCallback, useId, useState, type DragEvent } from "react";
 
-import type { KnowledgeDocument, KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
+import type { KnowledgeDocument, KnowledgeHit, KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
@@ -69,7 +69,7 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
 // The base's own view, always the first tab.
 const BASE = "";
 const MAX_OPEN_DOCUMENTS = 8;
-type OpenDocument = { id: string; title: string; at: number; external: boolean; classify: boolean };
+type OpenDocument = { id: string; title: string; at?: number; external: boolean; classify: boolean };
 
 // Lights the view while files are dragged over it and hands over the first file dropped. Entering and
 // leaving fire for every child crossed, so they are counted rather than trusted one by one. Only a
@@ -118,8 +118,8 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
   const [documents, setDocuments] = useState<OpenDocument[]>([]);
   const [current, setCurrent] = useState(BASE);
   // Classify… opens the document with its classification shown; asking again for an open document
-  // shows that too.
-  const open = useCallback((document: KnowledgeDocument, at: number, external: boolean, classify = false) => {
+  // shows that too. A search hit has no place in the list, so it opens without one.
+  const open = useCallback((document: Pick<KnowledgeDocument, "id" | "title">, at: number | undefined, external: boolean, classify = false) => {
     setDocuments((previous) =>
       previous.some((each) => each.id === document.id)
         ? previous.map((each) => each.id === document.id && classify ? { ...each, classify } : each)
@@ -179,7 +179,7 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
       )}
       <div hidden={current !== BASE}>
         <div className="library-tools">
-          <SearchBox transport={transport} />
+          <SearchBox transport={transport} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} />
           <button type="button" className="library-add primary" aria-haspopup="dialog" aria-expanded={adding} onClick={() => setAdding(true)}>
             {t("add_title")}
           </button>
@@ -226,7 +226,7 @@ function KnowledgeStatusLines({ status }: { status: KnowledgeStatus }) {
   );
 }
 
-function SearchBox({ transport }: { transport: Transport }) {
+function SearchBox({ transport, onOpen }: { transport: Transport; onOpen: (hit: KnowledgeHit) => void }) {
   const t = useTranslate();
   const inputId = useId();
   const [query, setQuery] = useState("");
@@ -260,13 +260,13 @@ function SearchBox({ transport }: { transport: Transport }) {
       <div aria-live="polite">
         {searching && <p role="status">{t("knowledge_searching")}</p>}
         {state.phase === "error" && <Problem error={state.error} />}
-        {state.phase === "ready" && <SearchResults search={state.data} />}
+        {state.phase === "ready" && <SearchResults search={state.data} onOpen={onOpen} />}
       </div>
     </>
   );
 }
 
-function SearchResults({ search }: { search: KnowledgeSearch | Off }) {
+function SearchResults({ search, onOpen }: { search: KnowledgeSearch | Off; onOpen: (hit: KnowledgeHit) => void }) {
   const t = useTranslate();
   const { fixed } = useNumbers();
   if (search.off) return <OffNotice reason={search.reason} />;
@@ -297,6 +297,8 @@ function SearchResults({ search }: { search: KnowledgeSearch | Off }) {
             <p>
               <strong>{hit.title}</strong>
               {hit.heading && <span className="detail"> {hit.heading}</span>}
+              {hit.sourceId && <>{" "}<button type="button" aria-label={t("documents_open_named", { title: hit.title || hit.sourceId })}
+                onClick={() => onOpen(hit)}>{t("documents_open")}</button></>}
             </p>
             <p className="hit-text">{hit.text}</p>
             <p className="detail">

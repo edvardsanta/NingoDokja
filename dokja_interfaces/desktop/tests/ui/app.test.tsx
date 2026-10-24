@@ -8,7 +8,7 @@ import pt from "../../src/renderer/i18n/locales/pt.json";
 import type { ActionType } from "../../src/shared/actions.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { TransportResult } from "../../src/shared/transport.js";
-import { ALL_UP, KNOWLEDGE_STATUS, OFF, SERVICES, deferred, failure, ok, routedTransport, statusReply } from "./support.js";
+import { ALL_UP, DIGEST_STATUS, KNOWLEDGE_STATUS, OFF, SERVICES, deferred, digestItem, digestPage, failure, ok, routedTransport, statusReply } from "./support.js";
 
 const wordmark = () => screen.getByRole("heading", { level: 1 });
 const tabNamed = (name: string) => screen.getByRole("tab", { name });
@@ -25,7 +25,7 @@ const QUIET: Partial<Record<ActionType, Route>> = {
   "knowledge.status": ok(OFF),
 };
 
-const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route>> = {}) =>
+const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route | Route[]>> = {}) =>
   routedTransport({ ...QUIET, "ningo.status": health, ...overrides });
 
 describe("the screen", () => {
@@ -81,6 +81,44 @@ describe("the screen", () => {
     await waitFor(() => expect(wordmark().dataset.pulse).toBe("calm"));
     expect(calls.map((call) => call.type)).toEqual(["ningo.status"]);
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
+  });
+
+  it("discusses a reading in Talk, grounded by its id, and the list keeps no chat of its own", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP), {
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([digestItem(1)])),
+      "message.created": [
+        ok({ reply: "The author argues that shared rules make coordination possible.", sessionNotice: "" }),
+        ok({ reply: "The second turn keeps the context of this discussion.", sessionNotice: "" }),
+      ],
+    });
+    render(<App transport={transport} locale="en" />);
+    fireEvent.click(tabNamed("Library"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Readings" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Discuss with Ningo: Entry 1" }));
+
+    // Talk opens on a conversation about the reading; the Readings list has no composer.
+    await waitFor(() => expect(selectedTab()).toBe("Talk"));
+    expect(screen.getByText(/Discussing “Entry 1”/)).toBeTruthy();
+    expect(screen.getAllByRole("textbox", { name: "Your message" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Explain the main idea in plain language" }));
+    await screen.findByText("The author argues that shared rules make coordination possible.");
+    fireEvent.change(screen.getByRole("textbox", { name: "Your message" }), { target: { value: "What should I question?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("The second turn keeps the context of this discussion.");
+
+    const [first, second] = calls.filter((call) => call.type === "message.created").map((call) => call.payload);
+    expect(first).toMatchObject({ content: "Explain the main idea in plain language", reading_id: "item-1" });
+    expect(second).toMatchObject({ content: "What should I question?", reading_id: "item-1" });
+    expect(second?.conversation_id).toBe(first?.conversation_id);
+    expect(first).not.toHaveProperty("summary");
+
+    // Closing the discussion leaves a fresh general conversation, with no reading attached.
+    fireEvent.click(screen.getByRole("button", { name: "Close discussion" }));
+    expect(screen.queryByText(/Discussing “Entry 1”/)).toBeNull();
+    expect(screen.queryByText("The author argues that shared rules make coordination possible.")).toBeNull();
+    screen.getByText("I've read more than you'd guess. Ask.");
   });
 
   it("keeps a knowledge search while the sources are looked at", async () => {
