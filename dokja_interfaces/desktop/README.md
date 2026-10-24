@@ -35,7 +35,7 @@ bare digit is always typed, never taken as a shortcut. Memes have no workspace o
 sends them, so they are picked in Messages. Changes to the research base require a real click or key press in the window (see
 "How it is built"). The Library lists its documents as it opens, can open one in a tab of its own (its text, rebuilt
 from the stored passages and said to be so, asked for alone with `include_text`; a tab closes with its
-×), page through them, index one
+×; a search hit opens its document the same way, read by its id), page through them, index one
 batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open

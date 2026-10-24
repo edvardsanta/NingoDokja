@@ -13,8 +13,13 @@ import { useCard, type LoadResult } from "./use_card.js";
 type Opened = { document: KnowledgeDocument } | { moved: true } | Off;
 
 // `external` counts the position among what came from outside only, as the list it came from did.
-export async function loadDocument(transport: Transport, id: string, at: number, external = false): Promise<LoadResult<Opened>> {
-  const answer = await transport.request("knowledge.list", { limit: 1, offset: at, include_text: true, ...(external ? { external: true } : {}) }, { timeoutMs: 15_000 });
+// A document opened from the list is read at its place there; one opened from a search hit has no
+// place, so it is read by its id.
+export async function loadDocument(transport: Transport, id: string, at: number | undefined, external = false): Promise<LoadResult<Opened>> {
+  const request = at === undefined
+    ? { source_id: id, include_text: true }
+    : { limit: 1, offset: at, include_text: true, ...(external ? { external: true } : {}) };
+  const answer = await transport.request("knowledge.list", request, { timeoutMs: 15_000 });
   if (!answer.ok) return answer;
   const page = parseDocuments(answer.result);
   if (!page) return { ok: false, error: { code: "unexpected", message: "unexpected knowledge reply" } };
@@ -26,7 +31,7 @@ export async function loadDocument(transport: Transport, id: string, at: number,
 // One document of the research base, in a tab of its own: what the list says of it, and its text.
 // The text is what the service rebuilds from the passages it stored, so it says so: close to the
 // original, not a faithful copy of it. It is shown as text, never as markup.
-export function DocumentView({ transport, id, at, external = false }: { transport: Transport; id: string; at: number; external?: boolean }) {
+export function DocumentView({ transport, id, at, external = false }: { transport: Transport; id: string; at?: number; external?: boolean }) {
   const t = useTranslate();
   const [classificationOpen, setClassificationOpen] = useState(false);
   const { fixed } = useNumbers();

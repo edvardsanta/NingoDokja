@@ -228,6 +228,8 @@ function knowledgeSearch(body: Record<string, unknown>): KnowledgeSearch {
       heading: shorten(text(hit.heading), 160),
       kind: text(hit.kind),
       sourceRef: shorten(text(hit.source_ref), 120),
+      // The document the passage came from, so the hit can open it; empty when it is no id.
+      sourceId: INGEST_ID.test(text(hit.source_id)) ? text(hit.source_id) : "",
       tags: words(hit.tags).slice(0, 8),
       text: shorten(text(hit.text), 400),
       score: typeof hit.score === "number" && Number.isFinite(hit.score) ? hit.score : null,
@@ -633,6 +635,11 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     // The text of a document comes only one document at a time: it is what a document's tab shows,
     // and a page of twenty texts would be large for nothing.
     payload: (raw) => {
+      // One document by its id, as a search hit names it: with its text, never a page of them.
+      if (raw.source_id !== undefined) {
+        if (typeof raw.source_id !== "string" || !INGEST_ID.test(raw.source_id)) return undefined;
+        return { limit: 1, offset: 0, source_id: raw.source_id, ...(raw.include_text === true ? { include_text: true } : {}) };
+      }
       const limit = clampInt(raw.limit, 1, 100, 20);
       return {
         limit,

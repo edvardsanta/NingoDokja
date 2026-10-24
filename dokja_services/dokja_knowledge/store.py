@@ -243,7 +243,12 @@ class Store:
         return True
 
     def list_documents(
-        self, limit: int, offset: int, kind: str = "", exclude: tuple[str, ...] = ()
+        self,
+        limit: int,
+        offset: int,
+        kind: str = "",
+        exclude: tuple[str, ...] = (),
+        source_id: str = "",
     ) -> list[sqlite3.Row]:
         # The kinds to leave out travel as one JSON array, so the query stays a fixed text with
         # every value bound.
@@ -256,20 +261,24 @@ class Store:
             LEFT JOIN document_metadata m ON m.document_id = d.id
             WHERE (? = '' OR d.kind = ?)
               AND d.kind NOT IN (SELECT value FROM json_each(?))
+              AND (? = '' OR d.source_id = ?)
             GROUP BY d.id
             ORDER BY d.updated_at DESC, d.id DESC
             LIMIT ? OFFSET ?
             """,
-            (kind, kind, json.dumps(list(exclude)), limit, offset),
+            (kind, kind, json.dumps(list(exclude)), source_id, source_id, limit, offset),
         ).fetchall()
 
-    def document_count(self, kind: str = "", exclude: tuple[str, ...] = ()) -> int:
+    def document_count(
+        self, kind: str = "", exclude: tuple[str, ...] = (), source_id: str = ""
+    ) -> int:
         return self.conn.execute(
             """
             SELECT COUNT(*) FROM documents
             WHERE (? = '' OR kind = ?) AND kind NOT IN (SELECT value FROM json_each(?))
+              AND (? = '' OR source_id = ?)
             """,
-            (kind, kind, json.dumps(list(exclude))),
+            (kind, kind, json.dumps(list(exclude)), source_id, source_id),
         ).fetchone()[0]
 
     def document_text(self, document_id: int) -> str:

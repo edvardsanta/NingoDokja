@@ -152,6 +152,7 @@ export const KNOWLEDGE_STATUS: KnowledgeStatus = {
 
 export const hit = (overrides: Partial<KnowledgeHit> = {}): KnowledgeHit => ({
   rank: 1,
+  sourceId: "note:example-1",
   title: "Document one",
   heading: "A section",
   kind: "note",

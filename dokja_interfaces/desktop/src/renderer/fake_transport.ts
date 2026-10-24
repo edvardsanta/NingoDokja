@@ -95,6 +95,7 @@ function searchFor(query: string): KnowledgeSearch {
         heading: "Chapter two",
         kind: "note",
         sourceRef: "notes/freedom.md",
+        sourceId: "note:example-1",
         tags: ["ethics"],
         text: "What we choose is shaped by what we are, and what we are was shaped before we chose.",
         score: 0.68,
@@ -106,6 +107,7 @@ function searchFor(query: string): KnowledgeSearch {
         heading: "",
         kind: "list",
         sourceRef: "notes/reading.md",
+        sourceId: "article:example-2",
         tags: [],
         text: "A short list of books to read again this year, with a line on why each one deserves it.",
         score: 0.52,
@@ -117,6 +119,7 @@ function searchFor(query: string): KnowledgeSearch {
         heading: "Method",
         kind: "note",
         sourceRef: "notes/cake.md",
+        sourceId: "book:example-3",
         tags: ["kitchen"],
         text: "Mix the flour and the sugar, then fold in the eggs.",
         score: 0.21,
@@ -427,9 +430,11 @@ export function createFakeTransport(delayMs = 400): Transport {
         case "knowledge.list": {
           const limit = Math.min(Math.max(Number(payload?.limit) || 20, 1), 100);
           const offset = Math.max(Number(payload?.offset) || 0, 0);
-          const withText = payload?.include_text === true && limit === 1;
+          const withText = payload?.include_text === true && (limit === 1 || typeof payload?.source_id === "string");
+          // A search hit's document is read by its id.
+          const shown = typeof payload?.source_id === "string" ? documents.filter((document) => document.id === payload.source_id) : documents;
           const page: KnowledgeDocuments = {
-            documents: documents
+            documents: shown
               .slice(offset, offset + limit)
               .map((document) => (withText ? { ...document, text: FAKE_TEXT, truncated: false } : document)),
             total: documents.length,

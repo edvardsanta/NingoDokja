@@ -125,3 +125,33 @@ it("loads classification for the opened document only when requested", async () 
   await screen.findByText("Classification is complete.");
   expect(calls.filter((call) => call.type === "knowledge.classify").map((call) => call.payload)).toEqual([{ source_id: "note:one" }]);
 });
+
+describe("a document opened from a search hit", () => {
+  it("opens the hit's document in a tab of its own, read by its id", async () => {
+    const search = { query: "free", hits: [{ rank: 1, title: "Title note:seven", heading: "", kind: "note", sourceRef: "", sourceId: "note:seven", tags: [], text: "a passage", score: 0.8, relevant: true }], relevantCount: 1, threshold: 0.45, degraded: false, reason: "" };
+    const { transport, calls } = routedTransport({
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "knowledge.list": [ok(PAGE), ok({ documents: [{ ...listed("note:seven"), text: "The whole text.", truncated: false }], total: 1, offset: 0 })],
+      "knowledge.search": ok(search),
+    });
+    renderCard(transport);
+    fireEvent.change(await screen.findByRole("searchbox"), { target: { value: "free" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open Title note:seven" }));
+
+    expect(await screen.findByText("The whole text.")).toBeTruthy();
+    expect(current()).toEqual(["Title note:seven"]);
+    const read = calls.filter((call) => call.type === "knowledge.list").at(-1);
+    expect(read?.payload).toEqual({ source_id: "note:seven", include_text: true });
+  });
+
+  it("offers no Open for a hit that names no document", async () => {
+    const search = { query: "free", hits: [{ rank: 1, title: "Nameless", heading: "", kind: "note", sourceRef: "", sourceId: "", tags: [], text: "a passage", score: 0.8, relevant: true }], relevantCount: 1, threshold: 0.45, degraded: false, reason: "" };
+    const { transport } = routedTransport({ "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.list": ok(PAGE), "knowledge.search": ok(search) });
+    renderCard(transport);
+    fireEvent.change(await screen.findByRole("searchbox"), { target: { value: "free" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await screen.findByText("a passage");
+    expect(screen.queryByRole("button", { name: "Open Nameless" })).toBeNull();
+  });
+});

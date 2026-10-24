@@ -29,6 +29,7 @@ function parseHit(value: unknown): KnowledgeHit | undefined {
     heading: text(value.heading),
     kind: text(value.kind),
     sourceRef: text(value.sourceRef),
+    sourceId: text(value.sourceId),
     tags: Array.isArray(value.tags) ? value.tags.map(text).filter((tag) => tag !== "") : [],
     text: text(value.text),
     score: typeof value.score === "number" && Number.isFinite(value.score) ? value.score : null,

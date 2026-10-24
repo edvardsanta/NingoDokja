@@ -199,9 +199,9 @@ test("knowledge.search keeps what a result list shows and cuts long texts", () =
         score: 0.612345,
         coverage: 1,
         relevant: true,
-        source_id: "id-must-not-leak",
+        source_id: "note:one",
       },
-      { rank: 2, title: "Document two", text: "short", score: null, relevant: false },
+      { rank: 2, title: "Document two", text: "short", score: null, relevant: false, source_id: "not an id; <b>" },
       "not a hit",
     ],
     relevant_count: 1,
@@ -226,7 +226,17 @@ test("knowledge.search keeps what a result list shows and cuts long texts", () =
   assert.equal(projected.relevantCount, 1);
   assert.equal(projected.degraded, true);
   assert.equal(projected.reason, "similarity is down");
-  assert.ok(!JSON.stringify(projected).includes("id-must-not-leak"));
+  // A hit names its document so it can be opened, as the document list already does; anything
+  // that is not an id is dropped.
+  assert.equal((projected.hits[0] as { sourceId?: string }).sourceId, "note:one");
+  assert.equal((projected.hits[1] as { sourceId?: string }).sourceId, "");
+});
+
+test("knowledge.list reads one document by its id, with its text, and nothing else", () => {
+  const payload = ACTIONS["knowledge.list"].payload;
+  assert.deepEqual(payload({ source_id: "note:one", include_text: true, limit: 50, offset: 9, kind: "x" }), { limit: 1, offset: 0, source_id: "note:one", include_text: true });
+  assert.deepEqual(payload({ source_id: "note:one" }), { limit: 1, offset: 0, source_id: "note:one" });
+  for (const source_id of ["", "a b", "x".repeat(201), 3, "' OR 1=1 --"]) assert.equal(payload({ source_id }), undefined, String(source_id));
 });
 
 test("meme.status keeps the queue counts", () => {

@@ -452,8 +452,14 @@ class KnowledgeService:
             raise ValueError("kind must be a short lowercase word such as note, article or book")
         exclude = _kinds(payload.get("exclude_kinds"))
         include_text = payload.get("include_text") is True
+        # One document by its id, as a search hit names it: the list narrowed to it.
+        source_id = payload.get("source_id")
+        if source_id is None:
+            source_id = ""
+        elif not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
+            raise ValueError("source_id must be valid")
         documents = []
-        for row in self.store.list_documents(limit, offset, kind, exclude):
+        for row in self.store.list_documents(limit, offset, kind, exclude, source_id):
             document = {
                 "source_id": row["source_id"], "title": row["title"], "kind": row["kind"],
                 "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
@@ -463,7 +469,7 @@ class KnowledgeService:
             if include_text:
                 document["text"] = self.store.document_text(row["id"])
             documents.append(document)
-        return {"documents": documents, "total": self.store.document_count(kind, exclude),
+        return {"documents": documents, "total": self.store.document_count(kind, exclude, source_id),
                 "offset": offset}
 
     def delete(self, payload: dict) -> dict:
