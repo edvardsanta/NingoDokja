@@ -89,9 +89,47 @@ export function runtimeProviders(body: Record<string, unknown>): import("../shar
   providers.push({ enabled: raw.enabled !== false, declaredModels: declarations ?? [], id: raw.id, name: names[raw.id]!, state: String(raw.state), reason: reasons.includes(String(raw.reason ?? "")) ? String(raw.reason ?? "") : "inspection_unavailable",
    models: raw.enabled !== false && raw.id === "ollama" && raw.state === "reachable" ? strings(raw.models, 64, 128).filter((name) => /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(name)) : [],
    modelDiscovery: raw.enabled === false ? "unavailable" : raw.id !== "ollama" ? "unsupported" : raw.state === "reachable" && raw.model_discovery === "listed" ? "listed" : "unavailable",
-   inferenceStatus: "not_tested", truncated: raw.models_truncated === true });
+   inferenceStatus: "not_tested", truncated: raw.models_truncated === true, ...engineFacts(raw) });
  }
  return { configurationRevision: revision, providers, checkedAt: text(body.checked_at).slice(0, 40) };
+}
+
+// A model name as the engine writes it; nothing that could pass for a flag.
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+const MODEL_SIZE = /^[0-9]{1,6}(\.[0-9]{1,2})? (B|KB|MB|GB|TB)$/;
+
+export function runtimeModel(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+ return typeof raw.model === "string" && MODEL_NAME.test(raw.model) ? { model: raw.model } : undefined;
+}
+export function runtimeModels(body: Record<string, unknown>): import("../shared/runtime.js").ModelsStatus {
+ if (typeof body.embedding_model !== "string" || !MODEL_NAME.test(body.embedding_model)) throw new Error("invalid models status");
+ const status: import("../shared/runtime.js").ModelsStatus = { embeddingModel: body.embedding_model };
+ if (["starting", "ready", "failed"].includes(text(body.engine))) {
+  status.engine = body.engine as "starting" | "ready" | "failed";
+  if (body.engine_error) status.engineError = text(body.engine_error).slice(0, 400);
+ }
+ if (body.pull !== undefined) {
+  const pull = body.pull;
+  if (!isRecord(pull) || typeof pull.model !== "string" || !MODEL_NAME.test(pull.model) || !["pulling", "done", "failed", "cancelled"].includes(text(pull.state))) throw new Error("invalid model pull");
+  status.pull = { model: pull.model, state: pull.state as import("../shared/runtime.js").ModelPullState };
+  if (["starting", "downloading", "verifying", "writing"].includes(text(pull.phase))) status.pull.phase = pull.phase as import("../shared/runtime.js").ModelPullPhase;
+  if (typeof pull.percent === "number" && Number.isInteger(pull.percent) && pull.percent >= 0 && pull.percent <= 100) status.pull.percent = pull.percent;
+  if (pull.error) status.pull.error = text(pull.error).slice(0, 200);
+ }
+ return status;
+}
+
+// What only the local engine reports: sizes in its own shape, and its embedding model.
+function engineFacts(raw: Record<string, unknown>): Pick<import("../shared/runtime.js").ProviderRow, "modelSizes" | "embeddingModel"> {
+ if (raw.id !== "ollama") return {};
+ const facts: Pick<import("../shared/runtime.js").ProviderRow, "modelSizes" | "embeddingModel"> = {};
+ if (isRecord(raw.model_sizes)) {
+  const sizes: Record<string, string> = {};
+  for (const [name, size] of Object.entries(raw.model_sizes).slice(0, 64)) if (MODEL_NAME.test(name) && typeof size === "string" && MODEL_SIZE.test(size)) sizes[name] = size;
+  facts.modelSizes = sizes;
+ }
+ if (typeof raw.embedding_model === "string" && MODEL_NAME.test(raw.embedding_model)) facts.embeddingModel = raw.embedding_model;
+ return facts;
 }
 
 export function runtimeChat(raw: Record<string,unknown>): import("../shared/runtime.js").ChatBinding {

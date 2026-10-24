@@ -1945,3 +1945,15 @@ button.icon-button[aria-expanded="true"] {
   text-overflow: ellipsis;
 }
 
+
+/* The local engine: each model's name takes the room, its size and what to do with it follow. */
+.provider-models li > span:first-child { flex: 1 1 12rem; overflow-wrap: anywhere; }
+.local-models { grid-column: 1 / -1; display: grid; gap: .5rem; margin-top: .75rem; }
+.local-models p { margin: 0; }
+.model-pull { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.model-pull progress { flex: 1 1 10rem; max-width: 20rem; accent-color: var(--cyan); }
+.model-download { display: grid; grid-template-columns: minmax(0, 24rem) auto; gap: .35rem .5rem; align-items: center; }
+.model-download label, .model-download .detail { grid-column: 1 / -1; }
+.model-download label { font-weight: 700; }
+.model-download input { min-width: 0; padding: .45rem .65rem; border: 1px solid var(--edge); border-radius: .25rem; background: var(--static); color: var(--ink); font: inherit; }
+.model-download input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }

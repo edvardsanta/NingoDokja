@@ -20,6 +20,13 @@ export const ACTION_TYPES = [
   "runtime.chat.configure",
   "runtime.settings",
   "runtime.settings.set",
+  // The local engine's models: reading their state is a read; starting the engine, downloading,
+  // cancelling and removing are changes, and a download or a removal is asked in a window.
+  "runtime.models.status",
+  "runtime.models.engine.start",
+  "runtime.models.pull",
+  "runtime.models.cancel",
+  "runtime.models.remove",
   "communications.channels",
   "communications.history",
   "communications.send",
@@ -56,6 +63,10 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "runtime.providers.configure",
   "runtime.chat.configure",
   "runtime.settings.set",
+  "runtime.models.engine.start",
+  "runtime.models.pull",
+  "runtime.models.cancel",
+  "runtime.models.remove",
   "message.created",
   "communications.send",
   "meme.hashtag.tag",
@@ -74,6 +85,8 @@ export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
   "communications.send",
   "communications.link.reset",
   "knowledge.delete",
+  "runtime.models.pull",
+  "runtime.models.remove",
 ];
 
 export function needsConfirmation(type: ActionType, payload?: Record<string, unknown>): boolean {

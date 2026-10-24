@@ -4,6 +4,7 @@ import type { Transport } from "../../shared/transport.js";
 import { isRecord } from "../../shared/records.js";
 import { useTranslate } from "../i18n/context.js";
 import { CardFrame, Problem } from "./card_frame.js";
+import { LocalModels, useRemoveModel } from "./local_models.js";
 import { availableProviderModels } from "./provider_model_catalog.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
@@ -50,6 +51,7 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
     return { ok: true, data: true };
   }, [transport, save]);
   const using = useAction(use);
+  const removing = useRemoveModel(transport, reload);
   useEffect(() => {
     if (using.state.phase !== "ready") return;
     reload();
@@ -61,24 +63,34 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
       <p className="detail">{t("providers_discovery_only")}</p>
       {action.state.phase === "error" && <Problem error={action.state.error} />}
       {using.state.phase === "error" && <Problem error={using.state.error} />}
+      {removing.state.phase === "error" && removing.state.error.code !== "cancelled" && <Problem error={removing.state.error} />}
       {!data.configurationRevision && <p className="detail">{t("provider_configuration_unavailable")}</p>}
       <ul className="services provider-list">{data.providers.map((row) => <li key={row.id}>
         <span className="service-name">{row.name}</span>
         <span className="service-status">{t(row.enabled === false ? "provider_disabled" : row.reason === "service_stopped" ? "provider_service_stopped" : row.state === "installed" ? "provider_installed" : row.state === "reachable" ? "provider_reachable" : "provider_unavailable")}</span>
-        <span className="detail">{row.modelDiscovery === "listed"
+        {row.id !== "ollama" || row.modelDiscovery !== "listed" || !data.configurationRevision ? <span className="detail">{row.modelDiscovery === "listed"
           ? row.models.length ? row.models.join(", ") : t("provider_no_models")
-          : t("provider_models_unavailable")}</span>
+          : t("provider_models_unavailable")}</span> : !row.models.length ? <span className="detail">{t("provider_no_models")}</span> : null}
         {row.truncated && <span className="detail">{t("provider_models_truncated")}</span>}
-        {data.configurationRevision && availableProviderModels(row).length > 0 ? <ul className="provider-models">{availableProviderModels(row).map((model) => {
+        {data.configurationRevision && shownModels(row).length > 0 ? <ul className="provider-models">{shownModels(row).map((model) => {
           const inUse = current?.provider === row.id && current.model === model;
+          const embedding = row.id === "ollama" && model === row.embeddingModel;
+          const busy = using.state.phase === "loading" || action.state.phase === "loading" || removing.state.phase === "loading";
           return <li key={model}>
             <span>{model}</span>
-            {inUse ? <span className="provider-in-use">{t("provider_in_use")}</span>
-              : <button type="button" disabled={using.state.phase === "loading" || action.state.phase === "loading"}
+            {row.modelSizes?.[model] && <span className="detail">{row.modelSizes[model]}</span>}
+            {embedding ? <span className="detail">{t("models_embedding")}</span>
+              : inUse ? <span className="provider-in-use">{t("provider_in_use")}</span>
+              : <button type="button" disabled={busy}
                 aria-label={t("provider_use_named", { model, name: row.name })}
                 onClick={() => using.start({ row, model, revision: data.configurationRevision ?? 0 })}>{t("provider_use")}</button>}
+            {row.id === "ollama" && !embedding && !inUse && <button type="button" disabled={busy}
+              aria-label={t("models_remove_named", { model })}
+              onClick={() => removing.start(model)}>{t("models_remove")}</button>}
           </li>;
         })}</ul> : null}
+        {/* A controller old enough to have no revision has no model actions either. */}
+        {row.id === "ollama" && row.enabled !== false && data.configurationRevision ? <LocalModels transport={transport} row={row} onChanged={reload} /> : null}
         {data.configurationRevision ? <details className="more provider-advanced">
           <summary>{t("provider_advanced")}</summary>
           <p className="detail">{t("provider_declared_models")}: {(row.declaredModels ?? []).join(", ") || t("provider_no_declarations")}</p>
@@ -87,6 +99,11 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
       </li>)}</ul>
     </>}
   </CardFrame>;
+}
+
+// Ollama shows every model it has, the embedding one marked; a CLI shows the names it could use.
+function shownModels(row: ProviderRow): string[] {
+  return row.id === "ollama" && row.modelDiscovery === "listed" ? row.models : availableProviderModels(row);
 }
 
 function ProviderPreferences({ row, revision, busy, onSave }: { row: ProviderRow; revision: number; busy: boolean; onSave: (change: ProviderRegistrationChange) => void }) {

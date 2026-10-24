@@ -389,6 +389,19 @@ require reload and explicit retry. Older controllers without a configuration
 revision remain read-only. Changes do not
 select a capability model or alter the fixed embedding profile.
 
+The Ollama row is the local model engine. It lists each model with its size, and marks the embedding
+model memory and knowledge use, which is never offered for chat. Below the list:
+- **Start Ollama** appears when the engine is stopped, so a model can be chatted with while memory and
+  knowledge are off.
+- **Download a model** takes a name from the Ollama library. The shell asks first, in a window of its
+  own that names the model and warns about the size. Then a line shows the phase and percentage, with
+  **Cancel download**. When it ends, the model joins the list with **Use for chat**.
+- **Remove** sits on every model but the embedding one and the one in use for chat. The shell asks
+  first.
+
+Every one of these changes needs a real press. A controller without the model actions shows the list
+only.
+
 Chat requires an explicit enabled provider and declared model. Select it in Desktop
 System → Inference providers → Chat provider and model, or run
 `dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
