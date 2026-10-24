@@ -92,6 +92,22 @@ authentication credential.
 The outbound and link policy extraction completed without introducing a new
 delivery guarantee. Gateway relocation followed in step 09.4-c.
 
+## Operator surfaces (step 09.4-d)
+
+The desktop joins Runtime module lifecycle with orchestrator application routing
+in one row per communication service. The TUI does the same: `space` controls
+the container and `e` controls routing for Discord and WhatsApp. CLI help keeps
+`modules` (container lifecycle) and `services` (application routing) as separate
+commands and describes the distinction. Operator interfaces remain Desktop,
+CLI and TUI; Discord and WhatsApp are communication adapters, not operator
+interfaces. The views expose no duplicate Discord or WhatsApp rows.
+
+Flow evidence reuses synthetic regression fixtures from step 09.4-b for inbound
+messages, Discord commands, replies, linking, history, outbound operator and
+scheduled delivery, refusal and echo suppression. Runtime tests cover explicit
+start/stop and allowlist-triggered recreation. No live platform account or
+message was used.
+
 ## Inbound eligibility migration (breaking, step 09.4-b)
 
 The gateway bridge now carries normalized message or command kind, Discord DM

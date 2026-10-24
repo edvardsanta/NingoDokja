@@ -822,18 +822,34 @@
             {
               "id": "09.4-d",
               "title": "Align operator terminology and validate platform communication flows",
-              "status": "pending",
+              "status": "completed",
               "depends_on": [
                 "09.4-c"
               ],
               "acceptance_criteria": [
                 "Desktop/CLI/TUI distinguish operator interfaces from communication services without duplicate rows.",
                 "Verify inbound messages/commands/replies, operator/scheduled delivery, linking/history, disabled/unconfigured states, echo protection and restart/rollback using synthetic fixtures."
-              ]
+              ],
+              "evidence": [
+                "Desktop labels Discord and WhatsApp as Communication services. Runtime lifecycle and application routing remain joined in one row per adapter; CLI help distinguishes modules (container lifecycle) from services (routing); TUI joins the same state and removes duplicate adapter rows while retaining separate controls.",
+                "Documented how to generate and configure DOKJA_GATEWAY_INGRESS_TOKEN after the observed missing-token startup error; the credential remains required and is shared by the orchestrator and enabled gateways."
+              ],
+              "checks": [
+                {
+                  "name": "operator_surface_regression",
+                  "status": "passed",
+                  "detail": "Desktop pnpm test: 224 Node tests and 271 Vitest tests passed. CLI go test ./... passed. TUI go test ./... passed, including a new synthetic test that checks one Discord/WhatsApp row and separate container/routing controls. Locale and tracker JSON validation and git diff --check passed."
+                },
+                {
+                  "name": "communication_flow_fixtures",
+                  "status": "passed",
+                  "detail": "Reused step 09.4-b synthetic inbound and policy suite evidence (Discord 30 tests, WhatsApp 141 tests) and domain/orchestrator delivery, linking, disabled-route and authorization checks. Runtime tests cover start/stop and coordinated allowlist recreation. No live account or message was used."
+                }
+              ],
+              "completed_on": "2026-10-23"
             }
           ],
           "remaining": [
-            "Validate operator terminology and platform communication flows in step 09.4-d; gateway relocation and inbound/linking policy extraction are complete.",
             "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
           ]
         },

@@ -95,7 +95,9 @@ platform identities to operator renderers as part of the rename.
    dependencies and platform lifecycles independent. Preserve volume identities.
 4. **Operator terminology:** present communication services/channels consistently
    in desktop, CLI, TUI and README. Preserve actual status, visibility before
-   setup, Start/Stop and routing behavior; avoid duplicate module rows.
+   setup, Start/Stop and routing behavior; avoid duplicate module rows. Completed
+   in step 09.4-d; Desktop and TUI join container lifecycle and routing by
+   adapter, while CLI command groups name each responsibility.
 5. **Integration/recovery:** verify inbound chat, commands, replies, operator and
    scheduled sends, history/linking, disabled routing, unavailable gateways,
    deduplication/echo handling and uncertain delivery outcomes. Validate restart
