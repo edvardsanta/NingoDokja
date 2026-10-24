@@ -5,6 +5,7 @@ import type { KnowledgeDocument, KnowledgeDocuments, Off, ReindexResult } from "
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { OffNotice, Problem } from "./card_frame.js";
+import { MenuRow, useRowMenu, type MenuItem } from "./context_menu.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
@@ -30,7 +31,7 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
 // `onOpen` opens a document in a tab of its own, given where it sits in the list: its text is asked
 // for there, one document at a time.
 export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen }: {
-  transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number, external: boolean) => void;
+  transport: Transport; revision: number; onChanged: () => void; onOpen?: (document: KnowledgeDocument, at: number, external: boolean, classify: boolean) => void;
 }) {
   const t = useTranslate();
   const [offset, setOffset] = useState(0);
@@ -83,15 +84,9 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
         <p>{t("documents_total", { count: page.total })}</p>
         {page.documents.length === 0 && <p>{t("documents_empty")}</p>}
         <ul className="hits">
-          {page.documents.map((document, index) => <li key={document.id}>
-            <p><strong>{document.title || document.id}</strong></p>
-            <p className="detail" title={document.id}>{[document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}</p>
-            <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
-            {onOpen && <button type="button" aria-label={t("documents_open_named", { title: document.title || document.id })}
-              onClick={() => onOpen(document, page.offset + index, !internal)}>{t("documents_open")}</button>}{" "}
-            <button type="button" disabled={removing} aria-label={t("documents_delete_named", { title: document.title || document.id })}
-              onClick={() => { if (!removing) deletion.start(document.id); }}>{t("documents_delete")}</button>
-          </li>)}
+          {page.documents.map((document, index) => <DocumentRow key={document.id} document={document} removing={removing}
+            onOpen={onOpen ? (classify) => onOpen(document, page.offset + index, !internal, classify) : undefined}
+            onDelete={() => { if (!removing) deletion.start(document.id); }} />)}
         </ul>
         <div className="pager">
           <button type="button" disabled={removing || page.offset === 0} onClick={() => setOffset(Math.max(0, page.offset - PAGE_SIZE))}>{t("documents_previous")}</button>
@@ -109,6 +104,27 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
       </div>
     </section>
   );
+}
+
+// One document of the list. Its title opens it; Open, Classify… and Delete… are in its menu (right
+// click, the Menu key or ⋯). Delete is still asked in the shell's own window.
+function DocumentRow({ document, removing, onOpen, onDelete }: {
+  document: KnowledgeDocument; removing: boolean; onOpen?: (classify: boolean) => void; onDelete: () => void;
+}) {
+  const t = useTranslate();
+  const title = document.title || document.id;
+  const items: MenuItem[] = [
+    ...(onOpen ? [{ label: t("documents_open"), run: () => onOpen(false) }, { label: t("documents_classify"), run: () => onOpen(true) }] : []),
+    { label: t("documents_delete_ask"), run: onDelete, disabled: removing },
+  ];
+  const menu = useRowMenu(items, title);
+  return <MenuRow menu={menu}>
+    <p>{onOpen
+      ? <button type="button" className="row-title" aria-label={t("documents_open_named", { title })} onClick={() => onOpen(false)}><strong>{title}</strong></button>
+      : <strong>{title}</strong>}</p>
+    <p className="detail" title={document.id}>{[document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}</p>
+    <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
+  </MenuRow>;
 }
 
 export function IndexPending({ transport, pending, onChanged }: {

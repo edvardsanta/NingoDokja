@@ -1960,3 +1960,29 @@ button.icon-button[aria-expanded="true"] {
 .model-download label { font-weight: 700; }
 .model-download input { min-width: 0; padding: .45rem .65rem; border: 1px solid var(--edge); border-radius: .25rem; background: var(--static); color: var(--ink); font: inherit; }
 .model-download input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* A list row with a menu: the title opens it, the ⋯ at the right and a right click hold the rest. */
+.menu-row { position: relative; padding-right: 2.75rem; outline-offset: 2px; }
+.menu-row:focus-visible { outline: 2px solid var(--cyan); }
+button.row-title, button.row-title:hover:not(:disabled) { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+button.row-title:hover:not(:disabled) strong { text-decoration: underline; text-underline-offset: 3px; color: var(--cyan); }
+button.row-menu-button { position: absolute; top: .25rem; right: 0; padding: .1rem .55rem; border-color: transparent; background: transparent; color: var(--ink-dim); line-height: 1; }
+button.row-menu-button:hover:not(:disabled), button.row-menu-button[aria-expanded="true"] { border-color: var(--rule); color: var(--ink); }
+
+/* The menu itself: a small panel at the pointer, one action per line. */
+.row-menu { position: fixed; z-index: 30; display: grid; min-width: 11rem; padding: .25rem; border: 1px solid var(--edge); background: var(--panel); box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / .45); }
+.row-menu button[role="menuitem"] { justify-content: flex-start; width: 100%; padding: .4rem .7rem; border-color: transparent; background: transparent; color: var(--ink); text-align: left; }
+.row-menu button[role="menuitem"]:hover:not(:disabled), .row-menu button[role="menuitem"]:focus-visible { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 10%, transparent); outline: none; }
+.row-menu button[role="menuitem"]:last-child { color: var(--magenta-text); }
+
+/* The drawer: a side panel over the right of the window, with a shade over the rest. */
+.drawer-shade { position: fixed; inset: 0; z-index: 20; background: rgb(4 8 12 / .55); }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 21; display: flex; flex-direction: column; width: min(30rem, 100vw); border-left: 1px solid var(--edge); background: var(--panel); box-shadow: -1rem 0 2rem rgb(0 0 0 / .4); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--rule); }
+.drawer-head h3 { margin: 0; }
+button.drawer-close { padding: .1rem .6rem; border-color: transparent; background: transparent; color: var(--ink-dim); font-size: 1.25rem; line-height: 1; }
+.drawer-body { flex: 1; overflow: auto; padding: 1rem 1.25rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .drawer { animation: drawer-in .16s ease-out; }
+  @keyframes drawer-in { from { transform: translateX(1.5rem); opacity: 0; } }
+}

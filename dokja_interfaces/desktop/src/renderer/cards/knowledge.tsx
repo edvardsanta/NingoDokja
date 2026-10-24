@@ -5,6 +5,7 @@ import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { CardFrame, OffNotice, Problem } from "./card_frame.js";
 import { DocumentView } from "./document_view.js";
+import { Drawer } from "./drawer.js";
 import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
 import { AddToBase, type Dropped } from "./knowledge_add.js";
 import {
@@ -68,7 +69,7 @@ export function KnowledgeCard({ transport }: { transport: Transport }) {
 // The base's own view, always the first tab.
 const BASE = "";
 const MAX_OPEN_DOCUMENTS = 8;
-type OpenDocument = { id: string; title: string; at: number; external: boolean };
+type OpenDocument = { id: string; title: string; at: number; external: boolean; classify: boolean };
 
 // Lights the view while files are dragged over it and hands over the first file dropped. Entering and
 // leaving fire for every child crossed, so they are counted rather than trusted one by one. Only a
@@ -116,11 +117,13 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
   // back to its tab; the oldest goes first past the limit.
   const [documents, setDocuments] = useState<OpenDocument[]>([]);
   const [current, setCurrent] = useState(BASE);
-  const open = useCallback((document: KnowledgeDocument, at: number, external: boolean) => {
+  // Classify… opens the document with its classification shown; asking again for an open document
+  // shows that too.
+  const open = useCallback((document: KnowledgeDocument, at: number, external: boolean, classify = false) => {
     setDocuments((previous) =>
       previous.some((each) => each.id === document.id)
-        ? previous
-        : [...previous, { id: document.id, title: document.title || document.id, at, external }].slice(-MAX_OPEN_DOCUMENTS),
+        ? previous.map((each) => each.id === document.id && classify ? { ...each, classify } : each)
+        : [...previous, { id: document.id, title: document.title || document.id, at, external, classify }].slice(-MAX_OPEN_DOCUMENTS),
     );
     setCurrent(document.id);
   }, []);
@@ -177,18 +180,20 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
       <div hidden={current !== BASE}>
         <div className="library-tools">
           <SearchBox transport={transport} />
-          <button type="button" className="library-add" aria-expanded={adding} onClick={() => setAdding((value) => !value)}>
+          <button type="button" className="library-add primary" aria-haspopup="dialog" aria-expanded={adding} onClick={() => setAdding(true)}>
             {t("add_title")}
           </button>
         </div>
-        {adding && <AddToBase transport={transport} onAdded={refresh} dropped={dropped} />}
+        {adding && <Drawer title={t("add_title")} onClose={() => setAdding(false)}>
+          <AddToBase transport={transport} onAdded={refresh} dropped={dropped} titled={false} />
+        </Drawer>}
         <KnowledgeStatusLines status={status} />
         <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />
         <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={refresh} onOpen={open} />
       </div>
       {documents.map((document) => (
         <div key={document.id} hidden={current !== document.id}>
-          <DocumentView transport={transport} id={document.id} at={document.at} external={document.external} />
+          <DocumentView transport={transport} id={document.id} at={document.at} external={document.external} classify={document.classify} />
         </div>
       ))}
     </div>

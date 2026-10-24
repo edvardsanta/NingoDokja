@@ -51,7 +51,8 @@ const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "",
 // is still a new drop.
 export type Dropped = { file: File; count: number };
 
-export function AddToBase({ transport, onAdded, dropped }: { transport: Transport; onAdded?: () => void; dropped?: Dropped }) {
+// titled is false where something around the form already names it, such as the Add drawer.
+export function AddToBase({ transport, onAdded, dropped, titled = true }: { transport: Transport; onAdded?: () => void; dropped?: Dropped; titled?: boolean }) {
   const t = useTranslate();
   const ids = useId();
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -125,8 +126,8 @@ export function AddToBase({ transport, onAdded, dropped }: { transport: Transpor
 
   const field = (name: string) => `${ids}-${name}`;
   return (
-    <section className="add" aria-labelledby={field("title")}>
-      <h3 id={field("title")}>{t("add_title")}</h3>
+    <section className="add" {...(titled ? { "aria-labelledby": field("title") } : { "aria-label": t("add_title") })}>
+      {titled && <h3 id={field("title")}>{t("add_title")}</h3>}
       <div className="scope" role="group" aria-label={t("add_title")}>
         {INGEST_MODES.map((mode) => (
           <button

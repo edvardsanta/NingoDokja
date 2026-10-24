@@ -162,7 +162,6 @@
   "documents_total": "{count} documents in the Library.",
   "documents_empty": "No documents on this page.",
   "documents_passages": "{indexed} of {count} passages indexed.",
-  "documents_delete_named": "Delete {title}",
   "documents_open": "Open",
   "documents_open_named": "Open {title}",
   "documents_tabs_label": "Open documents",
@@ -172,7 +171,6 @@
   "document_no_text": "No text is stored for this document.",
   "document_truncated": "Cut after {count} characters.",
   "document_moved": "The list changed since it was shown, so another document sits where this one was. Close this tab, load the list again and open the document from there.",
-  "documents_delete": "Delete",
   "documents_previous": "Previous documents",
   "documents_next": "Next documents",
   "documents_removing": "Waiting for confirmation or deletion…",
@@ -488,5 +486,9 @@
   "models_download_label": "Download a model",
   "models_download_placeholder": "name:tag",
   "models_download": "Download",
-  "models_download_hint": "A name from the Ollama library, with its size tag. You are asked before anything downloads; a model can take several gigabytes."
+  "models_download_hint": "A name from the Ollama library, with its size tag. You are asked before anything downloads; a model can take several gigabytes.",
+  "row_menu_named": "Actions for {name}",
+  "drawer_close_named": "Close {title}",
+  "documents_classify": "Classify…",
+  "documents_delete_ask": "Delete…"
 }

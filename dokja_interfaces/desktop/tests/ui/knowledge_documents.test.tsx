@@ -13,6 +13,12 @@ const document = (id = "note:one") => ({ id, title: `Title ${id}`, kind: "note",
 const page = (offset = 0, total = 21) => ({ documents: Array.from({ length: offset ? 1 : 20 }, (_, i) => document(`note:${offset + i}`)), total, offset });
 const wrap = (child: React.ReactNode) => <I18nProvider locale="en">{child}</I18nProvider>;
 
+// Delete lives in the row's menu, opened here with its ⋯ button.
+async function deleteFromMenu(title: string) {
+  fireEvent.click(await screen.findByRole("button", { name: `Actions for ${title}` }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete…" }));
+}
+
 describe("document management", () => {
   it("lists the documents as it opens, without a press, and navigates pages", async () => {
     const { transport, calls } = routedTransport({ "knowledge.list": [ok(page()), ok(page(20)), ok(page())] });
@@ -33,12 +39,11 @@ describe("document management", () => {
       "knowledge.delete": [failure("cancelled"), ok({ deleted: true })],
     });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={onChanged} />));
-    const remove = await screen.findByRole("button", { name: "Delete Title note:0" });
-    fireEvent.click(remove);
+    await deleteFromMenu("Title note:0");
     await screen.findByRole("alert");
     expect(onChanged).not.toHaveBeenCalled();
     screen.getByText("Title note:0");
-    fireEvent.click(remove);
+    await deleteFromMenu("Title note:0");
     await screen.findByText("Document deleted.");
     expect(onChanged).toHaveBeenCalledTimes(1);
     expect(calls.filter((call) => call.type === "knowledge.delete").map((call) => call.payload)).toEqual([{ id: "note:0" }, { id: "note:0" }]);
@@ -47,7 +52,7 @@ describe("document management", () => {
   it("reports a deletion timeout without retrying or removing the displayed document", async () => {
     const { transport, calls } = routedTransport({ "knowledge.list": ok(page()), "knowledge.delete": failure("timeout") });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={vi.fn()} />));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete Title note:0" }));
+    await deleteFromMenu("Title note:0");
     expect((await screen.findByRole("alert")).textContent).toContain("Reload documents to check");
     screen.getByText("Title note:0");
     expect(calls.filter((call) => call.type === "knowledge.delete")).toHaveLength(1);
@@ -90,7 +95,7 @@ describe("document management in the knowledge card", () => {
     render(wrap(<KnowledgeCard transport={transport} />));
     await screen.findByText("Title note:0");
     fireEvent.click(screen.getByRole("button", { name: "Next documents" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete Title note:20" }));
+    await deleteFromMenu("Title note:20");
     await screen.findByText("20 documents in 52 passages");
     await screen.findByText("Title note:0");
     expect(screen.queryByText("Title note:20")).toBeNull();
@@ -99,7 +104,7 @@ describe("document management in the knowledge card", () => {
 
   it("keeps the browser preview counts consistent with deletion and indexing", async () => {
     render(wrap(<KnowledgeCard transport={createFakeTransport(0)} />));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete An example document, number 1" }));
+    await deleteFromMenu("An example document, number 1");
     await screen.findByText("Document deleted.");
     await waitFor(() => expect(screen.queryByText("An example document, number 1")).toBeNull());
     await screen.findByText("22 documents in the Library.");
