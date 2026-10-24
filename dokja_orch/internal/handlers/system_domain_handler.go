@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	communications "read_books/dokja_domain/dokja_communications"
+	moderation "read_books/dokja_domain/dokja_moderation"
 	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -22,9 +23,7 @@ type MemeStatusReader interface {
 }
 
 // MemeScreener reports whether an image (with its caption) is safe for restricted channels.
-type MemeScreener interface {
-	Screen(ctx context.Context, url, caption string) (map[string]any, error)
-}
+type MemeScreener = moderation.MediaScreener
 
 // MemeMarker flags a meme as delivered so the scheduler does not repeat it.
 type MemeMarker interface {
@@ -323,7 +322,9 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 			continue
 		}
 		content, attempt := h.appendLearnedHashtag(ctx, event, content, attachmentURL)
-		safe, reason := memeSafety(meme)
+		label, _ := meme["nsfw"].(map[string]any)
+		assessment := moderation.AssessMediaLabel(label)
+		safe, reason := assessment.Safe, assessment.Reason
 		sent := false
 		for _, channelID := range h.deliveryChannels {
 			if _, skip := failed[channelID]; skip {
@@ -575,22 +576,11 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {
-	if h.memeScreen == nil {
-		return false, "no screener configured"
-	}
-	// With the meme service switched off nothing may use its filter, and an image that
-	// cannot be checked never reaches a safe-only channel.
-	if !h.serviceEnabled("meme") {
-		return false, "meme service is disabled, so the image cannot be screened"
-	}
-	result, err := h.memeScreen.Screen(ctx, url, caption)
-	if err != nil {
-		return false, "screen failed: " + err.Error()
-	}
-	if safe, _ := result["safe"].(bool); safe {
-		return true, ""
-	}
-	return false, firstNonEmptyString(resultString(result, "reason"), "flagged by the nsfw screen")
+	decision := (moderation.MediaPolicy{
+		Screener: h.memeScreen,
+		Enabled:  h.serviceEnabled("meme"),
+	}).Screen(ctx, url, caption)
+	return decision.Safe, decision.Reason
 }
 
 // channelSummary lists where the orchestrator delivers, so admin tools can offer them.
@@ -669,17 +659,6 @@ func intPointer(value any) *int {
 	default:
 		return nil
 	}
-}
-
-// memeSafety reads the meme service's NSFW label. A meme without a label counts as
-// unsafe, so a service that does not screen can never leak into a safe-only channel.
-func memeSafety(meme map[string]any) (bool, string) {
-	label, _ := meme["nsfw"].(map[string]any)
-	safe, ok := label["safe"].(bool)
-	if !ok {
-		return false, "no nsfw label"
-	}
-	return safe, resultString(label, "reason")
 }
 
 func memesFromResult(result map[string]any) []map[string]any {

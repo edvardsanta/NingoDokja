@@ -823,18 +823,25 @@ func TestDiscordSendErrorsWhenEveryTargetIsRestrictedAndFlagged(t *testing.T) {
 }
 
 func TestDiscordSendFailsClosedWhenScreenFailsOrIsMissing(t *testing.T) {
-	for name, screener := range map[string]MemeScreener{
-		"screen error": &fakeScreener{err: errors.New("model gone")},
-		"no screener":  nil,
-		"malformed":    &fakeScreener{result: map[string]any{"safe": "yes"}},
+	for name, tc := range map[string]struct {
+		screener MemeScreener
+		reason   string
+	}{
+		"screen error": {&fakeScreener{err: errors.New("model gone")}, "screen failed: model gone"},
+		"no screener":  {nil, "no screener configured"},
+		"malformed":    {&fakeScreener{result: map[string]any{"safe": "yes"}}, "flagged by the nsfw screen"},
+		"nil result":   {&fakeScreener{}, "flagged by the nsfw screen"},
 	} {
-		handler, deliverer := sendHandler(screener, nil)
+		handler, deliverer := sendHandler(tc.screener, nil)
 		result, err := sendImage(handler, map[string]any{"all": true, "content": "x"})
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", name, err)
 		}
 		if deliveredChannels(deliverer) != "open-chan" || result["skipped_unsafe"] == nil {
 			t.Fatalf("%s: expected only the open channel, got %q", name, deliveredChannels(deliverer))
+		}
+		if result["unsafe_reason"] != tc.reason {
+			t.Fatalf("%s: expected reason %q, got %v", name, tc.reason, result["unsafe_reason"])
 		}
 	}
 }
