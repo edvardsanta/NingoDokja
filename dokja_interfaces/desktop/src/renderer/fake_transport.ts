@@ -250,6 +250,13 @@ export function createFakeTransport(delayMs = 400): Transport {
   // Switches stay where they were put, as the orchestrator keeps them.
   let status = structuredClone(STATUS);
   const previewListeners = new Set<(preview: ChatPreview) => void>();
+
+  // The demo's local engine: placeholder model names, and a download that is only pretend.
+  const local: { models: string[]; sizes: Record<string, string>; chat: { configurationRevision: number; provider: string; model: string }; pull?: { model: string; state: string; phase?: string; percent?: number } } = {
+    models: ["demo/embed:latest", "demo/small:latest"],
+    sizes: { "demo/embed:latest": "1.2 GB", "demo/small:latest": "2.0 GB" },
+    chat: { configurationRevision: 1, provider: "", model: "" },
+  };
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     onChatPreview(listener) {
@@ -280,10 +287,37 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok({modules:structuredClone(modules),busy:false,error:""});
         }
         case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
-        case "runtime.providers": return ok({ checkedAt: new Date().toISOString(), providers: [
-          { id: "local", name: "Local models", state: "reachable", reason: "", models: ["demo/small:latest", "demo/embed:latest"], modelDiscovery: "listed", inferenceStatus: "not_tested", truncated: false },
-          { id: "cli", name: "Command-line tool", state: "installed", reason: "", models: [], modelDiscovery: "unsupported", inferenceStatus: "not_tested", truncated: false },
+        case "runtime.providers": return ok({ configurationRevision: 1, checkedAt: new Date().toISOString(), providers: [
+          { id: "ollama", name: "Ollama", enabled: true, declaredModels: [], state: "reachable", reason: "", models: [...local.models], modelSizes: { ...local.sizes }, embeddingModel: "demo/embed:latest", modelDiscovery: "listed", inferenceStatus: "not_tested", truncated: false },
+          { id: "codex", name: "Codex", enabled: true, declaredModels: [], state: "installed", reason: "", models: [], modelDiscovery: "unsupported", inferenceStatus: "not_tested", truncated: false },
         ] });
+        case "runtime.chat": return ok({ ...local.chat });
+        case "runtime.chat.configure":
+          local.chat = { configurationRevision: local.chat.configurationRevision + 1, provider: String(payload?.provider ?? ""), model: String(payload?.model ?? "") };
+          return ok({ ...local.chat });
+        case "runtime.providers.configure": return ok({ provider: payload?.provider, configurationRevision: Number(payload?.configuration_revision ?? 0) + 1 });
+        // A download advances a step at each read of the status, as if the engine were busy.
+        case "runtime.models.status": {
+          if (local.pull?.state === "pulling") {
+            const percent = Math.min(100, (local.pull.percent ?? 0) + 20);
+            local.pull = percent >= 100 ? { model: local.pull.model, state: "done" } : { ...local.pull, phase: "downloading", percent };
+            if (local.pull.state === "done" && !local.models.includes(local.pull.model)) {
+              local.models.push(local.pull.model);
+              local.sizes[local.pull.model] = "4.1 GB";
+            }
+          }
+          return ok({ embeddingModel: "demo/embed:latest", ...(local.pull ? { pull: { ...local.pull } } : {}) });
+        }
+        case "runtime.models.pull":
+          local.pull = { model: String(payload?.model ?? ""), state: "pulling", phase: "starting" };
+          return ok({ embeddingModel: "demo/embed:latest", pull: { ...local.pull } });
+        case "runtime.models.cancel":
+          if (local.pull?.state === "pulling") local.pull = { model: local.pull.model, state: "cancelled" };
+          return ok({ embeddingModel: "demo/embed:latest", ...(local.pull ? { pull: { ...local.pull } } : {}) });
+        case "runtime.models.remove":
+          local.models = local.models.filter((model) => model !== payload?.model);
+          return ok({ embeddingModel: "demo/embed:latest" });
+        case "runtime.models.engine.start": return ok({ embeddingModel: "demo/embed:latest", engine: "ready" });
         case "runtime.settings.set": {
           for (const [id,value] of Object.entries((payload?.values ?? {}) as Record<string,string>)) {
             const row=settings.find(s=>s.id===id); if(row)row.value=value;

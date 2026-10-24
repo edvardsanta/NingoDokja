@@ -2,17 +2,22 @@ package runtime
 
 import (
 	"context"
+	"regexp"
 	"sort"
 	"time"
 )
 
+var modelSize = regexp.MustCompile(`^[0-9]{1,6}(\.[0-9]{1,2})? (B|KB|MB|GB|TB)$`)
+
 // ProviderObservation describes discovery only, never successful inference,
 // authentication or authorization. Infrastructure may not supply display names.
 type ProviderObservation struct {
-	ID        string
-	State     string
-	Reason    string
-	Models    []string
+	ID     string
+	State  string
+	Reason string
+	Models []string
+	// Sizes are the engine's own figures, such as "4.7 GB", by model name.
+	Sizes     map[string]string
 	Truncated bool
 }
 
@@ -31,6 +36,10 @@ type ProviderRow struct {
 	ModelDiscovery  string   `json:"model_discovery"`
 	InferenceStatus string   `json:"inference_status"`
 	Truncated       bool     `json:"models_truncated,omitempty"`
+	// Only on the local engine: each listed model's size, and the model memory and knowledge embed
+	// with, which is no chat model.
+	ModelSizes     map[string]string `json:"model_sizes,omitempty"`
+	EmbeddingModel string            `json:"embedding_model,omitempty"`
 }
 
 type ProvidersView struct {
@@ -100,6 +109,12 @@ func (d *Domain) Providers(ctx context.Context) ProvidersView {
 						seen[name] = true
 						if len(row.Models) < 64 {
 							row.Models = append(row.Models, name)
+							if size := o.Sizes[name]; modelSize.MatchString(size) {
+								if row.ModelSizes == nil {
+									row.ModelSizes = map[string]string{}
+								}
+								row.ModelSizes[name] = size
+							}
 						} else {
 							row.Truncated = true
 						}
@@ -107,6 +122,15 @@ func (d *Domain) Providers(ctx context.Context) ProvidersView {
 				}
 				row.Truncated = row.Truncated || o.Truncated
 				sort.Strings(row.Models)
+			}
+		}
+		// Named as the engine lists it, so a screen compares names as they are.
+		if spec.id == "ollama" && d.models != nil {
+			row.EmbeddingModel = d.models.engine.EmbeddingModel()
+			for _, name := range row.Models {
+				if SameModel(name, row.EmbeddingModel) {
+					row.EmbeddingModel = name
+				}
 			}
 		}
 		view.Providers = append(view.Providers, row)

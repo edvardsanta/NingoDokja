@@ -102,13 +102,18 @@ Switches and jobs:
   profile is fixed and cannot be edited. Settings are shared with desktop and TUI
   through the controller; its first read imports allowed legacy options once.
   Manual Compose commands still use `.env`; see the production runbook.
-- `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: starts or stops the lite stack's
-  containers through the local runtime controller the desktop and TUI also use (launched when none is
-  running). Start brings up the dependencies a module needs; stop keeps data. It never changes a switch or a
-  job. Starting `discord` or `scheduler` first prints what they will do with the saved switches and jobs
-  (which jobs post and when, whether the bot answers) and asks; `--yes` skips the question. Run it on the host; inside a container it is refused.
-- `services list|enable|disable <meme|chat|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`: a logical switch in the orchestrator. While a
-  service is off its events are refused (scheduled jobs included). The container is not touched.
+- `modules list|start|stop <module> [--wait] [--runtime-root DIR]`: reports or changes local container
+  lifecycle through the runtime controller the desktop and TUI also use. This includes the Discord and
+  WhatsApp communication adapters. Start brings up dependencies; stop keeps data. It never changes
+  application routing or scheduled jobs. Starting `discord` or `scheduler` first prints what will happen
+  with the saved routing and jobs, then asks; `--yes` skips the question. Run it on the host; inside a
+  container it is refused.
+- `services list|enable|disable <meme|chat|book|knowledge|memory|feeds|scheduler|discord|whatsapp>`:
+  reports or changes application routing in the orchestrator. For communication adapters this
+  controls whether inbound events and outbound delivery are accepted; it does not start or stop
+  their containers.
+  Use `modules` for container lifecycle and `services` for application routing; the desktop and TUI join
+  these states so each communication service appears once.
 - `jobs list`: state, interval, last and next run of every scheduler job.
 - `jobs enable|disable <job>`: pauses or resumes the job's scheduled runs; persisted across restarts.
 - `jobs interval <job> <45m|6h|default>`: between 1 minute and 720 hours; the scheduler adopts it within

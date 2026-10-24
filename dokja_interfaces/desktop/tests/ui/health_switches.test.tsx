@@ -254,12 +254,12 @@ describe("the interfaces on the health card", () => {
   };
   const WHATSAPP_OFF = { ...INTERFACES, whatsapp: { status: "disabled", detail: "", enabled: false, kind: "interface" } };
 
-  it("lists them under their own heading with their state in words, not the status", async () => {
+  it("lists communication services under their own heading with readable state", async () => {
     const { transport } = routedTransport({ "ningo.status": status(INTERFACES) });
     renderCard(transport);
     await screen.findByText("Memes");
 
-    expect(screen.getByRole("heading", { name: "Chat interfaces" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Communication services" })).toBeTruthy();
     const items = [...document.querySelectorAll("ul.interfaces li")];
     expect(items.map((item) => item.querySelector(".service-name")?.textContent)).toEqual(["Discord", "WhatsApp"]);
     expect(items[0]?.querySelector(".service-status")?.textContent).toBe("Connected");
@@ -273,7 +273,7 @@ describe("the interfaces on the health card", () => {
     renderCard(transport, "pt");
     await screen.findByText("Memes");
 
-    expect(screen.getByRole("heading", { name: "Interfaces de conversa" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Serviços de comunicação" })).toBeTruthy();
     expect(document.querySelector("ul.interfaces li .service-status")?.textContent).toBe("Conectada");
   });
 
@@ -298,6 +298,6 @@ describe("the interfaces on the health card", () => {
     renderCard(transport);
     await screen.findByText("Memes");
 
-    expect(screen.queryByRole("heading", { name: "Chat interfaces" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Communication services" })).toBeNull();
   });
 });

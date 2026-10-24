@@ -1354,29 +1354,53 @@ func (m *Model) upload(p *preview) {
 
 // panelRow is one selectable line of the panel: a module, a service or a job.
 type panelRow struct {
-	isModule bool
-	isJob    bool
-	name     string
-	enabled  bool
+	isModule       bool
+	isJob          bool
+	name           string
+	enabled        bool
+	hasRouting     bool
+	routingEnabled bool
 }
 
 func (m *Model) panelRows() []panelRow {
 	var rows []panelRow
 	if m.modules != nil {
 		for _, module := range m.modules.Modules {
-			rows = append(rows, panelRow{isModule: true, name: module.Name, enabled: !module.Stopped()})
+			row := panelRow{isModule: true, name: module.Name, enabled: !module.Stopped()}
+			if m.status != nil {
+				if service, ok := m.status.service(module.Name); ok {
+					row.hasRouting = true
+					row.routingEnabled = service.Enabled
+				}
+			}
+			rows = append(rows, row)
 		}
 	}
 	if m.status == nil {
 		return rows
 	}
 	for _, service := range m.status.Services {
+		if m.hasRuntimeModule(service.Name) {
+			continue
+		}
 		rows = append(rows, panelRow{name: service.Name, enabled: service.Enabled})
 	}
 	for _, job := range m.status.Jobs {
 		rows = append(rows, panelRow{isJob: true, name: job.Name, enabled: job.Enabled})
 	}
 	return rows
+}
+
+func (m *Model) hasRuntimeModule(name string) bool {
+	if m.modules == nil {
+		return false
+	}
+	for _, module := range m.modules.Modules {
+		if module.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) selectedPanelRow() (panelRow, bool) {
@@ -1423,6 +1447,12 @@ func (m *Model) keyPanel(key string) (tea.Model, tea.Cmd) {
 		} else if ok {
 			m.setNotice(tr("only_jobs_can_be_run_select_a_job"), true)
 		}
+	case "e":
+		if row, ok := m.selectedPanelRow(); ok && row.isModule && row.hasRouting {
+			routing := panelRow{name: row.name, enabled: row.routingEnabled}
+			return m, m.exec(m.togglePending(routing))
+		}
+		m.setNotice(tr("select_a_communication_service"), true)
 	case "p":
 		m.openProfiles()
 	case "m":

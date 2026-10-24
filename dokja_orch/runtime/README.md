@@ -71,3 +71,31 @@ interface. Infrastructure discovers host CLIs and queries only the selected
 stack’s running Ollama. The Runtime domain reports installation/listing separately
 from inference, which is never performed by discovery. See
 [provider inventory](../../dokja_docs/provider-inventory.md).
+
+The local Ollama's models are managed with five actions. Every one answers the same status: the
+embedding model, the last download if any, and what this controller last did to the engine.
+
+- `runtime.models.status` reads that status.
+- `runtime.models.engine.start` starts the engine (the internal module `embeddings`) on its own, so a
+  model can be downloaded and chatted with while memory and knowledge are off. Stopping it stays with
+  the modules that need it.
+- `runtime.models.pull` with `{"model": name}` starts a download in the background and answers at once.
+  - Poll the status for its phase (`starting`, `downloading`, `verifying`, `writing`), its percentage,
+    and its end (`done`, `failed` with a plain reason, or `cancelled`).
+  - One download runs at a time, only while the engine runs, and for at most two hours.
+- `runtime.models.cancel` ends the pull command and kills the `ollama pull` process it started in the
+  container, which ending `docker compose exec` alone would leave running. A new pull waits until the
+  cancelled one has stopped.
+  - Not verified: whether the Ollama server stops a download when its client dies, and whether it keeps
+    the part already downloaded.
+- `runtime.models.remove` with `{"model": name}` deletes a model. It refuses:
+  - the model downloading now;
+  - the model chat is bound to;
+  - the embedding model while memory or knowledge run.
+
+Names must match the model-name pattern, so no flag or shell text reaches the engine. The pull's exit
+status says whether it worked. From its output only phases, byte counts and "not found" are read; its
+text is never passed on. Without a terminal the CLI redraws in place with escapes and no line breaks.
+`dokja_services/dokja_runtime/testdata` holds a recording of that for a missing model; a downloading
+layer's line is read from the CLI's known format, not yet from a recording. `runtime.providers` also
+gives each Ollama model's size and names the embedding model.

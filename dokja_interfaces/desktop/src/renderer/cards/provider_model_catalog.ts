@@ -7,7 +7,9 @@ const CLI_MODELS: Record<string, readonly string[]> = {
   claude_code: ["sonnet", "opus"],
 };
 
+// The models a provider could chat with. Ollama's embedding model is listed with the others but is no
+// chat model, so it is never offered.
 export function availableProviderModels(row: ProviderRow): string[] {
-  if (row.id === "ollama") return row.modelDiscovery === "listed" ? row.models : [];
+  if (row.id === "ollama") return row.modelDiscovery === "listed" ? row.models.filter((model) => model !== row.embeddingModel) : [];
   return [...(CLI_MODELS[row.id] ?? [])];
 }

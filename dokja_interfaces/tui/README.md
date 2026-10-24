@@ -38,9 +38,13 @@ text while running in English. Text that comes from the orchestrator (for exampl
 
 ## Screens
 
-- **Painel** (`1`): services, scheduler jobs, pool counts and the delivery channels. The channel that only
-  accepts NSFW-screened memes is marked. Refreshes on its own while this tab is open; `r` forces it.
-  Rows are selectable (`↑↓`): `space` switches a service off/on or pauses/resumes a job, `x` runs the
+- **Painel** (`1`): runtime modules, application-routing switches, scheduler jobs, pool
+  counts and delivery channels. Discord and WhatsApp each appear once, with separate
+  controls for starting the adapter and enabling routing. The channel that only
+  accepts NSFW-screened memes is marked. Refreshes while this tab is open; `r` forces it.
+  Rows are selectable (`↑↓`): `space` starts/stops a module, switches application
+  routing or pauses/resumes a job; `e` switches routing for Discord/WhatsApp on their
+  module row. `x` runs the
   selected job now (asks first), `i` changes its interval (`45m`, `6h`, or `default`).
   `p` opens the chat profiles and `m` the experience memory (see below).
 - **Memes** (`2`): browse the pool without consuming it. `s` runs the NSFW screen on the selected meme

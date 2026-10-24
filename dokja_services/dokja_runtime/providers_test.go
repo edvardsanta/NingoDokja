@@ -59,18 +59,18 @@ func TestDiscoveryNeverStartsStoppedServicesAndDoesNotLeakFailures(t *testing.T)
 	}
 }
 func TestModelListingBoundsAndEmptyCatalog(t *testing.T) {
-	names, truncated, ok := parseModelList([]byte("NAME ID SIZE MODIFIED\n"))
+	names, _, truncated, ok := parseModelList([]byte("NAME ID SIZE MODIFIED\n"))
 	if !ok || len(names) != 0 || truncated {
 		t.Fatal(names, truncated, ok)
 	}
-	names, truncated, ok = parseModelList([]byte("NAME ID SIZE MODIFIED\n" + strings.Repeat("fixture/model 0123456789ab 1GB today\n", 65)))
+	names, _, truncated, ok = parseModelList([]byte("NAME ID SIZE MODIFIED\n" + strings.Repeat("fixture/model 0123456789ab 1GB today\n", 65)))
 	if !ok || len(names) != 64 || !truncated {
 		t.Fatal(len(names), truncated, ok)
 	}
-	if _, _, ok = parseModelList([]byte(strings.Repeat("x", 65537))); ok {
+	if _, _, _, ok = parseModelList([]byte(strings.Repeat("x", 65537))); ok {
 		t.Fatal("unbounded output accepted")
 	}
-	if _, _, ok = parseModelList([]byte("NAME ID SIZE MODIFIED\nbroken\n")); ok {
+	if _, _, _, ok = parseModelList([]byte("NAME ID SIZE MODIFIED\nbroken\n")); ok {
 		t.Fatal("malformed row accepted")
 	}
 }
@@ -93,7 +93,14 @@ func TestDiscoveryCancellationDoesNotExecuteModelListing(t *testing.T) {
 }
 
 func TestModelListDoesNotMistakeDiagnosticsForModels(t *testing.T) {
-	if _, _, ok := parseModelList([]byte("NAME ID SIZE MODIFIED\nError: service unavailable try again\n")); ok {
+	if _, _, _, ok := parseModelList([]byte("NAME ID SIZE MODIFIED\nError: service unavailable try again\n")); ok {
 		t.Fatal("diagnostic parsed as a model")
+	}
+}
+
+func TestModelListKeepsSizesOnlyInTheEnginesShape(t *testing.T) {
+	names, sizes, _, ok := parseModelList([]byte("NAME            ID              SIZE      MODIFIED\nbge-m3:latest   790764642607    1.2 GB    3 weeks ago\nqwen3:8b        500a1f067a9f    5.2 GB    2 days ago\nodd:latest      0123456789ab    <b>huge   today\n"))
+	if !ok || len(names) != 3 || sizes["bge-m3:latest"] != "1.2 GB" || sizes["qwen3:8b"] != "5.2 GB" || sizes["odd:latest"] != "" {
+		t.Fatal(names, sizes, ok)
 	}
 }

@@ -86,6 +86,28 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       accept: pt ? "Registrar" : "Record", cancel: pt ? "Cancelar" : "Cancel",
     };
   }
+  if (type === "runtime.models.pull" || type === "runtime.models.remove") {
+    const pt = locale === "pt";
+    const model = String(wire.model);
+    if (type === "runtime.models.pull") {
+      return {
+        message: pt ? "Baixar este modelo?" : "Download this model?",
+        detail: `${model}\n\n${pt
+          ? "O Ollama baixa o modelo do registro dele. Um modelo pode ocupar vários gigabytes de disco e levar muito tempo numa conexão lenta."
+          : "Ollama downloads it from its registry. A model can take several gigabytes of disk and a long time on a slow connection."}`,
+        accept: pt ? "Baixar" : "Download",
+        cancel: pt ? "Cancelar" : "Cancel",
+      };
+    }
+    return {
+      message: pt ? "Remover este modelo?" : "Remove this model?",
+      detail: `${model}\n\n${pt
+        ? "Ele é apagado desta máquina. Para usá-lo de novo, será preciso baixá-lo outra vez."
+        : "It is deleted from this machine. Using it again means downloading it again."}`,
+      accept: pt ? "Remover" : "Remove",
+      cancel: pt ? "Cancelar" : "Cancel",
+    };
+  }
   if (type !== "knowledge.delete") return undefined;
   const texts = TEXTS[locale] ?? TEXTS.en;
   return {

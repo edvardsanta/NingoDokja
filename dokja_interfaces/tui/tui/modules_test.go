@@ -149,6 +149,36 @@ func TestServicesStillToggleBelowTheModules(t *testing.T) {
 	}
 }
 
+func TestCommunicationModuleShowsRoutingOnceAndKeepsSeparateControls(t *testing.T) {
+	withLanguage(t, "en")
+	fake := newFake()
+	services := fake.responses["ningo.status"]["services"].(map[string]any)
+	services["discord"] = map[string]any{"status": "ok", "enabled": true}
+	services["whatsapp"] = map[string]any{"status": "disabled", "enabled": false}
+	runtime := &fakeRuntime{snapshot: cli.RuntimeSnapshot{Modules: []cli.RuntimeModule{
+		{Name: "orchestrator", State: "ready"},
+		{Name: "discord", State: "ready"},
+		{Name: "whatsapp", State: "stopped"},
+	}}}
+	m := withModules(t, fake, runtime)
+	view := m.View()
+	if strings.Count(view, "discord") != 1 || strings.Count(view, "whatsapp") != 1 {
+		t.Fatalf("communication services must not have duplicate rows:\n%s", view)
+	}
+	if !strings.Contains(view, "routing on") || !strings.Contains(view, "routing off") {
+		t.Fatalf("communication module rows must show application routing state:\n%s", view)
+	}
+
+	press(m, "down", "down", "e")
+	request := fake.last("services.set")
+	if request.payload["name"] != "whatsapp" || request.payload["enabled"] != true {
+		t.Fatalf("e must toggle application routing separately from the container: %#v", request)
+	}
+	if runtimeSets(runtime) != 0 {
+		t.Fatal("routing control must not start the stopped WhatsApp container")
+	}
+}
+
 func TestWithoutAControllerThePanelSaysWhy(t *testing.T) {
 	m := NewModel(newFake(), time.Millisecond, time.Second)
 	m.SetRuntime(nil, "this interface runs in a container")

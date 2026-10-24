@@ -19,7 +19,7 @@ func (a *App) runtimeClient() (*RuntimeClient, error) {
 func (a *App) newModulesCommand(ctx context.Context) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "modules",
-		Short: "Start or stop the local lite stack's modules (containers)",
+		Short: "Start or stop local containers, including communication adapters",
 		Long: "Talks to the local runtime controller, the same one the desktop uses, and starts it when " +
 			"none is running. Start brings up a module with the dependencies it needs; stop keeps data and " +
 			"dependencies still in use. Neither changes the orchestrator's service switches or jobs.",
@@ -28,7 +28,7 @@ func (a *App) newModulesCommand(ctx context.Context) *cobra.Command {
 
 	list := &cobra.Command{
 		Use:   "list",
-		Short: "Show every module with its state (runtime.modules)",
+		Short: "Show local container lifecycle state (runtime.modules)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := a.runtimeClient()
 			if err != nil {

@@ -122,6 +122,40 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			reply("ok", result, "")
+		case "runtime.models.status", "runtime.models.cancel", "runtime.models.engine.start":
+			var result domain.ModelsStatus
+			var err error
+			switch e.Type {
+			case "runtime.models.status":
+				result, err = d.ModelsStatus()
+			case "runtime.models.cancel":
+				result, err = d.CancelPull()
+			default:
+				result, err = d.StartEngine()
+			}
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
+		case "runtime.models.pull", "runtime.models.remove":
+			model, ok := e.Payload["model"].(string)
+			if !ok {
+				reply("error", nil, "model is required")
+				return
+			}
+			var result domain.ModelsStatus
+			var err error
+			if e.Type == "runtime.models.pull" {
+				result, err = d.PullModel(r.Context(), model)
+			} else {
+				result, err = d.RemoveModel(r.Context(), model)
+			}
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
 		case "runtime.settings":
 			reply("ok", d.Settings(), "")
 		case "runtime.settings.set":
