@@ -62,12 +62,12 @@ func (p ProviderDiscovery) Inspect(ctx context.Context, enabled map[string]bool)
 		}
 		return append(rows, ollama)
 	}
-	names, truncated, ok := parseModelList(raw)
+	names, sizes, truncated, ok := parseModelList(raw)
 	if !ok {
 		ollama.Reason = "invalid_response"
 		return append(rows, ollama)
 	}
-	ollama.State, ollama.Reason, ollama.Models, ollama.Truncated = "reachable", "", names, truncated
+	ollama.State, ollama.Reason, ollama.Models, ollama.Sizes, ollama.Truncated = "reachable", "", names, sizes, truncated
 	return append(rows, ollama)
 }
 
@@ -75,15 +75,20 @@ func (p ProviderDiscovery) Inspect(ctx context.Context, enabled map[string]bool)
 // unknown header/row instead of inventing model names from diagnostics.
 var listedModelID = regexp.MustCompile(`^[0-9a-f]{12,64}$`)
 
-func parseModelList(raw []byte) ([]string, bool, bool) {
+// The size column reads "4.7 GB": two fields, kept only in that shape.
+var listedSize = regexp.MustCompile(`^[0-9]{1,6}(\.[0-9]{1,2})?$`)
+var listedUnit = map[string]bool{"B": true, "KB": true, "MB": true, "GB": true, "TB": true}
+
+func parseModelList(raw []byte) ([]string, map[string]string, bool, bool) {
 	if len(raw) > 64*1024 {
-		return nil, false, false
+		return nil, nil, false, false
 	}
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 	if len(lines) == 0 || strings.Join(strings.Fields(lines[0]), " ") != "NAME ID SIZE MODIFIED" {
-		return nil, false, false
+		return nil, nil, false, false
 	}
 	names := []string{}
+	sizes := map[string]string{}
 	truncated := false
 	for _, line := range lines[1:] {
 		if strings.TrimSpace(line) == "" {
@@ -91,13 +96,16 @@ func parseModelList(raw []byte) ([]string, bool, bool) {
 		}
 		fields := strings.Fields(line)
 		if len(fields) < 4 || !listedModelID.MatchString(fields[1]) {
-			return nil, false, false
+			return nil, nil, false, false
 		}
 		if len(names) < 64 {
 			names = append(names, fields[0])
+			if listedSize.MatchString(fields[2]) && listedUnit[fields[3]] {
+				sizes[fields[0]] = fields[2] + " " + fields[3]
+			}
 		} else {
 			truncated = true
 		}
 	}
-	return names, truncated, true
+	return names, sizes, truncated, true
 }

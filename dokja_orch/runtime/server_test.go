@@ -352,3 +352,48 @@ func TestChatSelectionRoutesPersistAndRefuseStaleOrNonControllerWrites(t *testin
 		}
 	}
 }
+
+type modelEngine struct{}
+
+func (modelEngine) Pull(context.Context, string, func(domain.PullProgress)) error { return nil }
+func (modelEngine) Remove(context.Context, string) error                          { return nil }
+func (modelEngine) EmbeddingModel() string                                        { return "bge-m3" }
+
+func TestModelActionsAreRoutedAndAnswerPlainly(t *testing.T) {
+	ask := func(handler http.Handler, kind string, payload map[string]any) map[string]any {
+		raw, _ := json.Marshal(Event{Type: kind, Source: "desktop", Payload: payload})
+		req := httptest.NewRequest(http.MethodPost, "/request", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var reply map[string]any
+		json.Unmarshal(w.Body.Bytes(), &reply)
+		return reply
+	}
+	without := Handler(domain.New(&fake{}, domain.Journal{}, nil), "fixture")
+	if reply := ask(without, "runtime.models.status", nil); reply["status"] != "error" || reply["error"] != "local models are unavailable" {
+		t.Fatal(reply)
+	}
+	handler := Handler(domain.New(&fake{}, domain.Journal{}, nil).WithModels(modelEngine{}), "fixture")
+	reply := ask(handler, "runtime.models.status", nil)
+	result, _ := reply["result"].(map[string]any)
+	inner, _ := result["result"].(map[string]any)
+	if reply["status"] != "ok" || inner["embedding_model"] != "bge-m3" {
+		t.Fatal(reply)
+	}
+	for _, kind := range []string{"runtime.models.pull", "runtime.models.remove"} {
+		if reply := ask(handler, kind, map[string]any{"model": 3}); reply["error"] != "model is required" {
+			t.Fatal(kind, reply)
+		}
+		// This fake stack runs nothing, so the engine is stopped.
+		if reply := ask(handler, kind, map[string]any{"model": "qwen3:8b"}); reply["error"] != "the local model engine is stopped" {
+			t.Fatal(kind, reply)
+		}
+	}
+	if reply := ask(handler, "runtime.models.cancel", nil); reply["status"] != "ok" {
+		t.Fatal(reply)
+	}
+	if reply := ask(handler, "runtime.models.engine.start", nil); reply["status"] != "ok" {
+		t.Fatal(reply)
+	}
+}
