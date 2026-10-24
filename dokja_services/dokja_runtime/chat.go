@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	domain "read_books/dokja_domain/dokja_runtime"
+	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 // ChatAdapters run a single bounded inference, never a workflow or fallback.
@@ -23,6 +25,17 @@ type ChatAdapters struct {
 }
 
 func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage) (string, error) {
+	return a.generate(ctx, b, m, nil)
+}
+
+// GenerateStream is Generate with a preview of the text so far, for the providers whose output can be
+// read as it comes (Ollama's text, Codex's agent messages). Claude Code gives none yet. The reply is
+// still taken and checked from the whole output, exactly as Generate does.
+func (a ChatAdapters) GenerateStream(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage, onPreview func(string)) (string, error) {
+	return a.generate(ctx, b, m, onPreview)
+}
+
+func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage, onPreview func(string)) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -54,10 +67,20 @@ func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []do
 	}
 	run := a.Run
 	if run == nil {
-		run = a.run
+		var observe func([]byte)
+		if onPreview != nil && (b.Provider == "ollama" || b.Provider == "codex") {
+			observe = (&chatPreview{provider: b.Provider, emit: onPreview}).observe
+		}
+		run = func(ctx context.Context, binary string, args []string, prompt, dir string) ([]byte, error) {
+			return a.runObserved(ctx, binary, args, prompt, dir, observe)
+		}
 	}
 	if b.Provider == "ollama" {
-		if _, err := run(ctx, binary, composeArgs(a.Root, []string{"exec", "-T", "dokja-ollama", "ollama", "show", b.Model}), "", dir); err != nil {
+		check := a.Run
+		if check == nil {
+			check = a.run
+		}
+		if _, err := check(ctx, binary, composeArgs(a.Root, []string{"exec", "-T", "dokja-ollama", "ollama", "show", b.Model}), "", dir); err != nil {
 			return "", fmt.Errorf("selected chat model is not installed or its provider is unavailable")
 		}
 	}
@@ -141,6 +164,11 @@ func validateChatEvents(output []byte) error {
 }
 
 func (a ChatAdapters) run(ctx context.Context, binary string, args []string, prompt, dir string) ([]byte, error) {
+	return a.runObserved(ctx, binary, args, prompt, dir, nil)
+}
+
+// runObserved runs one provider process; observe, when set, sees its output as it is written.
+func (a ChatAdapters) runObserved(ctx context.Context, binary string, args []string, prompt, dir string, observe func([]byte)) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = dir
 	cmd.Stdin = bytes.NewBufferString(prompt)
@@ -167,7 +195,7 @@ func (a ChatAdapters) run(ctx context.Context, binary string, args []string, pro
 		return nil
 	}
 	cmd.WaitDelay = time.Second
-	out := &chatOutput{}
+	out := &chatOutput{observe: observe}
 	cmd.Stdout = out
 	err := cmd.Run()
 	if out.overflow || stderr.overflow {
@@ -184,6 +212,7 @@ func (a ChatAdapters) run(ctx context.Context, binary string, args []string, pro
 type chatOutput struct {
 	buffer   bytes.Buffer
 	overflow bool
+	observe  func([]byte)
 }
 
 func (b *chatOutput) Bytes() []byte { return b.buffer.Bytes() }
@@ -194,5 +223,71 @@ func (b *chatOutput) Write(p []byte) (int, error) {
 		b.overflow = true
 		return 0, fmt.Errorf("output limit")
 	}
-	return b.buffer.Write(p)
+	n, err := b.buffer.Write(p)
+	if err == nil && b.observe != nil {
+		b.observe(p[:n])
+	}
+	return n, err
+}
+
+// chatPreview turns what a provider prints into the text it has written so far. It decides nothing:
+// a preview is shown and thrown away, and the reply is parsed and checked from the whole output once
+// the process ends. Output it cannot read gives no preview rather than a wrong one.
+type chatPreview struct {
+	provider string
+	emit     func(string)
+	raw      []byte
+	last     string
+}
+
+func (p *chatPreview) observe(chunk []byte) {
+	p.raw = append(p.raw, chunk...)
+	switch p.provider {
+	case "ollama":
+		p.show(validPrefix(p.raw))
+	case "codex":
+		// whole lines only; the last one may still be on its way
+		end := bytes.LastIndexByte(p.raw, '\n')
+		if end < 0 {
+			return
+		}
+		for _, line := range bytes.Split(p.raw[:end], []byte("\n")) {
+			var event struct {
+				Type string `json:"type"`
+				Item struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"item"`
+			}
+			if json.Unmarshal(line, &event) != nil {
+				continue
+			}
+			if (event.Type == "item.updated" || event.Type == "item.completed") && event.Item.Type == "agent_message" && event.Item.Text != "" {
+				p.show(event.Item.Text)
+			}
+		}
+		p.raw = append([]byte(nil), p.raw[end+1:]...)
+	}
+}
+
+func (p *chatPreview) show(text string) {
+	if strings.TrimSpace(text) == "" || text == p.last {
+		return
+	}
+	p.last = text
+	p.emit(text)
+}
+
+// validPrefix is the longest start of raw that is whole UTF-8: a character cut between two writes
+// waits for its other bytes.
+func validPrefix(raw []byte) string {
+	for end := len(raw); end > 0 && end > len(raw)-utf8.UTFMax; end-- {
+		if utf8.Valid(raw[:end]) {
+			return string(raw[:end])
+		}
+	}
+	if utf8.Valid(raw) {
+		return string(raw)
+	}
+	return ""
 }

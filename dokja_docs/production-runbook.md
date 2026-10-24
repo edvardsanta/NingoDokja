@@ -576,6 +576,13 @@ generated value into logs or chat. If the orchestrator says this variable is
 required, Compose did not pass it to the container; correct the ignored env file
 and recreate the orchestrator and enabled gateways together.
 
+The bridge also answers `POST /orchestrator/chat/stream` with the same bearer credential. It takes
+a desktop `message.created` envelope, exactly what the request socket takes, and answers
+newline-delimited JSON: `{"preview": ...}` lines with the reply written so far, then the response
+the request socket would give. Anything but a desktop chat turn is refused. Previews reach only the
+caller and are never stored; the reply is the record. The route is additive and nothing changes
+until an interface uses it.
+
 The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
 `DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
 `DOKJA_WHATSAPP_ALLOW_FROM` and `DOKJA_WHATSAPP_ALLOWED_GROUPS` from the same
@@ -833,6 +840,11 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
 5. Send a manual chat message and verify a reply. Disable the registration and verify that
    chat refuses inference; re-enable and retry. Authentication/quota errors stay explicit.
    History, reading reference and Knowledge citations continue through the same chat handler.
+
+The same socket also answers `POST /chat/stream`: newline-delimited JSON with
+`{"preview": ...}` lines (the text written so far, at most every 100 ms) and a last line that is
+the reply `/chat` would give, or `{"error": ...}`. Ollama and Codex give previews; Claude Code gives
+only the last line for now. A preview is never the reply and is not stored.
 
 Bounded adapter regressions and opt-in synthetic live checks are documented in
 [chat inference validation](chat-inference-validation.md). A healthy configuration

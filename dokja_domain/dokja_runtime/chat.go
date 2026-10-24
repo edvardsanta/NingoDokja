@@ -29,6 +29,12 @@ type ChatInference interface {
 	Generate(context.Context, ChatBinding, []ChatMessage) (string, error)
 }
 
+// ChatStreamInference is an inference that can show its text while it writes. The final string is
+// the reply; what reaches onPreview is only a preview of it.
+type ChatStreamInference interface {
+	GenerateStream(context.Context, ChatBinding, []ChatMessage, func(string)) (string, error)
+}
+
 func (d *Domain) WithChat(store ChatSettingsStore, inference ChatInference) *Domain {
 	d.chatSettings = store
 	d.chatInference = inference
@@ -86,6 +92,13 @@ func (d *Domain) ChatReady() error {
 	return d.validateChat(b)
 }
 func (d *Domain) Chat(ctx context.Context, messages []ChatMessage) (ChatReply, error) {
+	return d.ChatStream(ctx, messages, nil)
+}
+
+// ChatStream is Chat with a preview: while the provider writes, onPreview receives the text so far.
+// The preview is provisional and never the reply: it is not validated, and the reply is only what
+// ChatStream returns, under the same rules as Chat. An inference that cannot stream gives no preview.
+func (d *Domain) ChatStream(ctx context.Context, messages []ChatMessage, onPreview func(string)) (ChatReply, error) {
 	if err := ctx.Err(); err != nil {
 		return ChatReply{}, err
 	}
@@ -114,7 +127,12 @@ func (d *Domain) Chat(ctx context.Context, messages []ChatMessage) (ChatReply, e
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	reply, err := d.chatInference.Generate(ctx, b, messages)
+	var reply string
+	if streaming, ok := d.chatInference.(ChatStreamInference); ok && onPreview != nil {
+		reply, err = streaming.GenerateStream(ctx, b, messages, onPreview)
+	} else {
+		reply, err = d.chatInference.Generate(ctx, b, messages)
+	}
 	if ctx.Err() != nil {
 		return ChatReply{}, ctx.Err()
 	}
