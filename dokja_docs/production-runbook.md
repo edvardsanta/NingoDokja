@@ -298,6 +298,23 @@ a program, kept outside the repository. Compose mounts `${FEEDS_PLUGINS_HOST_DIR
 at `/plugins` (that default directory is git-ignored). With no plugin the service still answers and the
 digest is empty.
 
+Development and lite run Feeds from the source bind mount with `go run`. Their
+development image downloads and verifies the pinned `go.mod`/`go.sum`
+dependencies at build time, retaining the module cache under `/go/pkg/mod`,
+outside `/workspace`. Startup can compile the mounted sources without fetching
+Go modules through the container bridge. Rebuild the image after changing either
+Go dependency manifest:
+
+```sh
+docker compose -f docker-compose.dev.yml build dokja-feeds
+docker compose -f docker-compose.dev.yml up -d --no-deps dokja-feeds
+```
+
+Use `docker-compose.lite.yml` for the lite stack. This retains the existing data
+and plugin mounts. The production image already builds its executable before
+startup. A bridge DNS outage may still affect plugins that fetch external
+sources; the cached Go modules address the startup dependency failure.
+
 A plugin runs only when its manifest says `"enabled": true`, and changes to the directory are read when the
 service starts. Its program runs inside the `dokja-feeds` container, so it must exist in the image: the image
 has a POSIX shell, the usual command-line tools, and `python3` with `pypdf` (Debian packages). For anything
