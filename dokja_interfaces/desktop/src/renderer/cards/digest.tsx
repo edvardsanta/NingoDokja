@@ -17,9 +17,9 @@ import {
 } from "./digest_model.js";
 import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
-import { AssistantConversation } from "./assistant_conversation.js";
 import { Outcome, addToBase } from "./knowledge_add.js";
 import { useAction } from "./use_action.js";
+import { useDiscuss } from "../discussion_context.js";
 
 const TIMEOUT_MS = 20_000;
 
@@ -151,7 +151,7 @@ function Reading({ transport }: { transport: Transport }) {
 
 function DigestList({ page, transport }: { page: DigestPage; transport: Transport }) {
   const t = useTranslate();
-  const [selected, setSelected] = useState<string>();
+  const discuss = useDiscuss();
   const { ago } = useTimes();
   if (page.items.length === 0) {
     return (
@@ -163,7 +163,6 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
   return (
     <ul className="digest">
       {page.items.map((item, index) => {
-        const discussionId = item.id || `entry-${index}`;
         const when = item.published === "" ? "" : ago(item.published);
         const meta = [item.source, when].filter((part) => part !== "").join(", ");
         return (
@@ -171,13 +170,12 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
             <p className="digest-title">{item.title}</p>
             {meta !== "" && <p className="detail">{meta}</p>}
             {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
+            {/* The discussion happens in Talk, the one place with a composer. */}
             <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title}
-              onClick={() => setSelected((current) => current === discussionId ? undefined : discussionId)}>
-              {selected === discussionId ? t("assistant_close") : t("assistant_continue")}
+              onClick={() => discuss({ id: item.id, title: item.title, source: item.source })}>
+              {t("assistant_continue")}
             </button>
             {item.id && <SaveReading transport={transport} id={item.id} title={item.title} />}
-            {selected === discussionId && item.id && <AssistantConversation key={item.id} transport={transport}
-              reading={{ id: item.id, title: item.title, source: item.source }} /> }
           </li>
         );
       })}
