@@ -25,4 +25,10 @@ RUN case "$FEEDS_PLUGIN_EXTRAS" in \
     esac
 ENV PATH="/opt/feeds-plugins/bin:${PATH}"
 
+# Keep the Go module cache in the image, outside the source bind mount. Dev/lite
+# startup compiles local sources but must not need a fresh dependency download.
+WORKDIR /opt/feeds-build-deps
+COPY dokja_services/dokja_feeds/go.mod dokja_services/dokja_feeds/go.sum ./
+RUN go mod download && go mod verify
+
 WORKDIR /workspace/dokja_services/dokja_feeds
