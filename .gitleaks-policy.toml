@@ -59,7 +59,8 @@ keywords = ["http"]
   description = "Reserved placeholders, loopback, compose service names, hosts that are a single label (they cannot be a public site) and this repository. An address may carry user info (user:pass@host)."
   regexTarget = "match"
   regexes = [
-    '''(?i)^https?://(?:[^/@\s]+@)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:([0-9]+|\$\{[A-Za-z_.]+\}))?([/?#].*)?$''',
+    # The URL matcher includes sentence-ending periods in comments describing loopback URLs.
+    '''(?i)^https?://(?:[^/@\s]+@)?(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)(:([0-9]+|\$\{[A-Za-z_.]+\}))?([/?#].*|\.)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*(example|test|invalid|localhost)(:[0-9]+)?([/?#].*)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?([a-z0-9-]+\.)*example\.(com|org|net)(:[0-9]+)?([/?#].*)?$''',
     '''(?i)^https?://(?:[^/@\s]+@)?(dokja-[a-z-]+|ollama|orchestrator)(:[0-9]+)?([/?#].*)?$''',

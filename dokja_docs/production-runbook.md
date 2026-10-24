@@ -586,6 +586,14 @@ the request socket would give. Anything but a desktop chat turn is refused. Prev
 caller and are never stored; the reply is the record. The route is additive and nothing changes
 until an interface uses it.
 
+The desktop uses that route for Talk when its environment sets `DOKJA_BRIDGE_ENDPOINT` to the bridge
+on the same machine (for example `http://localhost:8091`; any other host is ignored) and
+`DOKJA_GATEWAY_INGRESS_TOKEN` to the bridge's credential. Without both, Talk goes over the request
+socket and shows the reply whole, as before. Giving the desktop this credential widens who holds it:
+it is the gateways' credential, and with it a process can also post to `/orchestrator` as the Discord
+or WhatsApp gateway. Give it only to a desktop on a machine you would trust with the gateways. If the
+bridge is not listening, or is too old to stream, the desktop sends the turn over the request socket.
+
 The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
 `DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
 `DOKJA_WHATSAPP_ALLOW_FROM` and `DOKJA_WHATSAPP_ALLOWED_GROUPS` from the same

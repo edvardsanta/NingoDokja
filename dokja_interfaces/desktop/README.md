@@ -89,6 +89,16 @@ Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127
 `--env-file` (communications credential file), `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). For example: `pnpm start --lang=pt`.
 
+## Replies as Ningo writes them
+
+Talk can show a reply while it is being written. Set `DOKJA_BRIDGE_ENDPOINT` to the orchestrator's
+HTTP bridge on this machine (for example `http://localhost:8091`; any other host is ignored) and
+`DOKJA_GATEWAY_INGRESS_TOKEN` to the bridge's credential, the one the orchestrator has. The shell then
+sends each Talk turn to `/orchestrator/chat/stream` and hands the screen the text so far, for that
+conversation only; the reply that lands replaces it. Without both, a turn goes over the request socket
+and the screen waits for the whole reply, as before. Only Ollama and Codex give previews; a Claude
+reply arrives whole.
+
 ## WhatsApp conversations
 
 The messages workspace also lists the WhatsApp conversations the owner named on the interface
@@ -185,8 +195,9 @@ launch Electron with `DOKJA_DESKTOP_DEV_URL=http://localhost:5173` (only a local
 ## How it is built
 
 ```
-screen (React)  ->  preload (three functions)  ->  main process  ->  orchestrator
-src/renderer        src/preload                    src/main          ZeroMQ REQ
+screen (React)  ->  preload (four functions)  ->  main process  ->  orchestrator
+src/renderer        src/preload                   src/main          ZeroMQ REQ, or the HTTP
+                                                                    bridge for a streamed Talk turn
 ```
 
 - **The screen** only knows a `Transport` (`src/shared/transport.ts`): `request(type, payload)`

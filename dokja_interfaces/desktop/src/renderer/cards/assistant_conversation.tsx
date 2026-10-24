@@ -12,6 +12,8 @@ type Reading = { id: string; title: string; source: string };
 export type Conversation = {
   id: string;
   turns: readonly Turn[];
+  // the reply written so far while it is on its way, when the shell can stream it; never the reply
+  preview: string;
   draft: string;
   setDraft: (draft: string) => void;
   busy: boolean;
@@ -33,7 +35,15 @@ export function useConversation(transport: Transport, reading?: Reading): Conver
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<TransportError>();
   const [notice, setNotice] = useState("");
+  const [preview, setPreview] = useState("");
   const field = useRef<HTMLTextAreaElement>(null);
+  // Only this conversation's previews, and only while its turn is on its way.
+  useEffect(() => {
+    if (!busy || !transport.onChatPreview) return undefined;
+    return transport.onChatPreview((each) => {
+      if (each.conversationId === id.current) setPreview(each.text);
+    });
+  }, [busy, transport]);
   const send = async (content: string) => {
     const message = content.trim();
     if (!message || busy) return;
@@ -54,24 +64,26 @@ export function useConversation(transport: Transport, reading?: Reading): Conver
       setNotice(result.sessionNotice === "new" || result.sessionNotice === "reset" ? t("assistant_session_reset") : "");
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
-    } finally { setBusy(false); field.current?.focus(); }
+    } finally { setBusy(false); setPreview(""); field.current?.focus(); }
   };
   const retry = () => void send(turns.at(-1)?.role === "user" ? turns.at(-1)!.text : draft);
-  return { id: id.current, turns, draft, setDraft, busy, error, notice, field, send, retry };
+  return { id: id.current, turns, preview, draft, setDraft, busy, error, notice, field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
 // conversation grows.
 export function Transcript({ conversation }: { conversation: Conversation }) {
   const t = useTranslate();
-  const { turns, busy, notice, error } = conversation;
+  const { turns, busy, notice, error, preview } = conversation;
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end" });
-  }, [turns.length, busy, error]);
+  }, [turns.length, busy, error, preview]);
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.map((turn, index) => <li key={index} data-role={turn.role}><strong>{t(turn.role === "user" ? "assistant_you" : "assistant_name")}</strong><p>{turn.text}</p></li>)}</ol>
-    {busy && <p role="status">{t("assistant_thinking")}</p>}
+    {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
+    {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
+    {busy && !preview && <p role="status">{t("assistant_thinking")}</p>}
     {notice && <p role="status">{notice}</p>}
     {error && <><Problem error={error}/><button type="button" disabled={busy} onClick={conversation.retry}>{t("assistant_retry")}</button></>}
     <div ref={end} />

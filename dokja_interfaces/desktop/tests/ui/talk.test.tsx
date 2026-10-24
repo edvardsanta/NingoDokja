@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../../src/renderer/app.js";
 import { AssistantCard } from "../../src/renderer/cards/assistant.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Locale } from "../../src/shared/locale.js";
-import type { Transport } from "../../src/shared/transport.js";
+import type { ChatPreview, Transport, TransportResult } from "../../src/shared/transport.js";
 import { failure, ok, routedTransport } from "./support.js";
 
 const reply = (text: string) => ok({ reply: text, sessionNotice: "" });
@@ -62,6 +62,42 @@ describe("the conversation", () => {
     const payloads = sent(calls);
     expect(payloads.map((payload) => payload?.content)).toEqual(["first", "second"]);
     expect(payloads[0]?.conversation_id).toBe(payloads[1]?.conversation_id);
+  });
+
+  it("shows the reply as Ningo writes it, for this conversation only, and the reply replaces it", async () => {
+    let listener: ((preview: ChatPreview) => void) | undefined;
+    let answer: (value: TransportResult) => void = () => {};
+    let conversationId = "";
+    const transport: Transport = {
+      request: (type, payload) => {
+        if (type !== "message.created") return Promise.resolve(ok({}));
+        conversationId = String(payload?.conversation_id);
+        return new Promise((resolve) => (answer = resolve));
+      },
+      preview: async () => ({ ok: false, error: { code: "unavailable", message: "none" } }),
+      onChatPreview: (each) => {
+        listener = each;
+        return () => {
+          listener = undefined;
+        };
+      },
+    };
+    renderTalk(transport);
+    fireEvent.change(field(), { target: { value: "question" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Ningo is thinking…");
+    await waitFor(() => expect(listener).toBeDefined());
+
+    act(() => listener?.({ conversationId: "another", text: "Not yours" }));
+    expect(screen.queryByText("Not yours")).toBeNull();
+    act(() => listener?.({ conversationId, text: "The ans" }));
+    expect(screen.getByText("The ans").closest(".assistant-preview")).not.toBeNull();
+    expect(screen.queryByText("Ningo is thinking…")).toBeNull();
+
+    act(() => answer(reply("The answer.")));
+    await screen.findByText("The answer.");
+    expect(screen.queryByText("The ans")).toBeNull();
+    expect(listener).toBeUndefined();
   });
 
   it("starts a new conversation with a new id and an empty transcript", async () => {

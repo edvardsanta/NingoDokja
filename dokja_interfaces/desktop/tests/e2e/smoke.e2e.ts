@@ -76,12 +76,12 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.equal(orchestrator.seen.length, before);
   });
 
-  it("gives the page no Node and no other door than three functions", async () => {
+  it("gives the page no Node and no other door than four functions", async () => {
     assert.equal(
       await page.evaluate("[typeof require, typeof process, typeof module, typeof Buffer, typeof __dirname].join()"),
       "undefined,undefined,undefined,undefined,undefined",
     );
-    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,preview,request");
+    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,onChatPreview,preview,request");
     assert.equal(await page.evaluate("[typeof window.electron, typeof window.ipcRenderer].join()"), "undefined,undefined");
   });
 

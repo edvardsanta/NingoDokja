@@ -15,6 +15,8 @@ export type DesktopConfig = {
   maxTimeoutMs: number;
   // Only for development: a Vite server on this machine to load instead of the built page.
   devServerUrl?: string;
+  // The orchestrator's HTTP bridge on this machine, where a Talk turn can be streamed.
+  bridgeEndpoint?: string;
 };
 
 // "30s", "2m", "1500ms"; a bare number is milliseconds.
@@ -75,6 +77,7 @@ export function parseConfig(
 
   const maxTimeoutMs = parseDuration(flag("timeout")) ?? DEFAULT_MAX_TIMEOUT_MS;
   const devServerUrl = variable("DOKJA_DESKTOP_DEV_URL");
+  const bridgeEndpoint = variable("DOKJA_BRIDGE_ENDPOINT");
 
   return {
     ...(flag("runtime-root") ? { runtimeRoot: flag("runtime-root") } : {}),
@@ -84,5 +87,6 @@ export function parseConfig(
     defaultTimeoutMs: Math.min(DEFAULT_REQUEST_TIMEOUT_MS, maxTimeoutMs),
     maxTimeoutMs,
     ...(isLocalUrl(devServerUrl) ? { devServerUrl } : {}),
+    ...(isLocalUrl(bridgeEndpoint) ? { bridgeEndpoint } : {}),
   };
 }
