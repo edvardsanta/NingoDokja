@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { KnowledgeDocument, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -31,9 +31,11 @@ export async function loadDocument(transport: Transport, id: string, at: number 
 // One document of the research base, in a tab of its own: what the list says of it, and its text.
 // The text is what the service rebuilds from the passages it stored, so it says so: close to the
 // original, not a faithful copy of it. It is shown as text, never as markup.
-export function DocumentView({ transport, id, at, external = false }: { transport: Transport; id: string; at?: number; external?: boolean }) {
+export function DocumentView({ transport, id, at, external = false, classify = false }: { transport: Transport; id: string; at?: number; external?: boolean; classify?: boolean }) {
   const t = useTranslate();
-  const [classificationOpen, setClassificationOpen] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(classify);
+  // Classify… on a document already open shows its classification.
+  useEffect(() => { if (classify) setClassificationOpen(true); }, [classify]);
   const { fixed } = useNumbers();
   const load = useCallback(() => loadDocument(transport, id, at, external), [transport, id, at, external]);
   const { state, reload } = useCard(load);
