@@ -1,6 +1,7 @@
 # Conversation history and resumable Ningo conversations
 
-Status: planned, not implemented. Tracks step 09.5.
+Status: H1 (domain contract and storage) implemented, not yet wired; H2 to H5 planned. Tracks step
+09.5.
 
 ## Current evidence
 
@@ -47,6 +48,34 @@ Keep three records distinct:
 ## Incremental implementation batches
 
 ### H1: Domain contract and storage
+
+**Storage decision (owner, 2026-10-23).** The archive is its own SQLite file,
+`dokja_conversations.db`, beside the shared `dokja.db` (path derived from
+`DOKJA_DB_FILE`, so no new variable), opened by the orchestrator alone. The shared
+database refuses a schema newer than the build, and four processes open it (the
+orchestrator, the CLI, the TUI and the desktop's runtime controller); a migration
+there would make every older one refuse the file. A separate file keeps them
+untouched, and rollback is the previous build. CLI, TUI and desktop reach the archive
+through orchestrator actions (H2), never by opening the file.
+
+**As built.**
+- `dokja_domain/dokja_conversation` holds the contract and rules:
+  - one owner scope for the desktop, the CLI and the TUI, and none for any other source;
+  - opaque IDs;
+  - turn states, with the selected provider and model kept apart from the observed ones;
+  - bounds;
+  - a send ID that makes a retried request return its turn (other text under the same ID is a
+    conflict);
+  - an explicit retry, on the owner's request only, that reopens the same turn instead of adding
+    one. Only the latest turn, and only a failed or interrupted one, may be retried; `attempts`
+    counts the sends;
+  - the bounded selection of completed turns for context.
+- `dokja_orch/internal/infrastructure/conversations` is the SQLite store:
+  - every query is scoped, and keyset pagination is used;
+  - turn order is assigned in a transaction;
+  - a turn that already ended keeps its outcome;
+  - turns left pending by a stop become interrupted, and none is sent again;
+  - an archive from a newer build is refused.
 
 Review schema compatibility before implementation. Define opaque conversation and
 turn IDs, canonical owner/scope, timestamps, deterministic ordering, revisions,

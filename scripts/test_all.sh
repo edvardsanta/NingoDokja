@@ -137,6 +137,13 @@ run_suite \
   "missing go.mod"
 
 run_suite \
+  "dokja_domain/dokja_conversation" \
+  "GOCACHE='$GOCACHE_DIR' go test ./..." \
+  "$ROOT_DIR/dokja_domain/dokja_conversation" \
+  "[ -f '$ROOT_DIR/dokja_domain/dokja_conversation/go.mod' ]" \
+  "missing go.mod"
+
+run_suite \
   "dokja_domain/dokja_runtime" \
   "GOCACHE='$GOCACHE_DIR' go test ./..." \
   "$ROOT_DIR/dokja_domain/dokja_runtime" \

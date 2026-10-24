@@ -861,7 +861,7 @@
         {
           "id": "09.5",
           "title": "Persist and resume Ningo conversation history across operator interfaces",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "09.4"
           ],
@@ -877,14 +877,21 @@
             "Review schema and additive route contracts before implementing; test restart, concurrency, idempotency, delete/retention and shared interface access."
           ],
           "evidence": [
-            "Owner requested planning conversation history. Current desktop transcript is component-local and orchestrator sessions are ephemeral; this scheduling entry does not claim persistence is implemented."
+            "Owner requested planning conversation history. Current desktop transcript is component-local and orchestrator sessions are ephemeral; this scheduling entry does not claim persistence is implemented.",
+            "H1 (domain contract and storage) is built, not wired. The owner chose its own SQLite file, dokja_conversations.db beside dokja.db and opened by the orchestrator alone, because a migration in the shared dokja.db would make every older orchestrator, CLI, TUI or runtime controller refuse it. dokja_domain/dokja_conversation holds scope, turn states, provenance, bounds, idempotent sends, explicit retry of the latest failed or interrupted turn and the context selection; dokja_orch/internal/infrastructure/conversations is the store."
           ],
-          "checks": [],
+          "checks": [
+            {
+              "name": "h1_archive_contract_and_store",
+              "status": "passed",
+              "detail": "go test -race in dokja_domain/dokja_conversation and in dokja_orch/internal/infrastructure/conversations passed against disposable SQLite files: restart persistence with stable IDs and order, failed turns kept failed, idempotent retried sends, conflicting text under one send ID, explicit retry of the latest turn only with two retries unable to both win, 20 concurrent sends in distinct places, foreign-scope reads and writes refused, keyset pages without repeats or gaps, revision-checked rename and delete with turns cascading, pending turns interrupted after a stop and never resent, and a newer archive refused. dokja_orch go test ./... passed."
+            }
+          ],
           "blockers": [],
           "references": [
             "dokja_docs/conversation-history-plan.md"
           ],
-          "next_action": "Review H1 domain/storage contracts and migration compatibility, then implement and verify the incremental H1-H5 batches. No history behavior is delivered by this planning change."
+          "next_action": "H2: additive orchestrator actions to start, list, read, continue, retry, rename and delete conversations, with scope checked on every operation and recovery at start; then H3 (desktop) and H4 (CLI and TUI)."
         }
       ],
       "references": [
