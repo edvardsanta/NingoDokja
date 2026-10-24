@@ -13,7 +13,15 @@ export type ProviderRow = {
   id: string; name: string; state: string; reason: string; models: string[];
   enabled?: boolean; declaredModels?: string[];
   modelDiscovery: string; inferenceStatus: "not_tested"; truncated: boolean;
+  // Only on Ollama: each listed model's size as the engine gives it, and the model memory and
+  // knowledge embed with, which is no chat model.
+  modelSizes?: Record<string, string>; embeddingModel?: string;
 };
+
+export type ModelPullState = "pulling" | "done" | "failed" | "cancelled";
+export type ModelPullPhase = "starting" | "downloading" | "verifying" | "writing";
+export type ModelPull = { model: string; state: ModelPullState; phase?: ModelPullPhase; percent?: number; error?: string };
+export type ModelsStatus = { embeddingModel: string; pull?: ModelPull; engine?: "starting" | "ready" | "failed"; engineError?: string };
 export type ProvidersView = { configurationRevision?: number; providers: ProviderRow[]; checkedAt: string };
 
 export type ProviderRegistrationChange = { provider: string; configurationRevision: number; enabled: boolean; models: string[] };
