@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -138,7 +139,7 @@ func (t *HashtagTask) retrieve(ctx context.Context, in core.StepInput) (core.Ste
 	if source := resultString(answer, "matched_source_url"); source != "" {
 		// Knowledge has no scope model: the evidence stays unscoped.
 		result.Evidence = []core.Evidence{{
-			Ref: hashtagKnowledgeID(source), Capability: "knowledge.search", ObservedAt: time.Now().UTC(),
+			Ref: knowledgedomain.HashtagKnowledgeID(source), Capability: "knowledge.search", ObservedAt: time.Now().UTC(),
 			Reason: "closest labelled example",
 		}}
 	}

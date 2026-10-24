@@ -747,7 +747,8 @@
             "dokja_docs/decisions/0012-communication-services.md",
             "dokja_docs/communication-boundaries.md",
             "dokja_docs/decisions/0007-faculties-not-features.md",
-            "dokja_docs/media-admissibility.md"
+            "dokja_docs/media-admissibility.md",
+            "dokja_docs/hashtag-knowledge.md"
           ],
           "batches": [
             {
@@ -881,6 +882,36 @@
                   "name": "media_policy_compatibility",
                   "status": "passed",
                   "detail": "Reviewed existing event, route/action, provider and response contracts; no schema, command, env, Compose, port or volume change. Tracker JSON validation and git diff --check passed. No live provider, account, deployment or owner database was used."
+                }
+              ],
+              "completed_on": "2026-10-23"
+            },
+            {
+              "id": "09.4-f",
+              "title": "Move hashtag example lifecycle rules into Knowledge",
+              "status": "completed",
+              "depends_on": [
+                "09.4-e"
+              ],
+              "acceptance_criteria": [
+                "Knowledge owns hashtag validation, stable example identity, ingestion, search/list scoping and example reply projection; orchestration retains OCR sequencing, time budgets and existing recipe parameters.",
+                "Preserve meme.hashtag.* facade events, error/response shapes, legacy source IDs, retrieval behavior and task evidence references; invalid labels are refused before OCR or storage effects.",
+                "Keep schemas, service contracts, commands, configuration, delivery selection and feedback semantics unchanged, with domain and workflow regression evidence."
+              ],
+              "evidence": [
+                "Knowledge now prepares validated hashtag examples and owns the legacy kind/tag, stable document identity, ingestion, search/list scoping, deletion and response projection. The workflow delegates these rules while sequencing explicit text or OCR, enabled-state checks, search deadlines and existing recipe parameters.",
+                "Task evidence uses the same domain-owned ID function. Fixed legacy ID assertions preserve stored-document and task-reference compatibility. No public event, action/route, service contract, schema, command, env or Compose change; selection and feedback behavior are unchanged."
+              ],
+              "checks": [
+                {
+                  "name": "hashtag_knowledge_regression",
+                  "status": "passed",
+                  "detail": "Knowledge domain go test -race ./... and go vet ./... passed; orchestrator go test -race ./internal/handlers, go vet ./internal/handlers and go test ./... passed. Domain and workflow fixtures cover Unicode labels, invalid intent before effects, pinned IDs, storage/deletion payloads, unchanged/pending embedding receipts, scoped retrieval/paging, below-threshold candidates, empty/degraded responses, dependency failures and existing task/search budgets. Synthetic stores and media readers only."
+                },
+                {
+                  "name": "hashtag_knowledge_compatibility",
+                  "status": "passed",
+                  "detail": "Reviewed facade responses and errors, stored identity and kind/tag values, task evidence, provider/service contracts and rollback without backfill. Tracker JSON validation and git diff --check passed; no live provider, platform account, deployment or owner database used."
                 }
               ],
               "completed_on": "2026-10-23"

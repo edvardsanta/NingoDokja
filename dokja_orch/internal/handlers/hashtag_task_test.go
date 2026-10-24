@@ -57,7 +57,7 @@ func TestHashtagTaskLinksReadingRetrievalSelectionAndPrediction(t *testing.T) {
 		t.Fatalf("expected a frozen prediction with its baseline and support: %#v", attempt.Prediction)
 	}
 	if len(task.Evidence) != 2 || task.Evidence[0].Ref != experienceRef(testMemeURL) ||
-		task.Evidence[1].Ref != hashtagKnowledgeID(earlierMemeURL) || task.Evidence[1].Scope != (core.TaskScope{}) {
+		task.Evidence[1].Ref != "meme-hashtag:ab79f604fdb461b840259a66c868ae02" || task.Evidence[1].Scope != (core.TaskScope{}) {
 		t.Fatalf("evidence must cite the meme and the labelled example without addresses: %#v", task.Evidence)
 	}
 	if len(task.Proposals) != 1 || task.Proposals[0].ActionID != "append-hashtag" || len(task.Proposals[0].EvidenceRefs) != 2 {
