@@ -56,10 +56,10 @@ func TestMemeHashtagWorkflowStoresLabelsAsKnowledge(t *testing.T) {
 		t.Fatalf("expected OCR through the meme service, got %#v", media.urls)
 	}
 	call := knowledge.calls[0]
-	if call.eventType != "knowledge.ingest" || call.payload["kind"] != memeHashtagKnowledgeKind || call.payload["title"] != "#Humor" {
+	if call.eventType != "knowledge.ingest" || call.payload["kind"] != "meme_hashtag" || call.payload["title"] != "#Humor" {
 		t.Fatalf("unexpected knowledge ingest: %#v", call)
 	}
-	if call.payload["source_id"] != hashtagKnowledgeID("https://media.example/a.png") {
+	if call.payload["source_id"] != "meme-hashtag:4286467e0b88473247929fa128ef8c24" {
 		t.Fatalf("unexpected stable source id: %v", call.payload["source_id"])
 	}
 }
@@ -84,7 +84,7 @@ func TestMemeHashtagWorkflowRetrievesOnlyHashtagKnowledge(t *testing.T) {
 		t.Fatalf("unexpected suggestion: %#v", result)
 	}
 	call := knowledge.calls[0]
-	if call.eventType != "knowledge.search" || call.payload["kind"] != memeHashtagKnowledgeKind ||
+	if call.eventType != "knowledge.search" || call.payload["kind"] != "meme_hashtag" ||
 		call.payload["query"] != "a fresh joke" || call.payload["min_score"] != defaultMemeHashtagMinScore {
 		t.Fatalf("unexpected knowledge search: %#v", call)
 	}
@@ -115,7 +115,7 @@ func TestMemeHashtagWorkflowListsAndDeletesKnowledge(t *testing.T) {
 	if err != nil || deleted["deleted"] != true {
 		t.Fatalf("unexpected delete: %#v, %v", deleted, err)
 	}
-	if knowledge.calls[1].payload["source_id"] != hashtagKnowledgeID(url) {
+	if knowledge.calls[1].payload["source_id"] != "meme-hashtag:4286467e0b88473247929fa128ef8c24" {
 		t.Fatalf("delete did not address the same knowledge document: %#v", knowledge.calls[1])
 	}
 }
@@ -128,5 +128,16 @@ func TestMemeHashtagWorkflowHonorsKnowledgeSwitch(t *testing.T) {
 	_, err := workflow.Handle(context.Background(), "list-meme-hashtags", map[string]any{})
 	if err == nil || len(knowledge.calls) != 0 {
 		t.Fatalf("expected a switched-off error without a knowledge call, got %v, %#v", err, knowledge.calls)
+	}
+}
+
+func TestHashtagTagValidationPrecedesMediaAndStorageEffects(t *testing.T) {
+	for _, input := range [][2]string{{"", "Humor"}, {"https://media.example/a.png", ""}, {"https://media.example/a.png", "two words"}} {
+		media := &fakeMemeTextReader{result: map[string]any{"text": "words"}}
+		knowledge := &fakeHashtagKnowledge{}
+		_, err := NewMemeHashtagWorkflow(media, knowledge).TagHashtag(context.Background(), input[0], input[1], "")
+		if err == nil || len(media.urls) != 0 || len(knowledge.calls) != 0 {
+			t.Fatalf("invalid intent caused effects: error=%v media=%v storage=%v", err, media.urls, knowledge.calls)
+		}
 	}
 }

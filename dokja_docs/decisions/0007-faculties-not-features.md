@@ -123,6 +123,12 @@ interpretation into the Moderation domain. The
 [media admissibility record](../media-admissibility.md) describes the preserved
 delivery behavior and remaining provider, receipt and selection scope.
 
+Step 09.4-f moves explicit hashtag-example validation, stable identity,
+storage/retrieval scoping and result projection into Knowledge. The
+[hashtag Knowledge record](../hashtag-knowledge.md) describes its preserved
+facade and storage contracts; orchestration still sequences media text and
+the existing recipe parameters.
+
 - Moderation and attention are two faculties (decided above).
 - The meme pool is a reading cache, like the Feeds cache, not stored knowledge.
   Items enter Knowledge only through an explicit workflow step such as tagging.

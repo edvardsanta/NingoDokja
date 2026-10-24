@@ -27,6 +27,7 @@ Available docs:
 - [production-runbook.md](./production-runbook.md)
 - [domain-responsibilities.md](./domain-responsibilities.md)
 - [Media admissibility ownership](./media-admissibility.md)
+- [Hashtag example ownership](./hashtag-knowledge.md)
 - [voice-planning.md](./voice-planning.md)
 - [voice-service-proposal.md](./voice-service-proposal.md)
 - [desktop-app-plan.md](./desktop-app-plan.md)
