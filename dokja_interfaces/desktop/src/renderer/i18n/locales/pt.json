@@ -186,7 +186,7 @@
   "index_degraded": "A indexação por similaridade está indisponível. A busca por palavras continua funcionando.",
   "communications_title": "Conversas",
   "communications_not_set_up": "As mensagens ainda não estão configuradas.",
-  "communications_not_set_up_how": "Defina DOKJA_COMMUNICATIONS_TOKEN com o mesmo valor aleatório de pelo menos 32 caracteres para o orquestrador (no .env) e para o desktop, e reinicie os dois. Vincular o WhatsApp também precisa dele.",
+  "communications_not_set_up_how": "Defina DOKJA_COMMUNICATIONS_TOKEN com o mesmo valor aleatório de pelo menos 32 caracteres no .env da stack e reinicie o orquestrador e o desktop. O desktop lê esse arquivo; use --env-file para outra stack. Um valor exportado tem prioridade. Vincular o WhatsApp também precisa dele.",
   "communications_no_channels": "Nenhum canal de entrega configurado.",
   "communications_identity": "As mensagens são enviadas pelo Ningo. Somente canais configurados aparecem aqui.",
   "communications_channel": "Canais e conversas",

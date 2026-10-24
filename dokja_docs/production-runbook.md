@@ -485,8 +485,11 @@ addresses or the event envelope. `communications.channels` and `communications.h
 through `dokja_domain/dokja_communications` to the read-only `dokja-communications` HTTP service.
 `communications.send` reuses the existing Discord delivery workflow and safe-only channel rules.
 
-- Set `DOKJA_COMMUNICATIONS_TOKEN` to a randomly generated value of at least 32 characters in the
-  desktop shell, orchestrator and service. Empty, short and `CHANGE_ME` credentials disable the
+- Set `DOKJA_COMMUNICATIONS_TOKEN` to a randomly generated value of at least 32 characters for the
+  orchestrator and service. Desktop reads the checkout's `.env` when the variable is absent from
+  its process environment. If Compose uses `.env.prod`, launch Desktop from its package directory
+  with `pnpm start --env-file=../../.env.prod`. An exported value, including a blank one, overrides
+  the file. Restart Desktop after updating configuration. Empty, short and `CHANGE_ME` credentials disable the
   new routes. Keep the value in the ignored environment configuration, never in Git. The
   orchestrator removes the credential before dispatch and debug responses.
 - `COMMUNICATIONS_SERVICE_ENDPOINT` is `http://dokja-communications:8084` in all three Compose

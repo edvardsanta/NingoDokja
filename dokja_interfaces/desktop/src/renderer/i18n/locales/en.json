@@ -186,7 +186,7 @@
   "index_degraded": "Similarity indexing is unavailable. Keyword search still works.",
   "communications_title": "Conversations",
   "communications_not_set_up": "Messages are not set up yet.",
-  "communications_not_set_up_how": "Set DOKJA_COMMUNICATIONS_TOKEN to the same random value of at least 32 characters for the orchestrator (in .env) and for the desktop, then restart both. Linking WhatsApp needs it too.",
+  "communications_not_set_up_how": "Set DOKJA_COMMUNICATIONS_TOKEN to the same random value of at least 32 characters in the stack's .env, then restart the orchestrator and desktop. The desktop reads that file; use --env-file for another stack. An exported value takes precedence. Linking WhatsApp needs it too.",
   "communications_no_channels": "No delivery channels are configured.",
   "communications_identity": "Messages are sent as Ningo. Only configured channels appear here.",
   "communications_channel": "Channels and conversations",

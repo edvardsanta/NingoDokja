@@ -733,6 +733,11 @@
               "detail": "Read gateway ingress/delivery/link/history, Communications domain/read service, routing and System handler; no live accounts or sessions modified."
             },
             {
+              "name": "desktop_saved_communications_credential",
+              "status": "passed",
+              "detail": "Fixed Desktop ignoring the communications token already saved in the checkout .env. Explicit process values retain precedence; --env-file selects another stack's credential file. Only the main process reads the token. Desktop pnpm test: 229 Node and 271 UI tests passed; typecheck and build passed; four built Electron communications/authentication tests passed on a virtual display with a synthetic .env.prod and fake orchestrator. Updated a stale normal-send confirmation assertion to test the existing forced-send rule. No live credential was logged or changed."
+            },
+            {
               "name": "outbound_policy_extraction",
               "status": "passed",
               "detail": "Communications domain and orchestrator go test -race ./... and go vet ./...; final handler-focused race/vet after shared safety policy. Includes target refusal, bypass matrix, disabled destinations, named text restrictions, partial failure and timeout with no resend or mark-sent. Fake transports only."
