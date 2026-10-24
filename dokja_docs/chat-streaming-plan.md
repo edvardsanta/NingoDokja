@@ -1,6 +1,6 @@
 # Streaming Ningo's replies
 
-Status: planned, not implemented.
+Status: implemented in #118 (runtime), #119 (orchestrator) and #121 (desktop), in review.
 
 ## Why
 

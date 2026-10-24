@@ -1,6 +1,6 @@
 # Local models with Ollama
 
-Status: planned, not implemented.
+Status: implemented in #122 (runtime) and #123 (desktop), in review.
 
 ## Why
 
