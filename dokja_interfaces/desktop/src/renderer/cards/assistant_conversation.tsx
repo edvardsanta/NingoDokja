@@ -4,10 +4,10 @@ import { isRecord } from "../../shared/records.js";
 import type { MessageId } from "../i18n/i18n.js";
 import type { TransportError } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
+import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
 
 type Turn = { role: "user" | "assistant"; text: string };
-type Reading = { id: string; title: string; source: string };
 
 export type Conversation = {
   id: string;
@@ -112,18 +112,5 @@ export function Composer({ conversation, placeholder, hint }: { conversation: Co
 }
 
 // A conversation about one reading, inline under it: the reading's own suggestions send at once.
-export function AssistantConversation({ transport, reading }: { transport: Transport; reading: Reading }) {
-  const t = useTranslate();
-  const conversation = useConversation(transport, reading);
-  const prompts: MessageId[] = ["assistant_prompt_summary", "assistant_prompt_question", "assistant_prompt_critique"];
-  return <section className="assistant-conversation" aria-label={t("assistant_title")}>
-    <p className="note">{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</p>
-    <p className="detail">{t("assistant_excerpt_limit")}</p>
-    {conversation.turns.length === 0 && <div className="assistant-prompts">
-      <p>{t("assistant_reading_intro")}</p>
-      {prompts.map((id) => <button key={id} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(t(id))}>{t(id)}</button>)}
-    </div>}
-    <Transcript conversation={conversation} />
-    <Composer conversation={conversation} placeholder={t("assistant_placeholder")} />
-  </section>;
-}
+// The questions a reading's discussion can open with; each is sent as it is.
+export const READING_PROMPTS: readonly MessageId[] = ["assistant_prompt_summary", "assistant_prompt_question", "assistant_prompt_critique"];

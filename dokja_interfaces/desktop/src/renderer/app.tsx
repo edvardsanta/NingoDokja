@@ -5,6 +5,7 @@ import type { Transport } from "../shared/transport.js";
 import { CARDS, FALLBACK, START } from "./cards/registry.js";
 import { I18nProvider } from "./i18n/context.js";
 import { RuntimeEnabled } from "./runtime_context.js";
+import { DiscussionProvider } from "./discussion_context.js";
 import { Sidebar } from "./sidebar.js";
 import { StatusProvider, useStatus } from "./status_context.js";
 
@@ -26,7 +27,7 @@ export function App({ transport, locale, runtimeControls=false }: { transport: T
     <I18nProvider locale={locale}>
       <RuntimeEnabled.Provider value={runtimeControls}><StatusProvider transport={transport}>
         <main>
-          <Sidebar entries={CARDS} transport={transport} start={START} fallback={FALLBACK} header={<Wordmark />} />
+          <DiscussionProvider><Sidebar entries={CARDS} transport={transport} start={START} fallback={FALLBACK} header={<Wordmark />} /></DiscussionProvider>
         </main>
       </StatusProvider></RuntimeEnabled.Provider>
     </I18nProvider>
