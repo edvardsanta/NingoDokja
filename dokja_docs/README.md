@@ -26,6 +26,7 @@ Available docs:
 - [whatsapp-interface.md](./whatsapp-interface.md)
 - [production-runbook.md](./production-runbook.md)
 - [domain-responsibilities.md](./domain-responsibilities.md)
+- [Media admissibility ownership](./media-admissibility.md)
 - [voice-planning.md](./voice-planning.md)
 - [voice-service-proposal.md](./voice-service-proposal.md)
 - [desktop-app-plan.md](./desktop-app-plan.md)

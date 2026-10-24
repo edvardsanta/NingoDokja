@@ -745,7 +745,9 @@
           ],
           "references": [
             "dokja_docs/decisions/0012-communication-services.md",
-            "dokja_docs/communication-boundaries.md"
+            "dokja_docs/communication-boundaries.md",
+            "dokja_docs/decisions/0007-faculties-not-features.md",
+            "dokja_docs/media-admissibility.md"
           ],
           "batches": [
             {
@@ -849,6 +851,36 @@
                   "name": "communication_flow_fixtures",
                   "status": "passed",
                   "detail": "Reused step 09.4-b synthetic inbound and policy suite evidence (Discord 30 tests, WhatsApp 141 tests) and domain/orchestrator delivery, linking, disabled-route and authorization checks. Runtime tests cover start/stop and coordinated allowlist recreation. No live account or message was used."
+                }
+              ],
+              "completed_on": "2026-10-23"
+            },
+            {
+              "id": "09.4-e",
+              "title": "Move media admissibility decisions into Moderation",
+              "status": "completed",
+              "depends_on": [
+                "09.4-b"
+              ],
+              "acceptance_criteria": [
+                "Moderation owns interpretation of live screen results and cached media safety labels; System handlers sequence calls and Communications retains destination and bypass authorization.",
+                "Preserve refusal reasons and fail-closed restricted-channel behavior for disabled, missing, malformed and failed screening, with synthetic domain and delivery regression coverage.",
+                "Preserve event envelopes, routes, actions, provider contracts, commands, configuration and deployment; do not remove Meme facades or change delivery receipts."
+              ],
+              "evidence": [
+                "Moderation.MediaPolicy now interprets live screening results and controls provider availability checks; AssessMediaLabel interprets cached safety labels for scheduled delivery. System handlers pass observations to domain policy, while Communications retains destination eligibility and bypass authorization.",
+                "The exported MemeScreener port remains a type alias for existing wiring. Provider execution/thresholds, Meme facades, cache and receipt persistence remain in their current owners; the broader ADR 0010 concept reclassification is still proposed."
+              ],
+              "checks": [
+                {
+                  "name": "media_policy_regression",
+                  "status": "passed",
+                  "detail": "Moderation go test -race ./... and go vet ./... passed; orchestrator go test -race ./internal/handlers, go vet ./internal/handlers and go test ./... passed. Tests cover safe/unsafe and malformed observations, errors overriding safe flags, disabled providers without calls, cached labels, manual and scheduled safe-only delivery, bypass refusal and unchanged refusal reasons. Synthetic providers and transports only."
+                },
+                {
+                  "name": "media_policy_compatibility",
+                  "status": "passed",
+                  "detail": "Reviewed existing event, route/action, provider and response contracts; no schema, command, env, Compose, port or volume change. Tracker JSON validation and git diff --check passed. No live provider, account, deployment or owner database was used."
                 }
               ],
               "completed_on": "2026-10-23"

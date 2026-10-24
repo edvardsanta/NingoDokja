@@ -118,6 +118,11 @@ keeps describing the current layout until code actually moves.
 
 ## Resolved questions
 
+Implementation progress: step 09.4-e moves live/cached media safety observation
+interpretation into the Moderation domain. The
+[media admissibility record](../media-admissibility.md) describes the preserved
+delivery behavior and remaining provider, receipt and selection scope.
+
 - Moderation and attention are two faculties (decided above).
 - The meme pool is a reading cache, like the Feeds cache, not stored knowledge.
   Items enter Knowledge only through an explicit workflow step such as tagging.
