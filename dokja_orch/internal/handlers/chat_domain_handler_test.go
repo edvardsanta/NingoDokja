@@ -365,3 +365,32 @@ func TestDesktopReadingConversationUsesServerResolvedExcerptAndPrivateSession(t 
 		t.Fatalf("followup did not keep its conversation: %+v", generator.messages)
 	}
 }
+
+type streamingChatGenerator struct {
+	fakeChatGenerator
+	streamed bool
+}
+
+func (g *streamingChatGenerator) GenerateMessagesStream(_ context.Context, messages []map[string]string, onPreview func(string)) (map[string]any, error) {
+	g.streamed = true
+	g.messages = messages
+	onPreview("hel")
+	return g.result, g.err
+}
+
+func TestChatStreamsOnlyWhenTheRequesterAskedForAPreview(t *testing.T) {
+	event := core.Event{Type: "message.created", Payload: map[string]any{"content": "ping"}}
+	step := core.WorkflowStep{Domain: core.DomainChat, Action: "generate-response"}
+
+	plain := &streamingChatGenerator{fakeChatGenerator: fakeChatGenerator{result: map[string]any{"reply": "hello"}}}
+	if _, err := NewChatDomainHandler(plain).Handle(context.Background(), event, step); err != nil || plain.streamed {
+		t.Fatal("a request without a preview must not stream", err)
+	}
+
+	streaming := &streamingChatGenerator{fakeChatGenerator: fakeChatGenerator{result: map[string]any{"reply": "hello"}}}
+	var previews []string
+	result, err := NewChatDomainHandler(streaming).Handle(core.WithReplyPreview(context.Background(), func(text string) { previews = append(previews, text) }), event, step)
+	if err != nil || !streaming.streamed || result["reply"] != "hello" || len(previews) != 1 || previews[0] != "hel" {
+		t.Fatal(result, err, previews)
+	}
+}

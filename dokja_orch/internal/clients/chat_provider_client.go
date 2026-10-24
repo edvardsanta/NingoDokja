@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -66,6 +67,61 @@ func (c *ChatProviderClient) Generate(ctx context.Context, message string) (map[
 func (c *ChatProviderClient) GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error) {
 	return c.call(ctx, "POST", "/chat", map[string]any{"messages": messages})
 }
+
+// GenerateMessagesStream is GenerateMessages with a preview: the runtime's /chat/stream sends the
+// text written so far, then the reply. A runtime without /chat/stream is asked through /chat, with no
+// preview. A preview is shown and thrown away; only the returned reply is the answer.
+func (c *ChatProviderClient) GenerateMessagesStream(ctx context.Context, messages []map[string]string, onPreview func(string)) (map[string]any, error) {
+	data, err := json.Marshal(map[string]any{"messages": messages})
+	if err != nil {
+		return nil, fmt.Errorf("invalid chat request")
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://inference/chat/stream", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chat inference is unavailable; start or restart the local runtime controller")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return c.GenerateMessages(ctx, messages)
+	}
+	if resp.StatusCode != http.StatusOK {
+		var failure map[string]any
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 524289))
+		if json.Unmarshal(raw, &failure) == nil {
+			if message, ok := failure["error"].(string); ok {
+				return nil, fmt.Errorf("%s", message)
+			}
+		}
+		return nil, fmt.Errorf("chat inference failed")
+	}
+	// Each preview repeats the text so far, so a long reply streams far more than its own size: lines
+	// are bounded, and the request's deadline bounds the stream.
+	lines := bufio.NewScanner(resp.Body)
+	lines.Buffer(make([]byte, 0, 64<<10), 524288)
+	for lines.Scan() {
+		var line map[string]any
+		if json.Unmarshal(lines.Bytes(), &line) != nil {
+			return nil, fmt.Errorf("invalid chat provider response")
+		}
+		if preview, ok := line["preview"].(string); ok {
+			if onPreview != nil {
+				onPreview(preview)
+			}
+			continue
+		}
+		if message, ok := line["error"].(string); ok {
+			return nil, fmt.Errorf("%s", message)
+		}
+		return line, nil
+	}
+	return nil, fmt.Errorf("invalid chat provider response")
+}
+
 func (c *ChatProviderClient) Health(ctx context.Context) error {
 	_, err := c.call(ctx, "GET", "/health", nil)
 	return err
