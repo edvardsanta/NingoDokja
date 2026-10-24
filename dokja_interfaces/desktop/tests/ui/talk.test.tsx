@@ -32,6 +32,8 @@ describe("the conversation", () => {
     expect(voice.nextElementSibling?.textContent).toBe("Ask anything, or start from one of these and finish the thought.");
     expect(field().closest(".wp-dock")).not.toBeNull();
     expect(field().placeholder).toBe("Ask Ningo…");
+    // Sending is the one main action of the dock, drawn like the other main actions.
+    expect(screen.getByRole("button", { name: "Send" }).className).toBe("primary");
   });
 
   it("fills the message from a beginning and sends nothing until the owner does", () => {

@@ -106,7 +106,7 @@ export function Composer({ conversation, placeholder, hint }: { conversation: Co
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
     <textarea id={fieldId} ref={field} value={draft} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
+    <button type="submit" className="primary" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
     {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
   </form>;
 }
