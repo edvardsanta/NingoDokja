@@ -29,6 +29,8 @@ func TestBaselineFeatureEventsKeepTheirWorkflowAndAction(t *testing.T) {
 		{"meme.hashtag.untag", "meme", DomainMeme, "untag-meme-hashtag"},
 		{"meme.dispatch.scheduled", "meme-dispatch", DomainSystem, "deliver-scheduled-memes"},
 		{"digest.items", "digest", DomainDigest, "read-digest"},
+		{"conversation.list", "conversation-archive", DomainConversation, "manage-conversation"},
+		{"conversation.read", "conversation-archive", DomainConversation, "manage-conversation"},
 		{"digest.status", "digest", DomainDigest, "inspect-digest"},
 		{"knowledge.ingest", "knowledge", DomainKnowledge, "ingest-knowledge"},
 		{"knowledge.search", "knowledge", DomainKnowledge, "search-knowledge"},

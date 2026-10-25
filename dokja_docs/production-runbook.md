@@ -117,8 +117,17 @@ The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`
   orchestrator writes it; the scheduler only reads the intervals. A corrupt file starts every job paused.
 - `/data/dokja.db` (`DOKJA_DB_FILE`): SQLite database with the chat provider profiles (base URL, model
   and token). Keep the volume private: the token is stored in plain text.
+- `/data/dokja_conversations.db`, beside `DOKJA_DB_FILE` and named from it, so there is no new
+  variable: the owner's conversations with Ningo, as written by the desktop and the CLI.
+  - Only the orchestrator opens it; it is created on the first start of a build that keeps
+    conversations, readable by its owner only.
+  - It is the owner's own text: keep the volume private and include it in backups.
+  - A build older than the file refuses it rather than reading it wrongly, and the orchestrator then
+    goes on without keeping conversations. Rolling back means the previous build and this file left
+    alone.
+  - At start, turns a stopped orchestrator left pending are marked interrupted; none is sent again.
 
-Without a writable volume both files would be lost on every deploy.
+Without a writable volume these files would be lost on every deploy.
 
 Startup still emits every scheduled job once, but the orchestrator skips the ones an operator paused, so a
 restart never posts something that was switched off. `dokja-cli services list` and `dokja-cli jobs list` show

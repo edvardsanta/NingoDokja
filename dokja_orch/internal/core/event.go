@@ -33,6 +33,8 @@ const (
 	DomainDigest         Domain = "digest"
 	DomainAutomation     Domain = "automation"
 	DomainModeration     Domain = "moderation"
+	// The owner's archive of conversations with Ningo: list, read, rename and delete.
+	DomainConversation Domain = "conversation"
 )
 
 type Event struct {
