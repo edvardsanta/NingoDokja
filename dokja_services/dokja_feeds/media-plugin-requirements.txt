@@ -1,0 +1,6 @@
+# Only what the media-perception adapter needs (screening, OCR and attachment download), without the
+# document processor's model and browser libraries. Pins match content-plugin-requirements.txt.
+curl_cffi==0.14.0
+requests==2.32.5
+nudenet==3.4.2
+rapidocr-onnxruntime==1.2.3
