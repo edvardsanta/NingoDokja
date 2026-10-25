@@ -1,6 +1,8 @@
-# Only what the media-perception adapter needs (screening, OCR and attachment download), without the
-# document processor's model and browser libraries. Pins match content-plugin-requirements.txt.
+# Memes as Feeds media: what the media-perception adapter needs (screening, OCR and attachment
+# download) and what meme source scrapers use, without the document processor's model and browser
+# libraries. Pins match content-plugin-requirements.txt and dokja_lab's requirements.
 curl_cffi==0.14.0
+cloudscraper==1.2.71
 requests==2.32.5
 nudenet==3.4.2
 rapidocr-onnxruntime==1.2.3

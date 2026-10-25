@@ -92,9 +92,10 @@ Browsing and caching work without OCR or model dependencies. To use the shipped
    keeps the image small.
    - `content` includes the document processor's model and browser libraries
      (`torch` and `transformers`, several gigabytes).
-   - `media` installs only screening, OCR and the attachment transport
-     (`media-plugin-requirements.txt`), so it fits where `content` runs out of
-     disk.
+   - `media` installs only screening, OCR, the attachment transport and the
+     meme scrapers' HTTP clients (`media-plugin-requirements.txt`), so it fits
+     where `content` runs out of disk. Memes are Feeds media: a meme source is a
+     `source.collect.v1` plugin with `kind: "media"`.
    - A custom provider can use its own dependency image.
 2. Copy the desired adapter from `plugins.example` to the external directory and
    set `enabled: true`. Examples always ship disabled. Keep only one enabled
