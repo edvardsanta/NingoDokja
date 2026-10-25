@@ -818,6 +818,17 @@ paths, plugin setup and preserved legacy controls. Existing status examples
 listing Book/Meme refer to `DOKJA_CONTENT_BACKEND=legacy`; plugin mode reports
 providers under Feeds and does not probe standalone Book/Meme endpoints.
 
+Step 09.4-h changes media fetch from consuming to read-only. Deploy the
+orchestrator and selected reader together (Feeds bundled/custom media library,
+or the legacy Meme service). A successful scheduled delivery now writes its
+receipt explicitly; manual delivery retains the explicit `mark_sent` option.
+One confirmed destination is sufficient even when another destination fails.
+Blocked, failed and unknown sends do not set a receipt. Existing flags and
+schema are preserved; old flags cannot establish historical delivery evidence.
+Rolling back the reader restores consume-on-fetch behavior, so rollback also
+requires the matching orchestrator. No deployment was performed by this change.
+See [receipt semantics and failure limits](media-delivery-receipts.md).
+
 ## Local inference-provider inspection
 
 The local lite controller exposes read-only `runtime.providers`: desktop System

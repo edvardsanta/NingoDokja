@@ -52,7 +52,8 @@ Preferred orchestrator envelope:
 Supported event types:
 
 - `meme.fetch`
-  Returns unsent memes and marks them as sent.
+  Returns unsent memes without changing delivery state. Repeated fetches keep
+  returning an item until a confirmed delivery records `meme.mark_sent`.
 - `meme.pool.refresh`
   Scrapes sources and stores new memes.
 - `meme.status`

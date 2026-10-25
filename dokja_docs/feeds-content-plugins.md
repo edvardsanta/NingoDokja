@@ -84,6 +84,13 @@ existing `meme` table and columns, preserves sent flags on duplicate collection,
 and serializes writes between plugin processes. There is no table migration or
 automatic data copy. Back up the database before changing deployments.
 
+As of step 09.4-h, `fetch` is a read and must not set sent flags. The
+orchestrator records `mark-sent` only after at least one destination acknowledges
+successful delivery. Custom `media.library.v1` replacements must follow this
+revised behavior. Update the reader and orchestrator together; see
+[confirmed media delivery receipts](media-delivery-receipts.md) for the breaking
+behavior change and receipt-storage limitations.
+
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:
 
@@ -118,7 +125,7 @@ this migration.
 
 `dokja-book` and `dokja-meme` now have the `legacy-content` Compose profile; they
 are not started by the normal stack. Stop an existing Meme server before allowing
-the plugin to consume its queue, so two consumers do not compete for the same
+the plugin to read its queue, so two dispatchers do not compete for the same
 items. Runtime inventory no longer manages these old containers.
 
 To restore the earlier transport, set `DOKJA_CONTENT_BACKEND=legacy` and explicitly
