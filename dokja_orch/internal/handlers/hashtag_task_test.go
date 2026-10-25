@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -56,7 +57,7 @@ func TestHashtagTaskLinksReadingRetrievalSelectionAndPrediction(t *testing.T) {
 		attempt.Prediction.BaselineP <= 0 || attempt.Prediction.Resolved != 10 {
 		t.Fatalf("expected a frozen prediction with its baseline and support: %#v", attempt.Prediction)
 	}
-	if len(task.Evidence) != 2 || task.Evidence[0].Ref != experienceRef(testMemeURL) ||
+	if len(task.Evidence) != 2 || task.Evidence[0].Ref != memorydomain.HashtagExperienceRef(testMemeURL) ||
 		task.Evidence[1].Ref != "meme-hashtag:ab79f604fdb461b840259a66c868ae02" || task.Evidence[1].Scope != (core.TaskScope{}) {
 		t.Fatalf("evidence must cite the meme and the labelled example without addresses: %#v", task.Evidence)
 	}
@@ -199,7 +200,7 @@ func TestThePredictionIsFrozenBeforeDeliveryAndRecordedAfterIt(t *testing.T) {
 		t.Fatalf("predict before the delivery, record after it: predicted=%v recordedEarly=%v", deliverer.predictedBy, deliverer.recordedEarly)
 	}
 	records := recordsOf(memory)
-	if len(records) != 1 || records[0]["ref"] != experienceRef(testMemeURL) || records[0]["detail"] != "#Humor" ||
+	if len(records) != 1 || records[0]["ref"] != memorydomain.HashtagExperienceRef(testMemeURL) || records[0]["detail"] != "#Humor" ||
 		records[0]["predicted_p"] == nil || records[0]["baseline_p"] == nil {
 		t.Fatalf("the attempt must be recorded with its frozen prediction: %#v", records)
 	}
