@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ACTIONS } from "../src/main/actions.js";
+import { isWriteAction, needsConfirmation } from "../src/shared/actions.js";
 import { buildIngest } from "../src/main/ingest.js";
 
 // Hand-built replies in the shapes the orchestrator uses, never a captured one: a real reply
@@ -606,4 +607,12 @@ test("meme.hashtag.tag may carry the meme's text the owner wrote, bounded", () =
   assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "  words  " }), { url: "https://images.example/a.png", hashtag: "#x", text: "words" });
   assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "   " }), { url: "https://images.example/a.png", hashtag: "#x" });
   assert.equal(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "w".repeat(2001) }), undefined);
+});
+
+test("meme.pool.refresh is a change the screen cannot size, and keeps only counts and source names", () => {
+  assert.equal(isWriteAction("meme.pool.refresh"), true);
+  assert.equal(needsConfirmation("meme.pool.refresh"), false);
+  assert.deepEqual(ACTIONS["meme.pool.refresh"].payload({ max_items_per_scraper: 200, scope: "all" }), {});
+  const projected = ACTIONS["meme.pool.refresh"].project({ domain: "meme", result: { added: 4, scrapers: ["a", 7, "b"], collection: { secret: "drop" }, status: "refreshed" } });
+  assert.deepEqual(projected, { added: 4, sources: ["a", "b"] });
 });

@@ -507,6 +507,7 @@ export function createFakeTransport(delayMs = 400): Transport {
           };
           return ok(page);
         }
+        case "meme.pool.refresh": return ok({ added: 3, sources: ["example-source"] });
         case "meme.list": {
           const scope = payload?.scope === "sent" ? "sent" : "unsent";
           const limit = Number(payload?.limit) || 12;

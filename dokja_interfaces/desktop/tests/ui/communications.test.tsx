@@ -247,6 +247,48 @@ describe("communications", () => {
       { url: "https://images.example/a.png", hashtag: "#reaction", text: "when the build is green" },
     ]);
   });
+  it("fetches new memes from the tray, says how many came, and shows the first page again once", async () => {
+    const first = { total: 1, offset: 0, memes: [{ url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" }] };
+    const after = { total: 2, offset: 0, memes: [
+      { url: "https://images.example/b.png", title: "Fresh", tags: "", source: "", createdAt: "", sentAt: "" },
+      { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const { preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": [ok(first), ok(after)],
+      "meme.pool.refresh": ok({ added: 1, sources: ["example-source"] }),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+    await screen.findByRole("button", { name: "Attach First" });
+    fireEvent.click(screen.getByRole("button", { name: "Fetch new memes" }));
+    await screen.findByText("1 new memes.");
+    await screen.findByRole("button", { name: "Attach Fresh" });
+    // Give a looping effect the chance to show itself before counting.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(calls.filter((call) => call.type === "meme.pool.refresh").map((call) => call.payload)).toEqual([{}]);
+    const lists = calls.filter((call) => call.type === "meme.list").map((call) => call.payload?.offset);
+    expect(lists).toEqual([0, 0]);
+  });
+
+  it("says when the sources brought nothing new, and why a refresh failed", async () => {
+    const { preview } = previewer();
+    const { transport } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": ok({ total: 0, offset: 0, memes: [] }),
+      "meme.pool.refresh": [ok({ added: 0, sources: [] }), failure("orchestrator", "1 source plugins failed; successful observations were retained")],
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Fetch new memes" }));
+    await screen.findByText("Nothing new from the sources.");
+    fireEvent.click(screen.getByRole("button", { name: "Fetch new memes" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/1 source plugins failed/);
+  });
+
   it("keeps the attached meme as a chip when the tray closes, and takes it off with the cross", async () => {
     const memePage = { total: 30, offset: 0, memes: [
       { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },

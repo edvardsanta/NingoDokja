@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
-import { isRecord } from "../../shared/records.js";
-import type { CommunicationChannel, CommunicationHistory, CommunicationSend, MemeItem, MemePage, Off } from "../../shared/replies.js";
+import { isRecord, text } from "../../shared/records.js";
+import type { CommunicationChannel, CommunicationHistory, CommunicationSend, MemeItem, MemePage, MemePoolRefresh, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import { WorkspacePanel, useWorkspaceRefresh } from "./workspace_panel.js";
-import { CardFrame, OffNotice, Problem } from "./card_frame.js";
+import { CardFrame, OffNotice, Problem, describeError } from "./card_frame.js";
 import { AttachedMeme, MemePicker } from "./memes.js";
 import { parseMemePage } from "./memes_model.js";
 import { useAction } from "./use_action.js";
@@ -249,6 +249,7 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
     if (canSend) send.start({ content: content.trim(), attachment, force: forceSend && attachment !== "" });
   }}>
     {!textOnly && picking && <div className="meme-tray" id={trayId}>
+      <RefreshMemes transport={transport} disabled={sending || memes.state.phase === "loading"} onRefreshed={() => { setMemeOffset(0); memes.start(0); }} />
       {memes.state.phase === "loading" && <p className="meme-tray-note" role="status">{t("loading")}</p>}
       {memes.state.phase === "error" && <div className="meme-tray-note"><Problem error={memes.state.error} /></div>}
       {memes.state.phase === "ready" && memes.state.data.off && <div className="meme-tray-note"><OffNotice reason={memes.state.data.reason} /></div>}
@@ -272,4 +273,36 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
       {send.state.phase === "ready" && (send.state.data.off ? <OffNotice reason={send.state.data.reason} /> : !(send.state.data.sent && (content !== "" || attached)) && <p data-tone={send.state.data.sent ? "ok" : "problem"}>{send.state.data.sent ? t("communications_sent") : t("communications_not_sent")}</p>)}
     </div>
   </form>;
+}
+
+// Asks the sources for new memes now, instead of waiting for the scheduler's next refresh, then shows
+// the first page again. It says how many came in; a source that failed is said too, while what the
+// others brought is kept.
+function RefreshMemes({ transport, disabled, onRefreshed }: { transport: Transport; disabled: boolean; onRefreshed: () => void }) {
+  const t = useTranslate();
+  const run = useCallback(async (): Promise<LoadResult<MemePoolRefresh | Off>> => {
+    const answer = await transport.request("meme.pool.refresh", {}, { timeoutMs: 120_000 });
+    if (!answer.ok) return answer;
+    const result = answer.result;
+    if (!isRecord(result)) return unexpected();
+    if (result.off === true) return { ok: true, data: { off: true, reason: text(result.reason) } };
+    if (typeof result.added !== "number") return unexpected();
+    return { ok: true, data: { added: result.added, sources: Array.isArray(result.sources) ? result.sources.map(text) : [] } };
+  }, [transport]);
+  const refresh = useAction(run);
+  // Once per refresh that came back: the callback is a new function on every render of the tray.
+  const refreshed = useRef(onRefreshed);
+  refreshed.current = onRefreshed;
+  useEffect(() => { if (refresh.state.phase === "ready") refreshed.current(); }, [refresh.state]);
+  const busy = refresh.state.phase === "loading";
+  return <div className="meme-refresh">
+    <button type="button" className="quiet" disabled={disabled || busy} onClick={() => refresh.start(undefined)}>{t("memes_refresh")}</button>
+    <span aria-live="polite">
+      {busy && <span role="status">{t("memes_refreshing")}</span>}
+      {refresh.state.phase === "ready" && ("off" in refresh.state.data
+        ? <span data-tone="off">{refresh.state.data.reason || t("service_off")}</span>
+        : <span>{t(refresh.state.data.added === 0 ? "memes_refreshed_none" : "memes_refreshed", { count: refresh.state.data.added })}</span>)}
+      {refresh.state.phase === "error" && <span role="alert" data-tone="problem">{describeError(refresh.state.error, t)}</span>}
+    </span>
+  </div>;
 }

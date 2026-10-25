@@ -494,5 +494,9 @@
   "error_media_reader_missing": "A leitura de imagens não está instalada: o Feeds não tem o plugin media-perception habilitado. Instale-o para ler o texto dos memes e baixar as imagens.",
   "error_attachment_blocked": "O site da imagem recusou o download ({status}). Com o plugin media-perception instalado no Feeds, o Ningo baixa a imagem por conta própria.",
   "memes_tag_text": "Texto do meme",
-  "memes_tag_text_hint": "O Ningo não conseguiu ler da imagem. Escreva o que o meme diz e crie a tag de novo."
+  "memes_tag_text_hint": "O Ningo não conseguiu ler da imagem. Escreva o que o meme diz e crie a tag de novo.",
+  "memes_refresh": "Buscar memes novos",
+  "memes_refreshing": "Perguntando às fontes…",
+  "memes_refreshed": "{count} memes novos.",
+  "memes_refreshed_none": "Nada novo nas fontes."
 }

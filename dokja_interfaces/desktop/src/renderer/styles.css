@@ -1995,3 +1995,6 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 /* The meme's text, asked only when it cannot be read from the image. */
 .meme-tag-text { display: grid; gap: .35rem; flex-basis: 100%; }
 .meme-tag-text textarea { min-width: 0; padding: .45rem .65rem; border: 1px solid var(--edge); background: var(--static); color: var(--ink); font: inherit; resize: vertical; }
+
+/* Fetching new memes, at the top of the tray: a quiet action and what it brought. */
+.meme-refresh { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .75rem; padding: .35rem .5rem; border-bottom: 1px solid var(--rule); color: var(--ink-dim); font-size: .875rem; }
