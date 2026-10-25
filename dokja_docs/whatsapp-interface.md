@@ -95,7 +95,7 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_WHATSAPP_HISTORY_DIR` | WhatsApp interface | Folder of the recorded text. Required when a conversation is named; `/history` (its own volume) in Compose |
 | `DOKJA_WHATSAPP_HISTORY_DAYS` | WhatsApp interface | How long the text is kept, 1 to 365 days, default `30` |
 | `DOKJA_WHATSAPP_STATUS_PORT` | WhatsApp interface | Internal port that answers the interface's state, default `8094`. Never published |
-| `WHATSAPP_INTERFACE_STATUS_ENDPOINT` | Orchestrator | `http://dokja-whatsapp:8094/status` in Compose. Empty (the default) means the desktop does not list WhatsApp |
+| `WHATSAPP_INTERFACE_STATUS_ENDPOINT` | Orchestrator | Defaults to `http://dokja-whatsapp:8094/status` in the lite and dev stacks. While nothing answers there, WhatsApp shows as not running, with no alarm. An empty value means the desktop shows WhatsApp as not configured |
 
 The service refuses to start, naming the variable and the position of the entry (never its value),
 when an entry is not a phone number or a group id, and when nothing at all would be answered (self
