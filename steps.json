@@ -748,7 +748,8 @@
             "dokja_docs/communication-boundaries.md",
             "dokja_docs/decisions/0007-faculties-not-features.md",
             "dokja_docs/media-admissibility.md",
-            "dokja_docs/hashtag-knowledge.md"
+            "dokja_docs/hashtag-knowledge.md",
+            "dokja_docs/hashtag-experience.md"
           ],
           "batches": [
             {
@@ -915,10 +916,41 @@
                 }
               ],
               "completed_on": "2026-10-23"
+            },
+            {
+              "id": "09.4-g",
+              "title": "Move hashtag experience observation rules into Memory",
+              "status": "completed",
+              "depends_on": [
+                "09.4-f"
+              ],
+              "acceptance_criteria": [
+                "Memory owns the hashtag action name, stable experience identity, bounded observation/evidence and prediction/record/feedback request preparation; orchestration retains sequencing, background execution and time budgets.",
+                "Preserve stored references, generic Memory events/actions, accepted/replaced resolution, frozen pre-delivery probabilities and the unscored fallback; recording an executed attempt never predicts again.",
+                "Keep existing delivery/feedback call sites and facade behavior, with domain and workflow regression evidence; no schema, command, configuration or deployment change."
+              ],
+              "evidence": [
+                "Memory now prepares immutable hashtag observations and fresh requests using the legacy media-derived reference and existing action name. Unicode bounds, positive evidence-score clamping, optional-note behavior and generic validation remain unchanged. Task evidence uses the domain-owned experience identity.",
+                "Handler match and prediction types remain aliases. The executed path copies the record probabilities before scheduling; later snapshot edits cannot change the request. Background sequencing, switches, budgets, existing successful-operation call sites and generic accepted/replaced resolution are preserved."
+              ],
+              "checks": [
+                {
+                  "name": "hashtag_experience_regression",
+                  "status": "passed",
+                  "detail": "Memory domain go test -race ./... and go vet ./... passed; orchestrator go test -race ./internal/handlers, go vet ./internal/handlers and go test ./... passed. New domain tests pin the legacy identity and payloads, Unicode bounds, absent/clamped scores, zero-value rejection, copied prediction values, independent request maps, consistent prediction context and accepted/replaced feedback. Existing workflow tests cover prediction failure, unscored execution without another prediction, background work, disabled/incomplete notes, delivery failures and log privacy. Synthetic stores only."
+                },
+                {
+                  "name": "hashtag_experience_compatibility",
+                  "status": "passed",
+                  "detail": "Reviewed public events, route/action and response shapes, stored identity, task evidence, generic validation, feedback and service contracts. No schema, command, env, Compose, port or volume change. No live provider, platform account, deployment or owner database used. Tracker JSON validation and git diff --check passed."
+                }
+              ],
+              "completed_on": "2026-10-25"
             }
           ],
           "remaining": [
-            "Meme, Digest and conversation responsibility migrations from ADR 0010 remain pending; this communication classification does not complete them."
+            "Meme pool mark-sent receipts and unsent filtering still use the current media-library adapter; hashtag experience extraction does not migrate those delivery receipts.",
+            "Meme selection/relevance, Digest ordering/freshness and conversation responsibility migrations remain pending; the broader ADR 0010 grouping is still proposed."
           ]
         },
         {

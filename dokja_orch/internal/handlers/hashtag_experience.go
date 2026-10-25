@@ -2,36 +2,18 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"math"
 	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/logger"
-	"strings"
 	"time"
-	"unicode/utf8"
 )
 
-const (
-	// hashtagSuggestAction names what the bot did when it appended a learned hashtag.
-	hashtagSuggestAction = "hashtag.suggest"
-	// experienceBudget is how long one memory call may take. The calls run in the background and
-	// are best effort: a slow or unreachable memory never delays or fails a delivery.
-	experienceBudget  = 5 * time.Second
-	maxExperienceText = 4000
-	// maxMatchedText is how much of the earlier example's text a suggestion keeps as its evidence.
-	maxMatchedText = 200
-)
+// experienceBudget bounds one background memory workflow. Slow memory never
+// delays or fails a delivery.
+const experienceBudget = 5 * time.Second
 
-// HashtagMatch is what a suggestion rested on: the earlier tagged meme it was closest to. A zero
-// value means the service did not say.
-type HashtagMatch struct {
-	// Score is how close that meme was, 0 to 1.
-	Score float64
-	// Text is what was read from that meme. It is the operator's own material.
-	Text string
-}
+// HashtagMatch remains an alias for callers while Memory owns evidence rules.
+type HashtagMatch = memorydomain.HashtagMatch
 
 // HashtagExperienceNotes is what the handlers tell the experience memory about hashtags.
 type HashtagExperienceNotes interface {
@@ -70,76 +52,65 @@ func (e *HashtagExperience) active() bool {
 }
 
 func (e *HashtagExperience) Suggested(url, text, hashtag string, match HashtagMatch) {
-	text, hashtag = truncateRunes(strings.TrimSpace(text), maxExperienceText), strings.TrimSpace(hashtag)
-	if !e.active() || url == "" || text == "" || hashtag == "" {
+	if !e.active() {
 		return
 	}
-	e.spawn(func() { e.recordSuggestion(experienceRef(url), text, hashtag, match) })
-}
-
-// Executed records an attempt of the hashtag task once its delivery reached at least one
-// channel. It uses the attempt's frozen prediction and never predicts again: an attempt
-// without one is recorded unscored.
-func (e *HashtagExperience) Executed(url string, attempt HashtagAttempt) {
-	text, hashtag := truncateRunes(strings.TrimSpace(attempt.QueryText), maxExperienceText), strings.TrimSpace(attempt.Hashtag)
-	if !e.active() || url == "" || text == "" || hashtag == "" {
+	observation, ok := memorydomain.PrepareHashtagExperience(url, text, hashtag, match)
+	if !ok {
 		return
-	}
-	snapshot := attempt.Prediction
-	if snapshot != nil {
-		frozen := *snapshot
-		snapshot = &frozen
 	}
 	e.spawn(func() {
-		e.recordWith(experienceRef(url), text, hashtag, attempt.Match, func(context.Context) (map[string]any, bool) {
-			if snapshot == nil {
-				return nil, false
-			}
-			return map[string]any{"predicted_p": snapshot.PredictedP, "baseline_p": snapshot.BaselineP}, true
-		})
+		ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
+		defer cancel()
+
+		prediction, err := e.domain.Handle(ctx, observation.PredictionRequest())
+		var snapshot *HashtagPrediction
+		if err != nil {
+			logger.Info(fmt.Sprintf("hashtag experience could not predict, recording without a score: %v", err))
+		} else {
+			predicted, _ := prediction["predicted_p"].(float64)
+			baseline, _ := prediction["baseline_p"].(float64)
+			snapshot = &HashtagPrediction{PredictedP: predicted, BaselineP: baseline}
+		}
+		e.recordIn(ctx, observation.RecordRequest(snapshot), snapshot != nil)
 	})
+}
+
+// Executed records a delivered attempt using its frozen prediction. An attempt
+// without a prediction stays unscored.
+func (e *HashtagExperience) Executed(url string, attempt HashtagAttempt) {
+	if !e.active() {
+		return
+	}
+	observation, ok := memorydomain.PrepareHashtagExperience(url, attempt.QueryText, attempt.Hashtag, attempt.Match)
+	if !ok {
+		return
+	}
+	// Build the request before scheduling so later mutation of the attempt's
+	// prediction cannot alter the recorded snapshot.
+	request := observation.RecordRequest(attempt.Prediction)
+	e.spawn(func() { e.record(request, attempt.Prediction != nil) })
 }
 
 func (e *HashtagExperience) Tagged(url, hashtag string) {
-	hashtag = strings.TrimSpace(hashtag)
-	if !e.active() || url == "" || hashtag == "" {
+	if !e.active() {
 		return
 	}
-	e.spawn(func() { e.resolveSuggestion(experienceRef(url), hashtag) })
+	request, ok := memorydomain.HashtagFeedbackRequest(url, hashtag)
+	if !ok {
+		return
+	}
+	e.spawn(func() { e.resolveSuggestion(request) })
 }
 
-func (e *HashtagExperience) recordSuggestion(ref, text, hashtag string, match HashtagMatch) {
-	// The prediction is made before the experience exists, so it only uses what came earlier. If
-	// it cannot be made the experience is still worth keeping: it just has nothing to score.
-	e.recordWith(ref, text, hashtag, match, func(ctx context.Context) (map[string]any, bool) {
-		prediction, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionPredictExperience, map[string]any{
-			"action": hashtagSuggestAction, "context": text,
-		}))
-		if err != nil {
-			logger.Info(fmt.Sprintf("hashtag experience could not predict, recording without a score: %v", err))
-			return nil, false
-		}
-		return prediction, true
-	})
-}
-
-func (e *HashtagExperience) recordWith(ref, text, hashtag string, match HashtagMatch, predict func(context.Context) (map[string]any, bool)) {
+func (e *HashtagExperience) record(request memorydomain.Request, scored bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
 	defer cancel()
+	e.recordIn(ctx, request, scored)
+}
 
-	record := map[string]any{"ref": ref, "action": hashtagSuggestAction, "context": text, "detail": hashtag}
-	if match.Score > 0 {
-		record["matched_score"] = math.Min(match.Score, 1)
-	}
-	if matched := truncateRunes(strings.TrimSpace(match.Text), maxMatchedText); matched != "" {
-		record["matched_context"] = matched
-	}
-	prediction, scored := predict(ctx)
-	if scored {
-		record["predicted_p"], record["baseline_p"] = prediction["predicted_p"], prediction["baseline_p"]
-	}
-
-	answer, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionRecordExperience, record))
+func (e *HashtagExperience) recordIn(ctx context.Context, request memorydomain.Request, scored bool) {
+	answer, err := e.domain.Handle(ctx, request)
 	if err != nil {
 		logger.Info(fmt.Sprintf("hashtag experience could not be recorded: %v", err))
 		return
@@ -147,13 +118,11 @@ func (e *HashtagExperience) recordWith(ref, text, hashtag string, match HashtagM
 	logger.Info(fmt.Sprintf("hashtag experience recorded created=%v scored=%t", answer["created"], scored))
 }
 
-func (e *HashtagExperience) resolveSuggestion(ref, hashtag string) {
+func (e *HashtagExperience) resolveSuggestion(request memorydomain.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
 	defer cancel()
 
-	answer, err := e.domain.Handle(ctx, memoryRequest(memorydomain.ActionResolveExperience, map[string]any{
-		"ref": ref, "observed": hashtag,
-	}))
+	answer, err := e.domain.Handle(ctx, request)
 	if err != nil {
 		logger.Info(fmt.Sprintf("hashtag experience could not be resolved: %v", err))
 		return
@@ -161,22 +130,4 @@ func (e *HashtagExperience) resolveSuggestion(ref, hashtag string) {
 	logger.Info(fmt.Sprintf(
 		"hashtag experience resolved found=%v resolved=%v matched=%v", answer["found"], answer["resolved"], answer["matched"],
 	))
-}
-
-func memoryRequest(action string, payload map[string]any) memorydomain.Request {
-	return memorydomain.Request{Action: action, Event: memorydomain.Event{Source: "orchestrator", Payload: payload}}
-}
-
-// experienceRef identifies a meme without keeping its address: the same address always gives the
-// same ref, so the tag that comes later finds the suggestion that came first.
-func experienceRef(url string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(url)))
-	return "hashtag:" + hex.EncodeToString(sum[:])[:32]
-}
-
-func truncateRunes(value string, limit int) string {
-	if utf8.RuneCountInString(value) <= limit {
-		return value
-	}
-	return string([]rune(value)[:limit])
 }

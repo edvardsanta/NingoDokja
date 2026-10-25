@@ -24,15 +24,7 @@ const (
 
 // HashtagPrediction is the shadow snapshot frozen before the action. It is a copy: nothing
 // that happens later changes it, and it never decides what is delivered.
-type HashtagPrediction struct {
-	Method       string
-	PredictedP   float64
-	BaselineP    float64
-	Support      float64
-	Resolved     float64
-	Insufficient bool
-	Reason       string
-}
+type HashtagPrediction = memorydomain.HashtagPrediction
 
 // HashtagAttempt is one suggestion attempt. Hashtag is empty when the task abstained or
 // could not finish; Prediction is nil when the attempt is unscored.
@@ -122,7 +114,7 @@ func (t *HashtagTask) read(url string) core.TaskStepFunc {
 			Disposition: core.StepContinue,
 			Output:      map[string]any{"text": text},
 			Evidence: []core.Evidence{{
-				Ref: experienceRef(url), Capability: "meme.text.read", ObservedAt: time.Now().UTC(),
+				Ref: memorydomain.HashtagExperienceRef(url), Capability: "meme.text.read", ObservedAt: time.Now().UTC(),
 				Scope: in.Scope, Reason: "text read from the meme",
 			}},
 		}, nil
@@ -183,9 +175,7 @@ func (t *HashtagTask) predict(ctx context.Context, in core.StepInput) (core.Step
 	}
 	done := make(chan answer, 1)
 	go func() {
-		values, err := t.memory.Handle(ctx, memoryRequest(memorydomain.ActionPredictExperience, map[string]any{
-			"action": hashtagSuggestAction, "context": truncateRunes(strings.TrimSpace(text), maxExperienceText),
-		}))
+		values, err := t.memory.Handle(ctx, memorydomain.HashtagPredictionRequest(text))
 		done <- answer{values, err}
 	}()
 	select {

@@ -129,6 +129,12 @@ storage/retrieval scoping and result projection into Knowledge. The
 facade and storage contracts; orchestration still sequences media text and
 the existing recipe parameters.
 
+Step 09.4-g moves hashtag experience identity, observation bounds, record and
+feedback preparation into Memory. The
+[hashtag experience record](../hashtag-experience.md) describes compatibility,
+frozen predictions and remaining pool-receipt work. Orchestration keeps the
+existing background execution, budgets and successful-operation call sites.
+
 - Moderation and attention are two faculties (decided above).
 - The meme pool is a reading cache, like the Feeds cache, not stored knowledge.
   Items enter Knowledge only through an explicit workflow step such as tagging.

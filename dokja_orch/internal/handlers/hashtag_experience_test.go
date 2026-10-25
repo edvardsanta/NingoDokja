@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 	"regexp"
 	"strings"
@@ -191,8 +192,8 @@ func TestEvidenceIsKeptWithinWhatTheMemoryAccepts(t *testing.T) {
 	if record["matched_score"] != 1.0 {
 		t.Fatalf("a score is a probability, rounding noise above 1 is clamped: %v", record["matched_score"])
 	}
-	if got := len([]rune(record["matched_context"].(string))); got != maxMatchedText {
-		t.Fatalf("the earlier example's text is cut to %d characters, got %d", maxMatchedText, got)
+	if got := len([]rune(record["matched_context"].(string))); got != 200 {
+		t.Fatalf("the earlier example's text is cut to %d characters, got %d", 200, got)
 	}
 }
 
@@ -202,8 +203,8 @@ func TestVeryLongTextIsCutToWhatTheMemoryAccepts(t *testing.T) {
 	synchronous(service, nil).Suggested(testMemeURL, strings.Repeat("é", 5000), "#Humor", HashtagMatch{})
 
 	record := service.sent()[1].payload
-	if got := len([]rune(record["context"].(string))); got != maxExperienceText {
-		t.Fatalf("the context should be cut to %d characters, got %d", maxExperienceText, got)
+	if got := len([]rune(record["context"].(string))); got != 4000 {
+		t.Fatalf("the context should be cut to %d characters, got %d", 4000, got)
 	}
 }
 
@@ -220,14 +221,14 @@ func TestTaggingResolvesTheSuggestionByWhatWasObserved(t *testing.T) {
 			t.Fatalf("%s: %s", name, got)
 		}
 		resolve := service.sent()[1].payload
-		if resolve["ref"] != experienceRef(testMemeURL) || resolve["outcome"] != tc.outcome {
+		if resolve["ref"] != memorydomain.HashtagExperienceRef(testMemeURL) || resolve["outcome"] != tc.outcome {
 			t.Fatalf("%s: resolved %v, want outcome %s", name, resolve, tc.outcome)
 		}
 	}
 }
 
 func TestTheSameAddressAlwaysGivesTheSameRef(t *testing.T) {
-	if experienceRef(testMemeURL) != experienceRef("  "+testMemeURL+" ") || experienceRef(testMemeURL) == experienceRef(testMemeURL+"?x=1") {
+	if memorydomain.HashtagExperienceRef(testMemeURL) != memorydomain.HashtagExperienceRef("  "+testMemeURL+" ") || memorydomain.HashtagExperienceRef(testMemeURL) == memorydomain.HashtagExperienceRef(testMemeURL+"?x=1") {
 		t.Fatal("a suggestion and the tag that follows it must meet at one ref, and different memes must not")
 	}
 }
