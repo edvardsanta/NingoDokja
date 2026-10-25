@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { isRecord, text } from "../../shared/records.js";
 import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
+import { describeError, needsWrittenText } from "./card_frame.js";
 import { usePreview } from "./use_preview.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
@@ -37,6 +38,9 @@ export function MemePicker({
 }) {
   const t = useTranslate();
   const [hashtag, setHashtag] = useState("");
+  // The meme's text, written by the owner when it cannot be read from the image.
+  const [written, setWritten] = useState("");
+  const textId = useId();
   const [createdTags, setCreatedTags] = useState<string[]>([]);
   const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
@@ -62,7 +66,7 @@ export function MemePicker({
   }, [transport]);
   const createTag = useCallback(async (): Promise<LoadResult<{ hashtag: string } | Off>> => {
     if (!selectedMeme || !hashtag.trim()) return { ok: false, error: { code: "invalid", message: "a hashtag is required" } };
-    const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim() }, { timeoutMs: 30_000 });
+    const answer = await transport.request("meme.hashtag.tag", { url: selectedMeme.url, hashtag: hashtag.trim(), ...(written.trim() ? { text: written.trim() } : {}) }, { timeoutMs: 30_000 });
     if (!answer.ok) return answer;
     if (!isRecord(answer.result)) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
     if (answer.result.off === true) return { ok: true, data: { off: true, reason: text(answer.result.reason) } };
@@ -70,13 +74,16 @@ export function MemePicker({
     if (!value) return { ok: false, error: { code: "unexpected", message: "unexpected hashtag reply" } };
     onPrepareTagged(value);
     setHashtag("");
+    setWritten("");
     await loadCreatedTags();
     return { ok: true, data: { hashtag: value } };
-  }, [hashtag, loadCreatedTags, onPrepareTagged, selectedMeme, transport]);
+  }, [hashtag, written, loadCreatedTags, onPrepareTagged, selectedMeme, transport]);
   const tag = useAction(createTag);
   useEffect(() => {
     setHashtag("");
+    setWritten("");
   }, [selected]);
+  const askText = tag.state.phase === "error" && needsWrittenText(tag.state.error) || written !== "";
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
   const root = useRef<HTMLDivElement>(null);
@@ -160,7 +167,13 @@ export function MemePicker({
         {tag.state.phase === "ready" && ("off" in tag.state.data
           ? <span className="meme-tag-status" data-tone="off">{tag.state.data.reason}</span>
           : <span className="meme-tag-status" data-tone="ok">{t("memes_tagged_ready", { tag: tag.state.data.hashtag })}</span>)}
-        {tag.state.phase === "error" && <span className="meme-tag-status" data-tone="problem" role="alert">{tag.state.error.message}</span>}
+        {tag.state.phase === "error" && <span className="meme-tag-status" data-tone="problem" role="alert" title={tag.state.error.message}>{describeError(tag.state.error, t)}</span>}
+        {askText && <div className="meme-tag-text">
+          <label htmlFor={`${textId}-text`}>{t("memes_tag_text")}</label>
+          <textarea id={`${textId}-text`} aria-describedby={`${textId}-hint`} value={written} maxLength={2000} rows={3} disabled={busy}
+            onChange={(event) => setWritten(event.target.value)} />
+          <p id={`${textId}-hint`} className="detail">{t("memes_tag_text_hint")}</p>
+        </div>}
         {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
           <span>{t("memes_tag_suggestions")}</span>
           {suggestions.map((suggestion) => <button key={suggestion} type="button" className="quiet"

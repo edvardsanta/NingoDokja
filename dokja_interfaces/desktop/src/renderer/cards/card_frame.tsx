@@ -16,8 +16,28 @@ const ERROR_IDS: Record<TransportErrorCode, MessageId> = {
   cancelled: "error_cancelled",
 };
 
+// Failures whose cause and fix are known are said plainly; the rest pass on the orchestrator's words.
 export function describeError(error: TransportError, t: Translate): string {
+  const known = knownFailure(error);
+  if (known) return t(known.id, known.values);
   return t(ERROR_IDS[error.code], { message: error.message });
+}
+
+type Known = { id: MessageId; values?: Record<string, string> };
+
+export function knownFailure(error: TransportError): Known | undefined {
+  if (error.code !== "orchestrator") return undefined;
+  // Feeds has no image reader: the media-perception plugin is not installed or not enabled.
+  if (/no enabled provider of media\.perceive\.v1/.test(error.message)) return { id: "error_media_reader_missing" };
+  // The image's host refused the download that went around the missing reader.
+  const blocked = /attachment fetch failed \((\d{3})\)/.exec(error.message);
+  if (blocked) return { id: "error_attachment_blocked", values: { status: blocked[1] ?? "" } };
+  return undefined;
+}
+
+// Reading a meme's text failed in a way the owner can make up for by writing the text.
+export function needsWrittenText(error: TransportError): boolean {
+  return knownFailure(error)?.id === "error_media_reader_missing" || /provide explicit text/.test(error.message);
 }
 
 // The three states every card body can be in besides showing its data.
@@ -28,7 +48,7 @@ export function Pending() {
 
 export function Problem({ error }: { error: TransportError }) {
   const t = useTranslate();
-  return <p role="alert">{describeError(error, t)}</p>;
+  return <p role="alert" title={knownFailure(error) ? error.message : undefined}>{describeError(error, t)}</p>;
 }
 
 // The operator switched the service off: an answer, not a failure.
