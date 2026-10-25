@@ -20,6 +20,7 @@ import type {
   KnowledgeStatus,
   MemePage,
   MemeHashtagTag,
+  MemePoolRefresh,
   MemeStatus,
   MemoryScore,
   MemoryStatus,
@@ -600,6 +601,14 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "meme.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "meme", memeStatus),
+  },
+  // The orchestrator's own bound applies (20 per source); the screen chooses nothing.
+  "meme.pool.refresh": {
+    payload: () => ({}),
+    project: (result) => inDomain(result, "meme", (body): MemePoolRefresh => ({
+      added: count(body.added),
+      sources: Array.isArray(body.scrapers) ? body.scrapers.filter((name): name is string => typeof name === "string").slice(0, 32).map((name) => name.slice(0, 80)) : [],
+    })),
   },
   "meme.list": {
     payload: (raw) => ({

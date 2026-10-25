@@ -490,5 +490,9 @@
   "row_menu_named": "Ações de {name}",
   "drawer_close_named": "Fechar {title}",
   "documents_classify": "Classificar…",
-  "documents_delete_ask": "Apagar…"
+  "documents_delete_ask": "Apagar…",
+  "memes_refresh": "Buscar memes novos",
+  "memes_refreshing": "Perguntando às fontes…",
+  "memes_refreshed": "{count} memes novos.",
+  "memes_refreshed_none": "Nada novo nas fontes."
 }

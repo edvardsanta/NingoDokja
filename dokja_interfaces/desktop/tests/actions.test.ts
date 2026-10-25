@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ACTIONS } from "../src/main/actions.js";
+import { isWriteAction, needsConfirmation } from "../src/shared/actions.js";
 import { buildIngest } from "../src/main/ingest.js";
 
 // Hand-built replies in the shapes the orchestrator uses, never a captured one: a real reply
@@ -600,3 +601,11 @@ test("knowledge.list leaves out what Ningo keeps for himself only when asked, an
   assert.deepEqual(payload({ limit: 20, offset: 0, exclude_kinds: ["note"] }), { limit: 20, offset: 0 }, "the screen cannot name kinds");
 });
 
+
+test("meme.pool.refresh is a change the screen cannot size, and keeps only counts and source names", () => {
+  assert.equal(isWriteAction("meme.pool.refresh"), true);
+  assert.equal(needsConfirmation("meme.pool.refresh"), false);
+  assert.deepEqual(ACTIONS["meme.pool.refresh"].payload({ max_items_per_scraper: 200, scope: "all" }), {});
+  const projected = ACTIONS["meme.pool.refresh"].project({ domain: "meme", result: { added: 4, scrapers: ["a", 7, "b"], collection: { secret: "drop" }, status: "refreshed" } });
+  assert.deepEqual(projected, { added: 4, sources: ["a", "b"] });
+});

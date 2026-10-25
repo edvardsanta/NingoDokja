@@ -46,6 +46,8 @@ export const ACTION_TYPES = [
   "knowledge.search",
   "meme.status",
   "meme.list",
+  // Fetching new memes from the sources: a change, on a real press, never asked in a window.
+  "meme.pool.refresh",
   "digest.status",
   "digest.items",
   "knowledge.ingest",
@@ -70,6 +72,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "message.created",
   "communications.send",
   "meme.hashtag.tag",
+  "meme.pool.refresh",
   "communications.link.start",
   "communications.link.reset",
   "services.set",
