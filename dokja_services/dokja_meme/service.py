@@ -70,13 +70,6 @@ class MemeService:
         # caller, which knows the destination (some channels take everything).
         entries = [self._to_dict(meme, nsfw=self._classify(meme)) for meme in memes]
 
-        if memes:
-            self.storage.update_many(
-                [meme.url for meme in memes],
-                {"sent_count": 1, "date_sent": datetime.now()},
-            )
-            logger.info("meme fetch_unsent marked_sent count=%d", len(memes))
-
         return {"memes": entries, "count": len(entries)}
 
     def _classify(self, meme) -> dict:
@@ -106,7 +99,7 @@ class MemeService:
         }
 
     def list_memes(self, scope=None, limit=None, offset=None) -> dict:
-        """Browse the pool without consuming it (unlike fetch_unsent)."""
+        """Browse the pool without changing confirmed delivery receipts."""
         scope = str(scope or "unsent").strip().lower()
         if scope not in LIST_SCOPES:
             raise ValueError(f"meme.list scope must be one of {sorted(LIST_SCOPES)}, got {scope!r}")

@@ -135,6 +135,12 @@ feedback preparation into Memory. The
 frozen predictions and remaining pool-receipt work. Orchestration keeps the
 existing background execution, budgets and successful-operation call sites.
 
+Step 09.4-h implements the owner-approved confirmed-delivery boundary: media
+fetch no longer marks items sent, and Memory receipt policy requires a known
+transport success. The [receipt record](../media-delivery-receipts.md) describes
+the coordinated behavior change, preserved historical flags and remaining
+physical storage/attempt-ledger work.
+
 - Moderation and attention are two faculties (decided above).
 - The meme pool is a reading cache, like the Feeds cache, not stored knowledge.
   Items enter Knowledge only through an explicit workflow step such as tagging.

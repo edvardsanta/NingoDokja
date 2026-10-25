@@ -38,15 +38,17 @@ def service_with(storage, screen=None):
     return MemeService(storage=storage, scrapers=[], worker=None, screen=screen)
 
 
-def test_fetching_marks_memes_sent_before_any_delivery_is_confirmed(storage):
+def test_fetching_keeps_memes_unsent_until_delivery_is_confirmed(storage):
     service = service_with(storage)
 
     fetched = service.dispatch({"type": "meme.fetch", "payload": {}})
 
     assert fetched["count"] == 2
-    assert service.status()["unsent_count"] == 0
-    assert service.status()["sent_count"] == 2
-    assert service.dispatch({"type": "meme.fetch", "payload": {}})["count"] == 0
+    assert service.status()["unsent_count"] == 2
+    assert service.status()["sent_count"] == 0
+    assert service.dispatch({"type": "meme.fetch", "payload": {}})["count"] == 2
+    service.mark_sent(FIRST_URL)
+    assert service.dispatch({"type": "meme.fetch", "payload": {}})["count"] == 1
 
 
 def test_listing_browses_without_consuming(storage):

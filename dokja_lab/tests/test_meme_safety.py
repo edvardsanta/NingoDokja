@@ -237,10 +237,8 @@ def test_service_labels_every_meme_without_dropping_unsafe_ones():
     assert [m["url"] for m in result["memes"]] == ["u0", "u1", "u2"]
     assert [m["nsfw"]["safe"] for m in result["memes"]] == [True, False, True]
     assert result["memes"][1]["nsfw"]["reason"] == "stub"
-    # Unsafe memes are still consumed, so the next fetch moves on to new ones.
-    assert storage.updates[0][0] == ["u0", "u1", "u2"]
-    assert storage.updates[0][1]["sent_count"] == 1
-    assert len(storage.updates) == 1
+    # Screening and retrieval do not confirm any delivery.
+    assert storage.updates == []
 
 
 def test_service_marks_screen_outage_as_unsafe_without_blocking_the_fetch():
@@ -255,7 +253,7 @@ def test_service_marks_screen_outage_as_unsafe_without_blocking_the_fetch():
     assert result["count"] == 1
     assert result["memes"][0]["nsfw"]["safe"] is False
     assert "screen unavailable" in result["memes"][0]["nsfw"]["reason"]
-    assert storage.updates[0][0] == ["a"]
+    assert storage.updates == []
 
 
 def test_service_without_screen_reports_everything_as_safe_and_accepts_float_limit():

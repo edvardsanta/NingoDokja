@@ -65,8 +65,6 @@ def dispatch(db, action, payload):
                        FROM meme WHERE sent_count = ? ORDER BY date_sent DESC, url LIMIT ? OFFSET ?"""
         fields = ("url", "title", "source", "tags", "sent_count", "date_created", "date_sent")
         rows = [dict(zip(fields, row)) for row in db.execute(query, (sent, limit, offset))]
-        if action == "fetch":
-            db.executemany("UPDATE meme SET sent_count = 1, date_sent = ? WHERE url = ?", [(now, row["url"]) for row in rows])
         return {"scope": scope, "total": total, "offset": offset, "memes": rows, "count": len(rows)}
     if action in {"contains", "mark-sent"}:
         url = valid_url(payload.get("url"))
@@ -92,7 +90,7 @@ def main():
         db.execute("""CREATE TABLE IF NOT EXISTS meme (
             url TEXT PRIMARY KEY, title TEXT, source TEXT, tags TEXT,
             sent_count INTEGER, date_created TEXT, date_sent TEXT)""")
-        # Transactions serialize fetch/mark/ingest across plugin processes and preserve receipts.
+        # Transactions serialize intake and receipt writes across plugin processes.
         db.execute("BEGIN IMMEDIATE")
         result = dispatch(db, request.get("action"), request.get("payload") or {})
         wire = json.dumps({"result": result}, ensure_ascii=False)

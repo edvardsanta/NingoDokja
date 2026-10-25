@@ -18,12 +18,14 @@ facade, or change deliberately.
 | Public feature events | [feature_routes_baseline_test.go](../dokja_orch/internal/core/feature_routes_baseline_test.go) | Every `book.*`, `meme.*`, `digest.*` and `knowledge.*` event and `meme.dispatch.scheduled` keeps its workflow, domain and action |
 | Hashtag suggestion | [meme_hashtag_baseline_test.go](../dokja_orch/internal/handlers/meme_hashtag_baseline_test.go), [meme_hashtag_workflow_test.go](../dokja_orch/internal/handlers/meme_hashtag_workflow_test.go), [hashtag_experience_test.go](../dokja_orch/internal/handlers/hashtag_experience_test.go) | Below the threshold the nearest label is still returned with `relevant=false` and no reason; missing or unreadable media text never reaches Knowledge; search is bounded by 5 s; Memory failures never escape |
 | Book | [test_book_summary_service.py](../dokja_services/dokja_book/test_book_summary_service.py), Book client/domain/handler Go tests | Classify and summarize response fields and the `pt-BR`/`study` defaults; summarize without content is refused. The strategy fields have no consumer (ADR 0006) |
-| Meme pool | [test_pool_baseline.py](../dokja_services/dokja_meme/tests/test_pool_baseline.py), [test_attachment_fetch.py](../dokja_services/dokja_meme/tests/test_attachment_fetch.py) | `meme.fetch` marks memes sent **before** delivery is confirmed; `meme.list` does not consume; screening labels but does not filter; an unavailable screen fails closed without blocking |
+| Meme pool | [test_pool_baseline.py](../dokja_services/dokja_meme/tests/test_pool_baseline.py), [test_attachment_fetch.py](../dokja_services/dokja_meme/tests/test_attachment_fetch.py) | Read-only `meme.fetch`/`meme.list` after the approved 09.4-h change; screening labels but does not filter; an unavailable screen fails closed without blocking |
 | Digest | [Digest domain tests](../dokja_domain/dokja_digest/domain_test.go), [handler tests](../dokja_orch/internal/handlers/digest_domain_handler_test.go) | Freshness window, newest first, duplicate removal, source balance, stable paging, and the Feeds switch skipping the digest |
 
-The meme-pool finding matters for ADR 0007: a sent mark is today a fetch side
-effect, not a delivery receipt. Experience receipts must not inherit it as
-evidence that a meme was delivered.
+This records the original baseline: a sent mark was a fetch side effect rather
+than delivery evidence. The owner approved changing it in step 09.4-h:
+[fetch is now read-only and receipts require confirmed delivery](media-delivery-receipts.md).
+The referenced tests now assert that revised contract. Historical flags are
+preserved and must not be reinterpreted as verified delivery evidence.
 
 ## 2. Plugin compatibility and failure baseline
 

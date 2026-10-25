@@ -55,7 +55,7 @@ a cognitive macro-component.
 | --- | --- | --- | --- | --- |
 | Reading | Digest owns item selection; Feeds owns collection mechanics | `dokja_services/dokja_feeds` | Digest handler calls `feeds.items` and `feeds.status` | One reading host, scheduled and on demand, absorbing Book and Knowledge extraction (ADR 0006); keep product ranking in Digest |
 | Semantic knowledge | `dokja_domain/dokja_knowledge` owns document and [hashtag-example lifecycle rules](hashtag-knowledge.md); consuming workflows decide when to use it | `dokja_services/dokja_knowledge` | Chat retrieves context; hashtag workflow sequences OCR with domain-owned example storage/retrieval; Knowledge commands manage documents | General facts, models and methods with provenance; current document retrieval is the starting mechanism |
-| Experience | `dokja_domain/dokja_memory` interprets episodes/outcomes and owns [hashtag observation preparation](hashtag-experience.md) | `dokja_services/dokja_memory` | Hashtag workflow sequences background prediction/recording and explicit feedback through domain-owned requests; Memory commands inspect experiences | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; current episodic storage does not implement the complete target |
+| Experience | `dokja_domain/dokja_memory` interprets episodes/outcomes and owns [hashtag observations](hashtag-experience.md) and [confirmed media receipt policy](media-delivery-receipts.md) | Memory service for experiences; existing media cache for transitional delivery flags | Hashtag workflow sequences prediction/recording and feedback; scheduled/manual sends pass confirmed outcomes to Memory receipt policy | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; receipt storage and durable attempt tracking still need migration |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_runtime/chat.go` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
 | Media perception and meme pool | Meme facade owns intake composition; Moderation interprets media safety observations; Communications owns destination eligibility | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | [Media admissibility](media-admissibility.md) is domain-owned. ADR 0010 still proposes grouping intake under Knowledge, admissibility/relevance under Rules and receipts under Memory; Meme events remain a facade |
@@ -233,6 +233,12 @@ retains the background work and time budget. The typed task records its frozen
 prediction only after successful delivery and never predicts again while
 recording; a missing snapshot stays unscored. See
 [hashtag experience ownership](hashtag-experience.md).
+
+Media fetch now leaves delivery state untouched. Scheduled delivery records a
+media-level receipt after at least one transport success; manual delivery keeps
+the explicit `mark_sent` option, including known partial success. Memory owns
+receipt eligibility, while the current media cache retains physical flags. See
+[receipt semantics and rollout](media-delivery-receipts.md).
 
 The background callback predicts before recording its experience, but is not a
 durable prediction-before-delivery gate. The experience reference is derived from

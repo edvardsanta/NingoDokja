@@ -749,7 +749,8 @@
             "dokja_docs/decisions/0007-faculties-not-features.md",
             "dokja_docs/media-admissibility.md",
             "dokja_docs/hashtag-knowledge.md",
-            "dokja_docs/hashtag-experience.md"
+            "dokja_docs/hashtag-experience.md",
+            "dokja_docs/media-delivery-receipts.md"
           ],
           "batches": [
             {
@@ -946,10 +947,46 @@
                 }
               ],
               "completed_on": "2026-10-25"
+            },
+            {
+              "id": "09.4-h",
+              "title": "Require confirmed delivery before recording media receipts",
+              "status": "completed",
+              "depends_on": [
+                "09.4-g"
+              ],
+              "acceptance_criteria": [
+                "Apply the owner-approved breaking behavior change: meme.fetch and media-library fetch must not change delivery state; sent requires at least one confirmed destination.",
+                "Memory owns receipt eligibility; orchestrator supplies observed outcomes and sequences the existing storage adapter. Scheduled sends record known success, and manual sends retain explicit mark_sent while recording partial success before returning aggregate errors.",
+                "Failed, unknown, blocked and disabled deliveries do not produce a successful receipt. Keep stored flags/schema and response shapes; document coordinated reader/orchestrator rollout and physical-storage/attempt-ledger limits."
+              ],
+              "evidence": [
+                "The owner selected confirmed delivery over consume-on-fetch. Bundled Feeds media-library and optional legacy Meme service now read unsent items without marking them. Duplicate ingestion and restart preserve existing flags; no historical delivery inference, reset or schema migration.",
+                "Memory.MediaReceiptPolicy permits a requested receipt only with a configured/enabled recorder, a media reference and a confirmed transport success. Scheduled workflows count acknowledgements and record after sends; manual mark_sent records known partial success before surfacing other destination errors. Public MemeMarker remains a port alias.",
+                "Receipt storage remains in the existing media cache as a transitional adapter. This batch does not implement durable attempts, distributed exclusion, per-destination receipts or exactly-once delivery; a crash or failed receipt write may permit a later duplicate. Reader and orchestrator must be updated or rolled back together."
+              ],
+              "checks": [
+                {
+                  "name": "confirmed_media_receipts",
+                  "status": "passed",
+                  "detail": "Memory go test -race ./... and go vet ./... passed; orchestrator full go test -race ./..., go test ./..., and go vet ./internal/handlers passed. Feeds go test -race ./... and go vet ./... passed, including real bundled-plugin read-only fetch across host recreation, retained explicit receipts and duplicate ingestion. Synthetic transports cover successful, blocked, failed, unknown and partial outcomes, write ordering and receipt failure without an immediate resend."
+                },
+                {
+                  "name": "legacy_reader_regression",
+                  "status": "passed",
+                  "detail": "106 focused Python tests passed across dokja_services/dokja_meme/tests and dokja_lab/tests/test_meme_safety.py in an isolated uv environment with pytest, requests, curl-cffi, pyzmq, numpy and opencv-python-headless; pytest addopts were cleared for this focused run. Host Python initially lacked pytest; an initial run also found one stale consume-on-fetch assertion, which was corrected to the approved contract. Black and isort checks passed for the changed Lab file. Full Lab quality/test suites were not run."
+                },
+                {
+                  "name": "receipt_compatibility",
+                  "status": "passed",
+                  "detail": "Reviewed event envelopes, routes/actions, service/plugin response shapes, commands, existing SQLite columns and flags, env and Compose. Intentional semantic breaking change to fetch/receipt timing and partial-success marking is documented in the capability map, plugin contract, legacy README, baseline record and production runbook. No live account, owner database or deployment used."
+                }
+              ],
+              "completed_on": "2026-10-25"
             }
           ],
           "remaining": [
-            "Meme pool mark-sent receipts and unsent filtering still use the current media-library adapter; hashtag experience extraction does not migrate those delivery receipts.",
+            "Physical media receipt storage still uses the existing cache table. Durable attempt/outcome identity, per-destination receipts and receipt-write/crash recovery remain separate work; historical sent flags are not verified delivery evidence.",
             "Meme selection/relevance, Digest ordering/freshness and conversation responsibility migrations remain pending; the broader ADR 0010 grouping is still proposed."
           ]
         },

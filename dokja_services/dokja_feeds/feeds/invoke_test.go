@@ -82,6 +82,16 @@ func TestBundledMediaLibraryKeepsReceiptsAcrossHostRestarts(t *testing.T) {
 	if r := invoke(s, "ingest", map[string]any{"items": items}); r["added"] != float64(1) {
 		t.Fatal(r)
 	}
+	// Fetch is now a read: neither a repeated fetch nor a host restart confirms delivery.
+	for i := 0; i < 2; i++ {
+		if r := invoke(s, "fetch", nil); r["count"] != float64(1) {
+			t.Fatal(r)
+		}
+		s = newHost()
+	}
+	if r := invoke(s, "status", nil); r["unsent_count"] != float64(1) || r["sent_count"] != float64(0) {
+		t.Fatal(r)
+	}
 	if r := invoke(s, "mark-sent", map[string]any{"url": "https://images.example/a.png"}); r["marked"] != true {
 		t.Fatal(r)
 	}

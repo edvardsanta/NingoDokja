@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	communications "read_books/dokja_domain/dokja_communications"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	moderation "read_books/dokja_domain/dokja_moderation"
 	store "read_books/dokja_store"
 	"read_books/internal/core"
@@ -26,9 +27,7 @@ type MemeStatusReader interface {
 type MemeScreener = moderation.MediaScreener
 
 // MemeMarker flags a meme as delivered so the scheduler does not repeat it.
-type MemeMarker interface {
-	MarkSent(ctx context.Context, url string) error
-}
+type MemeMarker = memorydomain.MediaReceiptRecorder
 
 // ChatProfiles is the part of the shared database the orchestrator may touch: it lists
 // profiles (masked) and selects one. Creating or editing a profile, which is where a
@@ -325,7 +324,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 		label, _ := meme["nsfw"].(map[string]any)
 		assessment := moderation.AssessMediaLabel(label)
 		safe, reason := assessment.Safe, assessment.Reason
-		sent := false
+		confirmed := 0
 		for _, channelID := range h.deliveryChannels {
 			if _, skip := failed[channelID]; skip {
 				continue
@@ -355,12 +354,13 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 				failed[channelID] = err
 				continue
 			}
-			sent = true
+			confirmed++
 		}
-		if sent {
+		if confirmed > 0 {
 			delivered++
 			h.noteHashtagAttempt(attachmentURL, attempt)
 		}
+		h.recordMediaReceipt(ctx, attachmentURL, true, confirmed)
 	}
 
 	if len(failed) > 0 {
@@ -534,6 +534,8 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	if len(sent) > 0 {
 		h.noteHashtagAttempt(attachmentURL, attempt)
 	}
+	markSent, _ := event.Payload["mark_sent"].(bool)
+	receipt := h.recordMediaReceipt(ctx, attachmentURL, markSent, len(sent))
 	logger.Info(fmt.Sprintf(
 		"system handler discord send event_id=%s sent=%s skipped_unsafe=%s failed=%d has_attachment=%t nsfw_bypassed=%t",
 		event.EventID,
@@ -565,14 +567,23 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 		response["skipped_unsafe"] = skipped
 		response["unsafe_reason"] = blockReason
 	}
-	if markSent, _ := event.Payload["mark_sent"].(bool); markSent && attachmentURL != "" && h.memeMarker != nil && h.serviceEnabled("meme") {
-		err := h.memeMarker.MarkSent(ctx, attachmentURL)
-		if err != nil {
-			logger.Info(fmt.Sprintf("system handler could not mark meme sent event_id=%s error=%v", event.EventID, err))
-		}
-		response["marked_sent"] = err == nil
+	if receipt.Attempted {
+		response["marked_sent"] = receipt.Marked
 	}
 	return response, nil
+}
+
+// recordMediaReceipt passes confirmed transport outcomes to Memory policy. A
+// receipt failure is reported in logs and never causes an immediate resend.
+func (h *SystemDomainHandler) recordMediaReceipt(ctx context.Context, url string, requested bool, confirmed int) memorydomain.MediaReceipt {
+	receipt, err := (memorydomain.MediaReceiptPolicy{
+		Recorder: h.memeMarker,
+		Enabled:  h.serviceEnabled("meme"),
+	}).Record(ctx, memorydomain.MediaDelivery{URL: url, Requested: requested, Confirmed: confirmed})
+	if err != nil {
+		logger.Info(fmt.Sprintf("system handler could not record media delivery receipt: %v", err))
+	}
+	return receipt
 }
 
 func (h *SystemDomainHandler) screenAttachment(ctx context.Context, url, caption string) (bool, string) {
