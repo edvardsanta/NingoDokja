@@ -498,5 +498,6 @@
   "memes_refresh": "Buscar memes novos",
   "memes_refreshing": "Perguntando às fontes…",
   "memes_refreshed": "{count} memes novos.",
-  "memes_refreshed_none": "Nada novo nas fontes."
+  "memes_refreshed_none": "Nada novo nas fontes.",
+  "runtime_logs_link_code": "[código de vinculação oculto: não dá para escanear pelos logs. Use Vincular em Sistema → Status.]"
 }

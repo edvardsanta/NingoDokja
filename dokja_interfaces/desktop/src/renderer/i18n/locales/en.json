@@ -498,5 +498,6 @@
   "memes_refresh": "Fetch new memes",
   "memes_refreshing": "Asking the sources…",
   "memes_refreshed": "{count} new memes.",
-  "memes_refreshed_none": "Nothing new from the sources."
+  "memes_refreshed_none": "Nothing new from the sources.",
+  "runtime_logs_link_code": "[link code hidden: it cannot be scanned from the logs. Use Link in System → Status.]"
 }

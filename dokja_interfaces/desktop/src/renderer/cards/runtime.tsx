@@ -9,6 +9,7 @@ import type { MessageId } from "../i18n/i18n.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { withoutLinkCodes } from "./log_text.js";
 
 const STATES: Record<RuntimeState, MessageId> = {
   starting: "runtime_starting",
@@ -155,7 +156,7 @@ function RuntimeLogs({ transport, name, label }: { transport: Transport; name: R
       {error && <p role="status">{t("runtime_logs_error")}</p>}
       <pre ref={box} tabIndex={0} aria-label={t("runtime_logs", { name: label })}
         onScroll={() => { const node = box.current; if (node) follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40; }}>
-        {output || t("runtime_logs_empty")}
+        {output ? withoutLinkCodes(output, t("runtime_logs_link_code")) : t("runtime_logs_empty")}
       </pre>
     </>}
   </details>;
