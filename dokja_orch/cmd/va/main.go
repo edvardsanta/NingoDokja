@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	bookdomain "read_books/dokja_domain/dokja_book"
 	communications "read_books/dokja_domain/dokja_communications"
+	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	memedomain "read_books/dokja_domain/dokja_meme"
 	store "read_books/dokja_store"
@@ -15,10 +16,12 @@ import (
 	"read_books/internal/clients"
 	"read_books/internal/core"
 	"read_books/internal/handlers"
+	"read_books/internal/infrastructure/conversations"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -40,6 +43,9 @@ func main() {
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
 	var profiles handlers.ChatProfiles
+	// The owner's conversations live in a file of their own beside the shared database, opened by
+	// the orchestrator alone. Without it, conversations are not kept and chat goes on as before.
+	var archive *conversation.Archive
 	if path := os.Getenv("DOKJA_DB_FILE"); path != "" {
 		db, err := store.Open(path)
 		if err != nil {
@@ -47,6 +53,19 @@ func main() {
 		} else {
 			defer db.Close()
 			profiles = db
+		}
+		kept, err := conversations.Open(conversations.PathBeside(path))
+		if err != nil {
+			logger.Error("open conversation archive; conversations are not kept", err)
+		} else {
+			defer kept.Close()
+			archive = conversation.New(kept)
+			// Turns a stopped orchestrator left pending are marked interrupted; none is sent again.
+			if n, err := archive.Recover(context.Background(), time.Now().UTC()); err != nil {
+				logger.Error("recover pending conversation turns", err)
+			} else if n > 0 {
+				logger.Info(fmt.Sprintf("conversation archive marked %d pending turns interrupted", n))
+			}
 		}
 	}
 
@@ -164,9 +183,10 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}),
+		}).WithArchive(archive),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
+		handlers.NewConversationDomainHandler(archive),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 
