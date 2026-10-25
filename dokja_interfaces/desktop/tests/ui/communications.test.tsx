@@ -212,6 +212,41 @@ describe("communications", () => {
     expect(calls.some((call) => call.type === "communications.send")).toBe(false);
     expect((screen.getByRole("button", { name: "Send as Ningo" }) as HTMLButtonElement).disabled).toBe(false);
   });
+  it("asks for the meme's text when it cannot be read from the image, and tags with what the owner wrote", async () => {
+    const memePage = { total: 1, offset: 0, memes: [
+      { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const { preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": ok(memePage),
+      "meme.hashtag.tag": [
+        failure("orchestrator", 'dispatch workflow: dispatch meme: unavailable: no enabled provider of media.perceive.v1 for "read-text"'),
+        ok({ source_url: "https://images.example/a.png", hashtag: "#reaction", embedded: true }),
+      ],
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+    const tile = await screen.findByRole("button", { name: "Attach First" });
+    await waitFor(() => expect(tile.querySelector("img")).not.toBeNull());
+    fireEvent.click(tile);
+    expect(screen.queryByRole("textbox", { name: "The meme's text" })).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText("#tag"), { target: { value: "#reaction" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag" }));
+
+    const problem = await screen.findByRole("alert");
+    expect(problem.textContent).toMatch(/^Reading images is not installed/);
+    expect(problem.getAttribute("title")).toMatch(/no enabled provider of media\.perceive\.v1/);
+    fireEvent.change(screen.getByRole("textbox", { name: "The meme's text" }), { target: { value: "  when the build is green  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag" }));
+    await screen.findByDisplayValue("#reaction");
+    const tags = calls.filter((call) => call.type === "meme.hashtag.tag").map((call) => call.payload);
+    expect(tags).toEqual([
+      { url: "https://images.example/a.png", hashtag: "#reaction" },
+      { url: "https://images.example/a.png", hashtag: "#reaction", text: "when the build is green" },
+    ]);
+  });
   it("keeps the attached meme as a chip when the tray closes, and takes it off with the cross", async () => {
     const memePage = { total: 30, offset: 0, memes: [
       { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },

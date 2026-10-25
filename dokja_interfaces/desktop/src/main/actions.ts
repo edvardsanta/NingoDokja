@@ -508,8 +508,10 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => {
       const url = text(raw.url).trim();
       const hashtag = text(raw.hashtag).trim();
-      if (!/^https?:\/\//.test(url) || url.length > 2048 || hashtag.length < 1 || hashtag.length > 80) return undefined;
-      return { url, hashtag };
+      // The meme's text, written by the owner when it cannot be read from the image.
+      const written = text(raw.text).trim();
+      if (!/^https?:\/\//.test(url) || url.length > 2048 || hashtag.length < 1 || hashtag.length > 80 || written.length > 2000) return undefined;
+      return { url, hashtag, ...(written ? { text: written } : {}) };
     },
     project: (result) => inDomain(result, "meme", (body): MemeHashtagTag => ({
       sourceUrl: text(body.source_url),

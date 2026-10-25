@@ -600,3 +600,10 @@ test("knowledge.list leaves out what Ningo keeps for himself only when asked, an
   assert.deepEqual(payload({ limit: 20, offset: 0, exclude_kinds: ["note"] }), { limit: 20, offset: 0 }, "the screen cannot name kinds");
 });
 
+
+test("meme.hashtag.tag may carry the meme's text the owner wrote, bounded", () => {
+  const payload = ACTIONS["meme.hashtag.tag"].payload;
+  assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "  words  " }), { url: "https://images.example/a.png", hashtag: "#x", text: "words" });
+  assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "   " }), { url: "https://images.example/a.png", hashtag: "#x" });
+  assert.equal(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "w".repeat(2001) }), undefined);
+});
