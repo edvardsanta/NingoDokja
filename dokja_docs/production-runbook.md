@@ -796,7 +796,9 @@ old containers are opt-in through the `legacy-content` profile. Before rollout,
 point `FEEDS_MEDIA_DB_FILE` at the existing database, stop the old queue consumer,
 and configure source and processing plugins. The optional
 `FEEDS_PLUGIN_EXTRAS=content` build argument installs the shipped compatibility
-processors' dependencies; `none` is the small default.
+processors' dependencies; `media` installs only the media-perception adapter's
+(screening, OCR and attachment download, without `torch`); `none` is the small
+default.
 
 All stacks configure `FEEDS_BUILTIN_PLUGINS_DIR`, the existing `dokja-data` volume
 for plugin state/model cache, and an optional models mount. Processing settings

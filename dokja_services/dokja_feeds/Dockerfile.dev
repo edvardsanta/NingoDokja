@@ -14,11 +14,14 @@ RUN apt-get update && apt-get install -y \
 
 # Optional dependencies are installed at image build time, never by a plugin request.
 ARG FEEDS_PLUGIN_EXTRAS=none
+# content: every compatibility adapter (documents and media). media: only the media-perception adapter,
+# without the document processor's torch and transformers, several gigabytes lighter.
 COPY dokja_services/dokja_feeds/content-plugin-requirements.txt /tmp/content-plugin-requirements.txt
+COPY dokja_services/dokja_feeds/media-plugin-requirements.txt /tmp/media-plugin-requirements.txt
 RUN case "$FEEDS_PLUGIN_EXTRAS" in \
       none) ;; \
-      content) python3 -m venv --system-site-packages /opt/feeds-plugins \
-        && /opt/feeds-plugins/bin/pip install --no-cache-dir -r /tmp/content-plugin-requirements.txt \
+      content|media) python3 -m venv --system-site-packages /opt/feeds-plugins \
+        && /opt/feeds-plugins/bin/pip install --no-cache-dir -r "/tmp/$FEEDS_PLUGIN_EXTRAS-plugin-requirements.txt" \
         && /opt/feeds-plugins/bin/pip uninstall -y opencv-python opencv-python-headless \
         && /opt/feeds-plugins/bin/pip install --no-cache-dir --no-deps opencv-python-headless==5.0.0.93 ;; \
       *) exit 2 ;; \

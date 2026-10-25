@@ -87,9 +87,15 @@ automatic data copy. Back up the database before changing deployments.
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:
 
-1. Build Feeds with `FEEDS_PLUGIN_EXTRAS=content`. The default `none` keeps the
-   image small; the optional requirements include the existing model and browser
-   transport libraries. A custom provider can use its own dependency image.
+1. Build Feeds with `FEEDS_PLUGIN_EXTRAS=content` for both adapters, or with
+   `FEEDS_PLUGIN_EXTRAS=media` for `media-perception` alone. The default `none`
+   keeps the image small.
+   - `content` includes the document processor's model and browser libraries
+     (`torch` and `transformers`, several gigabytes).
+   - `media` installs only screening, OCR and the attachment transport
+     (`media-plugin-requirements.txt`), so it fits where `content` runs out of
+     disk.
+   - A custom provider can use its own dependency image.
 2. Copy the desired adapter from `plugins.example` to the external directory and
    set `enabled: true`. Examples always ship disabled. Keep only one enabled
    provider per processing capability, or bind one explicitly in internal calls.
