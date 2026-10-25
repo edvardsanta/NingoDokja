@@ -602,6 +602,13 @@ test("knowledge.list leaves out what Ningo keeps for himself only when asked, an
 });
 
 
+test("meme.hashtag.tag may carry the meme's text the owner wrote, bounded", () => {
+  const payload = ACTIONS["meme.hashtag.tag"].payload;
+  assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "  words  " }), { url: "https://images.example/a.png", hashtag: "#x", text: "words" });
+  assert.deepEqual(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "   " }), { url: "https://images.example/a.png", hashtag: "#x" });
+  assert.equal(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "w".repeat(2001) }), undefined);
+});
+
 test("meme.pool.refresh is a change the screen cannot size, and keeps only counts and source names", () => {
   assert.equal(isWriteAction("meme.pool.refresh"), true);
   assert.equal(needsConfirmation("meme.pool.refresh"), false);

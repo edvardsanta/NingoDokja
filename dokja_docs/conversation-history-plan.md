@@ -1,7 +1,7 @@
 # Conversation history and resumable Ningo conversations
 
-Status: H1 (domain contract and storage) implemented, not yet wired; H2 to H5 planned. Tracks step
-09.5.
+Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 to H5
+planned. Tracks step 09.5.
 
 ## Current evidence
 
@@ -90,6 +90,35 @@ new event ID to duplicate a previous send. Exercise schema upgrade/rollback limi
 and restart persistence against disposable databases.
 
 ### H2: Orchestrator operations and compatibility
+
+**As built.** All of it is additive: the envelope, every existing route and every turn without a send
+id behave as before.
+- **Requests.** `conversation.start` (`title?`, `reading_id?` for a reading discussion),
+  `conversation.list` (`cursor?`, `limit?`), `conversation.read` (`conversation_id`, `before_seq?`,
+  `limit?`), `conversation.rename` and `conversation.delete` (`conversation_id`, `revision`).
+  - The workflow is `conversation-archive`, in the new `conversation` domain.
+  - The scope comes from the event's source, never the payload: `desktop` and `cli`, the source the
+    TUI also speaks as. Any other source is refused.
+  - Errors name what to do ("not found", "changed; read it again"); storage details are not passed on.
+- **Continuing a conversation.** A `message.created` from an owner's interface that carries the
+  archived `conversation_id` and a `send_id` is a turn of that conversation:
+  - it is recorded pending before the model is asked, and ends completed, with the provider and model
+    the runtime reported, or failed, with the reason;
+  - the context is the archive's completed turns, newest first within 20 turns and 24,000
+    characters, so it survives restarts and the 3-minute session no longer bounds it;
+  - a reading discussion is grounded by the reading its conversation was started for, whatever the
+    payload says, and a general one by none (a turn's `reading_id` is dropped); a question about
+    recent readings is grounded by the cached feeds, as in any other turn;
+  - the transcript keeps the reply as shown, citations included, so the context Ningo sees carries
+    its own citation markers (for H5 to weigh);
+  - the same `send_id` again is answered from the archive, never by the model a second time: the
+    stored reply, "still on its way", or "got no reply; retry it";
+  - `retry_turn_id` sends the latest failed or interrupted turn again, as the same turn.
+- **Unchanged.** A channel's message (Discord, WhatsApp) is never archived, even if it carries those
+  fields. Without a `send_id`, the desktop's and the CLI's turns use the short-lived session as
+  before.
+- **Start.** The archive opens beside the shared database. Pending turns are marked interrupted. If the
+  file cannot be opened, the orchestrator goes on without it and says so.
 
 Propose additive list/read/rename/delete actions and a way to continue an existing
 conversation without changing the shared event envelope. Review route, HTTP,

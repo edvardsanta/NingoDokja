@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -32,6 +33,7 @@ type ChatDomainHandler struct {
 
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
+	archive          *conversation.Archive
 }
 
 func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
@@ -48,6 +50,10 @@ func (h *ChatDomainHandler) Domain() core.Domain {
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
+	}
+	// A turn of an archived conversation is recorded there; any other goes on as before.
+	if conversationID, sendID, retryID, archived := archivedRequest(event); archived {
+		return h.handleArchived(ctx, event, workflow, conversationID, sendID, retryID)
 	}
 
 	content := chatMessageFromEvent(event)

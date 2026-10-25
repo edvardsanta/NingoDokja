@@ -973,20 +973,26 @@
           ],
           "evidence": [
             "Owner requested planning conversation history. Current desktop transcript is component-local and orchestrator sessions are ephemeral; this scheduling entry does not claim persistence is implemented.",
-            "H1 (domain contract and storage) is built, not wired. The owner chose its own SQLite file, dokja_conversations.db beside dokja.db and opened by the orchestrator alone, because a migration in the shared dokja.db would make every older orchestrator, CLI, TUI or runtime controller refuse it. dokja_domain/dokja_conversation holds scope, turn states, provenance, bounds, idempotent sends, explicit retry of the latest failed or interrupted turn and the context selection; dokja_orch/internal/infrastructure/conversations is the store."
+            "H1 (domain contract and storage) is built, not wired. The owner chose its own SQLite file, dokja_conversations.db beside dokja.db and opened by the orchestrator alone, because a migration in the shared dokja.db would make every older orchestrator, CLI, TUI or runtime controller refuse it. dokja_domain/dokja_conversation holds scope, turn states, provenance, bounds, idempotent sends, explicit retry of the latest failed or interrupted turn and the context selection; dokja_orch/internal/infrastructure/conversations is the store.",
+            "H1 merged in #128. H2 adds the conversation.start/list/read/rename/delete requests (conversation domain, scope from the event source: desktop and cli) and archived chat turns: a message.created with the archived conversation_id and a send_id is recorded pending, then completed with observed provenance or failed with its reason; context comes from the archive's completed turns within 20 turns and 24,000 characters; a repeated send is answered from the archive; retry_turn_id reopens the latest failed or interrupted turn. The archive opens beside DOKJA_DB_FILE and recovers pending turns at start."
           ],
           "checks": [
             {
               "name": "h1_archive_contract_and_store",
               "status": "passed",
               "detail": "go test -race in dokja_domain/dokja_conversation and in dokja_orch/internal/infrastructure/conversations passed against disposable SQLite files: restart persistence with stable IDs and order, failed turns kept failed, idempotent retried sends, conflicting text under one send ID, explicit retry of the latest turn only with two retries unable to both win, 20 concurrent sends in distinct places, foreign-scope reads and writes refused, keyset pages without repeats or gaps, revision-checked rename and delete with turns cascading, pending turns interrupted after a stop and never resent, and a newer archive refused. dokja_orch go test ./... passed."
+            },
+            {
+              "name": "h2_orchestrator_operations",
+              "status": "passed",
+              "detail": "go test -race ./... in dokja_orch passed. New tests over a real archive file and a stand-in model: an archived turn recorded with provenance; a repeated send answered from the archive without the model; a failed turn kept failed, its replay told to retry, and a retry answering the same turn (attempts 2); context from completed turns only, in order, across a reopened archive and a new handler; a reading conversation grounded by its own reading over a payload's; a Discord message carrying archive fields answered as before; no archive said plainly; start/list/read/rename/delete from desktop and cli, stale revisions refused; other sources refused; routing through core.Service to the conversation-archive workflow."
             }
           ],
           "blockers": [],
           "references": [
             "dokja_docs/conversation-history-plan.md"
           ],
-          "next_action": "H2: additive orchestrator actions to start, list, read, continue, retry, rename and delete conversations, with scope checked on every operation and recovery at start; then H3 (desktop) and H4 (CLI and TUI)."
+          "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI)."
         }
       ],
       "references": [
