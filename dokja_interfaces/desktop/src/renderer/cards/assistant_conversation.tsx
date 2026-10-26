@@ -91,7 +91,7 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
 }
 
 // Where the owner writes. Enter sends and Shift+Enter breaks the line.
-export function Composer({ conversation, placeholder, hint }: { conversation: Conversation; placeholder: string; hint?: string }) {
+export function Composer({ conversation, placeholder, hint, keyshortcuts }: { conversation: Conversation; placeholder: string; hint?: string; keyshortcuts?: string }) {
   const t = useTranslate();
   const { id, draft, setDraft, busy, field, send } = conversation;
   const fieldId = `assistant-prompt-${id}`;
@@ -104,7 +104,7 @@ export function Composer({ conversation, placeholder, hint }: { conversation: Co
   };
   return <form className="composer" onSubmit={submit}>
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
-    <textarea id={fieldId} ref={field} value={draft} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
+    <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
     <button type="submit" className="primary" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
     {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}

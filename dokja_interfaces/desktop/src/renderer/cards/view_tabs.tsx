@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 // The views of a workspace. They are places, so they are tabs: they sit in the panel's header, the
 // arrows move between them as in the sidebar, and a view is mounted the first time it opens and then
@@ -10,6 +10,7 @@ export function useViewTabs<Id extends string>(label: string, views: readonly { 
   const [opened, setOpened] = useState<ReadonlySet<Id>>(() => new Set(first ? [first] : []));
   const baseId = useId();
   const buttons = useRef(new Map<Id, HTMLButtonElement>());
+  const strip = useRef<HTMLDivElement>(null);
 
   const show = (id: Id, focus = false) => {
     setCurrent(id);
@@ -25,11 +26,29 @@ export function useViewTabs<Id extends string>(label: string, views: readonly { 
     if (next) show(next.id, true);
   };
 
+  // Alt and a digit open the views in order. Every workspace kept in the background has its own
+  // strip, so only the one on screen answers.
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (!/^[1-9]$/.test(event.key)) return;
+      if (!strip.current || strip.current.closest("[hidden]")) return;
+      // a dialog is open: what is behind it is not for the keys
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const view = views[Number(event.key) - 1];
+      if (!view) return;
+      event.preventDefault();
+      show(view.id, true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [views]);
+
   // One view needs no tabs: there is nowhere else to go.
   const tabs =
     views.length > 1 ? (
-      <div className="vtabs" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
-        {views.map((view) => (
+      <div ref={strip} className="vtabs" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+        {views.map((view, position) => (
           <button
             key={view.id}
             ref={(node) => {
@@ -42,6 +61,7 @@ export function useViewTabs<Id extends string>(label: string, views: readonly { 
             id={`${baseId}-tab-${view.id}`}
             aria-selected={current === view.id}
             aria-controls={`${baseId}-view-${view.id}`}
+            aria-keyshortcuts={`Alt+${position + 1}`}
             tabIndex={current === view.id ? 0 : -1}
             onClick={() => show(view.id)}
           >

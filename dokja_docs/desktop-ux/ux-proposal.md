@@ -24,8 +24,8 @@ These answer the open questions in §9 and win over the proposal where they diff
   line of Ningo's voice per view, followed by a plain next step; System stays plain.
 - **Composer:** docked only in Conversa for now; no global "ask Ningo" bar.
 - **System:** split into three sub-views, Status, Configurações and Provedores.
-- Still open: the Alt+1..3 and Ctrl+K shortcuts (§9); the recommended option applies until the
-  owner says otherwise.
+- **Shortcuts (2026-10-26):** Alt+1..3 open the views of the workspace on screen, and Ctrl+K opens
+  Conversa with its composer focused from any workspace, Mensagens included.
 
 ---
 

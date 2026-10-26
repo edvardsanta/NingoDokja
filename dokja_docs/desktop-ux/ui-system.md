@@ -336,8 +336,8 @@ page pixel 3.16. Cyan, magenta and amber shapes are above 8, 5.7 and 10. Known w
   Caderno 13, Mensagens 11, Sistema > Status about 20, Configurações 16. A scroll region is a stop only
   when it contains nothing focusable.
 - Esc closes the menu, then the popover, then the aside, and returns focus to what opened it.
-- Shortcuts from the proposal (Ctrl+1..5 done; Alt+1..3 for views and Ctrl+K still open) are not
-  represented beyond Ctrl+1..5.
+- Shortcuts: Ctrl+1..5 open the workspaces, Alt+1..3 the views of the one on screen, and Ctrl+K
+  opens Conversa with its composer focused. Each control names its key in `aria-keyshortcuts`.
 
 ### 9.3 Other
 
@@ -387,7 +387,7 @@ real app already has the tablist code in `sidebar.tsx`.
   strip-on-top rule for narrow windows is not carried into the mockup.
 - **Icons** are inline SVG drawn for the mockup (refresh, plus, close, dots, search, chevron, prev,
   next) because the bundled font is a latin subset. No icon package is proposed.
-- **Alt+1..3 and Ctrl+K** remain as the proposal's recommended option; the UI does not show key hints.
+- **Alt+1..3 and Ctrl+K** are built (owner's decision, 2026-10-26); the UI does not show key hints.
 - **Copy to update in `ux-proposal.md` section 5** (P7): plain strings say Biblioteca; "Ningo" takes the
   article in pt ("o Ningo não está respondendo", "Pergunte ao Ningo…", "Conversar com o Ningo"); "Enviar
   como Ningo" keeps no article (it is a role).

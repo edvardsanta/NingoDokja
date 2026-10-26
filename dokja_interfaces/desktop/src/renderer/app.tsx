@@ -27,7 +27,7 @@ export function App({ transport, locale, runtimeControls=false }: { transport: T
     <I18nProvider locale={locale}>
       <RuntimeEnabled.Provider value={runtimeControls}><StatusProvider transport={transport}>
         <main>
-          <DiscussionProvider><Sidebar entries={CARDS} transport={transport} start={START} fallback={FALLBACK} header={<Wordmark />} /></DiscussionProvider>
+          <DiscussionProvider><Sidebar entries={CARDS} transport={transport} start={START} fallback={FALLBACK} composer={START} header={<Wordmark />} /></DiscussionProvider>
         </main>
       </StatusProvider></RuntimeEnabled.Provider>
     </I18nProvider>
