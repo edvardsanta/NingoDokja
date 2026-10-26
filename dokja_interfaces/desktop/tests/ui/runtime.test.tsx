@@ -154,6 +154,21 @@ it("shows logs on demand while other modules remain usable", async () => {
  expect(screen.getByText("embedding model: downloading")).toBeTruthy();
 });
 
+it("hides a link code drawn in the logs behind one line that says where to link", async () => {
+ const rows=["█▀▀▀▀▀█ ▄▀▄ █▀▀▀▀▀█","█ ███ █ ▀▄▀ █ ███ █","█ ▀▀▀ █ █▀█ █ ▀▀▀ █","▀▀▀▀▀▀▀ █ ▀ ▀▀▀▀▀▀▀","▄▀█▄ ▀▀▄█▀▄▀█▄ ▀█▄▀","▀▀▀▀▀▀▀ ▀ ▀ ▀ ▀▀▀ ▀"];
+ const text=["waiting for link",...rows,"still waiting"].join("\n");
+ const {transport}=routedTransport({"runtime.modules":page("starting",true),"runtime.logs":ok({module:"memory",text})});
+ show(transport);
+ await screen.findByText("Starting");
+ const details=screen.getByText("Logs for Memory").closest("details")!;
+ details.open=true;
+ fireEvent(details,new Event("toggle"));
+ const log=await screen.findByLabelText("Logs for Memory");
+ await waitFor(()=>expect(log.textContent).toContain("still waiting"));
+ expect(log.textContent).toContain("[link code hidden: it cannot be scanned from the logs. Use Link in System → Status.]");
+ expect(log.textContent).not.toContain("█");
+});
+
 it("splits System into Status, Settings and Providers, and asks for a view only when it opens", async () => {
   const { App } = await import("../../src/renderer/app.js");
   const { transport, calls } = routedTransport({
