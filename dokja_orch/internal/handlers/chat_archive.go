@@ -109,7 +109,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		reference = recentReadingReference(items)
 	}
 	sources := h.lookupKnowledge(ctx, turn.Content, anchor)
-	result, err := h.generateReply(ctx, turn.Content, history, sources, reference)
+	result, err := h.generateReply(ctx, event, turn.Content, history, sources, reference)
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
 	}
