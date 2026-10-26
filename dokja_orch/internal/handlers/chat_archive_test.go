@@ -28,6 +28,9 @@ func (m *scriptedModel) Generate(ctx context.Context, message string) (map[strin
 func (m *scriptedModel) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if len(messages) > 0 && messages[0]["content"] == chatPersona {
+		messages = messages[1:] // the persona is checked in chat_persona_test.go
+	}
 	m.asked = append(m.asked, messages)
 	if len(m.answers) == 0 || m.answers[0] == nil {
 		if len(m.answers) > 0 {

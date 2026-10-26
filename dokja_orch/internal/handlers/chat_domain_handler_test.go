@@ -13,6 +13,9 @@ import (
 type fakeChatGenerator struct {
 	message  string
 	messages []map[string]string
+	// personas counts the turns that opened with Ningo's persona; messages holds the rest, so the
+	// other tests read the turn's own context in order.
+	personas int
 	result   map[string]any
 	err      error
 }
@@ -23,8 +26,16 @@ func (f *fakeChatGenerator) Generate(_ context.Context, message string) (map[str
 }
 
 func (f *fakeChatGenerator) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
-	f.messages = messages
+	f.messages = f.withoutPersona(messages)
 	return f.result, f.err
+}
+
+func (f *fakeChatGenerator) withoutPersona(messages []map[string]string) []map[string]string {
+	if len(messages) > 0 && messages[0]["role"] == "system" && messages[0]["content"] == chatPersona {
+		f.personas++
+		return messages[1:]
+	}
+	return messages
 }
 
 func TestChatDomainHandlerHandle(t *testing.T) {
@@ -373,7 +384,7 @@ type streamingChatGenerator struct {
 
 func (g *streamingChatGenerator) GenerateMessagesStream(_ context.Context, messages []map[string]string, onPreview func(string)) (map[string]any, error) {
 	g.streamed = true
-	g.messages = messages
+	g.messages = g.withoutPersona(messages)
 	onPreview("hel")
 	return g.result, g.err
 }
