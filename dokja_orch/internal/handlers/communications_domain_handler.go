@@ -62,7 +62,7 @@ func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Eve
 	}
 	if musicActions[step.Action] {
 		if h.music == nil {
-			return refusedMusic("music is not set up"), nil
+			return refusedMusic("not_set_up", "music is not set up"), nil
 		}
 		return h.music.handle(ctx, event, step.Action)
 	}
