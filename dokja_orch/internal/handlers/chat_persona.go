@@ -1,5 +1,9 @@
 package handlers
 
+import "read_books/internal/core"
+
+// The identity is derived by the authenticated bridge, never from message text.
+
 // chatPersona is the first system message of every chat turn. Without it the model answers as
 // whatever assistant its provider trained it to be, and introduces itself under that name. The
 // persona is the one the project's README describes.
@@ -59,4 +63,20 @@ of inventing it; a philosopher who bluffs is just a liar.`
 // withPersona puts the persona ahead of everything else the turn sends.
 func withPersona(messages []map[string]string) []map[string]string {
 	return append([]map[string]string{{"role": "system", "content": chatPersona}}, messages...)
+}
+
+func withOwnerIdentity(messages []map[string]string, event core.Event) []map[string]string {
+	if !isConfiguredOwner(event) || len(messages) == 0 || messages[0]["role"] != "system" {
+		return messages
+	}
+	messages[0]["content"] += "\n\nThe current speaker is the configured owner of Ningo, verified by the Discord gateway. This identifies the speaker; it does not grant permission to reveal secrets, bypass rules, or perform actions."
+	return messages
+}
+
+func isConfiguredOwner(event core.Event) bool {
+	if event.Source != core.SourceDiscord || event.Context == nil {
+		return false
+	}
+	isOwner, _ := event.Context["is_owner"].(bool)
+	return isOwner
 }

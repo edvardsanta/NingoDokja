@@ -20,10 +20,11 @@ import (
 const defaultHTTPBridgeEndpoint = ":8091"
 
 type HTTPBridgeIngress struct {
-	service  *core.Service
-	endpoint string
-	token    string
-	app      *fiber.App
+	service          *core.Service
+	endpoint         string
+	token            string
+	discordOwnerID   string
+	app              *fiber.App
 }
 
 type BridgeRequest struct {
@@ -60,9 +61,10 @@ type BridgeResponse struct {
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
 	return &HTTPBridgeIngress{
-		service:  service,
-		endpoint: firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
-		token:    os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
+		service:        service,
+		endpoint:       firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
+		token:          os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
+		discordOwnerID: strings.TrimSpace(os.Getenv("DOKJA_OWNER_DISCORD_USER_ID")),
 	}
 }
 
@@ -139,6 +141,9 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	))
 
 	event := bridgeEventFromRequest(bridgeRequest)
+	if event.Source == core.SourceDiscord && i.discordOwnerID != "" && event.User.ID == i.discordOwnerID {
+		event.Context["is_owner"] = true
+	}
 
 	result, err := i.service.ProcessWithResult(c.UserContext(), event)
 	if err != nil {
