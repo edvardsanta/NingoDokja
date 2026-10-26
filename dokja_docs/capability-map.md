@@ -186,6 +186,15 @@ Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),
 [client](../dokja_orch/internal/clients/book_service_client.go),
 [service](../dokja_services/dokja_book/book_summary_service.py).
 
+### Cross-document application preparation
+
+`knowledge.application.prepare` is an opt-in, read-only task through the existing
+Knowledge route. The orchestrator bounds selected-document reads and workspace
+lifetime; Knowledge checks source identity, text fingerprints and content limits.
+The result contains versioned, unassessed source observations for an explicit
+goal. Claims, applicability decisions, actual outcomes and learned episode reuse
+remain pending in step `08.2`. See the [contract and limits](knowledge-application.md).
+
 ### On-demand reading
 
 `knowledge.read -> reading task: read (feeds.extract -> document.extract.v1 plugin) -> ingest (Knowledge domain -> knowledge.ingest per document) -> classify (feeds.classify -> document.classify.v1 plugin -> Knowledge domain -> knowledge.metadata.get/patch per new document)`
