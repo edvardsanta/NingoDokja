@@ -6,3 +6,5 @@ cloudscraper==1.2.71
 requests==2.32.5
 nudenet==3.4.2
 rapidocr-onnxruntime==1.2.3
+# audio-resolve: track metadata from a link or a search; pinned, updated on purpose.
+yt-dlp==2026.10.21
