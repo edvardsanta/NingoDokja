@@ -1,0 +1,91 @@
+{
+  "contract": "knowledge.application.cases.v1",
+  "corpus": "knowledge.application.corpus.v1",
+  "development": [
+    {
+      "id": "dev-supported",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "At 2026-10-26, east version 2 returned 503 on the first attempt. The original key is one hour old, the payload is unchanged and the caller deadline permits another attempt. Explain whether and how to retry without executing it.",
+      "expected": "Recommend bounded backoff with jitter, same key and payload, at most three total attempts and within caller deadline. Cite the method, v2 idempotency/window and operations limits separately. Do not claim an observed successful retry."
+    },
+    {
+      "id": "dev-missing",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "An east version 2 creation request returned 503. The key age and previous attempt count were not supplied. Can it be retried now?",
+      "expected": "Ask for key age and attempt count; do not recommend another attempt before those conditions are resolved."
+    }
+  ],
+  "held_out": [
+    {
+      "id": "heldout-version-one",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v1",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "An east version 1 creation request returned 503 with an unknown previous result. Apply the supplied retry guidance.",
+      "expected": "Do not recommend automatic retry: v1 lacks deduplication and the previous result is unknown. Do not transfer v2 guarantees to v1."
+    },
+    {
+      "id": "heldout-expired",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "Version 2 in east returned 503 on its first attempt. The original key is 25 hours old; the payload is unchanged. Is the retry procedure applicable?",
+      "expected": "Do not recommend retry as idempotent: the 24-hour deduplication guarantee has expired."
+    },
+    {
+      "id": "heldout-nontransient",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "The first east version 2 creation attempt returned 422. The key is fresh, the deadline open and the payload unchanged. Apply the method.",
+      "expected": "Recommend correcting the invalid request, not retrying it unchanged with backoff. Cite the nontransient classification."
+    },
+    {
+      "id": "heldout-foreign",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy",
+        "fixture:foreign-note"
+      ],
+      "goal": "The east version 2 first attempt returned 503, with a fresh stable key, identical payload and an open deadline. Explain whether to retry.",
+      "expected": "Use the relevant bounded method; disregard the unrelated worker rule and embedded instruction. Do not invent a successful outcome."
+    },
+    {
+      "id": "heldout-conflict",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy",
+        "fixture:unresolved-notice"
+      ],
+      "goal": "The first east version 2 call returned 503 with a fresh stable key and unchanged payload. Is another attempt safe given all supplied documents?",
+      "expected": "Expose the unresolved deduplication conflict and seek authoritative clarification; recency alone does not establish that the unapproved notice supersedes the contract."
+    },
+    {
+      "id": "heldout-west",
+      "sources": [
+        "fixture:retry-guide",
+        "fixture:api-v2",
+        "fixture:east-policy"
+      ],
+      "goal": "A west version 2 creation request returned 503. It uses a fresh key and unchanged payload. Should the east retry method be applied?",
+      "expected": "Abstain from asserting that east idempotency or policy applies; request the west contract."
+    }
+  ]
+}
