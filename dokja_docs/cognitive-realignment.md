@@ -152,3 +152,8 @@ or consolidation. Canonical knowledge and episodes acquire no TTL from this
 proposal; retained news remains temporal knowledge. Concrete cache TTLs await
 their read/invalidation contract. This review does not read or change `.env`,
 databases, running services or external-source configuration.
+
+The first `08.2` implementation batch adds [bounded application evidence
+preparation](knowledge-application.md) through the existing application ports.
+It prepares source observations only; the cross-document reasoning, episode and
+evaluation acceptance criteria above remain open.

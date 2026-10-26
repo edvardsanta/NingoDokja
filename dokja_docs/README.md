@@ -13,6 +13,7 @@ Available docs:
 - [Step 10 storage spike: W1](./step-10-storage-spike.md)
 - [Cognitive cycle: causal experiment and evaluation](./cognitive-cycle-experiment.md)
 - [Step 10.1 multi-hop correctness contract](./step-10-multihop.md)
+- [Cross-document application preparation](./knowledge-application.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)
