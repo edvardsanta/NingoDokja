@@ -35,6 +35,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
         buildBridgePayload({
           eventType: "message.created",
           content: context.content,
+          replyToContent: context.replyToContent,
           userId: context.userId,
           channelId: context.channelId,
           messageId: context.messageId,

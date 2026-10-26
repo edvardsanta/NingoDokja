@@ -2,6 +2,7 @@ export type BridgeRequest = {
   event_type: string;
   payload: {
     content?: string;
+    replyToContent?: string;
     limit?: number;
     maxItemsPerScraper?: number;
     userId: string;
@@ -104,6 +105,7 @@ export async function dispatchToOrchestrator(
 export function buildBridgePayload(params: {
   eventType: string;
   content?: string;
+  replyToContent?: string;
   limit?: number;
   maxItemsPerScraper?: number;
   startSession?: boolean;
@@ -122,6 +124,7 @@ export function buildBridgePayload(params: {
     event_type: params.eventType,
     payload: {
       content: params.content,
+      replyToContent: params.replyToContent?.slice(0, 8000),
       limit: params.limit,
       maxItemsPerScraper: params.maxItemsPerScraper,
       userId: params.userId,

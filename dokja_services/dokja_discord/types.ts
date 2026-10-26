@@ -56,6 +56,7 @@ export type DiscordMessageContext = {
   messageId: string;
   guildId?: string;
   content: string;
+  replyToContent?: string;
   isBot: boolean;
   isDirectMessage: boolean;
   mentionsBot: boolean;

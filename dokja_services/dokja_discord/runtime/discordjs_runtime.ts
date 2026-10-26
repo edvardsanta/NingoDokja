@@ -97,7 +97,7 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
 
   client.on(Events.MessageCreate, async (message) => {
     try {
-      await params.onMessage(toMessageContext(message, client.user?.id));
+      await params.onMessage(await toMessageContext(message, client.user?.id));
     } catch (error) {
       params.error?.("[dokja-discord] message listener failed", error);
     }
@@ -387,13 +387,26 @@ async function handleModal(
   params.log?.("[dokja-discord] modal submit completed", JSON.stringify({ customId: definition.customId }));
 }
 
-function toMessageContext(message: Message, botUserId?: string): DiscordMessageContext {
+export async function toMessageContext(message: Message, botUserId?: string): Promise<DiscordMessageContext> {
+  let replyToContent: string | undefined;
+  if (!message.author.bot && message.reference?.messageId
+    && message.reference.channelId === message.channelId) {
+    try {
+      const referenced = await message.fetchReference();
+      if (referenced.channelId === message.channelId && referenced.guildId === message.guildId) {
+        replyToContent = referenced.content?.slice(0, 8000) || undefined;
+      }
+    } catch {
+      // Deleted or inaccessible references must not prevent the new message being handled.
+    }
+  }
   return {
     userId: message.author.id,
     channelId: message.channelId,
     messageId: message.id,
     guildId: message.guildId ?? undefined,
     content: message.content?.trim() ?? "",
+    replyToContent,
     isBot: Boolean(message.author.bot),
     isDirectMessage: message.channel.type === ChannelType.DM,
     mentionsBot: botUserId ? message.mentions.users.has(botUserId) : true,

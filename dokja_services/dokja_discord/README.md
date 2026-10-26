@@ -2,6 +2,13 @@
 
 TypeScript Discord communication adapter for Dokja. It receives Discord messages and slash commands, maps them into Dokja orchestrator requests over HTTP, and sends the orchestrator reply back to Discord.
 
+For Discord replies, the adapter fetches the referenced message in the same
+channel and guild and forwards up to 8,000 characters as optional `replyToContent`
+on the HTTP bridge. Unavailable references do not block the new message. The chat
+handler treats this as quoted user context, including after session expiry;
+the current message remains the routing input. Deploy the updated orchestrator
+and adapter for this additive feature. Session expiry remains unchanged.
+
 Long replies are split into messages of at most 2,000 characters. The active
 discord.js runtime closes and reopens fenced code blocks with their language tag
 at each boundary, preserving code indentation and blank lines. Exceptionally long

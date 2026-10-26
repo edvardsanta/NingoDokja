@@ -11,22 +11,23 @@ func TestBridgeEventFromRequestMapsDiscordChat(t *testing.T) {
 	event := bridgeEventFromRequest(BridgeRequest{
 		EventType: "chat_message",
 		Payload: struct {
-			Content    string "json:\"content\""
-			Limit      *int   "json:\"limit\""
-			MaxItems   *int   "json:\"maxItemsPerScraper\""
-			UserID     string "json:\"userId\""
-			ChannelID  string "json:\"channelId\""
-			MessageID  string "json:\"messageId\""
-			GuildID    string "json:\"guildId\""
-			SessionKey string "json:\"sessionKey\""
-			StartChat  bool   "json:\"startSession\""
-			AccountID  string "json:\"accountId\""
-			EntryKind  string   "json:\"entryKind\""
-			Direct     *bool    "json:\"isDirectMessage\""
-			Mentioned  *bool    "json:\"mentionsBot\""
-			ChatKind   string   "json:\"chatKind\""
-			SelfChat   *bool    "json:\"isSelfChat\""
-			Numbers    []string "json:\"senderNumbers\""
+			Content        string   "json:\"content\""
+			ReplyToContent string   `json:"replyToContent"`
+			Limit          *int     "json:\"limit\""
+			MaxItems       *int     "json:\"maxItemsPerScraper\""
+			UserID         string   "json:\"userId\""
+			ChannelID      string   "json:\"channelId\""
+			MessageID      string   "json:\"messageId\""
+			GuildID        string   "json:\"guildId\""
+			SessionKey     string   "json:\"sessionKey\""
+			StartChat      bool     "json:\"startSession\""
+			AccountID      string   "json:\"accountId\""
+			EntryKind      string   "json:\"entryKind\""
+			Direct         *bool    "json:\"isDirectMessage\""
+			Mentioned      *bool    "json:\"mentionsBot\""
+			ChatKind       string   "json:\"chatKind\""
+			SelfChat       *bool    "json:\"isSelfChat\""
+			Numbers        []string "json:\"senderNumbers\""
 		}{
 			Content:   "hello dokja",
 			UserID:    "u1",
@@ -50,25 +51,47 @@ func TestBridgeEventFromRequestMapsDiscordChat(t *testing.T) {
 	}
 }
 
+func TestBridgeReplyContextIsBoundedAndDiscordOnly(t *testing.T) {
+	for _, source := range []string{"discord", "whatsapp"} {
+		var request BridgeRequest
+		request.Interface = source
+		request.EventType = "message.created"
+		request.Payload.Content = "Em python mesmo"
+		request.Payload.ReplyToContent = strings.Repeat("x", 9000)
+		event := bridgeEventFromRequest(request)
+		if event.Payload["content"] != "Em python mesmo" {
+			t.Fatal("reply context changed the routing input")
+		}
+		quoted, _ := event.Context["reply_to_content"].(string)
+		if source == "discord" && len(quoted) != 8000 {
+			t.Fatalf("expected bounded reference, got %d", len(quoted))
+		}
+		if source != "discord" && quoted != "" {
+			t.Fatal("unexpected Discord reference on another interface")
+		}
+	}
+}
+
 func TestBridgeEventFromRequestMapsMemeFetch(t *testing.T) {
 	event := bridgeEventFromRequest(BridgeRequest{
 		Payload: struct {
-			Content    string "json:\"content\""
-			Limit      *int   "json:\"limit\""
-			MaxItems   *int   "json:\"maxItemsPerScraper\""
-			UserID     string "json:\"userId\""
-			ChannelID  string "json:\"channelId\""
-			MessageID  string "json:\"messageId\""
-			GuildID    string "json:\"guildId\""
-			SessionKey string "json:\"sessionKey\""
-			StartChat  bool   "json:\"startSession\""
-			AccountID  string "json:\"accountId\""
-			EntryKind  string   "json:\"entryKind\""
-			Direct     *bool    "json:\"isDirectMessage\""
-			Mentioned  *bool    "json:\"mentionsBot\""
-			ChatKind   string   "json:\"chatKind\""
-			SelfChat   *bool    "json:\"isSelfChat\""
-			Numbers    []string "json:\"senderNumbers\""
+			Content        string   "json:\"content\""
+			ReplyToContent string   `json:"replyToContent"`
+			Limit          *int     "json:\"limit\""
+			MaxItems       *int     "json:\"maxItemsPerScraper\""
+			UserID         string   "json:\"userId\""
+			ChannelID      string   "json:\"channelId\""
+			MessageID      string   "json:\"messageId\""
+			GuildID        string   "json:\"guildId\""
+			SessionKey     string   "json:\"sessionKey\""
+			StartChat      bool     "json:\"startSession\""
+			AccountID      string   "json:\"accountId\""
+			EntryKind      string   "json:\"entryKind\""
+			Direct         *bool    "json:\"isDirectMessage\""
+			Mentioned      *bool    "json:\"mentionsBot\""
+			ChatKind       string   "json:\"chatKind\""
+			SelfChat       *bool    "json:\"isSelfChat\""
+			Numbers        []string "json:\"senderNumbers\""
 		}{
 			Content: "meme fetch 3",
 		},

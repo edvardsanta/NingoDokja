@@ -1,7 +1,45 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { splitDiscordReply } from "../runtime/discordjs_runtime.js";
+import { splitDiscordReply, toMessageContext } from "../runtime/discordjs_runtime.js";
+
+test("message replies fetch their quoted text without changing the current message", async () => {
+  const context = await toMessageContext({
+    author: { id: "user", bot: false }, id: "new", channelId: "channel", guildId: "guild",
+    content: "Em python mesmo", channel: { type: 0 }, mentions: { users: new Map() },
+    reference: { messageId: "previous", channelId: "channel" },
+    fetchReference: async () => ({ channelId: "channel", guildId: "guild", content: "A calculator like Windows?" }),
+  } as any);
+  assert.equal(context.content, "Em python mesmo");
+  assert.equal(context.replyToContent, "A calculator like Windows?");
+});
+
+test("missing and cross-channel reply references do not prevent handling", async () => {
+  for (const referenceChannel of ["channel", "other"]) {
+    let fetched = false;
+    const context = await toMessageContext({
+      author: { id: "user", bot: false }, id: "new", channelId: "channel", guildId: "guild",
+      content: "follow up", channel: { type: 0 }, mentions: { users: new Map() },
+      reference: { messageId: "previous", channelId: referenceChannel },
+      fetchReference: async () => { fetched = true; throw new Error("Deleted"); },
+    } as any);
+    assert.equal(fetched, referenceChannel === "channel");
+    assert.equal(context.content, "follow up");
+    assert.equal(context.replyToContent, undefined);
+  }
+});
+
+test("references from another channel or guild are discarded", async () => {
+  for (const target of [{ channelId: "other", guildId: "guild" }, { channelId: "channel", guildId: "other" }]) {
+    const context = await toMessageContext({
+      author: { id: "user", bot: false }, id: "new", channelId: "channel", guildId: "guild",
+      content: "follow up", channel: { type: 0 }, mentions: { users: new Map() },
+      reference: { messageId: "previous", channelId: "channel" },
+      fetchReference: async () => ({ ...target, content: "unrelated" }),
+    } as any);
+    assert.equal(context.replyToContent, undefined);
+  }
+});
 
 test("splitDiscordReply keeps short messages unchanged", () => {
   assert.deepEqual(splitDiscordReply("hello"), ["hello"]);

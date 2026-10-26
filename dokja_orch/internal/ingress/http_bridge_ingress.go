@@ -32,22 +32,23 @@ type BridgeRequest struct {
 	// what every existing client sends; only the values in bridgeInterfaces are accepted.
 	Interface string `json:"interface"`
 	Payload   struct {
-		Content    string   `json:"content"`
-		Limit      *int     `json:"limit"`
-		MaxItems   *int     `json:"maxItemsPerScraper"`
-		UserID     string   `json:"userId"`
-		ChannelID  string   `json:"channelId"`
-		MessageID  string   `json:"messageId"`
-		GuildID    string   `json:"guildId"`
-		SessionKey string   `json:"sessionKey"`
-		StartChat  bool     `json:"startSession"`
-		AccountID  string   `json:"accountId"`
-		EntryKind  string   `json:"entryKind"`
-		Direct     *bool    `json:"isDirectMessage"`
-		Mentioned  *bool    `json:"mentionsBot"`
-		ChatKind   string   `json:"chatKind"`
-		SelfChat   *bool    `json:"isSelfChat"`
-		Numbers    []string `json:"senderNumbers"`
+		Content        string   `json:"content"`
+		ReplyToContent string   `json:"replyToContent"`
+		Limit          *int     `json:"limit"`
+		MaxItems       *int     `json:"maxItemsPerScraper"`
+		UserID         string   `json:"userId"`
+		ChannelID      string   `json:"channelId"`
+		MessageID      string   `json:"messageId"`
+		GuildID        string   `json:"guildId"`
+		SessionKey     string   `json:"sessionKey"`
+		StartChat      bool     `json:"startSession"`
+		AccountID      string   `json:"accountId"`
+		EntryKind      string   `json:"entryKind"`
+		Direct         *bool    `json:"isDirectMessage"`
+		Mentioned      *bool    `json:"mentionsBot"`
+		ChatKind       string   `json:"chatKind"`
+		SelfChat       *bool    `json:"isSelfChat"`
+		Numbers        []string `json:"senderNumbers"`
 	} `json:"payload"`
 }
 
@@ -329,6 +330,13 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 	}
 	if eventType == "message.created" {
 		context["content"] = content
+		if source == core.SourceDiscord && request.Payload.ReplyToContent != "" {
+			quoted := []rune(request.Payload.ReplyToContent)
+			if len(quoted) > 8000 {
+				quoted = quoted[:8000]
+			}
+			context["reply_to_content"] = string(quoted)
+		}
 	}
 
 	return core.Event{
