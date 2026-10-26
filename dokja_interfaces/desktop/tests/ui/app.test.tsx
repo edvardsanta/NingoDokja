@@ -29,6 +29,18 @@ const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Ro
   routedTransport({ ...QUIET, "ningo.status": health, ...overrides });
 
 describe("the screen", () => {
+  it("comes back to the conversation's message from another workspace with Ctrl+K", async () => {
+    const { transport } = screenTransport(statusReply(ALL_UP));
+    render(<App transport={transport} locale="en" />);
+
+    fireEvent.click(tabNamed("Notebook"));
+    expect(selectedTab()).toBe("Notebook");
+    fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+
+    expect(selectedTab()).toBe("Talk");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Your message" })));
+  });
+
   it("shows the name and the workspaces, with the conversation open, in the language it was given", async () => {
     const { transport } = screenTransport(statusReply(ALL_UP));
     render(<App transport={transport} locale="pt" />);

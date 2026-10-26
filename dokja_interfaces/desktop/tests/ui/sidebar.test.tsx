@@ -215,6 +215,59 @@ describe("the sidebar", () => {
     });
   });
 
+  describe("Ctrl+K", () => {
+    // The conversation is "a", with a field that declares the shortcut, as Talk's composer does.
+    const composing: CardEntry[] = [
+      { kind: "a", labelId: "nav_assistant", Card: () => <textarea aria-label="message" aria-keyshortcuts="Control+K" /> },
+      { kind: "b", labelId: "nav_notebook", Card: () => <input aria-label="field b" /> },
+    ];
+    const renderComposing = (start?: string) =>
+      render(
+        <I18nProvider locale="en">
+          <Sidebar entries={composing} transport={NO_TRANSPORT} start={start} composer="a" />
+        </I18nProvider>,
+      );
+
+    it("opens the conversation from another workspace, a field included, and puts the focus in its message", () => {
+      renderComposing("b");
+      screen.getByLabelText("field b").focus();
+
+      expect(fireEvent.keyDown(screen.getByLabelText("field b"), { key: "k", ctrlKey: true })).toBe(false);
+      expect(selected()).toEqual(["Talk"]);
+      expect(document.activeElement).toBe(screen.getByLabelText("message"));
+    });
+
+    it("puts the focus back in the message when the conversation is already open", () => {
+      renderComposing();
+      tab("Talk").focus();
+
+      fireEvent.keyDown(document.body, { key: "K", ctrlKey: true });
+      expect(document.activeElement).toBe(screen.getByLabelText("message"));
+    });
+
+    it("leaves a bare k, other modifiers and an open dialog alone", () => {
+      renderComposing("b");
+      fireEvent.keyDown(document.body, { key: "k" });
+      fireEvent.keyDown(document.body, { key: "k", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document.body, { key: "k", ctrlKey: true, altKey: true });
+      const dialog = document.createElement("div");
+      dialog.setAttribute("aria-modal", "true");
+      document.body.append(dialog);
+      try {
+        fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+      } finally {
+        dialog.remove();
+      }
+      expect(selected()).toEqual(["Notebook"]);
+    });
+
+    it("does nothing without a conversation to go to", () => {
+      renderTabs([], "b");
+      expect(fireEvent.keyDown(document.body, { key: "k", ctrlKey: true })).toBe(true);
+      expect(selected()).toEqual(["Notebook"]);
+    });
+  });
+
   it("opens on the workspace it is told to start on, and mounts only that one", () => {
     const mounted = renderTabs([], "c");
 

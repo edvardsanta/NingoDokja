@@ -32,13 +32,15 @@ type SidebarProps = {
   fallback?: string;
   // What sits on top of the sidebar, above the workspaces.
   header?: ReactNode;
+  // The workspace Ctrl+K opens, giving the focus to the field in it that declares the shortcut.
+  composer?: string;
 };
 
 // One workspace per card, listed in a sidebar, the open one filling the work area. A card is
 // mounted the first time its workspace opens and then kept, hidden while another is open: it keeps
 // what it showed and is not asked for again, and the services behind a workspace nobody opened are
 // never asked at all (the orchestrator answers one request at a time).
-export function Sidebar({ entries, transport, start, fallback, header }: SidebarProps) {
+export function Sidebar({ entries, transport, start, fallback, header, composer }: SidebarProps) {
   const t = useTranslate();
   const { tones, pulse } = useStatus();
   const baseId = useId();
@@ -46,6 +48,8 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(selected ? [selected] : []));
   const tabs = useRef(new Map<string, HTMLButtonElement>());
   const moved = useRef(false);
+  // Counts the presses of Ctrl+K, so a press with the conversation already open still focuses.
+  const [composeRequests, setComposeRequests] = useState(0);
   const problems = Object.values(tones).filter((tone) => tone === "problem").length;
   const lost = pulse === "lost";
 
@@ -63,6 +67,16 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
   useEffect(() => {
     if (lost && fallback && !moved.current) show(fallback);
   }, [lost, fallback]);
+
+  // After Ctrl+K, once the composer's workspace is shown (and mounted, the first time), its field
+  // takes the focus.
+  useEffect(() => {
+    if (composeRequests === 0 || !composer) return;
+    document
+      .getElementById(`${baseId}-panel-${composer}`)
+      ?.querySelector<HTMLElement>('[aria-keyshortcuts~="Control+K"]')
+      ?.focus();
+  }, [composeRequests]);
 
   // The up and down arrows, Home and End move between workspaces and open the one they reach.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -96,6 +110,13 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
       if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       // a dialog is open: what is behind it is not for the keys
       if (document.querySelector('[aria-modal="true"]')) return;
+      // Ctrl+K: back to the conversation, ready to write, from any workspace
+      if (composer && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        show(composer);
+        setComposeRequests((count) => count + 1);
+        return;
+      }
       if (!/^[1-9]$/.test(event.key)) return;
       const entry = entries[Number(event.key) - 1];
       if (!entry) return;
@@ -104,7 +125,7 @@ export function Sidebar({ entries, transport, start, fallback, header }: Sidebar
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [entries]);
+  }, [entries, composer]);
 
   return (
     <div className="workspace">

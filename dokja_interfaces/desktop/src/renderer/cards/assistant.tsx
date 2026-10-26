@@ -36,7 +36,7 @@ function Talk({ transport, reading, onRestart }: { transport: Transport; reading
     conversation.setDraft(`${start} `);
     conversation.field.current?.focus();
   };
-  const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} />;
+  const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K" />;
   return <WorkspacePanel trail={[t("nav_assistant")]} actions={restart} dock={dock}>
     <section className="talk" aria-label={t("assistant_title")}>
       {pulse === "lost" && <div className="note" data-tone="problem">
