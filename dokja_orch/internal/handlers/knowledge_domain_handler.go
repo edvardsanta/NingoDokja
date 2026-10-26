@@ -9,9 +9,10 @@ import (
 )
 
 type KnowledgeDomainHandler struct {
-	domain   *knowledgedomain.Domain
-	reading  *ReadingTask
-	proposer knowledgedomain.ApplicationProposer
+	domain           *knowledgedomain.Domain
+	reading          *ReadingTask
+	proposer         knowledgedomain.ApplicationProposer
+	measuredProposer knowledgedomain.ApplicationProposer
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
@@ -30,6 +31,11 @@ func (h *KnowledgeDomainHandler) WithApplicationProposer(proposer knowledgedomai
 	return h
 }
 
+func (h *KnowledgeDomainHandler) WithMeasuredApplicationProposer(proposer knowledgedomain.ApplicationProposer) *KnowledgeDomainHandler {
+	h.measuredProposer = proposer
+	return h
+}
+
 func (h *KnowledgeDomainHandler) Domain() core.Domain {
 	return core.DomainKnowledge
 }
@@ -44,6 +50,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionProposeMeasuredApplication {
+		return h.proposeApplicationWith(ctx, event, h.measuredProposer)
+	}
 	if workflow.Action == knowledgedomain.ActionProposeApplication {
 		return h.proposeApplication(ctx, event)
 	}

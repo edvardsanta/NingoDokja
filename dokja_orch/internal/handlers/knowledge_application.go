@@ -90,15 +90,22 @@ func (h *KnowledgeDomainHandler) runApplicationTask(ctx context.Context, event c
 }
 
 func (h *KnowledgeDomainHandler) proposeApplication(ctx context.Context, event core.Event) (map[string]any, error) {
+	return h.proposeApplicationWith(ctx, event, h.proposer)
+}
+
+func (h *KnowledgeDomainHandler) proposeApplicationWith(ctx context.Context, event core.Event, proposer knowledge.ApplicationProposer) (map[string]any, error) {
 	request, err := knowledge.ParseApplicationRequest(event.Payload)
 	if err != nil {
 		return nil, err
 	}
-	if h.proposer == nil {
+	if proposer == nil {
 		return nil, fmt.Errorf("application inference is not configured")
 	}
 	workflow := h.applicationPreparationWorkflow(request)
 	workflow.Name = "knowledge-application-propose"
+	if event.Type == "knowledge.application.propose.measured" {
+		workflow.Name += "-measured"
+	}
 	workflow.Deadline = 90 * time.Second
 	workflow.Steps = append(workflow.Steps, core.TaskStep{
 		Name: "proposal", Domain: core.DomainKnowledge, Action: knowledge.ActionProposeApplication,
@@ -111,15 +118,29 @@ func (h *KnowledgeDomainHandler) proposeApplication(ctx context.Context, event c
 			callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 			defer cancel()
 			started := time.Now()
-			response, err := h.proposer.Propose(callCtx, prompt)
+			response, err := proposer.Propose(callCtx, prompt)
 			if callCtx.Err() != nil {
 				return core.StepResult{}, callCtx.Err()
 			}
-			metadata := map[string]any{"calls": 1, "provider": response.Provider, "requested_model": response.RequestedModel, "elapsed_ms": time.Since(started).Milliseconds(), "input_tokens": nil, "output_tokens": nil, "outcome": "unavailable"}
+			metadata := map[string]any{"calls": 1, "provider": response.Provider, "requested_model": response.RequestedModel, "elapsed_ms": time.Since(started).Milliseconds(), "input_tokens": nil, "output_tokens": nil, "budget_mode": response.BudgetMode, "budget_status": response.BudgetStatus, "outcome": "unavailable"}
+			if response.InputTokens != nil {
+				metadata["input_tokens"] = *response.InputTokens
+			}
+			if response.OutputTokens != nil {
+				metadata["output_tokens"] = *response.OutputTokens
+			}
 			stop := func(reason string) (core.StepResult, error) {
 				return core.StepResult{Disposition: core.StepStop, Reason: reason, Output: map[string]any{"inference": metadata}}, nil
 			}
 			if err != nil {
+				if response.BudgetStatus == "over_budget" {
+					metadata["outcome"] = "over_budget"
+					return stop("token_budget_exceeded")
+				}
+				if response.BudgetStatus == "usage_unavailable" {
+					metadata["outcome"] = "usage_unavailable"
+					return stop("token_usage_unavailable")
+				}
 				return stop("provider_unavailable")
 			}
 			output, err := knowledge.DecodeProviderProposal(input.TaskID, request, application, response.Body)

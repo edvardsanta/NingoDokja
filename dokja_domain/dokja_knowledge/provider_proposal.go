@@ -9,6 +9,9 @@ import (
 	"strings"
 )
 
+const ActionProposeMeasuredApplication = "propose-measured-knowledge-application"
+const ProposalMaxInputTokens int64 = 12000
+const ProposalMaxOutputTokens int64 = 2000
 const ActionProposeApplication = "propose-knowledge-application"
 const ProposalContract = "knowledge.application.proposal.v1"
 const MaxProposalPromptBytes = 24 * 1024
@@ -27,6 +30,10 @@ type ProposalResponse struct {
 	Body           string
 	Provider       string
 	RequestedModel string
+	InputTokens    *int64
+	OutputTokens   *int64
+	BudgetMode     string
+	BudgetStatus   string
 }
 type QuotedCitation struct {
 	SourceID    string `json:"source_id"`

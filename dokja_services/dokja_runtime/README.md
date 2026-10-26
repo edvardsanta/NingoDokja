@@ -46,3 +46,8 @@ for precedence, failure behavior and manual-Compose/rollback limits.
 them and lists models only in the selected running Ollama container. It never
 starts a service or performs inference. Unknown CLI table formats fail explicitly;
 see [provider inventory](../../dokja_docs/provider-inventory.md) for limits.
+
+Measured inference is opt-in through the Runtime `ChatMeasured` policy and private
+`/chat/measured` endpoint. It reports structured provider usage and withholds
+results that exceed post-generation acceptance budgets. Existing chat/stream
+contracts remain unchanged. See [limits and compatibility](../../dokja_docs/inference-token-budgets.md).

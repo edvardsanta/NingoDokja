@@ -169,3 +169,9 @@ through the existing Runtime inference socket, with task binding, unique quote
 anchoring and one-call/no-fallback controls. Candidate extraction is now connected;
 semantic acceptance and the frozen provider comparison remain unverified. No
 actual outcomes or reusable episodes are produced by this path.
+
+The next `08.2` batch adds [measured inference](inference-token-budgets.md) with
+reported usage and post-generation token acceptance limits. Unsupported measured
+adapters fail before launch and no fallback hides rejection. These checks match the frozen rule that token overflow is a failed run, while
+pre-generation billing caps are not claimed. Live comparisons and independently
+reviewed semantic results remain unverified.
