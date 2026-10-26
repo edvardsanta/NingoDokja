@@ -1,7 +1,7 @@
 # Music in voice channels
 
-Date: 2026-10-26. Status: phase 1 (sources and resolving) built; the queue,
-playback and commands are next.
+Date: 2026-10-26. Status: phases 1 (sources and resolving) and 2 (queue) built;
+playback and commands are next. Nothing plays yet.
 
 Ningo should play music in a voice channel. The main path is a few typed words:
 someone sends the play command with "monalisa jorge", and Ningo finds the song
@@ -120,9 +120,17 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
    `audio-pages` example, the `FEEDS_PLUGIN_REQUIREMENTS` build argument, and
    `ResolveTrack` and `BestMatch` in the Communications domain. No route calls
    them yet.
-2. **Queue and rules.** Orchestrator routes for adding, skipping, pausing,
-   resuming, stopping, listing and setting volume, per guild, through
-   `ResolveTrack`. Commands are serialized per guild.
+2. **Queue and rules (built).** Events `music.play`, `music.skip`,
+   `music.pause`, `music.resume`, `music.stop`, `music.queue`, `music.volume` and
+   `music.ended` route to the Communications domain, which keeps one queue per
+   server (`MusicQueue`: at most 3 waiting, volume 0 to 100, an "ended" report
+   advances only for the track playing). They are not `communications.*`, which
+   needs the operator token: people in a channel send them through the bridge,
+   after the inbound authorization (the server and the allowed channels). The
+   orchestrator keeps the queues in memory and serializes each server's commands,
+   but searches without holding the queue, within 150 seconds, so skip and pause
+   never wait for a search. A refusal (queue full, nothing found) is an answer,
+   `{ok: false, reason}`, which the bridge turns into one plain line.
 3. **Playback.** The voice adapter plays a page given by the orchestrator, using
    the copied relay, and reports when a track ends or fails so the queue can
    advance. This changes two contracts, reviewed before building: orchestrator to
