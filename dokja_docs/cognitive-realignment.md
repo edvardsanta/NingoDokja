@@ -163,3 +163,9 @@ and freezes authored technical sources, held-out cases and comparison criteria
 before provider runs. Citation integrity and provisional prerequisites are now
 checked through the application path. Semantic interpretation, actual outcomes,
 episode reuse and the full cognitive evaluation remain open.
+
+A further `08.2` batch adds [provider-backed proposals](knowledge-provider-proposals.md)
+through the existing Runtime inference socket, with task binding, unique quote
+anchoring and one-call/no-fallback controls. Candidate extraction is now connected;
+semantic acceptance and the frozen provider comparison remain unverified. No
+actual outcomes or reusable episodes are produced by this path.

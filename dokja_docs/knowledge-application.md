@@ -2,9 +2,11 @@
 
 Step `08.2` now has an opt-in application entry point,
 `knowledge.application.prepare`. It prepares versioned observations for a goal;
-provider-backed claim extraction, semantic method selection and learning remain
-unimplemented. A subsequent [cited-proposal assessor](knowledge-applicability.md)
-checks argument integrity and provisional applicability separately. This is the first implementation batch under the
+semantic method acceptance and learning remain unimplemented. The subsequent
+[provider proposal path](knowledge-provider-proposals.md) adds bounded candidate
+extraction. A subsequent [cited-proposal assessor](knowledge-applicability.md)
+checks argument integrity and provisional applicability separately. Preparation
+is the first implementation batch under the
 [cognitive realignment](cognitive-realignment.md), not completion of that step.
 
 ## Request and result
@@ -106,8 +108,9 @@ The existing route baseline includes the new opt-in action.
 
 The subsequent [assessment batch](knowledge-applicability.md) defines the cited
 claim/method proposal contract and freezes an authored technical corpus, held-out
-cases, rubric and comparison budget. Next, integrate provider-backed proposals
-and semantic review under that protocol before claiming knowledge application. Test supported application,
+cases, rubric and comparison budget. The [provider proposal path](knowledge-provider-proposals.md) subsequently adds
+candidate extraction. Next, integrate independent semantic review and complete
+token accounting under that protocol before claiming knowledge application. Test supported application,
 missing preconditions, contradictions, stale/foreign evidence and legitimate
 abstentions. Actual attempt/outcome recording, eligible episode reuse and durable
 restart controls remain required before step `08.3` can evaluate cognition.

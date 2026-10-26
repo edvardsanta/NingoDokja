@@ -78,8 +78,59 @@ func (h *KnowledgeDomainHandler) runApplicationTask(ctx context.Context, event c
 		result["status"] = status
 		result[resultKey] = task.Outputs[outputKey]
 	}
+	if output := task.Outputs["proposal"]; task.Status != core.TaskCompleted && output != nil {
+		if inference, ok := output["inference"]; ok {
+			result["inference"] = inference
+		}
+	}
 	// Partial source contents are never published as a usable context.
 	task.Outputs = nil
 	result["task"] = task
 	return result, nil
+}
+
+func (h *KnowledgeDomainHandler) proposeApplication(ctx context.Context, event core.Event) (map[string]any, error) {
+	request, err := knowledge.ParseApplicationRequest(event.Payload)
+	if err != nil {
+		return nil, err
+	}
+	if h.proposer == nil {
+		return nil, fmt.Errorf("application inference is not configured")
+	}
+	workflow := h.applicationPreparationWorkflow(request)
+	workflow.Name = "knowledge-application-propose"
+	workflow.Deadline = 90 * time.Second
+	workflow.Steps = append(workflow.Steps, core.TaskStep{
+		Name: "proposal", Domain: core.DomainKnowledge, Action: knowledge.ActionProposeApplication,
+		Run: func(ctx context.Context, input core.StepInput) (core.StepResult, error) {
+			application := input.Outputs["context"]
+			prompt, err := knowledge.BuildProposalPrompt(input.TaskID, application)
+			if err != nil {
+				return core.StepResult{}, err
+			}
+			callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+			defer cancel()
+			started := time.Now()
+			response, err := h.proposer.Propose(callCtx, prompt)
+			if callCtx.Err() != nil {
+				return core.StepResult{}, callCtx.Err()
+			}
+			metadata := map[string]any{"calls": 1, "provider": response.Provider, "requested_model": response.RequestedModel, "elapsed_ms": time.Since(started).Milliseconds(), "input_tokens": nil, "output_tokens": nil, "outcome": "unavailable"}
+			stop := func(reason string) (core.StepResult, error) {
+				return core.StepResult{Disposition: core.StepStop, Reason: reason, Output: map[string]any{"inference": metadata}}, nil
+			}
+			if err != nil {
+				return stop("provider_unavailable")
+			}
+			output, err := knowledge.DecodeProviderProposal(input.TaskID, request, application, response.Body)
+			if err != nil {
+				metadata["outcome"] = "invalid_proposal"
+				return stop("invalid_provider_proposal")
+			}
+			metadata["outcome"] = "accepted"
+			output["inference"] = metadata
+			return core.StepResult{Disposition: core.StepContinue, Output: output}, nil
+		},
+	})
+	return h.runApplicationTask(ctx, event, workflow, "proposed", "proposal", "proposal")
 }

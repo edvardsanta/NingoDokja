@@ -166,7 +166,9 @@ func main() {
 			WithContentPlugins(contentPlugins).WithServiceProbes(serviceProbes).WithInterfaceProbes(interfaceProbes).WithInterfaceLinks(interfaceLinks).WithWhatsApp(whatsappSender),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
-		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithReading(handlers.NewReadingTask(
+		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithApplicationProposer(
+			clients.NewKnowledgeProposalClient(clients.NewChatProviderClient("")),
+		).WithReading(handlers.NewReadingTask(
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),

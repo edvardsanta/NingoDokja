@@ -9,8 +9,9 @@ import (
 )
 
 type KnowledgeDomainHandler struct {
-	domain  *knowledgedomain.Domain
-	reading *ReadingTask
+	domain   *knowledgedomain.Domain
+	reading  *ReadingTask
+	proposer knowledgedomain.ApplicationProposer
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
@@ -21,6 +22,11 @@ func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomain
 // refused and every other knowledge event is unchanged.
 func (h *KnowledgeDomainHandler) WithReading(task *ReadingTask) *KnowledgeDomainHandler {
 	h.reading = task
+	return h
+}
+
+func (h *KnowledgeDomainHandler) WithApplicationProposer(proposer knowledgedomain.ApplicationProposer) *KnowledgeDomainHandler {
+	h.proposer = proposer
 	return h
 }
 
@@ -38,6 +44,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionProposeApplication {
+		return h.proposeApplication(ctx, event)
+	}
 	if workflow.Action == knowledgedomain.ActionAssessApplication {
 		return h.assessApplication(ctx, event)
 	}
