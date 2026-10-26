@@ -15,6 +15,10 @@ func (h *KnowledgeDomainHandler) prepareApplication(ctx context.Context, event c
 	if err != nil {
 		return nil, err
 	}
+	return h.runApplicationTask(ctx, event, h.applicationPreparationWorkflow(request), "prepared", "application", "context")
+}
+
+func (h *KnowledgeDomainHandler) applicationPreparationWorkflow(request knowledge.ApplicationRequest) core.TypedWorkflow {
 	workflow := core.TypedWorkflow{Name: "knowledge-application-prepare", Version: "1", Goal: request.Goal, Deadline: 15 * time.Second}
 	for index, selected := range request.Sources {
 		workflow.Steps = append(workflow.Steps, core.TaskStep{
@@ -41,17 +45,38 @@ func (h *KnowledgeDomainHandler) prepareApplication(ctx context.Context, event c
 			return core.StepResult{Disposition: core.StepContinue, Output: output}, err
 		},
 	})
+	return workflow
+}
+
+func (h *KnowledgeDomainHandler) assessApplication(ctx context.Context, event core.Event) (map[string]any, error) {
+	request, err := knowledge.ParseAssessmentRequest(event.Payload)
+	if err != nil {
+		return nil, err
+	}
+	workflow := h.applicationPreparationWorkflow(request.Application)
+	workflow.Name = "knowledge-application-assess"
+	workflow.Steps = append(workflow.Steps, core.TaskStep{
+		Name: "assessment", Domain: core.DomainKnowledge, Action: knowledge.ActionAssessApplication,
+		Run: func(_ context.Context, input core.StepInput) (core.StepResult, error) {
+			output, err := knowledge.AssessApplication(request, input.Outputs["context"])
+			return core.StepResult{Disposition: core.StepContinue, Output: output}, err
+		},
+	})
+	return h.runApplicationTask(ctx, event, workflow, "assessed", "assessment", "assessment")
+}
+
+func (h *KnowledgeDomainHandler) runApplicationTask(ctx context.Context, event core.Event, workflow core.TypedWorkflow, status, resultKey, outputKey string) (map[string]any, error) {
 	task, err := core.RunTask(ctx, event, workflow, core.TaskLimits{
-		MaxSteps: knowledge.MaxApplicationSources + 1, MaxEvidence: knowledge.MaxApplicationSources,
+		MaxSteps: len(workflow.Steps), MaxEvidence: knowledge.MaxApplicationSources,
 		MaxProposals: 1, MaxBytes: 512 * 1024,
 	})
 	if err != nil {
 		return nil, err
 	}
-	result := map[string]any{"status": "not_prepared"}
+	result := map[string]any{"status": "not_" + status}
 	if task.Status == core.TaskCompleted && task.Reason == "" {
-		result["status"] = "prepared"
-		result["application"] = task.Outputs["context"]
+		result["status"] = status
+		result[resultKey] = task.Outputs[outputKey]
 	}
 	// Partial source contents are never published as a usable context.
 	task.Outputs = nil

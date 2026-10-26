@@ -157,3 +157,9 @@ The first `08.2` implementation batch adds [bounded application evidence
 preparation](knowledge-application.md) through the existing application ports.
 It prepares source observations only; the cross-document reasoning, episode and
 evaluation acceptance criteria above remain open.
+
+The next `08.2` batch adds [cited proposal assessment](knowledge-applicability.md)
+and freezes authored technical sources, held-out cases and comparison criteria
+before provider runs. Citation integrity and provisional prerequisites are now
+checked through the application path. Semantic interpretation, actual outcomes,
+episode reuse and the full cognitive evaluation remain open.

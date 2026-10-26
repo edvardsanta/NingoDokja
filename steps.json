@@ -578,12 +578,13 @@
           ],
           "evidence": [
             "Owner selected understanding and applying knowledge across documents; minimum consumer and control requirements are documented, but concrete contracts, corpus/rubric freeze and implementation remain incomplete.",
-            "First application batch: knowledge.application.prepare runs through the existing route, domain, service client and bounded typed workspace. Selected sources carry identity/provenance and optional SHA-256 text pins; missing, changed, oversized or late evidence yields no prepared context. Applicability remains unassessed and experience is not consulted; see dokja_docs/knowledge-application.md. Knowledge domain and full orchestrator race suites pass; this does not demonstrate understanding, application or learning."
+            "First application batch: knowledge.application.prepare runs through the existing route, domain, service client and bounded typed workspace. Selected sources carry identity/provenance and optional SHA-256 text pins; missing, changed, oversized or late evidence yields no prepared context. Applicability remains unassessed and experience is not consulted; see dokja_docs/knowledge-application.md. Knowledge domain and full orchestrator race suites pass; this does not demonstrate understanding, application or learning.",
+            "Second application batch: knowledge.application.assess re-reads pinned observations, verifies source-span quotations and validates explicit caller-proposed claims/method prerequisites. Provisional applicability exposes missing, contradictory or conflicting proposed support; meaning remains unverified, execution disabled and experience not consulted. Authored technical corpus, two development/six held-out cases, rubric and bounded comparison protocol were frozen before implementation in commit 8b9f331. Domain/orchestrator race suites and static checks pass; no provider comparison, semantic acceptance or learning is claimed. See dokja_docs/knowledge-applicability.md."
           ],
           "remaining": [
-            "Define source-span/claim/concept/method/applicability and actual episode contracts beyond the implemented source/task preparation boundary; review persistence compatibility before writes.",
-            "Select and freeze the representative nonpersonal corpus, held-out cases, scoring rubric and model comparison budget before provider calls.",
-            "Extend the opt-in preparation task to validated cross-document application, actual attempted procedure/outcome recording and eligible later episode reuse; then run the 08.3 controls."
+            "Integrate provider-backed candidate extraction and independent semantic/applicability review, including source scope/date interpretation and prerequisite completeness; citation integrity alone is not supported application.",
+            "Run the frozen corpus/case protocol with recorded provider/model/settings and all failures; add any future corpus revision as a separate version, and retain the 08.3 causal/reliability gate.",
+            "Define concepts/relationships and actual episode/prediction contracts before persistence; extend the opt-in path to retrieval/revision, actual attempted procedure/outcome recording and eligible later durable episode reuse."
           ]
         },
         {

@@ -192,8 +192,12 @@ Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),
 Knowledge route. The orchestrator bounds selected-document reads and workspace
 lifetime; Knowledge checks source identity, text fingerprints and content limits.
 The result contains versioned, unassessed source observations for an explicit
-goal. Claims, applicability decisions, actual outcomes and learned episode reuse
-remain pending in step `08.2`. See the [contract and limits](knowledge-application.md).
+goal. `knowledge.application.assess` re-reads pinned observations and validates an
+explicit caller proposal of cited claims and method prerequisites. It exposes
+missing/conflicting/contradicted support and conditional applicability, with
+semantic meaning unverified and execution disabled. Provider-backed semantic
+application, actual outcomes and learned episode reuse remain pending in `08.2`.
+See [preparation](knowledge-application.md) and [assessment/evaluation inputs](knowledge-applicability.md).
 
 ### On-demand reading
 

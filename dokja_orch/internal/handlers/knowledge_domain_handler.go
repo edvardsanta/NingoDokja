@@ -38,6 +38,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionAssessApplication {
+		return h.assessApplication(ctx, event)
+	}
 	if workflow.Action == knowledgedomain.ActionPrepareApplication {
 		return h.prepareApplication(ctx, event)
 	}
