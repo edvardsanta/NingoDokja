@@ -72,7 +72,9 @@ the rest of Ningo carries on.
    track. yt-dlp's own errors reach the caller as a generic failure; the detail
    stays in the Feeds log. Enabling it: build Feeds with
    `FEEDS_PLUGIN_EXTRAS=media` (or `content`), copy the plugin to `feeds_plugins/`
-   and set `enabled: true`.
+   and set `enabled: true`. A `query` is searched on YouTube (`ytsearch`) until
+   the owner answers open question 5; a `url` from any host yt-dlp supports
+   resolves already. No route calls the capability yet.
 2. **Queue and rules.** Orchestrator routes for adding, skipping, pausing,
    resuming, stopping, listing and setting volume, per guild. The deciding domain
    follows open question 1, and admissibility goes to Moderation. Commands are
