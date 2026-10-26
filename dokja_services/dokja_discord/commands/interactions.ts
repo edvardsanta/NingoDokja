@@ -1,4 +1,5 @@
 import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
+import { localizeNotice } from "../messages/notices.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -86,6 +87,7 @@ async function fetchChatReply(
   orchestratorEndpoint: string,
   orchestratorTimeoutMs: number,
   content: string,
+  locale?: string,
 ) {
   const response = await dispatchToOrchestratorResponse(
     orchestratorEndpoint,
@@ -100,15 +102,17 @@ async function fetchChatReply(
       guildId: context.guildId,
     }),
   );
+  const reply = localizeNotice(response.notice, response.reply, locale);
   return response.attachments?.length
-    ? { content: response.reply, attachments: response.attachments }
-    : response.reply;
+    ? { content: reply, attachments: response.attachments }
+    : reply;
 }
 
 export function createInteractionDefinitions(params: {
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
   voice?: DiscordVoiceController;
+  locale?: string;
 }): {
   buttons: DiscordButtonAction[];
   selects: DiscordSelectAction[];
@@ -139,6 +143,7 @@ export function createInteractionDefinitions(params: {
         orchestratorEndpoint,
         orchestratorTimeoutMs,
         context.getText("prompt"),
+        params.locale,
       );
       await context.reply(reply);
     },

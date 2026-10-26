@@ -25,6 +25,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
   const MUSIC_COMMANDS = new Set(["play", "skip", "pause", "resume", "stop", "queue", "volume"]);
   const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
     logVoiceConversation: cfg.mode === "full",
+    locale: cfg.locale,
   });
   const commands =
     cfg.mode === "voice"

@@ -44,6 +44,12 @@ func TestChatMathDeliversImageOrReadableFallback(t *testing.T) {
 		if len(attachments) != wantAttachments || generator.renders != 1 {
 			t.Fatal("unexpected rendering result")
 		}
+		if renderErr != nil && result["notice"] != "chat.math_render_failed" {
+			t.Fatal("renderer failure was hidden")
+		}
+		if renderErr == nil && result["notice"] == "chat.math_render_failed" {
+			t.Fatal("successful rendering reported a failure")
+		}
 	}
 }
 
@@ -52,8 +58,26 @@ func TestChatMathDoesNotInterpretOtherInterfaces(t *testing.T) {
 	event := chatEvent("formula")
 	event.Source = core.SourceDesktop
 	input := "```math\nlatex: x\ntext: x\nimage: true\n```"
-	text, attachments := NewChatDomainHandler(generator).presentMath(context.Background(), event, input)
-	if text != input || len(attachments) != 0 || generator.renders != 0 {
+	presentation := NewChatDomainHandler(generator).presentMath(context.Background(), event, input)
+	if presentation.text != input || len(presentation.attachments) != 0 || presentation.failed || generator.renders != 0 {
 		t.Fatal("Discord presentation leaked to another interface")
+	}
+}
+
+func TestMathFallbackReportsMissingRendererAndInvalidPNG(t *testing.T) {
+	block := "```math\nlatex: x\ntext: x\nimage: true\n```\n"
+	for _, generator := range []ChatGenerator{
+		&fakeChatGenerator{result: map[string]any{"reply": block}},
+		&mathGenerator{fakeChatGenerator: fakeChatGenerator{result: map[string]any{"reply": block}}, data: []byte("invalid PNG")},
+	} {
+		event := chatEvent("Show a formula image")
+		event.Context = map[string]any{"force_new_session": true}
+		result, err := NewChatDomainHandler(generator).Handle(context.Background(), event, chatStep)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result["notice"] != "chat.math_render_failed" || result["reply"] != "x\n" || result["attachments"] != nil {
+			t.Fatalf("image failure was hidden or discarded text: %#v", result)
+		}
 	}
 }

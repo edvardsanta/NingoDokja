@@ -5,6 +5,8 @@ validated inline image bytes through optional bridge `attachments`; the adapter
 uploads them with messages, slash replies and chat modals. A long reply attaches
 files only to its first chunk. Readable plain-text formulas are retained even
 when rendering is unavailable.
+Rendering failures are stated above the text using the interface locale, in
+messages, slash replies and chat modals.
 
 TypeScript Discord communication adapter for Dokja. It receives Discord messages and slash commands, maps them into Dokja orchestrator requests over HTTP, and sends the orchestrator reply back to Discord.
 
