@@ -9,6 +9,11 @@ handler treats this as quoted user context, including after session expiry;
 the current message remains the routing input. Deploy the updated orchestrator
 and adapter for this additive feature. Session expiry remains unchanged.
 
+Up to 20 mentioned Discord user IDs also travel to the authenticated bridge.
+The orchestrator compares them with optional `DOKJA_OWNER_DISCORD_USER_ID` and
+passes only a trusted owner mention fact to chat; the ID itself is not sent to
+the model.
+
 Long replies are split into messages of at most 2,000 characters. The active
 discord.js runtime closes and reopens fenced code blocks with their language tag
 at each boundary, preserving code indentation and blank lines. Exceptionally long

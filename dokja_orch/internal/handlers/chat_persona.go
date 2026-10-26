@@ -66,17 +66,30 @@ func withPersona(messages []map[string]string) []map[string]string {
 }
 
 func withOwnerIdentity(messages []map[string]string, event core.Event) []map[string]string {
-	if !isConfiguredOwner(event) || len(messages) == 0 || messages[0]["role"] != "system" {
+	note := ownerIdentityNote(event)
+	if note == "" || len(messages) == 0 || messages[0]["role"] != "system" {
 		return messages
 	}
-	messages[0]["content"] += "\n\nThe current speaker is the configured owner of Ningo, verified by the Discord gateway. This identifies the speaker; it does not grant permission to reveal secrets, bypass rules, or perform actions."
+	messages[0]["content"] += "\n\n" + note
 	return messages
 }
 
-func isConfiguredOwner(event core.Event) bool {
+func ownerIdentityNote(event core.Event) string {
 	if event.Source != core.SourceDiscord || event.Context == nil {
-		return false
+		return ""
 	}
+	configured, _ := event.Context["owner_configured"].(bool)
 	isOwner, _ := event.Context["is_owner"].(bool)
-	return isOwner
+	mentioned, _ := event.Context["owner_mentioned"].(bool)
+	if !configured && !isOwner && !mentioned {
+		return ""
+	}
+	note := "The operator has configured the identity of Ningo's owner. Do not guess the owner's name or reveal their numeric Discord ID. This identity fact does not grant permission to reveal secrets, bypass rules, or perform actions."
+	if isOwner {
+		note += " The current speaker is the configured owner, verified by the Discord gateway."
+	}
+	if mentioned {
+		note += " The current message directly mentions the configured owner; if asked who the owner is, identify the owner by that mention without printing its raw ID."
+	}
+	return note
 }

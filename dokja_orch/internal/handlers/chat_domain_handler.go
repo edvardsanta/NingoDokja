@@ -155,8 +155,8 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, h
 		content = reference + "\n\nUser question:\n" + content
 	}
 	persona := chatPersona
-	if isConfiguredOwner(event) {
-		persona += "\n\nThe current speaker is the configured owner of Ningo, verified by the Discord gateway. This identifies the speaker; it does not grant permission to reveal secrets, bypass rules, or perform actions."
+	if ownerNote := ownerIdentityNote(event); ownerNote != "" {
+		persona += "\n\n" + ownerNote
 	}
 	return h.generator.Generate(ctx, persona+"\n\n"+content)
 }

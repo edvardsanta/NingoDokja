@@ -3,6 +3,7 @@ export type BridgeRequest = {
   payload: {
     content?: string;
     replyToContent?: string;
+    mentionedUserIds?: string[];
     limit?: number;
     maxItemsPerScraper?: number;
     userId: string;
@@ -106,6 +107,7 @@ export function buildBridgePayload(params: {
   eventType: string;
   content?: string;
   replyToContent?: string;
+  mentionedUserIds?: string[];
   limit?: number;
   maxItemsPerScraper?: number;
   startSession?: boolean;
@@ -125,6 +127,7 @@ export function buildBridgePayload(params: {
     payload: {
       content: params.content,
       replyToContent: params.replyToContent?.slice(0, 8000),
+      mentionedUserIds: params.mentionedUserIds?.slice(0, 20),
       limit: params.limit,
       maxItemsPerScraper: params.maxItemsPerScraper,
       userId: params.userId,
