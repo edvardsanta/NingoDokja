@@ -2,7 +2,8 @@
 export type QueueState = {
   epoch: string;
   version: number;
-  nowPlaying?: { entry: number; url: string; title: string; uploader: string };
+  nowPlaying?: { entry: number; url: string; title: string; uploader: string; requestedBy: string };
+  waiting: number;
   paused: boolean;
   volume: number;
 };
@@ -34,6 +35,7 @@ export function parseQueueState(raw: unknown): QueueState | undefined {
     version: raw.version as number,
     paused: raw.paused === true,
     volume: clampVolume(raw.volume),
+    waiting: Array.isArray(raw.waiting) ? Math.min(raw.waiting.length, 100) : 0,
   };
   const now = raw.now_playing;
   if (isRecord(now) && Number.isInteger(now.entry) && typeof now.url === "string" && /^https?:\/\//.test(now.url)) {
@@ -42,6 +44,8 @@ export function parseQueueState(raw: unknown): QueueState | undefined {
       url: now.url,
       title: typeof now.title === "string" ? now.title : "",
       uploader: typeof now.uploader === "string" ? now.uploader : "",
+      // a Discord user id, said back as a mention; anything else is left out
+      requestedBy: typeof now.requested_by === "string" && /^[0-9]{1,20}$/.test(now.requested_by) ? now.requested_by : "",
     };
   }
   return state;

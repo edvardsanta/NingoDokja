@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController } from "../voice/voice.js";
-import { createMusicCommands } from "../music/commands.js";
+import { createMusic, type MusicFeature } from "../music/commands.js";
 import { buildNingoPanelReply } from "./interactions.js";
 
 type DokjaCommandParams = {
@@ -67,6 +67,8 @@ export function createCommands(
   voice?: DiscordVoiceController,
   options?: {
     logVoiceConversation?: boolean;
+    // the music feature whose buttons the runtime also serves; one is made when left out
+    music?: MusicFeature;
   },
 ): DiscordSlashCommand[] {
   return [
@@ -423,6 +425,6 @@ export function createCommands(
       },
     },
     // Music in a voice channel: the queue lives in the orchestrator.
-    ...createMusicCommands({ orchestratorEndpoint, orchestratorTimeoutMs, voice }),
+    ...(options?.music ?? createMusic({ orchestratorEndpoint, orchestratorTimeoutMs, voice })).commands,
   ];
 }

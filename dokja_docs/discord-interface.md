@@ -46,6 +46,17 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
   radio is refused while a queue plays, and `/play` stops a radio that is playing.
 - Only Discord plays the queue: a change made elsewhere (desktop, CLI) is heard at the next
   Discord command or track end.
+- **The panel.** When a song starts, Ningo posts one message in the channel of the last music
+  command: the song, who asked for it, the volume and how many wait, with Pause/Resume, Skip,
+  Stop and volume −10/+10 buttons. It is edited as the queue changes, never posted again for the
+  same queue, and loses its buttons when the queue ends. Buttons follow the commands' rule and
+  answer only the person who pressed.
+- **Alone in the channel.** When nobody but bots is left in Ningo's voice channel, the music
+  pauses (apart from the queue's own pause and the pause while Ningo speaks). If someone comes
+  back within three minutes it resumes; otherwise Ningo leaves and the queue is reported stopped.
+- **Language.** Replies, refusals and the panel are said in `DOKJA_DISCORD_LOCALE` (`pt-BR` by
+  default, `en` too). The orchestrator sends the queue and a refusal `code`; a source's own
+  refusal keeps its words.
 
 ## State
 
