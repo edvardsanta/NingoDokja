@@ -105,6 +105,32 @@ class AdapterTests(unittest.TestCase):
             },
         )
 
+    def test_channel_names_come_from_every_configured_server(self):
+        adapter = Adapter("secret", "123,456,999", " 789 , 790 ,bad")
+        servers = {
+            "/guilds/789/channels": [{"id": "123", "name": "readings"}],
+            "/guilds/790/channels": [{"id": "456", "name": "music"}],
+        }
+        adapter.get = Mock(side_effect=lambda path: servers[path])
+        self.assertEqual(adapter.guilds, ["789", "790"])
+        self.assertEqual(
+            adapter.dispatch("channels", {"channel_ids": ["123", "456", "999"]}),
+            {
+                "channels": [
+                    {"id": "123", "name": "readings"},
+                    {"id": "456", "name": "music"},
+                    {"id": "999", "name": "999"},
+                ]
+            },
+        )
+        adapter.get.reset_mock()
+        adapter.dispatch("channels", {"channel_ids": ["123"]})
+        self.assertEqual(
+            [call.args[0] for call in adapter.get.call_args_list],
+            ["/guilds/789/channels"],
+            "the second server is not asked once every name is known",
+        )
+
     def test_attachment_only_and_edited_replies(self):
         row = project_message(
             {

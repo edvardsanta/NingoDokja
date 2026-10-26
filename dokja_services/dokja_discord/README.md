@@ -9,7 +9,8 @@ Environment variables:
 - `DOKJA_ORCH_HTTP_ENDPOINT`
 - `DOKJA_GATEWAY_INGRESS_TOKEN` required gateway credential; set the same value on the orchestrator
 - `DOKJA_ORCHESTRATOR_TIMEOUT_MS`
-- `DISCORD_GUILD_ID`
+- `DISCORD_GUILD_ID` one server, or several separated by commas; the `/` commands are registered on each
+  (globally when empty)
 - `DISCORD_ALLOWED_CHANNELS`
 - `DISCORD_DM_POLICY`
 - `DISCORD_REQUIRE_MENTION` optional orchestrator policy setting; defaults to `false`

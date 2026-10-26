@@ -33,7 +33,7 @@ import type {
 type StartDiscordRuntimeParams = {
   token: string;
   applicationId?: string;
-  devGuildId?: string;
+  devGuildIds?: string[];
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
   commands: DiscordSlashCommand[];
@@ -49,7 +49,7 @@ type StartDiscordRuntimeDeps = {
   createClient?: (params: {
     applicationId: string;
     token: string;
-    devGuildId?: string;
+    devGuildIds?: string[];
     commands: DiscordSlashCommand[];
     buttons?: DiscordButtonAction[];
     selects?: DiscordSelectAction[];
@@ -554,7 +554,7 @@ export async function startDiscordRuntime(
   const client = createClient({
     applicationId,
     token: params.token,
-    devGuildId: params.devGuildId,
+    devGuildIds: params.devGuildIds,
     commands: params.commands,
     buttons: params.buttons,
     selects: params.selects,
@@ -610,7 +610,7 @@ export async function startDiscordRuntime(
 function defaultCreateClient(params: {
   applicationId: string;
   token: string;
-  devGuildId?: string;
+  devGuildIds?: string[];
   commands: DiscordSlashCommand[];
   buttons?: DiscordButtonAction[];
   selects?: DiscordSelectAction[];
@@ -624,7 +624,7 @@ function defaultCreateClient(params: {
       publicKey: "a",
       token: params.token,
       autoDeploy: false,
-      devGuilds: params.devGuildId ? [params.devGuildId] : undefined,
+      devGuilds: params.devGuildIds && params.devGuildIds.length > 0 ? params.devGuildIds : undefined,
     },
     {
       commands: params.commands.map((definition) =>

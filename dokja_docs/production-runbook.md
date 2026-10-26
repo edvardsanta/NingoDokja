@@ -490,7 +490,7 @@ Check:
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
 - `DOKJA_ORCHESTRATOR_TIMEOUT_MS`
-- `DISCORD_GUILD_ID`
+- `DISCORD_GUILD_ID` (one server, or several separated by commas)
 - `DISCORD_ALLOWED_CHANNELS`
 - `DISCORD_SCHEDULED_MEME_CHANNEL_ID`
 
@@ -643,7 +643,11 @@ bridge is not listening, or is too old to stream, the desktop sends the turn ove
 The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
 `DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
 `DOKJA_WHATSAPP_ALLOW_FROM` and `DOKJA_WHATSAPP_ALLOWED_GROUPS` from the same
-ignored environment as the gateways. `DISCORD_REQUIRE_MENTION` is optional and
+ignored environment as the gateways. `DISCORD_GUILD_ID` may name several servers,
+separated by commas: Ningo answers in each (still only in `DISCORD_ALLOWED_CHANNELS`)
+and the Discord gateway registers its commands on each. A single value works as
+before. Recreate the orchestrator, `dokja-discord` and, when it runs,
+`dokja-communications` after changing it. `DISCORD_REQUIRE_MENTION` is optional and
 defaults to false, matching the previous running Discord listener. Set it to
 true only when ordinary guild messages should require a bot mention; slash
 commands remain available in allowed channels. Test with synthetic gateway

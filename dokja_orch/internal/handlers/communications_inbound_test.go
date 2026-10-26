@@ -10,7 +10,7 @@ import (
 
 func TestInboundHandlerRefusesMissingAndUnlistedMetadata(t *testing.T) {
 	h := NewCommunicationsDomainHandler(nil, "").WithInboundPolicy(communications.InboundPolicy{
-		DiscordGuildID: "guild", DiscordChannels: []string{"reading"},
+		DiscordGuildIDs: []string{"guild"}, DiscordChannels: []string{"reading"},
 	})
 	step := core.WorkflowStep{Domain: core.DomainCommunications, Action: communications.ActionAuthorizeInbound}
 	base := core.Event{Source: core.SourceDiscord, Channel: core.EventChannel{ID: "reading"}, Context: map[string]any{

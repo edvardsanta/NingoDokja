@@ -1,6 +1,7 @@
 export type DiscordInterfaceConfig = {
   applicationId?: string;
-  allowedGuildId: string;
+  // The servers Ningo answers in; none means any, with its commands registered globally.
+  allowedGuildIds: string[];
   allowedChannelIds: string[];
   dmPolicy: string;
   mode: "full" | "voice";
@@ -19,7 +20,10 @@ export function env(name: string, fallback = ""): string {
 export function buildConfig(): DiscordInterfaceConfig {
   return {
     applicationId: env("DISCORD_APPLICATION_ID") || undefined,
-    allowedGuildId: env("DISCORD_GUILD_ID"),
+    allowedGuildIds: env("DISCORD_GUILD_ID")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
     allowedChannelIds: env("DISCORD_ALLOWED_CHANNELS")
       .split(",")
       .map((value) => value.trim())

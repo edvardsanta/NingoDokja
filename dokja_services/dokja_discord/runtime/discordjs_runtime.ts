@@ -40,7 +40,7 @@ import { trackGatewayState, type GatewayStateTracker } from "./gateway_state.js"
 type StartDiscordJsRuntimeParams = {
   token: string;
   applicationId?: string;
-  devGuildId?: string;
+  devGuildIds?: string[];
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
   commands: DiscordSlashCommand[];
@@ -87,7 +87,7 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
         "[dokja-discord] command deploy failed",
         JSON.stringify({
           applicationId,
-          guildId: params.devGuildId,
+          guildIds: params.devGuildIds,
           error: error instanceof Error ? error.message : String(error),
         }),
       );
@@ -151,21 +151,29 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
   await client.login(params.token);
 }
 
-async function deployCommands(params: StartDiscordJsRuntimeParams) {
+type CommandRest = { put(route: `/${string}`, options: { body: unknown }): Promise<unknown> };
+
+export async function deployCommands(
+  params: Pick<StartDiscordJsRuntimeParams, "token" | "applicationId" | "devGuildIds" | "commands" | "log">,
+  rest: CommandRest = new REST({ version: "10" }).setToken(params.token),
+) {
   const applicationId = params.applicationId?.trim();
   if (!applicationId) {
     throw new Error("discord application id is required for command deployment");
   }
-  const rest = new REST({ version: "10" }).setToken(params.token);
   const payload = params.commands.map(serializeCommand);
-  if (params.devGuildId) {
-    await rest.put(Routes.applicationGuildCommands(applicationId, params.devGuildId), {
-      body: payload,
-    });
-    params.log?.(
-      "[dokja-discord] command deploy",
-      JSON.stringify({ mode: "guild", guildId: params.devGuildId, count: payload.length }),
-    );
+  // Commands registered on a server appear there at once; each configured server gets them.
+  const guildIds = params.devGuildIds ?? [];
+  if (guildIds.length > 0) {
+    for (const guildId of guildIds) {
+      await rest.put(Routes.applicationGuildCommands(applicationId, guildId), {
+        body: payload,
+      });
+      params.log?.(
+        "[dokja-discord] command deploy",
+        JSON.stringify({ mode: "guild", guildId, count: payload.length }),
+      );
+    }
     return;
   }
   await rest.put(Routes.applicationCommands(applicationId), { body: payload });
