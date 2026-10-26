@@ -7,7 +7,7 @@ semantic justification are different checks.
 
 ## Contract selected before implementation
 
-The additive `knowledge.application.assess` request will contain:
+The additive `knowledge.application.assess` request contains:
 
 - `contract: knowledge.application.assessment.v1`;
 - `application`: the existing preparation request with a goal, constraints and
@@ -83,3 +83,82 @@ recorded before comparison, with all raw proposals and failures accounted for.
 Held-out evaluation and independent semantic review remain pending in `08.3`.
 Experience-removal, eligible/inapplicable episode and restart/reuse controls are
 additional required evaluations when those application capabilities exist.
+
+## Implemented application path
+
+`knowledge.application.assess` is an additive orchestrator request type. Send it
+through the existing authenticated request ingress using the normal envelope;
+it is not a new Knowledge service operation. `application` uses exactly the
+`prepare` payload shape and contract. Every selected source requires the
+`text_version` obtained from preparation. `proposal` is an explicit caller
+submission; no provider adapter extracts it in this batch.
+
+| Proposal object | Fields |
+| --- | --- |
+| Claim | `id`, `statement`, `citations` |
+| Method | `id`, `description`, `prerequisites` (claim IDs), `citations` |
+| Citation | `source_id`, `text_version`, `start`, `end`, `quote`, `relation` |
+
+| Assessment bound | Value |
+| --- | --- |
+| Entire request, JSON encoded | 32 KiB |
+| Nested application request | Existing 8 KiB preparation budget |
+| Claims | 1..16; distinct IDs of 1..64 ASCII letters/digits/dot/underscore/hyphen, starting with a letter |
+| Statement / method description | Nonblank, at most 1200 / 2000 UTF-8 bytes |
+| Method prerequisites | 1..16 distinct existing claim IDs |
+| Citations | At most 8 per claim or method, 32 total |
+| Quotation | 1..1000 UTF-8 bytes; exact byte range and valid UTF-8 |
+| Sources, source size and aggregate text | Existing preparation bounds |
+| Task steps / evidence / workspace / deadline | At most 10 / 8 / 512 KiB / 15 seconds or earlier caller deadline |
+| Provider calls / persistent writes / external actions | 0 / 0 / 0 |
+
+The method ID must be distinct from all claim IDs. Each citation is unique within
+its claim/method; the same passage may legitimately appear in different claims.
+Uncited claims or an uncited method are accepted as explicit missing evidence,
+not replaced with invented support. Invalid structure or foreign references fail
+before reads. Changed pinned sources, fabricated quotations or incorrect spans
+fail during the bounded task. No partial assessment or source bodies are returned.
+
+The normal Knowledge result contains `status: assessed` plus `assessment` only
+when all structural and citation checks succeed. Its `applicability` is the
+provisional result of the proposed argument, **not semantic acceptance**. It
+retains the goal/constraints, source provenance, claims with `citation_state`,
+method, and missing/conflicted/blocked prerequisite IDs. `method_cited` separately
+reports an uncited method. `semantic_status: unverified`,
+`requires_semantic_review: true`, `can_execute: false` and
+`experience_status: not_consulted` are present on every successful assessment.
+
+Task failure, cancellation or limit exhaustion returns `status: not_assessed`
+and the task summary without `assessment`. Evidence and scope retain the existing
+rules: source observations are unscoped, task identity comes from ingress, and
+source text is never executed. A disabled Knowledge service keeps its existing
+skip result. `prepare` remains unchanged.
+
+## Verification and remaining work
+
+Freeze commit: `8b9f331`. The source/case JSON files and the protocol above were
+committed before the assessor implementation; they were not revised to match a
+model output. Source-span/argument tests exercise the development boundary and
+adversarial mutations. Structural tests only check held-out IDs, references and
+case shape; no held-out model comparison is claimed.
+
+Domain tests cover all four citation states, all provisional applicability
+outcomes, unknown/duplicate/foreign references, source pins, forged text/spans,
+per-object and total citation limits, request budgets, and the distinction
+between citation integrity and meaning. Application tests exercise actual
+`ProcessWithResult` routing, re-read pins, failure without partial publication,
+Unicode byte offsets, cancellation, disabled Knowledge and unchanged preparation.
+Both module race suites and static checks pass.
+
+This is an argument-integrity assessor. A caller can cite a real passage while
+misinterpreting it or omitting a prerequisite or contradiction. The assessor
+retains that proposal as semantically unverified; it cannot discover every such
+error. Provider-backed extraction, independent semantic review, additional
+retrieval/revision, concepts/relationships, actual outcomes and durable episode
+reuse remain in `08.2`. No canonical claims, procedures or learning are written.
+The simulation-only inference experience contract remains separate.
+
+Implementation: [domain contract and policy](../dokja_domain/dokja_knowledge/applicability.go),
+[domain regression tests](../dokja_domain/dokja_knowledge/applicability_test.go),
+[application workflow](../dokja_orch/internal/handlers/knowledge_application.go),
+and [application-port tests](../dokja_orch/internal/handlers/knowledge_applicability_test.go).
