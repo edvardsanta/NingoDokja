@@ -2,6 +2,8 @@ FROM docker.io/python:3.13-slim
 
 WORKDIR /workspace
 
-RUN pip install --no-cache-dir numpy pyzmq pypdf pytest
+COPY dokja_services/dokja_knowledge/postgres-requirements.txt /tmp/postgres-requirements.txt
+
+RUN pip install --no-cache-dir numpy pyzmq pypdf -r /tmp/postgres-requirements.txt pytest
 
 CMD ["python", "dokja_services/dokja_knowledge/main.py"]

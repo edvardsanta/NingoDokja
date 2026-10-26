@@ -67,6 +67,12 @@ consumer. The status of this record stays proposed; no engine is adopted.
 
 ## Compatibility
 
+Follow-up owner decision (2026-10-25):
+[ADR 0014](0014-application-postgres-adoption.md) authorizes PostgreSQL+pgvector
+application adoption, Knowledge first and Memory next. The original research
+record did not authorize migration; the new decision does. Graph comparison
+limitations remain separate from the application backend implementation.
+
 Documentation and tracker only. No envelope, route, HTTP/ZeroMQ contract,
 command, SQLite schema, dependency, environment variable or compose change.
 Existing stores and the step 09.2 classifier/cache work remain in place. The

@@ -71,6 +71,8 @@ def _now() -> str:
 
 
 class Store:
+    backend = "sqlite"
+
     def __init__(self, path: str):
         if path != ":memory:":
             directory = os.path.dirname(os.path.abspath(path))

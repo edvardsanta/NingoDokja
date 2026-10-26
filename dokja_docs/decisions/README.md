@@ -26,6 +26,8 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0013](./0013-database-runtime-settings.md) | Shared database-backed operational settings, fixed embedding profile and transitional Compose projection | First local lot implemented; provider catalog and durable apply recovery pending |
 
+| [0014](./0014-application-postgres-adoption.md) | Adopt PostgreSQL and pgvector in application stores, Knowledge then Memory, with verified migration and rollback | Owner-approved direction; Knowledge adapter implemented; cutover and Memory pending |
+
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):
 the orchestrator supervises the Knowledge–Prediction–Experience cycle. Its

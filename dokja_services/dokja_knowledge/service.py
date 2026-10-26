@@ -421,6 +421,15 @@ class KnowledgeService:
         except EmbedUnavailable as err:
             logger.warning("semantic search unavailable: %s", err)
             return {}, True, f"{err}; keyword search only"
+        if hasattr(self.store, "vector_search"):
+            scores = self.store.vector_search(vector[0], self.model, kind, CANDIDATES)
+            if scores:
+                return scores, False, ""
+            if kind and self.store.document_count(kind) == 0:
+                return {}, False, ""
+            if self.store.stats(self.model)["chunks"] > 0:
+                return {}, True, "embeddings are missing for this model (reindex pending); keyword search only"
+            return {}, False, ""
         ids, matrix = self._embeddings(kind)
         if len(ids) == 0 or matrix.shape[1] != vector.shape[1]:
             if kind and self.store.document_count(kind) == 0:
@@ -483,7 +492,7 @@ class KnowledgeService:
         reachable = None
         if self.embedder is not None and hasattr(self.embedder, "reachable"):
             reachable = self.embedder.reachable()
-        return {**stats, "pending_embeddings": stats["chunks"] - stats["embedded"],
+        return {**stats, "storage_backend": self.store.backend, "pending_embeddings": stats["chunks"] - stats["embedded"],
                 "embed_model": self.model, "embedder_reachable": reachable,
                 "threshold": self.min_score, "formats": self.registry.extensions,
                 "fetchers": self.registry.schemes, "fetch_enabled": self.fetch_enabled}
