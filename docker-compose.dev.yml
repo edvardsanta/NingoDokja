@@ -36,7 +36,9 @@ services:
       # address is set; otherwise its catalog row remains visible as unconfigured.
       # Set the WhatsApp address when starting its profile.
       DISCORD_INTERFACE_STATUS_ENDPOINT: http://dokja-discord:8092/status
-      WHATSAPP_INTERFACE_STATUS_ENDPOINT: ${WHATSAPP_INTERFACE_STATUS_ENDPOINT:-}
+      # The WhatsApp interface's status and link server. It answers only while its container runs;
+      # when nothing answers, WhatsApp shows as not running, not as a problem.
+      WHATSAPP_INTERFACE_STATUS_ENDPOINT: ${WHATSAPP_INTERFACE_STATUS_ENDPOINT:-http://dokja-whatsapp:8094/status}
       DISCORD_SCHEDULED_MEME_CHANNEL_ID: ${DISCORD_SCHEDULED_MEME_CHANNEL_ID}
       DISCORD_SAFE_ONLY_CHANNEL_IDS: ${DISCORD_SAFE_ONLY_CHANNEL_IDS:-}
       # Operator switches (services on/off, job pause, intervals); shared with the scheduler.

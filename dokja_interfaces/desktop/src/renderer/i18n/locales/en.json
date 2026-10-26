@@ -498,5 +498,7 @@
   "memes_refresh": "Fetch new memes",
   "memes_refreshing": "Asking the sources…",
   "memes_refreshed": "{count} new memes.",
-  "memes_refreshed_none": "Nothing new from the sources."
+  "memes_refreshed_none": "Nothing new from the sources.",
+  "state_not_running": "Not running",
+  "whatsapp_not_running": "WhatsApp is not running. Start the WhatsApp module to link it or send through it."
 }
