@@ -49,7 +49,13 @@ export type MessageKey = keyof typeof MESSAGES;
 export function say(locale: string, key: MessageKey, vars: Record<string, string | number> = {}): string {
   const entry = MESSAGES[key] as Record<string, string>;
   const text = entry[locale] ?? entry[locale.split("-")[0]] ?? entry.en;
-  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? quiet(String(vars[name])) : whole));
+}
+
+// Text from outside (a song's title, a source's refusal) can carry @everyone or @here; a zero-width
+// space after the @ keeps them from pinging anyone wherever the text is said.
+export function quiet(text: string): string {
+  return text.replace(/@(everyone|here)/gi, "@\u200b$1");
 }
 
 type Track = { title?: unknown; uploader?: unknown };
@@ -57,7 +63,7 @@ type Track = { title?: unknown; uploader?: unknown };
 export function songOf(locale: string, track: Track | undefined): string {
   const title = typeof track?.title === "string" && track.title.trim() ? track.title.trim() : say(locale, "untitled");
   const uploader = typeof track?.uploader === "string" ? track.uploader.trim() : "";
-  return uploader ? `${title} – ${uploader}` : title;
+  return quiet(uploader ? `${title} – ${uploader}` : title);
 }
 
 // The reply to a music command, from what the orchestrator answered: the queue, or a refusal code.
@@ -69,7 +75,7 @@ export function musicReplyText(locale: string, eventType: string, music: unknown
     const reason = typeof music.reason === "string" ? music.reason : "";
     if (code === "track_refused") return say(locale, "track_refused", { reason });
     if (code in MESSAGES) return say(locale, code as MessageKey);
-    return reason || fallback || say(locale, "failed");
+    return quiet(reason || fallback) || say(locale, "failed");
   }
   const now = isRecord(music.now_playing) ? (music.now_playing as Track) : undefined;
   switch (eventType) {

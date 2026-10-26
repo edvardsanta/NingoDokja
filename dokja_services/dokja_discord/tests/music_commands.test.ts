@@ -202,3 +202,16 @@ test("music answers in the configured language, refusals included", async () => 
     assert.equal(replies.at(-1), expected);
   }
 });
+
+test("a title from outside never pings the server", () => {
+  const message = panelMessage({ epoch: "e", version: 1, paused: false, volume: 100, waiting: 0,
+    nowPlaying: { entry: 1, url: "https://play.example/1", title: "@everyone wake up", uploader: "@here", requestedBy: "" } }, "en") as any;
+  assert.doesNotMatch(message.content, /@everyone|@here/);
+  assert.match(message.content, /@\u200beveryone wake up/);
+});
+
+test("the queue list never pings either", async () => {
+  const { musicReplyText } = await import("../music/messages.js");
+  const text = musicReplyText("en", "music.queue", { ok: true, now_playing: { title: "ok" }, waiting: [{ title: "@here now" }] }, "");
+  assert.doesNotMatch(text, /@here/);
+});

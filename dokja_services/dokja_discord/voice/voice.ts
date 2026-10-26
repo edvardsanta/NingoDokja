@@ -436,7 +436,8 @@ export function createDiscordVoiceController(options: {
       const client = await ensureVoiceClient();
       const channel = await client.channels.fetch(channelId);
       if (!channel || !("send" in channel) || typeof channel.send !== "function") return undefined;
-      const sent = await channel.send(toMessageReply(message) as never);
+      // Song titles come from outside: the panel pings nobody, not even the person it names.
+      const sent = await channel.send({ ...toMessageReply(message), allowedMentions: { parse: [] } } as never);
       return sent.id;
     },
     async editMessage({ channelId, messageId, message }) {
@@ -444,7 +445,7 @@ export function createDiscordVoiceController(options: {
       const channel = await client.channels.fetch(channelId);
       if (!channel || !("messages" in channel)) return;
       const found = await channel.messages.fetch(messageId);
-      await found.edit(toMessageReply(message) as never);
+      await found.edit({ ...toMessageReply(message), allowedMentions: { parse: [] } } as never);
     },
     async memberVoiceChannel({ guildId, userId }) {
       const client = await ensureVoiceClient();

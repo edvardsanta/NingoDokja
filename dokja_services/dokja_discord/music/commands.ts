@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { buildBridgePayload, dispatchToOrchestratorResponse, type OrchestratorReply } from "../transport/bridge.js";
 import type { DiscordButtonAction, DiscordButtonContext, DiscordCommandContext, DiscordComponentSpec, DiscordReply, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController, MusicHooks } from "../voice/voice.js";
-import { musicReplyText, say } from "./messages.js";
+import { musicReplyText, quiet, say } from "./messages.js";
 import { parseQueueState, type QueueState } from "./reconcile.js";
 
 type Dispatch = (eventType: string, request: { content: string; userId: string; channelId: string; guildId: string }) => Promise<OrchestratorReply>;
@@ -206,8 +206,8 @@ export const PANEL = {
 export function panelMessage(state: QueueState, locale = "pt-BR"): DiscordReply {
   const now = state.nowPlaying;
   if (!now) return { content: say(locale, "queueOver"), components: [] };
-  const title = `**${now.title.trim() || say(locale, "untitled")}**`;
-  const song = now.uploader.trim() ? `${title} – ${now.uploader.trim()}` : title;
+  const title = `**${quiet(now.title.trim()) || say(locale, "untitled")}**`;
+  const song = now.uploader.trim() ? `${title} – ${quiet(now.uploader.trim())}` : title;
   const lines = [
     `${say(locale, state.paused ? "panelPaused" : "panelPlaying")}: ${song}`,
     [
