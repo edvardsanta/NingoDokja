@@ -1,0 +1,3 @@
+# The default for FEEDS_PLUGIN_REQUIREMENTS: no libraries of the owner's plugins.
+# Point FEEDS_PLUGIN_REQUIREMENTS at a requirements file inside the build context
+# (for example feeds_plugins/requirements.txt) to install what your own plugins use.
