@@ -1,7 +1,7 @@
 # Music in voice channels
 
-Date: 2026-10-26. Status: phase 1 built. The owner decided the queue owner and
-voice precedence; four questions remain open below.
+Date: 2026-10-26. Status: phase 1 built. Every open question has an owner
+decision (below), except how Spotify credentials are supplied.
 
 Ningo should play music in a Discord voice channel: from a link or a search,
 with a queue, skip, pause and volume, without depending on a third-party bot or
@@ -72,12 +72,15 @@ the rest of Ningo carries on.
    track. yt-dlp's own errors reach the caller as a generic failure; the detail
    stays in the Feeds log. Enabling it: build Feeds with
    `FEEDS_PLUGIN_EXTRAS=media` (or `content`), copy the plugin to `feeds_plugins/`
-   and set `enabled: true`. A `query` is searched on YouTube (`ytsearch`) until
-   the owner answers open question 4; a `url` from any host yt-dlp supports
-   resolves already. No route calls the capability yet.
+   and set `enabled: true`. A `query` is searched on YouTube (`ytsearch`); a
+   YouTube or SoundCloud `url` resolves already. Spotify and Deezer links come in
+   phase 2 (see "What the sources mean for resolving"). No route calls the
+   capability yet.
 2. **Queue and rules.** Orchestrator routes for adding, skipping, pausing,
    resuming, stopping, listing and setting volume, per guild. The Communications
-   domain decides the queue, and admissibility goes to Moderation. Commands are
+   domain decides the queue (at most 3 waiting, anyone may control it, radio
+   refused while it runs), and admissibility (allowed sources) goes to
+   Moderation. The `audio-resolve` plugin gains Spotify and Deezer links. Commands are
    serialized per guild, as DisTube's `TaskQueue` does.
 3. **Playback.** The Discord adapter plays a track page given by the
    orchestrator, using the copied yt-dlp relay, and reports when a track ends or
@@ -100,17 +103,39 @@ the rest of Ningo carries on.
   a platform), next to the delivery policy it already owns.
 - **Ningo's speech pauses the music.** When Ningo speaks during a song, the song
   pauses and resumes where it stopped once he has finished.
+- **The radio has no precedence.** While a queue is playing or waiting, starting
+  the radio is refused with a plain message; the queue must be stopped first.
+- **Anyone** in the voice channel may add, skip, pause, resume, stop and set the
+  volume.
+- **The queue holds at most 3 tracks waiting**, besides the one playing. Adding a
+  fourth is refused, saying the queue is full.
+- **Live streams may be queued.** They play until someone skips them.
+- **Sources: YouTube, Spotify, Deezer and SoundCloud.** Playing YouTube on Discord
+  goes against YouTube's terms of service; the owner accepts it for this private
+  use.
 
-## Open questions for the owner
+### What the sources mean for resolving
 
-1. **The radio and the queue:** does starting the radio replace the queue, or
-   pause it like speech does?
-2. **Who may control it:** anyone in the voice channel, the person who queued the
-   track, or a role?
-3. **Limits:** a maximum track length, and whether live streams may be queued.
-4. **Sources.** Playing YouTube on Discord goes against YouTube's terms of
-   service. Direct file links, radio and other hosts do not. Which sources are
-   allowed?
+yt-dlp (2026.10.21) reads YouTube and SoundCloud, links and searches. It has no
+Spotify or Deezer extractor: both serve protected audio. A Spotify or Deezer link
+is therefore resolved in two steps, as other music bots do:
+
+1. Read the track's title and artist from the service. Deezer's public track API
+   needs no key. Spotify's needs an application's client id and secret, which
+   would be new settings passed to Feeds (every Compose file and the runbook
+   change with them), or its public embed data, which gives the title only.
+2. Search that title and artist on YouTube, and play the first match. The track
+   keeps the original link and names the source it was found on.
+
+A search typed by a person goes to YouTube; `scsearch` for SoundCloud is
+available if the owner later wants a different default.
+
+## Still open
+
+- **Spotify metadata.** Register a Spotify application and pass its client id
+  and secret to Feeds (exact title and artist, two new settings), or use the
+  public embed data without credentials (title only, so the YouTube match is
+  less sure).
 
 ## Compatibility
 
