@@ -68,6 +68,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     ? createInteractionDefinitions({
         orchestratorEndpoint: cfg.orchestratorEndpoint,
         orchestratorTimeoutMs: cfg.orchestratorTimeoutMs,
+        locale: cfg.locale,
         voice,
       })
     : { buttons: [], selects: [], modals: [] };

@@ -99,7 +99,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	// The session keeps the model's own words; citations are added only to what is sent, and only
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
-	reply := sessionAwareReply(citeSources(rawReply, sources), lifecycle, event)
+	reply := citeSources(rawReply, sources)
 	logger.Info(fmt.Sprintf(
 		"chat handler completed event_id=%s action=%s reply_chars=%d",
 		event.EventID,
@@ -112,6 +112,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		"reply":   reply,
 		"raw":     result,
 		"session": map[string]any{"id": lifecycle.SessionID, "created": lifecycle.Created, "revoked": lifecycle.Revoked, "reason": lifecycle.Reason},
+	}
+	if notice := sessionLifecycleNotice(lifecycle, event); notice != "" {
+		response["notice"] = notice
 	}
 	if len(sources) > 0 {
 		response["sources"] = sourcesForResult(sources)
@@ -161,53 +164,14 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 	return h.generator.Generate(ctx, persona+"\n\n"+content)
 }
 
-func sessionAwareReply(reply string, lifecycle chatSessionLifecycle, event core.Event) string {
-	reply = strings.TrimSpace(reply)
-	notice := sessionLifecycleNotice(lifecycle, event)
-	switch {
-	case notice == "":
-		return reply
-	case reply == "":
-		return notice
-	default:
-		return notice + "\n\n" + reply
-	}
-}
-
 func sessionLifecycleNotice(lifecycle chatSessionLifecycle, event core.Event) string {
-	portuguese := eventIsPortuguese(event)
 	if lifecycle.Revoked {
-		if portuguese {
-			return "O contexto da conversa foi compactado."
-		}
-		return "Conversation context was compacted."
+		return "chat.context_compacted"
 	}
 	if lifecycle.Created && boolFromContext(event.Context, "force_new_session") {
-		if portuguese {
-			return "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade."
-		}
-		return "New conversation session started. It will reset after 3 minutes of inactivity."
+		return "chat.session_started"
 	}
 	return ""
-}
-
-func eventIsPortuguese(event core.Event) bool {
-	content := strings.ToLower(chatMessageFromEvent(event))
-	if strings.ContainsAny(content, "áâãàçéêíóôõú") {
-		return true
-	}
-
-	for _, word := range strings.Fields(content) {
-		word = strings.Trim(word, ".,!?;:()[]{}\"'")
-		switch word {
-		case "a", "ao", "aos", "as", "com", "como", "da", "das", "de", "do", "dos",
-			"e", "ela", "em", "está", "esta", "foi", "isso", "mais", "na", "não",
-			"nao", "no", "nos", "o", "os", "para", "por", "que", "se", "sua", "uma",
-			"você", "voce":
-			return true
-		}
-	}
-	return false
 }
 
 func firstString(values map[string]any, keys ...string) string {

@@ -275,9 +275,9 @@ func TestChatDomainHandlerStartsSessionAndPrefixesReply(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "New conversation session started") {
-		t.Fatalf("expected session start notice, got %q", reply)
+	notice, _ := result["notice"].(string)
+	if notice != "chat.session_started" {
+		t.Fatalf("expected session start notice key, got %q", notice)
 	}
 }
 
@@ -306,24 +306,23 @@ func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
 		t.Fatalf("unexpected second error: %v", err)
 	}
 
-	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "Conversation context was compacted.") {
-		t.Fatalf("expected context compaction notice, got %q", reply)
+	chatResult, _ := result["notice"].(string)
+	if chatResult != "chat.context_compacted" {
+		t.Fatalf("expected context compaction key, got %q", chatResult)
 	}
 }
 
-func TestChatDomainHandlerLocalizesSessionNoticeToPortuguese(t *testing.T) {
+func TestChatDomainHandlerReturnsSessionNoticeKey(t *testing.T) {
 	lifecycle := chatSessionLifecycle{Revoked: true}
-	event := core.Event{Payload: map[string]any{"content": "Não encontrei a resposta"}}
-
-	if got := sessionLifecycleNotice(lifecycle, event); got != "O contexto da conversa foi compactado." {
-		t.Fatalf("expected Portuguese context notice, got %q", got)
+	event := core.Event{}
+	if got := sessionLifecycleNotice(lifecycle, event); got != "chat.context_compacted" {
+		t.Fatalf("expected context notice key, got %q", got)
 	}
 
 	lifecycle = chatSessionLifecycle{Created: true}
 	event.Context = map[string]any{"force_new_session": true}
-	if got := sessionLifecycleNotice(lifecycle, event); got != "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade." {
-		t.Fatalf("expected Portuguese session notice, got %q", got)
+	if got := sessionLifecycleNotice(lifecycle, event); got != "chat.session_started" {
+		t.Fatalf("expected session notice key, got %q", got)
 	}
 }
 
