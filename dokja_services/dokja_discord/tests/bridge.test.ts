@@ -3,6 +3,21 @@ import assert from "node:assert/strict";
 
 import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 
+test("bridge forwards bounded formula PNGs and drops unsafe attachments", async () => {
+  const originalFetch = globalThis.fetch;
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6JXAAAAAASUVORK5CYII=";
+  const valid = { filename: "formula-1.png", content_type: "image/png", data_b64: png };
+  const body = buildBridgePayload({ eventType: "message.created", userId: "u", channelId: "c", messageId: "m" });
+  globalThis.fetch = (async () => new Response(JSON.stringify({
+    status: "ok", reply: "x / 2", attachments: [valid, { ...valid, filename: "../../anything" }, { ...valid, content_type: "text/html" }],
+  }))) as typeof fetch;
+  try {
+    const result = await dispatchToOrchestratorResponse("http://orch", 1000, body);
+    assert.equal(result.reply, "x / 2");
+    assert.deepEqual(result.attachments, [valid]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("buildBridgePayload maps discord fields into orchestrator bridge request", () => {
   const payload = buildBridgePayload({
     eventType: "meme.fetch",

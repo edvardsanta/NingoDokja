@@ -74,7 +74,15 @@ answers, use readable plain-text notation such as x^4, sqrt(x), and (a + b) / c,
 that preserve the meaning. Discord text does not render LaTeX math. Do not use TeX commands such
 as \frac or \quad, or math delimiters, as if they would render. If the user explicitly asks for
 LaTeX source code, provide it as source in a fenced code block. A request to fix math formatting
-requires the corrected formula or explanation, not dropping the mathematics from the answer.`
+requires the corrected formula or explanation, not dropping the mathematics from the answer.
+
+For longer formulas with nested fractions or roots, integrals, or sums, you may use a fenced block
+with language math. Inside it, supply exactly two single-line fields: latex: followed by the math
+expression without dollar delimiters, and text: followed by its readable plain-text equivalent.
+The delivery system can render complex expressions as PNGs and always keeps the text fallback.
+For an explicit request for a formula image, add an image: true line in that block, even for a short
+expression. Use at most three blocks. Explain the math around them and do not promise that an
+attachment exists before delivery. Raw LaTeX requested as source belongs in a latex code block.`
 
 func personaForEvent(event core.Event) string {
 	if event.Source == core.SourceDiscord {

@@ -407,7 +407,7 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     guildId: message.guildId ?? undefined,
     content: message.content?.trim() ?? "",
     replyToContent,
-    mentionedUserIds: message.mentions.users.map((user) => user.id).slice(0, 20),
+    mentionedUserIds: Array.from(message.mentions.users.values(), user => user.id).slice(0, 20),
     isBot: Boolean(message.author.bot),
     isDirectMessage: message.channel.type === ChannelType.DM,
     mentionsBot: botUserId ? message.mentions.users.has(botUserId) : true,
@@ -429,6 +429,7 @@ export function splitDiscordReply(message: DiscordReply): DiscordReply[] {
     content,
     ephemeral: base.ephemeral,
     components: index === 0 ? base.components : undefined,
+    attachments: index === 0 ? base.attachments : undefined,
   }));
 }
 
@@ -591,13 +592,14 @@ function applyReplyOptions(
   return { ...message, ephemeral: message.ephemeral ?? true };
 }
 
-function toMessageReply(message: DiscordReply) {
+export function toMessageReply(message: DiscordReply) {
   if (typeof message === "string") {
     return { content: message };
   }
   return {
     content: message.content,
     components: buildRows(message.components ?? []),
+    files: attachmentFiles(message),
   };
 }
 
@@ -618,6 +620,7 @@ function toInteractionReply(
     content: message.content,
     components: buildRows(message.components ?? [], buttons, selects),
     flags: message.ephemeral || opts?.ephemeral ? MessageFlags.Ephemeral : undefined,
+    files: attachmentFiles(message),
   };
 }
 
@@ -633,7 +636,15 @@ function toInteractionEditReply(
   return {
     content: message.content,
     components: buildRows(message.components ?? [], buttons, selects),
+    files: attachmentFiles(message),
   };
+}
+
+function attachmentFiles(message: Exclude<DiscordReply, string>) {
+  return message.attachments?.map(file => ({
+    name: file.filename,
+    attachment: Buffer.from(file.data_b64, "base64"),
+  }));
 }
 
 function buildRows(

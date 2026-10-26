@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,6 +67,23 @@ func (c *ChatProviderClient) Generate(ctx context.Context, message string) (map[
 }
 func (c *ChatProviderClient) GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error) {
 	return c.call(ctx, "POST", "/chat", map[string]any{"messages": messages})
+}
+
+func (c *ChatProviderClient) RenderMath(ctx context.Context, expression string) ([]byte, error) {
+	result, err := c.call(ctx, http.MethodPost, "/math/render", map[string]string{"expression": expression})
+	if err != nil {
+		return nil, err
+	}
+	encoded, _ := result["data_b64"].(string)
+	contentType, _ := result["content_type"].(string)
+	if contentType != "image/png" || len(encoded) > 350000 {
+		return nil, fmt.Errorf("invalid formula image")
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(data) > 256<<10 {
+		return nil, fmt.Errorf("invalid formula image")
+	}
+	return data, nil
 }
 
 // GenerateMessagesStream is GenerateMessages with a preview: the runtime's /chat/stream sends the

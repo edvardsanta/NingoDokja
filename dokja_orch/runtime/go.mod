@@ -25,6 +25,15 @@ require (
 	modernc.org/sqlite v1.59.0 // indirect
 )
 
-require read_books/dokja_store v0.0.0 // indirect
+require (
+	git.sr.ht/~sbinet/gg v0.5.0 // indirect
+	github.com/campoy/embedmd v1.0.0 // indirect
+	github.com/go-latex/latex v0.0.0-20250304174226-2790903426af // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/image v0.18.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	read_books/dokja_store v0.0.0 // indirect
+)
 
 replace read_books/dokja_store => ../../dokja_store

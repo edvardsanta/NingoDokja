@@ -56,7 +56,9 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
         return;
       }
 
-      await context.reply(reply);
+      await context.reply(response.attachments?.length
+        ? { content: reply, attachments: response.attachments }
+        : reply);
       console.log(
         "[dokja-discord] message reply sent",
         JSON.stringify({ messageId: context.messageId, replyLength: reply.length }),

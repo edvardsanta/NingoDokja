@@ -149,6 +149,12 @@ Corrections should produce the corrected answer immediately, with brief
 acknowledgment rather than repeated apologies or invented memory explanations.
 Discord turns receive presentation guidance on every generation path: readable
 plain-text math by default, with LaTeX source only when explicitly requested.
+The Chat domain's Go presentation policy selects complex expressions or explicit
+image requests from bounded math blocks, always retaining a plain-text equivalent.
+The chat handler calls the private inference client's rendering port; the host
+runtime service renders a PNG without CLI tools, shell commands, or a TeX process.
+The bridge forwards up to three PNG attachments to Discord messages, commands,
+and chat modals. An unavailable renderer or unsupported expression keeps the text.
 This is interface guidance and conversational adaptation, not durable automatic
 learning of user preferences.
 These are generation instructions, not proof of injection resistance or a

@@ -99,7 +99,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	// The session keeps the model's own words; citations are added only to what is sent, and only
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
-	reply := citeSources(rawReply, sources)
+	presentedReply, attachments := h.presentMath(ctx, event, rawReply)
+	reply := citeSources(presentedReply, sources)
 	logger.Info(fmt.Sprintf(
 		"chat handler completed event_id=%s action=%s reply_chars=%d",
 		event.EventID,
@@ -112,6 +113,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		"reply":   reply,
 		"raw":     result,
 		"session": map[string]any{"id": lifecycle.SessionID, "created": lifecycle.Created, "revoked": lifecycle.Revoked, "reason": lifecycle.Reason},
+	}
+	if len(attachments) > 0 {
+		response["attachments"] = attachments
 	}
 	if notice := sessionLifecycleNotice(lifecycle, event); notice != "" {
 		response["notice"] = notice

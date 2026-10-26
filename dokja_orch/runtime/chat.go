@@ -9,46 +9,73 @@ import (
 )
 
 func ChatHandler(d *domain.Domain) http.Handler {
+	h := inferenceHTTPHandler{domain: d}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", h.health)
+	mux.HandleFunc("POST /chat", h.chat)
+	mux.HandleFunc("POST /chat/stream", h.stream)
+	mux.HandleFunc("POST /math/render", renderMath)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fail := func(err error) {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-		}
 		if r.Header.Get("Origin") != "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if r.Method == "GET" && r.URL.Path == "/health" {
-			if err := d.ChatReady(); err != nil {
-				fail(err)
-				return
-			}
-			json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
-			return
-		}
-		if r.Method != "POST" || (r.URL.Path != "/chat" && r.URL.Path != "/chat/stream") {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		var body struct {
-			Messages []domain.ChatMessage `json:"messages"`
-		}
-		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 131072)).Decode(&body) != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if r.URL.Path == "/chat/stream" {
-			streamChat(w, r, d, body.Messages, fail)
-			return
-		}
-		result, err := d.Chat(r.Context(), body.Messages)
-		if err != nil {
-			fail(err)
-			return
-		}
-		json.NewEncoder(w).Encode(result)
+		mux.ServeHTTP(w, r)
 	})
+}
+
+type inferenceHTTPHandler struct {
+	domain *domain.Domain
+}
+
+func (h inferenceHTTPHandler) health(w http.ResponseWriter, r *http.Request) {
+	if err := h.domain.ChatReady(); err != nil {
+		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
+}
+
+func (h inferenceHTTPHandler) chat(w http.ResponseWriter, r *http.Request) {
+	messages, ok := decodeChatMessages(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.domain.Chat(r.Context(), messages)
+	if err != nil {
+		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h inferenceHTTPHandler) stream(w http.ResponseWriter, r *http.Request) {
+	messages, ok := decodeChatMessages(w, r)
+	if !ok {
+		return
+	}
+	fail := func(err error) {
+		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
+	}
+	streamChat(w, r, h.domain, messages, fail)
+}
+
+func decodeChatMessages(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, bool) {
+	var body struct {
+		Messages []domain.ChatMessage `json:"messages"`
+	}
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 131072)).Decode(&body) != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return nil, false
+	}
+	return body.Messages, true
+}
+
+func writeInferenceError(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
 
 // previewEvery is the least time between two previews: what the reader sees grows smoothly, and the

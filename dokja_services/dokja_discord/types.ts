@@ -18,12 +18,19 @@ export type DiscordSelectSpec = {
 
 export type DiscordComponentSpec = DiscordButtonSpec | DiscordSelectSpec;
 
+export type DiscordAttachment = {
+  filename: string;
+  content_type: "image/png";
+  data_b64: string;
+};
+
 export type DiscordReply =
   | string
   | {
       content: string;
       ephemeral?: boolean;
       components?: DiscordComponentSpec[];
+      attachments?: DiscordAttachment[];
     };
 
 export type DiscordModalSpec = {

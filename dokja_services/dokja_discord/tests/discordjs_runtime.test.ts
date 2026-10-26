@@ -1,17 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { splitDiscordReply, toMessageContext } from "../runtime/discordjs_runtime.js";
+import { splitDiscordReply, toMessageContext, toMessageReply } from "../runtime/discordjs_runtime.js";
+
+test("long formula replies attach the PNG only to their first chunk", () => {
+  const attachment = { filename: "formula-1.png", content_type: "image/png" as const, data_b64: Buffer.from("png bytes").toString("base64") };
+  const parts = splitDiscordReply({ content: "x".repeat(4500), attachments: [attachment] });
+  assert.equal(parts.length, 3);
+  assert.deepEqual(typeof parts[0] === "object" && parts[0].attachments, [attachment]);
+  assert.ok(parts.slice(1).every(part => typeof part === "object" && part.attachments === undefined));
+  const payload = toMessageReply(parts[0]);
+  assert.equal(payload.files?.[0].name, "formula-1.png");
+  assert.deepEqual(payload.files?.[0].attachment, Buffer.from("png bytes"));
+});
 
 test("message replies fetch their quoted text without changing the current message", async () => {
   const context = await toMessageContext({
     author: { id: "user", bot: false }, id: "new", channelId: "channel", guildId: "guild",
-    content: "Em python mesmo", channel: { type: 0 }, mentions: { users: new Map() },
+    content: "Em python mesmo", channel: { type: 0 }, mentions: { users: new Map([["mentioned", { id: "mentioned" }]]) },
     reference: { messageId: "previous", channelId: "channel" },
     fetchReference: async () => ({ channelId: "channel", guildId: "guild", content: "A calculator like Windows?" }),
   } as any);
   assert.equal(context.content, "Em python mesmo");
   assert.equal(context.replyToContent, "A calculator like Windows?");
+  assert.deepEqual(context.mentionedUserIds, ["mentioned"]);
 });
 
 test("missing and cross-channel reply references do not prevent handling", async () => {

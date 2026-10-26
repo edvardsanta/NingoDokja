@@ -1,4 +1,4 @@
-import { buildBridgePayload, dispatchToOrchestrator } from "../transport/bridge.js";
+import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -87,7 +87,7 @@ async function fetchChatReply(
   orchestratorTimeoutMs: number,
   content: string,
 ) {
-  return await dispatchToOrchestrator(
+  const response = await dispatchToOrchestratorResponse(
     orchestratorEndpoint,
     orchestratorTimeoutMs,
     buildBridgePayload({
@@ -100,6 +100,9 @@ async function fetchChatReply(
       guildId: context.guildId,
     }),
   );
+  return response.attachments?.length
+    ? { content: response.reply, attachments: response.attachments }
+    : response.reply;
 }
 
 export function createInteractionDefinitions(params: {

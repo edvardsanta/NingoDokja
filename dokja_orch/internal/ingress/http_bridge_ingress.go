@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strconv"
@@ -55,10 +56,11 @@ type BridgeRequest struct {
 }
 
 type BridgeResponse struct {
-	Status string `json:"status"`
-	Reply  string `json:"reply,omitempty"`
-	Notice string `json:"notice,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Status      string            `json:"status"`
+	Reply       string            `json:"reply,omitempty"`
+	Notice      string            `json:"notice,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	Attachments []chat.Attachment `json:"attachments,omitempty"`
 }
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
@@ -177,10 +179,17 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		len(reply),
 	))
 	return c.Status(fiber.StatusOK).JSON(BridgeResponse{
-		Status: "ok",
-		Reply:  reply,
-		Notice: notice,
+		Status:      "ok",
+		Reply:       reply,
+		Notice:      notice,
+		Attachments: extractChatAttachments(result),
 	})
+}
+
+func extractChatAttachments(result core.ProcessResult) []chat.Attachment {
+	chatResult, _ := result.Result[string(core.DomainChat)].(map[string]any)
+	attachments, _ := chatResult["attachments"].([]chat.Attachment)
+	return attachments
 }
 
 // authorize checks the bearer token every bridge route requires; it answers the status to send when
