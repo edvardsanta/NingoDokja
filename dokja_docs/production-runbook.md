@@ -652,7 +652,11 @@ ignored environment as the gateways. `DISCORD_GUILD_ID` may name several servers
 separated by commas: Ningo answers in each (still only in `DISCORD_ALLOWED_CHANNELS`)
 and the Discord gateway registers its commands on each. A single value works as
 before. Recreate the orchestrator, `dokja-discord` and, when it runs,
-`dokja-communications` after changing it. `DISCORD_REQUIRE_MENTION` is optional and
+`dokja-communications` after changing it. The desktop's Messages lists every text channel of
+those servers, grouped by server, and the operator may read and write to any of them by hand
+(`communications.send` with explicit channels only); scheduled memes and "send to all" still use
+`DISCORD_SCHEDULED_MEME_CHANNEL_ID` alone. `dokja-communications` runs from a built image: after
+updating it, `docker compose --profile communications up -d --build dokja-communications`. `DISCORD_REQUIRE_MENTION` is optional and
 defaults to false, matching the previous running Discord listener. Set it to
 true only when ordinary guild messages should require a bot mention; slash
 commands remain available in allowed channels. Test with synthetic gateway

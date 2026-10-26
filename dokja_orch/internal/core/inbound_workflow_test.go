@@ -60,3 +60,45 @@ func TestBridgeCommandRoutesThroughCommunicationsFirst(t *testing.T) {
 		t.Fatalf("command bypassed inbound authorization: route=%#v err=%v", route, err)
 	}
 }
+
+func TestOnlyTheInboundAuthorizationStepIsRewritten(t *testing.T) {
+	plan := func(eventType string) []string {
+		event := Event{Source: SourceDiscord, Type: eventType, Context: map[string]any{"gateway_inbound": true}}
+		route, err := NewRuleBasedEventRouter().Route(context.Background(), event)
+		if err != nil {
+			t.Fatal(err)
+		}
+		workflow, err := NewDefaultWorkflowEngine().Plan(context.Background(), event, route)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actions := make([]string, len(workflow.Steps))
+		for i, step := range workflow.Steps {
+			actions[i] = string(step.Domain) + ":" + step.Action
+		}
+		return actions
+	}
+	if got := plan("music.play"); len(got) != 2 || got[0] != "communications:authorize-inbound" || got[1] != "communications:play-music" {
+		t.Fatalf("a music command must be authorized, then played: %v", got)
+	}
+	if got := plan("message.created"); len(got) != 3 || got[0] != "communications:authorize-inbound" || got[1] != "moderation:screen-event" {
+		t.Fatalf("a message keeps its authorization first: %v", got)
+	}
+	// Without the bridge's mark there is nothing to authorize: the action runs as planned.
+	route, _ := NewRuleBasedEventRouter().Route(context.Background(), Event{Type: "music.skip"})
+	workflow, _ := NewDefaultWorkflowEngine().Plan(context.Background(), Event{Type: "music.skip"}, route)
+	if len(workflow.Steps) != 1 || workflow.Steps[0].Action != "skip-music" {
+		t.Fatalf("%v", workflow.Steps)
+	}
+}
+
+func TestADeniedMusicCommandNeverReachesTheQueue(t *testing.T) {
+	communications := &inboundStepHandler{domain: DomainCommunications, deny: true}
+	service := DefaultService(communications)
+	result, err := service.ProcessWithResult(context.Background(), Event{
+		Source: SourceDiscord, Type: "music.play", Context: map[string]any{"gateway_inbound": true},
+	})
+	if err != nil || result.Result["silent"] != true || communications.calls != 1 {
+		t.Fatalf("denied music command ran: result=%#v calls=%d err=%v", result.Result, communications.calls, err)
+	}
+}

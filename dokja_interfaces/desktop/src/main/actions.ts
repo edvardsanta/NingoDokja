@@ -471,8 +471,12 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       channels: records(body.channels, (channel) => ({
         id: text(channel.id),
         name: shorten(text(channel.name), 100),
+        // the server a Discord channel belongs to, so the list can be grouped by it
+        ...(/^[0-9]{1,20}$/.test(text(channel.guild_id)) ? { guildId: text(channel.guild_id), guildName: shorten(text(channel.guild_name), 100) } : {}),
         ...(count(channel.retention_days) > 0 ? { retentionDays: clampInt(channel.retention_days, 1, 365, 1) } : {}),
-      })).slice(0, 100),
+      })).slice(0, 300),
+      // how many configured servers could not be read: a number, never their ids
+      ...(Array.isArray(body.unavailable_guilds) && body.unavailable_guilds.length > 0 ? { unavailableServers: Math.min(body.unavailable_guilds.length, 20) } : {}),
     })),
   },
   "communications.history": {

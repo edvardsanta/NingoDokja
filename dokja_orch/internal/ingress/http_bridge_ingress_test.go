@@ -161,3 +161,35 @@ func TestSanitizeDiscordOwnerIDKeepsOwnerAsMention(t *testing.T) {
 		t.Fatalf("expected %q, got %q", expected, reply)
 	}
 }
+
+func TestBridgeMapsMusicCommandsAndKeepsWhatWasTyped(t *testing.T) {
+	for _, eventType := range []string{"music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume"} {
+		request := BridgeRequest{EventType: eventType}
+		request.Payload.Content = "  monalisa jorge "
+		event := bridgeEventFromRequest(request)
+		if event.Type != eventType || event.Payload["content"] != "monalisa jorge" || event.Context["gateway_inbound"] != true {
+			t.Fatalf("%s: %#v", eventType, event)
+		}
+	}
+}
+
+func TestMusicRepliesAreOnePlainLine(t *testing.T) {
+	track := map[string]any{"title": "Monalisa", "uploader": "Jorge Vercillo"}
+	reply := func(eventType string, music map[string]any) string {
+		return extractBridgeReply(core.ProcessResult{Event: core.Event{Type: eventType}, Result: map[string]any{"communications": map[string]any{"music": music}}})
+	}
+	for name, check := range map[string][2]string{
+		"playing now": {reply("music.play", map[string]any{"ok": true, "place": 0, "added": track}), "Now playing: Monalisa – Jorge Vercillo."},
+		"queued":      {reply("music.play", map[string]any{"ok": true, "place": 2, "added": track}), "Queued #2: Monalisa – Jorge Vercillo."},
+		"refused":     {reply("music.play", map[string]any{"ok": false, "reason": "the queue is full"}), "The queue is full."},
+		"skip to end": {reply("music.skip", map[string]any{"ok": true}), "Skipped. The queue is empty."},
+		"volume":      {reply("music.volume", map[string]any{"ok": true, "volume": 40}), "Volume: 40%."},
+		"empty queue": {reply("music.queue", map[string]any{"ok": true}), "Nothing is playing."},
+		"queue": {reply("music.queue", map[string]any{"ok": true, "now_playing": track, "waiting": []any{map[string]any{"title": "Next"}}}),
+			"Now playing: Monalisa – Jorge Vercillo\n1. Next"},
+	} {
+		if check[0] != check[1] {
+			t.Fatalf("%s: %q", name, check[0])
+		}
+	}
+}

@@ -508,6 +508,24 @@ test("history accepts a Discord channel id or a WhatsApp alias, and nothing that
   assert.equal(history.payload({ channel_id: "whatsapp:friend", before: "1;drop" }), undefined);
 });
 
+test("the channel list keeps each Discord channel's server and how many servers could not be read", () => {
+  const reply = {
+    workflow: "communications",
+    domain: "communications",
+    result: {
+      channels: [
+        { id: "11", name: "chat", guild_id: "10", guild_name: "resenhudos" },
+        { id: "12", name: "odd", guild_id: "../x", guild_name: "bad" },
+      ],
+      unavailable_guilds: ["20", "30"],
+    },
+  };
+  const projected = channels.project(reply as never) as { channels: Record<string, unknown>[]; unavailableServers?: number };
+  assert.deepEqual(projected.channels[0], { id: "11", name: "chat", guildId: "10", guildName: "resenhudos" });
+  assert.deepEqual(projected.channels[1], { id: "12", name: "odd" });
+  assert.equal(projected.unavailableServers, 2);
+});
+
 test("the channel list keeps the retention of a WhatsApp conversation and nothing else it reports", () => {
   const reply = {
     workflow: "communications",

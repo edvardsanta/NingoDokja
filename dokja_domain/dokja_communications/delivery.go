@@ -31,9 +31,13 @@ type SendPlan struct {
 	ForceNSFW              bool
 }
 type DeliveryPolicy struct {
+	// Channels are where scheduled deliveries go, and what "all" means.
 	Channels []string
-	SafeOnly map[string]struct{}
-	Disabled map[string]bool
+	// ManualTargets are further channels one explicit send may name (a channel of a configured
+	// server the operator picked). They never join "all".
+	ManualTargets []string
+	SafeOnly      map[string]struct{}
+	Disabled      map[string]bool
 }
 
 func PlatformOf(target string) string {
@@ -76,6 +80,11 @@ func (p DeliveryPolicy) PlanChannelSend(r SendRequest) (SendPlan, error) {
 	allowed := map[string]bool{}
 	for _, target := range p.Channels {
 		allowed[target] = true
+	}
+	if !r.All {
+		for _, target := range p.ManualTargets {
+			allowed[target] = true
+		}
 	}
 	for _, target := range targets {
 		if !allowed[target] {

@@ -10,6 +10,7 @@ type CommunicationsDomainHandler struct {
 	domain            *communications.Domain
 	inbound           communications.InboundPolicy
 	inboundConfigured bool
+	music             *musicDesk
 }
 
 func NewCommunicationsDomainHandler(service communications.Service, channels string) *CommunicationsDomainHandler {
@@ -27,6 +28,26 @@ func (h *CommunicationsDomainHandler) WithInboundPolicy(policy communications.In
 	h.inboundConfigured = true
 	return h
 }
+
+// WithGuilds lets the text channels of these servers (comma-separated) be listed, read and
+// named in an operator's send.
+func (h *CommunicationsDomainHandler) WithGuilds(guilds string) *CommunicationsDomainHandler {
+	h.domain.WithGuilds(guilds)
+	return h
+}
+
+// Readable is the domain's decision on one Discord channel, for the operator's sends.
+func (h *CommunicationsDomainHandler) Readable(ctx context.Context, channel string) (bool, error) {
+	return h.domain.Readable(ctx, channel)
+}
+
+// WithMusic adds the voice channel queues, finding tracks through the music sources installed as
+// Feeds plugins.
+func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSources) *CommunicationsDomainHandler {
+	h.music = newMusicDesk(sources)
+	return h
+}
+
 func (h *CommunicationsDomainHandler) Domain() core.Domain { return core.DomainCommunications }
 func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (map[string]any, error) {
 	if step.Action == communications.ActionAuthorizeInbound {
@@ -38,6 +59,12 @@ func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Eve
 			return nil, core.ErrInboundDenied
 		}
 		return nil, nil
+	}
+	if musicActions[step.Action] {
+		if h.music == nil {
+			return refusedMusic("music is not set up"), nil
+		}
+		return h.music.handle(ctx, event, step.Action)
 	}
 	return h.domain.Handle(ctx, step.Action, event.Payload)
 }
