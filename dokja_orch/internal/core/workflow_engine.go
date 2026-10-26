@@ -24,9 +24,12 @@ func NewDefaultWorkflowEngine() *DefaultWorkflowEngine {
 
 func (e *DefaultWorkflowEngine) Plan(_ context.Context, event Event, route Route) (Workflow, error) {
 	steps := make([]WorkflowStep, 0, len(route.Domains))
-	for _, domain := range route.Domains {
+	inbound, _ := event.Context["gateway_inbound"].(bool)
+	for index, domain := range route.Domains {
 		action := actionFor(domain, event.Type)
-		if inbound, _ := event.Context["gateway_inbound"].(bool); inbound && domain == DomainCommunications {
+		// The router puts the inbound authorization first; a later Communications step is the
+		// workflow's own (music, for one).
+		if inbound && index == 0 && domain == DomainCommunications {
 			action = "authorize-inbound"
 		}
 		steps = append(steps, WorkflowStep{
@@ -76,6 +79,22 @@ func actionFor(domain Domain, eventType string) string {
 			return "list-communication-channels"
 		case "communications.history":
 			return "read-communication-history"
+		case "music.play":
+			return "play-music"
+		case "music.skip":
+			return "skip-music"
+		case "music.pause":
+			return "pause-music"
+		case "music.resume":
+			return "resume-music"
+		case "music.stop":
+			return "stop-music"
+		case "music.queue":
+			return "show-music-queue"
+		case "music.volume":
+			return "set-music-volume"
+		case "music.ended":
+			return "end-music-track"
 		default:
 			return "unsupported-communications"
 		}

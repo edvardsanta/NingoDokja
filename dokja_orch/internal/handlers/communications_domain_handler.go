@@ -10,6 +10,7 @@ type CommunicationsDomainHandler struct {
 	domain            *communications.Domain
 	inbound           communications.InboundPolicy
 	inboundConfigured bool
+	music             *musicDesk
 }
 
 func NewCommunicationsDomainHandler(service communications.Service, channels string) *CommunicationsDomainHandler {
@@ -40,6 +41,13 @@ func (h *CommunicationsDomainHandler) Readable(ctx context.Context, channel stri
 	return h.domain.Readable(ctx, channel)
 }
 
+// WithMusic adds the voice channel queues, finding tracks through the music sources installed as
+// Feeds plugins.
+func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSources) *CommunicationsDomainHandler {
+	h.music = newMusicDesk(sources)
+	return h
+}
+
 func (h *CommunicationsDomainHandler) Domain() core.Domain { return core.DomainCommunications }
 func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (map[string]any, error) {
 	if step.Action == communications.ActionAuthorizeInbound {
@@ -51,6 +59,12 @@ func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Eve
 			return nil, core.ErrInboundDenied
 		}
 		return nil, nil
+	}
+	if musicActions[step.Action] {
+		if h.music == nil {
+			return refusedMusic("music is not set up"), nil
+		}
+		return h.music.handle(ctx, event, step.Action)
 	}
 	return h.domain.Handle(ctx, step.Action, event.Payload)
 }

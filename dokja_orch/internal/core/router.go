@@ -53,6 +53,11 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 		return Route{Workflow: "interface-link", Domains: []Domain{DomainSystem}}, nil
 	case strings.HasPrefix(eventType, "communications."):
 		return Route{Workflow: "communications", Domains: []Domain{DomainCommunications}}, nil
+	case strings.HasPrefix(eventType, "music."):
+		// Music in a voice channel is a workflow of Communications (it decides the queue), not a
+		// domain of its own. Its events come from people in a channel, so they are not under the
+		// operator's communications.* routes.
+		return Route{Workflow: "music", Domains: []Domain{DomainCommunications}}, nil
 	case eventType == "discord.send":
 		return Route{
 			Workflow: "discord-send",
