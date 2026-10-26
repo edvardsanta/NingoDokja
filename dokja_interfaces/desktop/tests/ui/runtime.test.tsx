@@ -24,6 +24,14 @@ describe("local runtime modules",()=>{
   expect(calls.filter(c=>c.type==="runtime.set").map(c=>c.payload)).toEqual([{module:"memory",enabled:true}]);
   expect(calls.some(c=>c.type==="services.set")).toBe(false);
  });
+ it("marks a module on its way up or down as under way, not as running",async()=>{
+  const {transport}=routedTransport({"runtime.modules":ok({modules:[{name:"memory",state:"starting",error:"",dependencies:[]},{name:"feeds",state:"stopping",error:"",dependencies:[]},{name:"communications",state:"running",error:"",dependencies:[]}],busy:true,error:""})});show(transport);
+  const row=(text:string)=>screen.getByText(text).closest("li");
+  await screen.findByText("Starting");
+  expect(row("Starting")?.getAttribute("data-tone")).toBe("progress");
+  expect(screen.getByText("Feeds").closest("li")?.getAttribute("data-tone")).toBe("progress");
+  expect(row("Running (readiness not checked)")?.getAttribute("data-tone")).toBe("ok");
+ });
  it("keeps the module list on screen while polling a busy operation",async()=>{
   const later=deferred<ReturnType<typeof page>>();
   const {transport,calls}=scriptedTransport(page("starting",true),()=>later.promise);show(transport);

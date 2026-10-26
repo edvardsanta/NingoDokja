@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { useTranslate } from "../i18n/context.js";
 
@@ -6,7 +7,8 @@ const FOCUSABLE = "button:not(:disabled), input:not(:disabled), textarea:not(:di
 
 // A side panel over the right of the window for a task that is not the view itself, such as adding to
 // the Library. While it is open the focus stays inside it; Esc, × or a press on the shade behind it
-// closes it, and the focus goes back to what opened it.
+// closes it, and the focus goes back to what opened it. It is drawn on the page itself, outside the
+// workspace panel, so the panel measuring its own width cannot hold it in.
 export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const t = useTranslate();
   const id = useId();
@@ -35,7 +37,7 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   };
 
-  return <>
+  return createPortal(<>
     <div className="drawer-shade" aria-hidden="true" onClick={onClose} />
     <aside ref={panel} className="drawer" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={keep}>
       <header className="drawer-head">
@@ -44,5 +46,5 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
       </header>
       <div className="drawer-body">{children}</div>
     </aside>
-  </>;
+  </>, document.body);
 }
