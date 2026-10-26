@@ -16,6 +16,17 @@ def resolve_db_file() -> str:
     return os.getenv("KNOWLEDGE_DB_FILE", "dokja_knowledge.db")
 
 
+def open_store():
+    backend = os.getenv("KNOWLEDGE_STORAGE_BACKEND", "sqlite").strip().lower()
+    if backend == "sqlite":
+        return Store(resolve_db_file())
+    if backend == "postgres":
+        from postgres_store import PostgresStore
+
+        return PostgresStore(os.getenv("KNOWLEDGE_POSTGRES_DSN", ""))
+    raise ValueError("KNOWLEDGE_STORAGE_BACKEND must be sqlite or postgres")
+
+
 def build_service() -> KnowledgeService:
     endpoint = os.getenv("DOKJA_EMBED_ENDPOINT", DEFAULT_ENDPOINT)
     model = os.getenv("DOKJA_EMBED_MODEL", DEFAULT_MODEL)
@@ -32,7 +43,7 @@ def build_service() -> KnowledgeService:
     if not fetch_enabled:
         logger.warning("fetching addresses is disabled (KNOWLEDGE_FETCH=off)")
     return KnowledgeService(
-        Store(resolve_db_file()),
+        open_store(),
         embedder=embedder,
         model=model,
         min_score=float(os.getenv("KNOWLEDGE_MIN_SCORE", str(DEFAULT_MIN_SCORE))),

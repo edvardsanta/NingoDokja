@@ -143,6 +143,26 @@ orchestrator can only list them (masked) and select one, these archived profiles
 
 ## Research Knowledge Base
 
+### PostgreSQL and pgvector adoption
+
+Knowledge supports `KNOWLEDGE_STORAGE_BACKEND=postgres` with
+`KNOWLEDGE_POSTGRES_DSN`; the default remains SQLite until an explicit verified
+cutover. All three base stacks project these variables. The optional
+`docker-compose.postgres.yml` overlay provisions `dokja-postgres` and the
+independent `dokja-postgres-data` volume, with no published database port;
+`DOKJA_POSTGRES_PASSWORD` is required for that overlay. Runtime does not manage
+this infrastructure dependency automatically.
+
+Follow [the import, cutover and rollback procedure](knowledge-postgres.md).
+Stop writers, preserve the SQLite backup, import into an empty target, require
+the full-digest verification result, and inspect `knowledge.status` for
+`storage_backend: postgres` before reopening writes. No automatic import or
+fallback occurs. After PostgreSQL has accepted writes, use the verified export
+to a new SQLite file before any cutback; selecting the old snapshot alone does
+not preserve those writes. Back up PostgreSQL independently after adoption.
+Memory and receipt storage have not migrated in this batch. No deployment was
+performed by this change.
+
 ### Knowledge metadata schema upgrade
 
 The Knowledge build for step 09.2 upgrades its own database from schema 1 to 2 on

@@ -3,9 +3,11 @@
 A research knowledge base: it stores the documents a user feeds it and finds them again by
 meaning and by keyword, with a citable source.
 
-- Storage: its own SQLite file (`KNOWLEDGE_DB_FILE`), separate from `dokja.db`.
+- Storage: explicit PostgreSQL + pgvector backend or its existing SQLite file
+  (`KNOWLEDGE_DB_FILE`), separate from `dokja.db`. See the adoption section below.
 - Hybrid retrieval: cosine similarity over embeddings (bge-m3 through Ollama) plus an FTS5
-  keyword index, merged by reciprocal rank fusion.
+  keyword index on SQLite, or native SQL vector/text search on PostgreSQL, merged
+  by reciprocal rank fusion.
 - Without Ollama (or right after changing the model, before a reindex) the service stays up:
   it still ingests and searches by keyword only (`degraded: true` plus `reason`).
   `knowledge.reindex` embeds whatever was missed.
@@ -21,7 +23,7 @@ meaning and by keyword, with a citable source.
 | `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?`, `kind?`, `exclude_kinds?`, `include_text?`, `source_id?` (narrows the list to that one document) | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
-| `knowledge.status` | none | counts, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
+| `knowledge.status` | none | counts, `storage_backend`, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
 | `knowledge.reindex` | `limit?` | `embedded`, `remaining` |
 
 ## Structured metadata
@@ -231,3 +233,19 @@ source defaults, clarification questions and defining metadata are preserved.
 Roll out this service before the orchestrator; no SQL migration, embedding,
 configuration or compose change is needed. Rolling back both binaries leaves the
 stored metadata readable by the prior schema-2 builds.
+
+## PostgreSQL application backend
+
+Knowledge now supports PostgreSQL + pgvector through
+`KNOWLEDGE_STORAGE_BACKEND=postgres` and `KNOWLEDGE_POSTGRES_DSN`. SQLite remains
+the default until an explicit verified cutover; startup never imports data or
+falls back between stores. `knowledge.status` reports `storage_backend`.
+
+The [application adoption and migration contract](../../dokja_docs/knowledge-postgres.md)
+documents the exact vector search, keyword index, schema, optional Compose
+infrastructure, verified import, rollback export and remaining Memory work.
+Local development needs the dependencies in `postgres-requirements.txt`; both
+Knowledge Dockerfiles install them. PostgreSQL integration tests run only when
+`KNOWLEDGE_TEST_POSTGRES_DSN` is supplied and create their own disposable
+databases. The database role used for those tests must be able to create/drop
+these test databases. The production application never drops a database.

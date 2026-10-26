@@ -1039,7 +1039,7 @@
     {
       "id": "10",
       "title": "Define and implement required durable execution and state ownership",
-      "status": "pending",
+      "status": "in_progress",
       "depends_on": [
         "09"
       ],
@@ -1063,7 +1063,8 @@
       "evidence": [
         "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet.",
         "W1 storage spike (owner accepted W1 as first consumer, 2026-10-20): dokja_store/spikes/cognitive_storage compares SQLite, PostgreSQL 17 + pgvector 0.8.7 and Neo4j 2026.09 Community on a generated fixture up to 108k chunks x 1024 dims. All exact modes matched the gold; no engine leaked scope, superseded or deleted rows; PostgreSQL approximate stayed at recall 1.00, Neo4j approximate 0.23-0.52; exact p95 at the largest size 95 ms (PostgreSQL), 111 ms (SQLite), 850 ms (Neo4j). W1 does not measure graph workloads. See dokja_docs/step-10-storage-spike.md.",
-        "Incremental timeout fix ahead of durable execution: Knowledge ingest/reindex use a dedicated 110-second socket timeout instead of the generic five-second budget. Socket timeout/cancellation after dispatch reports knowledge_write_outcome_unknown; desktop preserves the form and advises checking stored documents before retrying. No automatic resend or durable acceptance is claimed."
+        "Incremental timeout fix ahead of durable execution: Knowledge ingest/reindex use a dedicated 110-second socket timeout instead of the generic five-second budget. Socket timeout/cancellation after dispatch reports knowledge_write_outcome_unknown; desktop preserves the form and advises checking stored documents before retrying. No automatic resend or durable acceptance is claimed.",
+        "2026-10-25: owner explicitly prioritized PostgreSQL+pgvector application adoption, Knowledge first then Memory, while preserving SQLite until verified migration. ADR 0014 records the accepted direction; new receipt-store implementation is deferred behind this adoption work."
       ],
       "checks": [
         {
@@ -1078,9 +1079,9 @@
         "completed_on": "2026-10-19",
         "document": "dokja_docs/cognitive-storage-research.md",
         "decision": "dokja_docs/decisions/0009-cognitive-storage-evaluation.md",
-        "recommendation_status": "proposed",
-        "benchmarks": "not_run",
-        "next_action": "Define the first graph consumer and scope/durability requirements, then run an isolated correctness-first comparison. Step 10 implementation remains pending."
+        "recommendation_status": "PostgreSQL application adoption approved for Knowledge then Memory; graph workload evaluation remains separate",
+        "benchmarks": "W1 and bounded client-BFS W2 results recorded; native traversal/concurrency and W4 remain incomplete",
+        "next_action": "Implement application PostgreSQL adoption under 10.4, then continue the distinct graph evaluation gaps; do not substitute benchmark adapters for application integration."
       },
       "substeps": [
         {
@@ -1204,6 +1205,81 @@
             "dokja_docs/model-assisted-cognition-experiment.md",
             "dokja_docs/model-assisted-cognition-follow-up.md"
           ]
+        },
+        {
+          "id": "10.4",
+          "title": "Adopt PostgreSQL and pgvector in application Knowledge then Memory",
+          "status": "in_progress",
+          "deliverables": [
+            "dokja_docs/decisions/0014-application-postgres-adoption.md",
+            "Application Knowledge PostgreSQL adapter, explicit configuration, verified import/rollback and CI",
+            "Memory PostgreSQL adapter and verified migration in a subsequent batch"
+          ],
+          "acceptance_criteria": [
+            "The application selects its actual storage implementation explicitly; PostgreSQL vector retrieval runs in SQL instead of application-side NumPy scans, preserving existing domain/orchestrator boundaries.",
+            "Preserve the original SQLite database until a verified migration; copy stable identities, text, metadata, timestamps, embeddings and model tags without recomputing them. Refuse overwrite and roll back failed verification.",
+            "Provide verified rollback export including writes accepted after cutover, and update every affected Compose stack and the production runbook.",
+            "Exercise real disposable PostgreSQL through application operations, metadata revision races, restart, replacement/deletion, model/dimension and kind filtering, privacy and rollback before claiming adoption readiness.",
+            "Keep Memory, durable receipts, graph ownership/scope gaps and actual deployment explicitly incomplete until their own implementation and verification."
+          ],
+          "batches": [
+            {
+              "id": "10.4-a",
+              "title": "Integrate Knowledge PostgreSQL storage and verified migration",
+              "status": "completed",
+              "completed_on": "2026-10-26",
+              "evidence": [
+                "Knowledge bootstrap supports explicit postgres storage using psycopg/pgvector and an owned PostgreSQL schema. Vector candidates are filtered by kind/model/dimension and ranked by exact cosine in PostgreSQL; keyword search uses GIN/unaccent and the existing fusion/relevance logic. Metadata patches use row locks and existing revision identities. The additive status storage_backend field identifies the active store.",
+                "Explicit schema-1/2 SQLite import reads a consistent read-only source snapshot and copies IDs, content, metadata, timestamps and vectors into an empty target. Full logical digest verification precedes commit. Verified reverse export publishes a new owner-readable SQLite file without overwriting existing files, preserving post-cutover writes. No owner database or deployment was changed.",
+                "All base stacks project storage variables; an optional PostgreSQL overlay adds private infrastructure and a separate volume. Pinned Python dependencies are packaged in both images and a new CI workflow enables real database integration tests. SQLite remains the default until explicit operator cutover, with no connection-error fallback or dual write."
+              ],
+              "checks": [
+                {
+                  "name": "postgres_application_regression",
+                  "status": "passed",
+                  "detail": "Knowledge suite with disposable PostgreSQL enabled: 181 passed, 8 existing live-model tests skipped. Fixtures create/drop only their own fresh databases. Tests cover application bootstrap/request envelope, SQL candidates, accents, filters, model/dimension changes, metadata races, fresh cross-connection reads, replacement/deletion, source-file preservation, schema-1 import, digest failure rollback, verified post-cutover export and private diagnostics."
+                },
+                {
+                  "name": "sqlite_without_postgres_dependencies",
+                  "status": "passed",
+                  "detail": "Knowledge tests in an isolated environment without psycopg/pgvector: 170 passed, 9 skipped (the PostgreSQL module plus 8 live-model tests). Existing SQLite operation remains available without optional driver installation."
+                },
+                {
+                  "name": "compose_configuration",
+                  "status": "passed",
+                  "detail": "Dev, lite and production Compose config --quiet passed with the optional PostgreSQL overlay. Only synthetic password/model settings were used; production validation supplied /dev/null as the environment file. No containers from the application stack were started or reconfigured."
+                },
+                {
+                  "name": "production_image_and_format",
+                  "status": "passed",
+                  "detail": "Knowledge production image built and passed a synthetic application roundtrip against disposable PostgreSQL 17.11 / pgvector 0.8.7, including ingest, native vector lookup, keyword search and storage_backend status. New Python files passed Black and isort checks; tracker JSON and git diff --check passed. The 8 model tests remain skipped; no live Ollama/model check, owner-data migration or production cutover was performed."
+                }
+              ]
+            },
+            {
+              "id": "10.4-b",
+              "title": "Integrate Memory PostgreSQL storage and verified migration",
+              "status": "pending",
+              "depends_on": [
+                "10.4-a"
+              ],
+              "evidence": []
+            },
+            {
+              "id": "10.4-c",
+              "title": "Review and perform approved data cutover and receipt integration",
+              "status": "pending",
+              "depends_on": [
+                "10.4-b"
+              ],
+              "evidence": []
+            }
+          ],
+          "references": [
+            "dokja_docs/decisions/0014-application-postgres-adoption.md",
+            "dokja_docs/knowledge-postgres.md"
+          ],
+          "next_action": "Review the Knowledge backend PR, then implement Memory PostgreSQL adoption. Production cutover remains an explicit operator-approved deployment; receipt-ledger storage follows the agreed PostgreSQL ownership."
         }
       ]
     },

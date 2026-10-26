@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 
 import zmq
 
@@ -38,6 +39,12 @@ class KnowledgeServiceServer:
             logger.info("knowledge service handling type=%s payload_keys=%d", request["type"], len(payload))
             return {"status": "ok", "result": self.service.dispatch(request)}
         except Exception as err:
+            # The optional PostgreSQL adapter loads its driver. Keep SQLite
+            # usable without it, and never log database row diagnostics.
+            driver = sys.modules.get("psycopg")
+            if driver is not None and isinstance(err, driver.Error):
+                logger.error("knowledge storage request failed error_type=%s", type(err).__name__)
+                return {"status": "error", "message": "knowledge storage request failed"}
             # Log the type and the error, never the payload: it is the user's private notes.
             logger.exception("knowledge request failed")
             return {"status": "error", "message": str(err)}
