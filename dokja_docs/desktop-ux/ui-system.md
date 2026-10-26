@@ -26,7 +26,10 @@ the mockup is built with them, so each one is listed to be accepted or reverted.
 
 **Owner's decision (2026-10-23).** Accepted: P2 (the voice line in Bodoni italic), P4 and P6 (a quiet
 legend; the sidebar says a word only when something is not well) and P7 (plain copy says "Biblioteca",
-which follows from the owner's names). Not taken: P1, P3 and P5. P8 and P9 are not decided yet. The owner likes the
+which follows from the owner's names). Not taken: P1, P3 and P5. P8 and P9 were accepted on 2026-10-26: the workspace panel
+is a size container (`ws`), and a module starting or stopping takes the `progress` tone. The drawer,
+the row menu and the media viewer are drawn on the page itself, outside the panel, because a size
+container would otherwise hold their fixed position. The owner likes the
 cyberpunk look as it is, so buttons stay cyan, the glow stays, and a state keeps its coloured square
 without a shape of its own. The mockup still shows the rejected proposals; the app does not.
 

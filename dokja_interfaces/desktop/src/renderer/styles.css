@@ -54,6 +54,12 @@
   --tone-text: var(--amber);
 }
 
+/* Under way: not up, not a problem, not unchecked. Plain ink, no neon; its square blinks. */
+[data-tone="progress"] {
+  --tone: var(--ink);
+  --tone-text: var(--ink);
+}
+
 [data-tone="off"],
 [data-tone="other"] {
   --tone: var(--off);
@@ -149,7 +155,10 @@ body {
  * so they stay crisp, and the two diagonals the clip leaves bare are drawn with gradients just inside
  * the cut. Header, body and dock stack inside; only the body scrolls.
  */
+/* The panel is the container its contents measure: what fits depends on the room the panel has
+ * beside the sidebar, not on the window. */
 .wp {
+  container: ws / inline-size;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -346,6 +355,12 @@ body {
   color: var(--tone-text);
 }
 
+.services li[data-tone="progress"] .service-status::after {
+  content: "■";
+  margin-left: 0.5ch;
+  animation: blink 1s steps(2, jump-none) infinite;
+}
+
 .service-detail {
   color: var(--ink-dim);
   font-size: 0.8125rem;
@@ -506,7 +521,7 @@ button:focus-visible {
   }
 }
 
-@media (max-width: 34rem) {
+@container ws (max-width: 34rem) {
   /* The name may wrap rather than push the state out of the row. */
   .services {
     grid-template-columns: minmax(0, max-content) 1fr;
@@ -525,6 +540,7 @@ button:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .services li,
+  .services li[data-tone="progress"] .service-status::after,
   .wp [role="status"]::after {
     animation: none;
   }
@@ -1312,7 +1328,7 @@ button.icon-button[aria-expanded="true"] {
   gap: 1.25rem;
 }
 
-/* One conversation, or a narrow window: the rail becomes a strip above the thread. */
+/* One conversation, or a narrow panel: the rail becomes a strip above the thread. */
 .messenger[data-single] {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -1779,7 +1795,8 @@ button.icon-button[aria-expanded="true"] {
   font-size: 0.75rem;
 }
 
-@media (max-width: 48rem) {
+/* A panel too narrow for the rail beside a readable thread: the rail becomes a strip above it. */
+@container ws (max-width: 40rem) {
   .messenger {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);

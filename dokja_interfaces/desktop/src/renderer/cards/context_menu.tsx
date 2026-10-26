@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
+import { createPortal } from "react-dom";
+
 import { useTranslate } from "../i18n/context.js";
 
 export type MenuItem = { label: string; run: () => void; disabled?: boolean };
@@ -87,11 +89,12 @@ function RowMenu({ items, place, name, onClose }: { items: readonly MenuItem[]; 
     else if (event.key === "End") { event.preventDefault(); go(entries.length - 1); }
   };
 
-  return <div ref={box} id={id} role="menu" aria-label={t("row_menu_named", { name })} className="row-menu"
+  // On the page itself, so it sits at the pointer whatever box the row is in.
+  return createPortal(<div ref={box} id={id} role="menu" aria-label={t("row_menu_named", { name })} className="row-menu"
     style={{ left: at.x, top: at.y }} onKeyDown={move}>
     {items.map((item) => <button key={item.label} type="button" role="menuitem" disabled={item.disabled}
       onClick={() => { onClose(); item.run(); }}>{item.label}</button>)}
-  </div>;
+  </div>, document.body);
 }
 
 // A list row that carries a menu: focusable, so the keyboard can reach the Menu key on it.

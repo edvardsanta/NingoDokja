@@ -24,6 +24,8 @@ it("opens a row's menu with a right click, the Menu key or its ⋯ button, with 
 
   fireEvent.contextMenu(second, { clientX: 40, clientY: 50 });
   expect(screen.getByRole("menu", { name: "Actions for Title note:one" })).toBeTruthy();
+  // drawn on the page itself, so a panel that measures its own width does not shift it
+  expect(screen.getByRole("menu").parentElement).toBe(document.body);
   expect(items()).toEqual(["Open", "Classify…", "Delete…"]);
   expect(document.activeElement?.textContent).toBe("Open");
   fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
@@ -88,6 +90,7 @@ it("adds to the Library in a drawer that keeps the focus and gives it back when 
   add.focus();
   fireEvent.click(add);
   const drawer = screen.getByRole("dialog", { name: "Add to the Library" });
+  expect(drawer.parentElement).toBe(document.body);
   expect(drawer.contains(document.activeElement)).toBe(true);
   expect(document.activeElement?.className).not.toBe("drawer-close");
   // One heading: the drawer's, not the form's as well.

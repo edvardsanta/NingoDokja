@@ -79,7 +79,8 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
         const start = module.state === "stopped" || module.state === "failed";
         const details = moduleDetails?.(module.name);
         const label = displayName(module.name, t);
-        return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : "ok"}>
+        const moving = module.state === "starting" || module.state === "stopping";
+        return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : moving ? "progress" : "ok"}>
           <span className="service-name" title={module.name}>{label}</span>
           <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
           <button type="button" className="switch" disabled={!!busy || !!view.error || module.state === "starting" || module.state === "stopping"}

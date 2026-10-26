@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { isRecord, text } from "../../shared/records.js";
 import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -184,14 +185,15 @@ export function MemePicker({
       <datalist id="meme-tag-suggestions">
         {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
       </datalist>
-      {viewer && <div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
+      {/* on the page itself, so it covers the window rather than the panel */}
+      {viewer && createPortal(<div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
         if (event.target === event.currentTarget) setViewer(undefined);
       }}>
         <section className="media-viewer" role="dialog" aria-modal="true" aria-label={viewer.title}>
           <button type="button" className="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</button>
           <Media dataUrl={viewer.dataUrl} label={viewer.title} expanded />
         </section>
-      </div>}
+      </div>, document.body)}
     </div>
   );
 }
