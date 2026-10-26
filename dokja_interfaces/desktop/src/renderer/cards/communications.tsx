@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { isRecord, text } from "../../shared/records.js";
 import type { CommunicationChannel, CommunicationHistory, CommunicationSend, MemeItem, MemePage, MemePoolRefresh, Off } from "../../shared/replies.js";
@@ -48,8 +48,8 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
 type ChannelListing = { channels: CommunicationChannel[]; unavailable: number };
 
 // The rail's groups: each server under its name, in the order the list gives them, then Discord
-// channels on no listed server, then the conversations an interface keeps. With no server named
-// there is one group and no heading.
+// channels on no listed server, then the conversations an interface keeps. Only an ungrouped
+// Discord list has no heading; named servers and interfaces can collapse even on their own.
 type ChannelGroup = { key: string; name: string; channels: CommunicationChannel[] };
 function groupChannels(channels: CommunicationChannel[], t: ReturnType<typeof useTranslate>): ChannelGroup[] {
   const servers = new Map<string, ChannelGroup>();
@@ -80,7 +80,7 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
   const [sending, setSending] = useState(false);
   const chosen = channels.find((channel) => channel.id === selected);
   const groups = groupChannels(channels, t);
-  const headed = groups.length > 1;
+  const headed = groups.length > 1 || groups.some(group => group.key !== "other");
   const entry = (channel: CommunicationChannel) => <li key={channel.id}>
     <button type="button" aria-label={channelLabel(channel, t)} aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
       <ChannelName channel={channel} />
@@ -89,10 +89,9 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
   return <div className="messenger" data-single={channels.length === 1 ? "" : undefined}>
     <nav className="channels" aria-label={t("communications_channel")}>
       {headed
-        ? groups.map((group) => <section key={group.key} className="channel-group" aria-label={group.name}>
-          <h3 className="channel-group-name">{group.name}</h3>
-          <ul>{group.channels.map(entry)}</ul>
-        </section>)
+        ? groups.map((group) => <ChannelGroupSection key={group.key} group={group}>
+          {group.channels.map(entry)}
+        </ChannelGroupSection>)
         : <ul>{channels.map(entry)}</ul>}
     </nav>
     <section className="thread">
@@ -103,6 +102,26 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
       <Conversation key={selected} channel={selected} transport={transport} active={active} onSending={setSending} />
     </section>
   </div>;
+}
+
+function ChannelGroupSection({ group, children }: { group: ChannelGroup; children: ReactNode }) {
+  const t = useTranslate();
+  const listId = useId();
+  const [expanded, setExpanded] = useState(true);
+  const label = t(expanded ? "communications_collapse_group" : "communications_expand_group", { name: group.name });
+
+  return <section className="channel-group" aria-label={group.name}>
+    <h3 className="channel-group-name">
+      <button type="button" className="channel-group-toggle" aria-label={label} title={label}
+        aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(open => !open)}>
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+          <path d="m5 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+        <span>{group.name}</span>
+      </button>
+    </h3>
+    <ul id={listId} hidden={!expanded}>{children}</ul>
+  </section>;
 }
 
 // The words that name a conversation: a WhatsApp one by its alias, a Discord one by its channel and,

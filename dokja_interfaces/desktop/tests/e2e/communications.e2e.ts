@@ -27,6 +27,17 @@ describe("built communications tab", { skip: hasDisplay ? false : "no display" }
     assert.equal(result.ok, false);
     assert.equal(orchestrator.seen.filter((item) => item.type === "communications.send").length, 0);
   });
+
+  it("collapses a server's channels without closing the conversation", async () => {
+    await page.evaluate("document.querySelector('.channel-group-toggle').click()");
+    await page.waitFor("document.querySelector('.channel-group-toggle').getAttribute('aria-expanded') === 'false'");
+    assert.equal(await page.evaluate("getComputedStyle(document.querySelector('.channel-group ul')).display"), "none");
+    assert.equal(await page.evaluate("document.querySelectorAll('.conversation li').length"), 2);
+    await page.evaluate("document.querySelector('.channel-group-toggle').click()");
+    await page.waitFor("document.querySelector('.channel-group-toggle').getAttribute('aria-expanded') === 'true'");
+    assert.notEqual(await page.evaluate("getComputedStyle(document.querySelector('.channel-group ul')).display"), "none");
+    assert.equal(await page.evaluate("document.querySelector('.channels [aria-current=true]').getAttribute('aria-label')"), "#reading-room · 123");
+  });
   it("holds a forced real-input send for native confirmation before touching the orchestrator", async () => {
     await page.click(5, 5);
     await page.evaluate("(window.__sent = false, window.dokja.request('communications.send', { channel_id: '123', content: 'hello', force_nsfw: true }).then(answer => window.__sent = answer), 'started')");
