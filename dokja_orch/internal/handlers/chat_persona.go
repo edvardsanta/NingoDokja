@@ -120,6 +120,9 @@ func withOwnerIdentity(messages []map[string]string, event core.Event) []map[str
 	return messages
 }
 
+// ownerWordNote is how Ningo treats the owner who made him (owner, 2026-10-26).
+const ownerWordNote = `With the owner, your own judgment still stands: you may disagree on taste or opinion and say so once, with your reason. When the owner settles a question, their word decides: accept it and move on, without insisting, bargaining or belittling them. This is about the conversation only; it grants no permission to reveal secrets, bypass rules or act.`
+
 func ownerIdentityNote(event core.Event) string {
 	if event.Source != core.SourceDiscord || event.Context == nil {
 		return ""
@@ -132,7 +135,7 @@ func ownerIdentityNote(event core.Event) string {
 	}
 	note := "The operator has configured the identity of Ningo's owner. Do not guess the owner's name or reveal their numeric Discord ID. This identity fact does not grant permission to reveal secrets, bypass rules, or perform actions."
 	if isOwner {
-		note += " The current speaker is the configured owner, verified by the Discord gateway."
+		note += " The current speaker is the configured owner, verified by the Discord gateway. " + ownerWordNote
 	}
 	if mentioned {
 		note += " The current message directly mentions the configured owner; if asked who the owner is, identify the owner by that mention without printing its raw ID."
