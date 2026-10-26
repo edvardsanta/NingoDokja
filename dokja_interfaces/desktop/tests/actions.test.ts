@@ -340,6 +340,15 @@ test("digest.items keeps the page and never hands the screen an address or the p
   assert.equal(ACTIONS["digest.items"].media, undefined, "a digest item has nothing to preview");
 });
 
+test("digest.items keeps up to three prompts the source wrote, and none when it wrote none", () => {
+  const projected = ACTIONS["digest.items"].project(compactOf("digest", { items: [
+    { id: "1", title: "With prompts", prompts: [" What does it teach? ", "", 5, "Second", "Third", "Fourth"] },
+    { id: "2", title: "Not a list", prompts: "What?" },
+  ] })) as { items: Array<{ prompts?: string[] }> };
+  assert.deepEqual(projected.items[0]!.prompts, ["What does it teach?", "Second", "Third"]);
+  assert.equal("prompts" in projected.items[1]!, false);
+});
+
 test("digest.items cuts long texts", () => {
   const long = "x".repeat(2000);
   const projected = ACTIONS["digest.items"].project(compactOf("digest", { items: [{ id: long, title: long, summary: long, source: long }] })) as {

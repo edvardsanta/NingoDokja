@@ -3,21 +3,24 @@ package handlers
 import (
 	"context"
 	"errors"
+	digestdomain "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
 	"strings"
 	"testing"
 )
 
 type fakeSearcher struct {
-	result map[string]any
-	err    error
-	calls  int
-	query  string
+	result   map[string]any
+	err      error
+	calls    int
+	query    string
+	minScore float64
 }
 
-func (f *fakeSearcher) Search(_ context.Context, query string, _ int) (map[string]any, error) {
+func (f *fakeSearcher) Search(_ context.Context, query string, _ int, minScore float64) (map[string]any, error) {
 	f.calls++
 	f.query = query
+	f.minScore = minScore
 	return f.result, f.err
 }
 
@@ -45,6 +48,7 @@ func TestOnlyRelevantHitsReachThePromptAndTheReplyCitesThem(t *testing.T) {
 		hit("note:cake", "Cake", "", "Blend the carrots.", false),
 	)}
 	handler, generator := chatWith(searcher, nil)
+	generator.result = map[string]any{"reply": "model reply [1]"}
 
 	result, err := handler.Handle(context.Background(), chatEvent("what does Kant say about experience?"), chatStep)
 	if err != nil {
@@ -176,5 +180,98 @@ func TestPlaceInDocumentDropsTheRepeatedTitle(t *testing.T) {
 		if got := placeInDocument(tc.title, tc.heading); got != tc.want {
 			t.Fatalf("placeInDocument(%q, %q) = %q, want %q", tc.title, tc.heading, got, tc.want)
 		}
+	}
+}
+
+// Regression: a relevant hit the model did not use was still listed as a source, so an unrelated
+// note showed up under a reply that never drew on it.
+func TestOnlySourcesTheReplyCitesAreListed(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult(
+		hit("note:fs", "Filesystems", "", "Pick a copy-on-write filesystem.", true),
+		hit("note:kant", "Kant", "", "The categories organise experience.", true),
+	)}
+	handler, generator := chatWith(searcher, nil)
+
+	result, err := handler.Handle(context.Background(), chatEvent("explain the main idea simply"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["reply"] != "model reply" || result["sources"] != nil {
+		t.Fatalf("an uncited source must not be listed, got %#v", result)
+	}
+
+	generator.result = map[string]any{"reply": "Experience is organised [2]."}
+	result, err = handler.Handle(context.Background(), chatEvent("and what does Kant add to that?"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, _ := result["reply"].(string)
+	if !strings.HasSuffix(reply, "Sources consulted: [2] Kant (note:kant)") || strings.Contains(reply, "Filesystems") {
+		t.Fatalf("expected only the cited source, keeping its number, got %q", reply)
+	}
+	sources, _ := result["sources"].([]map[string]any)
+	if len(sources) != 1 || sources[0]["number"] != 2 {
+		t.Fatalf("the sources field must match the footer, got %#v", result["sources"])
+	}
+}
+
+func TestCitedSourcesReadsEveryCitationForm(t *testing.T) {
+	sources := []knowledgeSource{{Number: 1}, {Number: 2}, {Number: 3}}
+	for reply, want := range map[string]int{"see [1][3]": 2, "see [1, 2]": 2, "see [2]": 1, "no citation": 0, "a list [x]": 0} {
+		if got := citedSources(reply, sources); len(got) != want {
+			t.Fatalf("%q: expected %d cited sources, got %#v", reply, want, got)
+		}
+	}
+}
+
+// Regression: in a reading conversation the lookup searched the bare question ("explain the main
+// idea"), which says nothing about the reading, so a note matched on wording alone.
+func TestAReadingConversationAnchorsTheLookupOnTheReading(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult()}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "model reply"}}
+	summary := strings.Repeat("Walk in love. ", 100)
+	handler := NewChatDomainHandler(generator).WithKnowledge(searcher, nil).WithReading(func(_ context.Context, id string) (digestdomain.Reference, error) {
+		return digestdomain.Reference{ID: id, Title: "Daily reading", Source: "Feed", Summary: summary}, nil
+	})
+
+	_, err := handler.Handle(context.Background(), core.Event{
+		Source: core.SourceDesktop, User: core.EventUser{ID: "u1"}, Channel: core.EventChannel{ID: "desktop"},
+		Type: "message.created", Payload: map[string]any{"content": "Explain it", "conversation_id": "reading-1", "reading_id": "item-1"},
+	}, chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if searcher.calls != 1 {
+		t.Fatalf("a short question about a reading must still be looked up, got %d calls", searcher.calls)
+	}
+	if !strings.HasPrefix(searcher.query, "Explain it\nDaily reading\nWalk in love.") {
+		t.Fatalf("expected the question first, then the reading, got %q", searcher.query)
+	}
+	if n := len([]rune(searcher.query)); n > knowledgeMaxQueryLen || n > len("Explain it\n")+knowledgeMaxAnchorLen {
+		t.Fatalf("the reading must be bounded so the question is never cut, got %d runes", n)
+	}
+}
+
+func TestAGeneralConversationSearchesTheQuestionAlone(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult()}
+	handler, _ := chatWith(searcher, nil)
+	if _, err := handler.Handle(context.Background(), chatEvent("what does Kant say about experience?"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if searcher.query != "what does Kant say about experience?" {
+		t.Fatalf("expected the bare question, got %q", searcher.query)
+	}
+}
+
+// Regression: a subjectless question scored 0.4518 against an unrelated note and cleared the
+// service's 0.45 default; chat asks for its stricter bar.
+func TestChatAsksForAStricterRelevanceThreshold(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult()}
+	handler, _ := chatWith(searcher, nil)
+	if _, err := handler.Handle(context.Background(), chatEvent("explain the main idea simply"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if searcher.minScore != knowledgeMinScore || knowledgeMinScore <= 0.45 {
+		t.Fatalf("expected chat's own threshold above the service default, got %v", searcher.minScore)
 	}
 }

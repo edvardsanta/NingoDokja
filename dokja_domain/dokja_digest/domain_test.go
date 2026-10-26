@@ -388,7 +388,7 @@ func TestTheReplyCarriesWhatTheScreenNeeds(t *testing.T) {
 	first := got["items"].([]map[string]any)[0]
 	want := map[string]any{
 		"id": "1", "plugin": "plugin-alpha", "title": "A title that is long enough", "summary": "About A title that is long enough",
-		"url": "https://example.com/1", "published": "2026-10-02T10:00:00Z", "source": "Alpha",
+		"url": "https://example.com/1", "published": "2026-10-02T10:00:00Z", "source": "Alpha", "prompts": []string{},
 	}
 	if !reflect.DeepEqual(first, want) {
 		t.Fatalf("first = %v", first)
@@ -418,5 +418,15 @@ func TestReferenceResolvesOnlyCachedItemsAndBoundsContext(t *testing.T) {
 	}
 	if _, err := New(service).Reference(context.Background(), strings.Repeat("x", 513)); err == nil {
 		t.Fatal("oversized ID accepted")
+	}
+}
+
+func TestAnItemKeepsThePromptsItsPluginSuggested(t *testing.T) {
+	withPrompts := entry("1", "Alpha", "A title that is long enough", 2, "")
+	withPrompts["prompts"] = []any{"What does it teach?", "", 5.0, "  Why now?  "}
+	got := readDigest(t, itemsReply(t, withPrompts), nil)
+	first := got["items"].([]map[string]any)[0]
+	if !reflect.DeepEqual(first["prompts"], []string{"What does it teach?", "Why now?"}) {
+		t.Fatalf("prompts = %#v", first["prompts"])
 	}
 }

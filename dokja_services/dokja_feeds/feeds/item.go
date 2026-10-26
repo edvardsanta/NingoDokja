@@ -18,6 +18,8 @@ const (
 	maxTitleRunes   = 300
 	maxSummaryRunes = 1000
 	maxSourceRunes  = 80
+	maxPrompts      = 3
+	maxPromptRunes  = 120
 	maxIDRunes      = 120
 	maxURLBytes     = 2048
 
@@ -30,10 +32,13 @@ type Item struct {
 	Kind     string
 	MediaURL string
 	Tags     []string
-	ID       string
-	Title    string
-	Summary  string
-	URL      string
+	// Prompts are questions the plugin suggests for discussing this item, written from its own
+	// text (the passages of a liturgy, the claim of an article). Empty when it has none.
+	Prompts []string
+	ID      string
+	Title   string
+	Summary string
+	URL     string
 	// Published is the zero time when the plugin gave none, or none that can be believed.
 	Published time.Time
 	Source    string
@@ -43,6 +48,7 @@ type rawItem struct {
 	Kind      string   `json:"kind"`
 	MediaURL  string   `json:"media_url"`
 	Tags      []string `json:"tags"`
+	Prompts   []string `json:"prompts"`
 	ID        string   `json:"id"`
 	Title     string   `json:"title"`
 	Summary   string   `json:"summary"`
@@ -109,9 +115,18 @@ func normalizeItem(raw rawItem, plugin Plugin, now time.Time) (Item, bool) {
 			tags = append(tags, tag)
 		}
 	}
+	prompts := make([]string, 0, min(len(raw.Prompts), maxPrompts))
+	for _, prompt := range raw.Prompts {
+		if len(prompts) >= maxPrompts {
+			break
+		}
+		if prompt = cleanText(prompt, maxPromptRunes); prompt != "" {
+			prompts = append(prompts, prompt)
+		}
+	}
 	kind := cleanText(raw.Kind, 40)
 	return Item{
-		Kind: kind, MediaURL: cleanURL(raw.MediaURL), Tags: tags,
+		Kind: kind, MediaURL: cleanURL(raw.MediaURL), Tags: tags, Prompts: prompts,
 		ID:        id,
 		Title:     title,
 		Summary:   cleanText(raw.Summary, maxSummaryRunes),

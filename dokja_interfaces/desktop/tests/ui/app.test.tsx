@@ -95,6 +95,28 @@ describe("the screen", () => {
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
   });
 
+  it("opens a reading's discussion with the questions its source wrote, in place of the generic ones", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP), {
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([digestItem(1, { prompts: ["What does the second reading teach?", "How does the psalm answer it?"] })])),
+      "message.created": [ok({ reply: "It teaches mercy.", sessionNotice: "" })],
+    });
+    render(<App transport={transport} locale="en" />);
+    fireEvent.click(tabNamed("Library"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Readings" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Discuss with Ningo: Entry 1" }));
+
+    await waitFor(() => expect(selectedTab()).toBe("Talk"));
+    expect(screen.queryByRole("button", { name: "Explain the main idea in plain language" })).toBeNull();
+    screen.getByRole("button", { name: "How does the psalm answer it?" });
+    fireEvent.click(screen.getByRole("button", { name: "What does the second reading teach?" }));
+    await screen.findByText("It teaches mercy.");
+
+    const [sent] = calls.filter((call) => call.type === "message.created").map((call) => call.payload);
+    expect(sent).toMatchObject({ content: "What does the second reading teach?", reading_id: "item-1" });
+  });
+
   it("discusses a reading in Talk, grounded by its id, and the list keeps no chat of its own", async () => {
     const { transport, calls } = screenTransport(statusReply(ALL_UP), {
       "knowledge.status": ok(KNOWLEDGE_STATUS),

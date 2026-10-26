@@ -163,6 +163,8 @@ export type DigestItem = {
   source: string;
   // RFC 3339, or empty when the source gave no date
   published: string;
+  // questions the item's own source suggests for discussing it; absent when it has none
+  prompts?: string[];
 };
 
 export type DigestPage = {

@@ -42,6 +42,9 @@ test("a page keeps its items, drops what has no title and reads its counts", () 
     items: [{ id: "1", title: "One", summary: "S", source: "A", published: "2026-10-02T10:00:00Z" }],
     total: 20, offset: 0, more: 19, updated: "2026-10-02T10:30:00Z",
   });
+  const withPrompts = parseDigestPage({ items: [{ id: "1", title: "One", prompts: ["What does it teach?", "", 3] }, { id: "2", title: "Two", prompts: [] }] });
+  assert.ok(withPrompts && !("off" in withPrompts));
+  assert.deepEqual(withPrompts.items.map((item) => item.prompts), [["What does it teach?"], undefined]);
   assert.deepEqual(parseDigestPage({ off: true, reason: "paused" }), { off: true, reason: "paused" });
   for (const reply of [null, [], {}, { items: "none" }]) {
     assert.equal(parseDigestPage(reply), undefined, JSON.stringify(reply));

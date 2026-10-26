@@ -507,3 +507,23 @@ func TestTheShippedExamplesAreDisabledUntilTheOwnerEnablesThem(t *testing.T) {
 		}
 	}
 }
+
+func TestItemsCarryThePromptsTheirPluginWrote(t *testing.T) {
+	root := t.TempDir()
+	newPlugin(t, root, "reading", map[string]any{"enabled": true})
+	service := startService(t, root, newFakeRunner(func(context.Context, Plugin) ([]byte, error) {
+		return []byte(`{"items":[{"id":"a","title":"With prompts","prompts":["What does it teach?"]},{"id":"b","title":"Without"}]}`), nil
+	}))
+
+	waitForRow(t, service, "reading", func(row map[string]any) bool { return row["state"] == "ok" })
+	items, _ := itemsOf(t, service)
+	if len(items) != 2 {
+		t.Fatalf("items = %v", items)
+	}
+	if prompts, _ := items[0]["prompts"].([]string); len(prompts) != 1 || prompts[0] != "What does it teach?" {
+		t.Fatalf("first item prompts = %#v", items[0]["prompts"])
+	}
+	if prompts, _ := items[1]["prompts"].([]string); len(prompts) != 0 {
+		t.Fatalf("an item without prompts must carry an empty list, got %#v", items[1]["prompts"])
+	}
+}

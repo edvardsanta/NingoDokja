@@ -96,7 +96,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 	if held.Kind == conversation.KindReading {
 		event.Payload["reading_id"] = held.ReadingID
 	}
-	reference, err := h.readingReference(ctx, event)
+	reference, anchor, err := h.readingReference(ctx, event)
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
 	}
@@ -108,7 +108,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		}
 		reference = recentReadingReference(items)
 	}
-	sources := h.lookupKnowledge(ctx, turn.Content)
+	sources := h.lookupKnowledge(ctx, turn.Content, anchor)
 	result, err := h.generateReply(ctx, turn.Content, history, sources, reference)
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
@@ -118,6 +118,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		return nil, h.failArchived(ctx, scope, turn, "the model returned no reply")
 	}
 	// The transcript keeps what the owner was shown, citations included.
+	sources = citedSources(raw, sources)
 	reply := citeSources(raw, sources)
 	provider, _ := result["provider"].(string)
 	model, _ := result["model"].(string)

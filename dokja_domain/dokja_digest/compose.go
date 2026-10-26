@@ -21,6 +21,8 @@ type item struct {
 	url       string
 	source    string
 	published time.Time // the zero time when unknown
+	// prompts are the questions the item's plugin suggests for discussing it; nil when none.
+	prompts []string
 }
 
 // itemsFrom reads the items of a feeds.items reply. An entry that is not an object with a title
@@ -57,6 +59,7 @@ func itemsFrom(reply map[string]any) ([]item, error) {
 			url:       text(fields, "url"),
 			source:    text(fields, "source"),
 			published: published,
+			prompts:   texts(fields, "prompts"),
 		})
 	}
 	return items, nil
@@ -65,6 +68,19 @@ func itemsFrom(reply map[string]any) ([]item, error) {
 func text(fields map[string]any, name string) string {
 	value, _ := fields[name].(string)
 	return strings.TrimSpace(value)
+}
+
+// texts reads a list of strings, skipping anything that is not a nonempty string. The feeds
+// service already bounds what plugins print.
+func texts(fields map[string]any, name string) []string {
+	values, _ := fields[name].([]any)
+	out := []string{}
+	for _, value := range values {
+		if each, ok := value.(string); ok && strings.TrimSpace(each) != "" {
+			out = append(out, strings.TrimSpace(each))
+		}
+	}
+	return out
 }
 
 type digest struct {
@@ -220,6 +236,7 @@ func (d digest) reply(updated string) map[string]any {
 			"url":       shown.url,
 			"published": published,
 			"source":    shown.source,
+			"prompts":   shown.prompts,
 		})
 	}
 

@@ -168,7 +168,10 @@ Measured with bge-m3 on only 3 documents (Kant, a cake recipe, interest rates):
 The groups almost touch (the weakest paraphrase scored 0.456, the strongest neighbour
 0.446). Treat 0.45 as a starting point, not a calibration: a larger base changes the
 distribution. That is why a consumer should always cite the source of each passage it uses,
-so a wrong retrieval is visible. The live test (`tests/test_live_embedder.py`, skipped
+so a wrong retrieval is visible. A consumer that injects context unasked can pass a stricter
+`min_score` with the search: chat asks for 0.55, because a question with no subject ("explique a
+ideia principal sem complicar") scored 0.45 - 0.46 against unrelated notes, as high as the
+weakest paraphrases. The live test (`tests/test_live_embedder.py`, skipped
 without Ollama) includes the neighbouring cases and prints the distribution. It uses a
 Portuguese corpus on purpose, to check that retrieval works across languages.
 
