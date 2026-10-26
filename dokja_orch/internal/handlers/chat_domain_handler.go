@@ -176,7 +176,7 @@ func sessionAwareReply(reply string, lifecycle chatSessionLifecycle, event core.
 
 func sessionLifecycleNotice(lifecycle chatSessionLifecycle, event core.Event) string {
 	if lifecycle.Revoked {
-		return "Previous conversation session was revoked. A new 3-minute session has started."
+		return "Conversation context was compacted."
 	}
 	if lifecycle.Created && boolFromContext(event.Context, "force_new_session") {
 		return "New conversation session started. It will reset after 3 minutes of inactivity."

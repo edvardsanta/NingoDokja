@@ -307,8 +307,8 @@ func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
 	}
 
 	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "Previous conversation session was revoked") {
-		t.Fatalf("expected revocation notice, got %q", reply)
+	if !strings.Contains(reply, "Conversation context was compacted.") {
+		t.Fatalf("expected context compaction notice, got %q", reply)
 	}
 }
 
