@@ -503,5 +503,7 @@
   "state_not_running": "Não está rodando",
   "whatsapp_not_running": "O WhatsApp não está rodando. Inicie o módulo do WhatsApp para vincular ou enviar por ele.",
   "communications_other_channels": "Outros canais",
+  "communications_collapse_group": "Recolher {name}",
+  "communications_expand_group": "Expandir {name}",
   "communications_servers_unavailable": "O Ningo não consegue ler {count} dos servidores configurados."
 }

@@ -34,7 +34,7 @@ function replyFor(type: string, payload: Record<string, unknown> = {}): Record<s
   });
   switch (type) {
     case "communications.channels":
-      return wrap("communications", { channels: [{ id: "123", name: "reading-room" }] });
+      return wrap("communications", { channels: [{ id: "123", name: "reading-room", guild_id: "900", guild_name: "Example server" }] });
     case "communications.history":
       return wrap("communications", { channel_id: "123", before: "", messages: [
         { id: "100", author: "A reader", bot: false, content: HOSTILE_TITLE, timestamp: "2026-10-03T00:00:00Z", attachments: ["clip.mp4"], token: "private-field" },
