@@ -57,6 +57,7 @@ type BridgeRequest struct {
 type BridgeResponse struct {
 	Status string `json:"status"`
 	Reply  string `json:"reply,omitempty"`
+	Notice string `json:"notice,omitempty"`
 	Error  string `json:"error,omitempty"`
 }
 
@@ -165,6 +166,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	}
 
 	reply := extractBridgeReply(result)
+	notice := extractBridgeNotice(result)
 	logger.Info(fmt.Sprintf(
 		"http bridge completed event_id=%s workflow=%s reply_chars=%d",
 		result.Event.EventID,
@@ -174,6 +176,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(BridgeResponse{
 		Status: "ok",
 		Reply:  reply,
+		Notice: notice,
 	})
 }
 
@@ -254,6 +257,7 @@ func extractBridgeReply(result core.ProcessResult) string {
 		if silent, _ := result.Result["silent"].(bool); silent {
 			return ""
 		}
+
 		reason, _ := result.Result["reason"].(string)
 		return fmt.Sprintf("That is switched off right now (%s).", strings.TrimSpace(reason))
 	}
@@ -275,6 +279,15 @@ func extractBridgeReply(result core.ProcessResult) string {
 	}
 
 	return ""
+}
+
+func extractBridgeNotice(result core.ProcessResult) string {
+	chatResult, ok := result.Result[string(core.DomainChat)].(map[string]any)
+	if !ok {
+		return ""
+	}
+	notice, _ := chatResult["notice"].(string)
+	return strings.TrimSpace(notice)
 }
 
 // bridgeInterfaces are the interfaces allowed to use the bridge, with the source their

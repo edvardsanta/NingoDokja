@@ -1,9 +1,10 @@
 export type DiscordMessageConfig = {
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
+  locale?: string;
 };
 
-import { buildBridgePayload, dispatchToOrchestrator } from "../transport/bridge.js";
+import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordMessageContext, DiscordMessageHandler } from "../types.js";
 
 export function createDiscordMessageHandler(config: DiscordMessageConfig): DiscordMessageHandler {
@@ -29,7 +30,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
     );
 
     try {
-      const reply = await dispatchToOrchestrator(
+      const response = await dispatchToOrchestratorResponse(
         config.orchestratorEndpoint,
         config.orchestratorTimeoutMs,
         buildBridgePayload({
@@ -46,6 +47,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           mentionsBot: context.mentionsBot,
         }),
       );
+      const reply = localizeNotice(response.notice, response.reply, config.locale);
       if (!reply.trim()) {
         console.log(
           "[dokja-discord] message dispatch completed",
@@ -70,4 +72,21 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
       throw error;
     }
   };
+}
+
+function localizeNotice(notice: string | undefined, reply: string, locale = "pt-BR"): string {
+  const messages: Record<string, Record<string, string>> = {
+    "chat.context_compacted": {
+      "pt-BR": "O contexto da conversa foi compactado.",
+      en: "Conversation context was compacted.",
+    },
+    "chat.session_started": {
+      "pt-BR": "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade.",
+      en: "New conversation session started. It will reset after 3 minutes of inactivity.",
+    },
+  };
+  const translations = notice ? messages[notice] : undefined;
+  const translated = translations?.[locale] ?? translations?.[locale.split("-")[0]] ?? translations?.en;
+  if (!translated) return reply;
+  return reply.trim() ? `${translated}\n\n${reply}` : translated;
 }

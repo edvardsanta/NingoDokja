@@ -5,6 +5,7 @@ export type DiscordInterfaceConfig = {
   allowedChannelIds: string[];
   dmPolicy: string;
   mode: "full" | "voice";
+  locale: string;
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
   voiceServiceEndpoint: string;
@@ -30,6 +31,7 @@ export function buildConfig(): DiscordInterfaceConfig {
       .filter(Boolean),
     dmPolicy: env("DISCORD_DM_POLICY", "open"),
     mode: env("DOKJA_DISCORD_MODE", "full") === "voice" ? "voice" : "full",
+    locale: env("DOKJA_DISCORD_LOCALE", "pt-BR"),
     orchestratorEndpoint: env(
       "DOKJA_ORCH_HTTP_ENDPOINT",
       "http://dokja-orchestrator:8091/orchestrator",

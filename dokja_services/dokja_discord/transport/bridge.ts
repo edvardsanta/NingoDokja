@@ -22,6 +22,7 @@ export type BridgeRequest = {
 type BridgeResponse = {
   status?: string;
   reply?: string;
+  notice?: string;
   result?: string;
   payload?: {
     reply?: string;
@@ -30,11 +31,25 @@ type BridgeResponse = {
   error?: string;
 };
 
+export type OrchestratorReply = {
+  reply: string;
+  notice?: string;
+};
+
 export async function dispatchToOrchestrator(
   endpoint: string,
   timeoutMs: number,
   body: BridgeRequest,
 ): Promise<string> {
+  const result = await dispatchToOrchestratorResponse(endpoint, timeoutMs, body);
+  return result.reply;
+}
+
+export async function dispatchToOrchestratorResponse(
+  endpoint: string,
+  timeoutMs: number,
+  body: BridgeRequest,
+): Promise<OrchestratorReply> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -88,7 +103,7 @@ export async function dispatchToOrchestrator(
         replyLength: reply.length,
       }),
     );
-    return reply;
+    return { reply, notice: payload.notice };
   } catch (error) {
     console.error(
       "[dokja-discord] bridge dispatch failed",

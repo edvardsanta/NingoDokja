@@ -46,7 +46,7 @@ test("message handler forwards allowed message and replies with orchestrator out
     assert.equal(body.payload.content, "hello bot");
     assert.equal(body.payload.replyToContent, "A calculator like Windows?");
 
-    return new Response(JSON.stringify({ status: "ok", reply: "hello human" }), {
+    return new Response(JSON.stringify({ status: "ok", reply: "hello human", notice: "chat.context_compacted" }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -74,7 +74,7 @@ test("message handler forwards allowed message and replies with orchestrator out
       },
     });
 
-    assert.equal(replyText, "hello human");
+    assert.equal(replyText, "O contexto da conversa foi compactado.\n\nhello human");
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -99,7 +99,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	// The session keeps the model's own words; citations are added only to what is sent, and only
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
-	reply := sessionAwareReply(citeSources(rawReply, sources), lifecycle, event)
+	reply := citeSources(rawReply, sources)
 	logger.Info(fmt.Sprintf(
 		"chat handler completed event_id=%s action=%s reply_chars=%d",
 		event.EventID,
@@ -112,6 +112,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		"reply":   reply,
 		"raw":     result,
 		"session": map[string]any{"id": lifecycle.SessionID, "created": lifecycle.Created, "revoked": lifecycle.Revoked, "reason": lifecycle.Reason},
+	}
+	if notice := sessionLifecycleNotice(lifecycle, event); notice != "" {
+		response["notice"] = notice
 	}
 	if len(sources) > 0 {
 		response["sources"] = sourcesForResult(sources)
@@ -161,25 +164,12 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 	return h.generator.Generate(ctx, persona+"\n\n"+content)
 }
 
-func sessionAwareReply(reply string, lifecycle chatSessionLifecycle, event core.Event) string {
-	reply = strings.TrimSpace(reply)
-	notice := sessionLifecycleNotice(lifecycle, event)
-	switch {
-	case notice == "":
-		return reply
-	case reply == "":
-		return notice
-	default:
-		return notice + "\n\n" + reply
-	}
-}
-
 func sessionLifecycleNotice(lifecycle chatSessionLifecycle, event core.Event) string {
 	if lifecycle.Revoked {
-		return "Previous conversation session was revoked. A new 3-minute session has started."
+		return "chat.context_compacted"
 	}
 	if lifecycle.Created && boolFromContext(event.Context, "force_new_session") {
-		return "New conversation session started. It will reset after 3 minutes of inactivity."
+		return "chat.session_started"
 	}
 	return ""
 }

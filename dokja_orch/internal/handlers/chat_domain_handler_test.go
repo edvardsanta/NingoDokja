@@ -275,9 +275,9 @@ func TestChatDomainHandlerStartsSessionAndPrefixesReply(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "New conversation session started") {
-		t.Fatalf("expected session start notice, got %q", reply)
+	notice, _ := result["notice"].(string)
+	if notice != "chat.session_started" {
+		t.Fatalf("expected session start notice key, got %q", notice)
 	}
 }
 
@@ -306,9 +306,23 @@ func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
 		t.Fatalf("unexpected second error: %v", err)
 	}
 
-	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "Previous conversation session was revoked") {
-		t.Fatalf("expected revocation notice, got %q", reply)
+	chatResult, _ := result["notice"].(string)
+	if chatResult != "chat.context_compacted" {
+		t.Fatalf("expected context compaction key, got %q", chatResult)
+	}
+}
+
+func TestChatDomainHandlerReturnsSessionNoticeKey(t *testing.T) {
+	lifecycle := chatSessionLifecycle{Revoked: true}
+	event := core.Event{}
+	if got := sessionLifecycleNotice(lifecycle, event); got != "chat.context_compacted" {
+		t.Fatalf("expected context notice key, got %q", got)
+	}
+
+	lifecycle = chatSessionLifecycle{Created: true}
+	event.Context = map[string]any{"force_new_session": true}
+	if got := sessionLifecycleNotice(lifecycle, event); got != "chat.session_started" {
+		t.Fatalf("expected session notice key, got %q", got)
 	}
 }
 
