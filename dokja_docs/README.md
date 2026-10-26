@@ -15,6 +15,7 @@ Available docs:
 - [Step 10.1 multi-hop correctness contract](./step-10-multihop.md)
 - [Cross-document application preparation](./knowledge-application.md)
 - [Cited application proposals and evaluation inputs](./knowledge-applicability.md)
+- [Provider-backed Knowledge application proposals](./knowledge-provider-proposals.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)

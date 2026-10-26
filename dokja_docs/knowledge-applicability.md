@@ -153,7 +153,7 @@ Both module race suites and static checks pass.
 This is an argument-integrity assessor. A caller can cite a real passage while
 misinterpreting it or omitting a prerequisite or contradiction. The assessor
 retains that proposal as semantically unverified; it cannot discover every such
-error. Provider-backed extraction, independent semantic review, additional
+error. The subsequent provider proposal path adds extraction; independent semantic review, additional
 retrieval/revision, concepts/relationships, actual outcomes and durable episode
 reuse remain in `08.2`. No canonical claims, procedures or learning are written.
 The simulation-only inference experience contract remains separate.
