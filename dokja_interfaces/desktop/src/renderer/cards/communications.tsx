@@ -192,6 +192,8 @@ function PictureIcon() {
   </svg>;
 }
 
+const MEME_PAGE = 12;
+
 // The message is one row: the field, a small button for a meme, and Send, the only primary. A meme
 // is picked from a tray that opens above the row and covers the history instead of pushing it; the
 // one picked stays beside the field as a chip, with its one option, until it is sent or taken off.
@@ -223,8 +225,8 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
       if (answer.result.off === true) return { ok: true, data: { off: true, reason: String(answer.result.reason ?? "") } };
       if (typeof answer.result.sent !== "boolean") return unexpected();
       const data = answer.result as CommunicationSend;
-      // sent: the draft is done, and the tray shut so the history shows the message arriving
-      if (data.sent && mounted.current) { setContent(""); setAttached(undefined); setForceSend(false); setPicking(false); onSent(); }
+      // sent: the draft is done; an open tray stays open, to pick the next one
+      if (data.sent && mounted.current) { setContent(""); setAttached(undefined); setForceSend(false); onSent(); }
       return { ok: true, data };
     } finally { busy.current = false; if (mounted.current) onSending(false); }
   }, [transport, channel, textOnly, onSent, onSending]);
@@ -232,12 +234,22 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
   const sending = send.state.phase === "loading";
   const loadMemes = useCallback(async (offset: number): Promise<LoadResult<MemePage | Off>> => {
     // The shell caps a page of memes at 24, so ask for what it will give.
-    const answer = await transport.request("meme.list", { scope: "unsent", limit: 12, offset }, { timeoutMs: 15_000 });
+    const answer = await transport.request("meme.list", { scope: "unsent", limit: MEME_PAGE, offset }, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
     const page = parseMemePage(answer.result);
     return page ? { ok: true, data: page } : unexpected();
   }, [transport]);
   const memes = useAction(loadMemes);
+  // A meme that went out is no longer waiting: an open tray reads its page again, and goes back a
+  // page when the one sent was the last on it.
+  const sentNow = send.state.phase === "ready" && !send.state.data.off && send.state.data.sent ? send.state.data : undefined;
+  useEffect(() => {
+    if (!sentNow || !picking) return;
+    const shown = memes.state.phase === "ready" && !memes.state.data.off ? memes.state.data.memes.length : 0;
+    const offset = shown <= 1 && memeOffset > 0 ? Math.max(0, memeOffset - MEME_PAGE) : memeOffset;
+    setMemeOffset(offset);
+    memes.start(offset);
+  }, [sentNow]);
   const togglePicker = () => {
     if (!picking) memes.start(memeOffset);
     setPicking((value) => !value);
