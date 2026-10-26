@@ -20,10 +20,11 @@ import (
 const defaultHTTPBridgeEndpoint = ":8091"
 
 type HTTPBridgeIngress struct {
-	service  *core.Service
-	endpoint string
-	token    string
-	app      *fiber.App
+	service        *core.Service
+	endpoint       string
+	token          string
+	discordOwnerID string
+	app            *fiber.App
 }
 
 type BridgeRequest struct {
@@ -32,23 +33,24 @@ type BridgeRequest struct {
 	// what every existing client sends; only the values in bridgeInterfaces are accepted.
 	Interface string `json:"interface"`
 	Payload   struct {
-		Content        string   `json:"content"`
-		ReplyToContent string   `json:"replyToContent"`
-		Limit          *int     `json:"limit"`
-		MaxItems       *int     `json:"maxItemsPerScraper"`
-		UserID         string   `json:"userId"`
-		ChannelID      string   `json:"channelId"`
-		MessageID      string   `json:"messageId"`
-		GuildID        string   `json:"guildId"`
-		SessionKey     string   `json:"sessionKey"`
-		StartChat      bool     `json:"startSession"`
-		AccountID      string   `json:"accountId"`
-		EntryKind      string   `json:"entryKind"`
-		Direct         *bool    `json:"isDirectMessage"`
-		Mentioned      *bool    `json:"mentionsBot"`
-		ChatKind       string   `json:"chatKind"`
-		SelfChat       *bool    `json:"isSelfChat"`
-		Numbers        []string `json:"senderNumbers"`
+		Content          string   `json:"content"`
+		ReplyToContent   string   `json:"replyToContent"`
+		MentionedUserIDs []string `json:"mentionedUserIds"`
+		Limit            *int     `json:"limit"`
+		MaxItems         *int     `json:"maxItemsPerScraper"`
+		UserID           string   `json:"userId"`
+		ChannelID        string   `json:"channelId"`
+		MessageID        string   `json:"messageId"`
+		GuildID          string   `json:"guildId"`
+		SessionKey       string   `json:"sessionKey"`
+		StartChat        bool     `json:"startSession"`
+		AccountID        string   `json:"accountId"`
+		EntryKind        string   `json:"entryKind"`
+		Direct           *bool    `json:"isDirectMessage"`
+		Mentioned        *bool    `json:"mentionsBot"`
+		ChatKind         string   `json:"chatKind"`
+		SelfChat         *bool    `json:"isSelfChat"`
+		Numbers          []string `json:"senderNumbers"`
 	} `json:"payload"`
 }
 
@@ -60,9 +62,10 @@ type BridgeResponse struct {
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
 	return &HTTPBridgeIngress{
-		service:  service,
-		endpoint: firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
-		token:    os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
+		service:        service,
+		endpoint:       firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
+		token:          os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
+		discordOwnerID: strings.TrimSpace(os.Getenv("DOKJA_OWNER_DISCORD_USER_ID")),
 	}
 }
 
@@ -139,6 +142,18 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	))
 
 	event := bridgeEventFromRequest(bridgeRequest)
+	if event.Source == core.SourceDiscord && i.discordOwnerID != "" {
+		event.Context["owner_configured"] = true
+		if event.User.ID == i.discordOwnerID {
+			event.Context["is_owner"] = true
+		}
+		for _, mentionedID := range bridgeRequest.Payload.MentionedUserIDs[:min(len(bridgeRequest.Payload.MentionedUserIDs), 20)] {
+			if mentionedID == i.discordOwnerID {
+				event.Context["owner_mentioned"] = true
+				break
+			}
+		}
+	}
 
 	result, err := i.service.ProcessWithResult(c.UserContext(), event)
 	if err != nil {

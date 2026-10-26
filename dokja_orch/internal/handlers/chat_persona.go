@@ -1,5 +1,9 @@
 package handlers
 
+import "read_books/internal/core"
+
+// The identity is derived by the authenticated bridge, never from message text.
+
 // chatPersona is the first system message of every chat turn. Without it the model answers as
 // whatever assistant its provider trained it to be, and introduces itself under that name. The
 // persona is the one the project's README describes.
@@ -59,4 +63,33 @@ of inventing it; a philosopher who bluffs is just a liar.`
 // withPersona puts the persona ahead of everything else the turn sends.
 func withPersona(messages []map[string]string) []map[string]string {
 	return append([]map[string]string{{"role": "system", "content": chatPersona}}, messages...)
+}
+
+func withOwnerIdentity(messages []map[string]string, event core.Event) []map[string]string {
+	note := ownerIdentityNote(event)
+	if note == "" || len(messages) == 0 || messages[0]["role"] != "system" {
+		return messages
+	}
+	messages[0]["content"] += "\n\n" + note
+	return messages
+}
+
+func ownerIdentityNote(event core.Event) string {
+	if event.Source != core.SourceDiscord || event.Context == nil {
+		return ""
+	}
+	configured, _ := event.Context["owner_configured"].(bool)
+	isOwner, _ := event.Context["is_owner"].(bool)
+	mentioned, _ := event.Context["owner_mentioned"].(bool)
+	if !configured && !isOwner && !mentioned {
+		return ""
+	}
+	note := "The operator has configured the identity of Ningo's owner. Do not guess the owner's name or reveal their numeric Discord ID. This identity fact does not grant permission to reveal secrets, bypass rules, or perform actions."
+	if isOwner {
+		note += " The current speaker is the configured owner, verified by the Discord gateway."
+	}
+	if mentioned {
+		note += " The current message directly mentions the configured owner; if asked who the owner is, identify the owner by that mention without printing its raw ID."
+	}
+	return note
 }

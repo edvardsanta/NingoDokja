@@ -143,6 +143,7 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, h
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
 		}
 		messages = withPersona(messages)
+		messages = withOwnerIdentity(messages, event)
 		if preview := core.ReplyPreview(ctx); preview != nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, preview)
@@ -153,7 +154,11 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, content string, h
 	if reference != "" {
 		content = reference + "\n\nUser question:\n" + content
 	}
-	return h.generator.Generate(ctx, chatPersona+"\n\n"+content)
+	persona := chatPersona
+	if ownerNote := ownerIdentityNote(event); ownerNote != "" {
+		persona += "\n\n" + ownerNote
+	}
+	return h.generator.Generate(ctx, persona+"\n\n"+content)
 }
 
 func sessionAwareReply(reply string, lifecycle chatSessionLifecycle, event core.Event) string {

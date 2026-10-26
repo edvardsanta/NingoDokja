@@ -407,6 +407,7 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     guildId: message.guildId ?? undefined,
     content: message.content?.trim() ?? "",
     replyToContent,
+    mentionedUserIds: message.mentions.users.map((user) => user.id).slice(0, 20),
     isBot: Boolean(message.author.bot),
     isDirectMessage: message.channel.type === ChannelType.DM,
     mentionsBot: botUserId ? message.mentions.users.has(botUserId) : true,
