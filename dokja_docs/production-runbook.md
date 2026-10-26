@@ -951,6 +951,20 @@ and infrastructure invokes only that adapter. No model is chosen from inventory 
    chat refuses inference; re-enable and retry. Authentication/quota errors stay explicit.
    History, reading reference and Knowledge citations continue through the same chat handler.
 
+The private inference socket also provides `POST /math/render` for bounded formula
+rendering. It accepts `{"expression":"..."}` and returns a PNG as `data_b64` with
+`content_type: "image/png"`. This is a pure Go math parser; inference CLIs keep
+their tools disabled. The orchestrator applies Chat domain presentation policy
+and sends at most three images per reply, each limited to 256 KiB, with readable
+text retained on rendering failures. Unsupported LaTeX commands use the text
+fallback; this is a math subset, not a full TeX document compiler.
+
+Rebuild/restart the host runtime controller, orchestrator and Discord adapter
+together to enable formula images. An older runtime returns no image and the
+orchestrator keeps the text fallback. No new port, volume or environment variable
+is required. The bridge response gains optional `attachments` entries with
+`filename`, `content_type` and `data_b64`; older clients continue using `reply`.
+
 The same socket also answers `POST /chat/stream`: newline-delimited JSON with
 `{"preview": ...}` lines (the text written so far, at most every 100 ms) and a last line that is
 the reply `/chat` would give, or `{"error": ...}`. Ollama and Codex give previews; Claude Code gives

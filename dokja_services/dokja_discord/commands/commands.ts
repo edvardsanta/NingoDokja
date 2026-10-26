@@ -1,7 +1,7 @@
 import { ApplicationCommandOptionType } from "discord-api-types/v10";
 import { randomUUID } from "node:crypto";
 
-import { buildBridgePayload, dispatchToOrchestrator } from "../transport/bridge.js";
+import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController } from "../voice/voice.js";
 import { createMusicCommands } from "../music/commands.js";
@@ -37,21 +37,22 @@ function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
     options,
     handle: async (context: DiscordCommandContext) => {
       try {
-        const reply = (
-          await dispatchToOrchestrator(
-            orchestratorEndpoint,
-            orchestratorTimeoutMs,
-            buildBridgePayload({
-              eventType,
-              userId: context.userId,
-              channelId: context.channelId,
-              messageId: context.messageId,
-              guildId: context.guildId,
-              ...(buildPayload?.(context) ?? {}),
-            }),
-          )
-        ).trim() || "No response.";
-        await context.reply(reply, { ephemeral: ephemeralResponse });
+        const response = await dispatchToOrchestratorResponse(
+          orchestratorEndpoint,
+          orchestratorTimeoutMs,
+          buildBridgePayload({
+            eventType,
+            userId: context.userId,
+            channelId: context.channelId,
+            messageId: context.messageId,
+            guildId: context.guildId,
+            ...(buildPayload?.(context) ?? {}),
+          }),
+        );
+        const reply = response.reply.trim() || "No response.";
+        await context.reply(response.attachments?.length
+          ? { content: reply, attachments: response.attachments }
+          : reply, { ephemeral: ephemeralResponse });
       } catch (error) {
         console.error(`[dokja-discord] command ${name} failed`, error);
         await context.reply("Command failed.", { ephemeral: true });

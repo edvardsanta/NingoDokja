@@ -1,3 +1,5 @@
+import type { DiscordAttachment } from "../types.js";
+
 export type BridgeRequest = {
   event_type: string;
   payload: {
@@ -29,6 +31,7 @@ type BridgeResponse = {
     result?: string;
   };
   error?: string;
+  attachments?: unknown;
   // a server's queue, after a music command
   music?: unknown;
 };
@@ -36,6 +39,7 @@ type BridgeResponse = {
 export type OrchestratorReply = {
   reply: string;
   notice?: string;
+  attachments?: DiscordAttachment[];
   music?: unknown;
 };
 
@@ -106,7 +110,13 @@ export async function dispatchToOrchestratorResponse(
         replyLength: reply.length,
       }),
     );
-    return { reply, notice: payload.notice, ...(payload.music !== undefined ? { music: payload.music } : {}) };
+    const attachments = validatedAttachments(payload.attachments);
+    return {
+      reply,
+      notice: payload.notice,
+      ...(attachments.length ? { attachments } : {}),
+      ...(payload.music !== undefined ? { music: payload.music } : {}),
+    };
   } catch (error) {
     console.error(
       "[dokja-discord] bridge dispatch failed",
@@ -119,6 +129,21 @@ export async function dispatchToOrchestratorResponse(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function validatedAttachments(value: unknown): DiscordAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).filter((entry): entry is DiscordAttachment => {
+    if (!entry || entry.content_type !== "image/png" || !/^formula-[1-3]\.png$/.test(entry.filename)
+      || typeof entry.data_b64 !== "string" || entry.data_b64.length > 349528
+      || !/^[A-Za-z0-9+/]+={0,2}$/.test(entry.data_b64)) return false;
+    const data = Buffer.from(entry.data_b64, "base64");
+    if (data.length < 24 || data.length > 262144 || data.toString("hex", 0, 8) !== "89504e470d0a1a0a"
+      || data.toString("ascii", 12, 16) !== "IHDR") return false;
+    const width = data.readUInt32BE(16);
+    const height = data.readUInt32BE(20);
+    return width > 0 && width <= 2232 && height > 0 && height <= 1032;
+  });
 }
 
 export function buildBridgePayload(params: {

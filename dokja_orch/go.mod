@@ -2,6 +2,10 @@ module read_books
 
 go 1.25.0
 
+require read_books/dokja_domain/dokja_chat v0.0.0
+
+replace read_books/dokja_domain/dokja_chat => ../dokja_domain/dokja_chat
+
 require read_books/dokja_domain/dokja_meme v0.0.0
 
 require read_books/dokja_domain/dokja_moderation v0.0.0

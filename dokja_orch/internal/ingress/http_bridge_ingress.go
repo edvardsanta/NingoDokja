@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strconv"
@@ -55,10 +56,11 @@ type BridgeRequest struct {
 }
 
 type BridgeResponse struct {
-	Status string `json:"status"`
-	Reply  string `json:"reply,omitempty"`
-	Notice string `json:"notice,omitempty"`
-	Error  string `json:"error,omitempty"`
+	Status      string            `json:"status"`
+	Reply       string            `json:"reply,omitempty"`
+	Notice      string            `json:"notice,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	Attachments []chat.Attachment `json:"attachments,omitempty"`
 	// Music is a server's queue after a music command, for the interface that plays it.
 	Music map[string]any `json:"music,omitempty"`
 }
@@ -179,11 +181,18 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		len(reply),
 	))
 	return c.Status(fiber.StatusOK).JSON(BridgeResponse{
-		Status: "ok",
-		Reply:  reply,
-		Notice: notice,
-		Music:  extractBridgeMusic(result),
+		Status:      "ok",
+		Reply:       reply,
+		Notice:      notice,
+		Attachments: extractChatAttachments(result),
+		Music:       extractBridgeMusic(result),
 	})
+}
+
+func extractChatAttachments(result core.ProcessResult) []chat.Attachment {
+	chatResult, _ := result.Result[string(core.DomainChat)].(map[string]any)
+	attachments, _ := chatResult["attachments"].([]chat.Attachment)
+	return attachments
 }
 
 // extractBridgeMusic is the queue a music command left, or nothing for any other event.

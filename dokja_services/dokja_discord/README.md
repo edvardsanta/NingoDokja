@@ -1,5 +1,11 @@
 # Dokja Discord Interface
 
+Chat replies may include up to three formula PNGs. The orchestrator supplies
+validated inline image bytes through optional bridge `attachments`; the adapter
+uploads them with messages, slash replies and chat modals. A long reply attaches
+files only to its first chunk. Readable plain-text formulas are retained even
+when rendering is unavailable.
+
 TypeScript Discord communication adapter for Dokja. It receives Discord messages and slash commands, maps them into Dokja orchestrator requests over HTTP, and sends the orchestrator reply back to Discord.
 
 For Discord replies, the adapter fetches the referenced message in the same

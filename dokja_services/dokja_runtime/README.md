@@ -47,6 +47,12 @@ them and lists models only in the selected running Ollama container. It never
 starts a service or performs inference. Unknown CLI table formats fail explicitly;
 see [provider inventory](../../dokja_docs/provider-inventory.md) for limits.
 
+`RenderMath` renders a bounded LaTeX math expression to a PNG using a Go parser,
+without invoking CLI tools, a shell, or a TeX installation. Expressions are
+limited to 1,024 bytes and 16 brace levels; commands are allowlisted and image
+dimensions/bytes are capped before delivery. Unsupported expressions return an
+error so the Chat domain's readable text fallback can be delivered.
+
 Measured inference is opt-in through the Runtime `ChatMeasured` policy and private
 `/chat/measured` endpoint. It reports structured provider usage and withholds
 results that exceed post-generation acceptance budgets. Existing chat/stream
