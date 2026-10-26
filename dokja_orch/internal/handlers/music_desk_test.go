@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -187,5 +188,22 @@ func TestASlowSearchDoesNotHoldTheQueue(t *testing.T) {
 	close(sources.hold)
 	if reply := <-done; reply["place"] != 1 {
 		t.Fatal(reply)
+	}
+}
+
+func TestAnEndedReportFromTheBridgeAdvancesAndRepliesCarryEpochAndVersion(t *testing.T) {
+	h := musicHandler(&fakeMusicSources{})
+	first := doMusic(t, h, "play-music", "one", "guild")
+	doMusic(t, h, "play-music", "two", "guild")
+	entry := first["added"].(map[string]any)["entry"].(int)
+	reply := doMusic(t, h, "end-music-track", strconv.Itoa(entry), "guild")
+	if reply["advanced"] != true || reply["now_playing"].(map[string]any)["title"] != "two" {
+		t.Fatal(reply)
+	}
+	if reply["epoch"] == "" || reply["epoch"] != first["epoch"] || reply["version"].(int) <= first["version"].(int) {
+		t.Fatal("one process keeps its epoch, and every change raises the version", first, reply)
+	}
+	if other := musicHandler(&fakeMusicSources{}); doMusic(t, other, "show-music-queue", "", "guild")["epoch"] == first["epoch"] {
+		t.Fatal("another process (a restart) has another epoch")
 	}
 }

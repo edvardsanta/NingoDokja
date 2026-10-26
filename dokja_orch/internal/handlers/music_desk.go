@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +23,9 @@ const musicResolveTimeout = 150 * time.Second
 type musicDesk struct {
 	sources communications.AudioSources
 	timeout time.Duration
+	// epoch names this process's queues: entries and versions start again after a restart, so
+	// whoever plays a queue compares states only within one epoch.
+	epoch string
 
 	mu     sync.Mutex
 	queues map[string]*guildQueue
@@ -31,7 +37,15 @@ type guildQueue struct {
 }
 
 func newMusicDesk(sources communications.AudioSources) *musicDesk {
-	return &musicDesk{sources: sources, timeout: musicResolveTimeout, queues: map[string]*guildQueue{}}
+	return &musicDesk{sources: sources, timeout: musicResolveTimeout, epoch: newEpoch(), queues: map[string]*guildQueue{}}
+}
+
+func newEpoch() string {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return strings.ReplaceAll(time.Now().UTC().Format("20060102T150405.000000000"), ".", "")
+	}
+	return hex.EncodeToString(raw[:])
 }
 
 func (d *musicDesk) guild(id string) *guildQueue {
@@ -83,14 +97,22 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 			err = queue.SetVolume(volume)
 		}
 	case "end-music-track":
-		entry, _ := event.Payload["entry"].(float64)
+		// The entry comes as a number from a client, or as the text the bridge carries.
+		entry, ok := event.Payload["entry"].(float64)
+		if !ok {
+			parsed, err := strconv.Atoi(strings.TrimSpace(content))
+			entry = float64(parsed)
+			if err != nil {
+				entry = 0
+			}
+		}
 		_, advanced := queue.Ended(int(entry))
 		reply["advanced"] = advanced
 	}
 	if err != nil {
 		return refusedMusic(err.Error()), nil
 	}
-	return musicReply(queue.State(), reply), nil
+	return d.musicReply(queue.State(), reply), nil
 }
 
 // play checks room before searching, searches without holding the server's queue (a search can
@@ -123,15 +145,15 @@ func (d *musicDesk) play(ctx context.Context, guild *guildQueue, request communi
 	if err != nil {
 		return refusedMusic(err.Error()), nil
 	}
-	return musicReply(guild.queue.State(), map[string]any{"added": queuedMap(queued), "place": place}), nil
+	return d.musicReply(guild.queue.State(), map[string]any{"added": queuedMap(queued), "place": place}), nil
 }
 
 func refusedMusic(reason string) map[string]any {
 	return map[string]any{"music": map[string]any{"ok": false, "reason": reason}}
 }
 
-func musicReply(state communications.QueueState, extra map[string]any) map[string]any {
-	music := map[string]any{"ok": true, "paused": state.Paused, "volume": state.Volume}
+func (d *musicDesk) musicReply(state communications.QueueState, extra map[string]any) map[string]any {
+	music := map[string]any{"ok": true, "paused": state.Paused, "volume": state.Volume, "version": state.Version, "epoch": d.epoch}
 	if state.NowPlaying != nil {
 		music["now_playing"] = queuedMap(*state.NowPlaying)
 	}
