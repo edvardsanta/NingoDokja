@@ -1,7 +1,7 @@
 # Music in voice channels
 
-Date: 2026-10-26. Status: phase 1 built; phases 2 to 5 wait on the owner's
-answers to the open questions below.
+Date: 2026-10-26. Status: phase 1 built. The owner decided the queue owner and
+voice precedence; four questions remain open below.
 
 Ningo should play music in a Discord voice channel: from a link or a search,
 with a queue, skip, pause and volume, without depending on a third-party bot or
@@ -21,7 +21,7 @@ both its concept and its ADR 0007 faculty.
 | --- | --- | --- | --- |
 | Turn a link or a search into tracks | Knowledge intake | Reading | Feeds, capability `audio.resolve.v1`, plugin `audio-resolve` (phase 1, built) |
 | May this track play here (length, live streams, sources) | Rules | Moderation | A rule in the Moderation domain, parameterized by the recipe |
-| What plays next: order, repeat, shuffle, who may skip | Rules or Action (open question 1) | Attention or Action | A faculty domain decides; the queue itself is volatile orchestration state |
+| What plays next: order, repeat, shuffle, who may skip | Action | Action | The Communications domain decides (owner, 2026-10-26); the queue itself is volatile orchestration state |
 | Play it in the voice channel | Action | Action | Discord communication adapter, on the voice session it already owns |
 | What played and what was skipped | Memory | Experience | Memory receipts (later, phase 5) |
 
@@ -73,11 +73,11 @@ the rest of Ningo carries on.
    stays in the Feeds log. Enabling it: build Feeds with
    `FEEDS_PLUGIN_EXTRAS=media` (or `content`), copy the plugin to `feeds_plugins/`
    and set `enabled: true`. A `query` is searched on YouTube (`ytsearch`) until
-   the owner answers open question 5; a `url` from any host yt-dlp supports
+   the owner answers open question 4; a `url` from any host yt-dlp supports
    resolves already. No route calls the capability yet.
 2. **Queue and rules.** Orchestrator routes for adding, skipping, pausing,
-   resuming, stopping, listing and setting volume, per guild. The deciding domain
-   follows open question 1, and admissibility goes to Moderation. Commands are
+   resuming, stopping, listing and setting volume, per guild. The Communications
+   domain decides the queue, and admissibility goes to Moderation. Commands are
    serialized per guild, as DisTube's `TaskQueue` does.
 3. **Playback.** The Discord adapter plays a track page given by the
    orchestrator, using the copied yt-dlp relay, and reports when a track ends or
@@ -94,18 +94,21 @@ the rest of Ningo carries on.
 5. **Memory.** Played and skipped tracks become episodes, which later lets Ningo
    learn what a server likes.
 
+## Owner decisions (2026-10-26)
+
+- **The Communications domain decides the queue** (Action: what Ningo is doing on
+  a platform), next to the delivery policy it already owns.
+- **Ningo's speech pauses the music.** When Ningo speaks during a song, the song
+  pauses and resumes where it stopped once he has finished.
+
 ## Open questions for the owner
 
-1. **Who decides the queue:** the Communications domain (Action, as "what Ningo
-   is doing on a platform") or Rules (selection and ordering, like Digest)?
-2. **Voice precedence.** One voice connection carries music, the radio, Ningo's
-   speech and the voice conversation. When Ningo speaks during a song, should
-   the song pause, play quieter under it, or should speech wait? Does the radio
-   replace the queue?
-3. **Who may control it:** anyone in the voice channel, the person who queued the
+1. **The radio and the queue:** does starting the radio replace the queue, or
+   pause it like speech does?
+2. **Who may control it:** anyone in the voice channel, the person who queued the
    track, or a role?
-4. **Limits:** a maximum track length, and whether live streams may be queued.
-5. **Sources.** Playing YouTube on Discord goes against YouTube's terms of
+3. **Limits:** a maximum track length, and whether live streams may be queued.
+4. **Sources.** Playing YouTube on Discord goes against YouTube's terms of
    service. Direct file links, radio and other hosts do not. Which sources are
    allowed?
 
