@@ -20,24 +20,50 @@ export const notSetUp = (message: string) => /access is not configured/i.test(me
 
 export function CommunicationsCard({ transport, active = true }: { transport: Transport; active?: boolean }) {
   const t = useTranslate();
-  const load = useCallback(async (): Promise<LoadResult<CommunicationChannel[] | typeof NOT_SET_UP>> => {
+  const load = useCallback(async (): Promise<LoadResult<ChannelListing | typeof NOT_SET_UP>> => {
     const answer = await transport.request("communications.channels", {}, { timeoutMs: 15_000 });
     // Not set up is an answer, not a failure: say what to do instead of showing the error.
     if (!answer.ok && notSetUp(answer.error.message)) return { ok: true, data: NOT_SET_UP };
     if (!answer.ok) return answer;
     if (!isRecord(answer.result) || !Array.isArray(answer.result.channels)) return unexpected();
-    return { ok: true, data: answer.result.channels.filter((row): row is CommunicationChannel => isRecord(row) && typeof row.id === "string" && typeof row.name === "string") };
+    const channels = answer.result.channels.filter((row): row is CommunicationChannel => isRecord(row) && typeof row.id === "string" && typeof row.name === "string");
+    const unavailable = typeof answer.result.unavailableServers === "number" ? answer.result.unavailableServers : 0;
+    return { ok: true, data: { channels, unavailable } };
   }, [transport]);
   // read again quietly, keeping what is shown: reloading the list must not throw away the open
   // conversation, which the same refresh brings to its latest messages on its own
   const { state, poll } = useCard(load);
   return <WorkspacePanel trail={[t("nav_messages")]} fill>
     <CardFrame title={t("communications_title")} state={state} onReload={poll}>
-      {(channels) => channels === NOT_SET_UP
+      {(listing) => listing === NOT_SET_UP
         ? <div className="note" data-tone="unchecked"><p>{t("communications_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></div>
-        : channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={channels} transport={transport} active={active} />}
+        : <>
+          {listing.unavailable > 0 && <p className="note" data-tone="unchecked">{t("communications_servers_unavailable", { count: listing.unavailable })}</p>}
+          {listing.channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={listing.channels} transport={transport} active={active} />}
+        </>}
     </CardFrame>
   </WorkspacePanel>;
+}
+
+type ChannelListing = { channels: CommunicationChannel[]; unavailable: number };
+
+// The rail's groups: each server under its name, in the order the list gives them, then Discord
+// channels on no listed server, then the conversations an interface keeps. With no server named
+// there is one group and no heading.
+type ChannelGroup = { key: string; name: string; channels: CommunicationChannel[] };
+function groupChannels(channels: CommunicationChannel[], t: ReturnType<typeof useTranslate>): ChannelGroup[] {
+  const servers = new Map<string, ChannelGroup>();
+  const other: ChannelGroup = { key: "other", name: t("communications_other_channels"), channels: [] };
+  const whatsapp: ChannelGroup = { key: "whatsapp", name: t("name_whatsapp"), channels: [] };
+  for (const channel of channels) {
+    if (isWhatsApp(channel.id)) whatsapp.channels.push(channel);
+    else if (channel.guildId) {
+      const group = servers.get(channel.guildId) ?? { key: channel.guildId, name: channel.guildName || channel.guildId, channels: [] };
+      group.channels.push(channel);
+      servers.set(channel.guildId, group);
+    } else other.channels.push(channel);
+  }
+  return [...servers.values(), other, whatsapp].filter((group) => group.channels.length > 0);
 }
 
 // A conversation an interface keeps the text of is told apart by its id, which carries the platform.
@@ -53,15 +79,21 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
   const [selected, setSelected] = useState(channels[0]?.id ?? "");
   const [sending, setSending] = useState(false);
   const chosen = channels.find((channel) => channel.id === selected);
+  const groups = groupChannels(channels, t);
+  const headed = groups.length > 1;
+  const entry = (channel: CommunicationChannel) => <li key={channel.id}>
+    <button type="button" aria-label={channelLabel(channel, t)} aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
+      <ChannelName channel={channel} />
+    </button>
+  </li>;
   return <div className="messenger" data-single={channels.length === 1 ? "" : undefined}>
     <nav className="channels" aria-label={t("communications_channel")}>
-      <ul>
-        {channels.map((channel) => <li key={channel.id}>
-          <button type="button" aria-label={channelLabel(channel, t)} aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
-            <ChannelName channel={channel} />
-          </button>
-        </li>)}
-      </ul>
+      {headed
+        ? groups.map((group) => <section key={group.key} className="channel-group" aria-label={group.name}>
+          <h3 className="channel-group-name">{group.name}</h3>
+          <ul>{group.channels.map(entry)}</ul>
+        </section>)
+        : <ul>{channels.map(entry)}</ul>}
     </nav>
     <section className="thread">
       <div className="thread-head">

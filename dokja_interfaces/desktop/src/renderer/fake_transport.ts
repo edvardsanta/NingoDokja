@@ -327,7 +327,11 @@ export function createFakeTransport(delayMs = 400): Transport {
           }
           return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
         }
-        case "communications.channels": return ok({ channels: [{ id: "123", name: "reading-room" }] });
+        case "communications.channels": return ok({ channels: [
+          { id: "123", name: "reading-room", guildId: "900", guildName: "Example server" },
+          { id: "124", name: "music", guildId: "900", guildName: "Example server" },
+          { id: "125", name: "general", guildId: "901", guildName: "Second server" },
+        ] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
         case "communications.link.status":
         case "communications.link.start":

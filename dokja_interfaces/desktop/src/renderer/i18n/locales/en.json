@@ -186,7 +186,7 @@
   "communications_not_set_up": "Messages are not set up yet.",
   "communications_not_set_up_how": "Set DOKJA_COMMUNICATIONS_TOKEN to the same random value of at least 32 characters in the stack's .env, then restart the orchestrator and desktop. The desktop reads that file; use --env-file for another stack. An exported value takes precedence. Linking WhatsApp needs it too.",
   "communications_no_channels": "No delivery channels are configured.",
-  "communications_identity": "Messages are sent as Ningo. Only configured channels appear here.",
+  "communications_identity": "Messages are sent as Ningo. The text channels of the configured servers appear here.",
   "communications_channel": "Channels and conversations",
   "communications_older": "Load earlier messages",
   "communications_empty": "No messages in this channel.",
@@ -501,5 +501,7 @@
   "memes_refreshed_none": "Nothing new from the sources.",
   "runtime_logs_link_code": "[link code hidden: it cannot be scanned from the logs. Use Link in System → Status.]",
   "state_not_running": "Not running",
-  "whatsapp_not_running": "WhatsApp is not running. Start the WhatsApp module to link it or send through it."
+  "whatsapp_not_running": "WhatsApp is not running. Start the WhatsApp module to link it or send through it.",
+  "communications_other_channels": "Other channels",
+  "communications_servers_unavailable": "Ningo cannot read {count} of the configured servers."
 }

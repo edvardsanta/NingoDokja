@@ -12,6 +12,29 @@ const view = (transport: Transport, active = true) => <I18nProvider locale="en">
 afterEach(() => vi.useRealTimers());
 
 describe("communications", () => {
+  it("groups the channels under their servers, then the others, and says when a server cannot be read", async () => {
+    const listing = { unavailableServers: 1, channels: [
+      { id: "1", name: "chat", guildId: "10", guildName: "resenhudos" },
+      { id: "2", name: "music", guildId: "10", guildName: "resenhudos" },
+      { id: "3", name: "general", guildId: "20", guildName: "old server" },
+      { id: "4", name: "4" },
+    ] };
+    const { transport } = routedTransport({ "communications.channels": ok(listing), "communications.history": ok(history("1")) });
+    render(view(transport));
+    const servers = await screen.findAllByRole("heading", { level: 3 });
+    expect(servers.map((heading) => heading.textContent)).toEqual(["resenhudos", "old server", "Other channels"]);
+    const first = screen.getByRole("region", { name: "resenhudos" });
+    expect(within(first).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["#chat · 1", "#music · 2"]);
+    screen.getByText("Ningo cannot read 1 of the configured servers.");
+  });
+
+  it("shows no server headings when nothing names a server", async () => {
+    const { transport } = routedTransport({ "communications.channels": ok(channels), "communications.history": ok(history()) });
+    render(view(transport));
+    await screen.findByRole("button", { name: "#reading · 123" });
+    expect(screen.queryAllByRole("heading", { level: 3 })).toEqual([]);
+  });
+
   it("lists channels and treats untrusted messages as text", async () => {
     const { transport, calls } = routedTransport({ "communications.channels": ok(channels), "communications.history": ok(history()) });
     const { container } = render(view(transport));

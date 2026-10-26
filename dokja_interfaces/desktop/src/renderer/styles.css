@@ -1375,6 +1375,27 @@ button.icon-button[aria-expanded="true"] {
   list-style: none;
 }
 
+/* Many servers and channels: the rail scrolls on its own, and each server is a quiet heading
+   over its channels. */
+.channels {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.channel-group-name {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0 0.75rem;
+  color: var(--ink-dim);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.channel-group:first-child .channel-group-name {
+  margin-top: 0;
+}
+
 /* A conversation: its name, and under it, dimmer, what identifies it. The open one is lit like the
    open workspace in the sidebar. */
 .channels button,
