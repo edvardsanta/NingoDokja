@@ -172,7 +172,7 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
             {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
             {/* The discussion happens in Talk, the one place with a composer. */}
             <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title}
-              onClick={() => discuss({ id: item.id, title: item.title, source: item.source })}>
+              onClick={() => discuss({ id: item.id, title: item.title, source: item.source, ...(item.prompts ? { prompts: item.prompts } : {}) })}>
               {t("assistant_continue")}
             </button>
             {item.id && <SaveReading transport={transport} id={item.id} title={item.title} />}

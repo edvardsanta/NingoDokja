@@ -332,6 +332,13 @@ function readingIngest(raw: Record<string, unknown>): Record<string, unknown> | 
   return address === undefined ? undefined : buildIngest({ mode: "address", address });
 }
 
+// The questions a source suggests for its item: at most three short lines, or nothing.
+function readingPrompts(value: unknown): { prompts?: string[] } {
+  if (!Array.isArray(value)) return {};
+  const prompts = value.map((each) => shorten(text(each), 120)).filter((each) => each !== "").slice(0, 3);
+  return prompts.length > 0 ? { prompts } : {};
+}
+
 function digestPage(body: Record<string, unknown>): DigestPage {
   return {
     items: records(body.items, (item) => {
@@ -342,6 +349,7 @@ function digestPage(body: Record<string, unknown>): DigestPage {
       summary: shorten(text(item.summary), 600),
       source: shorten(text(item.source), 80),
       published: text(item.published),
+      ...readingPrompts(item.prompts),
       };
     }),
     total: count(body.total),

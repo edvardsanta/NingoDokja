@@ -55,7 +55,14 @@ function parseItem(value: unknown): DigestItem | undefined {
     summary: text(value.summary),
     source: text(value.source),
     published: text(value.published),
+    ...prompts(value.prompts),
   };
+}
+
+function prompts(value: unknown): { prompts?: string[] } {
+  if (!Array.isArray(value)) return {};
+  const each = value.map(text).filter((prompt) => prompt !== "");
+  return each.length > 0 ? { prompts: each } : {};
 }
 
 export function parseDigestPage(value: unknown): DigestPage | Off | undefined {

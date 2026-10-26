@@ -30,7 +30,7 @@ them; at most 16 requests are in flight, past that a request is refused as busy.
 A `plugins[]` row has `id`, `name`, `state` (`ok`, `failed`, `pending`, `disabled` or `invalid`),
 `running`, `enabled`, `interval_seconds`, `items`, `skipped`, `last_run`, `last_ok` and
 `last_error`. An `items[]` entry has `id`, `plugin`, `title`, `summary`, `url`, `published` (RFC 3339
-UTC, or empty) and `source`. `last_error` is a short fixed phrase such as `exit status 2` or
+UTC, or empty), `source` and `prompts` (a list, possibly empty). `last_error` is a short fixed phrase such as `exit status 2` or
 `timed out after 30s`; what a plugin writes to stderr never appears in a reply. A manifest this
 service cannot run shows as `invalid`, and one that asks for a version, runtime or capability it
 does not support has a `last_error` starting with `incompatible:`.
@@ -76,7 +76,10 @@ to say goes to **stderr**, which only reaches the service log:
 ]}
 ```
 
-Only `title` is required. Every field is a string. Without an `id` the service derives a stable
+Only `title` is required. Every field is a string, except `prompts`: an optional list of up to 3
+questions the plugin suggests for discussing the item, written from its own text (for a liturgy,
+"O que Lc 13,10-17 ensina?"). The desktop offers them when a conversation about the item opens,
+instead of its generic ones. Without an `id` the service derives a stable
 one from the address and the title. A `published` that is not RFC 3339, or lies more than an hour
 in the future, is treated as unknown.
 
@@ -87,7 +90,8 @@ Plugin output comes from the outside, so it is bounded and cleaned before it is 
 - at most 1 MiB of output per run, and `max_items` items; an item that cannot be used is skipped
   and counted in `skipped`, the rest stays;
 - text is made one line of valid UTF-8 without control characters or the characters that reorder
-  what is displayed, and cut to 300 characters (title), 1000 (summary) and 80 (source);
+  what is displayed, and cut to 300 characters (title), 1000 (summary), 80 (source) and 120 (each
+  prompt; only the first 3 non-empty prompts are kept);
 - `url` is kept only if it is an absolute `http` or `https` address with a host and no credentials.
 
 ### What the service does to a plugin

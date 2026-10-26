@@ -326,6 +326,7 @@ func (s *Service) itemsReply() map[string]any {
 				"published": stamp(item.Published),
 				"source":    item.Source,
 				"kind":      item.Kind, "media_url": item.MediaURL, "tags": item.Tags,
+				"prompts": item.Prompts,
 			})
 		}
 	}

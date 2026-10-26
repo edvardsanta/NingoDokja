@@ -140,6 +140,22 @@ func TestNormalizeItem(t *testing.T) {
 			t.Fatalf("summary has %d characters", n)
 		}
 	})
+
+	t.Run("prompts are cleaned, bounded and optional", func(t *testing.T) {
+		item, _ := normalizeItem(rawItem{Title: "T"}, testPlugin(), testNow)
+		if len(item.Prompts) != 0 {
+			t.Fatalf("an item without prompts has %q", item.Prompts)
+		}
+		item, _ = normalizeItem(rawItem{Title: "T", Prompts: []string{
+			" What does\nthe passage teach? ", "", strings.Repeat("p", 500), "Third", "Fourth is dropped",
+		}}, testPlugin(), testNow)
+		if len(item.Prompts) != maxPrompts || item.Prompts[0] != "What does the passage teach?" || item.Prompts[2] != "Third" {
+			t.Fatalf("prompts = %q", item.Prompts)
+		}
+		if n := len([]rune(item.Prompts[1])); n != maxPromptRunes {
+			t.Fatalf("a prompt has %d characters", n)
+		}
+	})
 }
 
 func TestParseOutput(t *testing.T) {
@@ -150,6 +166,13 @@ func TestParseOutput(t *testing.T) {
 		items, skipped, err := parseOutput([]byte(`{"items":[{"id":"a","title":"One"},{"id":"b","title":"Two"}]}`), plugin, testNow)
 		if err != nil || skipped != 0 || len(items) != 2 || items[0].ID != "a" || items[1].Title != "Two" {
 			t.Fatalf("items=%v skipped=%d err=%v", items, skipped, err)
+		}
+	})
+
+	t.Run("prompts are read from the output", func(t *testing.T) {
+		items, _, err := parseOutput([]byte(`{"items":[{"id":"a","title":"One","prompts":["What does it teach?"]}]}`), plugin, testNow)
+		if err != nil || len(items) != 1 || len(items[0].Prompts) != 1 || items[0].Prompts[0] != "What does it teach?" {
+			t.Fatalf("items=%v err=%v", items, err)
 		}
 	})
 

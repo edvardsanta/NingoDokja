@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 
 import { useOpenWorkspace } from "./sidebar.js";
 
-// A reading the owner chose to discuss: the screen names it by id, as the orchestrator does.
-export type Reading = { id: string; title: string; source: string };
+// A reading the owner chose to discuss: the screen names it by id, as the orchestrator does. Its
+// prompts are the questions its own source suggests, written from its text.
+export type Reading = { id: string; title: string; source: string; prompts?: readonly string[] };
 
 type Discussion = {
   reading: Reading | undefined;

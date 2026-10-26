@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
-import type { MessageId } from "../i18n/i18n.js";
+import type { MessageId, Translate } from "../i18n/i18n.js";
 import { useOpenWorkspace } from "../sidebar.js";
 import { useDiscussion, type Reading } from "../discussion_context.js";
 import { useStatus } from "../status_context.js";
@@ -11,6 +11,12 @@ import { WorkspacePanel } from "./workspace_panel.js";
 // The beginnings of a question, written as challenges. They fill the message for the owner to finish;
 // they never send by themselves.
 const STARTS: readonly MessageId[] = ["talk_start_against", "talk_start_missing", "talk_start_judge"];
+
+// What a reading's discussion opens with: the questions its own source wrote from its text when it
+// gave any, otherwise the generic ones that fit any reading.
+function readingPrompts(reading: Reading, t: Translate): readonly string[] {
+  return reading.prompts && reading.prompts.length > 0 ? reading.prompts : READING_PROMPTS.map((id) => t(id));
+}
 
 // The conversation with Ningo, the front door. A new conversation is a new one for the orchestrator
 // too: the panel is mounted again with a new id, so a reply still on its way to the old one is
@@ -51,7 +57,7 @@ function Talk({ transport, reading, onRestart }: { transport: Transport; reading
       {reading && conversation.turns.length === 0 && <div className="talk-opening">
         <p className="detail">{t("assistant_reading_intro")}</p>
         <div className="talk-starts">
-          {READING_PROMPTS.map((id) => <button key={id} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(t(id))}>{t(id)}</button>)}
+          {readingPrompts(reading, t).map((prompt) => <button key={prompt} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(prompt)}>{prompt}</button>)}
         </div>
       </div>}
       {!reading && conversation.turns.length === 0 && <div className="talk-opening">
