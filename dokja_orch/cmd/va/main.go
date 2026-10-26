@@ -172,6 +172,8 @@ func main() {
 		handlers.NewBookDomainHandler(bookClient),
 		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithApplicationProposer(
 			clients.NewKnowledgeProposalClient(clients.NewChatProviderClient("")),
+		).WithMeasuredApplicationProposer(
+			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
 		).WithReading(handlers.NewReadingTask(
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),

@@ -25,17 +25,17 @@ type ChatAdapters struct {
 }
 
 func (a ChatAdapters) Generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage) (string, error) {
-	return a.generate(ctx, b, m, nil)
+	return a.generate(ctx, b, m, nil, nil)
 }
 
 // GenerateStream is Generate with a preview of the text so far, for the providers whose output can be
 // read as it comes (Ollama's text, Codex's agent messages). Claude Code gives none yet. The reply is
 // still taken and checked from the whole output, exactly as Generate does.
 func (a ChatAdapters) GenerateStream(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage, onPreview func(string)) (string, error) {
-	return a.generate(ctx, b, m, onPreview)
+	return a.generate(ctx, b, m, onPreview, nil)
 }
 
-func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage, onPreview func(string)) (string, error) {
+func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []domain.ChatMessage, onPreview func(string), usage *domain.TokenUsage) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -94,6 +94,9 @@ func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []do
 			return "", failure
 		}
 		return "", &domain.ChatProviderFailure{Code: domain.ChatUnavailable}
+	}
+	if usage != nil {
+		*usage = reportedTokenUsage(b.Provider, output)
 	}
 	switch b.Provider {
 	case "claude_code":
