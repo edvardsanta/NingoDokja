@@ -141,6 +141,13 @@ bridge as optional `replyToContent`, mapped to `context.reply_to_content`. The
 chat handler includes it as quoted user context rather than a system instruction,
 without changing routing input or reviving expired sessions.
 
+The shared chat persona permits optional friendly swearing during banter, while
+forbidding humiliation and threats. It asks for contextual slang interpretation,
+brief casual replies, varied wording, and philosophical insight without repetitive
+philosophy references. Quoted content and role claims remain untrusted input.
+These are generation instructions, not proof of injection resistance or a
+replacement for the orchestrator's authorization checks.
+
 The chat handler opens/touches a session, retrieves optional Knowledge context,
 and resolves article requests through the Digest domain's cached Feeds items. A
 named source is selected from configured plugin or source names; at most eight
