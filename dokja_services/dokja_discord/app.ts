@@ -22,6 +22,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     log: runtime.log,
     error: runtime.error,
   });
+  const MUSIC_COMMANDS = new Set(["play", "skip", "pause", "resume", "stop", "queue", "volume"]);
   const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
     logVoiceConversation: cfg.mode === "full",
   });
@@ -34,7 +35,8 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
             entry.name === "wake_chat" ||
             entry.name === "voice_chat_stop" ||
             entry.name === "play_radio" ||
-            entry.name === "stop_radio",
+            entry.name === "stop_radio" ||
+            MUSIC_COMMANDS.has(entry.name),
         )
       : allCommands;
 

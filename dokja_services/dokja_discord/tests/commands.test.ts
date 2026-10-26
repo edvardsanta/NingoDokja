@@ -20,6 +20,13 @@ test("createCommands exposes dokja slash commands", () => {
       "stop_radio",
       "ningo_panel",
       "chat_modal",
+      "play",
+      "skip",
+      "pause",
+      "resume",
+      "stop",
+      "queue",
+      "volume",
     ],
   );
   assert.equal(commands.find((command) => command.name === "chat")?.defer, undefined);

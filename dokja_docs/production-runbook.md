@@ -480,6 +480,14 @@ A failed or disabled fetch falls back to the previous behaviour (sending the pla
 URL), so this never blocks delivery for hosts that do not need it; no new ports, and
 rebuilding the meme service and orchestrator is enough to pick it up.
 
+## Music in voice channels
+
+The Discord image now carries `yt-dlp` (pinned, in `/opt/yt-dlp`, on the PATH) for music.
+Rebuild `dokja-discord` to get it (`up -d --build dokja-discord`); the dev and lite stacks
+mount the code, but the image itself must be rebuilt once. The queue lives in the orchestrator
+and is lost on restart; finding tracks needs the owner's music sources enabled in Feeds (see
+[the music plan](music-plan.md)). No port, volume or environment variable is added.
+
 ## Security Notes
 
 The orchestrator request port (`5558`) has no authentication and is published on every interface, so anyone

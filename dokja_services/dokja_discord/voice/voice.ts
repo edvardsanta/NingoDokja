@@ -20,12 +20,14 @@ import {
   type GuildMember,
 } from "discord.js";
 
+import { IDLE, reconcile, type LocalPlayback, type QueueState } from "../music/reconcile.js";
 import {
   createFileAudioSession,
   createRadioStreamSession,
   type FileAudioSession,
   type RadioStreamSession,
 } from "./radio_stream.js";
+import { createTrackStream, type TrackStream } from "./track_stream.js";
 
 const require = createRequire(import.meta.url);
 const prism = require("prism-media") as typeof import("prism-media");
@@ -36,6 +38,31 @@ type VoiceSession = {
   player: ReturnType<typeof createAudioPlayer>;
   stream: RadioStreamSession | FileAudioSession;
   listening?: ListeningSession;
+  // the music player has been tied to this connection
+  musicHooked?: boolean;
+};
+
+// A server's music: its own player beside the one for speech and radio, so speech can pause the
+// music and give the connection back to it afterwards.
+type MusicSession = {
+  player: ReturnType<typeof createAudioPlayer>;
+  stream?: TrackStream;
+  local: LocalPlayback;
+  // the entry the player is playing; an Idle with one set is the track ending (or failing)
+  playing?: number;
+  // the queue's pause, apart from the pause while Ningo speaks
+  userPaused: boolean;
+  speaking: boolean;
+  volume: number;
+  onEnded: (entry: number) => void;
+  onGone: () => void;
+};
+
+export type MusicHooks = {
+  // the track playing ended or could not start: the queue moves on
+  onEnded: (entry: number) => void;
+  // the voice connection is gone (Ningo was moved out or the channel closed): the queue stops
+  onGone: () => void;
 };
 
 type ListeningSession = {
@@ -55,6 +82,11 @@ export type DiscordVoiceController = {
   }): Promise<string>;
   stopConversation(params: { guildId?: string }): Promise<string>;
   stopRadio(params: { guildId?: string }): Promise<string>;
+  // The voice channel the person is in, and the one Ningo plays music in, if any.
+  memberVoiceChannel(params: { guildId: string; userId: string }): Promise<string | undefined>;
+  musicChannel(params: { guildId: string }): string | undefined;
+  // Brings the server's playback to the queue's state, joining the person's voice channel to play.
+  applyMusic(params: { guildId: string; userId: string; state: QueueState; hooks: MusicHooks }): Promise<void>;
 };
 
 export function createDiscordVoiceController(options: {
@@ -67,6 +99,11 @@ export function createDiscordVoiceController(options: {
   readyTimeoutMs?: number;
 }): DiscordVoiceController {
   const sessions = new Map<string, VoiceSession>();
+  const musics = new Map<string, MusicSession>();
+  // A restart of the adapter must not leave yt-dlp or ffmpeg running.
+  process.once("exit", () => {
+    for (const music of musics.values()) music.stream?.stop();
+  });
   const ffmpegPath = options.ffmpegPath ?? "ffmpeg";
   const readyTimeoutMs = options.readyTimeoutMs ?? 30_000;
 
@@ -114,6 +151,60 @@ export function createDiscordVoiceController(options: {
     return await voiceClientReady;
   };
 
+  // The server's music player, in the person's voice channel. A radio playing there is stopped:
+  // the radio has no precedence.
+  const musicSession = async ({ guildId, userId, hooks }: { guildId: string; userId: string; hooks: MusicHooks }) => {
+    // Already in a voice channel of this server: the music stays there, whoever asked (the next
+    // track plays even when the person who queued the last one has left).
+    const existing = sessions.get(guildId);
+    let session: VoiceSession;
+    if (existing && existing.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+      session = existing;
+    } else {
+      const client = await ensureVoiceClient();
+      const member = await fetchVoiceMember(client, guildId, userId);
+      const voiceChannel = member.voice.channel;
+      if (!voiceChannel) {
+        throw new Error("Join a voice channel to play music.");
+      }
+      if (voiceChannel.type !== ChannelType.GuildVoice && voiceChannel.type !== ChannelType.GuildStageVoice) {
+        throw new Error("Music plays only in voice channels.");
+      }
+      session = await ensureVoiceSession({ sessions, guildId, voiceChannel, readyTimeoutMs, log: options.log, error: options.error });
+      sessions.set(guildId, session);
+    }
+    if (session.stream !== undefined && (session.stream as RadioStreamSession).sourceUrl) {
+      interruptSessionPlayback(session);
+    }
+    let music = musics.get(guildId);
+    if (!music || !session.musicHooked) {
+      const player = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } });
+      const created: MusicSession = { player, local: IDLE, userPaused: false, speaking: false, volume: 100, onEnded: hooks.onEnded, onGone: hooks.onGone };
+      player.on("error", (error) => options.error?.("[dokja-discord] music player error", error));
+      // A track that ends, or fails to start, leaves the player idle with its entry still set.
+      player.on(AudioPlayerStatus.Idle, () => {
+        const entry = created.playing;
+        if (entry === undefined) return;
+        created.playing = undefined;
+        created.stream?.stop();
+        created.stream = undefined;
+        created.onEnded(entry);
+      });
+      session.connection.on("stateChange", (_old, next) => {
+        if (next.status !== VoiceConnectionStatus.Destroyed || musics.get(guildId) !== created) return;
+        const wasPlaying = created.local.entry !== undefined;
+        stopTrack(created);
+        musics.delete(guildId);
+        if (wasPlaying) created.onGone();
+      });
+      session.musicHooked = true;
+      music = created;
+      musics.set(guildId, music);
+    }
+    session.connection.subscribe(music.player);
+    return music;
+  };
+
   return {
     attachClient(_client?: unknown) {
       void ensureVoiceClient();
@@ -121,6 +212,10 @@ export function createDiscordVoiceController(options: {
     async playRadio({ guildId, userId, streamUrl }) {
       if (!guildId) {
         throw new Error("Radio playback only works in guild voice channels");
+      }
+      // The radio has no precedence over a queue (owner, 2026-10-26).
+      if (musics.get(guildId)?.local.entry !== undefined) {
+        throw new Error("Music is playing in this server. Stop the queue with /stop before starting the radio.");
       }
 
       const client = await ensureVoiceClient();
@@ -241,6 +336,19 @@ export function createDiscordVoiceController(options: {
       });
 
       replaceSessionStream(session, stream);
+      // Speech pauses the music and gives the connection back to it when it ends (owner, 2026-10-26).
+      const music = musics.get(guildId);
+      if (music?.playing !== undefined) {
+        music.speaking = true;
+        music.player.pause();
+        session.connection.subscribe(session.player);
+        session.player.once(AudioPlayerStatus.Idle, () => {
+          music.speaking = false;
+          if (musics.get(guildId) !== music || music.playing === undefined) return;
+          session.connection.subscribe(music.player);
+          if (!music.userPaused) music.player.unpause();
+        });
+      }
       session.player.play(stream.resource);
 
       try {
@@ -270,6 +378,55 @@ export function createDiscordVoiceController(options: {
         JSON.stringify({ guildId, voiceChannelId: voiceChannel.id, textChars: trimmed.length }),
       );
       return `Speaking in <#${voiceChannel.id}>`;
+    },
+    async memberVoiceChannel({ guildId, userId }) {
+      const client = await ensureVoiceClient();
+      const member = await fetchVoiceMember(client, guildId, userId);
+      return member.voice.channel?.id;
+    },
+    musicChannel({ guildId }) {
+      if (musics.get(guildId)?.local.entry === undefined) return undefined;
+      return sessions.get(guildId)?.channelId;
+    },
+    async applyMusic({ guildId, userId, state, hooks }) {
+      const current = musics.get(guildId);
+      const step = reconcile(current?.local ?? IDLE, state);
+      if (!step) return;
+      for (const action of step.actions) {
+        if (action.kind === "play") {
+          const music = await musicSession({ guildId, userId, hooks });
+          stopTrack(music);
+          const stream = createTrackStream(action.url, { ffmpegPath, log: options.log, error: options.error });
+          stream.resource.volume?.setVolume(music.volume / 100);
+          music.stream = stream;
+          music.playing = action.entry;
+          music.userPaused = false;
+          music.player.play(stream.resource);
+          options.log?.("[dokja-discord] music track", JSON.stringify({ guildId, entry: action.entry }));
+          continue;
+        }
+        const music = musics.get(guildId);
+        if (!music) continue;
+        if (action.kind === "stop") {
+          stopTrack(music);
+          sessions.get(guildId)?.connection.subscribe(sessions.get(guildId)!.player);
+        } else if (action.kind === "pause") {
+          music.userPaused = true;
+          music.player.pause();
+        } else if (action.kind === "resume") {
+          music.userPaused = false;
+          if (!music.speaking) music.player.unpause();
+        } else if (action.kind === "volume") {
+          music.volume = action.volume;
+          music.stream?.resource.volume?.setVolume(action.volume / 100);
+        }
+      }
+      const music = musics.get(guildId);
+      if (music) {
+        music.local = step.next;
+        music.onEnded = hooks.onEnded;
+        music.onGone = hooks.onGone;
+      }
     },
     async stopRadio({ guildId }) {
       if (!guildId) {
@@ -753,4 +910,12 @@ function buildWavFromPCM(pcmBytes: Buffer, sampleRate = 48_000, channels = 2, sa
   header.writeUInt32LE(pcmBytes.length, 40);
 
   return Buffer.concat([header, pcmBytes]);
+}
+
+// Ends the music track without it counting as ended: no report, and both processes stop.
+function stopTrack(music: MusicSession) {
+  music.playing = undefined;
+  music.player.stop(true);
+  music.stream?.stop();
+  music.stream = undefined;
 }

@@ -38,6 +38,9 @@ type MusicQueue struct {
 	paused  bool
 	volume  int
 	entries int
+	// version goes up on every change, so whoever plays the queue can tell a newer state from
+	// an older reply that arrived late.
+	version int
 }
 
 // QueueState is a copy of a queue, safe to hand out.
@@ -46,6 +49,7 @@ type QueueState struct {
 	Waiting    []QueuedTrack
 	Paused     bool
 	Volume     int
+	Version    int
 }
 
 func NewMusicQueue() *MusicQueue { return &MusicQueue{volume: MaxVolume} }
@@ -61,6 +65,7 @@ func (q *MusicQueue) Add(track Track, requestedBy string) (QueuedTrack, int, err
 		return QueuedTrack{}, 0, ErrQueueFull
 	}
 	q.entries++
+	q.version++
 	queued := QueuedTrack{Track: track, Entry: q.entries, RequestedBy: requestedBy}
 	if q.now == nil {
 		q.now, q.paused = &queued, false
@@ -88,6 +93,7 @@ func (q *MusicQueue) Ended(entry int) (*QueuedTrack, bool) {
 }
 
 func (q *MusicQueue) advance() *QueuedTrack {
+	q.version++
 	q.paused = false
 	if len(q.waiting) == 0 {
 		q.now = nil
@@ -104,6 +110,7 @@ func (q *MusicQueue) Pause() error {
 		return ErrNothingPlaying
 	}
 	q.paused = true
+	q.version++
 	return nil
 }
 
@@ -112,12 +119,14 @@ func (q *MusicQueue) Resume() error {
 		return ErrNothingPlaying
 	}
 	q.paused = false
+	q.version++
 	return nil
 }
 
 // Stop ends the track playing and empties the queue. The volume stays.
 func (q *MusicQueue) Stop() {
 	q.now, q.waiting, q.paused = nil, nil, false
+	q.version++
 }
 
 func (q *MusicQueue) SetVolume(volume int) error {
@@ -125,6 +134,7 @@ func (q *MusicQueue) SetVolume(volume int) error {
 		return ErrBadVolume
 	}
 	q.volume = volume
+	q.version++
 	return nil
 }
 
@@ -132,7 +142,7 @@ func (q *MusicQueue) SetVolume(volume int) error {
 func (q *MusicQueue) Active() bool { return q.now != nil }
 
 func (q *MusicQueue) State() QueueState {
-	state := QueueState{Paused: q.paused, Volume: q.volume, Waiting: append([]QueuedTrack(nil), q.waiting...)}
+	state := QueueState{Paused: q.paused, Volume: q.volume, Version: q.version, Waiting: append([]QueuedTrack(nil), q.waiting...)}
 	if q.now != nil {
 		now := *q.now
 		state.NowPlaying = &now

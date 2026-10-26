@@ -109,3 +109,33 @@ func TestWhatWasTypedAfterPlay(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEveryChangeRaisesTheVersionAndARefusalDoesNot(t *testing.T) {
+	q := NewMusicQueue()
+	last := q.State().Version
+	step := func(name string, change func() error) {
+		t.Helper()
+		if err := change(); err != nil {
+			t.Fatal(name, err)
+		}
+		if now := q.State().Version; now <= last {
+			t.Fatal(name, "did not raise the version", now, last)
+		} else {
+			last = now
+		}
+	}
+	step("add", func() error { _, _, err := q.Add(song("a"), "x"); return err })
+	step("add again", func() error { _, _, err := q.Add(song("b"), "x"); return err })
+	step("pause", q.Pause)
+	step("resume", q.Resume)
+	step("volume", func() error { return q.SetVolume(50) })
+	step("skip", func() error { _, err := q.Skip(); return err })
+	step("ended", func() error { q.Ended(q.State().NowPlaying.Entry); return nil })
+	step("stop", func() error { q.Stop(); return nil })
+	if err := q.Pause(); err == nil || q.State().Version != last {
+		t.Fatal("a refused change must not raise the version")
+	}
+	if _, advanced := q.Ended(999); advanced || q.State().Version != last {
+		t.Fatal("an ignored report must not raise the version")
+	}
+}

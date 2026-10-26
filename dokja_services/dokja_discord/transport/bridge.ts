@@ -29,11 +29,14 @@ type BridgeResponse = {
     result?: string;
   };
   error?: string;
+  // a server's queue, after a music command
+  music?: unknown;
 };
 
 export type OrchestratorReply = {
   reply: string;
   notice?: string;
+  music?: unknown;
 };
 
 export async function dispatchToOrchestrator(
@@ -103,7 +106,7 @@ export async function dispatchToOrchestratorResponse(
         replyLength: reply.length,
       }),
     );
-    return { reply, notice: payload.notice };
+    return { reply, notice: payload.notice, ...(payload.music !== undefined ? { music: payload.music } : {}) };
   } catch (error) {
     console.error(
       "[dokja-discord] bridge dispatch failed",
