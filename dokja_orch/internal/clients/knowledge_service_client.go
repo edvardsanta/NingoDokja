@@ -128,9 +128,14 @@ func (c *KnowledgeServiceClient) Dispatch(ctx context.Context, eventType string,
 	}
 }
 
-// Search asks for the k closest chunks to query.
-func (c *KnowledgeServiceClient) Search(ctx context.Context, query string, k int) (map[string]any, error) {
-	return c.Dispatch(ctx, "knowledge.search", map[string]any{"query": query, "k": k})
+// Search asks for the k closest chunks to query. minScore overrides the service's semantic
+// relevance threshold for this search; zero keeps the service's own.
+func (c *KnowledgeServiceClient) Search(ctx context.Context, query string, k int, minScore float64) (map[string]any, error) {
+	payload := map[string]any{"query": query, "k": k}
+	if minScore > 0 {
+		payload["min_score"] = minScore
+	}
+	return c.Dispatch(ctx, "knowledge.search", payload)
 }
 
 // Status reports the knowledge base's counts and whether its embedder answers.

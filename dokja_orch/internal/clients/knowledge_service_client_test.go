@@ -31,7 +31,7 @@ func knowledgeClient(requester *fakeKnowledgeRequester) *KnowledgeServiceClient 
 func TestKnowledgeClientSendsTheEventAndReturnsTheResult(t *testing.T) {
 	requester := &fakeKnowledgeRequester{response: `{"status":"ok","result":{"hits":[],"relevant_count":0}}`}
 
-	result, err := knowledgeClient(requester).Search(context.Background(), "o que e estoicismo", 4)
+	result, err := knowledgeClient(requester).Search(context.Background(), "o que e estoicismo", 4, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -42,6 +42,16 @@ func TestKnowledgeClientSendsTheEventAndReturnsTheResult(t *testing.T) {
 		if !strings.Contains(requester.request, want) {
 			t.Fatalf("request %q does not contain %s", requester.request, want)
 		}
+	}
+	if strings.Contains(requester.request, "min_score") {
+		t.Fatalf("a zero threshold must leave the service's own: %q", requester.request)
+	}
+
+	if _, err := knowledgeClient(requester).Search(context.Background(), "o que e estoicismo", 4, 0.55); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(requester.request, `"min_score":0.55`) {
+		t.Fatalf("request %q does not carry the threshold", requester.request)
 	}
 }
 

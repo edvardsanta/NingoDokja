@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"read_books/internal/logger"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,14 +16,21 @@ const (
 	knowledgeMaxChars     = 2000
 	knowledgeMinQueryLen  = 8
 	knowledgeMaxQueryLen  = 1000
+	knowledgeMaxAnchorLen = 500
 	knowledgeLookupBudget = 5 * time.Second
-	knowledgeFence        = "<<<"
-	knowledgeFenceClose   = ">>>"
+	// knowledgeMinScore is stricter than the service's default (0.45), which is tuned so that an
+	// explicit search still finds a loose paraphrase. With bge-m3, a question with no subject
+	// ("explain the main idea") scores up to about 0.46 against any note, so a hit that chat puts
+	// in front of the model unasked must clear a higher bar; matches sharing the question's words
+	// still pass through the service's lexical rule.
+	knowledgeMinScore   = 0.55
+	knowledgeFence      = "<<<"
+	knowledgeFenceClose = ">>>"
 )
 
 // KnowledgeSearcher answers a question from the user's research knowledge base.
 type KnowledgeSearcher interface {
-	Search(ctx context.Context, query string, k int) (map[string]any, error)
+	Search(ctx context.Context, query string, k int, minScore float64) (map[string]any, error)
 }
 
 // knowledgeSource is one retrieved chunk that was put in front of the model.
@@ -59,11 +68,15 @@ func (h *ChatDomainHandler) WithKnowledge(searcher KnowledgeSearcher, enabled fu
 // lookupKnowledge is best effort by design: a disabled, unreachable, slow or failing
 // knowledge base means the turn goes ahead without reference material, never that it
 // fails. Only hits the service marked relevant are used.
-func (h *ChatDomainHandler) lookupKnowledge(ctx context.Context, question string) []knowledgeSource {
+//
+// anchor is the text of the reading being discussed, empty in a general conversation. A
+// question such as "explain the main idea" says nothing about its subject, so searching it
+// alone matches notes by wording; the reading's own words make the search about the reading.
+func (h *ChatDomainHandler) lookupKnowledge(ctx context.Context, question, anchor string) []knowledgeSource {
 	if h == nil || h.knowledge == nil || (h.knowledgeEnabled != nil && !h.knowledgeEnabled()) {
 		return nil
 	}
-	question = strings.TrimSpace(question)
+	question = knowledgeQuery(question, anchor)
 	if utf8.RuneCountInString(question) < knowledgeMinQueryLen {
 		return nil
 	}
@@ -73,12 +86,26 @@ func (h *ChatDomainHandler) lookupKnowledge(ctx context.Context, question string
 
 	lookupCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
 	defer cancel()
-	result, err := h.knowledge.Search(lookupCtx, question, knowledgeMaxChunks+2)
+	result, err := h.knowledge.Search(lookupCtx, question, knowledgeMaxChunks+2, knowledgeMinScore)
 	if err != nil {
 		logger.Info(fmt.Sprintf("knowledge lookup skipped: %v", err))
 		return nil
 	}
 	return relevantSources(result)
+}
+
+// knowledgeQuery puts the question first so the length bound never cuts it, then as much of the
+// reading as fits.
+func knowledgeQuery(question, anchor string) string {
+	question = strings.TrimSpace(question)
+	anchor = strings.TrimSpace(anchor)
+	if anchor == "" {
+		return question
+	}
+	if utf8.RuneCountInString(anchor) > knowledgeMaxAnchorLen {
+		anchor = string([]rune(anchor)[:knowledgeMaxAnchorLen])
+	}
+	return question + "\n" + anchor
 }
 
 func relevantSources(result map[string]any) []knowledgeSource {
@@ -148,7 +175,30 @@ func withKnowledgeReference(messages []map[string]string, sources []knowledgeSou
 	return out
 }
 
-// citeSources appends what was consulted, so a wrong retrieval is visible to the reader.
+// citationPattern finds the numbers a reply cites: [1], [1][2] and [1, 2].
+var citationPattern = regexp.MustCompile(`\[(\d+(?:\s*,\s*\d+)*)\]`)
+
+// citedSources keeps the sources the reply cites by number, in their original numbering so they
+// still match the text. A source the model was shown but did not use is not a source of the reply.
+func citedSources(reply string, sources []knowledgeSource) []knowledgeSource {
+	cited := map[int]bool{}
+	for _, match := range citationPattern.FindAllStringSubmatch(reply, -1) {
+		for _, number := range strings.Split(match[1], ",") {
+			if n, err := strconv.Atoi(strings.TrimSpace(number)); err == nil {
+				cited[n] = true
+			}
+		}
+	}
+	out := []knowledgeSource{}
+	for _, source := range sources {
+		if cited[source.Number] {
+			out = append(out, source)
+		}
+	}
+	return out
+}
+
+// citeSources appends what the reply drew on, so a wrong retrieval is visible to the reader.
 func citeSources(reply string, sources []knowledgeSource) string {
 	if len(sources) == 0 {
 		return reply
