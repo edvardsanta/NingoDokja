@@ -9,6 +9,11 @@ handler treats this as quoted user context, including after session expiry;
 the current message remains the routing input. Deploy the updated orchestrator
 and adapter for this additive feature. Session expiry remains unchanged.
 
+Long replies are split into messages of at most 2,000 characters. The active
+discord.js runtime closes and reopens fenced code blocks with their language tag
+at each boundary, preserving code indentation and blank lines. Exceptionally long
+lines are split when necessary to fit the message limit.
+
 Environment variables:
 
 - `DISCORD_BOT_TOKEN`

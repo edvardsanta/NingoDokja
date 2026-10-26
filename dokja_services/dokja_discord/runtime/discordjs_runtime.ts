@@ -438,18 +438,52 @@ function splitDiscordContent(content: string): string[] {
   }
 
   const chunks: string[] = [];
-  let remaining = trimmed;
-  while (remaining.length > DISCORD_MESSAGE_LIMIT) {
-    const slice = remaining.slice(0, DISCORD_MESSAGE_LIMIT);
-    const splitAt = Math.max(slice.lastIndexOf("\n\n"), slice.lastIndexOf("\n"), slice.lastIndexOf(" "));
-    const boundary = splitAt > DISCORD_MESSAGE_LIMIT / 2 ? splitAt : DISCORD_MESSAGE_LIMIT;
-    chunks.push(remaining.slice(0, boundary).trimEnd());
-    remaining = remaining.slice(boundary).trimStart();
+  let chunk = "";
+  let fence: { marker: string; opening: string } | undefined;
+  let hasContent = false;
+
+  const flush = () => {
+    // These newlines belong to the wrapper, not the original source code.
+    chunks.push(chunk + (fence ? `\n${fence.marker}` : ""));
+    chunk = fence ? `${fence.opening}\n` : "";
+    hasContent = false;
+  };
+
+  for (const line of trimmed.match(/[^\n]*\n|[^\n]+$/g) ?? []) {
+    const match = line.match(/^ {0,3}(`{3,}|~{3,})([^\r\n]*)\r?\n?$/);
+    let nextFence = fence;
+    if (match) {
+      if (!fence && line.length + match[1].length + 3 < DISCORD_MESSAGE_LIMIT / 2
+        && !match[2].includes(match[1][0])) {
+        nextFence = { marker: match[1], opening: line.replace(/\r?\n$/, "") };
+      } else if (fence && match[1][0] === fence.marker[0]
+        && match[1].length >= fence.marker.length && !match[2].trim()) {
+        nextFence = undefined;
+      }
+    }
+
+    // Prefer whole lines so indentation and blank lines survive unchanged.
+    const reserve = Math.max(fence?.marker.length ?? 0, nextFence?.marker.length ?? 0) + 1;
+    if (hasContent && chunk.length + line.length + reserve > DISCORD_MESSAGE_LIMIT) {
+      flush();
+    }
+    let remaining = line;
+    while (remaining.length > 0) {
+      const capacity = DISCORD_MESSAGE_LIMIT - chunk.length - reserve;
+      let length = Math.min(remaining.length, capacity);
+      // Keep UTF-16 surrogate pairs together when a very long line must split.
+      if (length < remaining.length && /[\uD800-\uDBFF]/.test(remaining[length - 1])) {
+        length--;
+      }
+      chunk += remaining.slice(0, length);
+      remaining = remaining.slice(length);
+      hasContent = true;
+      if (remaining.length > 0) flush();
+    }
+    fence = nextFence;
   }
-  if (remaining.length > 0) {
-    chunks.push(remaining);
-  }
-  return chunks.length > 0 ? chunks : [""];
+  if (hasContent) chunks.push(chunk + (fence ? `\n${fence.marker}` : ""));
+  return chunks;
 }
 
 async function sendMessageReply(message: Message, reply: DiscordReply) {
