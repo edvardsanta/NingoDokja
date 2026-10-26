@@ -37,6 +37,58 @@ test("splitDiscordReply keeps components only on the first chunk", () => {
   assert.equal(parts[1].components, undefined);
 });
 
+function contents(message: string): string[] {
+  return splitDiscordReply(message).map(part => typeof part === "string" ? part : part.content);
+}
+
+test("long Python replies retain fences, language, indentation and blank lines", () => {
+  const source = 'class Calculadora:\n' + '    def calcular(self):\n        return "😀"\n\n'.repeat(130);
+  const parts = contents(`\`\`\`python\n${source}\`\`\``);
+
+  assert.ok(parts.length > 2);
+  for (const part of parts) {
+    assert.ok(part.length <= 2000);
+    assert.ok(part.startsWith("```python\n"));
+    assert.ok(part.endsWith("\n```"));
+  }
+  const restored = parts.map((part, index) => {
+    const body = part.slice("```python\n".length, -3);
+    return index < parts.length - 1 ? body.slice(0, -1) : body;
+  }).join("");
+  assert.equal(restored, source);
+});
+
+test("code fences do not leak into the explanation after the code", () => {
+  const source = '    print("hello")\n'.repeat(160);
+  const explanation = "Run the calculator. ".repeat(130);
+  const parts = contents(`Example:\n\`\`\`python\n${source}\`\`\`\n${explanation}`);
+  assert.ok(parts.every(part => part.length <= 2000));
+  assert.ok(parts.every(part => (part.match(/^```/gm) ?? []).length % 2 === 0));
+  assert.ok(parts.at(-1)?.includes("Run the calculator."));
+  assert.ok(!parts.at(-1)?.startsWith("```"));
+});
+
+test("long plain text preserves spaces and newlines", () => {
+  const message = "  text with spaces  \n\n".repeat(300);
+  assert.equal(contents(message).join(""), message);
+});
+
+test("oversized code lines preserve Unicode and stay within the limit", () => {
+  const parts = contents('```python\n    value = "' + "😀".repeat(2500) + '"\n```');
+  for (const part of parts) {
+    assert.ok(part.length <= 2000);
+    assert.equal(part.isWellFormed(), true);
+    assert.ok(part.startsWith("```python\n"));
+    assert.ok(part.endsWith("\n```"));
+  }
+});
+
+test("tilde fences retain their language across messages", () => {
+  const parts = contents("~~~python\n" + "    pass\n".repeat(600) + "~~~");
+  assert.ok(parts.length > 1);
+  assert.ok(parts.every(part => part.startsWith("~~~python\n") && part.endsWith("\n~~~")));
+});
+
 test("commands are registered on every configured server, or globally when there is none", async () => {
   const { deployCommands } = await import("../runtime/discordjs_runtime.js");
   const routes: string[] = [];
