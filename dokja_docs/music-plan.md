@@ -1,7 +1,7 @@
 # Music in voice channels
 
 Date: 2026-10-26. Status: phase 1 built. Every open question has an owner
-decision (below), except how Spotify credentials are supplied.
+decision (below).
 
 Ningo should play music in a Discord voice channel: from a link or a search,
 with a queue, skip, pause and volume, without depending on a third-party bot or
@@ -130,12 +130,29 @@ is therefore resolved in two steps, as other music bots do:
 A search typed by a person goes to YouTube; `scsearch` for SoundCloud is
 available if the owner later wants a different default.
 
-## Still open
+### Spotify through spotDL (owner, 2026-10-26)
 
-- **Spotify metadata.** Register a Spotify application and pass its client id
-  and secret to Feeds (exact title and artist, two new settings), or use the
-  public embed data without credentials (title only, so the YouTube match is
-  less sure).
+Spotify and Deezer links are resolved with `spotDL/spotify-downloader` (MIT,
+pinned at 4.6.0), used as a library in the `audio-resolve` plugin rather than
+copied. It reads the track (name, artists, album, duration) and finds the same
+song on YouTube Music with its own matching, which rejects covers and live
+versions the original does not have. A Deezer track, read from Deezer's public
+API, is given to the same matching.
+
+The owner chose this over registering Ningo's own Spotify application, knowing
+the trade-off:
+
+- spotDL reads Spotify by default through `spotipyFree`, an unofficial client
+  that imitates Spotify's web player; or, on its official path, with the client
+  id and secret published in spotDL's source, shared by every spotDL user. Either
+  can stop working when Spotify changes or limits them. Ningo's repository holds
+  no Spotify credential.
+- If it breaks, the fallback is Ningo's own Spotify application (two new
+  settings), with the same matching.
+- Checked in a scratch environment: spotDL 4.6.0 installs on Python 3.11+ (the
+  Feeds image has 3.11), requires the same yt-dlp as the pin, and read a Spotify
+  track's name, artist and duration with no setup. Its YouTube Music match was
+  not yet verified.
 
 ## Compatibility
 
