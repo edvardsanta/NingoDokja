@@ -26,3 +26,8 @@ content. Writing ownership intent precedes creating containers. Journal failures
 stop the operation before new containers are created. The daemon persists it
 privately; restoring it never automatically starts modules. Lifecycle operations
 are serialized so starts, stops and shared dependency cleanup cannot cross.
+
+Measured inference is opt-in through the Runtime `ChatMeasured` policy and private
+`/chat/measured` endpoint. It reports structured provider usage and withholds
+results that exceed post-generation acceptance budgets. Existing chat/stream
+contracts remain unchanged. See [limits and compatibility](../../dokja_docs/inference-token-budgets.md).

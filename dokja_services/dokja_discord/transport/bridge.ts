@@ -32,12 +32,15 @@ type BridgeResponse = {
   };
   error?: string;
   attachments?: unknown;
+  // a server's queue, after a music command
+  music?: unknown;
 };
 
 export type OrchestratorReply = {
   reply: string;
   notice?: string;
   attachments?: DiscordAttachment[];
+  music?: unknown;
 };
 
 export async function dispatchToOrchestrator(
@@ -108,7 +111,12 @@ export async function dispatchToOrchestratorResponse(
       }),
     );
     const attachments = validatedAttachments(payload.attachments);
-    return { reply, notice: payload.notice, ...(attachments.length ? { attachments } : {}) };
+    return {
+      reply,
+      notice: payload.notice,
+      ...(attachments.length ? { attachments } : {}),
+      ...(payload.music !== undefined ? { music: payload.music } : {}),
+    };
   } catch (error) {
     console.error(
       "[dokja-discord] bridge dispatch failed",

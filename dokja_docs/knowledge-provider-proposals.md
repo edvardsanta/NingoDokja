@@ -127,3 +127,12 @@ Implementation: [Knowledge provider contract](../dokja_domain/dokja_knowledge/pr
 [domain tests](../dokja_domain/dokja_knowledge/provider_proposal_test.go),
 [socket tests](../dokja_orch/internal/clients/knowledge_proposal_client_test.go), and
 [application-port tests](../dokja_orch/internal/handlers/knowledge_provider_proposal_test.go).
+
+## Subsequent measured path
+
+[Measured inference](inference-token-budgets.md) adds
+`knowledge.application.propose.measured` alongside this original path. It reports
+usage and rejects over-budget results after generation for supported adapters.
+This original action keeps null token metrics. The measured path does not add
+pre-generation resource/billing caps or semantic acceptance, and the frozen
+comparison remains unrun.

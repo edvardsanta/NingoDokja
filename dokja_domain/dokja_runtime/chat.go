@@ -112,18 +112,8 @@ func (d *Domain) ChatStream(ctx context.Context, messages []ChatMessage, onPrevi
 	if d.chatInference == nil {
 		return ChatReply{}, fmt.Errorf("chat inference is unavailable")
 	}
-	if len(messages) == 0 || len(messages) > 128 {
-		return ChatReply{}, fmt.Errorf("invalid chat history")
-	}
-	size := 0
-	for _, m := range messages {
-		size += len(m.Content)
-		if (m.Role != "user" && m.Role != "assistant" && m.Role != "system") || strings.TrimSpace(m.Content) == "" {
-			return ChatReply{}, fmt.Errorf("invalid chat message")
-		}
-	}
-	if size > 65536 {
-		return ChatReply{}, fmt.Errorf("chat history exceeds supported size")
+	if err := validateChatMessages(messages); err != nil {
+		return ChatReply{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()

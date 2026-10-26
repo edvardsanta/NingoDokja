@@ -224,7 +224,10 @@ semantic meaning unverified and execution disabled.
 Runtime, anchors unique quotations and runs that assessor. Semantic acceptance,
 actual outcomes and learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
-and [provider proposal bounds](knowledge-provider-proposals.md).
+[provider proposal bounds](knowledge-provider-proposals.md), and
+[measured inference](inference-token-budgets.md). The separate
+`knowledge.application.propose.measured` action applies post-generation token
+acceptance limits with retained usage; it does not enforce provider billing caps.
 
 ### On-demand reading
 

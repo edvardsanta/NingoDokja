@@ -144,3 +144,9 @@ func (c *ChatProviderClient) Health(ctx context.Context) error {
 	_, err := c.call(ctx, "GET", "/health", nil)
 	return err
 }
+
+// GenerateMeasuredMessages requests result acceptance limits, not provider-side
+// generation or billing caps. Runtime reports counts or withholds the reply.
+func (c *ChatProviderClient) GenerateMeasuredMessages(ctx context.Context, messages []map[string]string, budget map[string]int64) (map[string]any, error) {
+	return c.call(ctx, "POST", "/chat/measured", map[string]any{"messages": messages, "budget": budget})
+}

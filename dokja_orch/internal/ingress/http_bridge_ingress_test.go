@@ -193,3 +193,19 @@ func TestMusicRepliesAreOnePlainLine(t *testing.T) {
 		}
 	}
 }
+
+func TestTheBridgeHandsTheQueueBackOnlyForMusicCommands(t *testing.T) {
+	music := map[string]any{"ok": true, "version": 3, "epoch": "e1"}
+	result := map[string]any{"communications": map[string]any{"music": music}}
+	if got := extractBridgeMusic(core.ProcessResult{Event: core.Event{Type: "music.skip"}, Result: result}); got["version"] != 3 {
+		t.Fatal(got)
+	}
+	if got := extractBridgeMusic(core.ProcessResult{Event: core.Event{Type: "communications.channels"}, Result: result}); got != nil {
+		t.Fatal("only music commands carry the queue", got)
+	}
+	request := BridgeRequest{EventType: "music.ended"}
+	request.Payload.Content = " 7 "
+	if event := bridgeEventFromRequest(request); event.Type != "music.ended" || event.Payload["content"] != "7" {
+		t.Fatalf("%#v", event)
+	}
+}

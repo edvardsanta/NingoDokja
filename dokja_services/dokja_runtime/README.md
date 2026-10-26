@@ -52,3 +52,8 @@ without invoking CLI tools, a shell, or a TeX installation. Expressions are
 limited to 1,024 bytes and 16 brace levels; commands are allowlisted and image
 dimensions/bytes are capped before delivery. Unsupported expressions return an
 error so the Chat domain's readable text fallback can be delivered.
+
+Measured inference is opt-in through the Runtime `ChatMeasured` policy and private
+`/chat/measured` endpoint. It reports structured provider usage and withholds
+results that exceed post-generation acceptance budgets. Existing chat/stream
+contracts remain unchanged. See [limits and compatibility](../../dokja_docs/inference-token-budgets.md).

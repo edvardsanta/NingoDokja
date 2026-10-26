@@ -16,6 +16,7 @@ Available docs:
 - [Cross-document application preparation](./knowledge-application.md)
 - [Cited application proposals and evaluation inputs](./knowledge-applicability.md)
 - [Provider-backed Knowledge application proposals](./knowledge-provider-proposals.md)
+- [Measured inference and token acceptance budgets](./inference-token-budgets.md)
 - [Refactoring steps](../steps.json)
 - [capability-map.md](./capability-map.md)
 - [Prototype architecture decisions](./decisions/README.md)

@@ -61,6 +61,8 @@ type BridgeResponse struct {
 	Notice      string            `json:"notice,omitempty"`
 	Error       string            `json:"error,omitempty"`
 	Attachments []chat.Attachment `json:"attachments,omitempty"`
+	// Music is a server's queue after a music command, for the interface that plays it.
+	Music map[string]any `json:"music,omitempty"`
 }
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
@@ -183,6 +185,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Reply:       reply,
 		Notice:      notice,
 		Attachments: extractChatAttachments(result),
+		Music:       extractBridgeMusic(result),
 	})
 }
 
@@ -190,6 +193,16 @@ func extractChatAttachments(result core.ProcessResult) []chat.Attachment {
 	chatResult, _ := result.Result[string(core.DomainChat)].(map[string]any)
 	attachments, _ := chatResult["attachments"].([]chat.Attachment)
 	return attachments
+}
+
+// extractBridgeMusic is the queue a music command left, or nothing for any other event.
+func extractBridgeMusic(result core.ProcessResult) map[string]any {
+	if !strings.HasPrefix(strings.TrimSpace(result.Event.Type), "music.") {
+		return nil
+	}
+	communicationsResult, _ := result.Result[string(core.DomainCommunications)].(map[string]any)
+	music, _ := communicationsResult["music"].(map[string]any)
+	return music
 }
 
 // authorize checks the bearer token every bridge route requires; it answers the status to send when
@@ -487,7 +500,7 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
-	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume":
+	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended":
 		// What follows the command (words, a link, a volume) is read by the Communications
 		// domain; the bridge passes it on as typed.
 		return strings.TrimSpace(request.EventType), map[string]any{"content": content}

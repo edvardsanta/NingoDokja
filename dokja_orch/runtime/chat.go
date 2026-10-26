@@ -14,6 +14,7 @@ func ChatHandler(d *domain.Domain) http.Handler {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("POST /chat", h.chat)
 	mux.HandleFunc("POST /chat/stream", h.stream)
+	mux.HandleFunc("POST /chat/measured", h.measured)
 	mux.HandleFunc("POST /math/render", renderMath)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +61,13 @@ func (h inferenceHTTPHandler) stream(w http.ResponseWriter, r *http.Request) {
 		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
 	}
 	streamChat(w, r, h.domain, messages, fail)
+}
+
+func (h inferenceHTTPHandler) measured(w http.ResponseWriter, r *http.Request) {
+	fail := func(err error) {
+		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
+	}
+	serveMeasuredChat(w, r, h.domain, fail)
 }
 
 func decodeChatMessages(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, bool) {
