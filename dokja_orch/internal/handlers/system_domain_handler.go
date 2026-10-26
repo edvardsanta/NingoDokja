@@ -63,6 +63,9 @@ type SystemDomainHandler struct {
 	memeHashtags     MemeHashtagSuggester
 	discord          DiscordMessageDeliverer
 	deliveryChannels []string
+	// manualTarget decides whether a channel outside the delivery channels may be named by one
+	// explicit operator send.
+	manualTarget     func(ctx context.Context, channel string) (bool, error)
 	safeOnlyChannels map[string]struct{}
 	memeScreen       MemeScreener
 	memeMarker       MemeMarker
@@ -102,6 +105,39 @@ func (h *SystemDomainHandler) WithSafeOnlyChannels(channels string) *SystemDomai
 		h.safeOnlyChannels[channelID] = struct{}{}
 	}
 	return h
+}
+
+// WithManualTargets lets an operator's explicit send (communications.send, never "all" and never
+// a scheduled delivery) name any channel the check allows.
+func (h *SystemDomainHandler) WithManualTargets(check func(ctx context.Context, channel string) (bool, error)) *SystemDomainHandler {
+	h.manualTarget = check
+	return h
+}
+
+// manualTargets are the requested channels outside the delivery channels that the check allows.
+func (h *SystemDomainHandler) manualTargets(ctx context.Context, event core.Event) ([]string, error) {
+	request := communicationSendRequest(event)
+	if h.manualTarget == nil || request.All || strings.TrimSpace(event.Type) != "communications.send" {
+		return nil, nil
+	}
+	delivery := map[string]bool{}
+	for _, channel := range h.deliveryChannels {
+		delivery[channel] = true
+	}
+	var allowed []string
+	for _, channel := range request.Targets {
+		if delivery[channel] {
+			continue
+		}
+		ok, err := h.manualTarget(ctx, channel)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			allowed = append(allowed, channel)
+		}
+	}
+	return allowed, nil
 }
 
 func communicationSendRequest(event core.Event) communications.SendRequest {
@@ -484,6 +520,11 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 	}
 
 	policy := h.deliveryPolicy()
+	manual, err := h.manualTargets(ctx, event)
+	if err != nil {
+		return nil, err
+	}
+	policy.ManualTargets = manual
 	plan, err := policy.PlanChannelSend(communicationSendRequest(event))
 	if err != nil {
 		return nil, err

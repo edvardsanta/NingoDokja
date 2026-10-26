@@ -226,7 +226,7 @@ export type ReindexResult = {
 
 // `retentionDays` is only there for a conversation an interface keeps the text of (WhatsApp): how
 // long that text stays on this machine.
-export type CommunicationChannel = { id: string; name: string; retentionDays?: number };
+export type CommunicationChannel = { id: string; name: string; guildId?: string; guildName?: string; retentionDays?: number };
 export type CommunicationMessage = {
   id: string; author: string; bot: boolean; content: string; timestamp: string;
   edited: boolean; replyTo: string; attachments: string[];

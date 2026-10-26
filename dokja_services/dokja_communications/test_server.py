@@ -131,6 +131,70 @@ class AdapterTests(unittest.TestCase):
             "the second server is not asked once every name is known",
         )
 
+    def test_guild_channels_lists_text_channels_per_server_and_reports_failures(self):
+        adapter = Adapter("secret", "", "789,790")
+        replies = {
+            "/guilds/789": {"name": "resenhudos"},
+            "/guilds/789/channels": [
+                {"id": "2", "name": "musicas", "type": 0, "position": 2},
+                {"id": "1", "name": "chat-geral", "type": 0, "position": 1},
+                {"id": "3", "name": "avisos", "type": 5, "position": 3},
+                {"id": "4", "name": "Voz", "type": 2, "position": 0},
+                {"id": "5", "name": "Category", "type": 4, "position": 0},
+            ],
+        }
+
+        def get(path):
+            if path not in replies:
+                raise AdapterError("permission_denied")
+            return replies[path]
+
+        adapter.get = Mock(side_effect=get)
+        self.assertEqual(
+            adapter.dispatch("guild_channels", {}),
+            {
+                "guilds": [
+                    {
+                        "id": "789",
+                        "name": "resenhudos",
+                        "channels": [
+                            {"id": "1", "name": "chat-geral"},
+                            {"id": "2", "name": "musicas"},
+                            {"id": "3", "name": "avisos"},
+                        ],
+                    }
+                ],
+                "unavailable_guilds": ["790"],
+            },
+        )
+
+    def test_a_text_channel_of_a_configured_server_may_be_read(self):
+        adapter = Adapter("secret", "123", "789")
+        facts = {
+            "/channels/1": {"guild_id": "789", "type": 0},
+            "/channels/2": {"guild_id": "999", "type": 0},
+            "/channels/3": {"guild_id": "789", "type": 2},
+        }
+        adapter.get = Mock(side_effect=lambda path: facts[path])
+        self.assertTrue(adapter.may_read("123"))
+        adapter.get.assert_not_called()
+        self.assertTrue(adapter.may_read("1"))
+        self.assertFalse(adapter.may_read("2"), "a channel of another server")
+        self.assertFalse(adapter.may_read("3"), "a voice channel")
+        self.assertFalse(adapter.may_read("../x"))
+        self.assertEqual(
+            adapter.dispatch("channel_info", {"channel_id": "1"}),
+            {"id": "1", "guild_id": "789", "text": True},
+        )
+
+    def test_without_a_server_only_the_configured_channels_may_be_read(self):
+        adapter = Adapter("secret", "123", "")
+        adapter.get = Mock()
+        self.assertFalse(adapter.may_read("456"))
+        adapter.get.assert_not_called()
+        with self.assertRaises(AdapterError):
+            adapter.dispatch("history", {"channel_id": "456"})
+
     def test_attachment_only_and_edited_replies(self):
         row = project_message(
             {

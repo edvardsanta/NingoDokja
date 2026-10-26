@@ -186,7 +186,7 @@
   "communications_not_set_up": "As mensagens ainda não estão configuradas.",
   "communications_not_set_up_how": "Defina DOKJA_COMMUNICATIONS_TOKEN com o mesmo valor aleatório de pelo menos 32 caracteres no .env da stack e reinicie o orquestrador e o desktop. O desktop lê esse arquivo; use --env-file para outra stack. Um valor exportado tem prioridade. Vincular o WhatsApp também precisa dele.",
   "communications_no_channels": "Nenhum canal de entrega configurado.",
-  "communications_identity": "As mensagens são enviadas pelo Ningo. Somente canais configurados aparecem aqui.",
+  "communications_identity": "As mensagens são enviadas pelo Ningo. Aparecem aqui os canais de texto dos servidores configurados.",
   "communications_channel": "Canais e conversas",
   "communications_older": "Carregar mensagens anteriores",
   "communications_empty": "Nenhuma mensagem neste canal.",
@@ -501,5 +501,7 @@
   "memes_refreshed_none": "Nada novo nas fontes.",
   "runtime_logs_link_code": "[código de vinculação oculto: não dá para escanear pelos logs. Use Vincular em Sistema → Status.]",
   "state_not_running": "Não está rodando",
-  "whatsapp_not_running": "O WhatsApp não está rodando. Inicie o módulo do WhatsApp para vincular ou enviar por ele."
+  "whatsapp_not_running": "O WhatsApp não está rodando. Inicie o módulo do WhatsApp para vincular ou enviar por ele.",
+  "communications_other_channels": "Outros canais",
+  "communications_servers_unavailable": "O Ningo não consegue ler {count} dos servidores configurados."
 }

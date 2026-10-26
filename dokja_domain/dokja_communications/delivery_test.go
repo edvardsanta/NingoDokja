@@ -104,3 +104,14 @@ func TestConversationAuthorizationRespectsRoutingState(t *testing.T) {
 		t.Fatal("a channel was authorized as a conversation")
 	}
 }
+
+func TestManualTargetsAreForOneExplicitSendAndNeverJoinAll(t *testing.T) {
+	policy := DeliveryPolicy{Channels: []string{"meme"}, ManualTargets: []string{"chat"}}
+	if plan, err := policy.PlanChannelSend(SendRequest{Content: "hi", Targets: []string{"chat"}}); err != nil || !reflect.DeepEqual(plan.Targets, []string{"chat"}) {
+		t.Fatal(plan, err)
+	}
+	plan, err := policy.PlanChannelSend(SendRequest{Content: "meme", All: true, Targets: []string{"chat"}})
+	if err != nil || !reflect.DeepEqual(plan.Targets, []string{"meme"}) {
+		t.Fatal("a scheduled or 'all' delivery goes only to the delivery channels", plan, err)
+	}
+}

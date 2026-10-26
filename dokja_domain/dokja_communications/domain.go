@@ -40,6 +40,7 @@ type Conversations interface {
 type Domain struct {
 	service       Service
 	channels      []string
+	guilds        []string
 	conversations Conversations
 }
 
@@ -54,6 +55,35 @@ func New(service Service, configured string) *Domain {
 		}
 	}
 	return d
+}
+
+// WithGuilds lets every text channel of these servers be listed, read and written to by hand,
+// next to the configured channels. No server means the configured channels only: never every
+// server the bot happens to be in.
+func (d *Domain) WithGuilds(configured string) *Domain {
+	d.guilds = splitConfigured(configured)
+	return d
+}
+
+// Readable decides whether a Discord channel may be read and written to by hand: a configured
+// channel, or one Discord places in a configured server and that holds messages. The id the
+// operator sends is never trusted alone.
+func (d *Domain) Readable(ctx context.Context, channel string) (bool, error) {
+	for _, id := range d.channels {
+		if channel == id {
+			return true, nil
+		}
+	}
+	if len(d.guilds) == 0 || d.service == nil || !snowflake.MatchString(channel) {
+		return false, nil
+	}
+	info, err := d.service.Dispatch(ctx, "channel_info", map[string]any{"channel_id": channel})
+	if err != nil {
+		return false, err
+	}
+	text, _ := info["text"].(bool)
+	guild, _ := info["guild_id"].(string)
+	return text && contains(d.guilds, guild), nil
 }
 
 // WithConversations adds the conversations an interface keeps, next to the configured channels.
@@ -86,16 +116,34 @@ func (d *Domain) listChannels(ctx context.Context) (map[string]any, error) {
 	channels := []any{}
 	unavailable := []any{}
 	var discordErr error
-	if d.service != nil && len(d.channels) > 0 {
-		result, err := d.service.Dispatch(ctx, "channels", map[string]any{"channel_ids": d.channels})
+	listed := map[string]bool{}
+	if d.service != nil && len(d.guilds) > 0 {
+		guildChannels, unavailableGuilds, err := d.guildChannels(ctx)
+		if err != nil {
+			discordErr = err
+		}
+		for _, channel := range guildChannels {
+			listed[channel["id"].(string)] = true
+			channels = append(channels, channel)
+		}
+		if len(unavailableGuilds) > 0 {
+			answer["unavailable_guilds"] = unavailableGuilds
+		}
+	}
+	// Configured channels on no configured server are still listed, by id or name.
+	var rest []string
+	for _, id := range d.channels {
+		if !listed[id] {
+			rest = append(rest, id)
+		}
+	}
+	if d.service != nil && len(rest) > 0 {
+		result, err := d.service.Dispatch(ctx, "channels", map[string]any{"channel_ids": rest})
 		if err != nil {
 			discordErr = err
 		} else {
-			for key, value := range result {
-				answer[key] = value
-			}
-			if listed, ok := result["channels"].([]any); ok {
-				channels = append(channels, listed...)
+			if named, ok := result["channels"].([]any); ok {
+				channels = append(channels, named...)
 			}
 		}
 	}
@@ -133,12 +181,9 @@ func (d *Domain) channelHistory(ctx context.Context, channel, before string) (ma
 	if d.service == nil {
 		return nil, fmt.Errorf("communications service is not configured")
 	}
-	allowed := false
-	for _, id := range d.channels {
-		if channel == id {
-			allowed = true
-			break
-		}
+	allowed, err := d.Readable(ctx, channel)
+	if err != nil {
+		return nil, err
 	}
 	if !allowed {
 		return nil, fmt.Errorf("channel is not configured for communications")
@@ -177,4 +222,35 @@ func (d *Domain) conversationHistory(ctx context.Context, channel, name, before 
 		return nil, fmt.Errorf("conversation history is not available")
 	}
 	return map[string]any{"channel_id": channel, "messages": page["messages"], "before": page["before"]}, nil
+}
+
+// guildChannels lists the text channels of the configured servers, each tagged with its server.
+func (d *Domain) guildChannels(ctx context.Context) ([]map[string]any, []any, error) {
+	result, err := d.service.Dispatch(ctx, "guild_channels", map[string]any{})
+	if err != nil {
+		return nil, nil, err
+	}
+	var channels []map[string]any
+	guilds, _ := result["guilds"].([]any)
+	for _, raw := range guilds {
+		guild, _ := raw.(map[string]any)
+		guildID, _ := guild["id"].(string)
+		guildName, _ := guild["name"].(string)
+		// The service answers for the servers it was told; one it names unasked is ignored.
+		if !contains(d.guilds, guildID) {
+			continue
+		}
+		listed, _ := guild["channels"].([]any)
+		for _, rawChannel := range listed {
+			channel, _ := rawChannel.(map[string]any)
+			id, _ := channel["id"].(string)
+			if !snowflake.MatchString(id) {
+				continue
+			}
+			name, _ := channel["name"].(string)
+			channels = append(channels, map[string]any{"id": id, "name": name, "guild_id": guildID, "guild_name": guildName})
+		}
+	}
+	unavailable, _ := result["unavailable_guilds"].([]any)
+	return channels, unavailable, nil
 }

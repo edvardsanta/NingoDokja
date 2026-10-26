@@ -31,3 +31,37 @@ func TestCommunicationsSendUsesExistingDeliveryRules(t *testing.T) {
 		t.Fatal("desktop bypass accepted")
 	}
 }
+
+func TestAnOperatorSendMayNameAChannelTheCommunicationsDomainAllows(t *testing.T) {
+	token := strings.Repeat("x", 32)
+	deliverer := &fakeDiscordDeliverer{}
+	asked := []string{}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "123").WithManualTargets(func(_ context.Context, channel string) (bool, error) {
+		asked = append(asked, channel)
+		return channel == "456", nil
+	})
+	service := core.DefaultService(handler).WithCommunicationsToken(token)
+	send := func(eventType string, payload map[string]any) error {
+		_, err := service.ProcessWithResult(context.Background(), core.Event{Source: "desktop", Type: eventType, Context: map[string]any{"communications_token": token}, Payload: payload})
+		return err
+	}
+	if err := send("communications.send", map[string]any{"channel_ids": []any{"456"}, "content": "hello"}); err != nil || len(deliverer.deliveries) != 1 {
+		t.Fatal("a channel of a configured server was refused", err)
+	}
+	if err := send("communications.send", map[string]any{"channel_ids": []any{"789"}, "content": "hello"}); err == nil || len(deliverer.deliveries) != 1 {
+		t.Fatal("a channel the domain refuses was accepted")
+	}
+	if err := send("communications.send", map[string]any{"all": true, "content": "everyone"}); err != nil || len(deliverer.deliveries) != 2 {
+		t.Fatal(err)
+	}
+	if last := deliverer.deliveries[len(deliverer.deliveries)-1]; last.channelID != "123" {
+		t.Fatal("'all' goes only to the delivery channels:", deliverer.deliveries)
+	}
+	before := len(asked)
+	if err := send("discord.send", map[string]any{"channel_ids": []any{"456"}, "content": "hello"}); err == nil {
+		t.Fatal("discord.send, which the gateway can carry, must stay on the delivery channels")
+	}
+	if len(asked) != before {
+		t.Fatal("discord.send asked about manual targets")
+	}
+}
