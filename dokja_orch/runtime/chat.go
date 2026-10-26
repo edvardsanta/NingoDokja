@@ -27,8 +27,12 @@ func ChatHandler(d *domain.Domain) http.Handler {
 			json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
 			return
 		}
-		if r.Method != "POST" || (r.URL.Path != "/chat" && r.URL.Path != "/chat/stream") {
+		if r.Method != "POST" || (r.URL.Path != "/chat" && r.URL.Path != "/chat/stream" && r.URL.Path != "/chat/measured") {
 			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.URL.Path == "/chat/measured" {
+			serveMeasuredChat(w, r, d, fail)
 			return
 		}
 		var body struct {
