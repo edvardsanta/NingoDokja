@@ -33,6 +33,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
   });
   const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
     logVoiceConversation: cfg.mode === "full",
+    locale: cfg.locale,
     music,
   });
   const commands =

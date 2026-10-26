@@ -965,6 +965,14 @@ orchestrator keeps the text fallback. No new port, volume or environment variabl
 is required. The bridge response gains optional `attachments` entries with
 `filename`, `content_type` and `data_b64`; older clients continue using `reply`.
 
+When one or more selected formulas cannot be rendered, the chat result reports
+`chat.math_render_failed` as its notice. Discord localizes this notice above the
+readable text, including for slash replies and modals; it takes priority over a
+session lifecycle notice. The orchestrator logs the incomplete rendering count
+without logging formula contents. A 404 from `/math/render` means the running
+host controller does not provide this endpoint; updating containers alone does
+not update that host process.
+
 The same socket also answers `POST /chat/stream`: newline-delimited JSON with
 `{"preview": ...}` lines (the text written so far, at most every 100 ms) and a last line that is
 the reply `/chat` would give, or `{"error": ...}`. Ollama and Codex give previews; Claude Code gives

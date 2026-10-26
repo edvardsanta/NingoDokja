@@ -6,6 +6,7 @@ import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController } from "../voice/voice.js";
 import { createMusic, type MusicFeature } from "../music/commands.js";
 import { buildNingoPanelReply } from "./interactions.js";
+import { localizeNotice } from "../messages/notices.js";
 
 type DokjaCommandParams = {
   name: string;
@@ -15,6 +16,7 @@ type DokjaCommandParams = {
   orchestratorTimeoutMs: number;
   eventType: string;
   ephemeralResponse?: boolean;
+  locale?: string;
   buildPayload?: (context: DiscordCommandContext) => Partial<Parameters<typeof buildBridgePayload>[0]>;
 };
 
@@ -27,6 +29,7 @@ function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
     orchestratorTimeoutMs,
     eventType,
     ephemeralResponse = true,
+    locale,
     buildPayload,
   } =
     params;
@@ -49,7 +52,7 @@ function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
             ...(buildPayload?.(context) ?? {}),
           }),
         );
-        const reply = response.reply.trim() || "No response.";
+        const reply = localizeNotice(response.notice, response.reply.trim() || "No response.", locale);
         await context.reply(response.attachments?.length
           ? { content: reply, attachments: response.attachments }
           : reply, { ephemeral: ephemeralResponse });
@@ -67,6 +70,7 @@ export function createCommands(
   voice?: DiscordVoiceController,
   options?: {
     logVoiceConversation?: boolean;
+    locale?: string;
     // the music feature whose buttons the runtime also serves; one is made when left out
     music?: MusicFeature;
   },
@@ -74,6 +78,7 @@ export function createCommands(
   return [
     createDokjaCommand({
       name: "chat",
+      locale: options?.locale,
       description: "Send a chat message through Dokja.",
       orchestratorEndpoint,
       orchestratorTimeoutMs,
