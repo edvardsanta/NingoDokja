@@ -21,7 +21,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `document.process.v1` | `feeds.invoke`, `classify` or `summarize` | Compatibility Book result |
 | `media.library.v1` | `feeds.invoke`, `ingest`, `list`, `fetch`, `status`, `contains`, `mark-sent` | Media intake cache result |
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
-| `audio.resolve.v1` | `feeds.invoke`, `resolve` with exactly one of `url` or `query`, optional `limit` (1–5) | `tracks`: `id`, `source`, `url` (the page), `title`, `uploader`, `duration_s`, `live` |
+| `audio.resolve.v1` | `feeds.invoke`, `read {url}` or `search {query, limit}` | `handled`, and `refused` or `tracks` (see Music sources) |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`
 selects an explicitly named provider. The subprocess receives
@@ -92,15 +92,30 @@ revised behavior. Update the reader and orchestrator together; see
 [confirmed media delivery receipts](media-delivery-receipts.md) for the breaking
 behavior change and receipt-storage limitations.
 
-### Audio tracks
+### Music sources
 
-`plugins.example/audio-resolve` turns a link or a search into tracks with yt-dlp,
-reading metadata only: it downloads nothing and returns no stream address, because
-those expire and are bound to the network that asked for them. Whoever plays a
-track resolves it again from its page. It is the intake step of the music workflow
-([plan](music-plan.md)); it needs `FEEDS_PLUGIN_EXTRAS=media` or `content`, which
-pin yt-dlp, and no settings. Errors from yt-dlp itself are reported as a generic
-failure, with the detail only in the Feeds log.
+Each music source is a plugin providing `audio.resolve.v1`, with two actions:
+`read {url}` (the song a link names) and `search {query, limit}` (songs for a few
+words). A source answers `{handled: false}` for what it does not serve, so the
+caller asks the next one without the source being marked failed;
+`{handled: true, refused}` for a request it cannot do; and `{handled: true,
+tracks}` otherwise. Each track has `id`, `source`, `url`, `title`, `uploader`,
+`duration_s`, `live` and `playable`; a track that is not playable names a song to
+be found on a playable source. Sources return pages, never stream addresses, and
+step aside before loading heavy libraries. The Communications domain asks enabled
+sources in id order and decides which result is the song
+([music plan](music-plan.md)).
+
+`plugins.example/audio-pages` reads any page yt-dlp understands and searches with
+the yt-dlp search prefix set in a `settings.json` beside the installed `run.py`
+(`{"search_prefix": "…", "hosts": ["…"]}`, both optional). Other sources are the
+owner's, in `feeds_plugins/`.
+
+Libraries for the owner's plugins come from a requirements file of the owner's,
+named by the `FEEDS_PLUGIN_REQUIREMENTS` build argument as a path inside the build
+context (for example `feeds_plugins/requirements.txt`). The default,
+`dokja_services/dokja_feeds/no-plugin-requirements.txt`, lists nothing. The
+example needs `yt-dlp` there. Rebuild Feeds after changing the list.
 
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:

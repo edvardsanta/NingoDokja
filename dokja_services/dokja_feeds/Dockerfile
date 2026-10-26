@@ -42,6 +42,14 @@ RUN case "$FEEDS_PLUGIN_EXTRAS" in \
         && /opt/feeds-plugins/bin/pip install --no-cache-dir --no-deps opencv-python-headless==5.0.0.93 ;; \
       *) exit 2 ;; \
     esac
+# The owner's own plugins (in feeds_plugins/, outside git) bring their libraries in a requirements
+# file of the owner's, named by a path inside the build context. The default lists nothing.
+ARG FEEDS_PLUGIN_REQUIREMENTS=dokja_services/dokja_feeds/no-plugin-requirements.txt
+COPY ${FEEDS_PLUGIN_REQUIREMENTS} /tmp/owner-plugin-requirements.txt
+RUN if grep -q '^[^#[:space:]]' /tmp/owner-plugin-requirements.txt; then \
+      { [ -d /opt/feeds-plugins ] || python3 -m venv --system-site-packages /opt/feeds-plugins; } \
+      && /opt/feeds-plugins/bin/pip install --no-cache-dir -r /tmp/owner-plugin-requirements.txt; \
+    fi
 ENV PATH="/opt/feeds-plugins/bin:${PATH}"
 
 COPY dokja_services/dokja_knowledge/extractors /opt/dokja_knowledge/extractors
