@@ -1375,8 +1375,7 @@ button.icon-button[aria-expanded="true"] {
   list-style: none;
 }
 
-/* Many servers and channels: the rail scrolls on its own, and each server is a quiet heading
-   over its channels. */
+/* Server headings toggle their own lists; the conversation keeps its place. */
 .channels {
   min-height: 0;
   overflow-y: auto;
@@ -1384,7 +1383,7 @@ button.icon-button[aria-expanded="true"] {
 
 .channel-group-name {
   margin: 0.75rem 0 0.25rem;
-  padding: 0 0.75rem;
+  padding: 0;
   color: var(--ink-dim);
   font-size: 0.75rem;
   font-weight: 400;
@@ -1394,6 +1393,37 @@ button.icon-button[aria-expanded="true"] {
 
 .channel-group:first-child .channel-group-name {
   margin-top: 0;
+}
+
+.channels .channel-group-toggle,
+.channels .channel-group-toggle:hover:not(:disabled) {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.35rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.channels .channel-group-toggle:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.channel-group-toggle svg {
+  flex: 0 0 0.75rem;
+}
+
+.channel-group-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.channels .channel-group > ul[hidden] {
+  display: none;
 }
 
 /* A conversation: its name, and under it, dimmer, what identifies it. The open one is lit like the

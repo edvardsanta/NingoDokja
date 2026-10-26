@@ -24,7 +24,7 @@ describe("communications", () => {
     const servers = await screen.findAllByRole("heading", { level: 3 });
     expect(servers.map((heading) => heading.textContent)).toEqual(["resenhudos", "old server", "Other channels"]);
     const first = screen.getByRole("region", { name: "resenhudos" });
-    expect(within(first).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["#chat · 1", "#music · 2"]);
+    expect(within(first).getAllByRole("listitem").map((item) => within(item).getByRole("button").getAttribute("aria-label"))).toEqual(["#chat · 1", "#music · 2"]);
     screen.getByText("Ningo cannot read 1 of the configured servers.");
   });
 
@@ -33,6 +33,45 @@ describe("communications", () => {
     render(view(transport));
     await screen.findByRole("button", { name: "#reading · 123" });
     expect(screen.queryAllByRole("heading", { level: 3 })).toEqual([]);
+  });
+
+  it("collapses each server independently without changing the conversation or draft", async () => {
+    const listing = { channels: [
+      { id: "123", name: "reading", guildId: "guild-a", guildName: "Example server" },
+      { id: "456", name: "memes", guildId: "guild-b", guildName: "Second server" },
+    ] };
+    const { transport, calls } = routedTransport({ "communications.channels": ok(listing), "communications.history": ok(history()) });
+    render(view(transport));
+    await screen.findByText("<script>text</script>");
+    const composer = screen.getByRole("textbox", { name: "Message to send as Ningo" });
+    fireEvent.change(composer, { target: { value: "Keep this draft" } });
+    const toggle = screen.getByRole("button", { name: "Collapse Example server" });
+    const list = document.getElementById(toggle.getAttribute("aria-controls")!);
+    expect(list?.hidden).toBe(false);
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Expand Example server" }).getAttribute("aria-expanded")).toBe("false");
+    expect(list?.hidden).toBe(true);
+    expect(screen.queryByRole("button", { name: "#reading · 123" })).toBeNull();
+    screen.getByRole("button", { name: "#memes · 456" });
+    expect((composer as HTMLTextAreaElement).value).toBe("Keep this draft");
+    screen.getByText("<script>text</script>");
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Example server" }));
+    expect(screen.getByRole("button", { name: "#reading · 123" }).getAttribute("aria-current")).toBe("true");
+    expect(calls.filter(call => call.type === "communications.history")).toHaveLength(1);
+  });
+
+  it("keeps a single server collapsed when Messages refreshes", async () => {
+    const listing = { channels: [{ id: "123", name: "reading", guildId: "guild-a", guildName: "Example server" }] };
+    const { transport, calls } = routedTransport({ "communications.channels": ok(listing), "communications.history": ok(history()) });
+    render(view(transport));
+    await screen.findByText("<script>text</script>");
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Example server" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(calls.filter(call => call.type === "communications.channels")).toHaveLength(2));
+    expect(screen.getByRole("button", { name: "Expand Example server" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: "#reading · 123" })).toBeNull();
   });
 
   it("lists channels and treats untrusted messages as text", async () => {

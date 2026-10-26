@@ -4,8 +4,8 @@ import test from "node:test";
 import { IDLE, parseQueueState, reconcile, type QueueState } from "../music/reconcile.js";
 
 const state = (overrides: Partial<QueueState> = {}): QueueState => ({
-  epoch: "e1", version: 1, paused: false, volume: 100,
-  nowPlaying: { entry: 1, url: "https://play.example/1", title: "One", uploader: "Band" },
+  epoch: "e1", version: 1, paused: false, volume: 100, waiting: 0,
+  nowPlaying: { entry: 1, url: "https://play.example/1", title: "One", uploader: "Band", requestedBy: "" },
   ...overrides,
 });
 
@@ -28,7 +28,7 @@ test("the same track only changes what changed", () => {
 
 test("another entry plays, even of the same song, and an empty queue stops", () => {
   const local = reconcile(IDLE, state())!.next;
-  const next = state({ version: 2, nowPlaying: { entry: 2, url: "https://play.example/1", title: "One", uploader: "Band" } });
+  const next = state({ version: 2, nowPlaying: { entry: 2, url: "https://play.example/1", title: "One", uploader: "Band", requestedBy: "" } });
   assert.deepEqual(reconcile(local, next)?.actions, [{ kind: "play", entry: 2, url: "https://play.example/1" }]);
   assert.deepEqual(reconcile(local, state({ version: 3, nowPlaying: undefined }))?.actions, [{ kind: "stop" }]);
   assert.deepEqual(reconcile(IDLE, state({ nowPlaying: undefined }))?.actions, [], "nothing to stop");
@@ -48,5 +48,9 @@ test("only a well-formed reply is a state", () => {
   assert.equal(parseQueueState({ ok: false, reason: "the queue is full" }), undefined);
   assert.equal(parseQueueState({ ok: true, version: 1 }), undefined, "no epoch");
   const parsed = parseQueueState({ ok: true, epoch: "e1", version: 2, paused: true, volume: 250, now_playing: { entry: 3, url: "file:///etc/passwd" } });
-  assert.deepEqual(parsed, { epoch: "e1", version: 2, paused: true, volume: 100 }, "only an http(s) page plays, and the volume is bounded");
+  assert.deepEqual(parsed, { epoch: "e1", version: 2, paused: true, volume: 100, waiting: 0 }, "only an http(s) page plays, and the volume is bounded");
+  const full = parseQueueState({ ok: true, epoch: "e1", version: 3, waiting: [{}, {}], now_playing: { entry: 1, url: "https://play.example/1", requested_by: "12345", title: "One" } });
+  assert.equal(full?.waiting, 2);
+  assert.equal(full?.nowPlaying?.requestedBy, "12345");
+  assert.equal(parseQueueState({ ok: true, epoch: "e1", version: 3, now_playing: { entry: 1, url: "https://play.example/1", requested_by: "<@everyone>" } })?.nowPlaying?.requestedBy, "", "only an id is mentioned");
 });

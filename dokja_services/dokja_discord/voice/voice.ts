@@ -28,6 +28,11 @@ import {
   type RadioStreamSession,
 } from "./radio_stream.js";
 import { createTrackStream, type TrackStream } from "./track_stream.js";
+import { toMessageReply } from "../runtime/discordjs_runtime.js";
+import type { DiscordReply } from "../types.js";
+
+// How long Ningo waits, alone in a voice channel, before leaving it.
+export const ALONE_GRACE_MS = 3 * 60_000;
 
 const require = createRequire(import.meta.url);
 const prism = require("prism-media") as typeof import("prism-media");
@@ -53,6 +58,8 @@ type MusicSession = {
   // the queue's pause, apart from the pause while Ningo speaks
   userPaused: boolean;
   speaking: boolean;
+  // paused because nobody is left in the voice channel, apart from the other two pauses
+  away: boolean;
   volume: number;
   onEnded: (entry: number) => void;
   onGone: () => void;
@@ -85,6 +92,9 @@ export type DiscordVoiceController = {
   // The voice channel the person is in, and the one Ningo plays music in, if any.
   memberVoiceChannel(params: { guildId: string; userId: string }): Promise<string | undefined>;
   musicChannel(params: { guildId: string }): string | undefined;
+  // Posts or edits a message in a text channel (the music panel); the message id, when posted.
+  postMessage(params: { channelId: string; message: DiscordReply }): Promise<string | undefined>;
+  editMessage(params: { channelId: string; messageId: string; message: DiscordReply }): Promise<void>;
   // Brings the server's playback to the queue's state, joining the person's voice channel to play.
   applyMusic(params: { guildId: string; userId: string; state: QueueState; hooks: MusicHooks }): Promise<void>;
 };
@@ -119,6 +129,12 @@ export function createDiscordVoiceController(options: {
       intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
     });
 
+    // Someone joined or left a voice channel: Ningo pauses when nobody is left with it, and
+    // leaves when nobody comes back in time.
+    client.on("voiceStateUpdate", (oldState, newState) => {
+      for (const guildId of new Set([oldState.guild.id, newState.guild.id])) watchCompany(client, guildId);
+    });
+
     client.on("clientReady", () => {
       options.log?.(
         "[dokja-discord] discord.js voice client ready",
@@ -151,6 +167,43 @@ export function createDiscordVoiceController(options: {
     return await voiceClientReady;
   };
 
+  const aloneTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Whether anyone but bots is in Ningo's voice channel of a server; paused music waits for them.
+  const watchCompany = (client: DiscordJsClient, guildId: string) => {
+    const session = sessions.get(guildId);
+    if (!session) return;
+    const channel = client.channels.cache.get(session.channelId);
+    const members = channel && "members" in channel ? channel.members : undefined;
+    const company = members && typeof (members as { filter?: unknown }).filter === "function"
+      ? (members as unknown as { filter(fn: (member: GuildMember) => boolean): { size: number } }).filter((member) => !member.user.bot).size
+      : 1;
+    const music = musics.get(guildId);
+    if (company > 0) {
+      clearTimeout(aloneTimers.get(guildId));
+      aloneTimers.delete(guildId);
+      if (music?.away) {
+        music.away = false;
+        if (!music.userPaused && !music.speaking) music.player.unpause();
+      }
+      return;
+    }
+    if (aloneTimers.has(guildId)) return;
+    if (music && music.playing !== undefined) {
+      music.away = true;
+      music.player.pause();
+    }
+    options.log?.("[dokja-discord] alone in voice", JSON.stringify({ guildId, leaveInMs: ALONE_GRACE_MS }));
+    aloneTimers.set(guildId, setTimeout(() => {
+      aloneTimers.delete(guildId);
+      const current = sessions.get(guildId);
+      if (!current) return;
+      // Leaving destroys the connection; a queue playing there is then reported stopped.
+      stopGuildSession(current);
+      sessions.delete(guildId);
+      options.log?.("[dokja-discord] left an empty voice channel", JSON.stringify({ guildId }));
+    }, ALONE_GRACE_MS));
+  };
+
   // The server's music player, in the person's voice channel. A radio playing there is stopped:
   // the radio has no precedence.
   const musicSession = async ({ guildId, userId, hooks }: { guildId: string; userId: string; hooks: MusicHooks }) => {
@@ -179,7 +232,7 @@ export function createDiscordVoiceController(options: {
     let music = musics.get(guildId);
     if (!music || !session.musicHooked) {
       const player = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } });
-      const created: MusicSession = { player, local: IDLE, userPaused: false, speaking: false, volume: 100, onEnded: hooks.onEnded, onGone: hooks.onGone };
+      const created: MusicSession = { player, local: IDLE, userPaused: false, speaking: false, away: false, volume: 100, onEnded: hooks.onEnded, onGone: hooks.onGone };
       player.on("error", (error) => options.error?.("[dokja-discord] music player error", error));
       // A track that ends, or fails to start, leaves the player idle with its entry still set.
       player.on(AudioPlayerStatus.Idle, () => {
@@ -346,7 +399,7 @@ export function createDiscordVoiceController(options: {
           music.speaking = false;
           if (musics.get(guildId) !== music || music.playing === undefined) return;
           session.connection.subscribe(music.player);
-          if (!music.userPaused) music.player.unpause();
+          if (!music.userPaused && !music.away) music.player.unpause();
         });
       }
       session.player.play(stream.resource);
@@ -378,6 +431,20 @@ export function createDiscordVoiceController(options: {
         JSON.stringify({ guildId, voiceChannelId: voiceChannel.id, textChars: trimmed.length }),
       );
       return `Speaking in <#${voiceChannel.id}>`;
+    },
+    async postMessage({ channelId, message }) {
+      const client = await ensureVoiceClient();
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !("send" in channel) || typeof channel.send !== "function") return undefined;
+      const sent = await channel.send(toMessageReply(message) as never);
+      return sent.id;
+    },
+    async editMessage({ channelId, messageId, message }) {
+      const client = await ensureVoiceClient();
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !("messages" in channel)) return;
+      const found = await channel.messages.fetch(messageId);
+      await found.edit(toMessageReply(message) as never);
     },
     async memberVoiceChannel({ guildId, userId }) {
       const client = await ensureVoiceClient();
@@ -415,7 +482,7 @@ export function createDiscordVoiceController(options: {
           music.player.pause();
         } else if (action.kind === "resume") {
           music.userPaused = false;
-          if (!music.speaking) music.player.unpause();
+          if (!music.speaking && !music.away) music.player.unpause();
         } else if (action.kind === "volume") {
           music.volume = action.volume;
           music.stream?.resource.volume?.setVolume(action.volume / 100);

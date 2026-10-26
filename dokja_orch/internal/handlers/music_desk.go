@@ -70,7 +70,7 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 	// The server comes from the bridge's context, never from what the person typed.
 	guildID, _ := event.Context["guild_id"].(string)
 	if strings.TrimSpace(guildID) == "" {
-		return refusedMusic("music plays only in a server's voice channel"), nil
+		return refusedMusic("no_server", "music plays only in a server's voice channel"), nil
 	}
 	guild := d.guild(guildID)
 	content, _ := event.Payload["content"].(string)
@@ -110,7 +110,7 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 		reply["advanced"] = advanced
 	}
 	if err != nil {
-		return refusedMusic(err.Error()), nil
+		return refusedFor(err), nil
 	}
 	return d.musicReply(queue.State(), reply), nil
 }
@@ -119,22 +119,22 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 // take long, and skip or pause must not wait for it), then checks room again before adding.
 func (d *musicDesk) play(ctx context.Context, guild *guildQueue, request communications.TrackRequest, requestedBy string) (map[string]any, error) {
 	if request.Query == "" && request.URL == "" {
-		return refusedMusic("say what to play: a few words or a link"), nil
+		return refusedMusic("empty_request", "say what to play: a few words or a link"), nil
 	}
 	guild.mu.Lock()
 	full := guild.queue.Full()
 	guild.mu.Unlock()
 	if full {
-		return refusedMusic(communications.ErrQueueFull.Error()), nil
+		return refusedFor(communications.ErrQueueFull), nil
 	}
 	if d.sources == nil {
-		return refusedMusic("no music source is set up"), nil
+		return refusedMusic("no_source", "no music source is set up"), nil
 	}
 	resolveCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
 	track, err := communications.ResolveTrack(resolveCtx, d.sources, request)
 	if errors.Is(err, communications.ErrTrackRefused) || errors.Is(err, communications.ErrTrackNotFound) {
-		return refusedMusic(err.Error()), nil
+		return refusedFor(err), nil
 	}
 	if err != nil {
 		return nil, err
@@ -143,13 +143,33 @@ func (d *musicDesk) play(ctx context.Context, guild *guildQueue, request communi
 	defer guild.mu.Unlock()
 	queued, place, err := guild.queue.Add(track, requestedBy)
 	if err != nil {
-		return refusedMusic(err.Error()), nil
+		return refusedFor(err), nil
 	}
 	return d.musicReply(guild.queue.State(), map[string]any{"added": queuedMap(queued), "place": place}), nil
 }
 
-func refusedMusic(reason string) map[string]any {
-	return map[string]any{"music": map[string]any{"ok": false, "reason": reason}}
+// refusedMusic is a refusal the person reads. The code lets an interface say it in its own
+// language; the reason is the English text, kept for logs and clients without translations.
+func refusedMusic(code, reason string) map[string]any {
+	return map[string]any{"music": map[string]any{"ok": false, "code": code, "reason": reason}}
+}
+
+// refusedFor names the domain's refusals. A source's own refusal keeps its words: only the source
+// knows why it declined (an album link, say).
+func refusedFor(err error) map[string]any {
+	switch {
+	case errors.Is(err, communications.ErrQueueFull):
+		return refusedMusic("queue_full", err.Error())
+	case errors.Is(err, communications.ErrNothingPlaying):
+		return refusedMusic("nothing_playing", err.Error())
+	case errors.Is(err, communications.ErrBadVolume):
+		return refusedMusic("bad_volume", err.Error())
+	case errors.Is(err, communications.ErrTrackNotFound):
+		return refusedMusic("not_found", err.Error())
+	case errors.Is(err, communications.ErrTrackRefused):
+		return refusedMusic("track_refused", strings.TrimPrefix(err.Error(), communications.ErrTrackRefused.Error()+": "))
+	}
+	return refusedMusic("refused", err.Error())
 }
 
 func (d *musicDesk) musicReply(state communications.QueueState, extra map[string]any) map[string]any {

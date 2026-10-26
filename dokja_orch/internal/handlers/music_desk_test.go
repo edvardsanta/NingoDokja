@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -205,5 +206,33 @@ func TestAnEndedReportFromTheBridgeAdvancesAndRepliesCarryEpochAndVersion(t *tes
 	}
 	if other := musicHandler(&fakeMusicSources{}); doMusic(t, other, "show-music-queue", "", "guild")["epoch"] == first["epoch"] {
 		t.Fatal("another process (a restart) has another epoch")
+	}
+}
+
+func TestEveryMusicRefusalCarriesACodeForTheInterfaceToSayInItsLanguage(t *testing.T) {
+	h := musicHandler(&fakeMusicSources{})
+	for _, check := range []struct{ action, content, guild, code string }{
+		{"play-music", "one", "", "no_server"},
+		{"play-music", "", "guild", "empty_request"},
+		{"play-music", "nothing", "guild", "not_found"},
+		{"skip-music", "", "guild", "nothing_playing"},
+		{"set-music-volume", "loud", "guild", "bad_volume"},
+	} {
+		if reply := doMusic(t, h, check.action, check.content, check.guild); reply["ok"] != false || reply["code"] != check.code || reply["reason"] == "" {
+			t.Fatal(check, reply)
+		}
+	}
+	for range 4 {
+		doMusic(t, h, "play-music", "song", "full")
+	}
+	if reply := doMusic(t, h, "play-music", "song", "full"); reply["code"] != "queue_full" {
+		t.Fatal(reply)
+	}
+	if reply := doMusic(t, NewCommunicationsDomainHandler(nil, ""), "play-music", "x", "guild"); reply["code"] != "not_set_up" {
+		t.Fatal(reply)
+	}
+	refused := refusedFor(fmt.Errorf("%w: only track links are supported, not albums", communications.ErrTrackRefused))["music"].(map[string]any)
+	if refused["code"] != "track_refused" || refused["reason"] != "only track links are supported, not albums" {
+		t.Fatal("a source's refusal keeps only its own words", refused)
 	}
 }

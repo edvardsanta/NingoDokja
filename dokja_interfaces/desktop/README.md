@@ -131,6 +131,11 @@ reply ids and attachment filenames. Older pages are read on demand. The latest p
 every 15 seconds only while the workspace and window document are visible, and with the panel's
 refresh. An error pauses polling until a manual retry succeeds.
 
+Each named server heading expands or collapses its channel list with a click,
+Enter, or Space. Groups open independently; the current conversation and draft
+stay in place, and a Messages refresh preserves collapsed groups. The same
+control is available when there is only one server.
+
 The composer sends text (up to 2000 characters) and optionally a meme picked from the waiting
 queue's previews. The main process confirms the exact channel id, text and attachment address in a native
 window. The renderer cannot request broadcast, force a safety bypass, mark a meme as sent, choose
