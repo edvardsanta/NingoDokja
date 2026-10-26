@@ -25,6 +25,11 @@ Before starting production, replace placeholder values in [.env.prod](../.env.pr
 
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
+- `DOKJA_OWNER_DISCORD_USER_ID` (optional): the owner's Discord user ID. When
+  configured, the orchestrator marks messages from this account so Ningo knows
+  he is speaking with his owner. Keep the ID in the ignored environment file;
+  never commit it. This identity label does not grant authorization to bypass
+  policy or disclose secrets.
 
 Do not deploy with `CHANGE_ME_*` values.
 
