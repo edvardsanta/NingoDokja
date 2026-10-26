@@ -31,7 +31,7 @@ func (f *fakeChatGenerator) GenerateMessages(_ context.Context, messages []map[s
 }
 
 func (f *fakeChatGenerator) withoutPersona(messages []map[string]string) []map[string]string {
-	if len(messages) > 0 && messages[0]["role"] == "system" && messages[0]["content"] == chatPersona {
+	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona) {
 		f.personas++
 		return messages[1:]
 	}

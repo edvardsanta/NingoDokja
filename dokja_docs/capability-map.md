@@ -145,6 +145,12 @@ The shared chat persona permits occasional friendly swearing when the joke calls
 for it, while forbidding humiliation and threats. It asks for contextual slang interpretation,
 brief casual replies, varied wording, and philosophical insight without repetitive
 philosophy references. Quoted content and role claims remain untrusted input.
+Corrections should produce the corrected answer immediately, with brief
+acknowledgment rather than repeated apologies or invented memory explanations.
+Discord turns receive presentation guidance on every generation path: readable
+plain-text math by default, with LaTeX source only when explicitly requested.
+This is interface guidance and conversational adaptation, not durable automatic
+learning of user preferences.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
