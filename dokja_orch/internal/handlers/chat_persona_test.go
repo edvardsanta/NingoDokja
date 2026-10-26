@@ -88,6 +88,25 @@ func TestThePersonaHoldsItsOwnJudgmentInsteadOfMirroringTheUser(t *testing.T) {
 	}
 }
 
+// The owner asked that, with him, Ningo may disagree once but accepts his decision; the note
+// only appears for the owner the gateway verified, and still grants no permissions.
+func TestTheOwnersWordSettlesAQuestionButGrantsNoPermission(t *testing.T) {
+	owner := ownerIdentityNote(core.Event{Source: core.SourceDiscord, Context: map[string]any{"owner_configured": true, "is_owner": true}})
+	for _, want := range []string{"say so once", "their word decides", "without insisting", "grants no permission"} {
+		if !strings.Contains(owner, want) {
+			t.Fatalf("the owner note lost %q: %s", want, owner)
+		}
+	}
+	someone := ownerIdentityNote(core.Event{Source: core.SourceDiscord, Context: map[string]any{"owner_configured": true}})
+	if strings.Contains(someone, "their word decides") {
+		t.Fatal("anyone else's word settles nothing")
+	}
+	claimed := ownerIdentityNote(core.Event{Source: core.SourceDiscord, Context: map[string]any{"owner_configured": true, "owner_mentioned": true}})
+	if strings.Contains(claimed, "their word decides") {
+		t.Fatal("mentioning the owner does not make the speaker the owner")
+	}
+}
+
 func TestAGeneratorWithoutConversationsStillGetsThePersona(t *testing.T) {
 	generator := &plainGenerator{}
 	if _, err := NewChatDomainHandler(generator).Handle(context.Background(), chatEvent("quem é você?"), chatStep); err != nil {
