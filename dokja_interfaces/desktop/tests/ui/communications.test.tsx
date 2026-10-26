@@ -337,14 +337,59 @@ describe("communications", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
     await screen.findByText("Message sent.");
     expect(calls.find((call) => call.type === "communications.send")?.payload).toEqual({ channel_id: "123", content: "", attachment_url: "https://images.example/a.png", skip_hashtag: true, force_nsfw: true });
-    // sent: the draft is done, and the tray is shut so the history shows the message arriving
+    // sent: the draft is done, and the tray stays open for the next one
     expect(container.querySelector(".attached-meme")).toBeNull();
-    expect(screen.queryByRole("list", { name: "Memes to attach" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Attach a meme" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: "Attach a meme" }).getAttribute("aria-expanded")).toBe("true");
     // and "sent" is about that message: it goes as soon as the next one is begun
     fireEvent.change(screen.getByLabelText("Message to send as Ningo"), { target: { value: "next" } });
     expect(screen.queryByText("Message sent.")).toBeNull();
   });
+  it("keeps the tray open after a meme goes out, and reads it again without that meme", async () => {
+    const first = { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" };
+    const second = { url: "https://images.example/b.png", title: "Second", tags: "", source: "", createdAt: "", sentAt: "" };
+    const { preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": [ok({ total: 2, offset: 0, memes: [first, second] }), ok({ total: 1, offset: 0, memes: [second] })],
+      "communications.send": ok({ sent: true }),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach First" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
+
+    await screen.findByText("Message sent.");
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Attach First" })).toBeNull());
+    expect(screen.getByRole("list", { name: "Memes to attach" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Attach Second" })).toBeTruthy();
+    expect(calls.filter((call) => call.type === "meme.list").map((call) => (call.payload as { offset: number }).offset)).toEqual([0, 0]);
+  });
+
+  it("goes back a page when the meme sent was the last one on it", async () => {
+    const meme = (name: string) => ({ url: `https://images.example/${name}.png`, title: name, tags: "", source: "", createdAt: "", sentAt: "" });
+    const { preview } = previewer();
+    const { transport, calls } = routedTransport({
+      "communications.channels": ok(channels),
+      "communications.history": ok(history()),
+      "meme.list": [
+        ok({ total: 13, offset: 0, memes: Array.from({ length: 12 }, (_, index) => meme(`m${index}`)) }),
+        ok({ total: 13, offset: 12, memes: [meme("last")] }),
+        ok({ total: 12, offset: 0, memes: Array.from({ length: 12 }, (_, index) => meme(`m${index}`)) }),
+      ],
+      "communications.send": ok({ sent: true }),
+    }, preview);
+    render(view(transport));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+    await screen.findByText("1–12 of 13");
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Attach last" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send as Ningo" }));
+
+    await screen.findByText("1–12 of 12");
+    expect(calls.filter((call) => call.type === "meme.list").map((call) => (call.payload as { offset: number }).offset)).toEqual([0, 12, 0]);
+  });
+
   it("pages the memes in the tray with the offset it was asked for", async () => {
     const meme = (number: number) => ({ url: `https://images.example/${number}.png`, title: `Meme ${number}`, tags: "", source: "", createdAt: "", sentAt: "" });
     const first = { total: 24, offset: 0, memes: Array.from({ length: 12 }, (_, index) => meme(index + 1)) };
