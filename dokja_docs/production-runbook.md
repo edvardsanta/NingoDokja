@@ -834,7 +834,11 @@ and configure source and processing plugins. The optional
 `FEEDS_PLUGIN_EXTRAS=content` build argument installs the shipped compatibility
 processors' dependencies; `media` installs only the media-perception adapter's
 (screening, OCR and attachment download, without `torch`); `none` is the small
-default.
+default. `FEEDS_PLUGIN_REQUIREMENTS` names a requirements file of the owner's, by a
+path inside the build context (for example `feeds_plugins/requirements.txt`, which
+git ignores), whose libraries are installed for the owner's own plugins; the
+default is an empty list in the repository. Both are build arguments of the
+`dokja-feeds` image in every stack: rebuild Feeds after changing either.
 
 All stacks configure `FEEDS_BUILTIN_PLUGINS_DIR`, the existing `dokja-data` volume
 for plugin state/model cache, and an optional models mount. Processing settings

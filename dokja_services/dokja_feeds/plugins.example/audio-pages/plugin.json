@@ -1,8 +1,8 @@
 {
   "plugin_api": 1,
-  "id": "audio-resolve",
+  "id": "audio-pages",
   "version": "0.1.0",
-  "name": "Audio Resolve",
+  "name": "Audio Pages",
   "provides": [
     "audio.resolve.v1"
   ],

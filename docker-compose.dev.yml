@@ -178,6 +178,7 @@ services:
       dockerfile: dokja_services/dokja_feeds/Dockerfile.dev
       args:
         FEEDS_PLUGIN_EXTRAS: ${FEEDS_PLUGIN_EXTRAS:-none}
+        FEEDS_PLUGIN_REQUIREMENTS: ${FEEDS_PLUGIN_REQUIREMENTS:-dokja_services/dokja_feeds/no-plugin-requirements.txt}
     working_dir: /workspace/dokja_services/dokja_feeds
     command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-feeds"]
     environment:

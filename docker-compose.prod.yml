@@ -140,6 +140,7 @@ services:
       dockerfile: dokja_services/dokja_feeds/Dockerfile
       args:
         FEEDS_PLUGIN_EXTRAS: ${FEEDS_PLUGIN_EXTRAS:-none}
+        FEEDS_PLUGIN_REQUIREMENTS: ${FEEDS_PLUGIN_REQUIREMENTS:-dokja_services/dokja_feeds/no-plugin-requirements.txt}
     restart: unless-stopped
     environment:
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
