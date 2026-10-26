@@ -2,6 +2,11 @@
 
 TypeScript Discord communication adapter for Dokja. It receives Discord messages and slash commands, maps them into Dokja orchestrator requests over HTTP, and sends the orchestrator reply back to Discord.
 
+Long replies are split into messages of at most 2,000 characters. The active
+discord.js runtime closes and reopens fenced code blocks with their language tag
+at each boundary, preserving code indentation and blank lines. Exceptionally long
+lines are split when necessary to fit the message limit.
+
 Environment variables:
 
 - `DISCORD_BOT_TOKEN`
