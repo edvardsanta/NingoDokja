@@ -1,0 +1,60 @@
+package handlers
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	digestdomain "read_books/dokja_domain/dokja_digest"
+	"read_books/internal/core"
+)
+
+// Regression: with no persona the model introduced itself as another product in a Discord chat
+// ("Sou o ChatGPT, um assistente de IA da OpenAI", then "eu sou o Claude, feito pela Anthropic").
+func TestEveryChatTurnOpensWithNingosPersona(t *testing.T) {
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	handler := NewChatDomainHandler(generator).WithReading(func(_ context.Context, id string) (digestdomain.Reference, error) {
+		return digestdomain.Reference{ID: id, Title: "A reading", Summary: "Its text"}, nil
+	})
+
+	if _, err := handler.Handle(context.Background(), chatEvent("quem é você?"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handler.Handle(context.Background(), core.Event{
+		Source: core.SourceDesktop, User: core.EventUser{ID: "u1"}, Channel: core.EventChannel{ID: "desktop"},
+		Type: "message.created", Payload: map[string]any{"content": "explain it", "conversation_id": "reading-1", "reading_id": "item-1"},
+	}, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if generator.personas != 2 {
+		t.Fatalf("expected the persona first in both turns, got %d", generator.personas)
+	}
+	if generator.messages[0]["role"] != "system" || !strings.Contains(generator.messages[0]["content"], "Its text") {
+		t.Fatalf("the reading must still follow the persona: %#v", generator.messages)
+	}
+}
+
+func TestThePersonaNamesNingoAndRefusesOtherIdentities(t *testing.T) {
+	for _, want := range []string{"You are Ningo Dokja", "arrogant philosopher", "talkative", "never read it", "Never present yourself as ChatGPT, Claude", "Reply in the language the user wrote in"} {
+		if !strings.Contains(chatPersona, want) {
+			t.Fatalf("the persona lost %q", want)
+		}
+	}
+}
+
+func TestAGeneratorWithoutConversationsStillGetsThePersona(t *testing.T) {
+	generator := &plainGenerator{}
+	if _, err := NewChatDomainHandler(generator).Handle(context.Background(), chatEvent("quem é você?"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(generator.prompt, chatPersona) || !strings.HasSuffix(generator.prompt, "quem é você?") {
+		t.Fatalf("expected the persona before the message, got %q", generator.prompt)
+	}
+}
+
+type plainGenerator struct{ prompt string }
+
+func (g *plainGenerator) Generate(_ context.Context, message string) (map[string]any, error) {
+	g.prompt = message
+	return map[string]any{"reply": "ok"}, nil
+}
