@@ -22,6 +22,14 @@ configuration, validation and rollback. All affected base Compose files project
 the storage variables; an optional private PostgreSQL overlay provides local
 infrastructure. Deployments still require owner approval.
 
+## Priority revision (2026-10-26)
+
+The owner requested returning to cognitive contracts and application evaluation.
+Knowledge PostgreSQL support remains implemented and the storage direction
+remains accepted. Further Memory/receipt work follows the
+[reopened step 08 gate](../cognitive-realignment.md), so the required state
+semantics precede another migration. This is not a runtime rollback or cutover.
+
 ## Relationship to prior decisions
 
 This authorizes application adoption beyond ADR 0009's research-only status for

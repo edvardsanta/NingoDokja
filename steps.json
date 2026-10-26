@@ -3,9 +3,9 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-23",
+  "updated_on": "2026-10-26",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
-  "current_step": "09",
+  "current_step": "08",
   "status_values": [
     "pending",
     "in_progress",
@@ -16,7 +16,7 @@
   "tracking_rules": [
     "Update this file when a step starts, completes, changes scope, or encounters a concrete blocker.",
     "Complete a step only when its acceptance criteria have evidence; document blocked or skipped checks.",
-    "Keep at most one step in progress and point current_step to it; use null between steps.",
+    "Keep at most one top-level step in progress and point current_step to it; one selected descendant may be in progress on that same execution path. Retain historical implementation evidence when remaining work is rescheduled.",
     "Treat research proposals as hypotheses until a decision or experiment supports them.",
     "Review public-contract, schema, configuration, and deployment compatibility before implementation."
   ],
@@ -480,19 +480,25 @@
     {
       "id": "08",
       "title": "Evaluate the architecture and select the next migrations",
-      "status": "completed",
+      "status": "in_progress",
       "depends_on": [
         "07"
       ],
       "deliverables": [
         "dokja_docs/step-08-evaluation.md (comparison and owner decisions)",
-        "dokja_orch/internal/handlers/step08_comparison_test.go (three modes on 8 fixed cases)"
+        "dokja_orch/internal/handlers/step08_comparison_test.go (three modes on 8 fixed cases)",
+        "dokja_docs/cognitive-realignment.md (reopened application behavior gate)"
       ],
       "acceptance_criteria": [
         "Existing behavior, workspace-only behavior, and shadow prediction are compared on fixed cases.",
         "Coupling, fault containment, latency, resource use, and trace usefulness are assessed.",
         "Prediction skill, support, and feedback coverage are reported without claiming evidence from insufficient data.",
-        "The remaining roadmap is revised from measured results before broad adoption."
+        "The remaining roadmap is revised from measured results before broad adoption.",
+        "Define candidate claims/concepts/methods, source provenance, applicability, uncertainty, task context and observed episodes for one owner-selected application consumer; permanent service/UI grouping remains a hypothesis.",
+        "Prove the vertical through application ports and orchestrated domain steps, including evidence beyond initial retrieval, contradictions/missing evidence, justified applicability and later reuse of an observed outcome.",
+        "Compare simple retrieval and fixed bounded retrieval with the adaptive path using a frozen representative corpus, held-out cases, repeated runs, no-memory and inapplicable-memory controls; record failures and costs, not only one successful example.",
+        "Keep similarity, factual reliability, authorization, hypothetical prediction, user acceptance and observed task result distinct. Do not promote an unvalidated episode or erase canonical knowledge through cache TTL.",
+        "Use Feeds as the external integration side of Knowledge. Source/document views expose provenance and intake; broader grouping, consolidation, UI and unfinished storage work follow the behavioral review gate."
       ],
       "evidence": [
         "Existing, workspace-only and shadow modes deliver identical text on 8 fixed cases; task modes give a stable reason for abstention, unreadable media, Knowledge outage and degraded prediction where the existing path only logs or swallows it.",
@@ -500,7 +506,8 @@
         "Live memory.recall on the owner's running Memory service (read-only, 31 requests): warm p50 26 ms, p95 32 ms; cold 1305 ms, which misses the 1 s budget.",
         "Coupling per experiment commit and fault containment recorded; no envelope, schema, existing route or interface command changed; rollback is one composition line per orchestrator experiment.",
         "Real prediction data: 7 hashtag.suggest attempts scored (5 legacy path, 2 task path), 0 resolved over 5 days; Brier and skill not computable; feedback coverage 0/7.",
-        "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets."
+        "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets.",
+        "2026-10-26: source diagnosis found ordinary reading remains read -> ingest -> classify; generic consolidation 09.3 is pending and cognitive inference remains experimental. Owner selected understanding/application across documents and confirmed Feeds as external Knowledge integration. The original evaluations remain historical, scoped evidence."
       ],
       "checks": [
         {
@@ -525,12 +532,81 @@
         }
       ],
       "blockers": [],
-      "completed_on": "2026-10-19"
+      "initial_completed_on": "2026-10-19",
+      "reopened_on": "2026-10-26",
+      "reopened_reason": "Owner requested returning to conceptual/evaluation steps because information collections and infrastructure progress do not establish cognitive behavior. First proof case: understand and apply knowledge across documents. Feeds is the external integration side of Knowledge.",
+      "references": [
+        "dokja_docs/cognitive-realignment.md",
+        "dokja_docs/decisions/0005-knowledge-experience-content.md",
+        "dokja_docs/decisions/0006-reading-macro-component.md",
+        "dokja_docs/model-assisted-cognition-follow-up.md"
+      ],
+      "substeps": [
+        {
+          "id": "08.1",
+          "title": "Reconcile original cognitive goals with delivered application behavior",
+          "status": "completed",
+          "completed_on": "2026-10-26",
+          "evidence": [
+            "Inspected ADR 0005/0006/0008/0010, step 08/09 evaluation records, current reading task, workspace/inference contracts and prior model-assisted results. Recorded owner-selected cross-document consumer and Feeds external integration boundary in cognitive-realignment.md. No application-learning validation is claimed."
+          ],
+          "checks": [
+            {
+              "name": "roadmap_realignment_validation",
+              "status": "passed",
+              "detail": "Parsed tracker with 47 unique status nodes, verified one active top-level phase (08), all dependency/resume-gate references and acyclic dependencies, preserved every historical evidence/check entry and all previous completions except the explicitly reopened 08, and checked 179 local links plus Markdown fences. Documentation/tracker only; no cognitive behavior test, application code, env, database or runtime change."
+            }
+          ]
+        },
+        {
+          "id": "08.2",
+          "title": "Define and implement a cross-document knowledge-use application vertical",
+          "status": "in_progress",
+          "depends_on": [
+            "08.1"
+          ],
+          "deliverables": [
+            "Minimum versioned source/claim/concept/method/applicability/episode and bounded task-context contract",
+            "Frozen representative nonpersonal corpus, held-out application cases, expected supported conclusions/abstentions, scoring rubric and evaluation budget",
+            "Opt-in application vertical through existing domain/orchestrator/service ports, with compatibility and persistence review before changes"
+          ],
+          "acceptance_criteria": [
+            "Acquire observations through Feeds and retain provenance; input format does not independently dictate reasoning.",
+            "Represent support, contradiction, scope/date eligibility and unresolved preconditions before applying a method; missing support may require retrieval, revision, clarification or abstention.",
+            "Record actual attempted procedure/outcome and any prior prediction separately. Later applicable experience may inform a justified choice; absence/irrelevance must not invent remembered knowledge.",
+            "Preserve layer responsibilities and bound state, provider calls and external effects. This is application integration, not another benchmark-only demonstration."
+          ],
+          "evidence": [
+            "Owner selected understanding and applying knowledge across documents; minimum consumer and control requirements are documented, but concrete contracts, corpus/rubric freeze and implementation remain incomplete."
+          ],
+          "remaining": [
+            "Specify the concrete representation, ownership and persistence compatibility.",
+            "Select and freeze the corpus, held-out cases, scoring rubric and budget before model comparisons.",
+            "Implement and test the opt-in application vertical without assuming permanent faculty count or database topology."
+          ]
+        },
+        {
+          "id": "08.3",
+          "title": "Evaluate causal controls and accept only demonstrated cognitive responsibilities",
+          "status": "pending",
+          "depends_on": [
+            "08.2"
+          ],
+          "acceptance_criteria": [
+            "Compare simple and fixed bounded retrieval baselines with the adaptive path; report correctness, unsupported claims, abstentions, calls, latency and cost across repeated/held-out cases.",
+            "Exercise equivalent source content, extra retrieval, contradiction, missing/stale/foreign evidence, no experience, memory removal and inapplicable/contradicted experience.",
+            "Inspect every run, invalid/late outputs, authorization/budget integrity and restart/reuse limits. A single successful pair or changed choice alone is insufficient evidence of general learning.",
+            "Use evaluated behavior to decide consolidation/promotion rules and which functional boundaries/navigation are justified before resuming production adoption."
+          ],
+          "evidence": []
+        }
+      ],
+      "next_action": "08.2: freeze the minimum application state/authority contract, representative corpus and evaluation rubric, then implement the cross-document vertical. 08.3 evaluates it before production consolidation/migration resumes."
     },
     {
       "id": "09",
-      "title": "Adopt faculty boundaries in conversation, delivery and feature workflows",
-      "status": "in_progress",
+      "title": "Adopt validated cognitive behavior in application workflows",
+      "status": "pending",
       "depends_on": [
         "08"
       ],
@@ -539,19 +615,19 @@
         "Chat domain ownership migration",
         "Focused delivery and administration workflows",
         "Generic knowledge consolidation and summary flow; Book runtime retirement scope still to resolve",
-        "Meme and Digest expressed as workflows over the four concepts behind meme.* and digest.* facades (ADR 0007, ADR 0010)",
+        "Meme and Digest workflows preserve their facades while remaining cognitive responsibility/grouping decisions follow the reopened evaluation",
         "dokja_domain/dokja_knowledge/classification.go",
         "dokja_domain/dokja_knowledge/classification_test.go",
         "dokja_docs/step-09-consolidation.md"
       ],
       "acceptance_criteria": [
-        "Order: generic classification and knowledge consolidation (ADR 0008), then Meme and Digest faculty workflows, then chat ownership; preserve Book runtime contracts until retirement scope is resolved.",
+        "After the reopened 08.3 gate, start with generic knowledge consolidation 09.3 using the validated cross-document state/behavior contract, then review remaining feature and conversation responsibilities. Preserve existing runtime contracts until retirement scope is resolved.",
         "Conversation policy has one authoritative domain implementation.",
         "System-handler responsibilities have explicit owners and focused adapters.",
         "The adopted workspace and plugin contracts are reused only where the experiments justify them.",
         "Existing interface commands and successful responses have regression coverage and rollback instructions.",
         "The generic flow covers existing Book uses before the approved CLI book removal; remaining book.* route/domain/service retirement scope is resolved explicitly under ADR 0008.",
-        "Meme scrapers and OCR run as Feeds plugins (Knowledge intake) with the pool as an intake cache, screening, digest ordering and the hashtag relevance threshold sit under Rules, and sent receipts are Memory (ADR 0010, proposed), with existing commands and triggers passing their baseline tests.",
+        "Feeds is the external integration side of Knowledge. Remaining Meme/Digest grouping follows responsibilities demonstrated by the reopened evaluation; ADR 0010 remains proposed and neither four nor nine groups establish cognitive behavior.",
         "Book, Meme and Digest run as typed Go workflows composed from faculty steps (ADR 0007 stage 2); versioned recipes (stage 3) follow only after that.",
         "The first workflow that iterates gains the ADR 0005 loop transitions (need_evidence, revise, stagnated, oscillated) with snapshot reuse, moved from the step 03 experiment (moved from step 06).",
         "New workflows meet the step 08 budgets: workspace overhead at most 1 ms p95 per task; shadow prediction at most 1 s on a delivery path; on-demand reading within the plugin's manifest timeout, at most 2 minutes."
@@ -631,7 +707,7 @@
         {
           "id": "09.2",
           "title": "Integrate structured metadata persistence and reading-time classification with migration review",
-          "status": "in_progress",
+          "status": "pending",
           "evidence": [
             "Structured metadata accepted/resolved by the Knowledge domain and attached to Reading ingests; reader version and per-axis provenance are stored separately from tags.",
             "Knowledge schema 2 adds document_metadata. Search/list expose metadata; legacy kinds and tag limits remain unchanged.",
@@ -708,19 +784,27 @@
             "Pick an Ollama chat model for the last fallback.",
             "Wire classification questions/answers into chat interfaces; desktop, CLI and API continuation are implemented.",
             "Define the bounded desktop document-detail contract and content representation; retain the existing conversation model and expose useful open/classification actions only when implemented."
-          ]
+          ],
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3"
         },
         {
           "id": "09.3",
           "title": "Implement generic consolidation and summary methods; resolve remaining Book retirement scope",
           "status": "pending",
           "evidence": [],
-          "checks": []
+          "checks": [],
+          "depends_on": [
+            "08.3"
+          ],
+          "resume_gate": "08.3",
+          "next_action": "Use the accepted cross-document representation and measured application cycle to implement generic consolidation; summary/classification alone is not the acceptance criterion."
         },
         {
           "id": "09.4",
           "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
-          "status": "in_progress",
+          "status": "pending",
           "evidence": [
             "Owner accepted classifying Discord and WhatsApp gateways as communication-service adapters, while Desktop/CLI/TUI remain operator interfaces. ADR 0012 records inbound/outbound roles and preserved contracts; source audit completed, no code or deployment moved.",
             "2026-10-23: owner approved a breaking inbound bridge migration without a legacy gateway path. Communications now decides inbound application eligibility before chat or command steps; gateways retain protocol filtering. A dedicated bearer credential protects the bridge metadata. No live account or production rollout was performed.",
@@ -988,12 +1072,16 @@
           "remaining": [
             "Physical media receipt storage still uses the existing cache table. Durable attempt/outcome identity, per-destination receipts and receipt-write/crash recovery remain separate work; historical sent flags are not verified delivery evidence.",
             "Meme selection/relevance, Digest ordering/freshness and conversation responsibility migrations remain pending; the broader ADR 0010 grouping is still proposed."
-          ]
+          ],
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3",
+          "next_action": "Retain completed ownership extractions; review the remaining grouping only after the 08.3 application gate."
         },
         {
           "id": "09.5",
           "title": "Persist and resume Ningo conversation history across operator interfaces",
-          "status": "in_progress",
+          "status": "pending",
           "depends_on": [
             "09.4"
           ],
@@ -1029,17 +1117,25 @@
           "references": [
             "dokja_docs/conversation-history-plan.md"
           ],
-          "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI)."
+          "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI).",
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3"
         }
       ],
       "references": [
         "dokja_docs/feeds-content-plugins.md"
-      ]
+      ],
+      "status_before_review": "in_progress",
+      "rescheduled_on": "2026-10-26",
+      "resume_gate": "08.3",
+      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate.",
+      "previous_title": "Adopt faculty boundaries in conversation, delivery and feature workflows"
     },
     {
       "id": "10",
       "title": "Define and implement required durable execution and state ownership",
-      "status": "in_progress",
+      "status": "pending",
       "depends_on": [
         "09"
       ],
@@ -1081,13 +1177,13 @@
         "decision": "dokja_docs/decisions/0009-cognitive-storage-evaluation.md",
         "recommendation_status": "PostgreSQL application adoption approved for Knowledge then Memory; graph workload evaluation remains separate",
         "benchmarks": "W1 and bounded client-BFS W2 results recorded; native traversal/concurrency and W4 remain incomplete",
-        "next_action": "Implement application PostgreSQL adoption under 10.4, then continue the distinct graph evaluation gaps; do not substitute benchmark adapters for application integration."
+        "next_action": "Complete the reopened 08.2 application contract and 08.3 evaluation before remaining storage/graph adoption. Retain completed Knowledge PostgreSQL support and prior measurements; no runtime cutover is implied."
       },
       "substeps": [
         {
           "id": "10.1",
           "title": "Evaluate bounded multi-hop graph traversal before choosing a storage engine",
-          "status": "in_progress",
+          "status": "pending",
           "deliverables": [
             "Consumer and query contracts for W2 (claim evidence/dependencies) and W4 (method/procedure/episode/outcome)",
             "Deterministic graph fixtures, independent expected results and adapters for SQLite, PostgreSQL and Neo4j",
@@ -1124,7 +1220,10 @@
             "dokja_docs/cognitive-storage-research.md#reproducible-comparison-plan",
             "dokja_docs/step-10-multihop-storage-results.md"
           ],
-          "next_action": "Compare native recursive execution under equivalent bounds, evaluate concurrency/connected graph workloads and database resources; define the separate W4 consumer. No engine adoption or application migration."
+          "next_action": "Compare native recursive execution under equivalent bounds, evaluate concurrency/connected graph workloads and database resources; define the separate W4 consumer. No engine adoption or application migration.",
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3"
         },
         {
           "id": "10.2",
@@ -1175,7 +1274,7 @@
         {
           "id": "10.3",
           "title": "Integrate domain inference contracts with interchangeable infrastructure providers",
-          "status": "in_progress",
+          "status": "pending",
           "depends_on": [
             "10.2"
           ],
@@ -1204,12 +1303,16 @@
             "dokja_docs/decisions/0011-inference-provider-boundaries.md",
             "dokja_docs/model-assisted-cognition-experiment.md",
             "dokja_docs/model-assisted-cognition-follow-up.md"
-          ]
+          ],
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3",
+          "next_action": "Reuse tested inference contracts/adapters where appropriate in 08.2; general production adoption awaits 08.3 controls and reliability evidence."
         },
         {
           "id": "10.4",
           "title": "Adopt PostgreSQL and pgvector in application Knowledge then Memory",
-          "status": "in_progress",
+          "status": "pending",
           "deliverables": [
             "dokja_docs/decisions/0014-application-postgres-adoption.md",
             "Application Knowledge PostgreSQL adapter, explicit configuration, verified import/rollback and CI",
@@ -1261,9 +1364,11 @@
               "title": "Integrate Memory PostgreSQL storage and verified migration",
               "status": "pending",
               "depends_on": [
-                "10.4-a"
+                "10.4-a",
+                "08.3"
               ],
-              "evidence": []
+              "evidence": [],
+              "resume_gate": "08.3"
             },
             {
               "id": "10.4-c",
@@ -1279,9 +1384,16 @@
             "dokja_docs/decisions/0014-application-postgres-adoption.md",
             "dokja_docs/knowledge-postgres.md"
           ],
-          "next_action": "Review the Knowledge backend PR, then implement Memory PostgreSQL adoption. Production cutover remains an explicit operator-approved deployment; receipt-ledger storage follows the agreed PostgreSQL ownership."
+          "next_action": "Knowledge PostgreSQL support stays completed and available. Resume Memory adoption after 08.3 establishes episode/state semantics; no data cutover or cache TTL is introduced by replanning.",
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3"
         }
-      ]
+      ],
+      "status_before_review": "in_progress",
+      "rescheduled_on": "2026-10-26",
+      "resume_gate": "08.3",
+      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate."
     },
     {
       "id": "11",
@@ -1397,7 +1509,7 @@
         {
           "id": "11.4",
           "title": "Configure inference providers and capability bindings through shared settings",
-          "status": "in_progress",
+          "status": "pending",
           "depends_on": [
             "11.3",
             "10.3"
@@ -1486,12 +1598,15 @@
             },
             {
               "id": "bounded_chat_validation",
-              "status": "in_progress",
+              "status": "pending",
               "deliverables": [
                 "Completed-inference trace gate, cancellation and actual executable regressions",
                 "Opt-in synthetic live chat test and explicit provider results"
               ],
-              "next_action": "Successful Claude validation remains blocked by a provider-reported session limit. Recheck only through an explicit bounded test when allowance is available, evaluate an installed Ollama generation model and retain the provenance/cross-provider gaps."
+              "next_action": "Successful Claude validation remains blocked by a provider-reported session limit. Recheck only through an explicit bounded test when allowance is available, evaluate an installed Ollama generation model and retain the provenance/cross-provider gaps.",
+              "status_before_review": "in_progress",
+              "rescheduled_on": "2026-10-26",
+              "resume_gate": "08.3"
             },
             {
               "id": "discovery",
@@ -1550,10 +1665,15 @@
           "verification_gaps": [
             "Existing native communications confirmation fixture and Digest smoke timeout remain non-green on the parent branch; parallel Electron startup is also unstable. No failure is reported as passing.",
             "Live Codex synthetic chat passed with an ephemeral fixture binding; selected Claude failed and Ollama generation was not run. Authentication/quota diagnosis, cross-provider parity and actual answering-model provenance remain unverified."
-          ]
+          ],
+          "status_before_review": "in_progress",
+          "rescheduled_on": "2026-10-26",
+          "resume_gate": "08.3"
         }
-      ]
+      ],
+      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate."
     }
   ],
-  "next_step": null
+  "next_step": null,
+  "next_action": "08.2: define and implement the owner-selected cross-document understanding/application vertical under the reopened cognitive review; see dokja_docs/cognitive-realignment.md."
 }

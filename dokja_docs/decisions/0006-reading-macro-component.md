@@ -10,6 +10,14 @@ Generalized by [ADR 0007](./0007-faculties-not-features.md): features are workfl
 Related: [decision index](./README.md), [plugin lifecycle](./0002-plugin-lifecycle.md),
 [capability map](../capability-map.md).
 
+## Owner clarification (2026-10-26)
+
+Feeds is the external integration side of Knowledge, covering source and
+perception adapters rather than a separate conceptual peer of internal
+knowledge. [Cognitive realignment](../cognitive-realignment.md) records the
+behavioral gate. Existing migration history remains scoped evidence; this
+clarification introduces no direct cross-service calls or provider relocation.
+
 ## Context
 
 The owner decided the direction: reading a book is a *reading*, the same

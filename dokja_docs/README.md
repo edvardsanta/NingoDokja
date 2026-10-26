@@ -4,6 +4,8 @@ Project-level architecture and behavior notes.
 
 Available docs:
 
+- [Cognitive realignment and reopened step 08](./cognitive-realignment.md)
+
 - [Communication services: source audit and migration](./communication-boundaries.md)
 
 - [Cognitive storage research and comparison](./cognitive-storage-research.md)

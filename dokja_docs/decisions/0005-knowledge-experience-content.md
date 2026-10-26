@@ -5,6 +5,14 @@ Implementation: step `04`. Refines ADRs 0001 and 0003.
 Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 [state ownership](./0003-state-ownership.md), [capability map](../capability-map.md).
 
+## Reopened cognitive review (2026-10-26)
+
+The owner requested returning to conceptual and evaluation steps, with
+understanding and applying knowledge across documents as the first application
+proof case. [Reopened step 08](../cognitive-realignment.md) retains the original
+experiments as scoped evidence. Permanent capability allocation remains a
+hypothesis; information grouping is insufficient evidence of cognitive behavior.
+
 ## Current review scope (2026-10-21)
 
 The owner requested a fresh causal experiment. The historical prototype topology

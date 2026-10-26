@@ -10,6 +10,15 @@ Runtime availability has not been tested. A macro-component can span a domain,
 injected ports, service implementations, and provider plugins; this inventory
 does not prescribe a deployment or folder reorganization.
 
+## Reopened cognitive review
+
+Owner direction (2026-10-26): [step 08 is reopened](cognitive-realignment.md) to
+prove understanding and applying knowledge across documents. Feeds is
+Knowledge's external integration wing; source/document views expose intake and
+provenance. Existing storage, retrieval and feedback features are implementation
+evidence, not proof of general consolidation or application learning. Broader
+functional grouping remains a hypothesis.
+
 ## Layer responsibilities and extension path
 
 External input follows `Interface -> Event/Request -> Orchestrator -> Domain -> Service`.

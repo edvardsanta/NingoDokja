@@ -9,6 +9,16 @@ Inputs: [step 03 baseline](./step-03-baseline.md), steps `04`–`07`,
 The recommendations at the end are proposals. The owner decides whether each
 prototype is adopted, revised or stopped.
 
+## Reopened review (2026-10-26)
+
+The owner requested revisiting cognitive behavior and selected understanding
+and applying knowledge across documents as the first application proof case.
+Feeds is the external integration side of Knowledge. Historical measurements
+below retain their original scope; they do not establish general consolidation
+or application learning. Step `08` is active again, with the
+[realignment contract](cognitive-realignment.md) defining the evaluation gate
+before unfinished production migrations resume.
+
 ## 1. Three modes on fixed cases
 
 [step08_comparison_test.go](../dokja_orch/internal/handlers/step08_comparison_test.go)

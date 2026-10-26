@@ -4,6 +4,14 @@ Date: 2026-10-21. Status: proposed, for the owner to accept when reviewing it.
 Would supersede the faculty list of [ADR 0007](./0007-faculties-not-features.md)
 and amend [ADR 0006](./0006-reading-macro-component.md). Migration: pending.
 
+## Reopened review (2026-10-26)
+
+The owner challenged the current information-oriented grouping and requested
+returning to cognitive behavior. The proposed four groups remain unadopted as
+a complete cognitive model. Feeds as the external integration side of Knowledge
+is explicitly confirmed; the broader grouping awaits the
+[reopened application evaluation](../cognitive-realignment.md).
+
 ## Context
 
 ADR 0007 split Ningo into nine faculties: Reading, Knowledge, Experience,
