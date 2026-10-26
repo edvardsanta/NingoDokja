@@ -77,6 +77,7 @@ func TestBridgeHandleRefusesNonChatWhatsAppEvents(t *testing.T) {
 		"whatsapp meme event":    `{"event_type":"meme.fetch","interface":"whatsapp","payload":{"content":"x"}}`,
 		"whatsapp custom event":  `{"event_type":"discord.send","interface":"whatsapp","payload":{"content":"x"}}`,
 		"whatsapp default event": `{"interface":"whatsapp","payload":{"content":"x"}}`,
+		"whatsapp music event":   `{"event_type":"music.play","interface":"whatsapp","payload":{"content":"x"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			request := httptest.NewRequest("POST", "/orchestrator", strings.NewReader(body))

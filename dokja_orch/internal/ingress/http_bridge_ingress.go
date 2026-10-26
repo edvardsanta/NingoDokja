@@ -281,6 +281,12 @@ func extractBridgeReply(result core.ProcessResult) string {
 		return formatMemeReply(memeResult)
 	}
 
+	if communicationsResult, ok := result.Result[string(core.DomainCommunications)].(map[string]any); ok {
+		if music, ok := communicationsResult["music"].(map[string]any); ok {
+			return formatMusicReply(strings.TrimSpace(result.Event.Type), music)
+		}
+	}
+
 	return ""
 }
 
@@ -303,6 +309,61 @@ func sanitizeDiscordOwnerID(reply, ownerID string) string {
 	reply = strings.ReplaceAll(reply, "<@"+ownerID+">", marker)
 	reply = strings.ReplaceAll(reply, ownerID, marker)
 	return strings.ReplaceAll(reply, marker, "<@"+ownerID+">")
+}
+
+// formatMusicReply answers a music command in one plain line, or a short list for the queue.
+func formatMusicReply(eventType string, music map[string]any) string {
+	if ok, _ := music["ok"].(bool); !ok {
+		reason := strings.TrimSpace(stringValue(music["reason"]))
+		if reason == "" {
+			return "That could not be done."
+		}
+		return strings.ToUpper(reason[:1]) + reason[1:] + "."
+	}
+	now, _ := music["now_playing"].(map[string]any)
+	waiting, _ := music["waiting"].([]any)
+	switch eventType {
+	case "music.play":
+		added, _ := music["added"].(map[string]any)
+		if place, _ := intFromValue(music["place"]); place > 0 {
+			return fmt.Sprintf("Queued #%d: %s.", place, trackLine(added))
+		}
+		return fmt.Sprintf("Now playing: %s.", trackLine(added))
+	case "music.skip":
+		if now == nil {
+			return "Skipped. The queue is empty."
+		}
+		return fmt.Sprintf("Skipped. Now playing: %s.", trackLine(now))
+	case "music.pause":
+		return "Paused."
+	case "music.resume":
+		return "Resumed."
+	case "music.stop":
+		return "Stopped. The queue is empty."
+	case "music.volume":
+		volume, _ := intFromValue(music["volume"])
+		return fmt.Sprintf("Volume: %d%%.", volume)
+	}
+	if now == nil {
+		return "Nothing is playing."
+	}
+	lines := []string{"Now playing: " + trackLine(now)}
+	for i, raw := range waiting {
+		track, _ := raw.(map[string]any)
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, trackLine(track)))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func trackLine(track map[string]any) string {
+	title := strings.TrimSpace(stringValue(track["title"]))
+	if title == "" {
+		title = "an untitled track"
+	}
+	if uploader := strings.TrimSpace(stringValue(track["uploader"])); uploader != "" {
+		return title + " – " + uploader
+	}
+	return title
 }
 
 // bridgeInterfaces are the interfaces allowed to use the bridge, with the source their
@@ -417,6 +478,10 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
+	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume":
+		// What follows the command (words, a link, a volume) is read by the Communications
+		// domain; the bridge passes it on as typed.
+		return strings.TrimSpace(request.EventType), map[string]any{"content": content}
 	default:
 		return strings.TrimSpace(request.EventType), map[string]any{"content": content}
 	}

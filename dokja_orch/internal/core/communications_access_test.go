@@ -44,6 +44,14 @@ func TestCommunicationsRoutes(t *testing.T) {
 		"communications.link.status": DomainSystem,
 		"communications.link.start":  DomainSystem,
 		"communications.link.reset":  DomainSystem,
+		"music.play":                 DomainCommunications,
+		"music.skip":                 DomainCommunications,
+		"music.pause":                DomainCommunications,
+		"music.resume":               DomainCommunications,
+		"music.stop":                 DomainCommunications,
+		"music.queue":                DomainCommunications,
+		"music.volume":               DomainCommunications,
+		"music.ended":                DomainCommunications,
 	} {
 		event := Event{Type: eventType}
 		route, err := NewRuleBasedEventRouter().Route(context.Background(), event)
