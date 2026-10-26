@@ -24,6 +24,28 @@ Current capabilities:
 - select menus
 - modals
 - internal outbound message delivery for orchestrator-driven sends
+- music in a voice channel (below)
+
+## Music
+
+`/play song:<words or a link>`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue` and
+`/volume percent:<0-100>` send `music.*` events through the bridge, from the channel they were
+typed in, so the server and allowed-channel checks apply. The orchestrator keeps the queue; every
+music reply carries it (`music` in the bridge response, with an `epoch` and a `version`), and the
+adapter plays what it says, ignoring a reply older than the last one it applied.
+
+- A track plays from its page: `yt-dlp` (pinned in the image, using the image's node for pages
+  that run JavaScript) pipes its audio into ffmpeg, which hands Discord raw 48 kHz stereo PCM, so
+  the volume can change while it plays. Both processes end on skip, stop or shutdown. A track
+  takes a few seconds to start (about 7 to 9 in tests): the reply comes at once, the sound after.
+- When a track ends, or cannot start, the adapter sends `music.ended` with its entry and plays
+  what the reply says next. If the voice connection is gone, it sends `music.stop`.
+- `/play` needs the person in a voice channel; while music plays, the controls need them in
+  Ningo's voice channel. `/queue` works from anywhere allowed.
+- Ningo's speech pauses the music and resumes it after, unless the queue itself was paused. The
+  radio is refused while a queue plays, and `/play` stops a radio that is playing.
+- Only Discord plays the queue: a change made elsewhere (desktop, CLI) is heard at the next
+  Discord command or track end.
 
 ## State
 

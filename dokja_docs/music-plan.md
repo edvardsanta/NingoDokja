@@ -1,7 +1,7 @@
 # Music in voice channels
 
-Date: 2026-10-26. Status: phases 1 (sources and resolving) and 2 (queue) built;
-playback and commands are next. Nothing plays yet.
+Date: 2026-10-26. Status: phases 1 to 4 built (sources, queue, playback,
+commands); Memory receipts are later.
 
 Ningo should play music in a voice channel. The main path is a few typed words:
 someone sends the play command with "monalisa jorge", and Ningo finds the song
@@ -109,7 +109,7 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
 
 | Project | Licence | Decision |
 | --- | --- | --- |
-| `umutxyp/MusicBot` | MIT | Playback copies `src/music/ytdlp.js` and `src/music/relay.js` (yt-dlp feeding ffmpeg through a local relay, one proxy per guild, a concurrency cap) into the voice adapter, with the MIT notice and the upstream commit `bf396aa48887333c2fc8f199221b16f0eeef1b2c` (2026-10-17). From then on the copy is ours. |
+| `umutxyp/MusicBot` | MIT | Read, not copied. Its relay exists for stream addresses bound to the asking network; piping yt-dlp straight into ffmpeg avoids that, so playback needed none of its code. |
 | `skick1234/DisTube` | MIT | Not used. It joins voice itself in its own connection group, which would fight the adapter's voice session, and has one maintainer. Its `TaskQueue` (serialized seek, jump and skip) and `Queue` states guide the queue. |
 | `jagrosh/MusicBot` | Apache 2.0 | Not used. Java on an old voice library without the current voice encryption, no code commits since August 2024. |
 | A catalogue-reading library | MIT | Used by the owner's catalogue source, outside the repository. Its own matching rejects artists credited under another name, so the domain decides with `BestMatch` instead. |
@@ -131,16 +131,17 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
    but searches without holding the queue, within 150 seconds, so skip and pause
    never wait for a search. A refusal (queue full, nothing found) is an answer,
    `{ok: false, reason}`, which the bridge turns into one plain line.
-3. **Playback.** The voice adapter plays a page given by the orchestrator, using
-   the copied relay, and reports when a track ends or fails so the queue can
-   advance. This changes two contracts, reviewed before building: orchestrator to
-   adapter (a new kind on `POST /deliver` or a new internal endpoint), and
-   adapter to orchestrator ("track ended" over the existing HTTP bridge). Some
-   pages may need a JavaScript runtime for yt-dlp; this phase checks and adds it
-   to the adapter's image if so.
-4. **Commands.** A play command with words or a link, plus skip, queue, pause,
-   resume, stop and volume, and the same by voice through the existing voice
-   conversation. Desktop and CLI controls can follow.
+3. **Playback (built).** No new endpoint: every music reply carries the queue
+   (with a per-process `epoch` and a `version` raised on each change), and the
+   voice adapter brings its playback to it, ignoring late replies. When a track
+   ends or fails it sends `music.ended`; when its voice connection is gone,
+   `music.stop`. yt-dlp pipes straight into ffmpeg inside the adapter, so stream
+   addresses never travel and the relay is not copied (no code from
+   `umutxyp/MusicBot` is used). yt-dlp uses the image's node for pages that run
+   JavaScript. Details in [the Discord interface](discord-interface.md#music).
+4. **Commands (built).** `/play`, `/skip`, `/pause`, `/resume`, `/stop`,
+   `/queue` and `/volume` on Discord. By voice through the existing voice
+   conversation, and desktop or CLI controls, can follow.
 5. **Memory.** Played and skipped tracks become episodes.
 
 ## Owner decisions (2026-10-26)
