@@ -2,11 +2,13 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	domain "read_books/dokja_domain/dokja_runtime"
 	store "read_books/dokja_store"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -58,7 +60,16 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 				if id == "ollama" && strings.Contains(strings.Join(args, " "), " show ") {
 					return []byte("installed"), nil
 				}
-				if !strings.Contains(input, `"role":"system"`) || !strings.Contains(input, "followup") {
+				start := strings.Index(input, "\n[")
+				var transcript []domain.ChatMessage
+				if start < 0 || json.Unmarshal([]byte(input[start+1:]), &transcript) != nil {
+					t.Fatal("application transcript was not forwarded as valid JSON")
+				}
+				expected := []domain.ChatMessage{
+					{Role: "system", Content: "context"}, {Role: "user", Content: "question"},
+					{Role: "assistant", Content: "A billboard on the avenue."}, {Role: "user", Content: "followup"},
+				}
+				if !reflect.DeepEqual(transcript, expected) || !strings.Contains(input[:start], "same application assistant") {
 					t.Fatal("history lost")
 				}
 				command := strings.Join(args, " ")
@@ -79,7 +90,10 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 				}
 				return []byte("answer"), nil
 			}}
-			reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: id, Model: "fixture/model"}, []domain.ChatMessage{{Role: "system", Content: "context"}, {Role: "user", Content: "followup"}})
+			reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: id, Model: "fixture/model"}, []domain.ChatMessage{
+				{Role: "system", Content: "context"}, {Role: "user", Content: "question"},
+				{Role: "assistant", Content: "A billboard on the avenue."}, {Role: "user", Content: "followup"},
+			})
 			if err != nil || reply != "answer" || calls != map[string]int{"codex": 1, "claude_code": 1, "ollama": 2}[id] {
 				t.Fatal(reply, err, calls)
 			}

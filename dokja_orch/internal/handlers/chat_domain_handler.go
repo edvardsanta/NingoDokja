@@ -89,6 +89,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 	turnContent := withReplyContext(event, content)
 	lifecycle, history := h.sessions.BeginTurn(event, turnContent)
+	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d reset_reason=%q",
+		event.EventID, lifecycle.SessionID, len(history), lifecycle.Reason))
 	sources := h.lookupKnowledge(ctx, content, anchor)
 	result, err := h.generateReply(ctx, event, turnContent, history, sources, reference)
 	if err != nil {

@@ -157,6 +157,11 @@ The bridge forwards up to three PNG attachments to Discord messages, commands,
 and chat modals. An unavailable renderer or unsupported expression keeps the text.
 This is interface guidance and conversational adaptation, not durable automatic
 learning of user preferences.
+The selected provider/model does not form part of the chat session key. Runtime
+selection changes forward the caller's transcript with its roles unchanged;
+assistant turns remain Ningo's replies across models. The volatile Discord
+history is still scoped per user and channel, capped at 20 messages by default,
+and expires after three minutes of inactivity or an orchestrator restart.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
