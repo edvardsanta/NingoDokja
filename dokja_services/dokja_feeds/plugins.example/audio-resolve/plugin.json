@@ -1,0 +1,22 @@
+{
+  "plugin_api": 1,
+  "id": "audio-resolve",
+  "version": "0.1.0",
+  "name": "Audio Resolve",
+  "provides": [
+    "audio.resolve.v1"
+  ],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "env": [],
+  "limits": {
+    "timeout_ms": 30000,
+    "output_bytes": 65536
+  }
+}

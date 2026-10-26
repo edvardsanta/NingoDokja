@@ -21,6 +21,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `document.process.v1` | `feeds.invoke`, `classify` or `summarize` | Compatibility Book result |
 | `media.library.v1` | `feeds.invoke`, `ingest`, `list`, `fetch`, `status`, `contains`, `mark-sent` | Media intake cache result |
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
+| `audio.resolve.v1` | `feeds.invoke`, `resolve` with exactly one of `url` or `query`, optional `limit` (1–5) | `tracks`: `id`, `source`, `url` (the page), `title`, `uploader`, `duration_s`, `live` |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`
 selects an explicitly named provider. The subprocess receives
@@ -90,6 +91,16 @@ successful delivery. Custom `media.library.v1` replacements must follow this
 revised behavior. Update the reader and orchestrator together; see
 [confirmed media delivery receipts](media-delivery-receipts.md) for the breaking
 behavior change and receipt-storage limitations.
+
+### Audio tracks
+
+`plugins.example/audio-resolve` turns a link or a search into tracks with yt-dlp,
+reading metadata only: it downloads nothing and returns no stream address, because
+those expire and are bound to the network that asked for them. Whoever plays a
+track resolves it again from its page. It is the intake step of the music workflow
+([plan](music-plan.md)); it needs `FEEDS_PLUGIN_EXTRAS=media` or `content`, which
+pin yt-dlp, and no settings. Errors from yt-dlp itself are reported as a generic
+failure, with the detail only in the Feeds log.
 
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:
