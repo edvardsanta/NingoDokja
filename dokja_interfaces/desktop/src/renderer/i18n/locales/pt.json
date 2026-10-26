@@ -499,5 +499,7 @@
   "memes_refreshing": "Perguntando às fontes…",
   "memes_refreshed": "{count} memes novos.",
   "memes_refreshed_none": "Nada novo nas fontes.",
-  "runtime_logs_link_code": "[código de vinculação oculto: não dá para escanear pelos logs. Use Vincular em Sistema → Status.]"
+  "runtime_logs_link_code": "[código de vinculação oculto: não dá para escanear pelos logs. Use Vincular em Sistema → Status.]",
+  "state_not_running": "Não está rodando",
+  "whatsapp_not_running": "O WhatsApp não está rodando. Inicie o módulo do WhatsApp para vincular ou enviar por ele."
 }

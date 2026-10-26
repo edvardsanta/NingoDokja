@@ -99,6 +99,10 @@ func (h *SystemDomainHandler) WithInterfaceProbes(probes map[string]InterfacePro
 	return h
 }
 
+// optionalInterfaces are the interfaces a stack runs only when their container is started (WhatsApp
+// is behind its own Compose profile). Discord is always part of the stack, so its silence is a fault.
+var optionalInterfaces = map[string]bool{"whatsapp": true}
+
 // probeInterfaces reads every enabled interface at once, like probeServices. An interface that
 // does not answer is reported with a fixed sentence: the error text could carry an address, and
 // this reply is not authenticated. A switched-off interface is not read.
@@ -120,6 +124,14 @@ func (h *SystemDomainHandler) probeInterfaces(ctx context.Context, services map[
 			defer wg.Done()
 			level, state, detail, err := h.interfaceProbes[name](ctx)
 			if err != nil {
+				// An optional interface runs only when its container is started: no answer means it is
+				// not running, which is no fault. Its container's own state shows a real failure.
+				if optionalInterfaces[name] {
+					entries[i] = map[string]any{
+						"status": "disabled", "state": "not_running", "detail": "the interface is not running",
+					}
+					return
+				}
 				entries[i] = map[string]any{
 					"status": "error", "state": "unreachable", "detail": "no answer from the interface",
 				}

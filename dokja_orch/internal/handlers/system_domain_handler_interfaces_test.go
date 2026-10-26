@@ -89,15 +89,40 @@ func TestStatusStaysOkWhenEveryInterfaceIsUp(t *testing.T) {
 func TestAnInterfaceThatDoesNotAnswerIsReportedWithAFixedSentence(t *testing.T) {
 	handler, _ := controlledHandler(t)
 	handler.WithInterfaceProbes(map[string]InterfaceProbe{
-		"whatsapp": interfaceProbe("", "", "", errors.New("call interface status: dial tcp 10.0.0.7:8094: connection refused"), nil),
+		"discord": interfaceProbe("", "", "", errors.New("call interface status: dial tcp 10.0.0.7:8092: connection refused"), nil),
 	})
 
 	_, services := statusServices(t, handler)
 
-	entry := services["whatsapp"].(map[string]any)
+	entry := services["discord"].(map[string]any)
 	if entry["status"] != "error" || entry["state"] != "unreachable" || entry["detail"] != "no answer from the interface" {
 		t.Fatalf("unexpected entry %#v", entry)
 	}
+	noAddress(t, entry)
+}
+
+// WhatsApp runs only when its container is started: its silence is "not running", not a fault, so a
+// stack without it raises no alarm while its address is set by default.
+func TestAWhatsAppThatDoesNotAnswerIsNotRunningRatherThanAProblem(t *testing.T) {
+	handler, _ := quietHandler(t)
+	handler.WithInterfaceProbes(map[string]InterfaceProbe{
+		"whatsapp": interfaceProbe("", "", "", errors.New("call interface status: dial tcp 10.0.0.7:8094: connection refused"), nil),
+	})
+
+	overall, services := statusServices(t, handler)
+
+	entry := services["whatsapp"].(map[string]any)
+	if entry["status"] != "disabled" || entry["state"] != "not_running" || entry["configured"] != true {
+		t.Fatalf("unexpected entry %#v", entry)
+	}
+	if overall["status"] != "ok" {
+		t.Fatalf("a WhatsApp that is not running must not fail the status, got %v", overall["status"])
+	}
+	noAddress(t, entry)
+}
+
+func noAddress(t *testing.T, entry map[string]any) {
+	t.Helper()
 	for key, value := range entry {
 		if text, ok := value.(string); ok && strings.Contains(text, "10.0.0.7") {
 			t.Fatalf("the error text must not reach the unauthenticated status (%s): %q", key, text)

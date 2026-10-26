@@ -211,3 +211,13 @@ it("keeps the link on the row, not under Needs attention, once WhatsApp is conne
   const button = await screen.findByRole("button", { name: "Link WhatsApp" });
   expect(button.closest(".attention")).toBeNull();
 });
+
+it("a WhatsApp whose container is not running is off, not a problem, and offers no link it cannot make",async()=>{
+ const {transport,calls:seen}=routedTransport({"ningo.status":status("not_running",{status:"disabled",configured:true,detail:"the interface is not running"})});
+ renderCard(transport);
+ await screen.findByText("Not running", { selector: ".services .service-status" });
+ screen.getByText(/WhatsApp is not running\. Start the WhatsApp module/);
+ expect(screen.queryByRole("button",{name:/^Link/})).toBeNull();
+ expect(screen.queryByText(/Needs attention/)).toBeNull();
+ expect(calls(seen,"communications.link.status")).toHaveLength(0);
+});

@@ -54,6 +54,7 @@ const STATE_IDS: Record<string, MessageId> = {
   unreachable: "state_unreachable",
   off: "state_off",
   not_configured: "state_not_configured",
+  not_running: "state_not_running",
 };
 
 // What the screen can ask the orchestrator to switch. A switch carries the flag and nothing else; an
@@ -119,8 +120,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
           on={row.enabled} busy={change.state.phase === "loading" || row.configured === false}
           onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
         {row.enabled !== undefined && <p className="detail">{t("runtime_routing_hint")}</p>}
-        {name === LINKABLE && (row.configured === false
-          ? <p className="note">{t("whatsapp_setup_missing")}</p> : needsLink(row) ? <p className="detail">{t("link_see_attention")}</p> : <LinkControl link={link} />)}
+        {name === LINKABLE && <WhatsAppLinkRow row={row} link={link} />}
       </> : null;
     }} renderActivity={(runtimeAvailable) => <>
       {failure && <Problem error={failure} />}
@@ -202,7 +202,7 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
                 busy={busy}
                 onChange={onChange}
                 extra={
-                  row.name === LINKABLE ? row.configured === false ? <p className="note">{t("whatsapp_setup_missing")}</p> : needsLink(row) ? <p className="detail">{t("link_see_attention")}</p> : <LinkControl link={link} /> : undefined
+                  row.name === LINKABLE ? <WhatsAppLinkRow row={row} link={link} /> : undefined
                 }
               />
             ))}
@@ -245,6 +245,16 @@ function stateWord(row: ServiceRow, t: ReturnType<typeof useTranslate>): string 
 // WhatsApp waits for the owner's phone: the link is what needs doing, so it is offered where the
 // problem is said, not inside the module's closed options.
 const LINK_STATES = new Set(["waiting_for_link", "refused", "logged_out", "replaced"]);
+// What the WhatsApp row offers about linking: setup when it has no address, a start when its
+// container is not running (Link would find nobody to ask), and otherwise the link itself.
+function WhatsAppLinkRow({ row, link }: { row: ServiceRow; link: Parameters<typeof LinkControl>[0]["link"] }) {
+  const t = useTranslate();
+  if (row.configured === false) return <p className="note">{t("whatsapp_setup_missing")}</p>;
+  if (row.state === "not_running") return <p className="note">{t("whatsapp_not_running")}</p>;
+  if (needsLink(row)) return <p className="detail">{t("link_see_attention")}</p>;
+  return <LinkControl link={link} />;
+}
+
 const needsLink = (row: ServiceRow) => row.name === LINKABLE && row.configured !== false && LINK_STATES.has(row.state ?? "");
 
 function NeedsAttention({ health, link }: { health: Health; link: Link }) {

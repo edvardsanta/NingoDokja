@@ -652,10 +652,17 @@ one row per adapter, its state and routing control. See the adapter docs for sta
 - The orchestrator always lists known interfaces, including before setup. A missing
   status endpoint is `unchecked` / `not_configured` with `configured:false`; it
   does not degrade overall platform health. `DISCORD_INTERFACE_STATUS_ENDPOINT`
-  is set in the stacks. Set `WHATSAPP_INTERFACE_STATUS_ENDPOINT`
-  (`http://dokja-whatsapp:8094/status`) in the ignored environment file when
-  starting its profile, then recreate the orchestrator. Missing setup never
-  removes the WhatsApp row or falsely reports a connected account.
+  is set in the stacks.
+- `WHATSAPP_INTERFACE_STATUS_ENDPOINT` defaults to
+  `http://dokja-whatsapp:8094/status` in the lite and dev stacks.
+  - While the WhatsApp container is not running, nothing answers there. The
+    interface is then reported `disabled` / `not_running`: it is not a problem
+    and does not degrade health, and the desktop asks to start the module
+    instead of offering Link. A crashed container shows in its module's own
+    state.
+  - Set the variable empty to show WhatsApp as not configured instead.
+  - Missing setup never removes the WhatsApp row or falsely reports a connected
+    account.
 - **Switching an interface off** makes it answer nothing at all in its chats (no "switched off"
   reply) and leaves its channels out of scheduled and manual deliveries, which are reported as
   `skipped_interfaces` and are not failures. Its connection and credentials are left alone, and the
