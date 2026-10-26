@@ -32,7 +32,10 @@ class Adapter:
                 c.strip() for c in channels.split(",") if ID.fullmatch(c.strip())
             )
         )
-        self.guild = guild if ID.fullmatch(guild) else ""
+        # DISCORD_GUILD_ID may name several servers, separated by commas.
+        self.guilds = list(
+            dict.fromkeys(g.strip() for g in guild.split(",") if ID.fullmatch(g.strip()))
+        )
         self.opener = opener or build_opener(NoRedirect())
         # The address of the API is supplied by the operator and has no built-in value, so the
         # repository carries no address of its own. Only http(s) is accepted.
@@ -72,16 +75,19 @@ class Adapter:
             ):
                 raise AdapterError("permission_denied")
             names = {}
-            # One optional guild lookup supplies friendly names; other guilds still show ids.
-            if self.guild and asked:
-                rows = self.get("/guilds/" + self.guild + "/channels")
+            # Each configured server is asked for names until every channel has one; a
+            # channel on no configured server still shows its id.
+            for guild in self.guilds:
+                if not asked or all(c in names for c in asked):
+                    break
+                rows = self.get("/guilds/" + guild + "/channels")
                 if not isinstance(rows, list):
                     raise AdapterError("upstream_error")
-                names = {
-                    row.get("id"): row.get("name", "")
+                names.update(
+                    (row.get("id"), row.get("name", ""))
                     for row in rows
                     if isinstance(row, dict)
-                }
+                )
             return {
                 "channels": [
                     {"id": c, "name": str(names.get(c) or c)[:100]} for c in asked

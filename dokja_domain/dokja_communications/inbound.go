@@ -11,7 +11,8 @@ const ActionAuthorizeInbound = "authorize-inbound"
 // InboundPolicy contains application eligibility, supplied by the orchestrator's
 // configuration. Gateway adapters still reject echoes, duplicates and stale data.
 type InboundPolicy struct {
-	DiscordGuildID     string
+	// DiscordGuildIDs are the servers Ningo answers in; none means any.
+	DiscordGuildIDs    []string
 	DiscordChannels    []string
 	DiscordDMOpen      bool
 	DiscordNeedMention bool
@@ -43,7 +44,7 @@ func (p InboundPolicy) AuthorizeInbound(r InboundIntent) bool {
 		if r.GuildID == "" {
 			return false
 		}
-		if p.DiscordGuildID != "" && r.GuildID != p.DiscordGuildID {
+		if len(p.DiscordGuildIDs) > 0 && !contains(p.DiscordGuildIDs, r.GuildID) {
 			return false
 		}
 		if len(p.DiscordChannels) > 0 && !contains(p.DiscordChannels, r.ChannelID) {
@@ -120,7 +121,7 @@ func ParseInboundPolicy(values map[string]string) (InboundPolicy, error) {
 		return InboundPolicy{}, fmt.Errorf("DISCORD_REQUIRE_MENTION must be true or false")
 	}
 	p := InboundPolicy{
-		DiscordGuildID:     strings.TrimSpace(values["DISCORD_GUILD_ID"]),
+		DiscordGuildIDs:    splitConfigured(values["DISCORD_GUILD_ID"]),
 		DiscordChannels:    splitConfigured(values["DISCORD_ALLOWED_CHANNELS"]),
 		DiscordDMOpen:      defaultValue(values["DISCORD_DM_POLICY"], "open") == "open",
 		DiscordNeedMention: needMention,

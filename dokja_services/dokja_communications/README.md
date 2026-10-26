@@ -17,7 +17,7 @@ The service's port is not published by Compose.
 | `DISCORD_BOT_TOKEN` | Bot credential used only for the external API |
 | `DOKJA_DISCORD_API_BASE_URL` | Base address of the Discord REST API, version path included: the setting the delivery interface already uses. It has no built-in value; without it every call answers `not_configured` and nothing is requested |
 | `DISCORD_SCHEDULED_MEME_CHANNEL_ID` | Comma-separated allowed channel ids, shared with the delivery workflow |
-| `DISCORD_GUILD_ID` | Optional guild id used to resolve channel names; otherwise the list shows ids |
+| `DISCORD_GUILD_ID` | Optional guild ids, comma-separated, used to resolve channel names; a channel on none of them shows its id |
 | `COMMUNICATIONS_BIND` | Bind address, `127.0.0.1` on the host; container sets `0.0.0.0` |
 
 `GET /health` reports process liveness. `POST /dispatch` accepts

@@ -36,3 +36,17 @@ test("splitDiscordReply keeps components only on the first chunk", () => {
   assert.ok(parts[0].components?.length);
   assert.equal(parts[1].components, undefined);
 });
+
+test("commands are registered on every configured server, or globally when there is none", async () => {
+  const { deployCommands } = await import("../runtime/discordjs_runtime.js");
+  const routes: string[] = [];
+  const rest = { put: async (route: string) => { routes.push(route); } };
+  const command = { name: "speak", description: "Speak", options: [], execute: async () => {} } as any;
+
+  await deployCommands({ token: "t", applicationId: "app", devGuildIds: ["first", "second"], commands: [command] }, rest);
+  assert.deepEqual(routes, ["/applications/app/guilds/first/commands", "/applications/app/guilds/second/commands"]);
+
+  routes.length = 0;
+  await deployCommands({ token: "t", applicationId: "app", devGuildIds: [], commands: [command] }, rest);
+  assert.deepEqual(routes, ["/applications/app/commands"]);
+});

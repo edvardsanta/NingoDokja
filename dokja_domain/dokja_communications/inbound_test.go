@@ -3,7 +3,7 @@ package communications
 import "testing"
 
 func TestInboundDiscordEligibility(t *testing.T) {
-	p := InboundPolicy{DiscordGuildID: "guild", DiscordChannels: []string{"reading"}, DiscordDMOpen: true, DiscordNeedMention: true}
+	p := InboundPolicy{DiscordGuildIDs: []string{"guild"}, DiscordChannels: []string{"reading"}, DiscordDMOpen: true, DiscordNeedMention: true}
 	base := InboundIntent{Platform: "discord", Entry: "message", ChannelID: "reading", GuildID: "guild", Mentioned: true}
 	if !p.AuthorizeInbound(base) {
 		t.Fatal("allowed guild message refused")
@@ -94,5 +94,25 @@ func TestParseInboundPolicyNormalizesAndRefusesInvalidConfiguration(t *testing.T
 		if _, err := ParseInboundPolicy(values); err == nil {
 			t.Fatalf("accepted invalid policy %#v", values)
 		}
+	}
+}
+
+func TestInboundDiscordAcceptsEveryConfiguredServer(t *testing.T) {
+	p, err := ParseInboundPolicy(map[string]string{"DISCORD_GUILD_ID": " first , second ", "DISCORD_ALLOWED_CHANNELS": "a,b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for guild, want := range map[string]bool{"first": true, "second": true, "third": false} {
+		intent := InboundIntent{Platform: "discord", Entry: "command", ChannelID: "b", GuildID: guild}
+		if p.AuthorizeInbound(intent) != want {
+			t.Fatal(guild)
+		}
+	}
+	single, err := ParseInboundPolicy(map[string]string{"DISCORD_GUILD_ID": "only"})
+	if err != nil || len(single.DiscordGuildIDs) != 1 || single.DiscordGuildIDs[0] != "only" {
+		t.Fatal("one server, as before", single, err)
+	}
+	if !(InboundPolicy{}).AuthorizeInbound(InboundIntent{Platform: "discord", Entry: "command", ChannelID: "a", GuildID: "any"}) {
+		t.Fatal("no servers configured means any server")
 	}
 }

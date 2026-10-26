@@ -35,7 +35,7 @@ test("startDiscordRuntime wires commands, message listener, and guild-scoped dep
     {
       token: "token",
       applicationId: "app-1",
-      devGuildId: "guild-1",
+      devGuildIds: ["guild-1"],
       commands: [
         {
           name: "chat",
@@ -47,8 +47,8 @@ test("startDiscordRuntime wires commands, message listener, and guild-scoped dep
     },
     {
       fetchApplicationId: async () => ({ id: "app-1" }),
-      createClient: ({ applicationId, token, devGuildId, commands }) => {
-        capturedClientOptions = { applicationId, token, devGuildId };
+      createClient: ({ applicationId, token, devGuildIds, commands }) => {
+        capturedClientOptions = { applicationId, token, devGuildIds };
         capturedHandlers = { commands };
         return fakeClient as any;
       },
@@ -62,7 +62,7 @@ test("startDiscordRuntime wires commands, message listener, and guild-scoped dep
   assert.deepEqual(capturedClientOptions, {
     applicationId: "app-1",
     token: "token",
-    devGuildId: "guild-1",
+    devGuildIds: ["guild-1"],
   });
   assert.equal(capturedHandlers.commands.length, 1);
   assert.equal(deployCalled, true);
