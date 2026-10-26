@@ -67,6 +67,27 @@ func TestEveryBanterTurnKeepsToneIntentAndTrustBoundaries(t *testing.T) {
 	}
 }
 
+// Regression: told "Eu n gosto de MH rise", Ningo rewrote his own judgment ("Critério
+// restaurado") and then kept escalating the user's agreement ("Então está decidido", "Consenso
+// raro") to every "Ss" and "Exato". A taste is not a correction; an opinion is held.
+func TestThePersonaHoldsItsOwnJudgmentInsteadOfMirroringTheUser(t *testing.T) {
+	for _, want := range []string{
+		"Hold your own judgment",
+		"a disagreement about taste or opinion is not a correction",
+		"Concede a specific point only when they give an argument",
+		"Never announce a consensus",
+		"(ok, ss, exato, isso mesmo)",
+	} {
+		if !strings.Contains(strings.Join(strings.Fields(chatPersona), " "), want) {
+			t.Fatalf("the persona lost %q", want)
+		}
+	}
+	// Corrections of fact still apply.
+	if !strings.Contains(chatPersona, "Apply corrections by changing the answer immediately") {
+		t.Fatal("factual corrections must keep working")
+	}
+}
+
 func TestAGeneratorWithoutConversationsStillGetsThePersona(t *testing.T) {
 	generator := &plainGenerator{}
 	if _, err := NewChatDomainHandler(generator).Handle(context.Background(), chatEvent("quem é você?"), chatStep); err != nil {
