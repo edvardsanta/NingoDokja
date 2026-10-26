@@ -166,6 +166,9 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	}
 
 	reply := extractBridgeReply(result)
+	if event.Source == core.SourceDiscord {
+		reply = sanitizeDiscordOwnerID(reply, i.discordOwnerID)
+	}
 	notice := extractBridgeNotice(result)
 	logger.Info(fmt.Sprintf(
 		"http bridge completed event_id=%s workflow=%s reply_chars=%d",
@@ -288,6 +291,18 @@ func extractBridgeNotice(result core.ProcessResult) string {
 	}
 	notice, _ := chatResult["notice"].(string)
 	return strings.TrimSpace(notice)
+}
+
+func sanitizeDiscordOwnerID(reply, ownerID string) string {
+	ownerID = strings.TrimSpace(ownerID)
+	if ownerID == "" || reply == "" {
+		return reply
+	}
+	const marker = "\x00DOKJA_OWNER_MENTION\x00"
+	reply = strings.ReplaceAll(reply, "<@!"+ownerID+">", marker)
+	reply = strings.ReplaceAll(reply, "<@"+ownerID+">", marker)
+	reply = strings.ReplaceAll(reply, ownerID, marker)
+	return strings.ReplaceAll(reply, marker, "<@"+ownerID+">")
 }
 
 // bridgeInterfaces are the interfaces allowed to use the bridge, with the source their

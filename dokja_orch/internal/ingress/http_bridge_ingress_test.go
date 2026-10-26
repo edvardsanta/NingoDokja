@@ -153,3 +153,11 @@ func TestExtractBridgeReplyExplainsAnEventTheOperatorSwitchedOff(t *testing.T) {
 		t.Fatal("an ordinary empty result keeps its empty reply")
 	}
 }
+
+func TestSanitizeDiscordOwnerIDKeepsOwnerAsMention(t *testing.T) {
+	reply := sanitizeDiscordOwnerID("Ah, confundi com 1247657881155932170 e <@!1247657881155932170>.", "1247657881155932170")
+	expected := "Ah, confundi com <@1247657881155932170> e <@1247657881155932170>."
+	if reply != expected {
+		t.Fatalf("expected %q, got %q", expected, reply)
+	}
+}
