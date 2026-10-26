@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -33,6 +34,39 @@ type chatFake struct {
 	calls    int
 	messages []ChatMessage
 	binding  ChatBinding
+}
+
+func TestModelAndProviderSwitchesKeepTheApplicationTranscript(t *testing.T) {
+	store := &chatStore{b: ChatBinding{Revision: 1}}
+	registrations := &chatRegistrations{p: ProviderPreferences{Providers: []ProviderRegistration{
+		{ID: "codex", Enabled: true, Models: []string{"fixture/first", "fixture/second"}},
+		{ID: "claude_code", Enabled: true, Models: []string{"fixture/third"}},
+	}}}
+	inference := &chatFake{}
+	d := New(nil, Journal{}, nil).WithProviderSettings(registrations).WithChat(store, inference)
+	history := []ChatMessage{{Role: "user", Content: "A question"}}
+	for _, selected := range []ChatBinding{
+		{Provider: "codex", Model: "fixture/first"},
+		{Provider: "codex", Model: "fixture/second"},
+		{Provider: "claude_code", Model: "fixture/third"},
+	} {
+		selected.Revision = store.b.Revision
+		binding, err := d.ConfigureChat(selected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply, err := d.Chat(t.Context(), history)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if inference.binding != binding || !reflect.DeepEqual(inference.messages, history) {
+			t.Fatal("selection changed or discarded the supplied transcript")
+		}
+		history = append(history, ChatMessage{Role: "assistant", Content: reply.Reply}, ChatMessage{Role: "user", Content: "Continue"})
+	}
+	if len(inference.messages) != 5 || inference.messages[3].Role != "assistant" {
+		t.Fatal("prior provider replies did not reach the final provider")
+	}
 }
 
 func (f *chatFake) Generate(ctx context.Context, b ChatBinding, m []ChatMessage) (string, error) {
