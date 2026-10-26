@@ -13,6 +13,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 ID = re.compile(r"[0-9]{1,20}\Z")
 MAX_BODY = 32 * 1024
 MAX_REPLY = 1024 * 1024
+# Text and announcement channels: the ones with a message history to read. Voice channels,
+# categories, threads and forums are left out.
+TEXT_CHANNEL_TYPES = {0, 5}
 
 
 class AdapterError(Exception):
@@ -67,7 +70,73 @@ class Adapter:
         except (URLError, TimeoutError, ValueError, OSError):
             raise AdapterError("upstream_error") from None
 
+    def guild_channels(self):
+        """Every text channel of each configured server, with the server's name. A server
+        the bot left or cannot read is reported apart instead of failing the others."""
+        guilds, unavailable = [], []
+        for guild in self.guilds:
+            try:
+                info = self.get("/guilds/" + guild)
+                rows = self.get("/guilds/" + guild + "/channels")
+            except AdapterError:
+                unavailable.append(guild)
+                continue
+            if not isinstance(info, dict) or not isinstance(rows, list):
+                unavailable.append(guild)
+                continue
+            texts = sorted(
+                (
+                    row
+                    for row in rows
+                    if isinstance(row, dict)
+                    and row.get("type") in TEXT_CHANNEL_TYPES
+                    and ID.fullmatch(str(row.get("id", "")))
+                ),
+                key=lambda row: (row.get("position") or 0, str(row.get("id"))),
+            )
+            guilds.append(
+                {
+                    "id": guild,
+                    "name": str(info.get("name") or guild)[:100],
+                    "channels": [
+                        {"id": row["id"], "name": str(row.get("name") or row["id"])[:100]}
+                        for row in texts
+                    ],
+                }
+            )
+        return {"guilds": guilds, "unavailable_guilds": unavailable}
+
+    def channel_info(self, channel):
+        """What Discord says about one channel: its server and whether it holds messages."""
+        if not ID.fullmatch(str(channel)):
+            raise AdapterError("invalid_request")
+        row = self.get("/channels/" + channel)
+        if not isinstance(row, dict):
+            raise AdapterError("upstream_error")
+        return {
+            "id": channel,
+            "guild_id": str(row.get("guild_id") or ""),
+            "text": row.get("type") in TEXT_CHANNEL_TYPES,
+        }
+
+    def may_read(self, channel):
+        """A configured channel, or a text channel of a configured server. With no server
+        configured, only the configured channels: never every server the bot is in."""
+        if channel in self.channels:
+            return True
+        if not self.guilds or not ID.fullmatch(str(channel)):
+            return False
+        try:
+            info = self.channel_info(channel)
+        except AdapterError:
+            return False
+        return info["text"] and info["guild_id"] in self.guilds
+
     def dispatch(self, action, payload):
+        if action == "guild_channels":
+            return self.guild_channels()
+        if action == "channel_info":
+            return self.channel_info(payload.get("channel_id", ""))
         if action == "channels":
             asked = payload.get("channel_ids", [])
             if not isinstance(asked, list) or any(
@@ -96,7 +165,7 @@ class Adapter:
         if action != "history":
             raise AdapterError("invalid_request")
         channel = payload.get("channel_id")
-        if channel not in self.channels:
+        if not self.may_read(channel):
             raise AdapterError("permission_denied")
         before = payload.get("before", "")
         if not isinstance(before, str) or (before and not ID.fullmatch(before)):

@@ -27,6 +27,19 @@ func (h *CommunicationsDomainHandler) WithInboundPolicy(policy communications.In
 	h.inboundConfigured = true
 	return h
 }
+
+// WithGuilds lets the text channels of these servers (comma-separated) be listed, read and
+// named in an operator's send.
+func (h *CommunicationsDomainHandler) WithGuilds(guilds string) *CommunicationsDomainHandler {
+	h.domain.WithGuilds(guilds)
+	return h
+}
+
+// Readable is the domain's decision on one Discord channel, for the operator's sends.
+func (h *CommunicationsDomainHandler) Readable(ctx context.Context, channel string) (bool, error) {
+	return h.domain.Readable(ctx, channel)
+}
+
 func (h *CommunicationsDomainHandler) Domain() core.Domain { return core.DomainCommunications }
 func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (map[string]any, error) {
 	if step.Action == communications.ActionAuthorizeInbound {

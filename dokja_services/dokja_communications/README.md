@@ -21,7 +21,11 @@ The service's port is not published by Compose.
 | `COMMUNICATIONS_BIND` | Bind address, `127.0.0.1` on the host; container sets `0.0.0.0` |
 
 `GET /health` reports process liveness. `POST /dispatch` accepts
-`{"action":"channels|history","payload":{...}}` with `Authorization: Bearer <credential>`.
+`{"action":"channels|guild_channels|channel_info|history","payload":{...}}` with `Authorization: Bearer <credential>`.
+`guild_channels` lists the text and announcement channels of each server in `DISCORD_GUILD_ID`, with
+the server's name; a server the bot cannot read is reported in `unavailable_guilds`. `channel_info`
+gives one channel's server and whether it holds messages. `history` reads a configured channel or a
+text channel of a configured server; with no server configured, only the configured channels.
 `channels` accepts only configured `channel_ids`. `history` accepts `channel_id` and optional
 `before` (a message id); pages contain at most 30 messages in oldest-to-newest order. The response
 returns an empty `before` when there is no further full page. The domain does not accept arbitrary
