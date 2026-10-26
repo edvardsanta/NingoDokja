@@ -1,4 +1,5 @@
 import type { DiscordInterfaceConfig } from "./config.js";
+import { createMusic } from "./music/commands.js";
 import { createCommands } from "./commands/commands.js";
 import { createInteractionDefinitions } from "./commands/interactions.js";
 import { startDiscordDeliveryServer } from "./delivery/delivery_server.js";
@@ -23,8 +24,16 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     error: runtime.error,
   });
   const MUSIC_COMMANDS = new Set(["play", "skip", "pause", "resume", "stop", "queue", "volume"]);
+  // One music feature: its commands and its panel buttons share the queue they play.
+  const music = createMusic({
+    orchestratorEndpoint: cfg.orchestratorEndpoint,
+    orchestratorTimeoutMs: cfg.orchestratorTimeoutMs,
+    voice,
+    locale: cfg.locale,
+  });
   const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
     logVoiceConversation: cfg.mode === "full",
+    music,
   });
   const commands =
     cfg.mode === "voice"
@@ -83,7 +92,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     error: runtime.error,
     commands,
     gateway,
-    buttons: interactions.buttons,
+    buttons: [...interactions.buttons, ...music.buttons],
     selects: interactions.selects,
     modals: interactions.modals,
     onReady: (client) => {
