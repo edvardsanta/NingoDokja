@@ -312,6 +312,21 @@ func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
 	}
 }
 
+func TestChatDomainHandlerLocalizesSessionNoticeToPortuguese(t *testing.T) {
+	lifecycle := chatSessionLifecycle{Revoked: true}
+	event := core.Event{Payload: map[string]any{"content": "Não encontrei a resposta"}}
+
+	if got := sessionLifecycleNotice(lifecycle, event); got != "O contexto da conversa foi compactado." {
+		t.Fatalf("expected Portuguese context notice, got %q", got)
+	}
+
+	lifecycle = chatSessionLifecycle{Created: true}
+	event.Context = map[string]any{"force_new_session": true}
+	if got := sessionLifecycleNotice(lifecycle, event); got != "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade." {
+		t.Fatalf("expected Portuguese session notice, got %q", got)
+	}
+}
+
 func TestChatDomainHandlerSendsConversationHistoryToGenerator(t *testing.T) {
 	generator := &fakeChatGenerator{
 		result: map[string]any{"reply": "second"},

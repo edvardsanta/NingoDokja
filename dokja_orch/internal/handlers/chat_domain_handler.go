@@ -175,13 +175,39 @@ func sessionAwareReply(reply string, lifecycle chatSessionLifecycle, event core.
 }
 
 func sessionLifecycleNotice(lifecycle chatSessionLifecycle, event core.Event) string {
+	portuguese := eventIsPortuguese(event)
 	if lifecycle.Revoked {
+		if portuguese {
+			return "O contexto da conversa foi compactado."
+		}
 		return "Conversation context was compacted."
 	}
 	if lifecycle.Created && boolFromContext(event.Context, "force_new_session") {
+		if portuguese {
+			return "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade."
+		}
 		return "New conversation session started. It will reset after 3 minutes of inactivity."
 	}
 	return ""
+}
+
+func eventIsPortuguese(event core.Event) bool {
+	content := strings.ToLower(chatMessageFromEvent(event))
+	if strings.ContainsAny(content, "áâãàçéêíóôõú") {
+		return true
+	}
+
+	for _, word := range strings.Fields(content) {
+		word = strings.Trim(word, ".,!?;:()[]{}\"'")
+		switch word {
+		case "a", "ao", "aos", "as", "com", "como", "da", "das", "de", "do", "dos",
+			"e", "ela", "em", "está", "esta", "foi", "isso", "mais", "na", "não",
+			"nao", "no", "nos", "o", "os", "para", "por", "que", "se", "sua", "uma",
+			"você", "voce":
+			return true
+		}
+	}
+	return false
 }
 
 func firstString(values map[string]any, keys ...string) string {
