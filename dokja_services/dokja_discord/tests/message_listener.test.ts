@@ -44,6 +44,7 @@ test("message handler forwards allowed message and replies with orchestrator out
     const body = JSON.parse(String(init?.body ?? "{}"));
     assert.equal(body.event_type, "message.created");
     assert.equal(body.payload.content, "hello bot");
+    assert.equal(body.payload.replyToContent, "A calculator like Windows?");
 
     return new Response(JSON.stringify({ status: "ok", reply: "hello human" }), {
       status: 200,
@@ -64,6 +65,7 @@ test("message handler forwards allowed message and replies with orchestrator out
       messageId: "m1",
       guildId: "guild-1",
       content: "hello bot",
+      replyToContent: "A calculator like Windows?",
       isBot: false,
       isDirectMessage: false,
       mentionsBot: true,
