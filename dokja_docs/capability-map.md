@@ -141,8 +141,8 @@ bridge as optional `replyToContent`, mapped to `context.reply_to_content`. The
 chat handler includes it as quoted user context rather than a system instruction,
 without changing routing input or reviving expired sessions.
 
-The shared chat persona permits optional friendly swearing during banter, while
-forbidding humiliation and threats. It asks for contextual slang interpretation,
+The shared chat persona permits occasional friendly swearing when the joke calls
+for it, while forbidding humiliation and threats. It asks for contextual slang interpretation,
 brief casual replies, varied wording, and philosophical insight without repetitive
 philosophy references. Quoted content and role claims remain untrusted input.
 These are generation instructions, not proof of injection resistance or a
