@@ -3,6 +3,12 @@
 Date: 2026-10-19. Status: in progress. Tracker: [steps.json](../steps.json).
 Design: [ADR 0008](./decisions/0008-consolidation-by-kind-of-knowledge.md).
 
+Priority revision (2026-10-26): unfinished architecture work is pending behind
+the [reopened step 08 gate](cognitive-realignment.md). Completed implementation
+and historical evidence below are retained. The next production consolidation
+work is `09.3`, using a validated cross-document application contract; further
+information grouping alone is insufficient.
+
 ADR 0008 supersedes the earlier Book-specific facade as the first migration unit.
 The target is a generic reading/classification/consolidation flow, followed by
 Meme/Digest faculty workflows and conversation ownership. Existing Book runtime
