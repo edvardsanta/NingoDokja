@@ -186,6 +186,15 @@ summaries cannot configure ownership or install permanent rules. Regression
 fixtures verify policy delivery and that forged owner fields stay outside trusted
 bridge metadata; they do not constitute live-model jailbreak evaluations.
 
+Direct owner-identity questions such as `Quem sou eu?` and `Who am I?` have a
+Chat-domain reply derived from the Discord gateway's verified-owner metadata.
+The ordinary chat handler records that reply without asking the model to infer
+identity from history or a display name. Mentions, text claims, unknown request
+fields and matching account strings on another interface do not activate this
+reply. Other questions retain normal generation and trusted owner guidance.
+The existing session-compaction step can still require inference before a turn.
+Context diagnostics expose an `owner_verified` boolean, never the configured ID.
+
 The chat handler opens/touches a session, retrieves optional Knowledge context,
 and resolves article requests through the Digest domain's cached Feeds items. A
 named source is selected from configured plugin or source names; at most eight

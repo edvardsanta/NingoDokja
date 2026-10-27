@@ -99,10 +99,17 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if err != nil {
 		return nil, err
 	}
-	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d compacted=%t reset_reason=%q",
-		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.Reason))
-	sources := h.lookupKnowledge(ctx, content, anchor)
-	result, err := h.generateReply(ctx, event, turnContent, history, sources, reference)
+	verifiedOwner := event.Source == core.SourceDiscord && boolFromContext(event.Context, "is_owner")
+	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d compacted=%t owner_verified=%t reset_reason=%q",
+		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, verifiedOwner, lifecycle.Reason))
+	var sources []knowledgeSource
+	var result map[string]any
+	if identityReply := chat.OwnerIdentityReply(content, verifiedOwner); identityReply != "" {
+		result = map[string]any{"reply": identityReply}
+	} else {
+		sources = h.lookupKnowledge(ctx, content, anchor)
+		result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
+	}
 	if err != nil {
 		return nil, err
 	}
