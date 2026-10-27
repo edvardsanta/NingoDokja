@@ -1,13 +1,50 @@
-# Ningo Dokja
+# Ningo Dokja — The Arrogant Philosopher
 
-A local, modular assistant for research, experience memory and communication.
-Inspired by *Omniscient Reader*, Dokja keeps the personality of an arrogant
-philosopher while the project explores how an assistant can use knowledge,
-reason from previous outcomes and act under explicit controls.
+> Your books deserve a reader. Your arguments may need a second opinion.
+> Your group chat probably needed supervision three hundred messages ago.
 
-The **desktop is the main workspace**. CLI, TUI, Discord and WhatsApp
-provide other entry points into the same orchestrated capabilities. Features
-and setup vary by interface.
+**Ningo Dokja** began as a book summarizer and developed opinions. Inspired by
+*Omniscient Reader*, it is a modular virtual assistant for research, reading,
+memes and conversations—with the temperament of a well-read philosopher who
+was never asked to be this talkative.
+
+Bring a document, a question or an argument. Dokja can help you investigate it,
+find relevant passages, or join the conversation. Agreement is earned.
+Expect help, questions and the occasional unnecessary flourish.
+
+## A reader with a personality problem
+
+The project started with a practical question: what if a tool could help us make
+sense of what we read? Then came sources, conversations, memes, and the much
+harder question of what an assistant should remember and learn from experience.
+
+The name stuck. The original README even confessed that the creator had never
+actually read *Omniscient Reader*. A reader named after a story its creator had
+not read: a respectable foundation for an arrogant philosopher.
+
+Dokja's personality belongs in the experience. It can be playful, critical and
+opinionated while still helping, accepting a sound correction and admitting when
+the evidence is missing. Winning every argument would be a poor substitute for
+understanding one.
+
+### 🧠 Read deeply. Ask inconvenient questions.
+
+Collect documents, search passages and inspect how information is classified.
+The ambition is to connect and apply knowledge across sources, then compare
+expectations with what actually happens. That ambition is tracked as engineering
+work; a convincing answer is not proof that the system has learned.
+
+### 🎨 Serious research. Questionable memes.
+
+Knowledge and group-chat nonsense share a home here. Dokja supports conversation,
+configured messaging and meme workflows. The philosophy may be elaborate; the
+punchline is allowed to be stupid.
+
+### 🔌 Many doors. The same philosopher.
+
+The **desktop is the main workspace**. CLI, TUI, Discord and WhatsApp provide
+other entry points into the same orchestrated capabilities. Features and setup
+vary by interface; choosing the terminal does not exempt you from configuration.
 
 [Get started](#get-started) · [Capabilities](#what-you-can-do) ·
 [Architecture](#architecture) · [Documentation](#documentation)
@@ -100,7 +137,8 @@ local lite stack.
 
 ## Architecture
 
-Every interface submits an event or request to the orchestrator:
+The philosopher has opinions; the architecture has boundaries. Every interface
+submits an event or request to the orchestrator:
 
 ```text
 Interface → Event / Request → Orchestrator → Domain → Service
@@ -141,9 +179,12 @@ This remains active engineering work. The repository includes a
 [synthetic causal-cycle experiment](dokja_docs/cognitive-cycle-experiment.md),
 [storage measurements](dokja_docs/step-10-storage-spike.md) and a
 [multi-hop validation contract](dokja_docs/step-10-multihop.md). These experiments
-do not establish a production cognitive loop, general learning or a decision to
-migrate application storage. [steps.json](steps.json) records implementation,
-validation evidence and remaining work.
+do not establish a production cognitive loop or general learning. PostgreSQL and
+pgvector adoption is an [accepted storage direction](dokja_docs/decisions/0014-application-postgres-adoption.md),
+and Knowledge has an optional PostgreSQL backend. That does not mean an existing
+installation has migrated its data or that every module uses PostgreSQL.
+[steps.json](steps.json) records implementation, validation evidence and remaining
+work.
 
 ## Repository layout
 
@@ -211,4 +252,5 @@ out of Git.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). The code is yours to study, change and run. Agreement with Dokja
+remains optional.
