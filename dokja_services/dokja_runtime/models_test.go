@@ -141,3 +141,23 @@ func TestEmbeddingModelComesFromTheStacksSettings(t *testing.T) {
 		t.Fatal(odd.EmbeddingModel())
 	}
 }
+
+// Regression: a failed download said "check the network and the free disk space" whatever the
+// engine had said. The engine's own reason now travels with the failure.
+func TestAFailedPullCarriesTheEnginesReason(t *testing.T) {
+	var seen [][]string
+	output := "pulling manifest \nverifying sha256 digest \nError: digest mismatch, file must be downloaded again: " + strings.Repeat("x", 300) + "\n"
+	err := OllamaModels{Compose: streaming(output, errors.New("exit 1"), &seen)}.Pull(context.Background(), "qwen3:8b", func(domain.PullProgress) {})
+	var failure domain.PullFailure
+	if !errors.As(err, &failure) || !strings.HasPrefix(failure.Detail, "digest mismatch, file must be downloaded again") {
+		t.Fatal(err)
+	}
+	if len([]rune(failure.Detail)) > 201 || strings.ContainsAny(failure.Detail, "\n\r") {
+		t.Fatal("the reason is kept short and on one line", failure.Detail)
+	}
+	// With nothing said, the failure stays plain.
+	err = OllamaModels{Compose: streaming("pulling manifest \n", errors.New("exit 1"), &seen)}.Pull(context.Background(), "qwen3:8b", func(domain.PullProgress) {})
+	if errors.As(err, &failure) {
+		t.Fatal("no reason was given", err)
+	}
+}
