@@ -244,3 +244,15 @@ test("a missing music result with whitespace-only text is unconfirmed", async ()
   assert.equal(musicReplyText("en", "music.play", undefined, "  "), "The music command could not be confirmed.");
   assert.equal(musicReplyText("en", "music.play", undefined, "Music is switched off."), "Music is switched off.");
 });
+
+
+test("failed voice readiness does not claim playback or publish a playing panel", async () => {
+  const fake = fakeVoice("voice1");
+  fake.voice.applyMusic = async () => { throw new Error("Voice transport did not become ready."); };
+  const list = commands(fake.voice, { "music.play": { reply: "Now playing.", music: queue(1, 1) } }, []);
+  const { ctx, replies } = context({ song: "x" });
+  await find(list, "play").handle(ctx);
+  assert.match(replies.at(-1)!, /Could not play it/);
+  assert.doesNotMatch(replies.at(-1)!, /Now playing/);
+  assert.equal(fake.posted.length, 0);
+});
