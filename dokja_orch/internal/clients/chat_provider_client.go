@@ -43,6 +43,9 @@ func (c *ChatProviderClient) call(ctx context.Context, method, path string, body
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("chat inference is unavailable; start or restart the local runtime controller")
 	}
 	defer resp.Body.Close()
@@ -101,6 +104,9 @@ func (c *ChatProviderClient) GenerateMessagesStream(ctx context.Context, message
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("chat inference is unavailable; start or restart the local runtime controller")
 	}
 	defer resp.Body.Close()
