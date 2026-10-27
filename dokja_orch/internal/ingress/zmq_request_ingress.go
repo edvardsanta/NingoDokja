@@ -8,17 +8,23 @@ import (
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
+	"sync"
 
 	"github.com/pebbe/zmq4"
 )
 
 const defaultZeroMQRequestEndpoint = "tcp://*:5558"
 
+// requestWorkers is how many requests the ingress answers at once. One slow request (a chat turn
+// can take a minute) used to hold every other one behind it; now it holds one worker.
+const requestWorkers = 8
+
 type ZeroMQRequestIngress struct {
 	service  *core.Service
 	endpoint string
 	context  *zmq4.Context
-	socket   *zmq4.Socket
+	// done closes when the proxy and every worker have closed their sockets
+	done chan struct{}
 }
 
 type RequestResponse struct {
@@ -57,39 +63,84 @@ func (i *ZeroMQRequestIngress) Start() error {
 	if err != nil {
 		return fmt.Errorf("create zmq context: %w", err)
 	}
-
-	socket, err := contextHandle.NewSocket(zmq4.REP)
+	// Clients keep their REQ sockets: a ROUTER answers them the same way, and hands each request
+	// to the next free worker through a DEALER.
+	frontend, err := contextHandle.NewSocket(zmq4.ROUTER)
 	if err != nil {
 		contextHandle.Term()
 		return fmt.Errorf("create zmq socket: %w", err)
 	}
-
-	if err := socket.Bind(i.endpoint); err != nil {
-		socket.Close()
+	frontend.SetLinger(0)
+	if err := frontend.Bind(i.endpoint); err != nil {
+		frontend.Close()
 		contextHandle.Term()
 		return fmt.Errorf("bind request socket: %w", err)
 	}
+	backend, err := contextHandle.NewSocket(zmq4.DEALER)
+	if err != nil {
+		frontend.Close()
+		contextHandle.Term()
+		return fmt.Errorf("create zmq socket: %w", err)
+	}
+	backend.SetLinger(0)
+	workers := fmt.Sprintf("inproc://dokja-request-workers-%p", i)
+	if err := backend.Bind(workers); err != nil {
+		frontend.Close()
+		backend.Close()
+		contextHandle.Term()
+		return fmt.Errorf("bind request workers: %w", err)
+	}
 
 	i.context = contextHandle
-	i.socket = socket
-
-	go i.serve()
+	i.done = make(chan struct{})
+	var running sync.WaitGroup
+	for n := 0; n < requestWorkers; n++ {
+		running.Add(1)
+		go func() {
+			defer running.Done()
+			i.work(contextHandle, workers)
+		}()
+	}
+	running.Add(1)
+	go func() {
+		defer running.Done()
+		// Returns when the context ends; each socket is closed by the goroutine that used it.
+		_ = zmq4.Proxy(frontend, backend, nil)
+		frontend.Close()
+		backend.Close()
+	}()
+	go func() {
+		running.Wait()
+		close(i.done)
+	}()
 	return nil
 }
 
-func (i *ZeroMQRequestIngress) serve() {
+// work answers requests one after another on its own socket. ZeroMQ sockets are not shared between
+// goroutines, so each worker creates, uses and closes its own.
+func (i *ZeroMQRequestIngress) work(contextHandle *zmq4.Context, workers string) {
+	socket, err := contextHandle.NewSocket(zmq4.REP)
+	if err != nil {
+		return
+	}
+	defer socket.Close()
+	socket.SetLinger(0)
+	if err := socket.Connect(workers); err != nil {
+		return
+	}
 	for {
-		raw, err := i.socket.Recv(0)
+		raw, err := socket.Recv(0)
 		if err != nil {
 			return
 		}
-
 		response := i.handle(raw)
 		body, marshalErr := json.Marshal(response)
 		if marshalErr != nil {
 			body = []byte(`{"status":"error","error":"failed to encode response"}`)
 		}
-		_, _ = i.socket.Send(string(body), 0)
+		if _, err := socket.Send(string(body), 0); err != nil {
+			return
+		}
 	}
 }
 
@@ -151,25 +202,18 @@ func verboseResponsesEnabled() bool {
 }
 
 func (i *ZeroMQRequestIngress) Stop() error {
-	if i == nil {
+	if i == nil || i.context == nil {
 		return nil
 	}
-
-	var errParts []string
-	if i.socket != nil {
-		if err := i.socket.Close(); err != nil {
-			errParts = append(errParts, err.Error())
-		}
-		i.socket = nil
+	// Ending the context wakes every blocked socket; their goroutines close them, which Term
+	// waits for.
+	err := i.context.Term()
+	i.context = nil
+	if i.done != nil {
+		<-i.done
 	}
-	if i.context != nil {
-		if err := i.context.Term(); err != nil {
-			errParts = append(errParts, err.Error())
-		}
-		i.context = nil
-	}
-	if len(errParts) > 0 {
-		return fmt.Errorf("%s", strings.Join(errParts, "; "))
+	if err != nil {
+		return fmt.Errorf("%s", err.Error())
 	}
 	return nil
 }
