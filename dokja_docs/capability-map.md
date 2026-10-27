@@ -162,6 +162,9 @@ selection changes forward the caller's transcript with its roles unchanged;
 assistant turns remain Ningo's replies across models. The volatile Discord
 history is still scoped per user and channel, capped at 20 messages by default,
 and expires after three minutes of inactivity or an orchestrator restart.
+During debates, persona guidance advances a conceded point into a relevant unresolved
+tension or thought experiment, including clearly hypothetical absurdist humor. It
+does not require false disagreement or prolong practical tasks and closed conversations.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
