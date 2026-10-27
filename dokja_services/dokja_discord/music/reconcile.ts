@@ -2,7 +2,7 @@
 export type QueueState = {
   epoch: string;
   version: number;
-  nowPlaying?: { entry: number; url: string; title: string; uploader: string; requestedBy: string };
+  nowPlaying?: { entry: number; url: string; title: string; uploader: string; requestedBy: string; thumbnail: string };
   waiting: number;
   paused: boolean;
   volume: number;
@@ -46,6 +46,7 @@ export function parseQueueState(raw: unknown): QueueState | undefined {
       uploader: typeof now.uploader === "string" ? now.uploader : "",
       // a Discord user id, said back as a mention; anything else is left out
       requestedBy: typeof now.requested_by === "string" && /^[0-9]{1,20}$/.test(now.requested_by) ? now.requested_by : "",
+      thumbnail: typeof now.thumbnail === "string" && /^https?:\/\//.test(now.thumbnail) && now.thumbnail.length <= 2048 ? now.thumbnail : "",
     };
   }
   return state;

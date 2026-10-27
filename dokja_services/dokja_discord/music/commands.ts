@@ -205,17 +205,14 @@ export const PANEL = {
 // that fit the moment. An ended queue keeps its words and loses its buttons.
 export function panelMessage(state: QueueState, locale = "pt-BR"): DiscordReply {
   const now = state.nowPlaying;
-  if (!now) return { content: say(locale, "queueOver"), components: [] };
+  if (!now) return { content: say(locale, "queueOver"), components: [], embeds: [] };
   const title = `**${quiet(now.title.trim()) || say(locale, "untitled")}**`;
   const song = now.uploader.trim() ? `${title} – ${quiet(now.uploader.trim())}` : title;
-  const lines = [
-    `${say(locale, state.paused ? "panelPaused" : "panelPlaying")}: ${song}`,
-    [
-      now.requestedBy ? say(locale, "askedBy", { user: now.requestedBy }) : "",
-      `volume ${state.volume}%`,
-      state.waiting > 0 ? say(locale, "waiting", { count: state.waiting }) : say(locale, "nothingWaiting"),
-    ].filter(Boolean).join(" · "),
-  ];
+  const details = [
+    now.requestedBy ? say(locale, "askedBy", { user: now.requestedBy }) : "",
+    `volume ${state.volume}%`,
+    state.waiting > 0 ? say(locale, "waiting", { count: state.waiting }) : say(locale, "nothingWaiting"),
+  ].filter(Boolean).join(" · ");
   const components: DiscordComponentSpec[] = [
     state.paused
       ? { kind: "button", customId: PANEL.resume, label: say(locale, "resume"), style: "primary" }
@@ -225,7 +222,16 @@ export function panelMessage(state: QueueState, locale = "pt-BR"): DiscordReply 
     { kind: "button", customId: PANEL.quieter, label: `🔉 −${VOLUME_STEP}`, style: "secondary" },
     { kind: "button", customId: PANEL.louder, label: `🔊 +${VOLUME_STEP}`, style: "secondary" },
   ];
-  return { content: lines.join("\n"), components };
+  // A card with the song, who asked and the queue, and the cover beside it when the track has one.
+  return {
+    content: "",
+    embeds: [{
+      title: say(locale, state.paused ? "panelPaused" : "panelPlaying"),
+      description: `${song}\n${details}`,
+      ...(now.thumbnail ? { thumbnailUrl: now.thumbnail } : {}),
+    }],
+    components,
+  };
 }
 
 // The commands alone, for callers that do not show buttons.

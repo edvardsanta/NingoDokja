@@ -47,7 +47,8 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
 - Only Discord plays the queue: a change made elsewhere (desktop, CLI) is heard at the next
   Discord command or track end.
 - **The panel.** When a song starts, Ningo posts one message in the channel of the last music
-  command: the song, who asked for it, the volume and how many wait, with Pause/Resume, Skip,
+  command: a card with the song, who asked for it, the volume, how many wait and the song's cover
+  beside it (when its source gives one), with Pause/Resume, Skip,
   Stop and volume −10/+10 buttons. It is edited as the queue changes, never posted again for the
   same queue, and loses its buttons when the queue ends. Buttons follow the commands' rule and
   answer only the person who pressed.
