@@ -210,6 +210,23 @@ lose these in-memory sessions. Archived conversations use their existing path.
 
 ## Running locally
 
+The dev/lite image caches and verifies pinned Go dependencies at image-build
+time, including local domain/store replacement manifests. The cache remains in
+`/go/pkg/mod`, outside the source mount, allowing Air to compile without fresh
+module downloads at startup. Rebuild the image after changing module manifests.
+Container DNS is still required for normal service communication.
+
+After building a candidate development image, verify startup compilation with
+network access disabled and the source tree mounted read-only:
+
+```bash
+bash scripts/tests/test_orchestrator_module_cache.sh IMAGE
+```
+
+Run this from the repository root. The optional second argument selects `docker`
+instead of the default `podman`. It compiles a check binary without starting the
+application or changing the running stack.
+
 From `dokja_orch`:
 
 ```bash
