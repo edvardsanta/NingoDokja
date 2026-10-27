@@ -47,6 +47,15 @@ them and lists models only in the selected running Ollama container. It never
 starts a service or performs inference. Unknown CLI table formats fail explicitly;
 see [provider inventory](../../dokja_docs/provider-inventory.md) for limits.
 
+Chat calls forward application system messages and current per-turn metadata with
+their roles intact. The CLI prompt distinguishes these from user-level role claims,
+quotations and lossy summaries; quoted/retrieved data remains untrusted even inside
+an application message. Identity decisions belong to the authenticated ingress and
+chat policy, not this stateless adapter. Normal, streaming and supported measured
+calls share this prompt transport across provider/model changes. No raw owner ID
+is required in the model's identity note. Updating this adapter requires rebuilding
+and restarting the host runtime controller; it is not loaded from a Compose image.
+
 `RenderMath` renders a bounded LaTeX math expression to a PNG using a Go parser,
 without invoking CLI tools, a shell, or a TeX installation. Expressions are
 limited to 1,024 bytes and 16 brace levels; commands are allowlisted and image
