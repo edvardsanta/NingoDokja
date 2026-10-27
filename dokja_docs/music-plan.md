@@ -189,3 +189,11 @@ Recovery uses the existing readiness timeout. Failed recovery discards the stale
 session, stops its resources, and returns a playback failure without publishing a
 new playing panel or a success message. This does not change commands, event
 contracts, configuration, or the domain's ownership of the queue.
+
+
+The adapter also observes disconnections without waiting for another command.
+It allows five seconds for transport recovery; if readiness does not return, it
+removes and destroys the lost session. The existing connection-loss hook reports
+`music.stop` through the orchestrator and refreshes the panel. A recovered
+connection cancels this cleanup. Detection alone never forces the bot back into a
+call after removal; a later explicit playback request may join again.
