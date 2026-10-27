@@ -28,7 +28,7 @@ import {
   type RadioStreamSession,
 } from "./radio_stream.js";
 import { createTrackStream, type TrackStream } from "./track_stream.js";
-import { ensureConnectionReady } from "./connection_ready.js";
+import { ensureConnectionReady, watchConnectionLoss } from "./connection_ready.js";
 import { toMessageReply } from "../runtime/discordjs_runtime.js";
 import type { DiscordReply } from "../types.js";
 
@@ -928,12 +928,21 @@ async function ensureVoiceSession(params: {
 
   connection.subscribe(player);
 
-  return {
+  const session: VoiceSession = {
     channelId: params.voiceChannel.id,
     connection,
     player,
     stream: createEmptyStream(),
   };
+  watchConnectionLoss(connection, () => {
+    if (params.sessions.get(params.guildId) !== session) return;
+    params.log?.("[dokja-discord] voice connection lost", JSON.stringify({ status: connection.state.status }));
+    params.sessions.delete(params.guildId);
+    // Destroying the connection also invokes the music onGone hook: stop the
+    // queue through the orchestrator and refresh its existing panel.
+    stopGuildSession(session);
+  });
+  return session;
 }
 
 function createEmptyStream(): FileAudioSession {

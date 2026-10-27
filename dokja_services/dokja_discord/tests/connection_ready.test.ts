@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { VoiceConnectionStatus, type VoiceConnection } from "@discordjs/voice";
-import { ensureConnectionReady } from "../voice/connection_ready.js";
+import { ensureConnectionReady, watchConnectionLoss } from "../voice/connection_ready.js";
 
 class Connection extends EventEmitter {
   state: { status: VoiceConnectionStatus } = { status: VoiceConnectionStatus.Disconnected };
@@ -50,4 +50,58 @@ test("failed rejoin and readiness timeout reject playback", async () => {
   const stalled = new Connection();
   await assert.rejects(ensureConnectionReady(stalled as unknown as VoiceConnection, "voice1", 20));
   assert.equal(stalled.joins, 1);
+});
+
+
+test("a persistent disconnect is detected without another playback request", t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const connection = new Connection();
+  connection.ready();
+  let lost = 0;
+  watchConnectionLoss(connection as unknown as VoiceConnection, () => { lost++; });
+  connection.state.status = VoiceConnectionStatus.Disconnected;
+  connection.emit("stateChange");
+  connection.emit("stateChange");
+  t.mock.timers.tick(4999);
+  assert.equal(lost, 0);
+  t.mock.timers.tick(1);
+  assert.equal(lost, 1);
+  connection.emit("stateChange");
+  t.mock.timers.tick(5000);
+  assert.equal(lost, 1, "one queue-stop notification per lost connection");
+  assert.equal(connection.joins, 0, "detection does not force the bot back into a call");
+});
+
+test("recovery cancels loss detection, but another disconnect starts a new grace period", t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const connection = new Connection();
+  let lost = 0;
+  watchConnectionLoss(connection as unknown as VoiceConnection, () => { lost++; });
+  t.mock.timers.tick(1000);
+  connection.ready();
+  connection.emit("stateChange");
+  t.mock.timers.tick(5000);
+  assert.equal(lost, 0);
+  connection.state.status = VoiceConnectionStatus.Disconnected;
+  connection.emit("stateChange");
+  connection.state.status = VoiceConnectionStatus.Connecting;
+  connection.emit("stateChange");
+  t.mock.timers.tick(5000);
+  assert.equal(lost, 1, "an unfinished handshake cannot retain stale playback indefinitely");
+});
+
+test("destroying or disposing a connection cancels pending loss detection", t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  for (const destroyed of [true, false]) {
+    const connection = new Connection();
+    let lost = 0;
+    const dispose = watchConnectionLoss(connection as unknown as VoiceConnection, () => { lost++; });
+    if (destroyed) {
+      connection.state.status = VoiceConnectionStatus.Destroyed;
+      connection.emit("stateChange");
+    } else dispose();
+    t.mock.timers.tick(5000);
+    assert.equal(lost, 0);
+    assert.equal(connection.listenerCount("stateChange"), 0);
+  }
 });
