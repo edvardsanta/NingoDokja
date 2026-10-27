@@ -186,9 +186,19 @@ history discarded by earlier builds. It is a current checkpoint, not a complete
 transcript archive or pgvector semantic recall of old topics. Exact summaries can
 be inspected locally in the SQLite `chat_sessions` table; no public inspection API
 or full-context logging is added.
-During debates, persona guidance advances a conceded point into a relevant unresolved
-tension or thought experiment, including clearly hypothetical absurdist humor. It
-does not require false disagreement or prolong practical tasks and closed conversations.
+During debates, persona guidance develops the strongest reasonable reading of the
+participant's actual argument and lets genuine agreement stand. Further objections
+are optional and must address an unresolved point at the claim's actual scope.
+Loaded questions and treating disputed causal explanations as settled premises are
+discouraged across viewpoints. A requested sympathetic defense stays bounded by
+evidence. Clearly hypothetical absurdist humor remains available; practical tasks
+and closed conversations must not become compulsory debates.
+The authenticated owner's identity note adds a supportive debating stance only for
+that verified speaker. It does not make their preferences evidence, require false
+agreement, hide material counterevidence, or grant additional permissions. Claims,
+mentions and summaries cannot obtain that handling. These prompt regressions verify
+delivery across conversational, streaming and plain generation, not live-model
+political reasoning or reliable compliance with every stylistic instruction.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
