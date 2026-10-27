@@ -61,3 +61,11 @@ test("a cover is kept only from an http(s) address", () => {
   assert.equal(cover("javascript:alert(1)"), "");
   assert.equal(cover(42), "");
 });
+
+test("the next track is read so it can be made ready, only from an http(s) page", () => {
+  const parsed = parseQueueState({ ok: true, epoch: "e", version: 1, now_playing: { entry: 1, url: "https://play.example/1" },
+    waiting: [{ entry: 2, url: "https://play.example/2" }, { entry: 3, url: "https://play.example/3" }] });
+  assert.deepEqual(parsed?.next, { entry: 2, url: "https://play.example/2" });
+  assert.equal(parseQueueState({ ok: true, epoch: "e", version: 1, waiting: [{ entry: 2, url: "file:///x" }] })?.next, undefined);
+  assert.equal(parseQueueState({ ok: true, epoch: "e", version: 1, waiting: [] })?.next, undefined);
+});

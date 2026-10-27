@@ -13,7 +13,7 @@ function fakes() {
   const ytdlp = join(dir, "yt-dlp");
   writeFileSync(ytdlp, `#!/bin/sh\necho "$@" > ${args}\necho $$ > ${dir}/pid\nwhile true; do printf 'aaaa'; sleep 0.05; done\n`);
   const ffmpeg = join(dir, "ffmpeg");
-  writeFileSync(ffmpeg, "#!/bin/sh\nexec cat\n");
+  writeFileSync(ffmpeg, `#!/bin/sh\necho "$@" > ${dir}/ffmpeg-args\nexec cat\n`);
   chmodSync(ytdlp, 0o755);
   chmodSync(ffmpeg, 0o755);
   return { dir, args, ytdlp, ffmpeg };
@@ -37,6 +37,9 @@ test("a track pipes yt-dlp into ffmpeg and stop ends both", async () => {
   const used = readFileSync(args, "utf8");
   assert.match(used, /--js-runtimes node/);
   assert.match(used, /-o - -- https:\/\/play\.example\/watch\?v=1/);
+  const decoded = readFileSync(join(dir, "ffmpeg-args"), "utf8");
+  assert.match(decoded, /-af loudnorm=I=-16/, "every track is brought to the same loudness");
+  assert.match(decoded, /-f s16le -ar 48000 -ac 2 pipe:1/);
   const pid = Number(readFileSync(join(dir, "pid"), "utf8"));
   assert.ok(alive(pid));
   stream.stop();

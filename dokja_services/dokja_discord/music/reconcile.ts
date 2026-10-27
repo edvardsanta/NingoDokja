@@ -4,6 +4,8 @@ export type QueueState = {
   version: number;
   nowPlaying?: { entry: number; url: string; title: string; uploader: string; requestedBy: string; thumbnail: string };
   waiting: number;
+  // the track after the one playing, so it can be made ready while this one plays
+  next?: { entry: number; url: string };
   paused: boolean;
   volume: number;
 };
@@ -37,6 +39,10 @@ export function parseQueueState(raw: unknown): QueueState | undefined {
     volume: clampVolume(raw.volume),
     waiting: Array.isArray(raw.waiting) ? Math.min(raw.waiting.length, 100) : 0,
   };
+  const next = Array.isArray(raw.waiting) ? raw.waiting[0] : undefined;
+  if (isRecord(next) && Number.isInteger(next.entry) && typeof next.url === "string" && /^https?:\/\//.test(next.url)) {
+    state.next = { entry: next.entry as number, url: next.url };
+  }
   const now = raw.now_playing;
   if (isRecord(now) && Number.isInteger(now.entry) && typeof now.url === "string" && /^https?:\/\//.test(now.url)) {
     state.nowPlaying = {

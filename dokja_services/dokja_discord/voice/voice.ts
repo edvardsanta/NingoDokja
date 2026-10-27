@@ -60,6 +60,8 @@ type MusicSession = {
   speaking: boolean;
   // paused because nobody is left in the voice channel, apart from the other two pauses
   away: boolean;
+  // the next track's stream, started while this one plays so it starts at once
+  prepared?: { entry: number; stream: TrackStream };
   volume: number;
   onEnded: (entry: number) => void;
   onGone: () => void;
@@ -112,7 +114,10 @@ export function createDiscordVoiceController(options: {
   const musics = new Map<string, MusicSession>();
   // A restart of the adapter must not leave yt-dlp or ffmpeg running.
   process.once("exit", () => {
-    for (const music of musics.values()) music.stream?.stop();
+    for (const music of musics.values()) {
+      music.stream?.stop();
+      music.prepared?.stream.stop();
+    }
   });
   const ffmpegPath = options.ffmpegPath ?? "ffmpeg";
   const readyTimeoutMs = options.readyTimeoutMs ?? 30_000;
@@ -204,6 +209,26 @@ export function createDiscordVoiceController(options: {
     }, ALONE_GRACE_MS));
   };
 
+  // The bitrate Discord should encode music at: the voice channel's own, within 32 to 128 kbps.
+  const channelBitrate = (guildId: string) => {
+    const channelId = sessions.get(guildId)?.channelId;
+    const channel = channelId ? voiceClient?.channels.cache.get(channelId) : undefined;
+    const bitrate = channel && "bitrate" in channel && typeof channel.bitrate === "number" ? channel.bitrate : 64_000;
+    return Math.min(128_000, Math.max(32_000, bitrate));
+  };
+
+  // Keeps the next track's stream ready, and lets go of one that is no longer next.
+  const prepareNext = (music: MusicSession, next: QueueState["next"]) => {
+    if (music.prepared && music.prepared.entry === next?.entry) return;
+    dropPrepared(music);
+    if (!next) return;
+    try {
+      music.prepared = { entry: next.entry, stream: createTrackStream(next.url, { ffmpegPath, log: options.log, error: options.error }) };
+    } catch (error) {
+      options.error?.("[dokja-discord] music prepare failed", error);
+    }
+  };
+
   // The server's music player, in the person's voice channel. A radio playing there is stopped:
   // the radio has no precedence.
   const musicSession = async ({ guildId, userId, hooks }: { guildId: string; userId: string; hooks: MusicHooks }) => {
@@ -247,6 +272,7 @@ export function createDiscordVoiceController(options: {
         if (next.status !== VoiceConnectionStatus.Destroyed || musics.get(guildId) !== created) return;
         const wasPlaying = created.local.entry !== undefined;
         stopTrack(created);
+        dropPrepared(created);
         musics.delete(guildId);
         if (wasPlaying) created.onGone();
       });
@@ -464,8 +490,13 @@ export function createDiscordVoiceController(options: {
         if (action.kind === "play") {
           const music = await musicSession({ guildId, userId, hooks });
           stopTrack(music);
-          const stream = createTrackStream(action.url, { ffmpegPath, log: options.log, error: options.error });
+          // The track made ready while the last one played starts at once; any other starts now.
+          const ready = music.prepared?.entry === action.entry ? music.prepared.stream : undefined;
+          if (!ready) dropPrepared(music);
+          music.prepared = undefined;
+          const stream = ready ?? createTrackStream(action.url, { ffmpegPath, log: options.log, error: options.error });
           stream.resource.volume?.setVolume(music.volume / 100);
+          stream.resource.encoder?.setBitrate(channelBitrate(guildId));
           music.stream = stream;
           music.playing = action.entry;
           music.userPaused = false;
@@ -477,6 +508,7 @@ export function createDiscordVoiceController(options: {
         if (!music) continue;
         if (action.kind === "stop") {
           stopTrack(music);
+          dropPrepared(music);
           sessions.get(guildId)?.connection.subscribe(sessions.get(guildId)!.player);
         } else if (action.kind === "pause") {
           music.userPaused = true;
@@ -491,6 +523,8 @@ export function createDiscordVoiceController(options: {
       }
       const music = musics.get(guildId);
       if (music) {
+        // Only while something plays is there a next track worth making ready.
+        prepareNext(music, step.next.entry === undefined ? undefined : state.next);
         music.local = step.next;
         music.onEnded = hooks.onEnded;
         music.onGone = hooks.onGone;
@@ -986,4 +1020,10 @@ function stopTrack(music: MusicSession) {
   music.player.stop(true);
   music.stream?.stop();
   music.stream = undefined;
+}
+
+// Lets go of a track made ready that will not play: both its processes end.
+function dropPrepared(music: MusicSession) {
+  music.prepared?.stream.stop();
+  music.prepared = undefined;
 }
