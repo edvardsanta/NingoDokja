@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { OrchestratorClient, OrchestratorError } from "../src/main/orchestrator_client.js";
-import { ok, sleep, startReplyServer } from "./support/reply_server.js";
+import { ok, sleep, startConcurrentServer, startReplyServer } from "./support/reply_server.js";
 
 function isCode(code: string) {
   return (error: unknown): boolean => {
@@ -68,7 +68,8 @@ test("counts the wait in line against the deadline and never sends an expired re
     return ok({ answered: request.payload });
   });
   try {
-    const client = new OrchestratorClient({ endpoint: server.endpoint });
+    // one request out at a time, so the second waits in line here
+    const client = new OrchestratorClient({ endpoint: server.endpoint, maxInFlight: 1 });
     const slow = client.request("ningo.status", { n: "slow" }, 5_000);
     const impatient = client.request("ningo.status", { n: "impatient" }, 100);
 
@@ -111,13 +112,13 @@ test("rejects a reply that is not a JSON object with a status", async () => {
   }
 });
 
-test("sends requests one at a time in the order they were made", async () => {
+test("with one request allowed out, sends them in the order they were made", async () => {
   const server = await startReplyServer(async (request, index) => {
     await sleep(index === 1 ? 60 : 0);
     return ok({ answered: request.payload });
   });
   try {
-    const client = new OrchestratorClient({ endpoint: server.endpoint });
+    const client = new OrchestratorClient({ endpoint: server.endpoint, maxInFlight: 1 });
     const replies = await Promise.all(
       [1, 2, 3].map((n) => client.request("ningo.status", { n }, 5_000)),
     );
@@ -130,6 +131,46 @@ test("sends requests one at a time in the order they were made", async () => {
       server.requests.map((request) => request.payload),
       [{ n: 1 }, { n: 2 }, { n: 3 }],
     );
+  } finally {
+    await server.close();
+  }
+});
+
+// Regression: the Library timed out while a chat turn ran, because every request waited for the one
+// before it. With an orchestrator that answers several at once, a quick request comes back at once.
+test("a slow request does not hold a quick one", async () => {
+  const server = await startConcurrentServer(async (request) => {
+    if ((request.payload as { n?: string }).n === "slow") await sleep(600);
+    return ok({ answered: request.payload });
+  });
+  try {
+    const client = new OrchestratorClient({ endpoint: server.endpoint });
+    const slow = client.request("message.created", { n: "slow" }, 5_000);
+    const started = Date.now();
+    const quick = await client.request("knowledge.list", { n: "quick" }, 5_000);
+    assert.deepEqual(quick.result, { answered: { n: "quick" } });
+    assert.ok(Date.now() - started < 400, "the quick request did not wait for the slow one");
+    assert.deepEqual((await slow).result, { answered: { n: "slow" } });
+  } finally {
+    await server.close();
+  }
+});
+
+test("past the limit, requests wait their turn and still keep their deadline", async () => {
+  const server = await startConcurrentServer(async (request) => {
+    await sleep(300);
+    return ok({ answered: request.payload });
+  });
+  try {
+    const client = new OrchestratorClient({ endpoint: server.endpoint, maxInFlight: 2 });
+    const first = client.request("a", { n: 1 }, 5_000);
+    const second = client.request("a", { n: 2 }, 5_000);
+    const third = client.request("a", { n: 3 }, 100);
+    await assert.rejects(third, isCode("timeout"));
+    await Promise.all([first, second]);
+    await sleep(50);
+    assert.deepEqual(server.requests.map((request) => request.payload).sort((x: any, y: any) => x.n - y.n), [{ n: 1 }, { n: 2 }],
+      "the third expired while waiting and was never sent");
   } finally {
     await server.close();
   }

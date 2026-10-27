@@ -210,8 +210,9 @@ src/renderer        src/preload                   src/main          ZeroMQ REQ, 
 - **The screen** only knows a `Transport` (`src/shared/transport.ts`): `request(type, payload)`
   resolves with data or with an error code, never throws. In Electron the preload implements it
   over IPC; in a browser a fake does. Nothing in the screen depends on the shell.
-- **The main process** owns the socket. It sends one request at a time and counts the wait in line
-  against each request's deadline. Each request uses its own socket, because a REQ socket that timed
+- **The main process** owns the socket. It sends up to eight requests at once (the orchestrator
+  answers that many in parallel, so a chat turn does not hold the Library), and counts any wait for
+  a turn against each request's deadline. Each request uses its own socket, because a REQ socket that timed
   out can never send again and a late reply must not be taken for the next answer. `immediate` mode
   makes it fail fast, as "unavailable", when nobody is listening.
 - **The allow-list** (`src/shared/actions.ts`) names the only actions the screen may ask for. Anything

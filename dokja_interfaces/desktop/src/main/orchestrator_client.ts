@@ -26,20 +26,44 @@ type ClientOptions = {
   // How long to wait for the orchestrator to accept a request before calling it unavailable.
   connectTimeoutMs?: number;
   communicationsToken?: string;
+  // How many requests may be out at once; the rest wait their turn here.
+  maxInFlight?: number;
 };
 
+// The orchestrator answers several requests at once (eight workers), so a slow one, such as a chat
+// turn, does not hold the others. The desktop sends as many.
+const DEFAULT_MAX_IN_FLIGHT = 8;
+
 // Sends requests to the orchestrator over ZeroMQ REQ/REP, the same wire format the CLI and the
-// TUI use. The orchestrator answers one request at a time, so requests wait here in line.
+// TUI use. Up to maxInFlight requests are out at once, each on its own socket; the rest wait here.
 export class OrchestratorClient {
   private readonly endpoint: string;
   private readonly communicationsToken: string;
   private readonly connectTimeoutMs: number;
-  private line: Promise<void> = Promise.resolve();
+  private readonly maxInFlight: number;
+  private inFlight = 0;
+  private readonly waiting: Array<() => void> = [];
 
   constructor(options: ClientOptions) {
     this.endpoint = options.endpoint;
     this.communicationsToken = options.communicationsToken ?? "";
     this.connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
+    this.maxInFlight = Math.max(1, options.maxInFlight ?? DEFAULT_MAX_IN_FLIGHT);
+  }
+
+  // A turn to send: at once while fewer than maxInFlight are out, otherwise in the order asked.
+  private async turn(): Promise<void> {
+    if (this.inFlight < this.maxInFlight) {
+      this.inFlight++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.waiting.push(resolve));
+  }
+
+  private done(): void {
+    const next = this.waiting.shift();
+    if (next) next();
+    else this.inFlight--;
   }
 
   request(
@@ -70,13 +94,15 @@ export class OrchestratorClient {
         settle(() => reject(new OrchestratorError("timeout", `no answer within ${timeoutMs} ms`)));
       }, timeoutMs);
 
-      this.line = this.line.then(async () => {
-        if (settled) return;
+      void this.turn().then(async () => {
         try {
+          if (settled) return;
           const reply = await this.exchange(type, payload, deadline);
           settle(() => resolve(reply));
         } catch (error) {
           settle(() => reject(toOrchestratorError(error)));
+        } finally {
+          this.done();
         }
       });
     });
