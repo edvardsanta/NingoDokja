@@ -195,7 +195,18 @@ Behavior:
 - `DISCORD_SCHEDULED_MEME_CHANNEL_ID`
   - scheduled meme delivery target
 - `DOKJA_CHAT_SESSION_TIMEOUT`
-  - conversation session timeout, default `3m`
+  - inactivity trigger for conversation compaction, default `3m`; does not discard history
+- `DOKJA_CHAT_SESSION_MAX_MESSAGES`
+  - raw turn compaction threshold, default `20` (minimum effective window is two turns)
+
+Non-archived chat sessions compact older turns through the configured model before
+the message threshold, after inactivity, or at 32 KiB of raw context. A bounded
+summary is merged with prior summary context and kept alongside recent verbatim
+turns. A summary request has a 25-second timeout and adds an inference call when
+needed. If it fails or returns invalid output, the request fails with its original
+history preserved for retry. Only successful summaries produce the compaction
+notice. Explicit new conversations clear context; orchestrator restarts still
+lose these in-memory sessions. Archived conversations use their existing path.
 
 ## Running locally
 

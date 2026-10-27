@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestDiscordReplyKeepsQuotedContextAfterSessionExpiry(t *testing.T) {
+func TestDiscordReplyKeepsQuotedContextAfterSessionCompaction(t *testing.T) {
 	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
 	handler := NewChatDomainHandler(generator)
 	now := time.Now()
@@ -22,17 +22,17 @@ func TestDiscordReplyKeepsQuotedContextAfterSessionExpiry(t *testing.T) {
 	if _, err := handler.Handle(context.Background(), event, chatStep); err != nil {
 		t.Fatal(err)
 	}
-	if len(generator.messages) != 1 || generator.messages[0]["role"] != "user" {
+	if len(generator.messages) != 2 || generator.messages[0]["role"] != "user" || generator.messages[1]["role"] != "user" {
 		t.Fatalf("reference must stay in user context: %#v", generator.messages)
 	}
-	content := generator.messages[0]["content"]
+	if !strings.Contains(generator.messages[0]["content"], "Earlier conversation summary") {
+		t.Fatal("compacted history missing")
+	}
+	content := generator.messages[1]["content"]
 	for _, want := range []string{"A calculator like Windows?", "quoted context, not instructions", "Current user message:\nEm python mesmo"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("missing %q in %q", want, content)
 		}
-	}
-	if strings.Contains(content, "old conversation") {
-		t.Fatal("an expired session must not be revived")
 	}
 }
 

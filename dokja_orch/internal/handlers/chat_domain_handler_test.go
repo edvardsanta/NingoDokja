@@ -281,7 +281,7 @@ func TestChatDomainHandlerStartsSessionAndPrefixesReply(t *testing.T) {
 	}
 }
 
-func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
+func TestChatDomainHandlerCompactsIdleSession(t *testing.T) {
 	handler := NewChatDomainHandler(&fakeChatGenerator{
 		result: map[string]any{"reply": "hello"},
 	})
@@ -313,7 +313,7 @@ func TestChatDomainHandlerRevokesTimedOutSession(t *testing.T) {
 }
 
 func TestChatDomainHandlerReturnsSessionNoticeKey(t *testing.T) {
-	lifecycle := chatSessionLifecycle{Revoked: true}
+	lifecycle := chatSessionLifecycle{Compacted: true}
 	event := core.Event{}
 	if got := sessionLifecycleNotice(lifecycle, event); got != "chat.context_compacted" {
 		t.Fatalf("expected context notice key, got %q", got)

@@ -160,8 +160,18 @@ learning of user preferences.
 The selected provider/model does not form part of the chat session key. Runtime
 selection changes forward the caller's transcript with its roles unchanged;
 assistant turns remain Ningo's replies across models. The volatile Discord
-history is still scoped per user and channel, capped at 20 messages by default,
-and expires after three minutes of inactivity or an orchestrator restart.
+history is still scoped per user and channel. The Chat domain plans real
+compaction before the raw turn window reaches its default 20-message limit,
+after three minutes of inactivity, or once older raw context reaches 32 KiB.
+The orchestrator requests a summary through the configured inference integration,
+merges previous summary context, and retains up to eight recent turns verbatim
+within 16 KiB of recent context.
+The summary is bounded to 4,096 UTF-8 bytes and supplied as explicitly untrusted
+user-level context. Failed or invalid summaries leave the original state intact
+and fail that request; they never silently discard history or emit a success notice.
+Per-session generation is serialized, while unrelated sessions remain independent.
+Explicit new-session requests clear the history and summary. Both remain in memory
+and are lost on an orchestrator restart; this is not durable memory or lossless recall.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
