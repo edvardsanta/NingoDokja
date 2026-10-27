@@ -19,6 +19,18 @@ Production stack:
 - `dokja-discord`
 - `dokja-scheduler`
 
+## Chat context
+
+Non-archived chat history is held in orchestrator memory. Inactivity (default
+three minutes) triggers real model-based compaction on the next message, rather
+than a reset. The default raw-message threshold is 20; recent turns remain verbatim
+alongside a bounded summary. Compaction adds an inference call using the configured
+provider and can lose detail. A summary failure preserves history and fails the
+request for retry. An explicit new conversation clears context; restarting the
+orchestrator still loses it. This change needs an updated orchestrator and Discord
+adapter for the corrected session-start notice, with no new variables, ports,
+volumes or database migrations. It does not change archived conversations.
+
 ## Required Secrets
 
 Before starting production, replace placeholder values in [.env.prod](../.env.prod):

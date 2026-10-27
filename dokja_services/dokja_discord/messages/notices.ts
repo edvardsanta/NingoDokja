@@ -5,8 +5,8 @@ export function localizeNotice(notice: string | undefined, reply: string, locale
       en: "Conversation context was compacted.",
     },
     "chat.session_started": {
-      "pt-BR": "Nova sessão de conversa iniciada. Ela será reiniciada após 3 minutos de inatividade.",
-      en: "New conversation session started. It will reset after 3 minutes of inactivity.",
+      "pt-BR": "Nova sessão de conversa iniciada.",
+      en: "New conversation session started.",
     },
     "chat.math_render_failed": {
       "pt-BR": "Algumas fórmulas não puderam ser geradas como imagem. As versões em texto estão abaixo.",

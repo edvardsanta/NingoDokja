@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"os"
+	chat "read_books/dokja_domain/dokja_chat"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +18,7 @@ type chatSessionState struct {
 	id         string
 	lastSeenAt time.Time
 	messages   []chatMessage
+	summary    string
 }
 
 type chatSessionLifecycle struct {
@@ -23,6 +26,7 @@ type chatSessionLifecycle struct {
 	Created   bool
 	Revoked   bool
 	Reason    string
+	Compacted bool
 }
 
 type chatSessionManager struct {
@@ -31,12 +35,10 @@ type chatSessionManager struct {
 	maxMsgs int
 	nowFn   func() time.Time
 	items   map[string]chatSessionState
+	turns   map[string]chan struct{}
 }
 
-type chatMessage struct {
-	Role    string
-	Content string
-}
+type chatMessage = chat.ContextMessage
 
 func newChatSessionManager() *chatSessionManager {
 	return &chatSessionManager{
@@ -44,73 +46,75 @@ func newChatSessionManager() *chatSessionManager {
 		maxMsgs: intFromEnv("DOKJA_CHAT_SESSION_MAX_MESSAGES", 20),
 		nowFn:   func() time.Time { return time.Now().UTC() },
 		items:   map[string]chatSessionState{},
+		turns:   map[string]chan struct{}{},
 	}
 }
 
-func (m *chatSessionManager) Touch(event core.Event) chatSessionLifecycle {
-	if m == nil {
-		return chatSessionLifecycle{}
+// LockTurn serializes each session through generation without blocking other sessions.
+func (m *chatSessionManager) LockTurn(ctx context.Context, event core.Event) (func(), error) {
+	key := chatSessionBaseKey(event)
+	if m == nil || key == "" {
+		return func() {}, nil
 	}
-
-	baseKey := chatSessionBaseKey(event)
-	if baseKey == "" {
-		return chatSessionLifecycle{}
-	}
-
-	forceNew := boolFromContext(event.Context, "force_new_session")
-	now := m.nowFn()
-
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	gate := m.turns[key]
+	if gate == nil {
+		gate = make(chan struct{}, 1)
+		m.turns[key] = gate
+	}
+	m.mu.Unlock()
+	select {
+	case gate <- struct{}{}:
+		return func() { <-gate }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
 
-	current, ok := m.items[baseKey]
+func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, content string, summarize func(context.Context, chat.ContextCompaction) (string, error)) (chatSessionLifecycle, []chatMessage, error) {
 	lifecycle := chatSessionLifecycle{}
-	if ok {
-		if forceNew {
-			lifecycle.Revoked = true
-			lifecycle.Reason = "new chat session requested"
-			ok = false
-		} else if now.Sub(current.lastSeenAt) > m.timeout {
-			lifecycle.Revoked = true
-			lifecycle.Reason = fmt.Sprintf("session timed out after %s", m.timeout.Round(time.Second))
-			ok = false
-		}
-	}
-
-	if !ok {
-		current = chatSessionState{
-			id:         fmt.Sprintf("chat-%d", now.UnixNano()),
-			lastSeenAt: now,
-		}
-		m.items[baseKey] = current
-		lifecycle.Created = true
-	} else {
-		current.lastSeenAt = now
-		m.items[baseKey] = current
-	}
-
-	lifecycle.SessionID = current.id
-	return lifecycle
-}
-
-func (m *chatSessionManager) BeginTurn(event core.Event, content string) (chatSessionLifecycle, []chatMessage) {
-	lifecycle := m.Touch(event)
-	if m == nil {
-		return lifecycle, nil
-	}
-
 	baseKey := chatSessionBaseKey(event)
-	if baseKey == "" {
-		return lifecycle, []chatMessage{{Role: "user", Content: content}}
+	if m == nil || baseKey == "" {
+		return lifecycle, []chatMessage{{Role: "user", Content: content}}, nil
 	}
-
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	state := m.items[baseKey]
-	state.messages = appendAndTrim(state.messages, chatMessage{Role: "user", Content: strings.TrimSpace(content)}, m.maxMsgs)
+	state, exists := m.items[baseKey]
+	state.messages = cloneMessages(state.messages)
+	m.mu.Unlock()
+	now := m.nowFn()
+	forceNew := boolFromContext(event.Context, "force_new_session")
+	if forceNew || !exists {
+		lifecycle.Created = true
+		lifecycle.Revoked = exists
+		if exists {
+			lifecycle.Reason = "new chat session requested"
+		}
+		state = chatSessionState{id: fmt.Sprintf("chat-%d", now.UnixNano())}
+	}
+	plan := chat.PlanContext(state.summary, state.messages, m.maxMsgs, exists && now.Sub(state.lastSeenAt) > m.timeout)
+	if len(plan.Older) > 0 {
+		summary, err := summarize(ctx, plan)
+		if err != nil {
+			return lifecycle, nil, fmt.Errorf("compact conversation context: %w", err)
+		}
+		state.summary, err = chat.ValidateSummary(summary)
+		if err != nil {
+			return lifecycle, nil, err
+		}
+		state.messages = cloneMessages(plan.Recent)
+		lifecycle.Compacted = true
+	}
+	state.lastSeenAt = now
+	state.messages = append(state.messages, chatMessage{Role: "user", Content: strings.TrimSpace(content)})
+	m.mu.Lock()
 	m.items[baseKey] = state
-	return lifecycle, cloneMessages(state.messages)
+	m.mu.Unlock()
+	lifecycle.SessionID = state.id
+	history := cloneMessages(state.messages)
+	if state.summary != "" {
+		history = append([]chatMessage{chat.SummaryContext(state.summary)}, history...)
+	}
+	return lifecycle, history, nil
 }
 
 func (m *chatSessionManager) CompleteTurn(event core.Event, reply string) {
@@ -129,7 +133,9 @@ func (m *chatSessionManager) CompleteTurn(event core.Event, reply string) {
 	if !ok {
 		return
 	}
-	state.messages = appendAndTrim(state.messages, chatMessage{Role: "assistant", Content: strings.TrimSpace(reply)}, m.maxMsgs)
+	if strings.TrimSpace(reply) != "" {
+		state.messages = append(state.messages, chatMessage{Role: "assistant", Content: strings.TrimSpace(reply)})
+	}
 	m.items[baseKey] = state
 }
 
@@ -185,17 +191,6 @@ func intFromEnv(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
-}
-
-func appendAndTrim(messages []chatMessage, message chatMessage, max int) []chatMessage {
-	if strings.TrimSpace(message.Content) == "" {
-		return messages
-	}
-	messages = append(messages, message)
-	if max > 0 && len(messages) > max {
-		messages = append([]chatMessage(nil), messages[len(messages)-max:]...)
-	}
-	return messages
 }
 
 func cloneMessages(messages []chatMessage) []chatMessage {

@@ -1,4 +1,4 @@
-// Package chat owns chat presentation decisions; rendering and transport remain integrations.
+// Package chat owns context and presentation decisions; inference, rendering and transport remain integrations.
 package chat
 
 import (
