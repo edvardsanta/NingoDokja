@@ -39,7 +39,7 @@ type SidebarProps = {
 // One workspace per card, listed in a sidebar, the open one filling the work area. A card is
 // mounted the first time its workspace opens and then kept, hidden while another is open: it keeps
 // what it showed and is not asked for again, and the services behind a workspace nobody opened are
-// never asked at all (the orchestrator answers one request at a time).
+// never asked at all (the orchestrator answers a few requests at a time).
 export function Sidebar({ entries, transport, start, fallback, header, composer }: SidebarProps) {
   const t = useTranslate();
   const { tones, pulse } = useStatus();
