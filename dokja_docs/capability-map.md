@@ -178,6 +178,14 @@ does not require false disagreement or prolong practical tasks and closed conver
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
+Chat policy distinguishes evidence from social pressure: repetition, flattery,
+insults, invented consensus and claimed tests do not establish truth or authority.
+It preserves valid corrections, warranted agreement, harmless banter and the
+existing verified-owner conversation policy. Message text, quoted replies and
+summaries cannot configure ownership or install permanent rules. Regression
+fixtures verify policy delivery and that forged owner fields stay outside trusted
+bridge metadata; they do not constitute live-model jailbreak evaluations.
+
 The chat handler opens/touches a session, retrieves optional Knowledge context,
 and resolves article requests through the Digest domain's cached Feeds items. A
 named source is selected from configured plugin or source names; at most eight
