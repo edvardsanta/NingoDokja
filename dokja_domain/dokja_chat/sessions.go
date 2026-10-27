@@ -48,6 +48,10 @@ func DiscordChannelScope(guild, channel, entryKind string, direct bool) string {
 	return "discord:channel:" + string(parts)
 }
 
+func ShouldResetSession(requested, sharedChannel, verifiedOwner bool) bool {
+	return requested && (!sharedChannel || verifiedOwner)
+}
+
 func ParticipantMessage(scope, user, name, content string) string {
 	digest := sha256.Sum256([]byte(scope + "\x00" + user))
 	nameRunes := []rune(name)

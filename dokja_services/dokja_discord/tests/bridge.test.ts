@@ -25,6 +25,7 @@ test("buildBridgePayload maps discord fields into orchestrator bridge request", 
     eventType: "meme.fetch",
     limit: 3,
     userId: "u1",
+    userName: "Member".repeat(40),
     channelId: "c1",
     messageId: "m1",
     guildId: "g1",
@@ -32,6 +33,8 @@ test("buildBridgePayload maps discord fields into orchestrator bridge request", 
 
   assert.equal(payload.event_type, "meme.fetch");
   assert.equal(payload.payload.limit, 3);
+  assert.equal(payload.payload.userName, "Member".repeat(40).slice(0, 100));
+  assert.equal(payload.payload.userId, "u1");
   assert.equal(payload.payload.sessionKey, "discord:c1:u1");
   assert.equal(payload.payload.accountId, "default");
 });

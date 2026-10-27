@@ -32,6 +32,7 @@ test("message handler forwards mention facts for domain authorization", async ()
   let replied = false;
   await handler({
     userId: "u1",
+    userName: "Channel Scholar",
     channelId: "channel-1",
     messageId: "m1",
     guildId: "guild-1",
@@ -46,6 +47,8 @@ test("message handler forwards mention facts for domain authorization", async ()
 
   assert.equal(replied, false);
   assert.equal(metadata.entryKind, "message");
+  assert.equal(metadata.userName, "Channel Scholar");
+  assert.equal(metadata.userId, "u1");
   assert.equal(metadata.isDirectMessage, false);
   assert.equal(metadata.mentionsBot, false);
   } finally { globalThis.fetch = originalFetch; }

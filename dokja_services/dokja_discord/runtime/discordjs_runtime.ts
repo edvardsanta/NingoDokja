@@ -403,6 +403,7 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
   }
   return {
     userId: message.author.id,
+    userName: message.member?.displayName ?? message.author.globalName ?? message.author.username,
     channelId: message.channelId,
     messageId: message.id,
     guildId: message.guildId ?? undefined,

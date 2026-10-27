@@ -13,9 +13,19 @@ TypeScript Discord communication adapter for Dokja. It receives Discord messages
 For Discord replies, the adapter fetches the referenced message in the same
 channel and guild and forwards up to 8,000 characters as optional `replyToContent`
 on the HTTP bridge. Unavailable references do not block the new message. The chat
-handler treats this as quoted user context, including after session expiry;
+handler treats this as quoted user context, including after compaction and restarts;
 the current message remains the routing input. Deploy the updated orchestrator
-and adapter for this additive feature. Session expiry remains unchanged.
+and adapter for this additive feature. Only the direct reference is fetched;
+the adapter does not walk the reply chain to the initial topic.
+
+Natural server messages also forward an optional bounded `userName` for untrusted
+speaker attribution. Account IDs remain the identity source; display names never
+establish ownership. These discussions share context only within the same
+guild/channel. DMs and slash-command conversations keep separate per-user scopes.
+The orchestrator persists the latest summary and recent turns in its private
+`dokja_chat_sessions.db`, using existing data mounts. It records handled exchanges,
+not every channel message or pre-deployment history. It does not index chat in
+pgvector. Only the verified owner can reset a shared channel snapshot.
 
 Up to 20 mentioned Discord user IDs also travel to the authenticated bridge.
 The orchestrator compares them with optional `DOKJA_OWNER_DISCORD_USER_ID` and

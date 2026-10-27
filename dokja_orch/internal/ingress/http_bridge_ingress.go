@@ -40,6 +40,7 @@ type BridgeRequest struct {
 		Limit            *int     `json:"limit"`
 		MaxItems         *int     `json:"maxItemsPerScraper"`
 		UserID           string   `json:"userId"`
+		UserName         string   `json:"userName"`
 		ChannelID        string   `json:"channelId"`
 		MessageID        string   `json:"messageId"`
 		GuildID          string   `json:"guildId"`
@@ -465,12 +466,17 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 		}
 	}
 
+	displayName := []rune(strings.TrimSpace(request.Payload.UserName))
+	name := string(displayName[:min(len(displayName), 100)])
+	if name == "" {
+		name = strings.TrimSpace(request.Payload.UserID)
+	}
 	return core.Event{
 		Source: source,
 		Type:   eventType,
 		User: core.EventUser{
 			ID:   strings.TrimSpace(request.Payload.UserID),
-			Name: strings.TrimSpace(request.Payload.UserID),
+			Name: name,
 		},
 		Channel: core.EventChannel{
 			ID: strings.TrimSpace(request.Payload.ChannelID),

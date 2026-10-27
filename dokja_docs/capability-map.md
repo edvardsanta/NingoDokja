@@ -159,8 +159,9 @@ This is interface guidance and conversational adaptation, not durable automatic
 learning of user preferences.
 The selected provider/model does not form part of the chat session key. Runtime
 selection changes forward the caller's transcript with its roles unchanged;
-assistant turns remain Ningo's replies across models. The volatile Discord
-history is still scoped per user and channel. The Chat domain plans real
+assistant turns remain Ningo's replies across models. Discord server message
+discussions share a guild/channel scope with participant attribution. DMs and
+slash-command sessions retain separate per-user scopes. The Chat domain plans real
 compaction before the raw turn window reaches its default 20-message limit,
 after three minutes of inactivity, or once older raw context reaches 32 KiB.
 The orchestrator requests a summary through the configured inference integration,
@@ -170,8 +171,18 @@ The summary is bounded to 4,096 UTF-8 bytes and supplied as explicitly untrusted
 user-level context. Failed or invalid summaries leave the original state intact
 and fail that request; they never silently discard history or emit a success notice.
 Per-session generation is serialized, while unrelated sessions remain independent.
-Explicit new-session requests clear the history and summary. Both remain in memory
-and are lost on an orchestrator restart; this is not durable memory or lossless recall.
+The orchestrator stores non-archived session snapshots in `dokja_chat_sessions.db`
+beside `DOKJA_DB_FILE`, or under `.dokja/` when unset. The separate versioned
+SQLite file stores summaries and recent user/assistant turns and reloads them after
+restart. Storage errors fail explicitly without a volatile fallback. Explicit new
+sessions clear the relevant snapshot; only a verified owner may reset a shared
+channel scope. Identity and system instructions are rebuilt per turn, never restored
+from the database. Existing local owner conversation archives remain separate.
+This stores bot-handled exchanges, not every channel message, and cannot recover
+history discarded by earlier builds. It is a current checkpoint, not a complete
+transcript archive or pgvector semantic recall of old topics. Exact summaries can
+be inspected locally in the SQLite `chat_sessions` table; no public inspection API
+or full-context logging is added.
 During debates, persona guidance advances a conceded point into a relevant unresolved
 tension or thought experiment, including clearly hypothetical absurdist humor. It
 does not require false disagreement or prolong practical tasks and closed conversations.

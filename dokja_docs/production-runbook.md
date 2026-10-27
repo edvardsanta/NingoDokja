@@ -32,15 +32,35 @@ other services; a DNS outage still needs a network-level fix.
 
 ## Chat context
 
-Non-archived chat history is held in orchestrator memory. Inactivity (default
+Non-archived chat history is cached in memory and persisted in
+`dokja_chat_sessions.db` beside `DOKJA_DB_FILE`. If the latter is unset, the default
+is `.dokja/dokja_chat_sessions.db` relative to the orchestrator's working directory.
+The new file uses schema version 1; existing database schemas are unchanged.
+An unreadable, unwritable or unsupported session database fails explicitly; startup
+does not silently fall back to volatile chat. Inactivity (default
 three minutes) triggers real model-based compaction on the next message, rather
 than a reset. The default raw-message threshold is 20; recent turns remain verbatim
 alongside a bounded summary. Compaction adds an inference call using the configured
 provider and can lose detail. A summary failure preserves history and fails the
-request for retry. An explicit new conversation clears context; restarting the
-orchestrator still loses it. This change needs an updated orchestrator and Discord
-adapter for the corrected session-start notice, with no new variables, ports,
-volumes or database migrations. It does not change archived conversations.
+request for retry. Restarting the orchestrator reloads saved summaries and recent
+turns. Server message discussions share only the same Discord guild/channel, with
+untrusted display-name and participant attribution; direct messages and commands
+retain separate per-user scopes. Explicit new conversations clear their scope, but
+resetting a shared channel requires the configured verified owner. This change needs
+an updated orchestrator and Discord adapter, with no new variables, ports or volumes.
+It does not change archived owner conversations, index chat in pgvector, walk reply
+chains, or import channel history from before deployment.
+
+The stored summary is readable locally with a SQLite client in read-only mode:
+
+```sql
+SELECT scope_key, session_id, summary FROM chat_sessions;
+```
+
+Inspect the actual session file, not `dokja.db`. Keep it private: it contains
+conversation data. The stored checkpoint is the latest summary and recent turns,
+not a complete long-term transcript archive. Back it up using SQLite's online backup
+mechanism or stop its writer before copying an active database and WAL.
 
 ## Required Secrets
 
@@ -145,6 +165,9 @@ The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`
   orchestrator writes it; the scheduler only reads the intervals. A corrupt file starts every job paused.
 - `/data/dokja.db` (`DOKJA_DB_FILE`): SQLite database with the chat provider profiles (base URL, model
   and token). Keep the volume private: the token is stored in plain text.
+- `/data/dokja_chat_sessions.db`: durable non-archived session snapshots, created
+  with mode `0600` and covered by the existing data volume. Include it in backups.
+  An older build ignores this separate file; do not delete it during rollback.
 - `/data/dokja_conversations.db`, beside `DOKJA_DB_FILE` and named from it, so there is no new
   variable: the owner's conversations with Ningo, as written by the desktop and the CLI.
   - Only the orchestrator opens it; it is created on the first start of a build that keeps

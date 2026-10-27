@@ -205,8 +205,15 @@ summary is merged with prior summary context and kept alongside recent verbatim
 turns. A summary request has a 25-second timeout and adds an inference call when
 needed. If it fails or returns invalid output, the request fails with its original
 history preserved for retry. Only successful summaries produce the compaction
-notice. Explicit new conversations clear context; orchestrator restarts still
-lose these in-memory sessions. Archived conversations use their existing path.
+notice. Non-archived snapshots are saved in `dokja_chat_sessions.db` beside
+`DOKJA_DB_FILE`, or under `.dokja/` when that setting is absent, and restored after
+restart. Storage failures fail the request rather than silently losing context.
+The file has its own versioned schema and does not alter existing SQLite files.
+Discord server message discussions share only their guild/channel, with speaker
+attribution. DMs and slash-command conversations stay separate per user. Only the
+verified owner can explicitly reset shared-channel context. Archived owner
+conversations use their existing separate path. Saved state covers bot-handled
+exchanges; it does not backfill old channel history or provide vector topic recall.
 
 ## Running locally
 

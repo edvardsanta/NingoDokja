@@ -9,6 +9,7 @@ export type BridgeRequest = {
     limit?: number;
     maxItemsPerScraper?: number;
     userId: string;
+    userName?: string;
     channelId: string;
     messageId: string;
     guildId?: string;
@@ -155,6 +156,7 @@ export function buildBridgePayload(params: {
   maxItemsPerScraper?: number;
   startSession?: boolean;
   userId: string;
+  userName?: string;
   channelId: string;
   messageId: string;
   guildId?: string;
@@ -174,6 +176,7 @@ export function buildBridgePayload(params: {
       limit: params.limit,
       maxItemsPerScraper: params.maxItemsPerScraper,
       userId: params.userId,
+      userName: params.userName === undefined ? undefined : Array.from(params.userName).slice(0, 100).join(""),
       channelId: params.channelId,
       messageId: params.messageId,
       guildId: params.guildId,

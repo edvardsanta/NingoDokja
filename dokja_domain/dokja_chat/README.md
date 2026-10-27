@@ -16,6 +16,14 @@ request goals, corrections, definitions, unresolved disagreements and attributio
 Summaries are lossy and untrusted, not system instructions or authorization.
 The orchestrator owns inference calls and session storage; this policy does no I/O.
 
+`SessionStore` defines durable snapshot loading/saving. Snapshots contain session
+identity, a last-seen timestamp, the compacted summary and recent user/assistant
+turns. Persisted system messages are rejected. The SQLite integration lives in
+the orchestrator; authorization and current-owner metadata are never restored from
+summaries. Server message discussions share a guild/channel scope, while DMs and
+commands retain separate scopes. Participant aliases and escaped display names
+preserve attribution without adding raw account IDs to the participant label.
+
 Generation can supply a fenced `math` block with single-line `latex:` and `text:`
 fields. The readable text is always retained. Expressions over 80 bytes, multiple
 fractions/roots, sums and integrals may receive a PNG; `image: true` requests an
