@@ -527,3 +527,19 @@ func TestItemsCarryThePromptsTheirPluginWrote(t *testing.T) {
 		t.Fatalf("an item without prompts must carry an empty list, got %#v", items[1]["prompts"])
 	}
 }
+
+func TestItemsCarryFullBodyOnlyWhenProvided(t *testing.T) {
+	root := t.TempDir()
+	newPlugin(t, root, "reading", map[string]any{"enabled": true})
+	service := startService(t, root, newFakeRunner(func(context.Context, Plugin) ([]byte, error) {
+		return []byte(`{"items":[{"id":"a","title":"Full reading","summary":"Excerpt","body":"First paragraph.\n\nLast paragraph."},{"id":"b","title":"Link only"}]}`), nil
+	}))
+	waitForRow(t, service, "reading", func(row map[string]any) bool { return row["state"] == "ok" })
+	items, _ := itemsOf(t, service)
+	if len(items) != 2 || items[0]["body"] != "First paragraph.\n\nLast paragraph." {
+		t.Fatalf("items = %#v", items)
+	}
+	if _, present := items[1]["body"]; present {
+		t.Fatal("a link-only source must keep its existing response shape")
+	}
+}

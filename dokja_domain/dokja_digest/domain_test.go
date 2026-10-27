@@ -430,3 +430,65 @@ func TestAnItemKeepsThePromptsItsPluginSuggested(t *testing.T) {
 		t.Fatalf("prompts = %#v", first["prompts"])
 	}
 }
+
+func TestDigestCarriesFullTextSeparatelyFromTheExcerpt(t *testing.T) {
+	reading := entry("day-1", "Daily", "Daily reading", 2, "https://example.com/")
+	body := "First paragraph.\n\n" + strings.Repeat("Full reading text. ", 100)
+	reading["body"] = body
+	got := readDigest(t, itemsReply(t, reading), nil)
+	first := got["items"].([]map[string]any)[0]
+	if first["body"] != strings.TrimSpace(body) || first["summary"] != reading["summary"] {
+		t.Fatalf("full text or excerpt changed: %#v", first)
+	}
+}
+
+func TestFiltersRunBeforePaginationAndSearchFullCollectedText(t *testing.T) {
+	var entries []map[string]any
+	for n := 0; n < 12; n++ {
+		entries = append(entries, entry(fmt.Sprint(n), "Alpha", fmt.Sprintf("Unrelated article number %d", n), 1, fmt.Sprintf("https://example.com/a/%d", n)))
+	}
+	match := entry("match", "Beta", "Daily readings", 2, "https://example.com/daily")
+	match["body"] = "A passage about CHARITY beyond the preview excerpt."
+	entries = append(entries, match)
+	got := readDigest(t, itemsReply(t, entries...), map[string]any{"source": "plugin-beta", "query": "charity", "limit": 1})
+	if got["total"] != 1 || got["more"] != 0 || got["items"].([]map[string]any)[0]["id"] != "match" {
+		t.Fatalf("filtered page = %#v", got)
+	}
+}
+
+func TestDateRangeIsInclusiveAndExcludesUndatedItems(t *testing.T) {
+	var entries []map[string]any
+	for n, timestamp := range []string{"2023-04-24T23:59:59Z", "2023-04-25T00:00:00Z", "2023-04-25T23:59:59Z", "2023-04-26T00:00:00Z", ""} {
+		row := entry(fmt.Sprint(n), "Alpha", fmt.Sprintf("Dated article number %d", n), -1, fmt.Sprintf("https://example.com/d/%d", n))
+		row["published"] = timestamp
+		entries = append(entries, row)
+	}
+	got := readDigest(t, itemsReply(t, entries...), map[string]any{"from": "2023-04-25", "to": "2023-04-25"})
+	if got["total"] != 2 {
+		t.Fatalf("explicit dates should include collected older items: %#v", got)
+	}
+	rows := got["items"].([]map[string]any)
+	if rows[0]["id"] != "2" || rows[1]["id"] != "1" {
+		t.Fatalf("wrong date boundary results: %#v", rows)
+	}
+}
+
+func TestInvalidReadingFiltersAreRejected(t *testing.T) {
+	for _, payload := range []map[string]any{
+		{"from": "2026-02-30"}, {"to": 42}, {"from": "2026-10-02", "to": "2026-10-01"},
+		{"source": []any{"Alpha"}}, {"query": strings.Repeat("a", 201)},
+	} {
+		if _, err := policyFrom(payload); err == nil {
+			t.Fatalf("invalid filters accepted: %#v", payload)
+		}
+	}
+}
+
+func TestDigestKeepsTheSourceMediaForPreview(t *testing.T) {
+	row := entry("meme", "Images", "Collected image", 1, "https://example.com/page")
+	row["media_url"] = "https://example.com/image.jpg"
+	got := readDigest(t, itemsReply(t, row), nil)
+	if got["items"].([]map[string]any)[0]["media_url"] != row["media_url"] {
+		t.Fatalf("media reference lost: %#v", got)
+	}
+}

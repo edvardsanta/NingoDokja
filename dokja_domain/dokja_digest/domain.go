@@ -106,6 +106,10 @@ type policy struct {
 	offset    int
 	perSource int
 	maxAge    time.Duration
+	source    string
+	query     string
+	from      time.Time
+	until     time.Time
 }
 
 func policyFrom(payload map[string]any) (policy, error) {
@@ -125,6 +129,34 @@ func policyFrom(payload map[string]any) (policy, error) {
 		return policy{}, err
 	}
 	chosen.maxAge = time.Duration(hours) * time.Hour
+	for name, target := range map[string]*string{"source": &chosen.source, "query": &chosen.query} {
+		if raw, present := payload[name]; present {
+			value, ok := raw.(string)
+			if !ok || utf8.RuneCountInString(value) > 200 {
+				return policy{}, fmt.Errorf("%s must be text of at most 200 characters", name)
+			}
+			*target = strings.TrimSpace(value)
+		}
+	}
+	chosen.query = strings.ToLower(chosen.query)
+	for name, target := range map[string]*time.Time{"from": &chosen.from, "to": &chosen.until} {
+		if raw, present := payload[name]; present && raw != "" {
+			value, ok := raw.(string)
+			if !ok {
+				return policy{}, fmt.Errorf("%s must be a date", name)
+			}
+			*target, err = time.Parse("2006-01-02", value)
+			if err != nil {
+				return policy{}, fmt.Errorf("%s must be a date in YYYY-MM-DD format", name)
+			}
+		}
+	}
+	if !chosen.from.IsZero() && !chosen.until.IsZero() && chosen.from.After(chosen.until) {
+		return policy{}, fmt.Errorf("from must not be later than to")
+	}
+	if !chosen.until.IsZero() {
+		chosen.until = chosen.until.AddDate(0, 0, 1) // inclusive calendar date, exclusive instant
+	}
 	return chosen, nil
 }
 
