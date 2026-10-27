@@ -59,3 +59,32 @@ func TestSummaryValidationAndUntrustedContext(t *testing.T) {
 		t.Fatal(got, err)
 	}
 }
+
+func TestRecoveryContextIsBoundedAndDoesNotChangeHistory(t *testing.T) {
+	messages := []ContextMessage{}
+	for i := 0; i < 30; i++ {
+		role := "user"
+		if i%2 == 1 {
+			role = "assistant"
+		}
+		messages = append(messages, ContextMessage{Role: role, Content: strings.Repeat("x", 3000)})
+	}
+	recent, omitted := RecoveryContext(messages, 20)
+	bytes := 0
+	for _, message := range recent {
+		bytes += len(message.Content)
+	}
+	if !omitted || len(recent) > 8 || bytes > 16<<10 || len(recent) > 0 && recent[0].Role != "user" {
+		t.Fatal("unbounded or detached recovery context")
+	}
+	recent[0].Content = "changed projection"
+	if messages[len(messages)-len(recent)].Content == "changed projection" {
+		t.Fatal("projection mutated stored history")
+	}
+	if OmittedContextNotice().Role != "user" {
+		t.Fatal("notice promoted to trusted authority")
+	}
+	if all, omitted := RecoveryContext(messages[:2], 20); omitted || len(all) != 2 {
+		t.Fatal("short history needlessly omitted")
+	}
+}

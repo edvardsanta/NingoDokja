@@ -101,12 +101,14 @@ func TestMessageLimitCompactionMergesPriorSummaryAndPreservesRecentTurns(t *test
 	}
 }
 
-func TestFailedCompactionPreservesOriginalHistoryAndCanRetry(t *testing.T) {
-	for _, bad := range []string{"", strings.Repeat("x", chat.MaxSummaryBytes+1), "provider-error"} {
+func TestFailedCompactionRepliesWithoutLosingHistoryAndRetriesAfterCooldown(t *testing.T) {
+	for _, bad := range []string{"", strings.Repeat("x", chat.MaxSummaryBytes+1), "provider-error", "timeout"} {
 		t.Run(bad[:min(len(bad), 16)], func(t *testing.T) {
 			g := &compactionGenerator{summary: bad}
 			h := NewChatDomainHandler(g)
 			h.sessions.maxMsgs = 2
+			now := time.Unix(100, 0)
+			h.sessions.nowFn = func() time.Time { return now }
 			event := chatEvent("A correction to remember")
 			if _, err := h.Handle(t.Context(), event, chatStep); err != nil {
 				t.Fatal(err)
@@ -115,17 +117,40 @@ func TestFailedCompactionPreservesOriginalHistoryAndCanRetry(t *testing.T) {
 			if bad == "provider-error" {
 				g.err = errors.New("offline")
 			}
-			if _, err := h.Handle(t.Context(), event, chatStep); err == nil {
-				t.Fatal("invalid summary accepted")
+			if bad == "timeout" {
+				g.err = context.DeadlineExceeded
+			}
+			result, err := h.Handle(t.Context(), event, chatStep)
+			if err != nil {
+				t.Fatal("failed compaction blocked the reply", err)
 			}
 			after := h.sessions.items[chatSessionBaseKey(event)]
-			if !reflect.DeepEqual(before, after) || len(g.replies) != 1 {
-				t.Fatal("failed compaction changed history or generated a reply")
+			if len(g.replies) != 2 || len(after.messages) != len(before.messages)+2 || after.summary != before.summary || after.id != before.id || result["notice"] != nil {
+				t.Fatal("fallback lost history, reset session or claimed compaction")
+			}
+			if !reflect.DeepEqual(before.messages, after.messages[:len(before.messages)]) {
+				t.Fatal("older turns changed")
+			}
+			// The current question remains present even when all old raw turns are withheld.
+			last := g.replies[len(g.replies)-1]
+			if last[len(last)-1]["content"] != "A correction to remember" {
+				t.Fatal("current input omitted")
 			}
 			g.err = nil
 			g.summary = "Preserved correction."
-			if _, err := h.Handle(t.Context(), event, chatStep); err != nil {
+			if _, err = h.Handle(t.Context(), event, chatStep); err != nil {
 				t.Fatal(err)
+			}
+			if len(g.requests) != 1 || len(g.replies) != 3 {
+				t.Fatal("cooldown retried compaction or blocked reply")
+			}
+			now = now.Add(compactionRetryDelay + time.Second)
+			result, err = h.Handle(t.Context(), event, chatStep)
+			if err != nil || len(g.requests) != 2 || result["notice"] != "chat.context_compacted" {
+				t.Fatal("compaction did not recover after cooldown", err)
+			}
+			if state := h.sessions.items[chatSessionBaseKey(event)]; state.summary != g.summary || !state.compactionRetryAt.IsZero() {
+				t.Fatal("valid summary not adopted")
 			}
 		})
 	}

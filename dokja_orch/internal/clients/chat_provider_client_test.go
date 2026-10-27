@@ -3,12 +3,14 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestChatUsesPrivateSocketAndForwardsHistory(t *testing.T) {
@@ -109,5 +111,29 @@ func TestChatStreamReturnsALongReplyWhosePreviewsAddUpPastMegabytes(t *testing.T
 	reply, err := c.GenerateMessagesStream(context.Background(), []map[string]string{{"role": "user", "content": "q"}}, func(string) { previews++ })
 	if err != nil || reply["reply"] != text || previews != 1000 {
 		t.Fatal(err, previews)
+	}
+}
+
+func TestInferenceCancellationIsNotReportedAsRuntimeUnavailability(t *testing.T) {
+	client := NewChatProviderClient(filepath.Join(t.TempDir(), "missing.sock"))
+	for _, deadline := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(t.Context())
+		want := error(context.Canceled)
+		if deadline {
+			cancel()
+			ctx, cancel = context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+			want = context.DeadlineExceeded
+		} else {
+			cancel()
+		}
+		_, err := client.Generate(ctx, "question")
+		if !errors.Is(err, want) {
+			t.Fatalf("request cancellation masked as transport unavailability: %v", err)
+		}
+		_, err = client.GenerateMessagesStream(ctx, []map[string]string{{"role": "user", "content": "question"}}, nil)
+		cancel()
+		if !errors.Is(err, want) {
+			t.Fatalf("stream cancellation masked as transport unavailability: %v", err)
+		}
 	}
 }

@@ -16,9 +16,18 @@ request goals, corrections, definitions, unresolved disagreements and attributio
 Summaries are lossy and untrusted, not system instructions or authorization.
 The orchestrator owns inference calls and session storage; this policy does no I/O.
 
+On a failed or rejected summary, `RecoveryContext` supplies at most eight prior
+raw messages within 16 KiB without changing stored history. The current user turn
+is appended intact, and an untrusted omission notice distinguishes missing context
+from a reset or disproved facts. The last valid summary remains untrusted context.
+The orchestrator continues the reply and uses a one-minute volatile retry cooldown;
+it only replaces older raw turns after a valid summary. Caller cancellation,
+primary inference failure and persistence failures remain terminal.
+
 `SessionStore` defines durable snapshot loading/saving. Snapshots contain session
-identity, a last-seen timestamp, the compacted summary and recent user/assistant
-turns. Persisted system messages are rejected. The SQLite integration lives in
+identity, a last-seen timestamp, the last valid summary and raw user/assistant
+turns. Failed compaction retains pending raw turns until successful compaction;
+the inference projection is separate from this checkpoint. Persisted system messages are rejected. The SQLite integration lives in
 the orchestrator; authorization and current-owner metadata are never restored from
 summaries. Server message discussions share a guild/channel scope, while DMs and
 commands retain separate scopes. Participant aliases and escaped display names
