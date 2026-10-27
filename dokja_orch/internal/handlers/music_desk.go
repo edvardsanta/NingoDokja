@@ -199,5 +199,8 @@ func queuedMap(track communications.QueuedTrack) map[string]any {
 	if track.RequestedURL != "" {
 		queued["requested_url"] = track.RequestedURL
 	}
+	if track.Thumbnail != "" {
+		queued["thumbnail"] = track.Thumbnail
+	}
 	return queued
 }
