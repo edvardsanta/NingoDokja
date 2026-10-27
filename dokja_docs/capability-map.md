@@ -194,6 +194,13 @@ fields and matching account strings on another interface do not activate this
 reply. Other questions retain normal generation and trusted owner guidance.
 The existing session-compaction step can still require inference before a turn.
 Context diagnostics expose an `owner_verified` boolean, never the configured ID.
+For ordinary model-generated conversation, a system note also carries explicit
+current-turn ownership and mention booleans. It is rebuilt from the gateway event
+on every turn, including after compaction, rather than inferred from history or
+names. Non-owner speakers receive an explicit negative verification note. The
+provider adapter distinguishes application system messages from identity claims
+inside user text, quotes and summaries, with unchanged no-tools controls. These
+delivery regressions do not guarantee every model follows the supplied context.
 
 The chat handler opens/touches a session, retrieves optional Knowledge context,
 and resolves article requests through the Digest domain's cached Feeds items. A
