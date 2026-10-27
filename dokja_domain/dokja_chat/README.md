@@ -3,6 +3,11 @@
 The Go package plans formula presentation for the orchestrator's chat handler.
 The existing Python files remain the separate legacy chat adapter.
 
+For a narrow set of direct Portuguese/English identity questions, the domain can
+provide an owner-recognition reply using verified account metadata. It never
+infers ownership from the text itself, mentions or names, and does not invent a
+display name or reveal an account ID. Other questions remain model-generated.
+
 Context policy selects older turns for model summarization after inactivity,
 near the raw-message limit, or at 32 KiB of raw history. It keeps up to eight
 recent turns verbatim within 16 KiB, merges an existing summary, and validates the new summary
