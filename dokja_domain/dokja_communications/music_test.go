@@ -111,6 +111,34 @@ func TestACatalogueLinkFindsTheSameRecordingUnderAnotherArtistName(t *testing.T)
 	}
 }
 
+func TestATrackKeepsItsPictureAndACatalogueCoverWins(t *testing.T) {
+	sources := &stubSources{
+		order: []string{"10-catalogue", "20-music"},
+		replies: map[string]map[string]any{
+			"10-catalogue read": tracks(map[string]any{"title": "Garota de Ipanema", "uploader": "Tom Jobim", "duration_s": 243.0, "thumbnail": "https://covers.example/album.jpg"}),
+			"20-music search": tracks(func() map[string]any {
+				track := playable("real1", "Garota de Ipanema", "Tom Jobim", 243)
+				track["thumbnail"] = "https://frames.example/video.jpg"
+				return track
+			}()),
+		},
+	}
+	track, err := ResolveTrack(context.Background(), sources, TrackRequest{URL: "https://catalogue.example/track/1"})
+	if err != nil || track.Thumbnail != "https://covers.example/album.jpg" {
+		t.Fatal("the album cover is the song's picture", track, err)
+	}
+	words, _ := ResolveTrack(context.Background(), &stubSources{order: []string{"20-music"}, replies: map[string]map[string]any{
+		"20-music search": tracks(func() map[string]any {
+			track := playable("v", "Song", "Band", 200)
+			track["thumbnail"] = "javascript:alert(1)"
+			return track
+		}()),
+	}}, TrackRequest{Query: "song"})
+	if words.Thumbnail != "" {
+		t.Fatal("only an http(s) picture is kept", words.Thumbnail)
+	}
+}
+
 func TestASourceRefusalReachesThePersonAtOnce(t *testing.T) {
 	sources := &stubSources{
 		order: []string{"10-catalogue", "20-music"},

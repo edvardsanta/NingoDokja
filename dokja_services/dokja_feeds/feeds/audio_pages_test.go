@@ -29,7 +29,7 @@ class YoutubeDL:
             json.dump({"target": target, "download": download, "options": self.options}, out)
         if target.startswith("findsearch"):
             return {"entries": [
-                {"id": "abc", "ie_key": "Pages", "url": "https://video.example/watch?v=abc", "title": "First song", "uploader": "Band", "duration": 201.0},
+                {"id": "abc", "ie_key": "Pages", "url": "https://video.example/watch?v=abc", "title": "First song", "uploader": "Band", "duration": 201.0, "thumbnails": [{"url": "https://pictures.example/small.jpg"}, {"url": "https://pictures.example/large.jpg"}]},
                 {"title": "no id"},
                 {"id": "def", "ie_key": "Pages", "url": "https://video.example/watch?v=def", "title": "Live set", "live_status": "is_live"},
             ]}
@@ -108,6 +108,9 @@ func TestAudioPagesSearchesWithTheOwnersPrefixWithoutDownloading(t *testing.T) {
 	first := tracks[0].(map[string]any)
 	if first["id"] != "abc" || first["url"] != "https://video.example/watch?v=abc" || first["duration_s"] != float64(201) || first["live"] != false || first["playable"] != true {
 		t.Fatal(first)
+	}
+	if first["thumbnail"] != "https://pictures.example/large.jpg" {
+		t.Fatal("the largest listed picture is the track's", first)
 	}
 	if live := tracks[1].(map[string]any); live["live"] != true || live["duration_s"] != nil {
 		t.Fatal(live)

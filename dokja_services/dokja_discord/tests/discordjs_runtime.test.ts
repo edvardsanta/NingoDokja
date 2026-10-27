@@ -152,3 +152,10 @@ test("commands are registered on every configured server, or globally when there
   await deployCommands({ token: "t", applicationId: "app", devGuildIds: [], commands: [command] }, rest);
   assert.deepEqual(routes, ["/applications/app/commands"]);
 });
+
+test("an embed keeps a picture only from an http(s) address and bounds its text", async () => {
+  const { toEmbed } = await import("../runtime/discordjs_runtime.js");
+  assert.deepEqual(toEmbed({ title: "t", description: "d", thumbnailUrl: "https://covers.example/a.jpg" }), { title: "t", description: "d", thumbnail: { url: "https://covers.example/a.jpg" } });
+  assert.deepEqual(toEmbed({ title: "t", thumbnailUrl: "file:///etc/passwd" }), { title: "t" });
+  assert.equal(toEmbed({ title: "x".repeat(300) }).title?.length, 256);
+});

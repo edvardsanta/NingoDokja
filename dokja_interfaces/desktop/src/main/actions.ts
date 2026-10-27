@@ -690,8 +690,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   },
   "knowledge.reindex": {
     // One small batch per click. A change needs a click just before it, so there is no loop to
-    // run on the screen's own, and the orchestrator answers one request at a time: a long batch
-    // would hold every other card. The service embeds 16 passages per call to the embedder.
+    // run on the screen's own, and a long batch would keep one of the orchestrator's few request
+    // workers busy. The service embeds 16 passages per call to the embedder.
     payload: (raw) => ({ limit: clampInt(raw.limit, 1, 64, 32) }),
     project: (result) => inDomain(result, "knowledge", reindexResult),
   },

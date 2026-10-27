@@ -83,6 +83,23 @@ it("says plainly why a download failed", async () => {
   expect((await screen.findByRole("alert")).textContent).toBe("nope was not downloaded: the registry has no model by this name");
 });
 
+// Regression: the model downloaded on a retry and was listed, yet the earlier attempt's failure
+// stayed on screen, still blaming the network and the disk.
+it("a failure about a model the engine now lists is not shown", async () => {
+  renderProviders({ "runtime.providers": ollama(), "runtime.models.status": status({ pull: { model: "qwen3:8b", state: "failed", error: "the engine reported: digest mismatch" } }) });
+  await screen.findByText("qwen3:8b");
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Download a model" })).not.toBeNull());
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("a name without a tag is the engine's latest", async () => {
+  const { isInstalled } = await import("../../src/renderer/cards/local_models.js");
+  const row = { models: ["bge-m3:latest", "Qwen3:8B"] } as never;
+  expect(isInstalled(row, "bge-m3")).toBe(true);
+  expect(isInstalled(row, "qwen3:8b")).toBe(true);
+  expect(isInstalled(row, "qwen3:14b")).toBe(false);
+});
+
 it("an older controller without the model actions shows the inventory and no engine panel", async () => {
   renderProviders({ "runtime.providers": ollama(), "runtime.models.status": { ok: false, error: { code: "orchestrator", message: "unsupported local runtime event" } } });
   await screen.findByText("qwen3:8b");

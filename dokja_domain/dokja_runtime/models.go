@@ -22,6 +22,11 @@ var pullPhases = map[string]bool{"starting": true, "downloading": true, "verifyi
 // ErrModelNotFound is the engine's answer for a name its registry does not have.
 var ErrModelNotFound = errors.New("model not found")
 
+// PullFailure is a download the engine refused, with the engine's own words for why.
+type PullFailure struct{ Detail string }
+
+func (f PullFailure) Error() string { return "model pull failed: " + f.Detail }
+
 // ModelEngine downloads and removes the local engine's models. It never chooses a model by itself.
 type ModelEngine interface {
 	Pull(ctx context.Context, model string, progress func(PullProgress)) error
@@ -158,6 +163,8 @@ func (d *Domain) runPull(ctx context.Context, cancel context.CancelFunc, model s
 		pull.State, pull.Error = "failed", "the registry has no model by this name"
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		pull.State, pull.Error = "failed", "the download took too long and was stopped"
+	case pullFailureDetail(err) != "":
+		pull.State, pull.Error = "failed", "the engine reported: "+pullFailureDetail(err)
 	default:
 		pull.State, pull.Error = "failed", "the download failed; check the network and the free disk space"
 	}
@@ -265,4 +272,13 @@ func (d *Domain) engineRunning(ctx context.Context) error {
 		return fmt.Errorf("the local model engine is stopped")
 	}
 	return nil
+}
+
+// pullFailureDetail is the engine's reason for a failed download, when it gave one.
+func pullFailureDetail(err error) string {
+	var failure PullFailure
+	if errors.As(err, &failure) {
+		return failure.Detail
+	}
+	return ""
 }

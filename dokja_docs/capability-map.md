@@ -172,6 +172,9 @@ and fail that request; they never silently discard history or emit a success not
 Per-session generation is serialized, while unrelated sessions remain independent.
 Explicit new-session requests clear the history and summary. Both remain in memory
 and are lost on an orchestrator restart; this is not durable memory or lossless recall.
+During debates, persona guidance advances a conceded point into a relevant unresolved
+tension or thought experiment, including clearly hypothetical absurdist humor. It
+does not require false disagreement or prolong practical tasks and closed conversations.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 

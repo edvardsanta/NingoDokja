@@ -100,7 +100,8 @@ words). A source answers `{handled: false}` for what it does not serve, so the
 caller asks the next one without the source being marked failed;
 `{handled: true, refused}` for a request it cannot do; and `{handled: true,
 tracks}` otherwise. Each track has `id`, `source`, `url`, `title`, `uploader`,
-`duration_s`, `live` and `playable`; a track that is not playable names a song to
+`duration_s`, `live`, `playable` and, optionally, `thumbnail` (an http(s) picture: a
+catalogue's album cover or a video's frame; a catalogue cover wins); a track that is not playable names a song to
 be found on a playable source. Sources return pages, never stream addresses, and
 step aside before loading heavy libraries. The Communications domain asks enabled
 sources in id order and decides which result is the song

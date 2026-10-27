@@ -112,8 +112,9 @@ short loop (up to 5 s at 8 fps, extracted with `ffmpeg`).
 
 ## Behaviour worth knowing
 
-- One request at a time. The orchestrator answers requests serially and a dispatch that screens images
-  can take a while, so the panel poll is skipped and other actions wait while one is running.
+- One request at a time from the TUI. The orchestrator answers several clients at once, but the TUI
+  itself sends one request at a time; a dispatch that screens images can take a while, so the panel
+  poll is skipped and other actions wait while one is running.
 - The safe-only rule is enforced by the orchestrator, not the TUI: an image bound for a safe-only channel
   is screened server-side and skipped if flagged. Sending a picked meme from the queue also marks it as
   sent so the scheduler does not repeat it.

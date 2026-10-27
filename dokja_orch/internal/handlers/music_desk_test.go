@@ -50,6 +50,7 @@ func (f *fakeMusicSources) InvokeAudio(ctx context.Context, _, action string, in
 	}
 	return map[string]any{"handled": true, "tracks": []any{map[string]any{
 		"id": query, "url": "https://play.example/" + query, "title": query, "uploader": "Band", "duration_s": 200.0, "playable": true,
+		"thumbnail": "https://pictures.example/" + query + ".jpg",
 	}}}, nil
 }
 
@@ -88,6 +89,9 @@ func TestPlayQueuesUpToThreeAndRefusesTheFourthWithoutSearching(t *testing.T) {
 		t.Fatal("a full queue refuses before searching", reply, sources.searches)
 	}
 	queue := doMusic(t, h, "show-music-queue", "", "guild")
+	if queue["now_playing"].(map[string]any)["thumbnail"] != "https://pictures.example/one.jpg" {
+		t.Fatal("the track's picture reaches whoever plays it", queue)
+	}
 	if queue["now_playing"].(map[string]any)["title"] != "one" || len(queue["waiting"].([]any)) != 3 {
 		t.Fatal(queue)
 	}
