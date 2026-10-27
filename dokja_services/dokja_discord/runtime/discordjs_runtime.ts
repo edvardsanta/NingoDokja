@@ -26,6 +26,7 @@ import {
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
+  DiscordEmbedSpec,
   DiscordModalAction,
   DiscordModalContext,
   DiscordMessageContext,
@@ -600,6 +601,16 @@ export function toMessageReply(message: DiscordReply) {
     content: message.content,
     components: buildRows(message.components ?? []),
     files: attachmentFiles(message),
+    ...(message.embeds ? { embeds: message.embeds.map(toEmbed) } : {}),
+  };
+}
+
+// An embed in Discord's own shape; a picture only from an http(s) address.
+export function toEmbed(embed: DiscordEmbedSpec) {
+  return {
+    ...(embed.title ? { title: embed.title.slice(0, 256) } : {}),
+    ...(embed.description ? { description: embed.description.slice(0, 4096) } : {}),
+    ...(embed.thumbnailUrl && /^https?:\/\//.test(embed.thumbnailUrl) ? { thumbnail: { url: embed.thumbnailUrl } } : {}),
   };
 }
 

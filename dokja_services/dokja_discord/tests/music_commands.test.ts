@@ -136,7 +136,8 @@ test("the panel is posted with the first song, edited as the queue changes, and 
   await play.handle(context({ song: "x" }).ctx);
   assert.equal(fake.posted.length, 1);
   assert.equal(fake.posted[0].channelId, "text1");
-  assert.match(fake.posted[0].message.content, /Now playing: \*\*Monalisa\*\* – Jorge/);
+  assert.equal(fake.posted[0].message.embeds[0].title, "🎶 Now playing");
+  assert.match(fake.posted[0].message.embeds[0].description, /\*\*Monalisa\*\* – Jorge/);
 
   const pause = music.buttons.find((entry) => entry.customId === PANEL.pause)!;
   const pressed: string[] = [];
@@ -144,7 +145,7 @@ test("the panel is posted with the first song, edited as the queue changes, and 
     reply: async (message: any) => { pressed.push(message.content); }, update: async () => {}, showModal: async () => {} });
   assert.deepEqual(pressed, ["Paused."], "the button answers only the person who pressed it");
   assert.equal(fake.posted.length, 1, "the panel is edited, not posted again");
-  assert.match(fake.edited.at(-1)!.message.content, /Paused/);
+  assert.match(fake.edited.at(-1)!.message.embeds[0].title, /Paused/);
   assert.ok(fake.edited.at(-1)!.message.components.some((button: any) => button.customId === PANEL.resume));
 
   await music.commands.find((entry) => entry.name === "stop")!.handle(context().ctx);
@@ -178,11 +179,15 @@ test("the volume buttons step from the last volume and stay within 0 to 100", as
 
 test("the panel says who asked, the volume and what waits", () => {
   const state = { epoch: "e", version: 1, paused: false, volume: 60, waiting: 2,
-    nowPlaying: { entry: 1, url: "https://play.example/1", title: "Monalisa", uploader: "Jorge", requestedBy: "42" } };
+    nowPlaying: { entry: 1, url: "https://play.example/1", title: "Monalisa", uploader: "Jorge", requestedBy: "42", thumbnail: "" } };
   const message = panelMessage(state, "en") as any;
-  assert.equal((panelMessage(state) as any).content, "🎶 Tocando agora: **Monalisa** – Jorge\npedido por <@42> · volume 60% · 2 na fila",
-    "Portuguese by default, as DOKJA_DISCORD_LOCALE");
-  assert.equal(message.content, "🎶 Now playing: **Monalisa** – Jorge\nasked by <@42> · volume 60% · 2 waiting");
+  const portuguese = (panelMessage(state) as any).embeds[0];
+  assert.equal(portuguese.title, "🎶 Tocando agora", "Portuguese by default, as DOKJA_DISCORD_LOCALE");
+  assert.equal(portuguese.description, "**Monalisa** – Jorge\npedido por <@42> · volume 60% · 2 na fila");
+  assert.equal(message.embeds[0].thumbnailUrl, undefined, "no cover, no picture");
+  const covered = panelMessage({ ...state, nowPlaying: { ...state.nowPlaying, thumbnail: "https://covers.example/album.jpg" } }, "en") as any;
+  assert.equal(covered.embeds[0].thumbnailUrl, "https://covers.example/album.jpg");
+  assert.equal(message.embeds[0].description, "**Monalisa** – Jorge\nasked by <@42> · volume 60% · 2 waiting");
   assert.deepEqual(message.components.map((button: any) => button.customId), [PANEL.pause, PANEL.skip, PANEL.stop, PANEL.quieter, PANEL.louder]);
 });
 
@@ -205,9 +210,9 @@ test("music answers in the configured language, refusals included", async () => 
 
 test("a title from outside never pings the server", () => {
   const message = panelMessage({ epoch: "e", version: 1, paused: false, volume: 100, waiting: 0,
-    nowPlaying: { entry: 1, url: "https://play.example/1", title: "@everyone wake up", uploader: "@here", requestedBy: "" } }, "en") as any;
-  assert.doesNotMatch(message.content, /@everyone|@here/);
-  assert.match(message.content, /@\u200beveryone wake up/);
+    nowPlaying: { entry: 1, url: "https://play.example/1", title: "@everyone wake up", uploader: "@here", requestedBy: "", thumbnail: "" } }, "en") as any;
+  assert.doesNotMatch(message.embeds[0].description, /@everyone|@here/);
+  assert.match(message.embeds[0].description, /@\u200beveryone wake up/);
 });
 
 test("the queue list never pings either", async () => {

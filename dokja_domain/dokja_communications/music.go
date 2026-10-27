@@ -30,6 +30,8 @@ type Track struct {
 	Live         bool
 	Playable     bool
 	RequestedURL string
+	// Thumbnail is a picture of the track: the album cover a catalogue gives, or a video's frame.
+	Thumbnail string
 }
 
 // TrackRequest is what someone asked to play: a few words, or a link.
@@ -84,6 +86,10 @@ func ResolveTrack(ctx context.Context, sources AudioSources, request TrackReques
 		return Track{}, err
 	}
 	found.RequestedURL = link
+	// The catalogue's album cover is the song's own picture; a video frame only stands in for it.
+	if named.Thumbnail != "" {
+		found.Thumbnail = named.Thumbnail
+	}
 	return found, nil
 }
 
@@ -247,6 +253,10 @@ func trackOf(fields map[string]any) (Track, bool) {
 	track.Playable, _ = fields["playable"].(bool)
 	if duration, ok := fields["duration_s"].(float64); ok && duration > 0 {
 		track.DurationS = int(duration)
+	}
+	// A picture comes from outside: only an http(s) address of reasonable length is kept.
+	if thumbnail := text("thumbnail"); len(thumbnail) <= 2048 && (strings.HasPrefix(thumbnail, "https://") || strings.HasPrefix(thumbnail, "http://")) {
+		track.Thumbnail = thumbnail
 	}
 	if track.Title == "" || (track.Playable && track.URL == "") {
 		return Track{}, false

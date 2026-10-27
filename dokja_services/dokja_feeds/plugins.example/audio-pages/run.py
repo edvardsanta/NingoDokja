@@ -135,7 +135,20 @@ def describe(entry: dict) -> dict | None:
         "duration_s": int(duration) if isinstance(duration, (int, float)) else None,
         "live": bool(entry.get("is_live") or entry.get("live_status") == "is_live"),
         "playable": True,
+        "thumbnail": thumbnail(entry),
     }
+
+
+def thumbnail(entry: dict) -> str:
+    """The track's picture: the one yt-dlp names, else the last (largest) of those it lists."""
+    candidates = [entry.get("thumbnail")]
+    listed = entry.get("thumbnails")
+    if isinstance(listed, list):
+        candidates += [item.get("url") for item in reversed(listed) if isinstance(item, dict)]
+    for candidate in candidates:
+        if isinstance(candidate, str) and is_page(candidate) and len(candidate) <= 2048:
+            return candidate
+    return ""
 
 
 if __name__ == "__main__":
