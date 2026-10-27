@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 
-import type { DigestPage, DigestSource, DigestStatus, Off } from "../../shared/replies.js";
+import type { DigestItem, DigestPage, DigestSource, DigestStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -19,6 +19,7 @@ import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { Outcome, addToBase } from "./knowledge_add.js";
 import { useAction } from "./use_action.js";
+import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";
 
 const TIMEOUT_MS = 20_000;
@@ -36,8 +37,11 @@ export async function loadDigestStatus(transport: Transport): Promise<LoadResult
 }
 
 // The page is the first `shown` items of the digest: a longer page holds the shorter one.
-export async function loadDigestPage(transport: Transport, shown: number): Promise<LoadResult<DigestPage | Off>> {
-  const answer = await transport.request("digest.items", { limit: shown, offset: 0 }, { timeoutMs: TIMEOUT_MS });
+type ReadingFilters = { source: string; query: string; from: string; to: string };
+const EMPTY_FILTERS: ReadingFilters = { source: "", query: "", from: "", to: "" };
+
+export async function loadDigestPage(transport: Transport, shown: number, filters?: ReadingFilters): Promise<LoadResult<DigestPage | Off>> {
+  const answer = await transport.request("digest.items", { limit: shown, offset: 0, ...Object.fromEntries(Object.entries(filters ?? {}).filter(([, value]) => value !== "")) }, { timeoutMs: TIMEOUT_MS });
   if (!answer.ok) return answer;
   const page = parseDigestPage(answer.result);
   return page ? { ok: true, data: page } : unexpected("unexpected digest items reply");
@@ -97,7 +101,7 @@ function DigestBody({ transport, status }: { transport: Transport; status: Diges
           })}
         </p>
       )}
-      {following === "following" && <Reading transport={transport} />}
+      {following === "following" && <Reading transport={transport} sources={status.sources} />}
       {!!status.providers?.length && <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some(provider => provider.state === "failed")} processing />}
       {status.sources.length > 0 && (
         <SourceList sources={status.sources} title="digest_sources_title" open={explanation !== undefined || status.failed + status.invalid > 0} />
@@ -106,11 +110,22 @@ function DigestBody({ transport, status }: { transport: Transport; status: Diges
   );
 }
 
-function Reading({ transport }: { transport: Transport }) {
+function Reading({ transport, sources }: { transport: Transport; sources: readonly DigestSource[] }) {
   const t = useTranslate();
   const { ago } = useTimes();
   const [shown, setShown] = useState(SHOW_STEP);
-  const load = useCallback(() => loadDigestPage(transport, shown), [transport, shown]);
+  const [draft, setDraft] = useState<ReadingFilters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<ReadingFilters>(EMPTY_FILTERS);
+  const load = useCallback(() => loadDigestPage(transport, shown, filters), [transport, shown, filters]);
+  const invalidDates = !!draft.from && !!draft.to && draft.from > draft.to;
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (invalidDates) return;
+    setShown(SHOW_STEP);
+    setFilters({ ...draft });
+  };
+  const reset = () => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setShown(SHOW_STEP); };
+
   const { state, reload } = useCard(load);
 
   // Asking for a longer page must not blank the list: the last page stays until the new one lands.
@@ -125,7 +140,24 @@ function Reading({ transport }: { transport: Transport }) {
 
   return (
     <>
-      {page && !page.off && <DigestList page={page} transport={transport} />}
+      <form className="reading-filters" onSubmit={apply}>
+        <label>{t("reading_search")}<input type="search" value={draft.query} maxLength={100} onChange={event => setDraft({ ...draft, query: event.target.value })} /></label>
+        <label>{t("reading_source")}<select value={draft.source} onChange={event => setDraft({ ...draft, source: event.target.value })}>
+          <option value="">{t("reading_all_sources")}</option>
+          {sources.map(source => <option key={source.id} value={source.id}>{source.name}</option>)}
+        </select></label>
+        <label>{t("reading_from")}<input type="date" value={draft.from} max={draft.to || undefined} onChange={event => setDraft({ ...draft, from: event.target.value })} /></label>
+        <label>{t("reading_to")}<input type="date" value={draft.to} min={draft.from || undefined} onChange={event => setDraft({ ...draft, to: event.target.value })} /></label>
+        <div className="reading-filter-actions">
+          <button type="submit" disabled={invalidDates}>{t("reading_apply")}</button>
+          <button type="button" onClick={reset}>{t("reading_clear")}</button>
+        </div>
+        {invalidDates && <p role="alert">{t("reading_invalid_dates")}</p>}
+      </form>
+      {page && !page.off && <>
+        {(filters.source || filters.query || filters.from || filters.to) && <p role="status">{t("reading_matches", { count: page.total })}</p>}
+        <DigestList page={page} transport={transport} />
+      </>}
       {loading && <Pending />}
       {state.phase === "error" && (
         <>
@@ -171,6 +203,7 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
             <p className="digest-title">{item.title}</p>
             {meta !== "" && <p className="detail">{meta}</p>}
             {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
+            <ReadingPreview item={item} transport={transport} />
             {/* The discussion happens in Talk, the one place with a composer. */}
             <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title}
               onClick={() => discuss({ id: item.id, title: item.title, source: item.source, ...(item.prompts ? { prompts: item.prompts } : {}) })}>
@@ -184,9 +217,33 @@ function DigestList({ page, transport }: { page: DigestPage; transport: Transpor
   );
 }
 
-// What the world brought in becomes knowledge on a press: the reading's page is added to the
-// Library, read by the knowledge service from its address. The screen names the reading by id; the
-// shell holds the address. Adding it again refreshes that page.
+function ReadingPreview({ item, transport }: { item: DigestItem; transport: Transport }) {
+  const t = useTranslate();
+  const [open, setOpen] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  return <details className="reading-preview" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>{t("reading_preview")}</summary>
+    {open && <div className="reading-preview-content">
+      {item.mediaUrl && <ReadingMedia key={attempt} transport={transport} url={item.mediaUrl} title={item.title} onRetry={() => setAttempt(attempt + 1)} />}
+      {(item.previewText || item.summary) ? <>
+        {!item.previewText && <p className="detail">{t("reading_excerpt")}</p>}
+        <div className="reading-preview-text" tabIndex={0} aria-label={item.title}>{item.previewText || item.summary}</div>
+      </> : !item.mediaUrl && <p className="detail">{t("reading_no_preview")}</p>}
+    </div>}
+  </details>;
+}
+
+function ReadingMedia({ transport, url, title, onRetry }: { transport: Transport; url: string; title: string; onRetry: () => void }) {
+  const t = useTranslate();
+  const preview = usePreview(transport, url, true);
+  if (preview.phase === "loading") return <Pending />;
+  if (preview.phase === "failed") return <><Problem error={preview.error} /><button type="button" onClick={onRetry}>{t("retry")}</button></>;
+  return preview.dataUrl.startsWith("data:video/")
+    ? <video src={preview.dataUrl} aria-label={title} controls playsInline preload="metadata" />
+    : <img src={preview.dataUrl} alt={title} loading="lazy" />;
+}
+
+// The screen names the reading; the shell builds the ingest request from cached source data.
 function SaveReading({ transport, id, title }: { transport: Transport; id: string; title: string }) {
   const t = useTranslate();
   const run = useCallback(() => addToBase(transport, { mode: "reading", reading: id }), [transport, id]);
