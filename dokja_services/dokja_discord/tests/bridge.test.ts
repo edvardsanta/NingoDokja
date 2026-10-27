@@ -60,33 +60,35 @@ test("dispatchToOrchestrator returns reply payload", async () => {
       },
     });
 
-    test("dispatchToOrchestratorResponse returns presentation notice metadata", async () => {
-      const originalFetch = globalThis.fetch;
-      globalThis.fetch = (async () =>
-        new Response(JSON.stringify({ status: "ok", reply: "hello back", notice: "chat.context_compacted" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        })) as typeof fetch;
 
-      try {
-        const response = await dispatchToOrchestratorResponse("http://orch", 1000, {
-          event_type: "message.created",
-          payload: {
-            content: "oi",
-            userId: "u1",
-            channelId: "c1",
-            messageId: "m1",
-            sessionKey: "discord:c1:u1",
-            accountId: "default",
-          },
-        });
-        assert.deepEqual(response, { reply: "hello back", notice: "chat.context_compacted" });
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
-    });
 
     assert.equal(reply, "hello back");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("dispatchToOrchestratorResponse returns presentation notice metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ status: "ok", reply: "hello back", notice: "chat.context_compacted" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })) as typeof fetch;
+
+  try {
+    const response = await dispatchToOrchestratorResponse("http://orch", 1000, {
+      event_type: "message.created",
+      payload: {
+        content: "oi",
+        userId: "u1",
+        channelId: "c1",
+        messageId: "m1",
+        sessionKey: "discord:c1:u1",
+        accountId: "default",
+      },
+    });
+    assert.deepEqual(response, { reply: "hello back", notice: "chat.context_compacted" });
   } finally {
     globalThis.fetch = originalFetch;
   }

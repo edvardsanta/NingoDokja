@@ -9,4 +9,17 @@ RUN python3 -m venv /opt/yt-dlp \
   && /opt/yt-dlp/bin/pip install --no-cache-dir "yt-dlp[default]==2026.10.21" \
   && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp
 
-WORKDIR /workspace
+# Populate the package manager and dependency store while build networking is available.
+WORKDIR /opt/dokja-discord
+COPY dokja_services/dokja_discord/package.json ./package.json
+COPY dokja_services/dokja_discord/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY dokja_services/dokja_discord/pnpm-workspace.yaml ./pnpm-workspace.yaml
+RUN corepack install --global pnpm@12.4.1 \
+  && pnpm install --frozen-lockfile --store-dir /opt/pnpm-store
+
+# Runtime must not discover or download a package-manager release.
+ENV COREPACK_DEFAULT_TO_LATEST=0 COREPACK_ENABLE_NETWORK=0
+COPY dokja_services/dokja_discord/dev_start.sh /usr/local/bin/dokja-discord-dev
+RUN chmod +x /usr/local/bin/dokja-discord-dev
+WORKDIR /workspace/dokja_services/dokja_discord
+CMD ["/usr/local/bin/dokja-discord-dev"]
