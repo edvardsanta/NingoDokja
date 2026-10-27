@@ -105,7 +105,7 @@ export function createMusic(params: {
     try {
       await apply(guildId, userId, reply.music);
     } catch (error) {
-      return `${text}\n${error instanceof Error ? error.message : say(locale, "couldNotPlay")}`;
+      return `${say(locale, "couldNotPlay")}${error instanceof Error ? ` ${error.message}` : ""}`;
     }
     return text;
   };

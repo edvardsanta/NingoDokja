@@ -178,3 +178,14 @@ queue is reached; inspect server/channel access configuration rather than assumi
 an audio decoder or source failure. Existing explicit bridge text is preserved.
 The adapter reports an unconfirmed command and does not start playback or create
 a music panel. This notice changes no inbound policy or access configuration.
+
+
+## Voice connection recovery
+
+Before reusing a voice session for music, radio, or speech, the adapter must wait
+for the connection to become Ready. A disconnected session must explicitly rejoin
+its saved voice channel; merely retaining its object does not reconnect it.
+Recovery uses the existing readiness timeout. Failed recovery discards the stale
+session, stops its resources, and returns a playback failure without publishing a
+new playing panel or a success message. This does not change commands, event
+contracts, configuration, or the domain's ownership of the queue.

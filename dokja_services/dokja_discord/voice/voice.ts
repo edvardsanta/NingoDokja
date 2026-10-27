@@ -28,6 +28,7 @@ import {
   type RadioStreamSession,
 } from "./radio_stream.js";
 import { createTrackStream, type TrackStream } from "./track_stream.js";
+import { ensureConnectionReady } from "./connection_ready.js";
 import { toMessageReply } from "../runtime/discordjs_runtime.js";
 import type { DiscordReply } from "../types.js";
 
@@ -237,6 +238,13 @@ export function createDiscordVoiceController(options: {
     const existing = sessions.get(guildId);
     let session: VoiceSession;
     if (existing && existing.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+      try {
+        await ensureConnectionReady(existing.connection, existing.channelId, readyTimeoutMs);
+      } catch (error) {
+        sessions.delete(guildId);
+        stopGuildSession(existing);
+        throw error;
+      }
       session = existing;
     } else {
       const client = await ensureVoiceClient();
@@ -846,6 +854,13 @@ async function ensureVoiceSession(params: {
       "[dokja-discord] reusing voice session",
       JSON.stringify({ guildId: params.guildId, voiceChannelId: params.voiceChannel.id }),
     );
+    try {
+      await ensureConnectionReady(existing.connection, existing.channelId, params.readyTimeoutMs);
+    } catch (error) {
+      params.sessions.delete(params.guildId);
+      stopGuildSession(existing);
+      throw error;
+    }
     return existing;
   }
 
@@ -876,7 +891,7 @@ async function ensureVoiceSession(params: {
   });
 
   try {
-    await entersState(connection, VoiceConnectionStatus.Ready, params.readyTimeoutMs);
+    await ensureConnectionReady(connection, params.voiceChannel.id, params.readyTimeoutMs);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     params.error?.(
