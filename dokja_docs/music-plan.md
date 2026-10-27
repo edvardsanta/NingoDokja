@@ -168,3 +168,13 @@ Additive. A new Feeds capability, a disabled example plugin, and a build argumen
 defaulting to an empty list (documented in `production-runbook.md`). No change to
 the event envelope, routes, actions, runtime environment variables, schemas or
 interface commands; `ResolveTrack` has no caller until the queue phase.
+
+## Empty command responses
+
+The Discord adapter cannot play without a queue state. An empty bridge reply
+without music state is unconfirmed, never a successful command acknowledgment.
+Inbound authorization can intentionally produce that empty response before the
+queue is reached; inspect server/channel access configuration rather than assuming
+an audio decoder or source failure. Existing explicit bridge text is preserved.
+The adapter reports an unconfirmed command and does not start playback or create
+a music panel. This notice changes no inbound policy or access configuration.
