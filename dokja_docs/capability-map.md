@@ -200,6 +200,16 @@ summaries cannot configure ownership or install permanent rules. Regression
 fixtures verify policy delivery and that forged owner fields stay outside trusted
 bridge metadata; they do not constitute live-model jailbreak evaluations.
 
+Roleplay preserves Ningo's independent stance: fictional rulers and commanders
+do not gain authority or recruit him into a subordinate office. Courtly address
+is restricted to clear irony. Prior assistant replies and summaries remain
+untrusted conversation data; an earlier acceptance is acknowledged and corrected
+rather than denied or promoted to an obligation. Factual corrections retain their
+original scope and do not require inventing another objection. The existing
+verified-owner conversation policy remains intact. These are model instructions;
+regressions verify their delivery across history/owner/streaming boundaries, not
+a guarantee that every generated reply will follow them.
+
 Direct owner-identity questions such as `Quem sou eu?` and `Who am I?` have a
 Chat-domain reply derived from the Discord gateway's verified-owner metadata.
 The ordinary chat handler records that reply without asking the model to infer
