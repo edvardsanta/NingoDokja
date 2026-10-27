@@ -66,8 +66,11 @@ func (o OllamaModels) Pull(ctx context.Context, model string, progress func(doma
 	if reader.notFound() {
 		return domain.ErrModelNotFound
 	}
-	// The command's exit status says whether the model is there; the drawn text is only for progress.
+	// The command's exit status says whether the model is there; the drawn text gives the reason.
 	if err != nil {
+		if reason := reader.failure(); reason != "" {
+			return domain.PullFailure{Detail: reason}
+		}
 		return fmt.Errorf("model pull failed")
 	}
 	return nil
@@ -96,6 +99,8 @@ type pullReader struct {
 	pending string
 	layers  map[string]layer
 	missing bool
+	// the engine's last error line, said back when the download fails
+	lastError string
 }
 
 var (
@@ -148,6 +153,7 @@ func (r *pullReader) read(line string) {
 		if strings.Contains(lower, "file does not exist") || strings.Contains(lower, "not found") {
 			r.missing = true
 		}
+		r.lastError = boundedReason(strings.TrimSpace(line[len("error"):]))
 	case strings.HasPrefix(lower, "pulling manifest"):
 		r.emit("starting", -1)
 	case strings.HasPrefix(lower, "verifying"):
@@ -188,6 +194,22 @@ func (r *pullReader) emit(phase string, percent int) {
 	if r.report != nil {
 		r.report(domain.PullProgress{Phase: phase, Percent: percent})
 	}
+}
+
+func (r *pullReader) failure() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.lastError
+}
+
+// boundedReason keeps an engine's error short and on one line: a colon or space before it goes.
+func boundedReason(reason string) string {
+	reason = strings.TrimLeft(reason, ": ")
+	reason = strings.Join(strings.Fields(reason), " ")
+	if runes := []rune(reason); len(runes) > 200 {
+		reason = string(runes[:200]) + "…"
+	}
+	return reason
 }
 
 func (r *pullReader) notFound() bool {

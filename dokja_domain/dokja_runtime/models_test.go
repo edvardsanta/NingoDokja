@@ -142,6 +142,13 @@ func TestPullFailuresAreSaidPlainly(t *testing.T) {
 	if pull.Error != "the download failed; check the network and the free disk space" {
 		t.Fatal(pull)
 	}
+	// When the engine said why, its words are what the owner reads.
+	d.PullModel(context.Background(), "qwen3.5:27b")
+	e.end <- PullFailure{Detail: "digest mismatch, file must be downloaded again"}
+	pull = waitPull(t, d, func(p *ModelPull) bool { return p.State == "failed" && p.Model == "qwen3.5:27b" })
+	if pull.Error != "the engine reported: digest mismatch, file must be downloaded again" {
+		t.Fatal(pull)
+	}
 }
 
 func TestCancelStopsTheDownload(t *testing.T) {
