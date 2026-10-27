@@ -8,4 +8,21 @@ RUN apt-get update && apt-get install -y \
 RUN go install github.com/air-verse/air@v1.63.0
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
+# Retain verified dependencies outside /workspace, which Compose bind-mounts.
+# Copy local replacement manifests too, preserving go.mod's relative layout.
+WORKDIR /opt/orchestrator-build-deps/dokja_orch
+COPY dokja_orch/go.mod dokja_orch/go.sum ./
+COPY dokja_domain/dokja_book/go.mod ../dokja_domain/dokja_book/go.mod
+COPY dokja_domain/dokja_chat/go.mod ../dokja_domain/dokja_chat/go.mod
+COPY dokja_domain/dokja_communications/go.mod ../dokja_domain/dokja_communications/go.mod
+COPY dokja_domain/dokja_conversation/go.mod ../dokja_domain/dokja_conversation/go.mod
+COPY dokja_domain/dokja_digest/go.mod ../dokja_domain/dokja_digest/go.mod
+COPY dokja_domain/dokja_knowledge/go.mod ../dokja_domain/dokja_knowledge/go.mod
+COPY dokja_domain/dokja_memory/go.mod ../dokja_domain/dokja_memory/go.mod
+COPY dokja_domain/dokja_meme/go.mod ../dokja_domain/dokja_meme/go.mod
+COPY dokja_domain/dokja_moderation/go.mod ../dokja_domain/dokja_moderation/go.mod
+COPY dokja_store/go.mod dokja_store/go.sum ../dokja_store/
+# Downloads are checked against go.sum by Go; local replacements have no zip hash.
+RUN go mod download
+
 WORKDIR /workspace/dokja_orch

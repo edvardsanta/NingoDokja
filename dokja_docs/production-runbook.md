@@ -19,6 +19,17 @@ Production stack:
 - `dokja-discord`
 - `dokja-scheduler`
 
+## Orchestrator development startup
+
+Development and lite orchestrator images download and verify Go dependencies
+during the image build. Their module cache lives under `/go/pkg/mod`, outside the
+`/workspace` source mount, so a recreated container can compile the mounted code
+without downloading its pinned dependencies through bridge DNS. Rebuild
+`dokja-orchestrator` after changing the orchestrator, local domain or store module
+manifests. The production image already compiles its executable during the build.
+This startup cache does not repair container DNS or restore network access to
+other services; a DNS outage still needs a network-level fix.
+
 ## Chat context
 
 Non-archived chat history is held in orchestrator memory. Inactivity (default
