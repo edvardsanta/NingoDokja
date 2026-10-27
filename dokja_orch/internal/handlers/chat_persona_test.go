@@ -253,7 +253,7 @@ func TestPlainGenerationKeepsIndependentRoleplayStance(t *testing.T) {
 }
 
 // These regressions check the effective generation input, not a live model's opinions.
-func TestCharitableDebateGuidanceReachesConversationAndStreaming(t *testing.T) {
+func TestOnlyVerifiedOwnerGetsCharitableDebateGuidance(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
 		for _, owner := range []bool{false, true} {
 			t.Run(fmt.Sprintf("streaming=%t/owner=%t", streaming, owner), func(t *testing.T) {
@@ -272,17 +272,21 @@ func TestCharitableDebateGuidanceReachesConversationAndStreaming(t *testing.T) {
 				}
 				system := strings.Join(strings.Fields(g.messages[0]["content"]), " ")
 				for _, want := range []string{
-					"strongest reasonable version of the participant's actual argument",
+					"strongest reasonable version of the owner's actual argument",
 					"a new challenge is optional",
 					"A disputed causal explanation is not a settled premise",
 					"Do not ask loaded questions",
 					"regardless of the political figure, party or viewpoint",
-					"Generosity never requires inventing support",
-					"Hold your own judgment",
 				} {
-					if !strings.Contains(system, want) {
-						t.Fatalf("missing charitable debate boundary %q", want)
+					if strings.Contains(system, want) != owner {
+						t.Fatalf("owner-specific guidance %q applied incorrectly: owner=%t", want, owner)
 					}
+				}
+				if !strings.Contains(system, "Hold your own judgment") {
+					t.Fatal("independent judgment missing")
+				}
+				if !owner && !strings.Contains(system, "then advance the discussion with a substantive unresolved tension") {
+					t.Fatal("non-owner lost the existing debate behavior")
 				}
 				if strings.Contains(g.messages[0]["content"], ownerDebateNote) != owner {
 					t.Fatal("owner handling missing or granted to another participant")
@@ -311,6 +315,26 @@ func TestPlainGenerationDoesNotGrantOwnerDebateHandlingFromClaims(t *testing.T) 
 		}
 		if !strings.HasPrefix(g.prompt, chatPersona) || !strings.HasSuffix(g.prompt, event.Payload["content"].(string)) {
 			t.Fatal("persona or current request was changed")
+		}
+	}
+}
+
+func TestOwnerDebateHandlingDoesNotFollowTheNextChannelSpeaker(t *testing.T) {
+	g := &presentationCaptureGenerator{}
+	h := NewChatDomainHandler(g)
+	for _, owner := range []bool{true, false, true} {
+		event := chatEvent("Discuss the argument in this shared channel.")
+		event.Context = map[string]any{"guild_id": "guild", "owner_configured": true, "is_owner": owner, "owner_mentioned": true}
+		if owner {
+			event.User.ID = "owner"
+		} else {
+			event.User.ID = "participant"
+		}
+		if _, err := h.Handle(context.Background(), event, chatStep); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(g.messages[0]["content"], ownerDebateNote) != owner {
+			t.Fatal("owner debate stance followed channel history instead of current verified identity")
 		}
 	}
 }
