@@ -45,6 +45,7 @@ export async function loadDigestPage(transport: Transport, shown: number): Promi
 
 const STATE_IDS: Record<string, MessageId> = {
   ok: "digest_state_ok",
+  ready: "digest_state_ready",
   failed: "digest_state_failed",
   pending: "digest_state_pending",
   disabled: "digest_state_disabled",
@@ -97,7 +98,7 @@ function DigestBody({ transport, status }: { transport: Transport; status: Diges
         </p>
       )}
       {following === "following" && <Reading transport={transport} />}
-      {!!status.providers?.length && <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some(provider => provider.state === "failed")} />}
+      {!!status.providers?.length && <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some(provider => provider.state === "failed")} processing />}
       {status.sources.length > 0 && (
         <SourceList sources={status.sources} title="digest_sources_title" open={explanation !== undefined || status.failed + status.invalid > 0} />
       )}
@@ -202,7 +203,7 @@ function SaveReading({ transport, id, title }: { transport: Transport; id: strin
   );
 }
 
-function SourceList({ sources, title, open }: { sources: readonly DigestSource[]; title: MessageId; open: boolean }) {
+function SourceList({ sources, title, open, processing = false }: { sources: readonly DigestSource[]; title: MessageId; open: boolean; processing?: boolean }) {
   const t = useTranslate();
   const { ago } = useTimes();
   return (
@@ -218,9 +219,9 @@ function SourceList({ sources, title, open }: { sources: readonly DigestSource[]
             .filter((part) => part !== "")
             .join(", ");
           return (
-            <li key={source.id} data-tone={sourceTone(source.state)} style={{ "--i": index } as CSSProperties}>
+            <li key={source.id} data-tone={sourceTone(processing && source.state === "pending" ? "ready" : source.state)} style={{ "--i": index } as CSSProperties}>
               <span className="service-name">{source.name}</span>
-              <span className="service-status">{t(STATE_IDS[source.state] ?? "digest_state_unknown")}</span>
+              <span className="service-status">{t(STATE_IDS[processing && source.state === "pending" ? "ready" : source.state] ?? "digest_state_unknown")}</span>
               {detail !== "" && <span className="service-detail">{detail}</span>}
             </li>
           );

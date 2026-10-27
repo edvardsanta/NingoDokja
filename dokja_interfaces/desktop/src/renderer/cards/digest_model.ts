@@ -94,6 +94,7 @@ export function followingOf(status: DigestStatus): Following {
 export function sourceTone(state: string): Tone {
   switch (state) {
     case "ok":
+    case "ready":
       return "ok";
     case "failed":
     case "invalid":
