@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	bookdomain "read_books/dokja_domain/dokja_book"
 	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
@@ -16,6 +17,7 @@ import (
 	"read_books/internal/clients"
 	"read_books/internal/core"
 	"read_books/internal/handlers"
+	chatsessions "read_books/internal/infrastructure/chat_sessions"
 	"read_books/internal/infrastructure/conversations"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
@@ -39,6 +41,16 @@ func main() {
 	if note := controls.LoadNote(); note != "" {
 		logger.Error("controls state", errors.New(note))
 	}
+	sharedPath := os.Getenv("DOKJA_DB_FILE")
+	if sharedPath == "" {
+		sharedPath = filepath.Join(".dokja", "dokja.db")
+	}
+	chatSessions, err := chatsessions.Open(chatsessions.PathBeside(sharedPath))
+	if err != nil {
+		logger.Error("open durable chat sessions", err)
+		os.Exit(1)
+	}
+	defer chatSessions.Close()
 
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
@@ -178,7 +190,7 @@ func main() {
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

@@ -36,6 +36,7 @@ type chatSessionManager struct {
 	nowFn   func() time.Time
 	items   map[string]chatSessionState
 	turns   map[string]chan struct{}
+	store   chat.SessionStore
 }
 
 type chatMessage = chat.ContextMessage
@@ -81,8 +82,18 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	state, exists := m.items[baseKey]
 	state.messages = cloneMessages(state.messages)
 	m.mu.Unlock()
+	if !exists && m.store != nil {
+		saved, found, err := m.store.Load(ctx, baseKey)
+		if err != nil {
+			return lifecycle, nil, err
+		}
+		if found {
+			state = chatSessionState{id: saved.ID, lastSeenAt: saved.LastSeenAt, summary: saved.Summary, messages: cloneMessages(saved.Messages)}
+			exists = true
+		}
+	}
 	now := m.nowFn()
-	forceNew := boolFromContext(event.Context, "force_new_session")
+	forceNew := chat.ShouldResetSession(boolFromContext(event.Context, "force_new_session"), discordChannelScope(event) != "", boolFromContext(event.Context, "is_owner"))
 	if forceNew || !exists {
 		lifecycle.Created = true
 		lifecycle.Revoked = exists
@@ -106,6 +117,9 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	}
 	state.lastSeenAt = now
 	state.messages = append(state.messages, chatMessage{Role: "user", Content: strings.TrimSpace(content)})
+	if err := m.persist(ctx, baseKey, state); err != nil {
+		return lifecycle, nil, err
+	}
 	m.mu.Lock()
 	m.items[baseKey] = state
 	m.mu.Unlock()
@@ -117,29 +131,55 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	return lifecycle, history, nil
 }
 
-func (m *chatSessionManager) CompleteTurn(event core.Event, reply string) {
+func (m *chatSessionManager) CompleteTurn(ctx context.Context, event core.Event, reply string) error {
 	if m == nil {
-		return
+		return nil
 	}
 	baseKey := chatSessionBaseKey(event)
 	if baseKey == "" {
-		return
+		return nil
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	state, ok := m.items[baseKey]
+	state.messages = cloneMessages(state.messages)
+	m.mu.Unlock()
 	if !ok {
-		return
+		return nil
 	}
 	if strings.TrimSpace(reply) != "" {
 		state.messages = append(state.messages, chatMessage{Role: "assistant", Content: strings.TrimSpace(reply)})
 	}
+	state.lastSeenAt = m.nowFn()
+	if err := m.persist(ctx, baseKey, state); err != nil {
+		return err
+	}
+	m.mu.Lock()
 	m.items[baseKey] = state
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *chatSessionManager) persist(ctx context.Context, key string, state chatSessionState) error {
+	if m.store == nil {
+		return nil
+	}
+	return m.store.Save(ctx, key, chat.SessionSnapshot{ID: state.id, LastSeenAt: state.lastSeenAt, Summary: state.summary, Messages: state.messages})
+}
+
+func discordChannelScope(event core.Event) string {
+	if event.Source != core.SourceDiscord {
+		return ""
+	}
+	guild, _ := event.Context["guild_id"].(string)
+	kind, _ := event.Context["entry_kind"].(string)
+	return chat.DiscordChannelScope(guild, event.Channel.ID, kind, boolFromContext(event.Context, "is_direct_message"))
 }
 
 func chatSessionBaseKey(event core.Event) string {
+	if scope := discordChannelScope(event); scope != "" {
+		return scope
+	}
 	if event.Context != nil {
 		if value, _ := event.Context["session_key"].(string); strings.TrimSpace(value) != "" {
 			return strings.TrimSpace(value)

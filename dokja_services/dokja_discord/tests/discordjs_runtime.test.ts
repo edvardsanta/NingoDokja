@@ -16,12 +16,14 @@ test("long formula replies attach the PNG only to their first chunk", () => {
 
 test("message replies fetch their quoted text without changing the current message", async () => {
   const context = await toMessageContext({
-    author: { id: "user", bot: false }, id: "new", channelId: "channel", guildId: "guild",
+    author: { id: "user", bot: false, username: "account-name" }, member: { displayName: "Channel Scholar" }, id: "new", channelId: "channel", guildId: "guild",
     content: "Em python mesmo", channel: { type: 0 }, mentions: { users: new Map([["mentioned", { id: "mentioned" }]]) },
     reference: { messageId: "previous", channelId: "channel" },
     fetchReference: async () => ({ channelId: "channel", guildId: "guild", content: "A calculator like Windows?" }),
   } as any);
   assert.equal(context.content, "Em python mesmo");
+  assert.equal(context.userName, "Channel Scholar");
+  assert.equal(context.userId, "user");
   assert.equal(context.replyToContent, "A calculator like Windows?");
   assert.deepEqual(context.mentionedUserIds, ["mentioned"]);
 });

@@ -49,6 +49,11 @@ func (h *ChatDomainHandler) Domain() core.Domain {
 	return core.DomainChat
 }
 
+func (h *ChatDomainHandler) WithSessionStore(store chat.SessionStore) *ChatDomainHandler {
+	h.sessions.store = store
+	return h
+}
+
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
@@ -95,6 +100,13 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		reference = recentReadingReference(items)
 	}
 	turnContent := withReplyContext(event, content)
+	if scope := discordChannelScope(event); scope != "" {
+		name := event.User.Name
+		if name == event.User.ID {
+			name = ""
+		}
+		turnContent = chat.ParticipantMessage(scope, event.User.ID, name, turnContent)
+	}
 	lifecycle, history, err := h.sessions.BeginTurn(ctx, event, turnContent, h.summarizeContext)
 	if err != nil {
 		return nil, err
@@ -114,7 +126,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		return nil, err
 	}
 	rawReply := chatReplyFromResult(result)
-	h.sessions.CompleteTurn(event, rawReply)
+	if err := h.sessions.CompleteTurn(ctx, event, rawReply); err != nil {
+		return nil, err
+	}
 	// The session keeps the model's own words; citations are added only to what is sent, and only
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)

@@ -40,6 +40,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           replyToContent: context.replyToContent,
           mentionedUserIds: context.mentionedUserIds,
           userId: context.userId,
+          userName: context.userName,
           channelId: context.channelId,
           messageId: context.messageId,
           guildId: context.guildId,

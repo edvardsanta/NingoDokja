@@ -67,6 +67,7 @@ export type DiscordCommandContext = {
 
 export type DiscordMessageContext = {
   userId: string;
+  userName?: string;
   channelId: string;
   messageId: string;
   guildId?: string;
