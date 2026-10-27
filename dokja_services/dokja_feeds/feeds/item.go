@@ -17,6 +17,7 @@ const ellipsis rune = 0x2026
 const (
 	maxTitleRunes   = 300
 	maxSummaryRunes = 1000
+	maxBodyBytes    = 100_000
 	maxSourceRunes  = 80
 	maxPrompts      = 3
 	maxPromptRunes  = 120
@@ -38,7 +39,9 @@ type Item struct {
 	ID      string
 	Title   string
 	Summary string
-	URL     string
+	// Body is optional full plain text for saving pages rendered by a client application.
+	Body string
+	URL  string
 	// Published is the zero time when the plugin gave none, or none that can be believed.
 	Published time.Time
 	Source    string
@@ -52,6 +55,7 @@ type rawItem struct {
 	ID        string   `json:"id"`
 	Title     string   `json:"title"`
 	Summary   string   `json:"summary"`
+	Body      string   `json:"body"`
 	URL       string   `json:"url"`
 	Published string   `json:"published"`
 	Source    string   `json:"source"`
@@ -130,10 +134,21 @@ func normalizeItem(raw rawItem, plugin Plugin, now time.Time) (Item, bool) {
 		ID:        id,
 		Title:     title,
 		Summary:   cleanText(raw.Summary, maxSummaryRunes),
+		Body:      fullBody(raw.Body),
 		URL:       link,
 		Published: parsePublished(raw.Published, now),
 		Source:    source,
 	}, true
+}
+
+// fullBody preserves paragraph structure. Oversized bodies are omitted instead of
+// silently saving an incomplete document; the original page remains available.
+func fullBody(raw string) string {
+	body := strings.TrimSpace(strings.ToValidUTF8(raw, ""))
+	if len(body) > maxBodyBytes {
+		return ""
+	}
+	return body
 }
 
 // cleanText makes text safe to show: valid UTF-8, one line, no control characters and none of

@@ -117,7 +117,7 @@ describe("the digest card", () => {
     const { transport } = routedTransport({ "digest.status": ok(odd), "digest.items": ok(digestPage([])) });
     renderCard(transport);
 
-    expect((await screen.findByText("Odd")).parentElement?.textContent).toBe("Oddunknown");
+    expect((await screen.findByText("Odd", { selector: ".service-name" })).parentElement?.textContent).toBe("Oddunknown");
   });
 
   describe("showing more", () => {
@@ -356,4 +356,105 @@ it("saves a reading to the Library by its id alone, and says what happened", asy
   fireEvent.click(await screen.findByRole("button", { name: "Save to the Library: Entry 1" }));
   await screen.findByText(/^Added/);
   expect(calls.filter((call) => call.type === "knowledge.ingest").map((call) => call.payload)).toEqual([{ mode: "reading", reading: "item-1" }]);
+});
+
+
+describe("reading previews and filters", () => {
+  it("expands full plain text without interpreting markup", async () => {
+    const fullText = "First paragraph.\n\n<img src=x onerror=alert(1)>\n" + "Full passage. ".repeat(100);
+    const { transport } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([digestItem(1, { previewText: fullText })])) });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    expect(document.querySelector('.reading-preview-text')).toBeNull();
+    fireEvent.click(screen.getByText("Preview"));
+    await waitFor(() => expect(document.querySelector('.reading-preview-text')?.textContent).toBe(fullText.trim()));
+    expect(document.querySelector('.reading-preview img')).toBeNull();
+    expect(document.querySelector('.reading-preview-text')?.textContent?.length).toBeGreaterThan(1000);
+  });
+
+  it("loads a meme through the shell only when its preview is expanded", async () => {
+    const requests: string[] = [];
+    const url = "https://example.com/digest-preview-image.jpg";
+    const { transport } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([digestItem(1, { mediaUrl: url })])) }, async address => {
+      requests.push(address);
+      return { ok: true, dataUrl: "data:image/png;base64,aW1hZ2U=" };
+    });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    expect(requests).toEqual([]);
+    fireEvent.click(screen.getByText("Preview"));
+    const image = await screen.findByAltText("Entry 1");
+    expect(image.getAttribute("src")).toBe("data:image/png;base64,aW1hZ2U=");
+    expect(requests).toEqual([url]);
+    screen.getByText("Source excerpt; full text was not supplied.");
+  });
+
+  it("previews a video with controls and no autoplay", async () => {
+    const { transport } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([digestItem(1, { mediaUrl: "https://example.com/digest-preview-video.mp4" })])) }, async () => ({ ok: true, dataUrl: "data:video/mp4;base64,dmlkZW8=" }));
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    fireEvent.click(screen.getByText("Preview"));
+    await waitFor(() => expect(document.querySelector('.reading-preview video')).not.toBeNull());
+    const video = document.querySelector('video')!;
+    expect(video.controls).toBe(true);
+    expect(video.autoplay).toBe(false);
+  });
+
+  it("submits source, search and dates to the domain and clears them", async () => {
+    const { transport, calls } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": [ok(digestPage([digestItem(1)], { more: 3 })), ok(digestPage([])), ok(digestPage([digestItem(1)]))] });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Search readings"), { target: { value: "charity" } });
+    fireEvent.change(screen.getByLabelText("From date (UTC)"), { target: { value: "2026-10-01" } });
+    fireEvent.change(screen.getByLabelText("To date (UTC)"), { target: { value: "2026-10-27" } });
+    fireEvent.click(screen.getByText("Apply filters"));
+    await screen.findByText("0 matching readings");
+    expect(itemCalls(calls).at(-1)).toEqual({ limit: 8, offset: 0, source: "beta", query: "charity", from: "2026-10-01", to: "2026-10-27" });
+    fireEvent.click(screen.getByText("Clear filters"));
+    await screen.findByText("Entry 1");
+    expect(itemCalls(calls).at(-1)).toEqual({ limit: 8, offset: 0 });
+  });
+
+  it("refuses an inverted date interval before requesting another page", async () => {
+    const { transport, calls } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([digestItem(1)])) });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    fireEvent.change(screen.getByLabelText("From date (UTC)"), { target: { value: "2026-10-27" } });
+    fireEvent.change(screen.getByLabelText("To date (UTC)"), { target: { value: "2026-10-01" } });
+    expect(screen.getByRole("button", { name: "Apply filters" }).hasAttribute("disabled")).toBe(true);
+    screen.getByRole("alert");
+    expect(itemCalls(calls)).toHaveLength(1);
+  });
+});
+
+
+it("keeps reading filters when loading the next page", async () => {
+  const { transport, calls } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": [
+    ok(digestPage([digestItem(1)])),
+    ok(digestPage([digestItem(2)], { total: 20, more: 12 })),
+    ok(digestPage([digestItem(2), digestItem(3)], { total: 20, more: 4 })),
+  ] });
+  renderCard(transport);
+  await screen.findByText("Entry 1");
+  fireEvent.change(screen.getByLabelText("Source"), { target: { value: "beta" } });
+  fireEvent.click(screen.getByText("Apply filters"));
+  await screen.findByText("Entry 2");
+  fireEvent.click(screen.getByRole("button", { name: "Show 8 more" }));
+  await screen.findByText("Entry 3");
+  expect(itemCalls(calls).at(-1)).toEqual({ limit: 16, offset: 0, source: "beta" });
+});
+
+it("offers a retry when a reading media preview fails", async () => {
+  let attempts = 0;
+  const { transport } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([digestItem(1, { mediaUrl: "https://example.com/retry-reading-image.png" })])) }, async () => {
+    attempts++;
+    return attempts === 1 ? { ok: false, error: { code: "unavailable", message: "Preview unavailable" } } : { ok: true, dataUrl: "data:image/png;base64,aW1hZ2U=" };
+  });
+  renderCard(transport);
+  await screen.findByText("Entry 1");
+  fireEvent.click(screen.getByText("Preview"));
+  fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+  await screen.findByAltText("Entry 1");
+  expect(attempts).toBe(2);
 });

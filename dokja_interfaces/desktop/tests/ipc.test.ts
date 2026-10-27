@@ -681,3 +681,15 @@ test("desktop conversation requires input and forwards only its bounded message 
   assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",sessionNotice:"new"}});
   assert.deepEqual(calls,[{type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1"}}]);
 });
+
+
+test("reading media enters the preview gate without authorizing its article address", async () => {
+  const remembered: string[][] = [];
+  const { orchestrator } = recorder({ status: "ok", result: { domain: "digest", result: { items: [
+    { id: "picture", title: "Collected picture", media_url: "https://images.example/reading.jpg", url: "https://example.com/article" },
+    { id: "article", title: "Article", url: "https://example.com/other" },
+  ] } } });
+  const result = await handleRequest({ type: "digest.items" }, orchestrator, limits, { remember: urls => remembered.push(urls) });
+  assert.equal(result.ok, true);
+  assert.deepEqual(remembered, [["https://images.example/reading.jpg"]]);
+});

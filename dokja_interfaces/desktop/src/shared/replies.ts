@@ -154,9 +154,11 @@ export type DigestStatus = {
   sources: DigestSource[];
 };
 
-// An item of the digest. The address is not here: nothing in the app opens a link yet, so the
-// screen does not get one.
+// An item of the digest. Article addresses stay in the shell; optional media references
+// are authorized by its preview gate and rendered only from the data URL it returns.
 export type DigestItem = {
+  previewText?: string;
+  mediaUrl?: string;
   id: string;
   title: string;
   summary: string;

@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import { runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryResolvePayload, memoryResolution } from "./memory_experiences.js";
 import { buildIngest } from "./ingest.js";
 import { linkImage } from "./link_image.js";
-import { INGEST_ID } from "../shared/ingest.js";
+import { INGEST_ID, INGEST_LIMITS } from "../shared/ingest.js";
 import type {
   DeleteResult,
   DigestPage,
@@ -303,33 +304,45 @@ function webAddress(raw: string): string {
   if (raw.length > 2000) return "";
   try {
     const parsed = new URL(raw);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? raw : "";
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname && !parsed.username && !parsed.password ? raw : "";
   } catch {
     return "";
   }
 }
 
-// The pages of the readings last handed to the screen, by id. The screen never holds an address:
-// saving a reading to the Library names it by id, and the shell finds its page here.
-const READING_ADDRESSES = new Map<string, string>();
+// The shell keeps source text and addresses by reading id; the screen only names an item.
+const READINGS = new Map<string, Record<string, unknown>>();
 const MAX_READINGS = 500;
 
-function rememberReading(id: string, address: string): void {
-  if (id === "" || address === "") return;
-  READING_ADDRESSES.delete(id);
-  READING_ADDRESSES.set(id, address);
-  while (READING_ADDRESSES.size > MAX_READINGS) {
-    const oldest = READING_ADDRESSES.keys().next().value;
+function rememberReading(item: Record<string, unknown>): void {
+  const id = shorten(text(item.id), 120);
+  if (id === "") return;
+  READINGS.delete(id);
+  const address = webAddress(text(item.url));
+  const body = typeof item.body === "string" ? item.body.trim() : "";
+  const payload = body && body.length <= INGEST_LIMITS.noteChars
+    ? buildIngest({
+      mode: "note", title: shorten(text(item.title), 300), body,
+      kind: "article", reference: address,
+    })
+    : address ? buildIngest({ mode: "address", address }) : undefined;
+  if (payload) {
+    // Identity follows the source and reading, so refreshing its text updates the same document.
+    if (body && payload.body) {
+      payload.source_id = `reading:${createHash("sha256").update(JSON.stringify([text(item.plugin), id])).digest("hex")}`;
+    }
+    READINGS.set(id, payload);
+  }
+  while (READINGS.size > MAX_READINGS) {
+    const oldest = READINGS.keys().next().value;
     if (oldest === undefined) break;
-    READING_ADDRESSES.delete(oldest);
+    READINGS.delete(oldest);
   }
 }
 
-// A reading is added by its page, as an address would be; one the shell never handed over, or one
-// without a page, is refused.
 function readingIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
-  const address = READING_ADDRESSES.get(text(raw.reading));
-  return address === undefined ? undefined : buildIngest({ mode: "address", address });
+  const payload = READINGS.get(text(raw.reading));
+  return payload ? { ...payload } : undefined;
 }
 
 // The questions a source suggests for its item: at most three short lines, or nothing.
@@ -342,13 +355,15 @@ function readingPrompts(value: unknown): { prompts?: string[] } {
 function digestPage(body: Record<string, unknown>): DigestPage {
   return {
     items: records(body.items, (item) => {
-      rememberReading(shorten(text(item.id), 120), webAddress(text(item.url)));
+      rememberReading(item);
       return {
       id: shorten(text(item.id), 120),
       title: shorten(text(item.title), 300),
       summary: shorten(text(item.summary), 600),
       source: shorten(text(item.source), 80),
       published: text(item.published),
+      ...(typeof item.body === "string" && item.body.trim() ? { previewText: item.body.trim().slice(0, 100_000) } : {}),
+      ...(webAddress(text(item.media_url)) ? { mediaUrl: webAddress(text(item.media_url)) } : {}),
       ...readingPrompts(item.prompts),
       };
     }),
@@ -645,8 +660,11 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => ({
       limit: clampInt(raw.limit, 1, 50, 8),
       offset: clampInt(raw.offset, 0, 1000, 0),
+      ...Object.fromEntries(["source", "query", "from", "to"].filter(key => typeof raw[key] === "string" && (raw[key] as string).trim()).map(key => [key, (raw[key] as string).trim().slice(0, key === "source" || key === "query" ? 200 : 10)])),
     }),
     project: (result) => inDomain(result, "digest", digestPage),
+    media: (projected) => isRecord(projected) && Array.isArray(projected.items)
+      ? projected.items.filter(isRecord).map(item => text(item.mediaUrl)).filter(Boolean) : [],
   },
   "knowledge.ingest": {
     // A file travels as base64 text: the cap is the largest file, a third more.

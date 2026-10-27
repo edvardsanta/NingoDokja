@@ -445,7 +445,9 @@
         "Crash, hang, malformed output, oversized output, incompatible lifecycle or operation version, ambiguity and unreadable files each give a defined reason; a failed read stores nothing.",
         "The serial REP server would stall feeds.status behind a reading; it now uses ROUTER with one goroutine per request (REQ clients unchanged).",
         "The file and text stay outside the 64 KiB workspace; evidence is a hashed file ref plus reader@version.",
-        "Runtime: subprocess with Debian python3 and python3-pypdf in the Feeds images; no sandbox, the container is the isolation boundary (step-07-reading.md)."
+        "Runtime: subprocess with Debian python3 and python3-pypdf in the Feeds images; no sandbox, the container is the isolation boundary (step-07-reading.md).",
+        "2026-10-27: scheduled collectors may provide an optional full plain-text body (100,000 UTF-8 bytes maximum). Digest preserves it and the desktop shell saves it through knowledge.ingest with stable reading identity and source provenance, avoiding empty application homepages; link-only collectors retain URL fetching. Feeds and Digest go test -race ./... pass; desktop pnpm test (253 Node, 313 UI tests), typecheck and build pass. Full live-stack ingestion remains unverified.",
+        "2026-10-27: Readings adds expandable plain-text and gated image/video previews, with lazy media loading and retry. Source/query/inclusive UTC date filters run in the Digest domain before ordering and pagination; explicit dates include older collected cache entries. Digest go test -race ./... passed; desktop pnpm test (256 Node and 320 UI tests), typecheck and build passed; focused built Electron test verifies full-text rendering, source/date/search forwarding through IPC, and filter layout. No production deployment performed."
       ],
       "checks": [
         {

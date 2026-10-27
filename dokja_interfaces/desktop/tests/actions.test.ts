@@ -337,7 +337,7 @@ test("digest.items keeps the page and never hands the screen an address or the p
     total: 20, offset: 0, more: 17, updated: "2026-10-02T10:00:00Z",
   });
   assert.doesNotMatch(JSON.stringify(projected), /example\.com\/1|source-1/);
-  assert.equal(ACTIONS["digest.items"].media, undefined, "a digest item has nothing to preview");
+  assert.deepEqual(ACTIONS["digest.items"].media!(projected), [], "article addresses are never authorized as media");
 });
 
 test("digest.items keeps up to three prompts the source wrote, and none when it wrote none", () => {
@@ -642,4 +642,61 @@ test("meme.pool.refresh is a change the screen cannot size, and keeps only count
   assert.deepEqual(ACTIONS["meme.pool.refresh"].payload({ max_items_per_scraper: 200, scope: "all" }), {});
   const projected = ACTIONS["meme.pool.refresh"].project({ domain: "meme", result: { added: 4, scrapers: ["a", 7, "b"], collection: { secret: "drop" }, status: "refreshed" } });
   assert.deepEqual(projected, { added: 4, sources: ["a", "b"] });
+});
+
+
+test("saving a collected reading uses its full text and keeps a stable identity per day", () => {
+  const project = ACTIONS["digest.items"].project;
+  const ingest = ACTIONS["knowledge.ingest"].payload;
+  const body = "First paragraph.\n\n" + "Full reading text. ".repeat(100);
+  const reading = { id: "daily:2026-10-27", plugin: "daily", title: "Daily reading", summary: "Excerpt", body, url: "https://example.com/" };
+  const shown = project(compactOf("digest", { items: [reading] }));
+  assert.equal((shown as { items: Array<{ previewText: string }> }).items[0]!.previewText, body.trim());
+  const payload = ingest({ mode: "reading", reading: reading.id, body: "Forged text", source_id: "forged" })!;
+  assert.equal(payload.body, body.trim());
+  assert.equal(payload.title, reading.title);
+  assert.equal(payload.kind, "article");
+  assert.equal(payload.source_ref, reading.url);
+  assert.equal(payload.source, undefined, "the empty application homepage is never fetched");
+  assert.match(String(payload.source_id), /^reading:[a-f0-9]{64}$/);
+  project(compactOf("digest", { items: [{ ...reading, body: "Revised full text" }] }));
+  const revised = ingest({ mode: "reading", reading: reading.id })!;
+  assert.equal(revised.source_id, payload.source_id);
+  assert.equal(revised.body, "Revised full text");
+  project(compactOf("digest", { items: [{ ...reading, id: "daily:2026-10-28" }] }));
+  assert.notEqual(ingest({ mode: "reading", reading: "daily:2026-10-28" })!.source_id, payload.source_id);
+});
+
+test("reading snapshots support missing links and discard stale text on refresh", () => {
+  const project = ACTIONS["digest.items"].project;
+  const ingest = ACTIONS["knowledge.ingest"].payload;
+  const reading = { id: "snapshot-only", title: "Snapshot", body: "Collected full text" };
+  project(compactOf("digest", { items: [reading] }));
+  assert.equal(ingest({ mode: "reading", reading: reading.id })!.body, reading.body);
+  project(compactOf("digest", { items: [{ ...reading, body: "", url: "https://example.com/page" }] }));
+  assert.deepEqual(ingest({ mode: "reading", reading: reading.id }), buildIngest({ mode: "address", address: "https://example.com/page" }));
+  project(compactOf("digest", { items: [{ ...reading, body: "" }] }));
+  assert.equal(ingest({ mode: "reading", reading: reading.id }), undefined);
+});
+
+
+test("digest preview exposes bounded text and authorizes only valid source media", () => {
+  const projected = ACTIONS["digest.items"].project(compactOf("digest", { items: [
+    { id: "picture", title: "Picture", body: "x".repeat(120_000), media_url: "https://example.com/picture.jpg", url: "https://example.com/article", secret: "PRIVATE" },
+    { id: "bad", title: "Bad", media_url: "javascript:alert(1)" },
+    { id: "credentials", title: "Credentials", media_url: "https://user:pass@example.com/image.jpg" },
+  ] })) as { items: Array<Record<string, unknown>> };
+  assert.equal(String(projected.items[0]!.previewText).length, 100_000);
+  assert.deepEqual(ACTIONS["digest.items"].media!(projected), ["https://example.com/picture.jpg"]);
+  assert.equal(projected.items[1]!.mediaUrl, undefined);
+  assert.equal(projected.items[2]!.mediaUrl, undefined);
+  assert.equal(JSON.stringify(projected).includes("PRIVATE"), false);
+});
+
+test("digest filters are allowlisted and empty filters preserve the existing request", () => {
+  const build = ACTIONS["digest.items"].payload;
+  assert.deepEqual(build({ source: " alpha ", query: " reading ", from: "2026-10-01", to: "2026-10-27", extra: "ignored" }), {
+    limit: 8, offset: 0, source: "alpha", query: "reading", from: "2026-10-01", to: "2026-10-27",
+  });
+  assert.deepEqual(build({ source: "", query: " ", from: "", to: "" }), { limit: 8, offset: 0 });
 });

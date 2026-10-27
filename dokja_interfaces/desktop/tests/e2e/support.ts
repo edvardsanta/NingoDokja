@@ -105,7 +105,7 @@ export type FakeOrchestrator = {
   stop(): Promise<void>;
 };
 
-export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
+export async function startFakeOrchestrator(respond?: (type: string, payload: Record<string, unknown>) => Record<string, unknown> | undefined): Promise<FakeOrchestrator> {
   const socket = new Reply();
   await socket.bind("tcp://127.0.0.1:*");
   const seen: FakeOrchestrator["seen"] = [];
@@ -114,7 +114,7 @@ export async function startFakeOrchestrator(): Promise<FakeOrchestrator> {
       const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown>; context?: Record<string, unknown> };
       seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
       const answer = String(event.type).startsWith("communications.") && event.context?.communications_token !== COMMUNICATIONS_TOKEN
-        ? { status: "error", error: "communications access denied" } : replyFor(String(event.type), event.payload as Record<string, unknown>);
+        ? { status: "error", error: "communications access denied" } : respond?.(String(event.type), event.payload ?? {}) ?? replyFor(String(event.type), event.payload as Record<string, unknown>);
       await socket.send(JSON.stringify(answer));
     }
   })().catch(() => undefined);

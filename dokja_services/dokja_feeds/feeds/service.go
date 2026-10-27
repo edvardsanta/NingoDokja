@@ -317,7 +317,7 @@ func (s *Service) itemsReply() map[string]any {
 			if len(items) >= MaxItemsReturned {
 				continue
 			}
-			items = append(items, map[string]any{
+			row := map[string]any{
 				"id":        item.ID,
 				"plugin":    e.plugin.ID,
 				"title":     item.Title,
@@ -327,7 +327,11 @@ func (s *Service) itemsReply() map[string]any {
 				"source":    item.Source,
 				"kind":      item.Kind, "media_url": item.MediaURL, "tags": item.Tags,
 				"prompts": item.Prompts,
-			})
+			}
+			if item.Body != "" {
+				row["body"] = item.Body
+			}
+			items = append(items, row)
 		}
 	}
 	return map[string]any{"items": items, "total": total, "updated": stamp(updated)}

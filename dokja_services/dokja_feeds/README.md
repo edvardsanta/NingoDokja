@@ -30,7 +30,7 @@ them; at most 16 requests are in flight, past that a request is refused as busy.
 A `plugins[]` row has `id`, `name`, `state` (`ok`, `failed`, `pending`, `disabled` or `invalid`),
 `running`, `enabled`, `interval_seconds`, `items`, `skipped`, `last_run`, `last_ok` and
 `last_error`. An `items[]` entry has `id`, `plugin`, `title`, `summary`, `url`, `published` (RFC 3339
-UTC, or empty), `source` and `prompts` (a list, possibly empty). `last_error` is a short fixed phrase such as `exit status 2` or
+UTC, or empty), `source`, optional `body` (full plain text) and `prompts` (a list, possibly empty). `last_error` is a short fixed phrase such as `exit status 2` or
 `timed out after 30s`; what a plugin writes to stderr never appears in a reply. A manifest this
 service cannot run shows as `invalid`, and one that asks for a version, runtime or capability it
 does not support has a `last_error` starting with `incompatible:`.
@@ -76,6 +76,13 @@ to say goes to **stderr**, which only reaches the service log:
 ]}
 ```
 
+A collector may also provide `body`: the complete plain text it already obtained from its
+source. This is separate from the bounded `summary`. The Library saves this text with the
+reading's stable identity and source address, without fetching the page again. This supports
+pages whose visible content comes from a client application or an API. Supply a stable `id`
+for each edition, such as `daily:2026-10-27`, even when editions share a homepage. Omit `body`
+when only an excerpt is available; saving then fetches the original page as before.
+
 Only `title` is required. Every field is a string, except `prompts`: an optional list of up to 3
 questions the plugin suggests for discussing the item, written from its own text (for a liturgy,
 "O que Lc 13,10-17 ensina?"). The desktop offers them when a conversation about the item opens,
@@ -92,6 +99,8 @@ Plugin output comes from the outside, so it is bounded and cleaned before it is 
 - text is made one line of valid UTF-8 without control characters or the characters that reorder
   what is displayed, and cut to 300 characters (title), 1000 (summary), 80 (source) and 120 (each
   prompt; only the first 3 non-empty prompts are kept);
+- full `body` text preserves paragraphs and is limited to 100,000 UTF-8 bytes; oversized
+  bodies are omitted rather than truncated;
 - `url` is kept only if it is an absolute `http` or `https` address with a host and no credentials.
 
 ### What the service does to a plugin

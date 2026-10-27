@@ -2066,3 +2066,74 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 
 /* Fetching new memes, at the top of the tray: a quiet action and what it brought. */
 .meme-refresh { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .75rem; padding: .35rem .5rem; border-bottom: 1px solid var(--rule); color: var(--ink-dim); font-size: .875rem; }
+
+
+.reading-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.reading-filters label {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.reading-filters input, .reading-filters select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.reading-filters input:focus-visible, .reading-filters select:focus-visible,
+.reading-preview summary:focus-visible, .reading-preview-text:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.reading-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reading-preview {
+  margin-block: 0.75rem;
+}
+
+.reading-preview summary {
+  cursor: pointer;
+  color: var(--cyan);
+  padding-block: 0.4rem;
+}
+
+.reading-preview-content {
+  padding: 0.75rem;
+  border: 1px solid var(--edge);
+  border-radius: 0.35rem;
+}
+
+.reading-preview-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32rem;
+  overflow: auto;
+  line-height: 1.65;
+}
+
+.reading-preview img, .reading-preview video {
+  display: block;
+  max-width: 100%;
+  max-height: 32rem;
+  margin: 0 auto 0.75rem;
+  object-fit: contain;
+}

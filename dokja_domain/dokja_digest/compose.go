@@ -18,6 +18,8 @@ type item struct {
 	plugin    string
 	title     string
 	summary   string
+	body      string
+	mediaURL  string
 	url       string
 	source    string
 	published time.Time // the zero time when unknown
@@ -56,6 +58,8 @@ func itemsFrom(reply map[string]any) ([]item, error) {
 			plugin:    text(fields, "plugin"),
 			title:     title,
 			summary:   text(fields, "summary"),
+			body:      text(fields, "body"),
+			mediaURL:  text(fields, "media_url"),
 			url:       text(fields, "url"),
 			source:    text(fields, "source"),
 			published: published,
@@ -107,7 +111,17 @@ func compose(items []item, chosen policy, now time.Time) digest {
 
 	fresh := make([]item, 0, len(items))
 	for _, candidate := range items {
-		if !candidate.published.IsZero() && candidate.published.Before(now.Add(-chosen.maxAge)) {
+		if chosen.source != "" && candidate.plugin != chosen.source && candidate.source != chosen.source {
+			continue
+		}
+		if chosen.query != "" && !strings.Contains(strings.ToLower(candidate.title+"\n"+candidate.summary+"\n"+candidate.body+"\n"+candidate.source), chosen.query) {
+			continue
+		}
+		if !chosen.from.IsZero() || !chosen.until.IsZero() {
+			if candidate.published.IsZero() || (!chosen.from.IsZero() && candidate.published.Before(chosen.from)) || (!chosen.until.IsZero() && !candidate.published.Before(chosen.until)) {
+				continue
+			}
+		} else if !candidate.published.IsZero() && candidate.published.Before(now.Add(-chosen.maxAge)) {
 			result.older++
 			continue
 		}
@@ -228,7 +242,7 @@ func (d digest) reply(updated string) map[string]any {
 		if !shown.published.IsZero() {
 			published = shown.published.UTC().Format(time.RFC3339)
 		}
-		page = append(page, map[string]any{
+		row := map[string]any{
 			"id":        shown.id,
 			"plugin":    shown.plugin,
 			"title":     shown.title,
@@ -237,7 +251,14 @@ func (d digest) reply(updated string) map[string]any {
 			"published": published,
 			"source":    shown.source,
 			"prompts":   shown.prompts,
-		})
+		}
+		if shown.mediaURL != "" {
+			row["media_url"] = shown.mediaURL
+		}
+		if shown.body != "" {
+			row["body"] = shown.body
+		}
+		page = append(page, row)
 	}
 
 	sources := map[string]bool{}

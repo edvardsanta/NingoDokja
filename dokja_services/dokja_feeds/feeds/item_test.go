@@ -224,3 +224,17 @@ func TestParseOutput(t *testing.T) {
 		}
 	})
 }
+
+func TestFullBodyPreservesParagraphsWithoutTruncation(t *testing.T) {
+	body := "First paragraph.\n\n" + strings.Repeat("Reading text. ", 100)
+	item, ok := normalizeItem(rawItem{Title: "Daily reading", Body: body}, testPlugin(), testNow)
+	if !ok || item.Body != strings.TrimSpace(body) {
+		t.Fatalf("full body was changed: %q", item.Body)
+	}
+	for _, oversized := range []string{strings.Repeat("a", maxBodyBytes+1), strings.Repeat("é", maxBodyBytes/2+1)} {
+		item, _ := normalizeItem(rawItem{Title: "Too large", Body: oversized}, testPlugin(), testNow)
+		if item.Body != "" {
+			t.Fatal("an oversized body must be omitted, not truncated")
+		}
+	}
+}
