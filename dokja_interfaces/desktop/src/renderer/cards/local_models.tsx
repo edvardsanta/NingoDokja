@@ -73,7 +73,7 @@ export function LocalModels({ transport, row, onChanged }: { transport: Transpor
     </p>}
     {pull?.state === "done" && <p role="status">{t("models_pull_done", { model: pull.model })}</p>}
     {pull?.state === "cancelled" && <p role="status">{t("models_pull_cancelled", { model: pull.model })}</p>}
-    {pull?.state === "failed" && <p role="alert">{t("models_pull_failed", { model: pull.model })}{pull.error ? `: ${pull.error}` : ""}</p>}
+    {pull?.state === "failed" && !isInstalled(row, pull.model) && <p role="alert">{t("models_pull_failed", { model: pull.model })}{pull.error ? `: ${pull.error}` : ""}</p>}
     {!stopped && pull?.state !== "pulling" && <form className="model-download" onSubmit={(event) => {
       event.preventDefault();
       if (valid) action.start({ type: "runtime.models.pull", model: name.trim() });
@@ -95,4 +95,14 @@ export function useRemoveModel(transport: Transport, onChanged: () => void) {
   const action = useAction(remove);
   useEffect(() => { if (action.state.phase === "ready") onChanged(); }, [action.state, onChanged]);
   return action;
+}
+
+// A model the engine lists is there, whatever an earlier download of it said: that failure is
+// history. A name without a tag is the engine's ":latest".
+export function isInstalled(row: ProviderRow, model: string): boolean {
+  const name = (value: string) => {
+    const trimmed = value.trim().toLowerCase();
+    return trimmed.includes(":") ? trimmed : `${trimmed}:latest`;
+  };
+  return row.models.some((listed) => name(listed) === name(model));
 }
