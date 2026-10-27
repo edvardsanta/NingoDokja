@@ -334,7 +334,7 @@ services:
       context: .
       dockerfile: dokja_services/dokja_discord/Dockerfile.dev
     working_dir: /workspace/dokja_services/dokja_discord
-    command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
+    command: ["/usr/local/bin/dokja-discord-dev"]
     environment:
       CI: "true"
       DISCORD_APPLICATION_ID: ${DISCORD_APPLICATION_ID}

@@ -1066,3 +1066,36 @@ This development change does not perform a production deployment or live provide
 Rollback: restore the prior application/controller builds and Compose files. The separate chat
 binding key is ignored by older builds. Preserve the existing database and auth stores; do not
 restore a database backup over newer operator changes without reviewing them.
+
+
+### Discord package-manager startup failures
+
+The Discord images pin pnpm through `packageManager` and prepare it during the
+build. The dev/lite image also caches locked dependencies in `/opt/pnpm-store`.
+Its startup script installs from that store with `--offline --frozen-lockfile`
+before launching the watcher. The production image starts Node directly with its
+installed TypeScript loader. Corepack network access is disabled in both images
+at runtime; changing manifests or the lockfile requires rebuilding the image.
+The dev startup still writes its dependency links under the existing workspace
+bind mount, as the previous startup install did. No new volume is introduced.
+
+If an older image fails before gateway login with `EAI_AGAIN` during pnpm release
+discovery, rebuild the Discord image from this revision and recreate only that
+service using the selected stack. Build-time networking is required. Do not
+remove runtime databases or volumes to repair package-manager discovery. An
+uncached dependency or changed lockfile now fails locally rather than attempting
+a runtime download. This removes the registry bootstrap dependency; Discord
+login, media sources, and voice transport still need working network access.
+
+
+To verify dependency bootstrap without logging in to Discord, build an isolated
+review image and run the network-disabled regression:
+
+```sh
+docker build -f dokja_services/dokja_discord/Dockerfile.dev -t dokja-discord-startup-test .
+bash scripts/test_discord_startup.sh dokja-discord-startup-test
+```
+
+The check uses a fresh disposable project, loads TypeScript and voice dependencies,
+checks lockfile preservation, and rejects a changed manifest before gateway startup.
+It does not recreate application services or test live Discord connectivity.

@@ -15,10 +15,12 @@ COPY dokja_services/dokja_discord/package.json /app/package.json
 COPY dokja_services/dokja_discord/pnpm-lock.yaml /app/pnpm-lock.yaml
 COPY dokja_services/dokja_discord/pnpm-workspace.yaml /app/pnpm-workspace.yaml
 
-RUN pnpm install --frozen-lockfile
+RUN corepack install --global pnpm@12.4.1 \
+  && pnpm install --frozen-lockfile
+ENV COREPACK_DEFAULT_TO_LATEST=0 COREPACK_ENABLE_NETWORK=0
 
 COPY dokja_services/dokja_discord /app
 
 EXPOSE 8092
 
-CMD ["pnpm", "start"]
+CMD ["node", "--import", "tsx", "./main.ts"]
