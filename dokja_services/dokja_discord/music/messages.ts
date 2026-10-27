@@ -9,7 +9,7 @@ const MESSAGES = {
   playingElsewhere: { "pt-BR": "A música está tocando em <#{channel}>. Entre lá para controlar a fila.", en: "Music is playing in <#{channel}>. Join it to control the queue." },
   couldNotPlay: { "pt-BR": "Não consegui tocar.", en: "Could not play it." },
   failed: { "pt-BR": "Não deu para fazer isso.", en: "That could not be done." },
-  done: { "pt-BR": "Feito.", en: "Done." },
+  unconfirmed: { "pt-BR": "Não foi possível confirmar o comando de música.", en: "The music command could not be confirmed." },
   nowPlaying: { "pt-BR": "Tocando agora: {song}.", en: "Now playing: {song}." },
   queued: { "pt-BR": "Na fila (#{place}): {song}.", en: "Queued #{place}: {song}." },
   skippedEmpty: { "pt-BR": "Pulei. A fila acabou.", en: "Skipped. The queue is empty." },
@@ -67,9 +67,10 @@ export function songOf(locale: string, track: Track | undefined): string {
 }
 
 // The reply to a music command, from what the orchestrator answered: the queue, or a refusal code.
-// Without a music answer (an older orchestrator), its own text stands.
+// Preserve explicit text from an older orchestrator. An empty answer has no
+// confirmed queue action and must never be presented as success.
 export function musicReplyText(locale: string, eventType: string, music: unknown, fallback: string): string {
-  if (!isRecord(music)) return fallback || say(locale, "done");
+  if (!isRecord(music)) return fallback.trim() ? quiet(fallback) : say(locale, "unconfirmed");
   if (music.ok !== true) {
     const code = typeof music.code === "string" ? music.code : "";
     const reason = typeof music.reason === "string" ? music.reason : "";

@@ -220,3 +220,27 @@ test("the queue list never pings either", async () => {
   const text = musicReplyText("en", "music.queue", { ok: true, now_playing: { title: "ok" }, waiting: [{ title: "@here now" }] }, "");
   assert.doesNotMatch(text, /@here/);
 });
+
+
+test("an empty orchestrator response never confirms a music command or starts playback", async () => {
+  for (const locale of ["en", "pt-BR"]) {
+    const { voice, applied, posted } = fakeVoice("voice1");
+    const feature = createMusic({
+      orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000,
+      voice, locale, dispatch: async () => ({ reply: "" }),
+    });
+    const { ctx, replies } = context({ song: "a song" });
+    await feature.commands.find((entry) => entry.name === "play")!.handle(ctx);
+    assert.equal(replies.at(-1), locale === "en"
+      ? "The music command could not be confirmed."
+      : "Não foi possível confirmar o comando de música.");
+    assert.equal(applied.length, 0);
+    assert.equal(posted.length, 0);
+  }
+});
+
+test("a missing music result with whitespace-only text is unconfirmed", async () => {
+  const { musicReplyText } = await import("../music/messages.js");
+  assert.equal(musicReplyText("en", "music.play", undefined, "  "), "The music command could not be confirmed.");
+  assert.equal(musicReplyText("en", "music.play", undefined, "Music is switched off."), "Music is switched off.");
+});
