@@ -37,7 +37,11 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
 - A track plays from its page: `yt-dlp` (pinned in the image, using the image's node for pages
   that run JavaScript) pipes its audio into ffmpeg, which hands Discord raw 48 kHz stereo PCM, so
   the volume can change while it plays. Both processes end on skip, stop or shutdown. A track
-  takes a few seconds to start (about 7 to 9 in tests): the reply comes at once, the sound after.
+  takes a few seconds to start (about 7 to 9 in tests, yt-dlp reading the page; no other client
+  was faster): the reply comes at once, the sound after. The next track in the queue is made
+  ready while one plays, so the songs after the first start at once.
+- ffmpeg brings every track to about the same loudness (`loudnorm`, -16 LUFS), and Discord
+  encodes music at the voice channel's bitrate, within 32 to 128 kbps.
 - When a track ends, or cannot start, the adapter sends `music.ended` with its entry and plays
   what the reply says next. If the voice connection is gone, it sends `music.stop`.
 - `/play` needs the person in a voice channel; while music plays, the controls need them in

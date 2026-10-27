@@ -28,7 +28,9 @@ export function createTrackStream(pageUrl: string, options: TrackStreamOptions =
   );
   const ffmpeg = spawn(
     options.ffmpegPath ?? "ffmpeg",
-    ["-loglevel", "error", "-i", "pipe:0", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
+    // loudnorm brings every track to about the same loudness (-16 LUFS), so one song is not much
+    // louder than the next.
+    ["-loglevel", "error", "-i", "pipe:0", "-af", "loudnorm=I=-16:LRA=11:TP=-1.5", "-f", "s16le", "-ar", "48000", "-ac", "2", "pipe:1"],
     { stdio: ["pipe", "pipe", "pipe"] },
   );
   ytdlp.stdout?.pipe(ffmpeg.stdin!);
