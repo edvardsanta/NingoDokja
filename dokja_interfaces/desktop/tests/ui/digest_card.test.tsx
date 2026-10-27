@@ -64,6 +64,7 @@ describe("the digest card", () => {
       "digest.status": ok(DIGEST_STATUS),
       "digest.items": ok(digestPage([digestItem(1)])),
     });
+
     renderCard(transport);
 
     const sources = (await screen.findByText("Sources")).closest("details") as HTMLDetailsElement;
@@ -78,6 +79,25 @@ describe("the digest card", () => {
     expect([...sources.querySelectorAll("li")].map((row) => row.getAttribute("data-tone"))).toEqual([
       "ok", "ok", "problem", "off",
     ]);
+  });
+
+  it("shows processing plugins as available before their first on-demand use", async () => {
+    const processing = [
+      digestSource("media-library", { name: "Media Library", state: "pending" }),
+      digestSource("audio-pages", { name: "Pages", state: "pending" }),
+    ];
+    const { transport } = routedTransport({
+      "digest.status": ok(status({ providers: processing })),
+      "digest.items": ok(digestPage([])),
+    });
+    renderCard(transport);
+
+    const providers = (await screen.findByText("Processing plugins")).closest("details") as HTMLDetailsElement;
+    expect([...providers.querySelectorAll("li")].map((row) => row.textContent)).toEqual([
+      "Media Libraryavailable",
+      "Pagesavailable",
+    ]);
+    expect([...providers.querySelectorAll("li")].map((row) => row.getAttribute("data-tone"))).toEqual(["ok", "ok"]);
   });
 
   it("keeps the source list closed while everything works", async () => {

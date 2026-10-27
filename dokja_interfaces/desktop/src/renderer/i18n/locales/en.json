@@ -93,6 +93,7 @@
   "digest_providers_title": "Processing plugins",
   "digest_sources_title": "Sources",
   "digest_state_ok": "working",
+  "digest_state_ready": "available",
   "digest_state_failed": "failing",
   "digest_state_pending": "starting",
   "digest_state_disabled": "off",

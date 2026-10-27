@@ -93,6 +93,7 @@
   "digest_providers_title": "Plugins de processamento",
   "digest_sources_title": "Fontes",
   "digest_state_ok": "funcionando",
+  "digest_state_ready": "disponível",
   "digest_state_failed": "com falha",
   "digest_state_pending": "iniciando",
   "digest_state_disabled": "desligada",
