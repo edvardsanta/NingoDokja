@@ -41,9 +41,25 @@ does not silently fall back to volatile chat. Inactivity (default
 three minutes) triggers real model-based compaction on the next message, rather
 than a reset. The default raw-message threshold is 20; recent turns remain verbatim
 alongside a bounded summary. Compaction adds an inference call using the configured
-provider and can lose detail. A summary failure preserves history and fails the
-request for retry. Restarting the orchestrator reloads saved summaries and recent
-turns. Server message discussions share only the same Discord guild/channel, with
+provider and can lose detail. A rejected or failed summary preserves the last
+valid summary and all unsummarized raw turns, then continues generation with a
+bounded recent-context projection. That projection includes at most eight prior
+messages within 16 KiB, the current message intact, and the prior summary when
+available. An untrusted omission notice marks withheld older turns; no successful
+compaction notice is emitted. The complete unsummarized checkpoint remains in
+the existing session store until valid compaction replaces its older portion.
+Existing store/input byte limits still apply; this is not an unbounded archive.
+
+After a summary failure, a one-minute per-session cooldown avoids repeating the
+failed compaction on every turn. The cooldown is volatile: restart reloads pending
+history and can attempt compaction again. Logs use `compaction_fallback` values
+`invalid_summary`, `summary_timeout`, `provider_error` or `retry_cooldown`, never
+summary text. Summary calls retain their existing 25-second deadline; a child
+summary timeout can recover while caller cancellation remains terminal. The
+inference client preserves context cancellation/deadline errors rather than
+misreporting them as an unavailable Runtime. A failure of the actual reply provider
+or durable session store still fails the turn explicitly. Restarting the
+orchestrator reloads saved summaries and unsummarized turns. Server message discussions share only the same Discord guild/channel, with
 untrusted display-name and participant attribution; direct messages and commands
 retain separate per-user scopes. Explicit new conversations clear their scope, but
 resetting a shared channel requires the configured verified owner. This change needs

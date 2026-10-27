@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	chat "read_books/dokja_domain/dokja_chat"
@@ -13,20 +14,23 @@ import (
 )
 
 const defaultChatSessionTimeout = 3 * time.Minute
+const compactionRetryDelay = time.Minute
 
 type chatSessionState struct {
-	id         string
-	lastSeenAt time.Time
-	messages   []chatMessage
-	summary    string
+	id                string
+	lastSeenAt        time.Time
+	messages          []chatMessage
+	summary           string
+	compactionRetryAt time.Time // volatile retry control, never persisted as conversation data
 }
 
 type chatSessionLifecycle struct {
-	SessionID string
-	Created   bool
-	Revoked   bool
-	Reason    string
-	Compacted bool
+	SessionID          string
+	Created            bool
+	Revoked            bool
+	Reason             string
+	Compacted          bool
+	CompactionFallback string
 }
 
 type chatSessionManager struct {
@@ -74,6 +78,9 @@ func (m *chatSessionManager) LockTurn(ctx context.Context, event core.Event) (fu
 
 func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, content string, summarize func(context.Context, chat.ContextCompaction) (string, error)) (chatSessionLifecycle, []chatMessage, error) {
 	lifecycle := chatSessionLifecycle{}
+	if err := ctx.Err(); err != nil {
+		return lifecycle, nil, err
+	}
 	baseKey := chatSessionBaseKey(event)
 	if m == nil || baseKey == "" {
 		return lifecycle, []chatMessage{{Role: "user", Content: content}}, nil
@@ -103,17 +110,31 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 		state = chatSessionState{id: fmt.Sprintf("chat-%d", now.UnixNano())}
 	}
 	plan := chat.PlanContext(state.summary, state.messages, m.maxMsgs, exists && now.Sub(state.lastSeenAt) > m.timeout)
-	if len(plan.Older) > 0 {
+	if now.Before(state.compactionRetryAt) {
+		lifecycle.CompactionFallback = "retry_cooldown"
+	} else if len(plan.Older) > 0 {
 		summary, err := summarize(ctx, plan)
-		if err != nil {
-			return lifecycle, nil, fmt.Errorf("compact conversation context: %w", err)
+		// Caller cancellation remains terminal even if the summary provider ignores it.
+		if ctx.Err() != nil {
+			return lifecycle, nil, ctx.Err()
 		}
-		state.summary, err = chat.ValidateSummary(summary)
-		if err != nil {
-			return lifecycle, nil, err
+		reason := "provider_error"
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason = "summary_timeout"
 		}
-		state.messages = cloneMessages(plan.Recent)
-		lifecycle.Compacted = true
+		if err == nil {
+			summary, err = chat.ValidateSummary(summary)
+			reason = "invalid_summary"
+		}
+		if err != nil {
+			lifecycle.CompactionFallback = reason
+			state.compactionRetryAt = m.nowFn().Add(compactionRetryDelay)
+		} else {
+			state.summary = summary
+			state.messages = cloneMessages(plan.Recent)
+			state.compactionRetryAt = time.Time{}
+			lifecycle.Compacted = true
+		}
 	}
 	state.lastSeenAt = now
 	state.messages = append(state.messages, chatMessage{Role: "user", Content: strings.TrimSpace(content)})
@@ -125,6 +146,14 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	m.mu.Unlock()
 	lifecycle.SessionID = state.id
 	history := cloneMessages(state.messages)
+	if lifecycle.CompactionFallback != "" {
+		// Keep all raw turns in the checkpoint; only the inference projection is reduced.
+		recent, omitted := chat.RecoveryContext(state.messages[:len(state.messages)-1], m.maxMsgs)
+		history = append(recent, state.messages[len(state.messages)-1])
+		if omitted {
+			history = append([]chatMessage{chat.OmittedContextNotice()}, history...)
+		}
+	}
 	if state.summary != "" {
 		history = append([]chatMessage{chat.SummaryContext(state.summary)}, history...)
 	}

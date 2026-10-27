@@ -112,8 +112,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		return nil, err
 	}
 	verifiedOwner := event.Source == core.SourceDiscord && boolFromContext(event.Context, "is_owner")
-	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d compacted=%t owner_verified=%t reset_reason=%q",
-		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, verifiedOwner, lifecycle.Reason))
+	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d compacted=%t compaction_fallback=%q owner_verified=%t reset_reason=%q",
+		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.CompactionFallback, verifiedOwner, lifecycle.Reason))
 	var sources []knowledgeSource
 	var result map[string]any
 	if identityReply := chat.OwnerIdentityReply(content, verifiedOwner); identityReply != "" {

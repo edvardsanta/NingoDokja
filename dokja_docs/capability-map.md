@@ -168,12 +168,15 @@ The orchestrator requests a summary through the configured inference integration
 merges previous summary context, and retains up to eight recent turns verbatim
 within 16 KiB of recent context.
 The summary is bounded to 4,096 UTF-8 bytes and supplied as explicitly untrusted
-user-level context. Failed or invalid summaries leave the original state intact
-and fail that request; they never silently discard history or emit a success notice.
+user-level context. Failed or invalid summaries preserve the last valid summary
+and pending raw history, then continue with a bounded recent projection and a
+one-minute retry cooldown. They never silently discard history or claim successful
+compaction.
 Per-session generation is serialized, while unrelated sessions remain independent.
 The orchestrator stores non-archived session snapshots in `dokja_chat_sessions.db`
 beside `DOKJA_DB_FILE`, or under `.dokja/` when unset. The separate versioned
-SQLite file stores summaries and recent user/assistant turns and reloads them after
+SQLite file stores the last valid summary and unsummarized user/assistant turns,
+including pending raw history after failed compaction, and reloads them after
 restart. Storage errors fail explicitly without a volatile fallback. Explicit new
 sessions clear the relevant snapshot; only a verified owner may reset a shared
 channel scope. Identity and system instructions are rebuilt per turn, never restored
@@ -212,6 +215,12 @@ names. Non-owner speakers receive an explicit negative verification note. The
 provider adapter distinguishes application system messages from identity claims
 inside user text, quotes and summaries, with unchanged no-tools controls. These
 delivery regressions do not guarantee every model follows the supplied context.
+
+Failed context compaction is recoverable: the chat domain selects a bounded
+recent projection while the orchestrator retains pending raw history and the last
+valid summary. A one-minute volatile cooldown prevents per-turn summary retries;
+caller cancellation and durable storage failures still stop the turn. See the
+[operational policy](production-runbook.md#chat-context).
 
 The chat handler opens/touches a session, retrieves optional Knowledge context,
 and resolves article requests through the Digest domain's cached Feeds items. A
