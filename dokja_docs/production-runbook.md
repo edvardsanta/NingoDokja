@@ -548,7 +548,9 @@ The lite and dev voice commands use `main.py --reload`: Uvicorn watches only the
 speech service's Python source directory and creates providers in the reload
 worker. Model-cache changes do not restart it. Application timing logs remain
 configured after each reload. Discord uses its existing `tsx watch` process and
-the orchestrator uses Air. Production continues running without source reload.
+the orchestrator uses Air, watching `dokja_orch`, `dokja_domain`, and `dokja_store`
+so changes in replaced Go modules also trigger a rebuild. Its process working
+directory remains `dokja_orch`. Production continues without source reload.
 During development, a Python reload briefly reloads speech models; changes to
 Discord code restart its listener, so run `/voice_chat_start` again afterward.
 
