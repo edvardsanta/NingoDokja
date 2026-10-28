@@ -620,20 +620,23 @@ and pending transcripts are bounded to 32 each. Capacity errors are logged.
 
 The Chat domain records incidental speech without generating replies or running
 model summaries. Starting `/voice_chat_start` opens the exchange for the person who invoked it,
-so an immediate `teste` works without a second wake phrase. Calling `Ningo` or
+so an immediate `teste` works without a second wake phrase. The starter remains
+engaged for the listener session, including after long pauses. Calling `Ningo` or
 `Dokja` opens or reopens a conversational exchange.
-The addressed speaker can follow up without repeating the name for 30 seconds;
+Other addressed speakers can follow up without repeating the name for 30 seconds;
 that window includes estimated playback duration. Another participant can join
 with a clear question or continuation during a 12-second handoff window.
 Acknowledgments such as `uhum`, `ok` and `sim` remain context and do not invoke
-inference or extend engagement. The engagement window is transient; after a
-restart, address Ningo again. This eligibility grants no account authority.
+inference or extend engagement. Engagement is transient; listener metadata
+reestablishes the starter after an orchestrator restart. This eligibility grants
+no account authority.
 
 Ningo finishes each spoken reply while continuing to capture human speech.
 Speech heard during generation or playback is combined into the next room turn.
 It does not pause playback, cancel inference, or start overlapping replies.
 `/voice_chat_stop`, explicit session shutdown and transport loss still cancel
-outstanding work. The default spoken answer is one sentence, capped at 45 words;
+outstanding work. Voice uses the complete shared Ningo persona with a spoken
+presentation. Default replies allow up to three sentences and 90 words;
 explicit requests for detail allow a longer explanation. A long explanation is
 synthesized sentence by sentence with one sentence prepared ahead, so the first
 can play before synthesis of the whole answer finishes.
@@ -644,7 +647,7 @@ No token-level speech streaming or subsecond end-to-end guarantee is established
 The authenticated `/orchestrator/voice/chat/stream` endpoint sends keepalives and
 an optional `accepted` eligibility frame, then the final reply. The gateway
 sends a bounded listener ID and starter identity; repeated metadata for the same
-listener cannot refresh an expired window. Starter identity affects eligibility
+listener cannot replace its starter. Starter identity affects eligibility
 only, never current-speaker verification or permissions. A disconnected
 requester cancels its inference context and releases the room session lock.
 

@@ -51,7 +51,7 @@ func TestPassiveVoiceHistoryDoesNotInferOrCompactButIsUsedWhenAddressed(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g.calls != 1 || result["reply"] != "One sentence." {
+	if g.calls != 1 || result["reply"] != "One sentence. Extra sentence." {
 		t.Fatal("addressed reply was not concise", g.calls, result)
 	}
 	var combined strings.Builder

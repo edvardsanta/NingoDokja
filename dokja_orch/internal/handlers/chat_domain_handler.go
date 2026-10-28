@@ -255,9 +255,10 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 			if callback == nil {
 				return
 			}
-			sentences := completeVoiceSentences(text)
+			complete := strings.Join(completeVoiceSentences(text), " ")
+			sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, boolFromContext(event.Context, "voice_detailed")))
 			for emitted < len(sentences) {
-				if emitted >= 1 && !boolFromContext(event.Context, "voice_detailed") {
+				if emitted >= chat.VoiceDefaultMaxSentences && !boolFromContext(event.Context, "voice_detailed") {
 					return
 				}
 				callback(sentences[emitted])

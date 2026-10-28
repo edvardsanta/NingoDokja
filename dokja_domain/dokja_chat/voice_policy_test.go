@@ -69,13 +69,13 @@ func TestVoicePolicyRequestsDetailOnlyWhenExplicit(t *testing.T) {
 			t.Fatal(tc, result)
 		}
 	}
-	if reply := ConciseSpokenReply("The value is 3.14. Another sentence.", false); reply != "The value is 3.14." {
+	if reply := ConciseSpokenReply("The value is 3.14. Another sentence. Third sentence. Fourth sentence.", false); reply != "The value is 3.14. Another sentence. Third sentence." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply("First. Second.", true); reply != "First. Second." {
+	if reply := ConciseSpokenReply("First. Second. Third. Fourth.", true); reply != "First. Second. Third. Fourth." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), false); len(strings.Fields(reply)) != 45 {
+	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), false); len(strings.Fields(reply)) != 90 {
 		t.Fatal("long spoken default was not bounded")
 	}
 }

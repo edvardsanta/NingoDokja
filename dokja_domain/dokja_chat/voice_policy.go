@@ -10,6 +10,8 @@ import (
 
 const VoiceFollowupWindow = 30 * time.Second
 const VoiceHandoffWindow = 12 * time.Second
+const VoiceDefaultMaxSentences = 3
+const VoiceDefaultMaxWords = 90
 
 // VoiceDecision is conversational eligibility, independent of account authority.
 type VoiceDecision struct {
@@ -191,15 +193,19 @@ func ConciseSpokenReply(reply string, detailed bool) string {
 		return reply
 	}
 	runes := []rune(strings.TrimSpace(reply))
+	sentences := 0
 	for i, r := range runes {
 		if (r == '.' || r == '!' || r == '?') && (i+1 == len(runes) || unicode.IsSpace(runes[i+1])) {
-			reply = string(runes[:i+1])
-			break
+			sentences++
+			if sentences == VoiceDefaultMaxSentences {
+				reply = string(runes[:i+1])
+				break
+			}
 		}
 	}
 	words := strings.Fields(reply)
-	if len(words) > 45 {
-		return strings.Join(words[:45], " ") + "."
+	if len(words) > VoiceDefaultMaxWords {
+		return strings.Join(words[:VoiceDefaultMaxWords], " ") + "."
 	}
 	return reply
 }

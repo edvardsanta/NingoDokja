@@ -15,7 +15,8 @@ func (g *voiceStreamGenerator) GenerateVoiceMessagesStream(_ context.Context, _ 
 	g.calls++
 	onText("A primeira resposta chegou.")
 	onText("A primeira resposta chegou. E a conversa continua.")
-	return map[string]any{"reply": "A primeira resposta chegou. E a conversa continua."}, nil
+	onText("A primeira resposta chegou. E a conversa continua. Agora cabe um argumento. A quarta espera detalhes.")
+	return map[string]any{"reply": "A primeira resposta chegou. E a conversa continua. Agora cabe um argumento. A quarta espera detalhes."}, nil
 }
 
 func TestAddressedVoiceUsesDedicatedGeneratorAndStreamsOnlyUsableShortSpeech(t *testing.T) {
@@ -29,10 +30,10 @@ func TestAddressedVoiceUsesDedicatedGeneratorAndStreamsOnlyUsableShortSpeech(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if voice.calls != 1 || !reflect.DeepEqual(spoken, []string{"A primeira resposta chegou."}) {
+	if voice.calls != 1 || !reflect.DeepEqual(spoken, []string{"A primeira resposta chegou.", "E a conversa continua.", "Agora cabe um argumento."}) {
 		t.Fatalf("voice calls=%d streamed=%q", voice.calls, spoken)
 	}
-	if result["reply"] != "A primeira resposta chegou." {
+	if result["reply"] != "A primeira resposta chegou. E a conversa continua. Agora cabe um argumento." {
 		t.Fatalf("spoken final reply was not concise: %#v", result["reply"])
 	}
 }
@@ -63,6 +64,9 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	}
 	if strings.Contains(personaForEvent(event), discordReplyPresentation) || !strings.Contains(personaForEvent(event), "live Discord voice") {
 		t.Fatal("voice got text formatting instructions")
+	}
+	if !strings.Contains(personaForEvent(event), chatPersona) {
+		t.Fatal("voice lost Ningo's shared personality and conversational judgment")
 	}
 }
 
