@@ -189,6 +189,8 @@ export function createCommands(
 
         await context.reply("Starting voice conversation...", { ephemeral: true });
 
+        const voiceSessionId = randomUUID();
+
         void voice
           .startConversation({
             guildId: context.guildId,
@@ -199,12 +201,19 @@ export function createCommands(
               if (!turn) throw new Error("Voice speaker metadata is required");
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
+                voiceSessionId, voiceStartedBy: context.userId,
               });
               turn.signal.throwIfAborted();
-              if (reply.trim()) await voice.speakText({
-                guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
-                originChannelId: context.channelId, text: reply, signal: turn.signal,
-              });
+              if (reply.trim()) {
+                const speech = {
+                  guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
+                  originChannelId: context.channelId, text: reply, signal: turn.signal,
+                  waitForFloor: turn.waitForFloor,
+                };
+                await turn.waitForFloor?.();
+                if (voice.speakReply) await voice.speakReply(speech);
+                else await voice.speakText(speech);
+              }
             },
           })
           .then((reply) => context.updateReply(reply))
@@ -228,6 +237,8 @@ export function createCommands(
 
         await context.reply("Starting wake-word voice conversation...", { ephemeral: true });
 
+        const voiceSessionId = randomUUID();
+
         void voice
           .startConversation({
             guildId: context.guildId,
@@ -238,12 +249,19 @@ export function createCommands(
               if (!turn) throw new Error("Voice speaker metadata is required");
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
+                voiceSessionId, voiceStartedBy: context.userId,
               });
               turn.signal.throwIfAborted();
-              if (reply.trim()) await voice.speakText({
-                guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
-                originChannelId: context.channelId, text: reply, signal: turn.signal,
-              });
+              if (reply.trim()) {
+                const speech = {
+                  guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
+                  originChannelId: context.channelId, text: reply, signal: turn.signal,
+                  waitForFloor: turn.waitForFloor,
+                };
+                await turn.waitForFloor?.();
+                if (voice.speakReply) await voice.speakReply(speech);
+                else await voice.speakText(speech);
+              }
             },
           })
           .then((reply) => context.updateReply(reply))

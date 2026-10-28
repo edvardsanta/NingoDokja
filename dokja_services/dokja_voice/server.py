@@ -6,6 +6,8 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from audio_utils import wav_bytes_to_mono_16k
+from speech_activity import SpeechDetector
 from piper_tts_service import PiperTTSService
 from openwakeword_service import OpenWakeWordService
 from streaming import (
@@ -125,6 +127,7 @@ def create_app() -> FastAPI:
             hotword=os.getenv("DOKJA_VOICE_WAKEWORD_HOTWORD", "Ningo"),
         )
 
+    speech_detector = SpeechDetector()
     app = FastAPI(lifespan=lifespan)
 
     @app.get("/health")
@@ -201,6 +204,18 @@ def create_app() -> FastAPI:
             "audio_format": payload.audio_format,
             "language": payload.language,
         }
+
+    @app.post("/activity")
+    def activity(payload: STTRequest) -> dict:
+        try:
+            audio = decode_audio_b64(payload.audio_bytes_b64)
+            pcm = wav_bytes_to_mono_16k(audio)
+            # Activity probes carry at most 640 ms; this endpoint never runs ASR.
+            if len(pcm) > 10240:
+                raise ValueError("activity probe exceeds 640 ms")
+            return {"status": "ok", **speech_detector.detect(pcm, strict=True)}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/wakeword")
     async def wakeword(payload: WakewordRequest, request: Request) -> dict:

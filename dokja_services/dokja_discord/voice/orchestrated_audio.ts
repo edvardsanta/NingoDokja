@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { buildBridgePayload } from "../transport/bridge.js";
 
 export async function voiceAudioRequest(endpoint: string | undefined,
-  action: "synthesize" | "transcribe" | "wakeword",
+  action: "synthesize" | "transcribe" | "wakeword" | "activity",
   input: { guildId: string; userId: string; channelId: string; text?: string;
     audio_bytes_b64?: string; hotword?: string }, signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
@@ -15,7 +15,7 @@ export async function voiceAudioRequest(endpoint: string | undefined,
     hotword: input.hotword, language: "pt-BR" };
   const response = await fetch(endpoint, { method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}` },
-    body: JSON.stringify(body), signal: AbortSignal.any([AbortSignal.timeout(15_000), ...(signal ? [signal] : [])]),
+    body: JSON.stringify(body), signal: AbortSignal.any([AbortSignal.timeout(action === "activity" ? 1500 : 15_000), ...(signal ? [signal] : [])]),
   });
   if (!response.ok) throw new Error(`Voice orchestration failed: ${response.status}`);
   const result = await response.json() as { status: string; voice?: Record<string, unknown> };

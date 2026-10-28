@@ -24,7 +24,7 @@ func NewVoiceServiceClient(endpoint string) *VoiceServiceClient {
 	return &VoiceServiceClient{strings.TrimRight(endpoint, "/"), &http.Client{Timeout: 15 * time.Second}}
 }
 func (c *VoiceServiceClient) Invoke(ctx context.Context, operation string, payload map[string]any) (map[string]any, error) {
-	if operation != "tts" && operation != "stt" && operation != "wakeword" {
+	if operation != "tts" && operation != "stt" && operation != "wakeword" && operation != "activity" {
 		return nil, fmt.Errorf("unsupported voice operation")
 	}
 	encoded, err := json.Marshal(payload)

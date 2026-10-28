@@ -34,6 +34,8 @@ import { toMessageReply } from "../runtime/discordjs_runtime.js";
 import type { DiscordReply } from "../types.js";
 import { LiveConversation, type VoiceTurnContext } from "./live_conversation.js";
 import { voiceAudioRequest } from "./orchestrated_audio.js";
+import { SpeechActivity } from "./speech_activity.js";
+import { playSpeechQueue } from "./speech_queue.js";
 
 // How long Ningo waits, alone in a voice channel, before leaving it.
 export const ALONE_GRACE_MS = 3 * 60_000;
@@ -83,10 +85,21 @@ type ListeningSession = {
   stop(): void;
 };
 
+type SpeakParams = {
+  guildId?: string;
+  userId: string;
+  text: string;
+  channelId?: string;
+  originChannelId?: string;
+  signal?: AbortSignal;
+  waitForFloor?: () => Promise<void>;
+};
+
 export type DiscordVoiceController = {
   attachClient(client?: unknown, botUserId?: string): void;
   playRadio(params: { guildId?: string; userId: string; streamUrl: string }): Promise<string>;
-  speakText(params: { guildId?: string; userId: string; text: string; channelId?: string; originChannelId?: string; signal?: AbortSignal }): Promise<string>;
+  speakText(params: SpeakParams): Promise<string>;
+  speakReply?(params: SpeakParams): Promise<void>;
   startConversation(params: {
     guildId?: string;
     userId: string;
@@ -297,6 +310,120 @@ export function createDiscordVoiceController(options: {
     return music;
   };
 
+  async function renderSpeech({ guildId, userId, text, channelId, originChannelId, signal, waitForFloor,
+    preparedAudio, waitForEnd,
+  }: SpeakParams & { preparedAudio?: Buffer; waitForEnd?: boolean }): Promise<string> {
+    if (!guildId) {
+      throw new Error("Speech playback only works in guild voice channels");
+    }
+    const trimmed = text.trim();
+    if (!trimmed) {
+      throw new Error("Speech text cannot be empty");
+    }
+
+    signal?.throwIfAborted();
+    const client = await ensureVoiceClient();
+    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+    const voiceChannel = channelId
+      ? guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId)
+      : (await fetchVoiceMember(client, guildId, userId)).voice.channel;
+
+    if (!voiceChannel) {
+      throw new Error("Join a voice channel before asking Ningo to speak");
+    }
+    if (
+      voiceChannel.type !== ChannelType.GuildVoice &&
+      voiceChannel.type !== ChannelType.GuildStageVoice
+    ) {
+      throw new Error("Speech playback only works in voice channels");
+    }
+
+    const wavBytes = preparedAudio ?? Buffer.from((await voiceAudioRequest(
+      options.orchestratorEndpoint, "synthesize", {
+        guildId, userId, channelId: originChannelId ?? voiceChannel.id, text: trimmed,
+      }, signal,
+    )).audio_bytes_b64 as string, "base64");
+    signal?.throwIfAborted();
+    const tempDir = mkdtempSync(join(tmpdir(), "dokja-voice-"));
+    const tempPath = join(tempDir, "speech.wav");
+    writeFileSync(tempPath, wavBytes);
+
+    const session = await ensureVoiceSession({
+      sessions,
+      guildId,
+      voiceChannel,
+      readyTimeoutMs,
+      log: options.log,
+      error: options.error,
+    });
+    const stream = createFileAudioSession(tempPath, {
+      ffmpegPath,
+      log: options.log,
+      error: options.error,
+    });
+
+    if (signal?.aborted) { stream.stop(); signal.throwIfAborted(); }
+    replaceSessionStream(session, stream);
+    // Only explicit session cancellation stops playback. Human speech keeps
+    // accumulating for the next turn while this reply finishes.
+    const abortPlayback = () => {
+      if (session.stream === stream) interruptSessionPlayback(session);
+    };
+    signal?.addEventListener("abort", abortPlayback, { once: true });
+    session.player.once(AudioPlayerStatus.Idle, () => signal?.removeEventListener("abort", abortPlayback));
+    // Speech pauses the music and gives the connection back to it when it ends (owner, 2026-10-26).
+    const music = musics.get(guildId);
+    if (music?.playing !== undefined) {
+      music.speaking = true;
+      music.player.pause();
+      session.connection.subscribe(session.player);
+      session.player.once(AudioPlayerStatus.Idle, () => {
+        music.speaking = false;
+        if (musics.get(guildId) !== music || music.playing === undefined) return;
+        session.connection.subscribe(music.player);
+        if (!music.userPaused && !music.away) music.player.unpause();
+      });
+    }
+    await waitForFloor?.();
+    signal?.throwIfAborted();
+    session.player.play(stream.resource);
+
+    try {
+      await entersState(session.player, AudioPlayerStatus.Playing, 15_000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      options.error?.(
+        "[dokja-discord] speech player failed to start",
+        JSON.stringify({
+          guildId,
+          voiceChannelId: voiceChannel.id,
+          connectionStatus: session.connection.state.status,
+          playerStatus: session.player.state.status,
+          error: message,
+        }),
+      );
+      stream.stop();
+      if (session.connection.state.status === VoiceConnectionStatus.Destroyed) {
+        sessions.delete(guildId);
+      }
+      throw new Error("Joined the voice channel, but speech playback did not start.");
+    }
+
+    sessions.set(guildId, session);
+    options.log?.(
+      "[dokja-discord] speech started",
+      JSON.stringify({ guildId, voiceChannelId: voiceChannel.id, textChars: trimmed.length }),
+    );
+    if (waitForEnd) {
+      const done = AbortSignal.any([
+        AbortSignal.timeout(120_000), ...(signal ? [signal] : []),
+      ]);
+      await entersState(session.player, AudioPlayerStatus.Idle, done);
+      stream.stop();
+    }
+    return `Speaking in <#${voiceChannel.id}>`;
+  }
+
   return {
     attachClient(_client?: unknown) {
       void ensureVoiceClient();
@@ -370,106 +497,23 @@ export function createDiscordVoiceController(options: {
       );
       return `Playing radio in <#${voiceChannel.id}>`;
     },
-    async speakText({ guildId, userId, text, channelId, originChannelId, signal }) {
-      if (!guildId) {
-        throw new Error("Speech playback only works in guild voice channels");
-      }
-      const trimmed = text.trim();
-      if (!trimmed) {
-        throw new Error("Speech text cannot be empty");
-      }
-
-      signal?.throwIfAborted();
-      const client = await ensureVoiceClient();
-      const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
-      const voiceChannel = channelId
-        ? guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId)
-        : (await fetchVoiceMember(client, guildId, userId)).voice.channel;
-
-      if (!voiceChannel) {
-        throw new Error("Join a voice channel before asking Ningo to speak");
-      }
-      if (
-        voiceChannel.type !== ChannelType.GuildVoice &&
-        voiceChannel.type !== ChannelType.GuildStageVoice
-      ) {
-        throw new Error("Speech playback only works in voice channels");
-      }
-
-      const audio = await voiceAudioRequest(options.orchestratorEndpoint, "synthesize", {
-        guildId, userId, channelId: originChannelId ?? voiceChannel.id, text: trimmed,
-      }, signal);
-      const wavBytes = Buffer.from(audio.audio_bytes_b64 as string, "base64");
-      signal?.throwIfAborted();
-      const tempDir = mkdtempSync(join(tmpdir(), "dokja-voice-"));
-      const tempPath = join(tempDir, "speech.wav");
-      writeFileSync(tempPath, wavBytes);
-
-      const session = await ensureVoiceSession({
-        sessions,
-        guildId,
-        voiceChannel,
-        readyTimeoutMs,
-        log: options.log,
-        error: options.error,
+    speakText: renderSpeech,
+    async speakReply(params) {
+      if (!params.guildId) throw new Error("Speech playback only works in guild voice channels");
+      await playSpeechQueue(params.text, {
+        signal: params.signal,
+        waitForFloor: params.waitForFloor,
+        prepare: async (text) => {
+          const audio = await voiceAudioRequest(options.orchestratorEndpoint, "synthesize", {
+            guildId: params.guildId!, userId: params.userId,
+            channelId: params.originChannelId ?? params.channelId!, text,
+          }, params.signal);
+          return Buffer.from(audio.audio_bytes_b64 as string, "base64");
+        },
+        play: async (text, preparedAudio) => {
+          await renderSpeech({ ...params, text, preparedAudio, waitForEnd: true });
+        },
       });
-      const stream = createFileAudioSession(tempPath, {
-        ffmpegPath,
-        log: options.log,
-        error: options.error,
-      });
-
-      if (signal?.aborted) { stream.stop(); signal.throwIfAborted(); }
-      replaceSessionStream(session, stream);
-      // The listener interrupts playback on new human speech; cancellation also
-      // covers a stop/restart while synthesis or connection setup was in flight.
-      const abortPlayback = () => {
-        if (session.stream === stream) interruptSessionPlayback(session);
-      };
-      signal?.addEventListener("abort", abortPlayback, { once: true });
-      session.player.once(AudioPlayerStatus.Idle, () => signal?.removeEventListener("abort", abortPlayback));
-      // Speech pauses the music and gives the connection back to it when it ends (owner, 2026-10-26).
-      const music = musics.get(guildId);
-      if (music?.playing !== undefined) {
-        music.speaking = true;
-        music.player.pause();
-        session.connection.subscribe(session.player);
-        session.player.once(AudioPlayerStatus.Idle, () => {
-          music.speaking = false;
-          if (musics.get(guildId) !== music || music.playing === undefined) return;
-          session.connection.subscribe(music.player);
-          if (!music.userPaused && !music.away) music.player.unpause();
-        });
-      }
-      session.player.play(stream.resource);
-
-      try {
-        await entersState(session.player, AudioPlayerStatus.Playing, 15_000);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        options.error?.(
-          "[dokja-discord] speech player failed to start",
-          JSON.stringify({
-            guildId,
-            voiceChannelId: voiceChannel.id,
-            connectionStatus: session.connection.state.status,
-            playerStatus: session.player.state.status,
-            error: message,
-          }),
-        );
-        stream.stop();
-        if (session.connection.state.status === VoiceConnectionStatus.Destroyed) {
-          sessions.delete(guildId);
-        }
-        throw new Error("Joined the voice channel, but speech playback did not start.");
-      }
-
-      sessions.set(guildId, session);
-      options.log?.(
-        "[dokja-discord] speech started",
-        JSON.stringify({ guildId, voiceChannelId: voiceChannel.id, textChars: trimmed.length }),
-      );
-      return `Speaking in <#${voiceChannel.id}>`;
     },
     async postMessage({ channelId, message }) {
       const client = await ensureVoiceClient();
@@ -697,7 +741,7 @@ export function createListeningSession(params: {
     const participant = params.participant(speakingUserId);
     if (stopped || !participant || activeStreams.has(speakingUserId)
       || activeStreams.size >= MAX_VOICE_SPEAKERS) return;
-    let sequence = conversation.begin();
+    let sequence = conversation.begin(false);
     const opusStream = params.session.connection.receiver.subscribe(speakingUserId, {
       end: { behavior: EndBehaviorType.AfterSilence, duration: VOICE_SILENCE_MS },
     });
@@ -705,8 +749,13 @@ export function createListeningSession(params: {
     let chunks: Buffer[] = [];
     let bytes = 0;
     let finished = false;
-    const enqueue = (seq: number, audio: Buffer) => {
-      if (stopped || audio.length < 19_200) { conversation.finish(seq); return; }
+    let activity = new SpeechActivity();
+    let hasSpeech = false;
+    let lastSpeechByte = 0;
+    let lastProbeByte = 0;
+    let probing = false;
+    const enqueue = (seq: number, audio: Buffer, speech: boolean) => {
+      if (stopped || !speech || audio.length < 48_000) { conversation.finish(seq); return; }
       if (jobs.length >= 32) {
         conversation.finish(seq);
         params.error?.("[dokja-discord] voice transcription capacity reached");
@@ -736,21 +785,55 @@ export function createListeningSession(params: {
       });
       drain();
     };
+    const flushSegment = () => {
+      const current = sequence;
+      sequence = conversation.begin(false);
+      enqueue(current, Buffer.concat(chunks, bytes), activity.transcribable);
+      chunks = []; bytes = 0;
+      activity = new SpeechActivity();
+      hasSpeech = false;
+      lastSpeechByte = 0;
+      lastProbeByte = 0;
+    };
+    const probeSpeech = () => {
+      const probeBytes = 61_440; // 320 ms of Discord stereo PCM
+      if (probing || bytes - lastProbeByte < probeBytes || !activity.transcribable) return;
+      const current = sequence;
+      const probeEnd = bytes;
+      const audio = Buffer.concat(chunks, bytes).subarray(Math.max(0, bytes - probeBytes));
+      lastProbeByte = bytes;
+      probing = true;
+      void voiceAudioRequest(params.orchestratorEndpoint, "activity", {
+        guildId: params.guildId, ...participant, channelId: params.originChannelId,
+        audio_bytes_b64: buildWavFromPCM(audio).toString("base64"),
+      }, lifetime.signal).then(result => {
+        if (stopped || finished || current !== sequence) return;
+        if (result.speech === true) {
+          hasSpeech = true;
+          lastSpeechByte = probeEnd;
+          conversation.voiceActivity(current);
+        } else if (hasSpeech && probeEnd - lastSpeechByte >= 122_880) {
+          // End an utterance even if Discord keeps sending background-noise packets.
+          flushSegment();
+        }
+      }).catch(error => {
+        if (!lifetime.signal.aborted) params.error?.("[dokja-discord] voice activity probe failed", error);
+      }).finally(() => { probing = false; });
+    };
     const finalize = () => {
       if (finished) return;
       finished = true;
       activeStreams.delete(speakingUserId);
-      enqueue(sequence, Buffer.concat(chunks, bytes));
+      enqueue(sequence, Buffer.concat(chunks, bytes), activity.transcribable);
       chunks = []; bytes = 0;
     };
     decoder.on("data", (chunk: Buffer) => {
       if (stopped) return;
       chunks.push(Buffer.from(chunk)); bytes += chunk.length;
+      activity.push(chunk);
+      probeSpeech();
       if (bytes >= VOICE_SEGMENT_BYTES) {
-        const current = sequence;
-        sequence = conversation.begin();
-        enqueue(current, Buffer.concat(chunks, bytes));
-        chunks = []; bytes = 0;
+        flushSegment();
       }
     });
     decoder.once("end", finalize);

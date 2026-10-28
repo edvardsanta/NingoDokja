@@ -33,3 +33,15 @@ test("an intentional silent decision stays silent",async()=>{
  globalThis.fetch=async()=>new Response('{"status":"ok"}\n');
  try{assert.equal(await conversationReply("http://orch",1000,{guildId:"g",originChannelId:"text",turn:{userId:"a",channelId:"room",signal:new AbortController().signal,turns:[{userId:"a",text:"hi",sequence:0}]}}),"");}finally{globalThis.fetch=previous;}
 });
+
+
+test("explicit listener metadata opens an exchange without replacing the actual speaker",async()=>{
+ const previous=globalThis.fetch;
+ globalThis.fetch=async(_,init)=>{
+  const body=JSON.parse(String(init?.body));
+  assert.equal(body.payload.userId,"actual-speaker");assert.equal(body.payload.voiceStartedBy,"starter");assert.equal(body.payload.voiceSessionId,"listener-one");
+  return new Response('{"accepted":true}\n{"status":"ok","reply":"ready"}\n');
+ };
+ let eligible:boolean|undefined;
+ try{await conversationReply("http://orch",1000,{guildId:"g",originChannelId:"text",voiceSessionId:"listener-one",voiceStartedBy:"starter",turn:{userId:"actual-speaker",channelId:"room",signal:new AbortController().signal,turns:[{userId:"actual-speaker",text:"teste",sequence:0}],decide(value){eligible=value;}}});assert.equal(eligible,true);}finally{globalThis.fetch=previous;}
+});

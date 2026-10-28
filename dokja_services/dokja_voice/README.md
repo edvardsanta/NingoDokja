@@ -2,12 +2,12 @@
 
 Standalone FastAPI service for Dokja voice synthesis.
 
-This is the first scaffold for voice support.
+Local speech providers for synthesis, recognition and speech-activity detection.
 
 Current status:
 
-- TTS only
-- no STT
+- Piper TTS and Whisper STT
+- WebRTC speech detection before Whisper and for short activity probes
 - supports streaming TTS over WebSocket
 - supports:
   - a local stub synthesizer
@@ -18,6 +18,7 @@ Endpoints:
 - `GET /health`
 - `POST /tts`
 - `POST /stt`
+- `POST /activity`: a WAV probe up to 640 ms; returns `speech`, `speech_ms` and `speech_ratio`
 - `WS /tts/stream`
 
 ## Request
@@ -200,3 +201,18 @@ The service buffers incoming text and synthesizes as soon as:
 - or the buffered text reaches the configured threshold
 
 That keeps the protocol ready for real-time conversational streaming while staying compatible with the current Piper backend.
+
+## Continuous Discord listening
+
+Install both `requirements.txt` and `requirements-vad.txt`; both Dockerfiles do
+this. Activity probes use WebRTC VAD in aggressive mode. Whisper rejects silence,
+short segments and non-speech before bounded deterministic decoding. This avoids
+using a language decoder as a noise detector. STT runs outside the HTTP event
+loop with serialized access to the shared model.
+
+The service detects speech; the Chat domain decides whether to answer. The
+Discord adapter keeps capturing speech while finishing playback, then submits
+the collected next turn. Voice requests pass through the orchestrator.
+
+Run provider regressions in an environment with the service dependencies:
+`python -m unittest discover -s dokja_services/dokja_voice -p 'test_*.py' -v`.

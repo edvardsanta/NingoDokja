@@ -7,6 +7,7 @@ import type { VoiceTurnContext } from "./live_conversation.js";
 // reply can become speech; speculative previews are never spoken.
 export async function conversationReply(endpoint: string, timeoutMs: number, input: {
   guildId?: string; originChannelId: string; turn: VoiceTurnContext;
+  voiceSessionId?: string; voiceStartedBy?: string;
 }): Promise<string> {
   const { turn } = input;
   turn.signal.throwIfAborted();
@@ -17,6 +18,8 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
   });
   body.payload.voiceTurns = turn.turns.map(({userId,userName,text})=>({userId,userName,text}));
   body.payload.voiceChannelId = turn.channelId;
+  body.payload.voiceSessionId = input.voiceSessionId;
+  body.payload.voiceStartedBy = input.voiceStartedBy;
   const response = await fetch(`${endpoint.replace(/\/$/, "")}/voice/chat/stream`, {
     method: "POST", headers: { "content-type": "application/json",
       authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}` },
@@ -26,6 +29,8 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let decided = false;
+  let accepted = false;
   try {
     while (true) {
       const {value,done} = await reader.read();
@@ -36,10 +41,18 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
       while ((newline=buffer.indexOf("\n"))>=0) {
         const line = buffer.slice(0,newline); buffer=buffer.slice(newline+1);
         if (!line.trim()) continue;
-        const frame = JSON.parse(line) as { heartbeat?: boolean; status?: string; reply?: string; error?: string };
+        const frame = JSON.parse(line) as { heartbeat?: boolean; accepted?: boolean; status?: string; reply?: string; error?: string };
         if (frame.heartbeat) continue;
+        if (typeof frame.accepted === "boolean") {
+          turn.decide?.(frame.accepted);
+          decided = true;
+          accepted = frame.accepted;
+          continue;
+        }
         turn.signal.throwIfAborted();
         if (frame.status!=="ok" || (frame.reply !== undefined && typeof frame.reply!=="string")) throw new Error("Voice reply was refused");
+        if (decided && !accepted && frame.reply?.trim()) throw new Error("Ineligible voice turn returned speech");
+        if (!decided) turn.decide?.(Boolean(frame.reply?.trim()));
         return frame.reply ?? "";
       }
     }

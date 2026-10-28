@@ -79,6 +79,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "synthesize-voice"
 		case "voice.transcribe":
 			return "transcribe-voice"
+		case "voice.activity":
+			return "detect-voice-activity"
 		case "voice.wakeword":
 			return "detect-voice-wakeword"
 		case "communications.channels":

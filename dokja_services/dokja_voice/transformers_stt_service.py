@@ -8,6 +8,7 @@ import numpy as np
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 from audio_utils import wav_bytes_to_mono_16k
+from speech_activity import SpeechDetector
 
 
 class TransformersSTTService:
@@ -22,6 +23,7 @@ class TransformersSTTService:
 
         cache_dir = model_cache_dir.strip() if model_cache_dir else None
         self._inference_lock = threading.Lock()
+        self.speech_detector = SpeechDetector()
         self.default_language = default_language
         self.model_name = model_name
         self.processor = AutoProcessor.from_pretrained(model_name, cache_dir=cache_dir)
@@ -44,6 +46,11 @@ class TransformersSTTService:
         # packets can be rejected before Whisper tries to generate text for them.
         pcm = wav_bytes_to_mono_16k(audio_bytes)
         if pcm.size < 4000 or np.max(np.abs(pcm.astype(np.int32))) <= 32:
+            return ""
+        if not self.speech_detector.detect(pcm)["speech"]:
+            logging.getLogger("dokja_voice.stt").info(
+                "stt skipped non_speech audio_seconds=%.3f", pcm.size / 16000
+            )
             return ""
         samples = pcm.astype(np.float32) / 32768.0
         duration = samples.size / 16000

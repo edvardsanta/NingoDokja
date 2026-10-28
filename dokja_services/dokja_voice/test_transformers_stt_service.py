@@ -28,6 +28,8 @@ class TranscriptionTests(unittest.TestCase):
         self.service = TransformersSTTService.__new__(TransformersSTTService)
         self.service.default_language = "pt-BR"
         self.service._inference_lock = threading.Lock()
+        self.service.speech_detector = Mock()
+        self.service.speech_detector.detect.return_value = {"speech": True}
         self.service.pipeline = Mock(return_value={"text": "  recognized speech  "})
 
     def test_short_audio_and_digital_silence_never_reach_decoder(self):
@@ -49,6 +51,11 @@ class TranscriptionTests(unittest.TestCase):
         self.assertEqual(generation["max_new_tokens"], 24)
         self.assertFalse(generation["condition_on_prev_tokens"])
         self.assertFalse(generation["do_sample"])
+
+    def test_non_speech_never_reaches_whisper(self):
+        self.service.speech_detector.detect.return_value = {"speech": False}
+        self.assertEqual(self.service.transcribe(wav_bytes(2), "wav", "pt-BR"), "")
+        self.service.pipeline.assert_not_called()
 
     def test_decode_budget_has_an_absolute_cap(self):
         self.service.transcribe(wav_bytes(20, channels=1, rate=16000), "wav", "en")
