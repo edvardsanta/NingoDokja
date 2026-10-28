@@ -15,9 +15,11 @@ function pcm(bytes:number){
 test("listener captures every human independently, ignores bots, and stops outstanding work",async()=>{
  const previous=globalThis.fetch;
  const speaking=new EventEmitter();const streams=new Map<string,PassThrough>();
- const replies:VoiceTurnContext[]=[];const requests:any[]=[];
+ const replies:VoiceTurnContext[]=[];const requests:any[]=[];let releaseFirst!:()=>void;
+ const firstRecognition=new Promise<void>(resolve=>releaseFirst=resolve);
  globalThis.fetch=async(_url,init)=>{
   const body=JSON.parse(String(init?.body));requests.push(body);
+  if(body.payload.userId==="a")await firstRecognition;
   return new Response(JSON.stringify({status:"ok",voice:{text:`speech ${body.payload.userId}`}}));
  };
  const session:any={channelId:"room",player:{stop(){},pause(){},unpause(){},state:{status:"idle"}},stream:{stop(){}},
@@ -28,13 +30,14 @@ test("listener captures every human independently, ignores bots, and stops outst
  try{
   speaking.emit("start","bot");assert.equal(streams.size,0);
   speaking.emit("start","a");speaking.emit("start","b");assert.equal(streams.size,2);
-  streams.get("b")!.end(pcm(57600));await delay(10);assert.equal(replies.length,0);
-  streams.get("a")!.end(pcm(57600));await delay(120);
+  streams.get("a")!.end(pcm(57600));streams.get("b")!.end(pcm(57600));
+  await delay(120);assert.equal(replies.length,0,"later recognition escaped before the earlier captured segment");
+  releaseFirst();await delay(120);
   assert.deepEqual(replies[0].turns.map(t=>t.userId),["a","b"]);
   assert.ok(requests.every(r=>r.payload.channelId==="text"));
   assert.ok(requests.every(r=>r.event_type==="voice.transcribe"));
   listener.stop();speaking.emit("start","c");assert.equal(streams.size,2);
- }finally{listener.stop();globalThis.fetch=previous;}
+ }finally{releaseFirst();listener.stop();globalThis.fetch=previous;}
 });
 
 test("long continuous speech is transcribed in bounded segments before its speaker stops",async()=>{
