@@ -587,6 +587,14 @@ ordered by capture start, even when recognition finishes out of order. This
 keeps each speaker separate during overlapping speech; it does not make an
 unintelligible recording recoverable.
 
+Whisper normalizes Discord PCM to mono 16 kHz in memory, skips segments shorter
+than 250 ms and near-digital silence, and bounds deterministic decoding to
+12 tokens per second of audio (16–128 tokens). This prevents short non-speech
+segments consuming the full decoder context. STT runs outside the HTTP event
+loop and serializes access to the shared model. Inspect `dokja_voice.stt` logs
+for audio duration, elapsed time, text length and the token bound; speech text
+is not logged. The existing 15-second client deadline remains unchanged.
+
 A new voice turn interrupts playback and aborts pending synthesis/reply work.
 The authenticated `/orchestrator/voice/chat/stream` endpoint sends keepalives
 while inference runs so a disconnected requester cancels its inference context
