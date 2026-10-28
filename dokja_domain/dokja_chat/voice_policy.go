@@ -20,10 +20,11 @@ type VoiceDecision struct {
 }
 
 type voiceRoom struct {
-	listenerID   string
-	engaged      map[string]time.Time
-	handoffUntil time.Time
-	lastSeen     time.Time
+	listenerID      string
+	listenerStarter string
+	engaged         map[string]time.Time
+	handoffUntil    time.Time
+	lastSeen        time.Time
 }
 type VoicePolicy struct {
 	mu    sync.Mutex
@@ -99,7 +100,8 @@ func (p *VoicePolicy) roomLocked(scope string, now time.Time) *voiceRoom {
 }
 
 // OpenListener treats an explicit voice-start command as addressing the assistant.
-// Repeated turn metadata cannot keep extending the same listener's initial window.
+// The starter stays engaged for the listener lifetime; other speakers use the
+// ordinary addressing and follow-up windows. Repeated metadata cannot replace it.
 func (p *VoicePolicy) OpenListener(scope, listenerID, starter string) bool {
 	if listenerID == "" || starter == "" {
 		return false
@@ -112,6 +114,7 @@ func (p *VoicePolicy) OpenListener(scope, listenerID, starter string) bool {
 		return false
 	}
 	room.listenerID = listenerID
+	room.listenerStarter = starter
 	room.lastSeen = now
 	room.engaged = map[string]time.Time{starter: now.Add(VoiceFollowupWindow)}
 	room.handoffUntil = now.Add(VoiceHandoffWindow)
@@ -140,7 +143,8 @@ func (p *VoicePolicy) Decide(scope string, turns []VoiceTurn) VoiceDecision {
 		}
 		addressed := addressedVoice.MatchString(normalizeVoiceAccents.Replace(strings.ToLower(text)))
 
-		if !addressed && !now.Before(room.engaged[turn.UserID]) && !(now.Before(room.handoffUntil) && voiceFollowup(text)) {
+		listenerStarter := room.listenerID != "" && room.listenerStarter == turn.UserID
+		if !listenerStarter && !addressed && !now.Before(room.engaged[turn.UserID]) && !(now.Before(room.handoffUntil) && voiceFollowup(text)) {
 			continue
 		}
 		decision.Respond = true

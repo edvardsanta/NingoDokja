@@ -574,6 +574,9 @@ its reply in the caller's voice channel. Replies use the saved Runtime chat
 provider/model by default; the dedicated local voice model is optional.
 Speech providers do not select the text LLM.
 Use `/voice_chat_stop` to stop listening, or `/speak` to test synthesis alone.
+The person who starts `/voice_chat_start` stays engaged for that listening session,
+including after pauses longer than 30 seconds; brief acknowledgments remain silent.
+Other participants use the existing addressing and follow-up rules.
 
 The lite and dev stacks read `DOKJA_VOICE_PROVIDER` and
 `DOKJA_VOICE_STT_PROVIDER` from the environment. Their defaults are `stub`:
