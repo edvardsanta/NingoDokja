@@ -238,7 +238,7 @@ services:
       context: .
       dockerfile: dokja_services/dokja_voice/Dockerfile.dev
     working_dir: /workspace
-    command: python dokja_services/dokja_voice/main.py
+    command: python dokja_services/dokja_voice/main.py --reload
     environment:
       DOKJA_VOICE_HOST: 0.0.0.0
       DOKJA_VOICE_PORT: 8081

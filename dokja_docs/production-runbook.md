@@ -544,6 +544,15 @@ rebuilding the meme service and orchestrator is enough to pick it up.
 
 ## Discord voice conversations
 
+The lite and dev voice commands use `main.py --reload`: Uvicorn watches only the
+speech service's Python source directory and creates providers in the reload
+worker. Model-cache changes do not restart it. Application timing logs remain
+configured after each reload. Discord uses its existing `tsx watch` process and
+the orchestrator uses Air. Production continues running without source reload.
+During development, a Python reload briefly reloads speech models; changes to
+Discord code restart its listener, so run `/voice_chat_start` again afterward.
+
+
 Discord `/voice_chat_start` sends recognized speech to the orchestrator and plays
 its reply in the caller's voice channel. Replies use the saved Runtime chat
 provider/model, including CLI adapters; speech providers do not select the LLM.
