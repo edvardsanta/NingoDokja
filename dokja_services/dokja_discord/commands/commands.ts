@@ -202,6 +202,14 @@ export function createCommands(
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
                 voiceSessionId, voiceStartedBy: context.userId,
+                onSpeech: async (sentence) => {
+                  await turn.waitForFloor?.();
+                  const speech = { guildId: context.guildId, userId: turn.userId,
+                    channelId: turn.channelId, originChannelId: context.channelId,
+                    text: sentence, signal: turn.signal };
+                  if (voice.speakReply) await voice.speakReply(speech);
+                  else await voice.speakText(speech);
+                },
               });
               turn.signal.throwIfAborted();
               if (reply.trim()) {
@@ -250,6 +258,14 @@ export function createCommands(
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
                 voiceSessionId, voiceStartedBy: context.userId,
+                onSpeech: async (sentence) => {
+                  await turn.waitForFloor?.();
+                  const speech = { guildId: context.guildId, userId: turn.userId,
+                    channelId: turn.channelId, originChannelId: context.channelId,
+                    text: sentence, signal: turn.signal };
+                  if (voice.speakReply) await voice.speakReply(speech);
+                  else await voice.speakText(speech);
+                },
               });
               turn.signal.throwIfAborted();
               if (reply.trim()) {

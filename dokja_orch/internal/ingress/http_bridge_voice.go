@@ -50,9 +50,16 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 			err    error
 		}
 		decisions := make(chan bool, 1)
+		speech := make(chan string, 8)
 		ctx = core.WithVoiceDecision(ctx, func(respond bool) {
 			select {
 			case decisions <- respond:
+			case <-ctx.Done():
+			}
+		})
+		ctx = core.WithVoiceSpeech(ctx, func(text string) {
+			select {
+			case speech <- text:
 			case <-ctx.Done():
 			}
 		})
@@ -82,6 +89,17 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 				if !write(map[string]bool{"accepted": respond}) {
 					return
 				}
+			case sentence := <-speech:
+				select {
+				case respond := <-decisions:
+					if !write(map[string]bool{"accepted": respond}) {
+						return
+					}
+				default:
+				}
+				if !write(map[string]string{"speech": sentence}) {
+					return
+				}
 			case reply := <-completed:
 				select {
 				case respond := <-decisions:
@@ -90,6 +108,17 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 					}
 				default:
 				}
+				for {
+					select {
+					case sentence := <-speech:
+						if !write(map[string]string{"speech": sentence}) {
+							return
+						}
+					default:
+						goto speechDrained
+					}
+				}
+			speechDrained:
 				if reply.err != nil {
 					write(BridgeResponse{Status: "error", Error: "voice reply failed"})
 					return

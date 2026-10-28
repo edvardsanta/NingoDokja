@@ -552,10 +552,22 @@ the orchestrator uses Air. Production continues running without source reload.
 During development, a Python reload briefly reloads speech models; changes to
 Discord code restart its listener, so run `/voice_chat_start` again afterward.
 
+Voice chat uses the dedicated local Ollama model configured by
+`DOKJA_VOICE_CHAT_MODEL` (default `qwen3.5:2b` in dev and lite). Install it in
+the stack's Ollama service before testing, for example with
+`docker compose -f docker-compose.lite.yml exec dokja-ollama ollama pull qwen3.5:2b`.
+This binding is independent of the
+Runtime text chat provider, so Codex remains selected for text and deeper work.
+The first voice request loads the model; afterward it stays loaded until service
+restart (`DOKJA_VOICE_CHAT_KEEP_ALIVE` defaults to `-1s`), trading a few GB of RAM
+for low follow-up latency.
+The local model streams complete sentences to Discord as soon as they are usable;
+the listener keeps collecting other speakers while playback finishes.
 
 Discord `/voice_chat_start` sends recognized speech to the orchestrator and plays
-its reply in the caller's voice channel. Replies use the saved Runtime chat
-provider/model, including CLI adapters; speech providers do not select the LLM.
+its reply in the caller's voice channel. Replies use the dedicated local voice
+chat model; text replies continue using the saved Runtime chat provider/model.
+Speech providers do not select the text LLM.
 Use `/voice_chat_stop` to stop listening, or `/speak` to test synthesis alone.
 
 The lite and dev stacks read `DOKJA_VOICE_PROVIDER` and

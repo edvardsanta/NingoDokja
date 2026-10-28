@@ -152,13 +152,15 @@ func main() {
 		logger.Error("inbound communications policy", err)
 		os.Exit(1)
 	}
+	voiceServiceEndpoint := os.Getenv("DOKJA_VOICE_HTTP_ENDPOINT")
+	voiceServiceClient := clients.NewVoiceServiceClient(voiceServiceEndpoint)
 	communicationsHandler := handlers.NewCommunicationsDomainHandler(
 		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
 		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
 	).WithInboundPolicy(inboundPolicy).WithGuilds(os.Getenv("DISCORD_GUILD_ID")).
 		// Voice channel queues find their tracks through the music sources installed as Feeds plugins.
 		WithMusic(clients.NewFeedsAudioSources(feedsClient, communications.AudioCapability)).
-		WithVoice(clients.NewVoiceServiceClient(os.Getenv("DOKJA_VOICE_HTTP_ENDPOINT")))
+		WithVoice(voiceServiceClient)
 	// A nil client must stay a nil interface, so "not configured" is still seen as such.
 	var whatsappSender handlers.WhatsAppSender
 	if whatsappConversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); whatsappConversations != nil {
@@ -191,7 +193,7 @@ func main() {
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithVoiceGenerator(clients.NewVoiceChatClient(voiceServiceEndpoint)).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

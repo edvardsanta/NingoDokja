@@ -22,17 +22,36 @@ const voiceTurnBody = `{"event_type":"message.created","payload":{"userId":"fixt
 type voiceProbe struct {
 	events    chan core.Event
 	cancelled chan struct{}
+	speech    string
 }
 
 func (p voiceProbe) Domain() core.Domain { return core.DomainChat }
 func (p voiceProbe) Handle(ctx context.Context, event core.Event, _ core.WorkflowStep) (map[string]any, error) {
 	p.events <- event
+	if p.speech != "" {
+		core.ReportVoiceDecision(ctx, true)
+		core.VoiceSpeech(ctx)(p.speech)
+	}
 	if p.cancelled != nil {
 		<-ctx.Done()
 		close(p.cancelled)
 		return nil, ctx.Err()
 	}
 	return map[string]any{"reply": "spoken reply"}, nil
+}
+
+func TestVoiceBridgeForwardsCompleteSpeechFramesBeforeFinalReply(t *testing.T) {
+	probe := voiceProbe{events: make(chan core.Event, 1), speech: "First complete sentence."}
+	response, err := voiceApp(probe).Test(voiceRequest(voiceTurnBody, "Bearer fixture-credential"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(response.Body)
+	text := string(body)
+	if !strings.Contains(text, `"speech":"First complete sentence."`) || !strings.Contains(text, `"reply":"spoken reply"`) {
+		t.Fatal(text)
+	}
 }
 func voiceApp(probe voiceProbe) *fiber.App {
 	service := core.DefaultService(&identityPass{domain: core.DomainCommunications}, &identityPass{domain: core.DomainModeration}, probe)
