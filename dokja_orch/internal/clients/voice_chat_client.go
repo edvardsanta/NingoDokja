@@ -71,6 +71,9 @@ func (c *VoiceChatClient) GenerateVoiceMessagesStream(ctx context.Context, messa
 			}
 		}
 		if frame.Done {
+			if strings.TrimSpace(reply.String()) == "" {
+				return nil, fmt.Errorf("local voice model completed without speech text")
+			}
 			return map[string]any{"reply": reply.String()}, nil
 		}
 	}

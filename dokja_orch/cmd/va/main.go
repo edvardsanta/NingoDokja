@@ -153,6 +153,12 @@ func main() {
 		os.Exit(1)
 	}
 	voiceServiceEndpoint := os.Getenv("DOKJA_VOICE_HTTP_ENDPOINT")
+	voiceGenerator, err := voiceGeneratorForProvider(os.Getenv("DOKJA_VOICE_CHAT_PROVIDER"), voiceServiceEndpoint)
+	if err != nil {
+		logger.Error("configure voice chat provider", err)
+		os.Exit(1)
+	}
+	logger.Info(fmt.Sprintf("voice chat provider configured local=%t", voiceGenerator != nil))
 	voiceServiceClient := clients.NewVoiceServiceClient(voiceServiceEndpoint)
 	communicationsHandler := handlers.NewCommunicationsDomainHandler(
 		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
@@ -193,7 +199,7 @@ func main() {
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithVoiceGenerator(clients.NewVoiceChatClient(voiceServiceEndpoint)).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

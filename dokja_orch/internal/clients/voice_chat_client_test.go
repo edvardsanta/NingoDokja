@@ -30,7 +30,7 @@ func TestVoiceChatClientStreamsCumulativeTextAndFinalReply(t *testing.T) {
 }
 
 func TestVoiceChatClientRejectsMalformedAndUnfinishedFrames(t *testing.T) {
-	for _, response := range []string{`not json`, `{"text":"partial"}`} {
+	for _, response := range []string{`not json`, `{"text":"partial"}`, `{"done":true}`} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = fmt.Fprintln(w, response) }))
 		_, err := NewVoiceChatClient(server.URL).GenerateVoiceMessagesStream(context.Background(), nil, nil)
 		server.Close()
