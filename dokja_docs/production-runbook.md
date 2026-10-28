@@ -542,6 +542,82 @@ A failed or disabled fetch falls back to the previous behaviour (sending the pla
 URL), so this never blocks delivery for hosts that do not need it; no new ports, and
 rebuilding the meme service and orchestrator is enough to pick it up.
 
+## Discord voice conversations
+
+Discord `/voice_chat_start` sends recognized speech to the orchestrator and plays
+its reply in the caller's voice channel. Replies use the saved Runtime chat
+provider/model, including CLI adapters; speech providers do not select the LLM.
+Use `/voice_chat_stop` to stop listening, or `/speak` to test synthesis alone.
+
+The lite and dev stacks read `DOKJA_VOICE_PROVIDER` and
+`DOKJA_VOICE_STT_PROVIDER` from the environment. Their defaults are `stub`:
+placeholder tones and transcripts do not establish working speech. For real
+speech, configure the following in the ignored `.env` file:
+
+```dotenv
+DOKJA_VOICE_PROVIDER=piper
+DOKJA_VOICE_PIPER_MODEL=/workspace/.dokja/models/voice/pt_BR-faber-medium.onnx
+DOKJA_VOICE_STT_PROVIDER=transformers
+DOKJA_VOICE_STT_MODEL=openai/whisper-tiny
+DOKJA_VOICE_MODEL_CACHE_DIR=/workspace/.dokja/models/voice/whisper
+```
+
+Download the Piper ONNX model and its matching `.onnx.json` into the configured
+directory before restarting. Whisper downloads into its persistent cache on first
+load, which requires network access. Models under `.dokja/` stay out of Git.
+Recreate only the voice service with
+`docker compose -f docker-compose.lite.yml up -d --no-deps --force-recreate dokja-voice`.
+Query its `/health` endpoint and verify `tts_provider=piper` and
+`stt_provider=transformers`, then test synthesis and transcription. Finally, join
+a Discord voice channel and use `/voice_chat_start` to verify actual playback
+and microphone reception. Ordinary text replies do not automatically play aloud.
+
+Group conversations now capture every human in the connected voice channel,
+with independent audio streams and stable participant aliases in shared room
+history. The channel where `/voice_chat_start` was invoked remains the inbound
+policy channel; the physical voice room is the conversation scope. Bot audio is
+ignored. A speaker change does not reset history, and only the last speaker's
+account can supply current-turn owner verification.
+
+Capture uses 600 ms of silence and an 80 ms room settling period. Long speech is
+transcribed in eight-second segments while capture continues. At most 16 human
+streams and two transcription requests run at once; queued segments and pending
+transcripts are bounded to 32 each. Capacity errors are logged. Transcripts are
+ordered by capture start, even when recognition finishes out of order. This
+keeps each speaker separate during overlapping speech; it does not make an
+unintelligible recording recoverable.
+
+A new voice turn interrupts playback and aborts pending synthesis/reply work.
+The authenticated `/orchestrator/voice/chat/stream` endpoint sends keepalives
+while inference runs so a disconnected requester cancels its inference context
+and releases the shared session lock. Only the validated final CLI reply is
+spoken. This is continuous group listening with speech-turn responses, not a
+native audio-to-audio streaming model. CLI timeout, network and model latency
+still affect response time; no subsecond end-to-end guarantee is established.
+
+Speech requests follow Interface → Event → Orchestrator → Communications domain
+→ Voice service. The existing authenticated bridge gains optional `voice`
+request/response data for `voice.synthesize`, `.transcribe` and
+`.wakeword`. `DOKJA_VOICE_HTTP_ENDPOINT` now also configures the orchestrator's
+speech client; its default is the internal voice service on port 8081. Deploy the
+orchestrator and Discord adapter together. The production stack needs a reachable
+voice service configured before enabling voice commands; this change does not
+add that optional service to production. Roll back both components together.
+
+Verify with two human accounts speaking in the same voice room: start once,
+confirm both speakers appear in the conversation, overlap a short exchange,
+interrupt a pending/spoken reply, then stop while transcription is running.
+No later speech should play after stop. Check a second room has independent
+history and that another participant using the owner's nickname gains no owner
+status. These Discord microphone and playback checks require a live call;
+synthetic transport tests do not establish them.
+
+Wake-word mode is separate: it requires an installed detector and a matching
+trained model. `/voice_chat_start` does not use the wake-word provider. To restore
+placeholder speech for development, set both speech providers to `stub` and
+recreate the voice service again. Existing ports, volumes and HTTP contracts are
+unchanged.
+
 ## Music in voice channels
 
 The Discord image now carries `yt-dlp` (pinned, in `/opt/yt-dlp`, on the PATH) for music.

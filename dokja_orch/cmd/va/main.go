@@ -157,7 +157,8 @@ func main() {
 		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
 	).WithInboundPolicy(inboundPolicy).WithGuilds(os.Getenv("DISCORD_GUILD_ID")).
 		// Voice channel queues find their tracks through the music sources installed as Feeds plugins.
-		WithMusic(clients.NewFeedsAudioSources(feedsClient, communications.AudioCapability))
+		WithMusic(clients.NewFeedsAudioSources(feedsClient, communications.AudioCapability)).
+		WithVoice(clients.NewVoiceServiceClient(os.Getenv("DOKJA_VOICE_HTTP_ENDPOINT")))
 	// A nil client must stay a nil interface, so "not configured" is still seen as such.
 	var whatsappSender handlers.WhatsAppSender
 	if whatsappConversations := clients.NewWhatsAppConversationsClient(os.Getenv("WHATSAPP_INTERFACE_STATUS_ENDPOINT")); whatsappConversations != nil {

@@ -7,6 +7,7 @@ import (
 )
 
 type CommunicationsDomainHandler struct {
+	voice             communications.Voice
 	domain            *communications.Domain
 	inbound           communications.InboundPolicy
 	inboundConfigured bool
@@ -48,6 +49,11 @@ func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSour
 	return h
 }
 
+func (h *CommunicationsDomainHandler) WithVoice(voice communications.Voice) *CommunicationsDomainHandler {
+	h.voice = voice
+	return h
+}
+
 func (h *CommunicationsDomainHandler) Domain() core.Domain { return core.DomainCommunications }
 func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (map[string]any, error) {
 	if step.Action == communications.ActionAuthorizeInbound {
@@ -59,6 +65,13 @@ func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Eve
 			return nil, core.ErrInboundDenied
 		}
 		return nil, nil
+	}
+	if communications.VoiceAction(step.Action) {
+		result, err := communications.ProcessVoice(ctx, h.voice, step.Action, event.Payload)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"voice": result}, nil
 	}
 	if musicActions[step.Action] {
 		if h.music == nil {

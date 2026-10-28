@@ -3,6 +3,9 @@ import type { DiscordAttachment } from "../types.js";
 export type BridgeRequest = {
   event_type: string;
   payload: {
+    voice?: Record<string, unknown>;
+    voiceTurns?: Array<{ userId: string; userName?: string; text: string }>;
+    voiceChannelId?: string;
     content?: string;
     replyToContent?: string;
     mentionedUserIds?: string[];

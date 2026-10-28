@@ -8,6 +8,7 @@ import {
   joinVoiceChannel,
 } from "@discordjs/voice";
 import { Buffer } from "node:buffer";
+import type { Transform } from "node:stream";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -31,6 +32,8 @@ import { createTrackStream, type TrackStream } from "./track_stream.js";
 import { ensureConnectionReady, watchConnectionLoss } from "./connection_ready.js";
 import { toMessageReply } from "../runtime/discordjs_runtime.js";
 import type { DiscordReply } from "../types.js";
+import { LiveConversation, type VoiceTurnContext } from "./live_conversation.js";
+import { voiceAudioRequest } from "./orchestrated_audio.js";
 
 // How long Ningo waits, alone in a voice channel, before leaving it.
 export const ALONE_GRACE_MS = 3 * 60_000;
@@ -83,12 +86,13 @@ type ListeningSession = {
 export type DiscordVoiceController = {
   attachClient(client?: unknown, botUserId?: string): void;
   playRadio(params: { guildId?: string; userId: string; streamUrl: string }): Promise<string>;
-  speakText(params: { guildId?: string; userId: string; text: string }): Promise<string>;
+  speakText(params: { guildId?: string; userId: string; text: string; channelId?: string; originChannelId?: string; signal?: AbortSignal }): Promise<string>;
   startConversation(params: {
     guildId?: string;
     userId: string;
     activationMode?: "always" | "wakeword";
-    onTurn: (transcript: string) => Promise<void>;
+    originChannelId?: string;
+    onTurn: (transcript: string, turn?: VoiceTurnContext) => Promise<void>;
   }): Promise<string>;
   stopConversation(params: { guildId?: string }): Promise<string>;
   stopRadio(params: { guildId?: string }): Promise<string>;
@@ -105,6 +109,7 @@ export type DiscordVoiceController = {
 export function createDiscordVoiceController(options: {
   token: string;
   voiceServiceEndpoint: string;
+  orchestratorEndpoint?: string;
   logTranscripts?: boolean;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
@@ -365,7 +370,7 @@ export function createDiscordVoiceController(options: {
       );
       return `Playing radio in <#${voiceChannel.id}>`;
     },
-    async speakText({ guildId, userId, text }) {
+    async speakText({ guildId, userId, text, channelId, originChannelId, signal }) {
       if (!guildId) {
         throw new Error("Speech playback only works in guild voice channels");
       }
@@ -374,9 +379,12 @@ export function createDiscordVoiceController(options: {
         throw new Error("Speech text cannot be empty");
       }
 
+      signal?.throwIfAborted();
       const client = await ensureVoiceClient();
-      const member = await fetchVoiceMember(client, guildId, userId);
-      const voiceChannel = member.voice.channel;
+      const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+      const voiceChannel = channelId
+        ? guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId)
+        : (await fetchVoiceMember(client, guildId, userId)).voice.channel;
 
       if (!voiceChannel) {
         throw new Error("Join a voice channel before asking Ningo to speak");
@@ -388,22 +396,11 @@ export function createDiscordVoiceController(options: {
         throw new Error("Speech playback only works in voice channels");
       }
 
-      const response = await fetch(`${options.voiceServiceEndpoint}/tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: trimmed,
-          voice: "default",
-          language: "pt-BR",
-          format: "wav",
-        }),
-      });
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(`Voice synthesis failed: ${detail || response.status}`);
-      }
-
-      const wavBytes = Buffer.from(await response.arrayBuffer());
+      const audio = await voiceAudioRequest(options.orchestratorEndpoint, "synthesize", {
+        guildId, userId, channelId: originChannelId ?? voiceChannel.id, text: trimmed,
+      }, signal);
+      const wavBytes = Buffer.from(audio.audio_bytes_b64 as string, "base64");
+      signal?.throwIfAborted();
       const tempDir = mkdtempSync(join(tmpdir(), "dokja-voice-"));
       const tempPath = join(tempDir, "speech.wav");
       writeFileSync(tempPath, wavBytes);
@@ -422,7 +419,15 @@ export function createDiscordVoiceController(options: {
         error: options.error,
       });
 
+      if (signal?.aborted) { stream.stop(); signal.throwIfAborted(); }
       replaceSessionStream(session, stream);
+      // The listener interrupts playback on new human speech; cancellation also
+      // covers a stop/restart while synthesis or connection setup was in flight.
+      const abortPlayback = () => {
+        if (session.stream === stream) interruptSessionPlayback(session);
+      };
+      signal?.addEventListener("abort", abortPlayback, { once: true });
+      session.player.once(AudioPlayerStatus.Idle, () => signal?.removeEventListener("abort", abortPlayback));
       // Speech pauses the music and gives the connection back to it when it ends (owner, 2026-10-26).
       const music = musics.get(guildId);
       if (music?.playing !== undefined) {
@@ -551,7 +556,7 @@ export function createDiscordVoiceController(options: {
       options.log?.("[dokja-discord] radio stopped", JSON.stringify({ guildId }));
       return "Radio stopped.";
     },
-    async startConversation({ guildId, userId, activationMode = "always", onTurn }) {
+    async startConversation({ guildId, userId, originChannelId, activationMode = "always", onTurn }) {
       if (!guildId) {
         throw new Error("Voice conversation only works in guild voice channels");
       }
@@ -584,7 +589,13 @@ export function createDiscordVoiceController(options: {
         session,
         guildId,
         userId,
-        voiceServiceEndpoint: options.voiceServiceEndpoint,
+        orchestratorEndpoint: options.orchestratorEndpoint,
+        originChannelId: originChannelId ?? voiceChannel.id,
+        participant: (id) => {
+          const participant = voiceChannel.members.get(id);
+          return participant && !participant.user.bot
+            ? { userId: id, userName: participant.displayName } : undefined;
+        },
         logTranscripts: Boolean(options.logTranscripts),
         activationMode,
         log: options.log,
@@ -600,7 +611,7 @@ export function createDiscordVoiceController(options: {
       if (activationMode === "wakeword") {
         return `Listening for the wake word in <#${voiceChannel.id}>`;
       }
-      return `Listening to your voice in <#${voiceChannel.id}>`;
+      return `Listening to everyone in <#${voiceChannel.id}>`;
     },
     async stopConversation({ guildId }) {
       if (!guildId) {
@@ -646,191 +657,120 @@ function replaceSessionStream(
   session.stream = stream;
 }
 
-function createListeningSession(params: {
+export const VOICE_SILENCE_MS = 600;
+export const VOICE_SEGMENT_BYTES = 48_000 * 2 * 2 * 8; // eight seconds, stereo PCM16
+export const MAX_VOICE_SPEAKERS = 16;
+
+export function createListeningSession(params: {
+  decoderFactory?: () => Transform;
   session: VoiceSession;
   guildId: string;
   userId: string;
-  voiceServiceEndpoint: string;
+  orchestratorEndpoint?: string;
+  originChannelId: string;
+  participant(id: string): { userId: string; userName?: string } | undefined;
   logTranscripts: boolean;
   activationMode: "always" | "wakeword";
-  onTurn: (transcript: string) => Promise<void>;
+  onTurn: (transcript: string, turn?: VoiceTurnContext) => Promise<void>;
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
 }): ListeningSession {
-  const activeStreams = new Map<
-    string,
-    {
-      destroy(): void;
+  let stopped = false;
+  const lifetime = new AbortController();
+  const activeStreams = new Map<string, { destroy(): void }>();
+  const conversation = new LiveConversation({
+    channelId: params.session.channelId,
+    interrupt: () => interruptSessionPlayback(params.session),
+    onTurn: params.onTurn,
+    onError: (error) => params.error?.("[dokja-discord] voice reply failed", error),
+  });
+  // At most two transcriptions run at once; segment buffers and pending work are bounded.
+  let transcribing = 0;
+  const jobs: Array<() => Promise<void>> = [];
+  const drain = () => {
+    while (!stopped && transcribing < 2 && jobs.length) {
+      transcribing++;
+      void jobs.shift()!().finally(() => { transcribing--; drain(); });
     }
-  >();
-
-  const handleSpeakingStart = (speakingUserId: string) => {
-    if (speakingUserId !== params.userId || activeStreams.has(speakingUserId)) {
-      return;
-    }
-
-    if (params.session.player.state.status !== AudioPlayerStatus.Idle) {
-      params.log?.(
-        "[dokja-discord] interrupting voice playback for user speech",
-        JSON.stringify({
-          guildId: params.guildId,
-          userId: speakingUserId,
-          playerStatus: params.session.player.state.status,
-        }),
-      );
-    }
-
-    params.log?.(
-      "[dokja-discord] voice turn capture started",
-      JSON.stringify({ guildId: params.guildId, userId: speakingUserId }),
-    );
-
-    interruptSessionPlayback(params.session);
-
-    const opusStream = params.session.connection.receiver.subscribe(speakingUserId, {
-      end: {
-        behavior: EndBehaviorType.AfterSilence,
-        duration: 1_200,
-      },
-    });
-    const decoder = new prism.opus.Decoder({
-      frameSize: 960,
-      channels: 2,
-      rate: 48_000,
-    });
-    const pcmChunks: Buffer[] = [];
-    let finished = false;
-
-    const cleanup = () => {
-      activeStreams.delete(speakingUserId);
-      try {
-        opusStream.destroy();
-      } catch {
-        // Ignore cleanup errors from already-closed Discord voice streams.
-      }
-      try {
-        decoder.destroy();
-      } catch {
-        // Ignore cleanup errors from already-closed decoders.
-      }
-    };
-
-    const finalize = async () => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-
-      const pcmBytes = Buffer.concat(pcmChunks);
-      cleanup();
-      if (pcmBytes.length < 48_000) {
-        params.log?.(
-          "[dokja-discord] voice turn ignored",
-          JSON.stringify({ guildId: params.guildId, userId: speakingUserId, pcmBytes: pcmBytes.length }),
-        );
-        return;
-      }
-
-      try {
-        const wavBytes = buildWavFromPCM(pcmBytes);
-        let wakewordDetected = false;
-        let wakewordScore: number | undefined;
-        if (params.activationMode === "wakeword") {
-          const wakeword = await detectWakeword({
-            voiceServiceEndpoint: params.voiceServiceEndpoint,
-            audioBytes: wavBytes,
-            hotword: "Ningo",
-          });
-          wakewordDetected = wakeword.detected;
-          wakewordScore = wakeword.score;
-          params.log?.(
-            "[dokja-discord] wakeword detection completed",
-            JSON.stringify({
-              guildId: params.guildId,
-              userId: speakingUserId,
-              detected: wakeword.detected,
-              score: wakeword.score,
-              hotword: wakeword.hotword,
-            }),
-          );
-          if (!wakeword.detected) {
-            params.log?.(
-              "[dokja-discord] voice turn ignored missing wakeword",
-              JSON.stringify({ guildId: params.guildId, userId: speakingUserId }),
-            );
-            return;
-          }
-        }
-
-        const transcript = await transcribeVoiceTurn({
-          voiceServiceEndpoint: params.voiceServiceEndpoint,
-          audioBytes: wavBytes,
-          language: "pt-BR",
-        });
-        if (!transcript) {
-          return;
-        }
-        params.log?.(
-          "[dokja-discord] voice transcription completed",
-          JSON.stringify(
-            params.logTranscripts
-              ? {
-                  guildId: params.guildId,
-                  userId: speakingUserId,
-                  textChars: transcript.length,
-                  transcript,
-                  activationMode: params.activationMode,
-                  wakewordDetected,
-                  wakewordScore,
-                }
-              : {
-                  guildId: params.guildId,
-                  userId: speakingUserId,
-                  textChars: transcript.length,
-                  activationMode: params.activationMode,
-                  wakewordDetected,
-                  wakewordScore,
-                },
-          ),
-        );
-        await params.onTurn(transcript);
-      } catch (error) {
-        params.error?.("[dokja-discord] voice turn processing failed", error);
-      }
-    };
-
-    decoder.on("data", (chunk: Buffer) => {
-      pcmChunks.push(Buffer.from(chunk));
-    });
-    decoder.once("end", () => {
-      void finalize();
-    });
-    decoder.once("error", (error) => {
-      params.error?.("[dokja-discord] voice decoder error", error);
-      void finalize();
-    });
-    opusStream.once("error", (error) => {
-      params.error?.("[dokja-discord] voice receive error", error);
-      void finalize();
-    });
-
-    opusStream.pipe(decoder);
-    activeStreams.set(speakingUserId, {
-      destroy() {
-        cleanup();
-      },
-    });
   };
-
+  const handleSpeakingStart = (speakingUserId: string) => {
+    const participant = params.participant(speakingUserId);
+    if (stopped || !participant || activeStreams.has(speakingUserId)
+      || activeStreams.size >= MAX_VOICE_SPEAKERS) return;
+    let sequence = conversation.begin();
+    const opusStream = params.session.connection.receiver.subscribe(speakingUserId, {
+      end: { behavior: EndBehaviorType.AfterSilence, duration: VOICE_SILENCE_MS },
+    });
+    const decoder = params.decoderFactory?.() ?? new prism.opus.Decoder({ frameSize: 960, channels: 2, rate: 48_000 });
+    let chunks: Buffer[] = [];
+    let bytes = 0;
+    let finished = false;
+    const enqueue = (seq: number, audio: Buffer) => {
+      if (stopped || audio.length < 19_200) { conversation.finish(seq); return; }
+      if (jobs.length >= 32) {
+        conversation.finish(seq);
+        params.error?.("[dokja-discord] voice transcription capacity reached");
+        return;
+      }
+      jobs.push(async () => {
+        try {
+          const wav = buildWavFromPCM(audio).toString("base64");
+          if (params.activationMode === "wakeword") {
+            const wake = await voiceAudioRequest(params.orchestratorEndpoint, "wakeword", {
+              guildId: params.guildId, ...participant, channelId: params.originChannelId,
+              audio_bytes_b64: wav, hotword: "Ningo",
+            }, lifetime.signal);
+            if (!wake.detected) return;
+          }
+          const result = await voiceAudioRequest(params.orchestratorEndpoint, "transcribe", {
+            guildId: params.guildId, ...participant, channelId: params.originChannelId,
+            audio_bytes_b64: wav,
+          }, lifetime.signal);
+          // A speaker who left or moved rooms is never presented as still present.
+          if (!stopped && params.participant(speakingUserId)) {
+            conversation.finish(seq, { ...participant, text: String(result.text ?? "") });
+          }
+        } catch (error) {
+          if (!lifetime.signal.aborted) params.error?.("[dokja-discord] voice transcription failed", error);
+        } finally { conversation.finish(seq); }
+      });
+      drain();
+    };
+    const finalize = () => {
+      if (finished) return;
+      finished = true;
+      activeStreams.delete(speakingUserId);
+      enqueue(sequence, Buffer.concat(chunks, bytes));
+      chunks = []; bytes = 0;
+    };
+    decoder.on("data", (chunk: Buffer) => {
+      if (stopped) return;
+      chunks.push(Buffer.from(chunk)); bytes += chunk.length;
+      if (bytes >= VOICE_SEGMENT_BYTES) {
+        const current = sequence;
+        sequence = conversation.begin();
+        enqueue(current, Buffer.concat(chunks, bytes));
+        chunks = []; bytes = 0;
+      }
+    });
+    decoder.once("end", finalize);
+    decoder.once("error", () => { finalize(); opusStream.destroy(); });
+    opusStream.once("error", () => { finalize(); decoder.destroy(); });
+    activeStreams.set(speakingUserId, { destroy() {
+      opusStream.destroy(); decoder.destroy(); chunks = []; bytes = 0;
+    } });
+    opusStream.pipe(decoder);
+  };
   params.session.connection.receiver.speaking.on("start", handleSpeakingStart);
-
   return {
     targetUserId: params.userId,
     stop() {
+      stopped = true;
+      lifetime.abort();
+      conversation.stop();
+      jobs.length = 0;
       params.session.connection.receiver.speaking.off("start", handleSpeakingStart);
-      for (const active of activeStreams.values()) {
-        active.destroy();
-      }
+      for (const stream of activeStreams.values()) stream.destroy();
       activeStreams.clear();
     },
   };
@@ -960,60 +900,6 @@ function interruptSessionPlayback(session: VoiceSession) {
   session.player.stop(true);
   session.stream.stop();
   session.stream = createEmptyStream();
-}
-
-async function transcribeVoiceTurn(params: {
-  voiceServiceEndpoint: string;
-  audioBytes: Buffer;
-  language: string;
-}): Promise<string> {
-  const response = await fetch(`${params.voiceServiceEndpoint}/stt`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      audio_bytes_b64: params.audioBytes.toString("base64"),
-      audio_format: "wav",
-      language: params.language,
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Voice transcription failed: ${detail || response.status}`);
-  }
-
-  const payload = (await response.json()) as { text?: string };
-  return (payload.text ?? "").trim();
-}
-
-async function detectWakeword(params: {
-  voiceServiceEndpoint: string;
-  audioBytes: Buffer;
-  hotword: string;
-}): Promise<{ detected: boolean; score: number; hotword: string }> {
-  const response = await fetch(`${params.voiceServiceEndpoint}/wakeword`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      audio_bytes_b64: params.audioBytes.toString("base64"),
-      audio_format: "wav",
-      hotword: params.hotword,
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Wakeword detection failed: ${detail || response.status}`);
-  }
-
-  const payload = (await response.json()) as {
-    detected?: boolean;
-    score?: number;
-    hotword?: string;
-  };
-  return {
-    detected: Boolean(payload.detected),
-    score: Number(payload.score ?? 0),
-    hotword: String(payload.hotword ?? params.hotword),
-  };
 }
 
 function buildWavFromPCM(pcmBytes: Buffer, sampleRate = 48_000, channels = 2, sampleWidth = 2): Buffer {

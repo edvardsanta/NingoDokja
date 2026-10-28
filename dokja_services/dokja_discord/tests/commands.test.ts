@@ -195,6 +195,7 @@ test("speak command forwards text to the voice controller", async () => {
     guildId: "g1",
     userId: "u1",
     text: "ola ningo",
+    originChannelId: "c1",
   });
   assert.equal(updatedReplyText, "Speaking in <#g1>");
 });

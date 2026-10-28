@@ -1,3 +1,4 @@
+import { conversationReply } from "../voice/conversation_reply.js";
 import { ApplicationCommandOptionType } from "discord-api-types/v10";
 import { randomUUID } from "node:crypto";
 
@@ -165,6 +166,7 @@ export function createCommands(
             guildId: context.guildId,
             userId: context.userId,
             text: prompt,
+            originChannelId: context.channelId,
           })
           .then((reply) => context.updateReply(reply))
           .catch((error) => {
@@ -177,7 +179,7 @@ export function createCommands(
     },
     {
       name: "voice_chat_start",
-      description: "Start listening to your speech in the current voice channel.",
+      description: "Join the live conversation with everyone in your voice channel.",
       defer: false,
       async handle(context: DiscordCommandContext) {
         if (!voice) {
@@ -186,58 +188,23 @@ export function createCommands(
         }
 
         await context.reply("Starting voice conversation...", { ephemeral: true });
-        let firstTurn = true;
 
         void voice
           .startConversation({
             guildId: context.guildId,
             userId: context.userId,
             activationMode: "always",
-            onTurn: async (transcript) => {
-              if (options?.logVoiceConversation) {
-                console.log(
-                  "[dokja-discord] voice transcript dispatch",
-                  JSON.stringify({
-                    guildId: context.guildId,
-                    userId: context.userId,
-                    channelId: context.channelId,
-                    transcript,
-                  }),
-                );
-              }
-              const reply = await dispatchToOrchestrator(
-                orchestratorEndpoint,
-                orchestratorTimeoutMs,
-                buildBridgePayload({
-                  eventType: "message.created",
-                  content: transcript,
-                  userId: context.userId,
-                  channelId: context.channelId,
-                  messageId: randomUUID(),
-                  guildId: context.guildId,
-                  sessionKey: `discord-voice:${context.guildId ?? "dm"}:${context.userId}`,
-                  startSession: firstTurn,
-                }),
-              );
-              firstTurn = false;
-              if (options?.logVoiceConversation) {
-                console.log(
-                  "[dokja-discord] voice reply received",
-                  JSON.stringify({
-                    guildId: context.guildId,
-                    userId: context.userId,
-                    channelId: context.channelId,
-                    reply,
-                  }),
-                );
-              }
-              if (reply.trim()) {
-                await voice.speakText({
-                  guildId: context.guildId,
-                  userId: context.userId,
-                  text: reply,
-                });
-              }
+            originChannelId: context.channelId,
+            onTurn: async (_transcript, turn) => {
+              if (!turn) throw new Error("Voice speaker metadata is required");
+              const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
+                guildId: context.guildId, originChannelId: context.channelId, turn,
+              });
+              turn.signal.throwIfAborted();
+              if (reply.trim()) await voice.speakText({
+                guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
+                originChannelId: context.channelId, text: reply, signal: turn.signal,
+              });
             },
           })
           .then((reply) => context.updateReply(reply))
@@ -260,58 +227,23 @@ export function createCommands(
         }
 
         await context.reply("Starting wake-word voice conversation...", { ephemeral: true });
-        let firstTurn = true;
 
         void voice
           .startConversation({
             guildId: context.guildId,
             userId: context.userId,
             activationMode: "wakeword",
-            onTurn: async (transcript) => {
-              if (options?.logVoiceConversation) {
-                console.log(
-                  "[dokja-discord] wake voice transcript dispatch",
-                  JSON.stringify({
-                    guildId: context.guildId,
-                    userId: context.userId,
-                    channelId: context.channelId,
-                    transcript,
-                  }),
-                );
-              }
-              const reply = await dispatchToOrchestrator(
-                orchestratorEndpoint,
-                orchestratorTimeoutMs,
-                buildBridgePayload({
-                  eventType: "message.created",
-                  content: transcript,
-                  userId: context.userId,
-                  channelId: context.channelId,
-                  messageId: randomUUID(),
-                  guildId: context.guildId,
-                  sessionKey: `discord-wake-voice:${context.guildId ?? "dm"}:${context.userId}`,
-                  startSession: firstTurn,
-                }),
-              );
-              firstTurn = false;
-              if (options?.logVoiceConversation) {
-                console.log(
-                  "[dokja-discord] wake voice reply received",
-                  JSON.stringify({
-                    guildId: context.guildId,
-                    userId: context.userId,
-                    channelId: context.channelId,
-                    reply,
-                  }),
-                );
-              }
-              if (reply.trim()) {
-                await voice.speakText({
-                  guildId: context.guildId,
-                  userId: context.userId,
-                  text: reply,
-                });
-              }
+            originChannelId: context.channelId,
+            onTurn: async (_transcript, turn) => {
+              if (!turn) throw new Error("Voice speaker metadata is required");
+              const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
+                guildId: context.guildId, originChannelId: context.channelId, turn,
+              });
+              turn.signal.throwIfAborted();
+              if (reply.trim()) await voice.speakText({
+                guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
+                originChannelId: context.channelId, text: reply, signal: turn.signal,
+              });
             },
           })
           .then((reply) => context.updateReply(reply))
@@ -325,7 +257,7 @@ export function createCommands(
     },
     {
       name: "voice_chat_stop",
-      description: "Stop listening to your speech in this server.",
+      description: "Stop the live voice conversation in this server.",
       async handle(context: DiscordCommandContext) {
         try {
           if (!voice) {

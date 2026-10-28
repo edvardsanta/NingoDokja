@@ -32,31 +32,37 @@ type BridgeRequest struct {
 	EventType string `json:"event_type"`
 	// Interface names the interface the request came from. Empty means Discord, which is
 	// what every existing client sends; only the values in bridgeInterfaces are accepted.
-	Interface string `json:"interface"`
-	Payload   struct {
-		Content          string   `json:"content"`
-		ReplyToContent   string   `json:"replyToContent"`
-		MentionedUserIDs []string `json:"mentionedUserIds"`
-		Limit            *int     `json:"limit"`
-		MaxItems         *int     `json:"maxItemsPerScraper"`
-		UserID           string   `json:"userId"`
-		UserName         string   `json:"userName"`
-		ChannelID        string   `json:"channelId"`
-		MessageID        string   `json:"messageId"`
-		GuildID          string   `json:"guildId"`
-		SessionKey       string   `json:"sessionKey"`
-		StartChat        bool     `json:"startSession"`
-		AccountID        string   `json:"accountId"`
-		EntryKind        string   `json:"entryKind"`
-		Direct           *bool    `json:"isDirectMessage"`
-		Mentioned        *bool    `json:"mentionsBot"`
-		ChatKind         string   `json:"chatKind"`
-		SelfChat         *bool    `json:"isSelfChat"`
-		Numbers          []string `json:"senderNumbers"`
-	} `json:"payload"`
+	Interface string        `json:"interface"`
+	Payload   BridgePayload `json:"payload"`
+}
+
+type BridgePayload struct {
+	Voice            map[string]any   `json:"voice"`
+	VoiceTurns       []chat.VoiceTurn `json:"voiceTurns"`
+	VoiceChannelID   string           `json:"voiceChannelId"`
+	Content          string           `json:"content"`
+	ReplyToContent   string           `json:"replyToContent"`
+	MentionedUserIDs []string         `json:"mentionedUserIds"`
+	Limit            *int             `json:"limit"`
+	MaxItems         *int             `json:"maxItemsPerScraper"`
+	UserID           string           `json:"userId"`
+	UserName         string           `json:"userName"`
+	ChannelID        string           `json:"channelId"`
+	MessageID        string           `json:"messageId"`
+	GuildID          string           `json:"guildId"`
+	SessionKey       string           `json:"sessionKey"`
+	StartChat        bool             `json:"startSession"`
+	AccountID        string           `json:"accountId"`
+	EntryKind        string           `json:"entryKind"`
+	Direct           *bool            `json:"isDirectMessage"`
+	Mentioned        *bool            `json:"mentionsBot"`
+	ChatKind         string           `json:"chatKind"`
+	SelfChat         *bool            `json:"isSelfChat"`
+	Numbers          []string         `json:"senderNumbers"`
 }
 
 type BridgeResponse struct {
+	Voice       map[string]any    `json:"voice,omitempty"`
 	Status      string            `json:"status"`
 	Reply       string            `json:"reply,omitempty"`
 	Notice      string            `json:"notice,omitempty"`
@@ -93,6 +99,7 @@ func (i *HTTPBridgeIngress) Start() error {
 	i.app = fiber.New()
 	i.app.Post("/orchestrator", i.handle)
 	i.app.Post("/orchestrator/chat/stream", i.handleChatStream)
+	i.app.Post("/orchestrator/voice/chat/stream", i.handleVoiceChatStream)
 
 	go func() {
 		logger.Info(fmt.Sprintf("http bridge ingress listening endpoint=%s", i.endpoint))
@@ -123,6 +130,9 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		})
 	}
 
+	if len(bridgeRequest.Payload.VoiceTurns) > 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{Status: "error", Error: "voice batches require the voice stream endpoint"})
+	}
 	if _, source, ok := bridgeInterface(bridgeRequest.Interface); !ok {
 		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{
 			Status: "error",
@@ -187,7 +197,14 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Notice:      notice,
 		Attachments: extractChatAttachments(result),
 		Music:       extractBridgeMusic(result),
+		Voice:       extractBridgeVoice(result),
 	})
+}
+
+func extractBridgeVoice(result core.ProcessResult) map[string]any {
+	domain, _ := result.Result[string(core.DomainCommunications)].(map[string]any)
+	voice, _ := domain["voice"].(map[string]any)
+	return voice
 }
 
 func extractChatAttachments(result core.ProcessResult) []chat.Attachment {
@@ -440,6 +457,12 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 		"account_id":        strings.TrimSpace(request.Payload.AccountID),
 		"event_type":        strings.TrimSpace(request.EventType),
 	}
+	if source == core.SourceDiscord && len(request.Payload.VoiceTurns) > 0 {
+		context["voice_turns"] = request.Payload.VoiceTurns
+		context["voice_channel_id"] = strings.TrimSpace(request.Payload.VoiceChannelID)
+		context["session_key"] = "discord-voice:" + strings.TrimSpace(request.Payload.GuildID) + ":" + strings.TrimSpace(request.Payload.VoiceChannelID)
+		context["force_new_session"] = false
+	}
 	if request.Payload.Direct != nil {
 		context["is_direct_message"] = *request.Payload.Direct
 	}
@@ -506,6 +529,8 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
+	case "voice.synthesize", "voice.transcribe", "voice.wakeword":
+		return strings.TrimSpace(request.EventType), request.Payload.Voice
 	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended":
 		// What follows the command (words, a link, a volume) is read by the Communications
 		// domain; the bridge passes it on as typed.
