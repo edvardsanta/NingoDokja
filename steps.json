@@ -1862,7 +1862,26 @@
                 "Unsupported capabilities refuse before effects; cancellation and same-turn steering remain separate capabilities.",
                 "Bounded normalized observations preserve source/attempt/revision provenance and aggregate limits."
               ],
-              "evidence": []
+              "evidence": [
+                "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min)."
+              ],
+              "checks": [
+                {
+                  "name": "ordering_regression",
+                  "status": "passed",
+                  "detail": "Handler regressions for in-order answering with prior-reply context, independent conversations, cancellation while queued the queue bound and replay of settled/pending send IDs on a full queue (reproduced as a refusal before the fix) pass 5x under -race; with Wait made a no-op, the ordering and cancellation regressions fail."
+                },
+                {
+                  "name": "orchestrator_suite",
+                  "status": "passed",
+                  "detail": "dokja_orch: gofmt, go vet ./... and go test -race ./... passed."
+                },
+                {
+                  "name": "capability_admission",
+                  "status": "skipped",
+                  "detail": "Unsupported-capability refusal, a normalized queued/dispatched observation and ordering for non-chat workflows remain open in 10.6-b."
+                }
+              ]
             },
             {
               "id": "10.6-c",
@@ -1879,7 +1898,7 @@
               "evidence": []
             }
           ],
-          "next_action": "10.6-a.1 and 10.6-a.2 correct stale settlement and paired-ID retry admission. Continue general logical-task/revision/authority/budget mapping at a concrete workflow consumer; preserve existing RunTask IDs and the 08.3 adoption gate."
+          "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; the first 10.6-b batch orders archived chat sends per conversation. Next: explicit capability admission and a normalized queued/dispatched observation, then logical-task/revision/budget mapping at a workflow consumer. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
         }
       ],
       "status_before_review": "in_progress",

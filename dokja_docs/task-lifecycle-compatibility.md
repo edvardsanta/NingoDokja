@@ -127,11 +127,67 @@ fixtures retain existing scope/conflict behavior. Domain fixtures verify input
 validation and explicit refusal without fallback on an unsupported store. Full
 race suites and static checks passed again for both affected modules.
 
+## Ordered sends within a conversation (`10.6-b`, first batch)
+
+The owner's desktop, CLI and TUI share one conversation scope, so two sends to the
+same conversation could be answered at the same time. The later one then built
+its context without the earlier reply, and the replies could settle out of order.
+The owner chose to queue such sends in order rather than refuse them.
+
+The orchestrator now keeps a volatile ordered queue per conversation
+(`core.OrderedQueue`). A send is recorded as a pending turn and enrolled in the
+queue in one admission, so queue order is transcript order. Its context is read
+and the model is asked only after every earlier turn of the same conversation has
+settled; the earlier reply is therefore part of its context. Independent
+conversations are answered concurrently.
+
+| Outcome | Behavior |
+| --- | --- |
+| Accepted and queued | Pending turn recorded at its transcript position; the request waits |
+| Dispatched | The earlier turns settled; context is read and the model is asked |
+| Stopped while queued | Turn fails with `the request stopped while waiting for the earlier reply`; the model was never asked |
+| Refused | Eight sends already wait or run in the conversation; nothing is recorded |
+| Replayed send | Answered from the archive, even when the queue is full; it neither joins nor waits |
+
+A full conversation records nothing new: a repeated send ID is still looked up
+read-only and answered as a replay (or conflicts when its text differs), while a
+new send or a retry is refused.
+
+Waiting counts against the request's own deadline: 120 s for a desktop chat
+stream and the CLI's 2-minute default. With the runtime giving a provider up to
+90 s, a second send behind a slow reply can run out of time and fail as stopped
+while waiting; deeper queues reach that sooner than the bound of eight. A
+desktop stream writes nothing while it waits, so a client that disconnected is
+noticed only at its deadline and keeps its place until then.
+
+This is an observable behavior change for the owner's interfaces: a second send
+to a conversation now returns only after the earlier reply, and there is a new
+refusal message and failure reason.
+
+A retry shares its turn's position, so it does not wait behind a stale attempt of
+the same turn; the attempt fence above still rejects that attempt's result. The
+queue is in memory: a restart forgets it, and startup recovery marks every
+pending turn, queued or running, interrupted. Nothing is resent. A turn that
+fails while a later one is queued cannot be retried, because only the latest
+turn may be retried. The request and response shapes, routes, schema and
+configuration are unchanged; the queued state is not yet exposed as a separate
+progress observation.
+
+Verification: queue unit tests cover position order, independent lanes, same
+position retries, the bound refusing before recording, cancellation and lane
+cleanup. Handler regressions use channel-controlled generations: a second send
+is recorded but not asked until the first reply settles, and then sees it; other
+conversations proceed together; a queued request that stops is failed without a
+generation; a send past the bound is refused unrecorded, while a repeated settled
+or pending send ID is still answered from the archive. Making `Wait` a no-op
+fails the ordering and cancellation regressions. `go vet ./...` and
+`go test -race ./...` passed in `dokja_orch`.
+
 ## Remaining architecture work
 
 `10.6-a` remains open for the general logical-task mapping, state-revision and
 attempt relationships, authority and aggregate-budget contract, and compatibility
-at an actual workflow consumer. `10.6-b` owns input admission/ordering and explicit
-capability outcomes. `10.6-c` owns broader result/report settlement and justified
+at an actual workflow consumer. `10.6-b` still owns explicit capability outcomes, a
+normalized queued/dispatched observation and ordering beyond archived chat. `10.6-c` owns broader result/report settlement and justified
 durable recovery. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.
