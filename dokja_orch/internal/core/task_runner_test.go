@@ -68,8 +68,8 @@ func TestTaskIdentityAndScopeComeFromTheEvent(t *testing.T) {
 		t.Fatalf("scope must be copied from the event: %#v", result.Scope)
 	}
 	again := run(t, taskWorkflow(TaskStep{Name: "a", Run: continueWith(nil)}))
-	if again.AttemptID == result.AttemptID {
-		t.Fatal("every attempt needs its own identity even for the same event")
+	if again.AttemptID == result.AttemptID || again.TaskID == result.TaskID {
+		t.Fatal("each current workspace needs fresh task/attempt IDs even for the same event; logical task identity must be separate")
 	}
 }
 

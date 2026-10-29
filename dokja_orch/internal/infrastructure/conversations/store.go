@@ -289,11 +289,12 @@ func (s *Store) BeginTurn(ctx context.Context, scope conversation.Scope, t conve
 	return t, false, nil
 }
 
-// FinishTurn ends a pending turn of the scope; a turn that already ended keeps its outcome.
+// FinishTurn ends only the named pending attempt. The attempt comparison is in
+// the update, so an old executor cannot settle a turn reopened by RetryTurn.
 func (s *Store) FinishTurn(ctx context.Context, scope conversation.Scope, t conversation.Turn) (conversation.Turn, error) {
 	result, err := s.db.ExecContext(ctx, `UPDATE turns SET reply = ?, state = ?, reason = ?, observed_provider = ?, observed_model = ?, finished_at = ?
-		WHERE id = ? AND state = 'pending' AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)`,
-		t.Reply, string(t.State), t.Reason, t.Provenance.ObservedProvider, t.Provenance.ObservedModel, t.FinishedAt.UnixNano(), t.ID, string(scope))
+		WHERE id = ? AND attempts = ? AND state = 'pending' AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)`,
+		t.Reply, string(t.State), t.Reason, t.Provenance.ObservedProvider, t.Provenance.ObservedModel, t.FinishedAt.UnixNano(), t.ID, t.Attempts, string(scope))
 	if err != nil {
 		return conversation.Turn{}, fmt.Errorf("finish turn: %w", err)
 	}

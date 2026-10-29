@@ -1721,7 +1721,8 @@
             "dokja_docs/session-task-architecture-review.md",
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/conversation-history-plan.md",
-            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md",
+            "dokja_docs/task-lifecycle-compatibility.md"
           ],
           "batches": [
             {
@@ -1735,7 +1736,68 @@
                 "Identity/lifecycle mapping over existing conversation sends and typed workflow attempts",
                 "Compatibility fixtures for retry, revision, terminal and unknown outcomes"
               ],
-              "evidence": []
+              "evidence": [
+                "First compatibility batch maps existing conversation/send/turn/attempt/event/workspace/revision/provider identities and reproduces a stale-attempt archive overwrite. An atomic comparison against the existing attempts column now prevents old completion/failure from settling a retry. General logical-task integration and authority/budget contracts remain pending; see dokja_docs/task-lifecycle-compatibility.md."
+              ],
+              "remaining": [
+                "Define and integrate the general logical-task identity separately from the current per-invocation workspace IDs.",
+                "Specify state-revision, authority and aggregate-budget relationships at a concrete workflow consumer before broader lifecycle/dispatch adoption."
+              ],
+              "compatibility_exception": "Owner authorized continuing the architecture work. Correcting settlement of existing archive attempts and documenting current identity compatibility can proceed independently; the general 10.6 contract/adoption still follows 08.3 and active 08.2 is unchanged.",
+              "batches": [
+                {
+                  "id": "10.6-a.1",
+                  "title": "Map current identities and reject stale archive attempt settlements",
+                  "status": "completed",
+                  "completed_on": "2026-10-29",
+                  "depends_on": [
+                    "08.1"
+                  ],
+                  "worktree": ".worktrees/conversation-attempt-settlement",
+                  "branch": "fix/conversation-attempt-settlement",
+                  "parent_branch": "docs/session-task-architecture",
+                  "deliverables": [
+                    "dokja_docs/task-lifecycle-compatibility.md",
+                    "Atomic archive FinishTurn attempt comparison over the existing schema",
+                    "Independent-connection repository and controlled-overlap handler regressions",
+                    "Current workspace ID compatibility assertion"
+                  ],
+                  "acceptance_criteria": [
+                    "Old completions and failures cannot settle a newer pending retry, including after recovery.",
+                    "Current retry completion and same-send replay retain one turn and accepted answer/provenance.",
+                    "Preserve current workspace task/attempt identity behavior, schema, routes and public contracts."
+                  ],
+                  "evidence": [
+                    "Regression baseline: all four stale completion/failure cases failed before the change, overwriting attempt 2 with attempt 1 output. They pass after the atomic pending/attempt/scope comparison.",
+                    "Controlled application-port overlap verifies an old handler returns no final response and does not mutate the pending retry; current completion and duplicate replay succeed without a third generation."
+                  ],
+                  "checks": [
+                    {
+                      "name": "targeted_identity_settlement",
+                      "status": "passed",
+                      "detail": "go test -race ./internal/infrastructure/conversations ./internal/handlers ./internal/core -run TestOldAttemptCannotSettleARetriedTurn|TestLateArchivedReplyCannotCompleteTheCurrentRetry|TestTaskIdentityAndScopeComeFromTheEvent -count=1 passed (pattern supplied as one quoted argument). Disposable SQLite fixtures only."
+                    },
+                    {
+                      "name": "orchestrator_regression",
+                      "status": "passed",
+                      "detail": "go test -race ./... and go vet ./... passed in dokja_orch."
+                    },
+                    {
+                      "name": "conversation_domain",
+                      "status": "passed",
+                      "detail": "go test -race ./... and go vet ./... passed in dokja_domain/dokja_conversation."
+                    },
+                    {
+                      "name": "live_provider_restart",
+                      "status": "skipped",
+                      "detail": "No live provider, owner database, real process-kill integration or external side effects exercised. Recovery API and independent SQLite connections were tested; no exactly-once claim."
+                    }
+                  ],
+                  "references": [
+                    "dokja_docs/task-lifecycle-compatibility.md"
+                  ]
+                }
+              ]
             },
             {
               "id": "10.6-b",
@@ -1766,7 +1828,7 @@
               "evidence": []
             }
           ],
-          "next_action": "After the cognitive evaluation gate, begin 10.6-a over existing conversation and task contracts, then implement backend dispatch/settlement before exposing new controls. Preserve 08.2 as the active work."
+          "next_action": "10.6-a.1 closes existing archive attempt settlement and records current identity compatibility. Continue 10.6-a with a reviewed general logical-task/revision/authority/budget mapping and a concrete consumer; do not repurpose current RunTask IDs. Full adoption remains behind 08.3."
         }
       ],
       "status_before_review": "in_progress",

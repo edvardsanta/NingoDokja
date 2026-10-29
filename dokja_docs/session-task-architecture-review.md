@@ -5,6 +5,11 @@ must inform application architecture as well as interface design. The completed
 CSS preparation remains useful, but it is not the central architectural adoption.
 This source-based review adjusts planning; it changes no runtime contract.
 
+Implementation follow-up: [identity/lifecycle compatibility baseline](task-lifecycle-compatibility.md)
+records the first `10.6-a` batch. It preserves existing identities and adds an
+atomic archive attempt check; the general task/dispatch/settlement contract
+remains pending.
+
 ## 1. Transferable patterns and current evidence
 
 | Pattern from Cindy | Existing Ningo evidence | Architectural gap or next decision |

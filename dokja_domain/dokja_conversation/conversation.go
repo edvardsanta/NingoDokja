@@ -91,6 +91,8 @@ type Turn struct {
 	State   TurnState
 	Reason  string
 	// Attempts counts the times the turn was sent: 1, and one more for each retry.
+	// A completion/failure carries this snapshot unchanged; it may settle only
+	// that attempt, never a later retry of the same turn.
 	Attempts   int
 	Provenance Provenance
 	CreatedAt  time.Time
@@ -140,7 +142,8 @@ type Store interface {
 	// one attempt more. Only the conversation's latest turn may be retried; anything else, or a turn
 	// in any other state, is ErrConflict.
 	RetryTurn(ctx context.Context, scope Scope, turnID string, at time.Time) (Turn, error)
-	// FinishTurn ends a pending turn; a turn that already ended answers ErrConflict.
+	// FinishTurn ends the pending turn only if its stored Attempts matches t.Attempts.
+	// A stale attempt or already ended turn answers ErrConflict without mutation.
 	FinishTurn(ctx context.Context, scope Scope, t Turn) (Turn, error)
 	// Turns gives up to limit turns before seq (0: the latest), oldest first.
 	Turns(ctx context.Context, scope Scope, conversationID string, beforeSeq int, limit int) ([]Turn, error)
