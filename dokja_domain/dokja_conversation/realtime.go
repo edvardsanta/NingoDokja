@@ -24,6 +24,8 @@ type RealtimeMessage struct {
 	ReplyTo         string    `json:"reply_to,omitempty"`
 }
 type RealtimeSession struct {
+	channelWide     bool
+	startedBy       string
 	SessionID       string            `json:"session_id"`
 	GuildID         string            `json:"guild_id"`
 	ChannelID       string            `json:"channel_id"`
@@ -37,7 +39,7 @@ type RealtimeSession struct {
 
 // ConversationContextEngine's first projection is a bounded, ephemeral observation
 // journal. Semantic assignments are deliberately unresolved until supported by evidence.
-// Consent is per participant and session; a room administrator cannot consent for others.
+// Channel observers admit speakers resolved by the authorized Discord adapter.
 type ConversationContextEngine struct {
 	mu       sync.Mutex
 	sessions map[string]RealtimeSession
@@ -59,6 +61,16 @@ func (e *ConversationContextEngine) prune() {
 	}
 }
 func (e *ConversationContextEngine) Start(id, guild, channel, origin, speaker string) error {
+	return e.start(id, guild, channel, origin, speaker, false)
+}
+
+// StartChannel starts a silent observer for the whole voice channel.
+// The legacy Start/Consent API remains available to existing callers.
+func (e *ConversationContextEngine) StartChannel(id, guild, channel, origin, speaker string) error {
+	return e.start(id, guild, channel, origin, speaker, true)
+}
+
+func (e *ConversationContextEngine) start(id, guild, channel, origin, speaker string, channelWide bool) error {
 	if !bounded(id, 128) || !bounded(guild, 100) || !bounded(channel, 100) || !bounded(origin, 100) || !bounded(speaker, 100) {
 		return ErrRealtime
 	}
@@ -66,7 +78,7 @@ func (e *ConversationContextEngine) Start(id, guild, channel, origin, speaker st
 	defer e.mu.Unlock()
 	e.prune()
 	if prior, ok := e.sessions[id]; ok {
-		if prior.GuildID == guild && prior.ChannelID == channel && prior.OriginChannelID == origin && len(prior.Consenting) > 0 && prior.Consenting[0] == speaker && prior.Active {
+		if prior.GuildID == guild && prior.ChannelID == channel && prior.OriginChannelID == origin && prior.startedBy == speaker && prior.channelWide == channelWide && prior.Active {
 			return nil
 		}
 		return ErrRealtime
@@ -74,7 +86,7 @@ func (e *ConversationContextEngine) Start(id, guild, channel, origin, speaker st
 	if len(e.sessions) >= 32 {
 		return errors.New("realtime session capacity reached")
 	}
-	e.sessions[id] = RealtimeSession{SessionID: id, GuildID: guild, ChannelID: channel, OriginChannelID: origin, Mode: "observer", Active: true, Consenting: []string{speaker}, Messages: []RealtimeMessage{}, UpdatedAt: e.now()}
+	e.sessions[id] = RealtimeSession{channelWide: channelWide, startedBy: speaker, SessionID: id, GuildID: guild, ChannelID: channel, OriginChannelID: origin, Mode: "observer", Active: true, Consenting: []string{speaker}, Messages: []RealtimeMessage{}, UpdatedAt: e.now()}
 	return nil
 }
 func allowed(s RealtimeSession, speaker string) bool {
@@ -90,7 +102,7 @@ func (e *ConversationContextEngine) Consent(id, guild, origin, speaker string, j
 	defer e.mu.Unlock()
 	e.prune()
 	s, ok := e.sessions[id]
-	if !ok || !s.Active || s.GuildID != guild || s.OriginChannelID != origin || !bounded(speaker, 100) {
+	if !ok || !s.Active || s.channelWide || s.GuildID != guild || s.OriginChannelID != origin || !bounded(speaker, 100) {
 		return ErrRealtime
 	}
 	if join {
@@ -128,8 +140,14 @@ func (e *ConversationContextEngine) Observe(guild, origin string, m RealtimeMess
 	defer e.mu.Unlock()
 	e.prune()
 	s, ok := e.sessions[m.SessionID]
-	if !ok || !s.Active || s.GuildID != guild || s.OriginChannelID != origin || !allowed(s, m.SpeakerID) {
+	if !ok || !s.Active || s.GuildID != guild || s.OriginChannelID != origin || (!s.channelWide && !allowed(s, m.SpeakerID)) {
 		return ErrRealtime
+	}
+	if !allowed(s, m.SpeakerID) {
+		if len(s.Consenting) >= 16 {
+			return ErrRealtime
+		}
+		s.Consenting = append(s.Consenting, m.SpeakerID)
 	}
 	// Ingest never trusts semantic metadata supplied by the interface.
 	m.ThreadIDs = []string{}
@@ -176,7 +194,7 @@ func (e *ConversationContextEngine) Stop(id, guild, origin, speaker string) erro
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	s, ok := e.sessions[id]
-	if !ok || s.GuildID != guild || s.OriginChannelID != origin || !allowed(s, speaker) {
+	if !ok || s.GuildID != guild || s.OriginChannelID != origin || !bounded(speaker, 100) || (!s.channelWide && !allowed(s, speaker)) {
 		return ErrRealtime
 	}
 	// End means delete in this ephemeral MVP. No implicit long-term retention.

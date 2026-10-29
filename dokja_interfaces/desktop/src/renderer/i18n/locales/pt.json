@@ -521,7 +521,7 @@
   "communications_servers_unavailable": "O Ningo não consegue ler {count} dos servidores configurados.",
   "nav_realtime": "Tempo real",
   "realtime_intro": "Observador ao vivo",
-  "realtime_hint": "Inicie /conversation_start no Discord. Cada pessoa autoriza com /conversation_join. Ningo permanece em silêncio.",
+  "realtime_hint": "Use /conversation_start no Discord para transcrever o canal de voz e /conversation_stop para encerrar e excluir. Ningo permanece em silêncio.",
   "realtime_limits": "Transcrição final por segmento · Atualização de 1 segundo · Histórico temporário · Assuntos ainda não associados",
   "realtime_empty": "Nenhuma sessão de observação autorizada está ativa.",
   "realtime_session": "Sessão de voz {number}",

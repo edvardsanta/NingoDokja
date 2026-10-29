@@ -129,3 +129,30 @@ func TestRealtimeCaptureOrderSurvivesOutOfOrderRecognition(t *testing.T) {
 		t.Fatal("recognition order became conversation order")
 	}
 }
+
+func TestChannelObserverAdmitsSpeakersWithoutJoiningAndRetainsScope(t *testing.T) {
+	e := NewConversationContextEngine()
+	if err := e.StartChannel("session", "guild", "voice", "text", "a"); err != nil {
+		t.Fatal(err)
+	}
+	m := observation("one", "b", "second speaker")
+	if e.Observe("other", "text", m) == nil {
+		t.Fatal("foreign guild accepted")
+	}
+	if e.Observe("guild", "other", m) == nil {
+		t.Fatal("foreign origin accepted")
+	}
+	if err := e.Observe("guild", "text", m); err != nil {
+		t.Fatal(err)
+	}
+	snap := e.Snapshot()
+	if len(snap[0].Messages) != 1 || len(snap[0].Consenting) != 2 {
+		t.Fatal("channel speaker missing")
+	}
+	if err := e.Stop("session", "guild", "text", "b"); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Snapshot()) != 0 || e.Observe("guild", "text", m) == nil {
+		t.Fatal("stopped observer admitted evidence")
+	}
+}

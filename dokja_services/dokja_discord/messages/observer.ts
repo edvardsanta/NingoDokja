@@ -8,10 +8,6 @@ const MESSAGES = {
     "pt-BR": "O observador precisa de um controle de voz em um servidor",
     en: "Observer requires a guild voice controller",
   },
-  onlyParticipant: {
-    "pt-BR": "Somente um participante que consentiu pode encerrar este observador",
-    en: "Only a consenting participant can stop this observer",
-  },
   stopped: {
     "pt-BR": "Observador de conversa encerrado; transcrições temporárias excluídas.",
     en: "Conversation observer stopped; ephemeral transcripts deleted.",
@@ -20,13 +16,9 @@ const MESSAGES = {
     "pt-BR": "Nenhum observador está ativo",
     en: "No observer is active",
   },
-  left: {
-    "pt-BR": "Seu consentimento para transcrição foi retirado e suas transcrições temporárias foram excluídas.",
-    en: "Your transcription consent was withdrawn and your ephemeral transcripts deleted.",
-  },
   alreadyActive: {
-    "pt-BR": "Já existe um observador; use /conversation_join para consentir",
-    en: "An observer already exists; use /conversation_join to consent",
+    "pt-BR": "Já existe um observador neste servidor",
+    en: "An observer already exists in this server",
   },
   disconnected: {
     "pt-BR": "Observador de conversa encerrado. A sessão não aceita mais áudio; a exclusão do registro temporário foi solicitada.",
@@ -37,36 +29,16 @@ const MESSAGES = {
     en: "Observer stopped because transcript delivery failed. Audio capture is disabled; deletion was requested and remaining ephemeral data expires after inactivity.",
   },
   active: {
-    "pt-BR": "Observador de transcrição ativo. Somente participantes que consentiram explicitamente são capturados. Use /conversation_join para participar, /conversation_leave para retirar o consentimento ou /conversation_stop para encerrar e excluir as transcrições. Abra Realtime no Dokja Desktop para ver as transcrições finalizadas de cada segmento. Nenhum áudio bruto é armazenado; as transcrições expiram após 15 minutos de inatividade. Ningo não falará neste modo.",
-    en: "Transcription observer active. Only explicitly consenting participants are captured. Use /conversation_join to opt in, /conversation_leave to withdraw, or /conversation_stop to end and delete. Open Realtime in Dokja Desktop to view segment-final transcripts. No raw audio is retained; transcripts expire after 15 minutes of inactivity. Ningo will not speak in this mode.",
+    "pt-BR": "Observador de transcrição ativo. O canal de voz está sendo transcrito. Use /conversation_stop para encerrar e excluir as transcrições. Abra Realtime no Dokja Desktop para ver as transcrições finalizadas de cada segmento. Nenhum áudio bruto é armazenado; as transcrições expiram após 15 minutos de inatividade. Ningo não falará neste modo.",
+    en: "Transcription observer active. The voice channel is being transcribed. Use /conversation_stop to end and delete. Open Realtime in Dokja Desktop to view segment-final transcripts. No raw audio is retained; transcripts expire after 15 minutes of inactivity. Ningo will not speak in this mode.",
   },
   joinChannel: {
     "pt-BR": "Entre no canal de voz do observador e use o canal de texto original",
     en: "Join the observer voice channel and use the original text channel",
   },
-  newSession: {
-    "pt-BR": "Inicie uma nova sessão do observador antes de consentir novamente; o áudio na fila desta sessão foi invalidado",
-    en: "Start a new observer session before consenting again; queued audio from this session is invalidated",
-  },
-  ended: {
-    "pt-BR": "O observador foi encerrado durante sua entrada",
-    en: "Observer ended while joining",
-  },
-  joined: {
-    "pt-BR": "Você consentiu com a transcrição temporária nesta sessão do observador. Use /conversation_leave para retirar o consentimento.",
-    en: "You consented to ephemeral transcription in this observer session. Use /conversation_leave to withdraw.",
-  },
   conversation_start: {
-    "pt-BR": "Inicie um observador para quem consentir; Ningo fica em silêncio.",
-    en: "Start an observer for consenting speakers; Ningo stays silent.",
-  },
-  conversation_join: {
-    "pt-BR": "Consinta com a transcrição na sessão ativa do observador.",
-    en: "Consent to transcription in the active observer session.",
-  },
-  conversation_leave: {
-    "pt-BR": "Retire o consentimento e exclua suas transcrições temporárias.",
-    en: "Withdraw consent and delete your ephemeral transcripts.",
+    "pt-BR": "Inicie a transcrição do canal de voz; Ningo fica em silêncio.",
+    en: "Start transcribing the voice channel; Ningo stays silent.",
   },
   conversation_stop: {
     "pt-BR": "Encerre o observador e exclua suas transcrições temporárias.",

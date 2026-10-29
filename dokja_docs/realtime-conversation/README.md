@@ -8,32 +8,25 @@ continue to govern this implementation.
 
 ## First vertical flow
 
-Implemented in the observer worktree:
-
-1. `/conversation_start` joins the command author's current guild voice channel.
-   The public command response announces temporary transcription. Starting grants
-   consent only for that author, not everybody in the room.
-2. Other speakers use `/conversation_join` from the original text channel while
-   connected to the same voice channel. Unconsenting streams are not subscribed.
-3. Discord's individual participant streams pass through the existing bounded
+1. `/conversation_start` joins the command author's current guild voice channel
+   and starts transcribing its human speakers. The public reply announces capture.
+   There are no join/leave commands or per-speaker opt-in steps.
+2. Discord's individual participant streams pass through the existing bounded
    capture/VAD/ASR path. Only final recognized segments reach `realtime.observe`.
    Speaker identity comes from the authorized interface event, not transcript text.
-4. An independently routed Conversation-domain observer journal accepts bounded,
-   revisioned evidence. This route never calls Chat generation, TTS or an LLM.
-5. Dokja Desktop's Realtime workspace polls a bounded snapshot through the existing
-   shell allowlist and orchestrator transport. It shows session selection,
-   participant attribution, capture timestamps and chronological final transcripts.
-6. `/conversation_leave` withdraws that speaker's consent and deletes their
-   ephemeral evidence. Consent cannot be regranted within the same session; start
-   a fresh session to avoid admitting audio captured before withdrawal.
-7. `/conversation_stop` closes capture and deletes the journal. Any consenting
-   participant may stop. Replacing/disconnecting the listener requests deletion
-   and invalidates the local consent set. If that request cannot reach the
+3. The Conversation domain accepts bounded, revisioned evidence through the
+   orchestrator. This route never calls Chat generation, TTS or an LLM.
+4. Desktop polls the existing snapshot route and displays session-relative speaker
+   attribution, local capture times and chronological final transcripts. UTC capture
+   instants remain unchanged on the wire.
+5. `/conversation_stop` closes capture and deletes the journal. A human member of
+   the same voice channel can stop it from the original text channel. Replacing or
+   disconnecting the listener also requests deletion. If deletion cannot reach the
    orchestrator, the journal expires after 15 minutes of inactivity.
 
 No raw audio is written by the observer. Audio exists transiently in bounded
 capture/recognition buffers. Journals are process-local, capped at 32 sessions,
-16 consenting participants, 512 messages and 256,000 transcript bytes per session.
+16 tracked speakers, 512 messages and 256,000 transcript bytes per session.
 Snapshots share a 256,000-byte transcript and 512-message budget across sessions; metadata adds
 bounded overhead. Older messages outside the retained window are discarded in
 this ephemeral MVP. Nothing is imported into Knowledge or durable Memory.
@@ -41,8 +34,7 @@ Stopping or restarting the orchestrator loses these observer journals. This is
 an explicit privacy-first MVP boundary, not durable conversation storage.
 
 The existing `/voice_chat_start` and music commands retain their existing behavior.
-Use the new observer commands for the consent-gated silent workflow. This batch
-does not claim to retrofit all legacy capture paths with the new consent contract.
+Use the observer start/stop commands for silent channel transcription.
 
 ## Current limits
 
@@ -72,9 +64,6 @@ does not claim to retrofit all legacy capture paths with the new consent contrac
 Use the repository's existing compose stacks and development commands. There are
 no new environment variables, services, ports or volumes for the observer MVP.
 Use real configured speech providers; the stub provider is not a valid live test.
-Do not invoke the opt-in observer in a channel until its participants have been
-informed and explicitly opted in. The one command author does not authorize
-other participants' speech or retention on their behalf.
 
 From the relevant modules:
 
@@ -91,11 +80,10 @@ From the relevant modules:
  pnpm build
 ```
 
-A live acceptance check uses two consenting test participants and one person who
-has not opted in: start, opt in the second participant, speak overlapping known
-sentences, inspect Desktop attribution, withdraw the second person's consent,
-then stop. Confirm no further evidence appears after withdrawal/stop. Test with
-exact known sentences rather than asking the model whether it understood.
+A live acceptance check uses two test speakers: start once, speak overlapping known
+sentences, verify both speakers appear without extra commands, inspect Desktop
+local timestamps, then stop. Confirm no further evidence appears after stop and
+the journal is deleted. Use known sentences to evaluate transcription accuracy.
 Production rollout remains subject to the repository's deployment approval rule.
 
 See [architecture and contracts](architecture.md) for provider capabilities and

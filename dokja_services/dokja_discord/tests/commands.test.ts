@@ -8,7 +8,7 @@ test("createCommands exposes dokja slash commands", () => {
   assert.deepEqual(
     commands.map((command) => command.name),
     [
-      "conversation_start", "conversation_join", "conversation_leave", "conversation_stop",
+      "conversation_start", "conversation_stop",
       "chat",
       "meme_fetch",
       "meme_status",

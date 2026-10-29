@@ -12,10 +12,10 @@ replacing existing Go components with an additional Node backend.
 | AudioStreamProcessor / VoiceActivityDetector | Existing voice adapter and Communications voice integration | Decode/downmix/normalize, VAD/endpointing; no semantic topic decisions |
 | TranscriptionService | Stateless voice service via orchestrator | Provider capability negotiation, per-stream hypotheses and finalized revisions |
 | ConversationEventBus / LLMOrchestrator | Existing orchestrator routes/workflows | Independently admit observations; sequence projection jobs without capture depending on model latency |
-| ConversationContextEngine | Conversation domain | Evidence identity, consent/scope, revision lifecycle, bounded journal; future thread/reply hypotheses and validated state transitions |
+| ConversationContextEngine | Conversation domain | Evidence identity, channel scope, revision lifecycle, bounded journal; future thread/reply hypotheses and validated state transitions |
 | TopicDetector / ThreadResolver / ContextMemoryManager | Future Conversation-domain policies with stateless inference adapters | Attributed evidence, unresolved alternatives, source references, correction-aware summaries; no replacement of transcript text by generated prose |
 | RealtimeGateway | Existing orchestrator ingress and Desktop transport | Current bounded reads; future incremental subscription/replay with authorization and gap reporting |
-| Frontend | Existing Dokja Desktop React workspace and Discord commands | Display/control consent, original chronology, independent semantic projection, lifecycle/latency status |
+| Frontend | Existing Dokja Desktop React workspace and Discord commands | Start/stop capture, local timestamps, original chronology, independent semantic projection, lifecycle/latency status |
 
 No additional Redis, public HTTP listener, frontend application, database container
 or distributed broker is needed for the observer slice. Existing ZeroMQ requests
@@ -33,12 +33,18 @@ guild and origin text channel. The domain does not trust a payload speaker ID.
 
 | Operation | Authorized source | Payload | Result |
 | --- | --- | --- | --- |
-| `realtime.start` | Authenticated Discord gateway after inbound policy | `session_id`, `voice_channel_id` | New silent observer; only actor consents |
-| `realtime.join` | Same gateway, same guild/origin | `session_id` | Actor opts in; interface verifies current voice membership |
-| `realtime.leave` | Same gateway, same guild/origin | `session_id` | Actor revoked; their retained messages removed |
-| `realtime.observe` | Same gateway, active consenting speaker | Message fields below | Idempotent final evidence admission; no generated reply |
-| `realtime.stop` | Same gateway, consenting actor | `session_id` | Delete ephemeral journal |
+| `realtime.start` | Authenticated Discord gateway after inbound policy | `session_id`, `voice_channel_id` | New silent observer for the voice channel |
+| `realtime.observe` | Same gateway, speaker resolved from the active voice channel | Message fields below | Idempotent final evidence admission; no generated reply |
+| `realtime.stop` | Same gateway, same voice channel/origin | `session_id` | Delete ephemeral journal |
 | `realtime.snapshot` | Local Desktop source only | None | Bounded session/transcript projection |
+
+The Discord interface exposes only `/conversation_start` and `/conversation_stop`.
+The orchestrator starts channel-wide admission in the domain. The legacy domain
+`Start`/`Consent` API and join/leave routes remain for compatibility with older
+callers; they do not manage channel-wide sessions. The snapshot's existing
+`consenting_participants` key is retained for wire compatibility and lists tracked
+speakers in channel-wide sessions. The adapter excludes bots and resolves actual
+voice membership before capture; the domain retains guild/origin scope checks.
 
 A final message has `message_id`, `session_id`, event-derived `speaker_id`,
 `timestamp_start`, `timestamp_end`, `text`, `transcription_status: final`, and
@@ -122,8 +128,8 @@ No database migration or embedding model is selected by this observer batch.
 
 ## Delivery sequence and acceptance
 
-1. **Observer vertical slice (this batch):** consenting stream -> existing final
-   ASR -> independent evidence journal -> Desktop view. Verify revocation, scope,
+1. **Observer vertical slice:** voice-channel stream -> existing final
+   ASR -> independent evidence journal -> Desktop view. Verify stop/deletion, scope,
    duplicates, revisions, overlap and unavailable model independence.
 2. **Incremental perception:** provider abstraction plus a real streaming adapter;
    partial/final revisions; bounded subscriptions instead of one-second polling;

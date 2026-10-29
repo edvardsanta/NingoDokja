@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { formatAgo, formatNumber } from "../src/renderer/i18n/format.js";
+import { formatAgo, formatNumber, formatTime } from "../src/renderer/i18n/format.js";
 
 test("English writes a decimal point", () => {
   assert.equal(formatNumber("en", 0.081, 3), "0.081");
@@ -54,4 +54,21 @@ test("the largest whole unit is used, never rounded up", () => {
 
 test("text that is not a time says nothing", () => {
   for (const text of ["", "yesterday", "2026-13-45"]) assert.equal(formatAgo("en", text, NOW), "", text);
+});
+
+// Pin runtime timezone so the UTC-slicing regression fails on every host.
+test("capture timestamps use the local timezone in either screen language", () => {
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = "America/Sao_Paulo";
+    for (const locale of ["en", "pt"] as const) {
+      assert.equal(formatTime(locale, "2026-10-29T16:24:04Z"), "13:24:04");
+      assert.equal(formatTime(locale, "2026-10-29T00:24:04Z"), "21:24:04");
+      assert.equal(formatTime(locale, "2026-10-29T13:24:04-03:00"), "13:24:04");
+      assert.equal(formatTime(locale, "not a time"), "");
+    }
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
 });

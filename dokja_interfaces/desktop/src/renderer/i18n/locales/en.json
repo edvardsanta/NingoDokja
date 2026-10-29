@@ -521,7 +521,7 @@
   "communications_servers_unavailable": "Ningo cannot read {count} of the configured servers.",
   "nav_realtime": "Realtime",
   "realtime_intro": "Live observer",
-  "realtime_hint": "Start /conversation_start in Discord. Each speaker opts in with /conversation_join. Ningo stays silent.",
+  "realtime_hint": "Use /conversation_start in Discord to transcribe the voice channel and /conversation_stop to end and delete. Ningo stays silent.",
   "realtime_limits": "Segment-final transcription · 1 second refresh · Ephemeral history · Topic associations pending",
   "realtime_empty": "No consenting observer sessions are active.",
   "realtime_session": "Voice session {number}",
