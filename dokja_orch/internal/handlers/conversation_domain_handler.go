@@ -103,6 +103,8 @@ func archiveError(err error) error {
 		return conversation.ErrConflict
 	case errors.Is(err, conversation.ErrInvalid):
 		return conversation.ErrInvalid
+	case errors.Is(err, conversation.ErrUnavailable):
+		return conversation.ErrUnavailable
 	default:
 		return fmt.Errorf("the conversation archive could not be read or written")
 	}

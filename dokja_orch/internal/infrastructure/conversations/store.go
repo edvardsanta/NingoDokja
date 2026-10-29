@@ -69,6 +69,7 @@ var migrations = []string{
 type Store struct{ db *sql.DB }
 
 var _ conversation.Store = (*Store)(nil)
+var _ conversation.ConversationRetryStore = (*Store)(nil)
 
 // Open creates the archive if needed, readable by its owner only, and applies pending migrations. A
 // file from a newer build is refused rather than read wrongly.
@@ -304,12 +305,26 @@ func (s *Store) FinishTurn(ctx context.Context, scope conversation.Scope, t conv
 // RetryTurn reopens the conversation's latest turn when it failed or was interrupted. The condition
 // is in the update itself, so two retries of the same turn cannot both win.
 func (s *Store) RetryTurn(ctx context.Context, scope conversation.Scope, turnID string, at time.Time) (conversation.Turn, error) {
+	return s.retryTurn(ctx, scope, turnID, at, "")
+}
+
+// RetryTurnInConversation binds the conversation identity in the retry update,
+// before a turn or its conversation revision can change.
+func (s *Store) RetryTurnInConversation(ctx context.Context, scope conversation.Scope, conversationID, turnID string, at time.Time) (conversation.Turn, error) {
+	if conversationID == "" {
+		return conversation.Turn{}, conversation.ErrNotFound
+	}
+	return s.retryTurn(ctx, scope, turnID, at, conversationID)
+}
+
+func (s *Store) retryTurn(ctx context.Context, scope conversation.Scope, turnID string, at time.Time, conversationID string) (conversation.Turn, error) {
 	result, err := s.db.ExecContext(ctx, `UPDATE turns SET state = 'pending', reply = '', reason = '', observed_provider = '', observed_model = '',
 			finished_at = 0, attempts = attempts + 1
 		WHERE id = ? AND state IN ('failed', 'interrupted')
+			AND (? = '' OR conversation_id = ?)
 			AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)
 			AND seq = (SELECT MAX(seq) FROM turns AS latest WHERE latest.conversation_id = turns.conversation_id)`,
-		turnID, string(scope))
+		turnID, conversationID, conversationID, string(scope))
 	if err != nil {
 		return conversation.Turn{}, fmt.Errorf("retry turn: %w", err)
 	}
@@ -319,7 +334,11 @@ func (s *Store) RetryTurn(ctx context.Context, scope conversation.Scope, turnID 
 			return conversation.Turn{}, err
 		}
 	}
-	return s.reread(ctx, scope, turnID, result)
+	stored, err := s.reread(ctx, scope, turnID, result)
+	if conversationID != "" && stored.ConversationID != "" && stored.ConversationID != conversationID {
+		return conversation.Turn{}, conversation.ErrNotFound
+	}
+	return stored, err
 }
 
 // reread gives back the turn after a conditional update: ErrNotFound when the scope has no such

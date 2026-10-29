@@ -1737,7 +1737,8 @@
                 "Compatibility fixtures for retry, revision, terminal and unknown outcomes"
               ],
               "evidence": [
-                "First compatibility batch maps existing conversation/send/turn/attempt/event/workspace/revision/provider identities and reproduces a stale-attempt archive overwrite. An atomic comparison against the existing attempts column now prevents old completion/failure from settling a retry. General logical-task integration and authority/budget contracts remain pending; see dokja_docs/task-lifecycle-compatibility.md."
+                "First compatibility batch maps existing conversation/send/turn/attempt/event/workspace/revision/provider identities and reproduces a stale-attempt archive overwrite. An atomic comparison against the existing attempts column now prevents old completion/failure from settling a retry. General logical-task integration and authority/budget contracts remain pending; see dokja_docs/task-lifecycle-compatibility.md.",
+                "Second compatibility correction binds conversation and turn identity before retry mutation through an additive atomic storage capability. Rejected mismatches preserve both conversations and perform no inference. Existing store/turn-only APIs and public request/schema contracts remain compatible; general task identity/authority/budget work remains open."
               ],
               "remaining": [
                 "Define and integrate the general logical-task identity separately from the current per-invocation workspace IDs.",
@@ -1796,6 +1797,56 @@
                   "references": [
                     "dokja_docs/task-lifecycle-compatibility.md"
                   ]
+                },
+                {
+                  "id": "10.6-a.2",
+                  "title": "Bind retry admission to the stated conversation before mutation",
+                  "status": "completed",
+                  "completed_on": "2026-10-29",
+                  "depends_on": [
+                    "10.6-a.1"
+                  ],
+                  "worktree": ".worktrees/conversation-attempt-settlement",
+                  "branch": "fix/conversation-attempt-settlement",
+                  "deliverables": [
+                    "Additive domain ConversationRetryStore capability and RetryInConversation operation",
+                    "Atomic paired conversation/turn retry condition in the existing archive adapter",
+                    "Handler/domain/repository regressions for mismatches, unsupported stores and preserved conflict behavior"
+                  ],
+                  "acceptance_criteria": [
+                    "A retry naming a turn from another conversation refuses before changing either conversation or invoking inference.",
+                    "Valid paired-ID retries, latest-turn conflicts, unknown turns, foreign scopes and existing turn-only callers retain their intended behavior.",
+                    "Unsupported stores refuse the atomic scoped capability without falling back to mutation followed by validation."
+                  ],
+                  "evidence": [
+                    "Baseline handler fixtures reproduced the rejected-but-mutating retry for failed and interrupted turns: the other turn became pending and attempts increased. The domain now validates inputs and delegates the atomic paired-ID condition to storage; the handler no longer checks conversation membership after mutation.",
+                    "The original Store interface and turn-only retry API remain unchanged. The SQL update uses bound values and the existing schema; paired-ID mismatch returns not found without exposing another conversation record."
+                  ],
+                  "checks": [
+                    {
+                      "name": "paired_retry_regression",
+                      "status": "passed",
+                      "detail": "Targeted orchestrator race tests passed for paired retry, earlier/unknown/foreign-scope cases, previous stale-attempt cases and valid chat retry. Domain fixtures verify invalid input and explicit unsupported capability without fallback."
+                    },
+                    {
+                      "name": "orchestrator_regression",
+                      "status": "passed",
+                      "detail": "go test -race ./... and go vet ./... passed in dokja_orch."
+                    },
+                    {
+                      "name": "conversation_domain",
+                      "status": "passed",
+                      "detail": "go test -race ./... and go vet ./... passed in dokja_domain/dokja_conversation."
+                    },
+                    {
+                      "name": "live_accounts_and_data",
+                      "status": "skipped",
+                      "detail": "Disposable SQLite fixtures and fake models only; no owner database, live provider, platform message, production deploy or full process-restart integration."
+                    }
+                  ],
+                  "references": [
+                    "dokja_docs/task-lifecycle-compatibility.md"
+                  ]
                 }
               ]
             },
@@ -1828,7 +1879,7 @@
               "evidence": []
             }
           ],
-          "next_action": "10.6-a.1 closes existing archive attempt settlement and records current identity compatibility. Continue 10.6-a with a reviewed general logical-task/revision/authority/budget mapping and a concrete consumer; do not repurpose current RunTask IDs. Full adoption remains behind 08.3."
+          "next_action": "10.6-a.1 and 10.6-a.2 correct stale settlement and paired-ID retry admission. Continue general logical-task/revision/authority/budget mapping at a concrete workflow consumer; preserve existing RunTask IDs and the 08.3 adoption gate."
         }
       ],
       "status_before_review": "in_progress",

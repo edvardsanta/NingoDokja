@@ -53,12 +53,9 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 
 	var turn conversation.Turn
 	if retryID != "" {
-		turn, err = h.archive.Retry(ctx, scope, retryID)
+		turn, err = h.archive.RetryInConversation(ctx, scope, held.ID, retryID)
 		if err != nil {
 			return nil, archiveError(err)
-		}
-		if turn.ConversationID != held.ID {
-			return nil, conversation.ErrNotFound
 		}
 	} else {
 		var replayed bool

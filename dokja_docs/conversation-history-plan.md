@@ -6,7 +6,8 @@ planned. Tracks step 09.5.
 Attempt-settlement correction (2026-10-29):
 [identity/lifecycle compatibility](task-lifecycle-compatibility.md) records the
 atomic attempt check that prevents an old completion/failure from settling a
-retried turn. Existing IDs, schema and public actions are preserved; the broader
+retried turn, and binds the conversation/turn pair before retry mutation.
+Existing IDs, schema and public actions are preserved; the broader
 task lifecycle and history interface rollout remain separate work.
 
 ## Current evidence

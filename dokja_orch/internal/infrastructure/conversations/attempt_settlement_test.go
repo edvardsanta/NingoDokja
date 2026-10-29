@@ -73,3 +73,44 @@ func TestOldAttemptCannotSettleARetriedTurn(t *testing.T) {
 		}
 	}
 }
+
+func TestConversationBoundRetryPreservesExistingConflictAndScopeRules(t *testing.T) {
+	s, archive := open(t, filepath.Join(t.TempDir(), FileName))
+	held, err := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, _, err := archive.Send(ctx, conversation.OwnerScope, held.ID, "send-0001", "First", conversation.Provenance{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.Fail(ctx, conversation.OwnerScope, first, "Unavailable"); err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := archive.Send(ctx, conversation.OwnerScope, held.ID, "send-0002", "Second", conversation.Provenance{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.Fail(ctx, conversation.OwnerScope, second, "Unavailable"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.RetryInConversation(ctx, conversation.OwnerScope, held.ID, first.ID); !errors.Is(err, conversation.ErrConflict) {
+		t.Fatal("earlier turn in the right conversation must remain a conflict", err)
+	}
+	if _, err := archive.RetryInConversation(ctx, conversation.OwnerScope, held.ID, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); !errors.Is(err, conversation.ErrNotFound) {
+		t.Fatal("unknown turn must not become a conflict", err)
+	}
+	if _, err := s.RetryTurnInConversation(ctx, "other", held.ID, second.ID, time.Now()); !errors.Is(err, conversation.ErrNotFound) {
+		t.Fatal("another scope must see no turn", err)
+	}
+	if _, err := s.RetryTurnInConversation(ctx, conversation.OwnerScope, "", second.ID, time.Now()); !errors.Is(err, conversation.ErrNotFound) {
+		t.Fatal("scoped storage operation must not accept an empty conversation", err)
+	}
+	retried, err := archive.RetryInConversation(ctx, conversation.OwnerScope, held.ID, second.ID)
+	if err != nil || retried.ID != second.ID || retried.Attempts != 2 || retried.State != conversation.TurnPending {
+		t.Fatal(retried, err)
+	}
+	if _, err := archive.RetryInConversation(ctx, conversation.OwnerScope, held.ID, second.ID); !errors.Is(err, conversation.ErrConflict) {
+		t.Fatal("a second retry must not be admitted", err)
+	}
+}

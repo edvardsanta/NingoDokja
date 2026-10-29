@@ -59,12 +59,38 @@ does not introduce a new preview-retraction or routing protocol.
 
 ## Compatibility and rollback
 
+### Bind retry admission to the stated conversation
+
+A retry request names both a conversation and a turn. Those identities must
+match before mutation, not after reopening a turn. Previously the handler called
+the turn-only retry operation and then compared the returned conversation ID.
+A mismatched request returned not found but had already reopened another
+conversation's turn and increased its attempt count/revision.
+
+`Archive.RetryInConversation` now validates the full request and requires the
+additive `ConversationRetryStore` capability. The SQLite adapter includes the
+conversation identity in the retry update; mismatches return not found without
+changing either conversation. Earlier turns of the matching conversation and
+already-pending retries retain their conflict behavior.
+
+The original `Store` interface, `Archive.Retry` and turn-only repository method
+remain available for existing callers. A store lacking the atomic paired-ID
+capability refuses the conversation-bound operation explicitly; it never falls
+back to a mutation followed by a post-write identity check. The production
+adapter implements the new capability. No public request shape or schema changes.
+
+### Preserved contracts
+
 - Preserve event envelope, routes/actions, public response shapes, interface
   commands, provider contracts, configuration and Compose files.
 - Preserve SQLite schema/version, database location and existing archive records.
   Use the already-persisted attempt counter; no data conversion is required.
 - Preserve valid current-attempt completion/failure, same-send replay and explicit
   retry behavior. The corrected behavior is rejection of stale settlements.
+- Reject mismatched conversation/turn retries before mutation or generation.
+  Preserve not-found/conflict results for unknown turns, foreign scopes, earlier
+  matching turns and repeated retries. Unsupported custom stores report
+  unavailable instead of attempting an unsafe fallback.
 - Keep the current task runner's fresh-ID behavior and volatile state semantics.
   A stronger compatibility assertion guards against changing them accidentally.
 - Reverting this batch requires no migration, but restores the stale-attempt
@@ -92,6 +118,14 @@ Verification results: all four repository regression cases failed on the old
 update and passed after the attempt comparison. Targeted repository/handler/core
 race checks passed. `go test -race ./...` and `go vet ./...` passed in both
 `dokja_orch` and `dokja_domain/dokja_conversation`; formatting checks passed.
+
+The paired-ID retry baseline also reproduced mutation after refusal for both a
+failed and an interrupted turn in a different conversation. The corrected
+application tests compare complete turn snapshots and both conversation records,
+verify no generation on refusal and verify a subsequent valid retry. Repository
+fixtures retain existing scope/conflict behavior. Domain fixtures verify input
+validation and explicit refusal without fallback on an unsupported store. Full
+race suites and static checks passed again for both affected modules.
 
 ## Remaining architecture work
 

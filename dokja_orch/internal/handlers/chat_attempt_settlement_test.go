@@ -113,3 +113,65 @@ func TestLateArchivedReplyCannotCompleteTheCurrentRetry(t *testing.T) {
 		t.Fatal("replay must use the current attempt's stored result", replayed, err, model.calls.Load())
 	}
 }
+
+func TestArchivedRetryCannotChangeAnotherConversation(t *testing.T) {
+	for _, interrupted := range []bool{false, true} {
+		name := "failed"
+		if interrupted {
+			name = "interrupted"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			archive := archiveFor(t)
+			stated, err := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Stated conversation")
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual, err := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Actual conversation")
+			if err != nil {
+				t.Fatal(err)
+			}
+			turn, _, err := archive.Send(ctx, conversation.OwnerScope, actual.ID, "send-0001", "Question", conversation.Provenance{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if interrupted {
+				if n, err := archive.Recover(ctx, time.Now().UTC()); err != nil || n != 1 {
+					t.Fatal(n, err)
+				}
+			} else if _, err := archive.Fail(ctx, conversation.OwnerScope, turn, "Unavailable"); err != nil {
+				t.Fatal(err)
+			}
+			before, err := archive.Turns(ctx, conversation.OwnerScope, actual.ID, 0, 10)
+			if err != nil || len(before) != 1 {
+				t.Fatal(before, err)
+			}
+			beforeConversation, err := archive.Get(ctx, conversation.OwnerScope, actual.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := &scriptedModel{answers: []map[string]any{{"reply": "Correct retry"}}}
+			handler := NewChatDomainHandler(model).WithArchive(archive)
+			result, err := handler.Handle(ctx, ownerTurn(map[string]any{"conversation_id": stated.ID, "retry_turn_id": turn.ID}), archiveStep)
+			if !errors.Is(err, conversation.ErrNotFound) || result != nil || len(model.asked) != 0 {
+				t.Fatal("mismatched conversation must refuse before generation", result, err, len(model.asked))
+			}
+			after, err := archive.Turns(ctx, conversation.OwnerScope, actual.ID, 0, 10)
+			if err != nil || len(after) != 1 || after[0] != before[0] {
+				t.Fatal("refused retry mutated another conversation's turn", before, after, err)
+			}
+			afterConversation, err := archive.Get(ctx, conversation.OwnerScope, actual.ID)
+			if err != nil || afterConversation != beforeConversation {
+				t.Fatal("refused retry changed another conversation's revision", beforeConversation, afterConversation, err)
+			}
+			unchangedStated, err := archive.Get(ctx, conversation.OwnerScope, stated.ID)
+			if err != nil || unchangedStated != stated {
+				t.Fatal("refused retry changed the stated conversation", stated, unchangedStated, err)
+			}
+			result, err = handler.Handle(ctx, ownerTurn(map[string]any{"conversation_id": actual.ID, "retry_turn_id": turn.ID}), archiveStep)
+			if err != nil || result["reply"] != "Correct retry" || len(model.asked) != 1 {
+				t.Fatal("valid matching retry must remain available", result, err, len(model.asked))
+			}
+		})
+	}
+}
