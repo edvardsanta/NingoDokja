@@ -3,6 +3,10 @@
 Implemented: 2026-10-29, step `09.6-a`. This is a compatible foundation batch;
 the broader token/accessibility/visual acceptance in `09.6` remains pending.
 
+Follow-up `09.6-c` centralizes focus and motion without changing their defaults.
+The [consumer inventory](token-consumer-inventory.md) records migrated roles,
+remaining palette consumers and the limits of its native accessibility samples.
+
 ## Ownership and migration
 
 [tokens.css](../../dokja_interfaces/desktop/src/renderer/tokens.css) defines the
@@ -69,6 +73,29 @@ All runtime checks used synthetic fixtures. No live provider, account, owner
 conversation, database, platform message or application stack was exercised.
 The full native e2e suite was not run for this scoped CSS batch; the existing
 smoke test assumes five workspaces while the current registry has six.
+
+### Focus and motion follow-up
+
+The additional solid-outline consumers now share `--focus-width` and the existing
+2 px/3 px offsets. Accent fields/disclosures/list rows use `--focus-accent-ring`
+(initially cyan); view tabs use `--tab-focus-ring` (initially primary ink).
+Base-button focus remains independently configurable. This retains the approved
+visual distinction instead of recoloring every focused control alike.
+
+Existing effects use duration primitives, semantic reveal/pulse/glow/overlay
+roles and component aliases. Defaults remain 500 ms for row reveal, 70 ms row
+stagger, 1000 ms status blink, 450 ms wordmark transition and 160 ms drawer entry.
+Reduced-motion rules remain authoritative; changing a duration does not enable
+an effect when reduced motion is requested.
+
+Follow-up checks passed: 258 Node tests, 322 UI tests, typecheck/build and eight
+native token tests. Before migration, the expanded suite had seven passes and
+the semantic-focus override regression failed; afterward all eight pass.
+Browser media emulation verifies reduced motion and forced-color focus for the
+sampled field/button. Another 37-node Talk/System comparison has zero sampled
+computed-style differences. This does not establish full native high-contrast,
+all-workspace keyboard, zoom or screenshot acceptance. Screenshot capture was
+not retried in this follow-up; its earlier limitation remains open.
 
 ## Rollback
 

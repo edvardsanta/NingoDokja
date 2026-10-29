@@ -108,7 +108,7 @@ body {
   text-shadow:
     calc(var(--ghost) * -1px) 0 var(--cyan),
     calc(var(--ghost) * 1px) 0 var(--magenta);
-  transition: text-shadow 0.45s steps(5);
+  transition: text-shadow var(--wordmark-transition-duration) steps(5);
 }
 
 .wordmark[data-pulse="calm"] {
@@ -324,8 +324,8 @@ body {
   padding: 0.35rem 0.75rem;
   border-left: 3px solid var(--tone);
   background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%);
-  animation: print 0.5s steps(24) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation: print var(--row-enter-duration) steps(24) both;
+  animation-delay: calc(var(--i, 0) * var(--row-stagger-delay));
 }
 
 .service-status {
@@ -335,7 +335,7 @@ body {
 .services li[data-tone="progress"] .service-status::after {
   content: "■";
   margin-left: 0.5ch;
-  animation: blink 1s steps(2, jump-none) infinite;
+  animation: blink var(--status-pulse-duration) steps(2, jump-none) infinite;
 }
 
 .service-detail {
@@ -446,7 +446,7 @@ button[role="switch"][aria-checked="true"] {
 .wp [role="status"]::after {
   content: "▌";
   margin-left: 0.25ch;
-  animation: blink 1s steps(2, jump-none) infinite;
+  animation: blink var(--status-pulse-duration) steps(2, jump-none) infinite;
 }
 
 .wp [role="alert"] {
@@ -585,8 +585,8 @@ button:focus-visible {
 }
 
 .search input:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .hits {
@@ -672,8 +672,8 @@ button:focus-visible {
 
 .setting-edit input:focus-visible,
 .setting-edit select:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .setting-edit > .detail {
@@ -785,8 +785,8 @@ button:focus-visible {
 }
 
 .vtab:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+  outline: var(--focus-width) solid var(--tab-focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 button[aria-pressed="true"] {
@@ -968,8 +968,8 @@ button[aria-pressed="true"] {
 }
 
 .sources summary:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 3px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset);
 }
 
 /*
@@ -1004,8 +1004,8 @@ button[aria-pressed="true"] {
 }
 
 .preview.meme-pick:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .meme-badge {
@@ -1202,8 +1202,8 @@ button.meme-zoom:hover:not(:disabled) {
 
 .add-form input:focus-visible,
 .add-form textarea:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .add-form input[type="file"] {
@@ -1236,8 +1236,8 @@ button.meme-zoom:hover:not(:disabled) {
 }
 
 .add-form .more summary:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 3px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .add-form .more p {
@@ -1606,8 +1606,8 @@ button.icon-button[aria-expanded="true"] {
 
 .message-compose textarea:focus-visible,
 .wp select:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 /* What the message carries: a state (attached), so it has the left bar a state has. */
@@ -1793,8 +1793,8 @@ button.icon-button[aria-expanded="true"] {
 }
 
 .meme-tag-form input:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .meme-tag-form > button {
@@ -1885,7 +1885,7 @@ button.icon-button[aria-expanded="true"] {
   color: var(--ink);
   font: inherit;
 }
-.classification-panel select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.classification-panel select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
 .experience-detail {
   margin-top: 0.75rem;
@@ -1921,7 +1921,7 @@ button.icon-button[aria-expanded="true"] {
 .assistant-turns p { white-space: pre-wrap; margin-bottom: 0; }
 .composer { display: grid; gap: .5rem; }
 .composer textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: inherit; background: var(--static); border: 1px solid var(--edge); padding: .7rem; }
-.composer textarea:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.composer textarea:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
 /*
  * Ningo's own voice: one line, in the face of his name, set apart from what the screen reports. It is
@@ -2004,7 +2004,7 @@ button.icon-button[aria-expanded="true"] {
 .model-download label, .model-download .detail { grid-column: 1 / -1; }
 .model-download label { font-weight: 700; }
 .model-download input { min-width: 0; padding: .45rem .65rem; border: 1px solid var(--edge); border-radius: .25rem; background: var(--static); color: var(--ink); font: inherit; }
-.model-download input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.model-download input:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
 /* What Talk is about, above the transcript: the reading named, and the way to drop it. */
 .talk-context { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: .75rem; }
@@ -2012,8 +2012,8 @@ button.icon-button[aria-expanded="true"] {
 .talk-context .detail { flex-basis: 100%; margin: 0; }
 
 /* A list row with a menu: the title opens it, the ⋯ at the right and a right click hold the rest. */
-.menu-row { position: relative; padding-right: 2.75rem; outline-offset: 2px; }
-.menu-row:focus-visible { outline: 2px solid var(--cyan); }
+.menu-row { position: relative; padding-right: 2.75rem; outline-offset: var(--focus-offset-tight); }
+.menu-row:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); }
 button.row-title, button.row-title:hover:not(:disabled) { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 button.row-title:hover:not(:disabled) strong { text-decoration: underline; text-underline-offset: 3px; color: var(--cyan); }
 button.row-menu-button { position: absolute; top: .25rem; right: 0; padding: .1rem .55rem; border-color: transparent; background: transparent; color: var(--ink-dim); line-height: 1; }
@@ -2033,7 +2033,7 @@ button.row-menu-button:hover:not(:disabled), button.row-menu-button[aria-expande
 button.drawer-close { padding: .1rem .6rem; border-color: transparent; background: transparent; color: var(--ink-dim); font-size: 1.25rem; line-height: 1; }
 .drawer-body { flex: 1; overflow: auto; padding: 1rem 1.25rem; }
 @media (prefers-reduced-motion: no-preference) {
-  .drawer { animation: drawer-in .16s ease-out; }
+  .drawer { animation: drawer-in var(--drawer-enter-duration) ease-out; }
   @keyframes drawer-in { from { transform: translateX(1.5rem); opacity: 0; } }
 }
 
@@ -2073,8 +2073,8 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 
 .reading-filters input:focus-visible, .reading-filters select:focus-visible,
 .reading-preview summary:focus-visible, .reading-preview-text:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .reading-filter-actions {

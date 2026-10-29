@@ -24,6 +24,11 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
   --space-7: 3rem;
+  --duration-70: 70ms;
+  --duration-160: 160ms;
+  --duration-450: 450ms;
+  --duration-500: 500ms;
+  --duration-1000: 1000ms;
 
   /* Semantic roles: equal defaults do not imply equal responsibilities. */
   --surface-page: var(--color-slate-900);
@@ -42,8 +47,15 @@
   --status-off-text: var(--text-secondary);
   --status-progress: var(--text-primary);
   --focus-ring: var(--text-primary);
+  --focus-accent-ring: var(--color-cyan-400);
   --focus-width: 2px;
   --focus-offset: 3px;
+  --focus-offset-tight: 2px;
+  --motion-reveal-duration: var(--duration-500);
+  --motion-pulse-duration: var(--duration-1000);
+  --motion-glow-duration: var(--duration-450);
+  --motion-overlay-duration: var(--duration-160);
+  --motion-stagger-delay: var(--duration-70);
   --font-body: var(--font-family-mono);
   --font-display: var(--font-family-display);
   --font-size-body: 0.9375rem;
@@ -58,12 +70,18 @@
     0 calc(100% - var(--panel-cut))
   );
 
-  /* Component defaults: only the base button is migrated in this batch. */
+  /* Component defaults for migrated controls and the existing motion effects. */
   --button-border: var(--action-primary);
   --button-text: var(--action-primary);
   --button-hover-bg: var(--action-primary);
   --button-hover-text: var(--text-on-action);
   --button-focus-ring: var(--focus-ring);
+  --tab-focus-ring: var(--focus-ring);
+  --wordmark-transition-duration: var(--motion-glow-duration);
+  --row-enter-duration: var(--motion-reveal-duration);
+  --row-stagger-delay: var(--motion-stagger-delay);
+  --status-pulse-duration: var(--motion-pulse-duration);
+  --drawer-enter-duration: var(--motion-overlay-duration);
 
   /* Compatibility aliases. Remove only after all consumers have migrated. */
   --static: var(--surface-page);
