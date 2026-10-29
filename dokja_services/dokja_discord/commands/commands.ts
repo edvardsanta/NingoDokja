@@ -1,3 +1,4 @@
+import { observerCommands } from "./observer_commands.js";
 import { conversationReply } from "../voice/conversation_reply.js";
 import { ApplicationCommandOptionType } from "discord-api-types/v10";
 import { randomUUID } from "node:crypto";
@@ -77,6 +78,7 @@ export function createCommands(
   },
 ): DiscordSlashCommand[] {
   return [
+    ...observerCommands(orchestratorEndpoint, orchestratorTimeoutMs, voice),
     createDokjaCommand({
       name: "chat",
       locale: options?.locale,

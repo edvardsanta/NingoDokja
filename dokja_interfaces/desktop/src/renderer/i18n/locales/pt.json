@@ -518,5 +518,18 @@
   "communications_other_channels": "Outros canais",
   "communications_collapse_group": "Recolher {name}",
   "communications_expand_group": "Expandir {name}",
-  "communications_servers_unavailable": "O Ningo não consegue ler {count} dos servidores configurados."
+  "communications_servers_unavailable": "O Ningo não consegue ler {count} dos servidores configurados.",
+  "nav_realtime": "Tempo real",
+  "realtime_intro": "Observador ao vivo",
+  "realtime_hint": "Inicie /conversation_start no Discord. Cada pessoa autoriza com /conversation_join. Ningo permanece em silêncio.",
+  "realtime_limits": "Transcrição final por segmento · Atualização de 1 segundo · Histórico temporário · Assuntos ainda não associados",
+  "realtime_empty": "Nenhuma sessão de observação autorizada está ativa.",
+  "realtime_session": "Sessão de voz {number}",
+  "realtime_speaker": "Participante {number}",
+  "realtime_messages": "Transcrição",
+  "realtime_no_messages": "Aguardando falas de participantes autorizados.",
+  "realtime_pending": "As associações semânticas estão pendentes; a ordem cronológica foi preservada.",
+  "realtime_connected": "Observador conectado",
+  "realtime_disconnected": "Observador indisponível",
+  "realtime_select": "Selecione uma sessão de voz"
 }

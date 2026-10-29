@@ -215,6 +215,9 @@ func actionFor(domain Domain, eventType string) string {
 	case DomainAutomation:
 		return "execute-automation"
 	case DomainConversation:
+		if len(eventType) > 9 && eventType[:9] == "realtime." {
+			return "observe-conversation"
+		}
 		return "manage-conversation"
 	default:
 		return "handle-event"

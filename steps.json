@@ -1106,7 +1106,8 @@
             "2026-10-27: non-archived chat checkpoints now have a separate versioned dokja_chat_sessions.db beside DOKJA_DB_FILE. Summaries and recent user/assistant turns reload after restart; natural Discord messages share a guild/channel scope with untrusted participant attribution, while DMs and commands remain separate. Verified identity is rebuilt per turn. This checkpoint work does not complete the owner archive/interface rollout, provide full transcript retention, index chat in pgvector, or backfill prior Discord history.",
             "Owner requested planning conversation history. Current desktop transcript is component-local and orchestrator sessions are ephemeral; this scheduling entry does not claim persistence is implemented.",
             "H1 (domain contract and storage) is built, not wired. The owner chose its own SQLite file, dokja_conversations.db beside dokja.db and opened by the orchestrator alone, because a migration in the shared dokja.db would make every older orchestrator, CLI, TUI or runtime controller refuse it. dokja_domain/dokja_conversation holds scope, turn states, provenance, bounds, idempotent sends, explicit retry of the latest failed or interrupted turn and the context selection; dokja_orch/internal/infrastructure/conversations is the store.",
-            "H1 merged in #128. H2 adds the conversation.start/list/read/rename/delete requests (conversation domain, scope from the event source: desktop and cli) and archived chat turns: a message.created with the archived conversation_id and a send_id is recorded pending, then completed with observed provenance or failed with its reason; context comes from the archive's completed turns within 20 turns and 24,000 characters; a repeated send is answered from the archive; retry_turn_id reopens the latest failed or interrupted turn. The archive opens beside DOKJA_DB_FILE and recovers pending turns at start."
+            "H1 merged in #128. H2 adds the conversation.start/list/read/rename/delete requests (conversation domain, scope from the event source: desktop and cli) and archived chat turns: a message.created with the archived conversation_id and a send_id is recorded pending, then completed with observed provenance or failed with its reason; context comes from the archive's completed turns within 20 turns and 24,000 characters; a repeated send is answered from the archive; retry_turn_id reopens the latest failed or interrupted turn. The archive opens beside DOKJA_DB_FILE and recovers pending turns at start.",
+            "Observer follow-up: consent-gated Discord final transcript ingestion and a local Desktop live view are implemented separately from the owner archive. Scope, revocation, duplicate/revision and capture-order tests cover the ephemeral journal. Semantic threads, partial hypotheses and PostgreSQL persistence remain pending; no archive milestone is declared complete by this observer slice."
           ],
           "checks": [
             {
@@ -1127,7 +1128,8 @@
           ],
           "blockers": [],
           "references": [
-            "dokja_docs/conversation-history-plan.md"
+            "dokja_docs/conversation-history-plan.md",
+            "dokja_docs/realtime-conversation/README.md"
           ],
           "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI).",
           "status_before_review": "in_progress",

@@ -10,6 +10,7 @@
 // erases the saved session, so it is asked in a window. Experience feedback (memory.resolve) also requires a gesture and confirmation because the first verdict is retained. What else changes something (forget, record, discord.send, the scheduler's own
 // heartbeat) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
+  "realtime.snapshot",
   "runtime.modules",
   "runtime.logs",
   "message.created",

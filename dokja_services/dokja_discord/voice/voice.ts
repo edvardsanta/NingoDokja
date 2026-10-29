@@ -87,6 +87,8 @@ type ListeningSession = {
   stop(): void;
 };
 
+export type VoiceObservation = { userId: string; channelId: string; sequence: number; text: string; startedAt: string; endedAt: string };
+
 type SpeakParams = {
   guildId?: string;
   userId: string;
@@ -103,10 +105,14 @@ export type DiscordVoiceController = {
   playRadio(params: { guildId?: string; userId: string; streamUrl: string }): Promise<string>;
   speakText(params: SpeakParams): Promise<string>;
   speakReply?(params: SpeakParams): Promise<void>;
+  getVoiceChannelId?(guildId: string, userId: string): Promise<string>;
   startConversation(params: {
     guildId?: string;
     userId: string;
     activationMode?: "always" | "wakeword";
+    consentingUsers?: ReadonlySet<string>;
+    onObservation?(observation: VoiceObservation): Promise<void>;
+    onStopped?(): void;
     originChannelId?: string;
     onTurn: (transcript: string, turn?: VoiceTurnContext) => Promise<void>;
   }): Promise<string>;
@@ -611,7 +617,12 @@ export function createDiscordVoiceController(options: {
       options.log?.("[dokja-discord] radio stopped", JSON.stringify({ guildId }));
       return "Radio stopped.";
     },
-    async startConversation({ guildId, userId, originChannelId, activationMode = "always", onTurn }) {
+    async getVoiceChannelId(guildId, userId) {
+      const member = await fetchVoiceMember(await ensureVoiceClient(), guildId, userId);
+      if (!member.voice.channel) throw new Error("Join the observer voice channel first");
+      return member.voice.channel.id;
+    },
+    async startConversation({ guildId, userId, originChannelId, activationMode = "always", onTurn, consentingUsers, onObservation, onStopped }) {
       if (!guildId) {
         throw new Error("Voice conversation only works in guild voice channels");
       }
@@ -648,14 +659,14 @@ export function createDiscordVoiceController(options: {
         originChannelId: originChannelId ?? voiceChannel.id,
         participant: (id) => {
           const participant = voiceChannel.members.get(id);
-          return participant && !participant.user.bot
+          return participant && !participant.user.bot && (!consentingUsers || consentingUsers.has(id))
             ? { userId: id, userName: participant.displayName } : undefined;
         },
         logTranscripts: Boolean(options.logTranscripts),
         activationMode,
         log: options.log,
         error: options.error,
-        onTurn,
+        onTurn, onObservation, onStopped,
       });
       sessions.set(guildId, session);
 
@@ -724,6 +735,8 @@ export function createListeningSession(params: {
   orchestratorEndpoint?: string;
   originChannelId: string;
   participant(id: string): { userId: string; userName?: string } | undefined;
+  onObservation?(observation: VoiceObservation): Promise<void>;
+  onStopped?(): void;
   logTranscripts: boolean;
   activationMode: "always" | "wakeword";
   onTurn: (transcript: string, turn?: VoiceTurnContext) => Promise<void>;
@@ -754,6 +767,7 @@ export function createListeningSession(params: {
     if (stopped || !participant || activeStreams.has(speakingUserId)
       || activeStreams.size >= MAX_VOICE_SPEAKERS) return;
     let sequence = conversation.begin(false);
+    let startedAt = new Date().toISOString();
     const opusStream = params.session.connection.receiver.subscribe(speakingUserId, {
       end: { behavior: EndBehaviorType.AfterSilence, duration: VOICE_SILENCE_MS },
     });
@@ -766,7 +780,8 @@ export function createListeningSession(params: {
     let lastSpeechByte = 0;
     let lastProbeByte = 0;
     let probing = false;
-    const enqueue = (seq: number, audio: Buffer, speech: boolean) => {
+    const enqueue = (seq: number, audio: Buffer, speech: boolean, captureStart: string) => {
+      const endedAt = new Date().toISOString();
       if (stopped || !speech || audio.length < 48_000) { conversation.finish(seq); return; }
       if (jobs.length >= 32) {
         conversation.finish(seq);
@@ -791,7 +806,12 @@ export function createListeningSession(params: {
           }, lifetime.signal);
           // A speaker who left or moved rooms is never presented as still present.
           if (!stopped && params.participant(speakingUserId)) {
-            conversation.finish(seq, { ...participant, text: String(result.text ?? "") });
+            const text = String(result.text ?? "").trim();
+            if (params.onObservation && text) {
+              await params.onObservation({ userId: participant.userId, channelId: params.session.channelId,
+                sequence: seq, text, startedAt: captureStart, endedAt });
+              conversation.finish(seq, undefined, "observed");
+            } else if (!params.onObservation) conversation.finish(seq, { ...participant, text });
           }
         } catch (error) {
           if (!lifetime.signal.aborted) params.error?.("[dokja-discord] voice transcription failed", error);
@@ -802,7 +822,8 @@ export function createListeningSession(params: {
     const flushSegment = () => {
       const current = sequence;
       sequence = conversation.begin(false);
-      enqueue(current, Buffer.concat(chunks, bytes), activity.transcribable);
+      enqueue(current, Buffer.concat(chunks, bytes), activity.transcribable, startedAt);
+      startedAt = new Date().toISOString();
       chunks = []; bytes = 0;
       activity = new SpeechActivity();
       hasSpeech = false;
@@ -838,7 +859,7 @@ export function createListeningSession(params: {
       if (finished) return;
       finished = true;
       activeStreams.delete(speakingUserId);
-      enqueue(sequence, Buffer.concat(chunks, bytes), activity.transcribable);
+      enqueue(sequence, Buffer.concat(chunks, bytes), activity.transcribable, startedAt);
       chunks = []; bytes = 0;
     };
     decoder.on("data", (chunk: Buffer) => {
@@ -862,6 +883,7 @@ export function createListeningSession(params: {
   return {
     targetUserId: params.userId,
     stop() {
+      if (stopped) return;
       stopped = true;
       lifetime.abort();
       conversation.stop();
@@ -869,6 +891,7 @@ export function createListeningSession(params: {
       params.session.connection.receiver.speaking.off("start", handleSpeakingStart);
       for (const stream of activeStreams.values()) stream.destroy();
       activeStreams.clear();
+      params.onStopped?.();
     },
   };
 }

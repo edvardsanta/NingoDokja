@@ -47,3 +47,19 @@ test("long continuous speech is transcribed in bounded segments before its speak
  const listener=createListeningSession({session,guildId:"g",userId:"a",originChannelId:"text",orchestratorEndpoint:"http://orch",participant(id){return{userId:id};},decoderFactory:()=>new PassThrough(),activationMode:"always",logTranscripts:false,async onTurn(){replies++;}});
  try{speaking.emit("start","a");for(let i=0;i<VOICE_SEGMENT_BYTES/3840;i++)stream.write(pcm(3840));await delay(10);assert.equal(sizes.length,1);assert.equal(sizes[0],VOICE_SEGMENT_BYTES+44);assert.equal(replies,0);stream.end(pcm(57600));await delay(120);assert.equal(replies,1);}finally{listener.stop();globalThis.fetch=previous;}
 });
+
+test("observer publishes a final attributed segment without entering reply generation",async()=>{
+ const previous=globalThis.fetch;const speaking=new EventEmitter();let stream!:PassThrough;
+ const observed:any[]=[];let replies=0;const consent=new Set(["a"]);
+ globalThis.fetch=async()=>new Response('{"status":"ok","voice":{"text":"Redis with expiration"}}');
+ const session:any={channelId:"room",player:{stop(){},pause(){},unpause(){}},stream:{stop(){}},connection:{receiver:{speaking,subscribe(){return stream=new PassThrough();}}}};
+ const listener=createListeningSession({session,guildId:"g",userId:"a",originChannelId:"text",orchestratorEndpoint:"http://orch",
+ participant(id){return consent.has(id)?{userId:id}:undefined;},decoderFactory:()=>new PassThrough(),activationMode:"always",logTranscripts:false,
+ async onTurn(){replies++;},async onObservation(value){observed.push(value);}});
+ try{
+  speaking.emit("start","b");assert.equal(stream,undefined);
+  speaking.emit("start","a");stream.end(pcm(57600));await delay(60);
+  assert.equal(observed.length,1);assert.equal(observed[0].userId,"a");assert.equal(observed[0].text,"Redis with expiration");
+  assert.ok(Date.parse(observed[0].endedAt)>=Date.parse(observed[0].startedAt));assert.equal(replies,0);
+ }finally{listener.stop();globalThis.fetch=previous;}
+});

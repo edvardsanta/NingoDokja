@@ -62,9 +62,9 @@ export class LiveConversation {
     this.traces.get(sequence)?.mark("recognition_started");
   }
 
-  finish(sequence: number, turn?: Omit<VoiceTurn, "sequence">): void {
+  finish(sequence: number, turn?: Omit<VoiceTurn, "sequence">, outcome?: "observed"): void {
     if (this.stopped || !this.active.delete(sequence)) return;
-    this.traces.get(sequence)?.mark(turn?.text.trim() ? "transcript_ready" : "segment_discarded");
+    this.traces.get(sequence)?.mark(outcome === "observed" ? "observation_published" : turn?.text.trim() ? "transcript_ready" : "segment_discarded");
     if (!turn?.text.trim()) this.traces.delete(sequence);
     this.voiced.delete(sequence);
     this.recognizing.delete(sequence);

@@ -39,6 +39,7 @@ type BridgeRequest struct {
 type BridgePayload struct {
 	VoiceSessionID   string           `json:"voiceSessionId"`
 	VoiceStartedBy   string           `json:"voiceStartedBy"`
+	Realtime         map[string]any   `json:"realtime"`
 	Voice            map[string]any   `json:"voice"`
 	VoiceTurns       []chat.VoiceTurn `json:"voiceTurns"`
 	VoiceChannelID   string           `json:"voiceChannelId"`
@@ -64,6 +65,7 @@ type BridgePayload struct {
 }
 
 type BridgeResponse struct {
+	Realtime    map[string]any    `json:"realtime,omitempty"`
 	Voice       map[string]any    `json:"voice,omitempty"`
 	Status      string            `json:"status"`
 	Reply       string            `json:"reply,omitempty"`
@@ -200,7 +202,16 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Attachments: extractChatAttachments(result),
 		Music:       extractBridgeMusic(result),
 		Voice:       extractBridgeVoice(result),
+		Realtime:    extractBridgeRealtime(result),
 	})
+}
+
+func extractBridgeRealtime(result core.ProcessResult) map[string]any {
+	domain, _ := result.Result[string(core.DomainConversation)].(map[string]any)
+	if accepted, _ := domain["accepted"].(bool); accepted {
+		return map[string]any{"accepted": true}
+	}
+	return nil
 }
 
 func extractBridgeVoice(result core.ProcessResult) map[string]any {
@@ -531,6 +542,8 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
+	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":
+		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":
 		return strings.TrimSpace(request.EventType), request.Payload.Voice
 	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended":
