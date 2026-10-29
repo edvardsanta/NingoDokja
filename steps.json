@@ -1166,12 +1166,13 @@
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
             "dokja_docs/cindy-architecture-research.md",
-            "dokja_docs/desktop-ux/design-tokens.md"
+            "dokja_docs/desktop-ux/design-tokens.md",
+            "dokja_docs/desktop-ux/token-consumer-inventory.md"
           ],
-          "next_action": "09.6-a foundation batch is complete; review its branch. After 08.3, finish remaining consumer inventory and visual/accessibility acceptance in 09.6-b. The full 09.6 step remains pending.",
-          "worktree": ".worktrees/design-token-foundations",
-          "branch": "refactor/design-token-foundations",
-          "preparation_exception": "2026-10-29: owner requested starting implementation. Compatible token-only preparation may proceed independently without changing cognition, navigation, provider control or public contracts. Full 09.6 acceptance and broader interface adoption still resume after 08.3; active path remains 08.2.",
+          "next_action": "Compatible preparation batches 09.6-a and 09.6-c are complete. Review the focus/motion branch; after 08.3, finish remaining all-workspace visual/accessibility acceptance in 09.6-b. Full 09.6 remains pending and active cognitive path remains 08.2.",
+          "worktree": ".worktrees/desktop-focus-motion",
+          "branch": "refactor/desktop-focus-motion",
+          "preparation_exception": "2026-10-29: owner requested starting implementation. Compatible token-only preparation may proceed independently without changing cognition, navigation, provider control or public contracts. Full 09.6 acceptance and broader interface adoption still resume after 08.3; active path remains 08.2. Follow-up owner authorization to continue covers compatible focus/motion preparation 09.6-c with unchanged defaults and no new interface capabilities.",
           "batches": [
             {
               "id": "09.6-a",
@@ -1219,19 +1220,71 @@
               ]
             },
             {
+              "id": "09.6-c",
+              "title": "Centralize compatible focus and motion roles and verify browser accessibility preferences",
+              "status": "completed",
+              "completed_on": "2026-10-29",
+              "depends_on": [
+                "09.6-a"
+              ],
+              "deliverables": [
+                "Shared accent/tab focus roles and preserved offsets",
+                "Primitive/semantic/component durations for existing effects",
+                "Native focus, semantic override, reduced-motion and forced-color regression coverage",
+                "dokja_docs/desktop-ux/token-consumer-inventory.md"
+              ],
+              "evidence": [
+                "Migrated 13 solid cyan outline declarations and the inner-tab ink outline to role-based tokens; preserved base-button focus and all default offsets/colors. Existing reveal, blink, glow and drawer timing/staggering now use tokens; reduced-motion rules remain authoritative. Consumer inventory distinguishes source migration from native interaction coverage."
+              ],
+              "checks": [
+                {
+                  "name": "regression_baseline",
+                  "status": "passed",
+                  "detail": "Expanded native suite against pre-migration CSS: seven passed and the semantic accent-focus override failed as expected. After migration all eight tests pass."
+                },
+                {
+                  "name": "desktop_regression",
+                  "status": "passed",
+                  "detail": "pnpm test: 258 Node tests and 322 UI tests passed. pnpm typecheck and pnpm build passed; dependencies and lockfile unchanged."
+                },
+                {
+                  "name": "native_focus_motion",
+                  "status": "passed",
+                  "detail": "node --import tsx --test tests/e2e/design_tokens.e2e.ts: eight passed using isolated Electron and synthetic local orchestrator. Focus defaults/independent override, motion timing/independent overlay override, reduced-motion disabling and forced-color outline samples verified."
+                },
+                {
+                  "name": "computed_style_parity",
+                  "status": "passed",
+                  "detail": "Before/after Talk/System comparison: 37 visible nodes, zero differences in sampled default styles. This is not pixel or all-workspace acceptance."
+                },
+                {
+                  "name": "full_visual_accessibility",
+                  "status": "skipped",
+                  "detail": "All-workspace keyboard/zoom/narrow-window coverage and manual/native assistive-technology validation remain pending in 09.6-b. Screenshot capture was not retried after the recorded compositor timeouts."
+                }
+              ],
+              "references": [
+                "dokja_docs/desktop-ux/design-tokens.md",
+                "dokja_docs/desktop-ux/token-consumer-inventory.md"
+              ]
+            },
+            {
               "id": "09.6-b",
               "title": "Complete consumer inventory and visual/accessibility acceptance",
               "status": "pending",
               "depends_on": [
                 "09.6-a",
-                "08.3"
+                "08.3",
+                "09.6-c"
               ],
               "resume_gate": "08.3",
               "acceptance_criteria": [
                 "Inventory remaining palette uses before removing aliases or migrating feature-specific controls.",
                 "Complete all-workspace visual checks plus focus, reduced-motion, forced-color and zoom/text-growth validation; preserve approved visual choices."
               ],
-              "evidence": []
+              "evidence": [
+                "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed."
+              ]
             }
           ]
         },

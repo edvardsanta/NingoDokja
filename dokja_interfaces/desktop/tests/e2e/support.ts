@@ -286,6 +286,12 @@ export class Page {
     return message.result?.result?.value as T;
   }
 
+  // Exercise Chromium's real media-query resolution, not a mocked matchMedia.
+  async emulateMedia(features: Array<{ name: "prefers-reduced-motion" | "forced-colors"; value: string }>): Promise<void> {
+    const message = await this.send("Emulation.setEmulatedMedia", { features });
+    if (message.error) throw new Error(`media emulation failed: ${JSON.stringify(message.error)}`);
+  }
+
   // A press of the mouse as the browser itself reports it, unlike element.click() from a script.
   async click(x: number, y: number): Promise<void> {
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
