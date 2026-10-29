@@ -75,6 +75,12 @@ func actionFor(domain Domain, eventType string) string {
 		}
 	case DomainCommunications:
 		switch eventType {
+		case "voice.synthesize":
+			return "synthesize-voice"
+		case "voice.transcribe":
+			return "transcribe-voice"
+		case "voice.wakeword":
+			return "detect-voice-wakeword"
 		case "communications.channels":
 			return "list-communication-channels"
 		case "communications.history":

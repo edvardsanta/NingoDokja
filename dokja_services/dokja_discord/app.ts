@@ -19,6 +19,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
   const voice = createDiscordVoiceController({
     token,
     voiceServiceEndpoint: cfg.voiceServiceEndpoint,
+    orchestratorEndpoint: cfg.orchestratorEndpoint,
     logTranscripts: cfg.mode === "full",
     log: runtime.log,
     error: runtime.error,

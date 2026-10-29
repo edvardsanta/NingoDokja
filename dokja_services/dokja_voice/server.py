@@ -173,7 +173,9 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/stt")
-    async def stt(payload: STTRequest, request: Request) -> dict:
+    # FastAPI runs blocking CPU inference in its worker pool. A slow segment
+    # must not block health checks, synthesis, or cancellation at the HTTP loop.
+    def stt(payload: STTRequest, request: Request) -> dict:
         logger.info(
             "received stt request remote=%s audio_format=%s language=%s audio_chars=%d",
             request.client.host if request.client else "",

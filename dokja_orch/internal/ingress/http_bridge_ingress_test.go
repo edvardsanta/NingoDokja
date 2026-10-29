@@ -10,27 +10,7 @@ import (
 func TestBridgeEventFromRequestMapsDiscordChat(t *testing.T) {
 	event := bridgeEventFromRequest(BridgeRequest{
 		EventType: "chat_message",
-		Payload: struct {
-			Content          string   "json:\"content\""
-			ReplyToContent   string   `json:"replyToContent"`
-			MentionedUserIDs []string `json:"mentionedUserIds"`
-			Limit            *int     "json:\"limit\""
-			MaxItems         *int     "json:\"maxItemsPerScraper\""
-			UserID           string   "json:\"userId\""
-			UserName         string   `json:"userName"`
-			ChannelID        string   "json:\"channelId\""
-			MessageID        string   "json:\"messageId\""
-			GuildID          string   "json:\"guildId\""
-			SessionKey       string   "json:\"sessionKey\""
-			StartChat        bool     "json:\"startSession\""
-			AccountID        string   "json:\"accountId\""
-			EntryKind        string   "json:\"entryKind\""
-			Direct           *bool    "json:\"isDirectMessage\""
-			Mentioned        *bool    "json:\"mentionsBot\""
-			ChatKind         string   "json:\"chatKind\""
-			SelfChat         *bool    "json:\"isSelfChat\""
-			Numbers          []string "json:\"senderNumbers\""
-		}{
+		Payload: BridgePayload{
 			Content:   "hello dokja",
 			UserID:    "u1",
 			ChannelID: "c1",
@@ -92,27 +72,7 @@ func TestBridgeDisplayNamesAreBoundedAttributionAndNeverIdentity(t *testing.T) {
 
 func TestBridgeEventFromRequestMapsMemeFetch(t *testing.T) {
 	event := bridgeEventFromRequest(BridgeRequest{
-		Payload: struct {
-			Content          string   "json:\"content\""
-			ReplyToContent   string   `json:"replyToContent"`
-			MentionedUserIDs []string `json:"mentionedUserIds"`
-			Limit            *int     "json:\"limit\""
-			MaxItems         *int     "json:\"maxItemsPerScraper\""
-			UserID           string   "json:\"userId\""
-			UserName         string   `json:"userName"`
-			ChannelID        string   "json:\"channelId\""
-			MessageID        string   "json:\"messageId\""
-			GuildID          string   "json:\"guildId\""
-			SessionKey       string   "json:\"sessionKey\""
-			StartChat        bool     "json:\"startSession\""
-			AccountID        string   "json:\"accountId\""
-			EntryKind        string   "json:\"entryKind\""
-			Direct           *bool    "json:\"isDirectMessage\""
-			Mentioned        *bool    "json:\"mentionsBot\""
-			ChatKind         string   "json:\"chatKind\""
-			SelfChat         *bool    "json:\"isSelfChat\""
-			Numbers          []string "json:\"senderNumbers\""
-		}{
+		Payload: BridgePayload{
 			Content: "meme fetch 3",
 		},
 	})

@@ -122,3 +122,21 @@ Response body:
   "has_attachment": true
 }
 ```
+
+## Live group voice
+
+Join a server voice channel and run `/voice_chat_start` once. Ningo listens to all
+human participants in that room, keeps speaker attribution and shared room
+history, and gives brief spoken replies after people pause. New human speech
+interrupts playback and cancels a pending reply. `/voice_chat_stop` stops the
+room listener and outstanding work. Bots are ignored; speech from different
+people is decoded separately rather than mixed into a single recording.
+
+Recognition runs incrementally for long speech, with final replies after a
+600 ms pause and a short room settling period. This is a speech-turn pipeline,
+not native audio-to-audio inference. CLI/model latency remains part of response
+time. Piper and Whisper must be configured with real models; stub providers
+produce test audio/transcripts. Speech requests now go through the orchestrator,
+which uses `DOKJA_VOICE_HTTP_ENDPOINT` to reach the Voice service. Deploy the
+orchestrator and Discord adapter together. See the production runbook for
+configuration, limits and live verification.

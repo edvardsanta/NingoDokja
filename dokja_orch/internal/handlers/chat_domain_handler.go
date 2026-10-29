@@ -100,7 +100,12 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		reference = recentReadingReference(items)
 	}
 	turnContent := withReplyContext(event, content)
-	if scope := discordChannelScope(event); scope != "" {
+	if turns, ok := event.Context["voice_turns"].([]chat.VoiceTurn); ok {
+		turnContent, err = chat.VoiceTranscript(chatSessionBaseKey(event), turns)
+		if err != nil {
+			return nil, err
+		}
+	} else if scope := discordChannelScope(event); scope != "" {
 		name := event.User.Name
 		if name == event.User.ID {
 			name = ""
@@ -125,7 +130,13 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	rawReply := chatReplyFromResult(result)
+	if _, voice := event.Context["voice_turns"]; voice {
+		rawReply = chat.SpokenReply(rawReply)
+	}
 	if err := h.sessions.CompleteTurn(ctx, event, rawReply); err != nil {
 		return nil, err
 	}
