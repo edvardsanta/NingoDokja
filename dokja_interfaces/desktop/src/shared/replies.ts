@@ -280,3 +280,35 @@ export type MemoryExperienceDetail = { off?: false; found: false } | { off?: fal
 export type MemoryResolution = { off?: false; found: boolean; resolved: boolean; outcome: string };
 
 export type ChatReply = { off?: false; reply: string; sessionNotice: string };
+
+// One send of an archived conversation and how it ended, as the archive keeps it. A pending turn is
+// not proof a reply is coming; an interrupted one was cut by a restart and nobody knows its outcome.
+export type ArchivedTurnState = "pending" | "completed" | "failed" | "interrupted";
+export type ArchivedTurn = {
+  id: string;
+  seq: number;
+  sendId: string;
+  content: string;
+  reply: string;
+  state: ArchivedTurnState;
+  reason: string;
+  attempts: number;
+};
+
+export type ArchivedConversation = {
+  id: string;
+  kind: "general" | "reading";
+  readingId: string;
+  title: string;
+  updatedAt: string;
+  revision: number;
+  turns: number;
+};
+
+// The answer to an archived send: the turn as the archive now holds it, and whether the same send
+// was answered before (a replay, never asked again).
+export type ArchivedChatReply = { off?: false; reply: string; replayed: boolean; turn: ArchivedTurn };
+
+export type ConversationStarted = { off?: false; conversation: ArchivedConversation };
+
+export type ConversationRead = { off?: false; conversation: ArchivedConversation; turns: ArchivedTurn[] };

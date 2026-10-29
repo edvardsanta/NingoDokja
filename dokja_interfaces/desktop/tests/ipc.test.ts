@@ -672,14 +672,55 @@ test("Knowledge's inner write timeout is an unknown outcome, never a definite in
 });
 
 
-test("desktop conversation requires input and forwards only its bounded message and reading identity", async () => {
+test("an archived message forwards only its conversation, send id and text, or a bare retry", async () => {
+  const conversation = "a".repeat(32);
+  const turnId = "b".repeat(32);
   const calls: unknown[] = [];
-  const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({type,payload}); return {status:"ok",result:{domain:"chat",result:{reply:"Think through the evidence.",session:{created:true}}}}; } };
+  const turn = {id:turnId,seq:1,send_id:"send-0001",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1};
+  const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({type,payload}); return {status:"ok",result:{domain:"chat",result:{reply:"Think through the evidence.",turn}}}; } };
   const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
-  assert.equal((await handleRequest({type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1"}},client,limits)).ok,false);
-  const answer = await handleRequest({type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1",system:"inject"}},client,limits,undefined,{recent:()=>true});
-  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",sessionNotice:"new"}});
-  assert.deepEqual(calls,[{type:"message.created",payload:{content:"explain",conversation_id:"thread-1",reading_id:"entry-1"}}]);
+  const present = {recent:()=>true};
+  const message = {content:"explain",conversation_id:conversation,send_id:"send-0001"};
+  assert.equal((await handleRequest({type:"message.created",payload:message},client,limits)).ok,false, "a message needs a recent gesture");
+  const answer = await handleRequest({type:"message.created",payload:{...message,reading_id:"entry-1",system:"inject"}},client,limits,undefined,present);
+  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",replayed:false,turn:{id:turnId,seq:1,sendId:"send-0001",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1}}});
+  await handleRequest({type:"message.created",payload:{conversation_id:conversation,retry_turn_id:turnId,content:"ignored",send_id:"send-0002"}},client,limits,undefined,present);
+  assert.deepEqual(calls,[
+    {type:"message.created",payload:message},
+    {type:"message.created",payload:{conversation_id:conversation,retry_turn_id:turnId}},
+  ]);
+  for (const payload of [
+    {content:"explain",conversation_id:"thread-1",send_id:"send-0001"},
+    {content:"explain",conversation_id:conversation},
+    {content:"explain",conversation_id:conversation,send_id:"short"},
+    {content:"",conversation_id:conversation,send_id:"send-0001"},
+    {conversation_id:conversation,retry_turn_id:"not-a-turn"},
+  ]) {
+    const refused = await handleRequest({type:"message.created",payload},client,limits,undefined,present);
+    assert.equal(refused.ok,false,JSON.stringify(payload));
+  }
+  assert.equal(calls.length,2,"a refused message never reaches the orchestrator");
+});
+
+test("a conversation is started with only its reading, and read by its archive id", async () => {
+  const conversation = {id:"c".repeat(32),kind:"reading",reading_id:"entry-1",title:"",updated_at:"t",revision:1,turns:0};
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"conversation",result:type==="conversation.read"?{conversation,turns:[{id:"d".repeat(32),seq:1,send_id:"send-0001",content:"q",reply:"",state:"bogus"}]}:{conversation}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  assert.equal((await handleRequest({type:"conversation.start",payload:{reading_id:"entry-1"}},client,limits)).ok,false, "starting one records it, so it needs a gesture");
+  const started = await handleRequest({type:"conversation.start",payload:{reading_id:"entry-1",title:"ignored"}},client,limits,undefined,{recent:()=>true});
+  assert.deepEqual(started,{ok:true,result:{conversation:{id:"c".repeat(32),kind:"reading",readingId:"entry-1",title:"",updatedAt:"t",revision:1,turns:0}}});
+  const read = await handleRequest({type:"conversation.read",payload:{conversation_id:"c".repeat(32),limit:5000}},client,limits);
+  assert.equal(read.ok,true);
+  assert.deepEqual((read as {result:{turns:unknown[]}}).result.turns,[],"a turn in an unknown state is dropped");
+  assert.equal((await handleRequest({type:"conversation.read",payload:{conversation_id:"../x"}},client,limits)).ok,false);
+  assert.deepEqual(calls,[
+    {type:"conversation.start",payload:{reading_id:"entry-1"}},
+    {type:"conversation.read",payload:{conversation_id:"c".repeat(32),limit:100}},
+  ]);
 });
 
 

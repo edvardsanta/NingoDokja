@@ -14,6 +14,10 @@ export const ACTION_TYPES = [
   "runtime.modules",
   "runtime.logs",
   "message.created",
+  // The owner's conversations with Ningo: starting one records it, so it is a change; reading one is
+  // only a read.
+  "conversation.start",
+  "conversation.read",
   "runtime.set",
   "runtime.providers",
   "runtime.chat",
@@ -74,6 +78,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "runtime.models.cancel",
   "runtime.models.remove",
   "message.created",
+  "conversation.start",
   "communications.send",
   "meme.hashtag.tag",
   "meme.pool.refresh",

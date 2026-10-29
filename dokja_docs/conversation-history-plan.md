@@ -1,7 +1,7 @@
 # Conversation history and resumable Ningo conversations
 
-Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 to H5
-planned. Tracks step 09.5.
+Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 under
+way (first batch: Talk continues one archived conversation); H4 and H5 planned. Tracks step 09.5.
 
 Attempt-settlement correction (2026-10-29):
 [identity/lifecycle compatibility](task-lifecycle-compatibility.md) records the
@@ -147,6 +147,19 @@ source references without silently replacing an unavailable reading.
 Show loading, empty, unavailable, pending and failed states. Late replies must not
 appear in the wrong conversation after navigation. Retrying a failed send must not
 duplicate the displayed user message or overwrite a completed result.
+
+H3 first batch (2026-10-29): Talk is an archive client. The conversation is
+started in the archive with the first message (a reading discussion is started
+with its reading), so opening Talk records nothing. Each message carries its own
+send id. A failed or interrupted turn is retried with `retry_turn_id`, never sent
+as a new message; a send whose outcome could not be read is sent again under the
+same send id, which the archive answers once; a turn still pending is only read
+again. After any failure the screen reads the archive back instead of inferring
+the outcome. If the archive cannot start a conversation, Talk says so and gives
+the message back unsent; there is no unarchived fallback. The session-notice
+("started a fresh conversation") no longer appears, because the desktop no longer
+uses the process-local session path. The list, reopen/restore, rename/delete and
+a queued-waiting state follow in later H3 batches.
 
 ### H4: CLI and TUI parity
 

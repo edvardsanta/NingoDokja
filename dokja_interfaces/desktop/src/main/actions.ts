@@ -10,6 +10,12 @@ import { INGEST_ID, INGEST_LIMITS } from "../shared/ingest.js";
 import { POST_REFUSALS, type PostRefusal } from "../shared/posts.js";
 import type { PostStore } from "./post_store.js";
 import type {
+  ArchivedChatReply,
+  ArchivedConversation,
+  ArchivedTurn,
+  ArchivedTurnState,
+  ConversationRead,
+  ConversationStarted,
   DeleteResult,
   DigestPage,
   DigestStatus,
@@ -193,19 +199,79 @@ function inDomain<T>(
 
 const noPayload = (): Record<string, unknown> => ({});
 
+// The archive's identities: its own opaque ids, and the send id the desktop names each message by,
+// kept the same when the same message is sent again so the archive answers it once.
+const ARCHIVE_ID = /^[0-9a-f]{32}$/;
+const SEND_ID = /^[A-Za-z0-9_-]{8,64}$/;
+// The archive's bounds: what the owner writes and what Ningo answers.
+const MAX_TURN_CONTENT_CHARS = 12000;
+const MAX_TURN_REPLY_CHARS = 24000;
+const MAX_TITLE_CHARS = 120;
+const MAX_TURNS_READ = 100;
+const TURN_STATES = new Set<ArchivedTurnState>(["pending", "completed", "failed", "interrupted"]);
+
+// A message to Ningo is one of two things in an archived conversation: a new message with its send id,
+// or the explicit retry of a turn that got no reply, which carries no text because the archive keeps it.
 function chatPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
-  const content = text(raw.content).trim();
   const conversationId = text(raw.conversation_id);
-  const readingId = text(raw.reading_id);
-  if (!content || content.length > 12000 || conversationId.length > 512 || readingId.length > 512) return undefined;
-  return { content, conversation_id: conversationId, ...(readingId ? { reading_id: readingId } : {}) };
+  if (!ARCHIVE_ID.test(conversationId)) return undefined;
+  const retryTurnId = text(raw.retry_turn_id);
+  if (retryTurnId) return ARCHIVE_ID.test(retryTurnId) ? { conversation_id: conversationId, retry_turn_id: retryTurnId } : undefined;
+  const content = text(raw.content);
+  const sendId = text(raw.send_id);
+  if (!content || content.length > MAX_TURN_CONTENT_CHARS || !SEND_ID.test(sendId)) return undefined;
+  return { content, conversation_id: conversationId, send_id: sendId };
 }
 
-function chatReply(result: unknown): { reply: string; sessionNotice: string } | Off {
+function count0(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function archivedTurn(value: unknown): ArchivedTurn | undefined {
+  if (!isRecord(value) || !ARCHIVE_ID.test(text(value.id))) return undefined;
+  const state = text(value.state) as ArchivedTurnState;
+  if (!TURN_STATES.has(state)) return undefined;
+  return {
+    id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64),
+    content: shorten(text(value.content), MAX_TURN_CONTENT_CHARS), reply: shorten(text(value.reply), MAX_TURN_REPLY_CHARS),
+    state, reason: shorten(text(value.reason)), attempts: count0(value.attempts),
+  };
+}
+
+function archivedConversation(value: unknown): ArchivedConversation {
+  const body = isRecord(value) ? value : {};
+  const id = text(body.id);
+  if (!ARCHIVE_ID.test(id)) throw new Error("unexpected conversation reply");
+  return {
+    id, kind: body.kind === "reading" ? "reading" : "general", readingId: shorten(text(body.reading_id), 512),
+    title: shorten(text(body.title), MAX_TITLE_CHARS), updatedAt: text(body.updated_at),
+    revision: count0(body.revision), turns: count0(body.turns),
+  };
+}
+
+function chatReply(result: unknown): ArchivedChatReply | Off {
   return inDomain(result, "chat", (body) => {
-    const session = isRecord(body.session) ? body.session : {};
-    return { reply: shorten(text(body.reply), 12000), sessionNotice: session.created === true ? "new" : session.revoked === true ? "reset" : "" };
+    const turn = archivedTurn(body.turn);
+    if (!turn) throw new Error("unexpected chat reply");
+    return { reply: shorten(text(body.reply), MAX_TURN_REPLY_CHARS), replayed: body.replayed === true, turn };
   });
+}
+
+// A new conversation: general, or about one reading, which it keeps for good.
+function conversationStartPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const readingId = text(raw.reading_id);
+  if (readingId.length > 512) return undefined;
+  return readingId ? { reading_id: readingId } : {};
+}
+
+function conversationReadPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.conversation_id);
+  return ARCHIVE_ID.test(id) ? { conversation_id: id, limit: MAX_TURNS_READ } : undefined;
+}
+
+function conversationRead(body: Record<string, unknown>): ConversationRead {
+  const turns = Array.isArray(body.turns) ? body.turns.slice(0, MAX_TURNS_READ).map(archivedTurn).filter((turn): turn is ArchivedTurn => turn !== undefined) : [];
+  return { conversation: archivedConversation(body.conversation), turns };
 }
 
 // The three link actions share one payload (the interface, fixed) and one projection (the state and
@@ -662,6 +728,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "runtime.modules": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.logs": { payload: runtimeModule, project: (result) => inDomain(result,"runtime",runtimeLogs) },
   "message.created": { payload: chatPayload, project: chatReply },
+  "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
+  "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },
   "runtime.chat": {payload:noPayload,project:(result)=>inDomain(result,"runtime",runtimeChat)},
