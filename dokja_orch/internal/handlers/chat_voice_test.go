@@ -12,7 +12,7 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	generator := &plainGenerator{}
 	handler := NewChatDomainHandler(generator)
 	event := chatEvent("second")
-	event.Context = map[string]any{"guild_id": "guild", "entry_kind": "command", "session_key": "discord-voice:guild:room", "voice_turns": []chat.VoiceTurn{{"account-a", "Scholar", "first"}, {"account-b", "Reader", "Ningo, second"}}}
+	event.Context = map[string]any{"guild_id": "guild", "entry_kind": "command", "session_key": "discord-voice:guild:room", "voice_turns": []chat.VoiceTurn{{UserID: "account-a", UserName: "Scholar", Text: "first"}, {UserID: "account-b", UserName: "Reader", Text: "Ningo, second"}}}
 	event.User = core.EventUser{ID: "account-b", Name: "Reader"}
 	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
 		t.Fatal(err)
@@ -23,7 +23,7 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	}
 	originalID := state.id
 	event.User = core.EventUser{ID: "account-c", Name: "Third"}
-	event.Context["voice_turns"] = []chat.VoiceTurn{{"account-c", "Third", "And why?"}}
+	event.Context["voice_turns"] = []chat.VoiceTurn{{UserID: "account-c", UserName: "Third", Text: "And why?"}}
 	event.Payload["content"] = "continue"
 	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
 		t.Fatal(err)
