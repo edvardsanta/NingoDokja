@@ -8,6 +8,9 @@ import (
 	"unicode"
 )
 
+// VoiceKnowledgeLookupBudget bounds optional retrieval on the spoken response path.
+const VoiceKnowledgeLookupBudget = 100 * time.Millisecond
+
 const VoiceFollowupWindow = 30 * time.Second
 const VoiceHandoffWindow = 12 * time.Second
 const VoiceDefaultMaxSentences = 3

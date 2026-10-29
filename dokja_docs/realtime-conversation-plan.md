@@ -428,3 +428,163 @@ Technical references checked for this plan: pgvector upstream README sections
 on exact/approximate search and filtering; PostgreSQL 17 manual section 5.9 on row
 security. Record installed versions in R0. External URLs are omitted from this
 repository document in accordance with repository publishing rules.
+
+## R0 implementation evidence
+
+The first instrumentation batch adds monotonic adapter timing events from capture
+start through recognition queue/start, transcript readiness, response dispatch,
+bridge request, eligibility, usable sentence/final reception and floor wait.
+Events contain only a random trace ID, stage and elapsed milliseconds. The latest
+contributing segment's trace follows the response and supplies the bridge message
+identity. Other batched segments retain their own dispatch timings.
+
+R0 remains in progress. Capture start is not the last speech sample; recognition
+queue time includes endpointing. Handler completion includes awaited playback.
+Stream parsing awaits speech callbacks, so final-frame reception can include
+playback time. These events do not establish audible latency or pure provider
+latency. Last-sample and outbound audio-frame timestamps, server-side correlation, a
+reproducible corpus and a live baseline remain pending.
+
+### TTS and player timing report
+
+Voice replies now forward the trace through both streamed sentences and final
+reply playback. Each synthesized segment gets an opaque sentence ID so prefetch
+cannot mix timing pairs. Events cover `tts_requested`, `tts_ready`, `tts_failed`,
+`playback_enqueued`, `playback_started`, `playback_finished`, and explicit playback
+cancellation/start failure. Playback start means Discord's player reached Playing;
+finish means the awaited player reached Idle. Neither proves remote audibility.
+
+Run the offline report against a saved development log:
+
+```sh
+python3 scripts/voice_latency_report.py /tmp/voice-session.log
+python3 -m unittest discover -s scripts -p test_voice_latency_report.py -v
+```
+
+The report contains sample counts, nearest-rank p50/p95/p99, incomplete trace
+counts, malformed events and failure counts without echoing identifiers or log
+contents. It measures recognition queue/work, dispatch wait, per-sentence TTS and
+player time, plus a clearly labeled capture-to-first-player proxy. Recognition
+work includes bridge and preprocessing overhead. Passive and batched segment
+traces can legitimately have no playback; absence of playback is not alone a
+failure. Separate cold/warm and workload recordings when collecting a baseline.
+Zero samples produce null percentiles, never a claim of zero latency.
+
+### Restored development baseline — 2026-10-28 local time
+
+The development orchestrator, Discord adapter, voice service and Feeds service
+were rebuilt and started with the instrumentation worktree mounted. The host
+Runtime inference socket was restored. Discord reported ready; voice reported
+Piper with the cached CPU Whisper model. Hot reload is active for the mounted
+sources. These are development operations, not a production rollout.
+
+Two sequential synthetic Portuguese requests through the authenticated voice
+bridge completed in 8,705 ms and 9,456 ms, returning 54 and 53 characters.
+They bypassed capture, ASR and playback and used isolated synthetic rooms. These
+are bridge response measurements, not pure inference or end-of-speech latency.
+Container restoration/build activity overlapped this diagnostic period; collect
+an idle baseline before attributing the full delay to a provider. The current
+path already misses the proposed latency gate in these samples.
+
+Three local voice-service round trips using synthesized Portuguese audio measured:
+
+| Sample | Piper synthesis | Whisper transcription |
+| --- | ---: | ---: |
+| 1 | 114 ms | 338 ms |
+| 2 | 96 ms | 342 ms |
+| 3 | 86 ms | 560 ms |
+
+These synthetic audio measurements exclude Discord and human endpointing. They
+establish neither ASR accuracy nor percentile reliability. No diagnostic audio
+was played in Discord. A book-related bridge request initially failed at roughly
+five seconds because Feeds was absent; Feeds was subsequently restored. Do not
+classify that failure as model generation latency.
+
+Fresh validation in the restored voice container passed all 12 tests via
+`python -m unittest test_main test_speech_activity test_transformers_stt_service
+test_voice_chat -q`, from the service directory. Live multi-speaker capture,
+audible latency and the target corpus remain pending. The next measurement is a
+user voice session with the new trace events, followed by provider-only timing
+under an idle workload.
+
+### Optional Knowledge timeout fix — 2026-10-28 local time
+
+An additional idle bridge sample took 8,659 ms. Its logs showed an optional
+Knowledge lookup consuming five seconds before generation. Knowledge was not
+running. Direct Runtime requests with the full voice persona took 6,242, 4,456
+and 3,981 ms; those prompts omitted bridge-specific attribution/identity notes,
+so this is an isolation diagnostic rather than an identical-prompt benchmark.
+
+Chat domain policy now bounds optional voice Knowledge retrieval to 100 ms.
+Timeout continues without sources under the existing best-effort retrieval
+contract; references returned within budget remain in context. Text chat retains
+its existing retrieval budget. This adds no routes, envelopes, schemas or config.
+It is not the planned semantic conversation-memory implementation.
+
+Two synthetic bridge requests after hot reload took 3,738 and 3,851 ms, returning
+65 and 60 characters. This is consistent with removing the five-second lookup
+stall. Sample counts and variable response lengths prevent a percentile or
+quality claim. The remaining delay still exceeds the realtime target. No Codex
+model, reasoning configuration or final-response validation was changed. Official
+Codex configuration documentation was consulted; tuning reasoning remains an
+unapplied experiment rather than an assumed fix.
+
+Regression tests exercise deadline expiry with continued generation and timely
+reference inclusion. The full orchestrator suite, vet and the Chat domain suite pass with the
+final domain policy constant and both regression tests.
+
+### Repeated clarification investigation — 2026-10-28 local time
+
+A live report of repeated acknowledgments/clarifications was traced to actual
+model replies, not a hardcoded fallback. Read-only snapshot inspection found
+short, broken recognized fragments and replies reporting missing context. There
+was no known spoken reference for that test, so neither transcription accuracy
+nor the relative contribution of segmentation/context can be quantified.
+
+A controlled three-sentence Portuguese Piper corpus (37 reference words) compared
+multilingual Whisper checkpoints with the existing preprocessing and decoding:
+
+| Model | Word edit errors | Per-clip inference |
+| --- | ---: | --- |
+| tiny | 3 | 255–284 ms |
+| base | 2 | 420–457 ms |
+| small | 2 | 1,480–2,153 ms |
+
+Punctuation/case/accents were normalized for word edit distance. All three had
+two word edits on the sentence containing the assistant name. This is a small
+synthetic diagnostic, not an ASR quality benchmark or proof of a name-recognition
+fix. The development-only override selects cached base for a live trial, with
+network-offline model loading preserved. Tracked defaults remain unchanged.
+Small was not selected because its extra latency bought no gain on this fixture.
+No transcript history was deleted and no generic response filter was introduced.
+The follow-up test needs an exact known question spoken in the room; compare its
+recognized meaning and speaker before claiming the clarification loop is fixed.
+
+### Live dispatch delay and overlap correction
+
+A short live window contained 38 capture traces, nine completed recognition/
+dispatch pairs and two traces with playback. Recognition queue wait was negligible;
+recognition median was about 427 ms, and some finalized segments waited as long
+as 8,147 ms before dispatch. Median TTS preparation was about 97 ms. Two capture-
+to-player observations ranged from roughly 6.0 to 13.6 seconds; they include the
+human utterance duration and cannot establish end-of-speech latency or an SLO.
+
+The report now strips Compose ANSI color wrappers before parsing timing JSON;
+previously those wrappers caused every event in this log to be counted malformed.
+A regression fixture covers colored output.
+
+Response preparation no longer waits for all later captures and recognitions.
+It still waits for earlier unfinished captures before the latest pending sequence,
+keeps one response/playback owner, and waits for a quiet floor before first audio.
+Later activity cannot erase an already scheduled finalized response. Speech never
+cancels playback. This overlaps generation with later speech, without claiming
+that any newly arriving correction is already included in the prepared answer;
+those turns remain queued for the next exchange. Freshness/revision validation
+from R1/R2 is still pending.
+
+Regression tests cover preparation during later speech, quiet-floor playback,
+later recognition not cancelling dispatch, earlier recognition preserving order,
+and uninterrupted answers. Six targeted Discord test files and three offline
+report tests pass. Hot reload restarts the Discord listener after source changes;
+restart the listener command before comparing live behavior. Post-change live
+latency has not yet been measured.

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { prepareSpeech, type VoiceLatencyTrace } from "./latency_trace.js";
 import {
   AudioPlayerStatus,
   EndBehaviorType,
@@ -93,6 +95,7 @@ type SpeakParams = {
   originChannelId?: string;
   signal?: AbortSignal;
   waitForFloor?: () => Promise<void>;
+  trace?: VoiceLatencyTrace;
 };
 
 export type DiscordVoiceController = {
@@ -311,8 +314,8 @@ export function createDiscordVoiceController(options: {
   };
 
   async function renderSpeech({ guildId, userId, text, channelId, originChannelId, signal, waitForFloor,
-    preparedAudio, waitForEnd,
-  }: SpeakParams & { preparedAudio?: Buffer; waitForEnd?: boolean }): Promise<string> {
+    preparedAudio, waitForEnd, trace, sentenceId = randomUUID(),
+  }: SpeakParams & { preparedAudio?: Buffer; waitForEnd?: boolean; sentenceId?: string }): Promise<string> {
     if (!guildId) {
       throw new Error("Speech playback only works in guild voice channels");
     }
@@ -338,11 +341,11 @@ export function createDiscordVoiceController(options: {
       throw new Error("Speech playback only works in voice channels");
     }
 
-    const wavBytes = preparedAudio ?? Buffer.from((await voiceAudioRequest(
+    const wavBytes = preparedAudio ?? Buffer.from((await prepareSpeech(trace, sentenceId, () => voiceAudioRequest(
       options.orchestratorEndpoint, "synthesize", {
         guildId, userId, channelId: originChannelId ?? voiceChannel.id, text: trimmed,
       }, signal,
-    )).audio_bytes_b64 as string, "base64");
+    ))).audio_bytes_b64 as string, "base64");
     signal?.throwIfAborted();
     const tempDir = mkdtempSync(join(tmpdir(), "dokja-voice-"));
     const tempPath = join(tempDir, "speech.wav");
@@ -367,7 +370,10 @@ export function createDiscordVoiceController(options: {
     // Only explicit session cancellation stops playback. Human speech keeps
     // accumulating for the next turn while this reply finishes.
     const abortPlayback = () => {
-      if (session.stream === stream) interruptSessionPlayback(session);
+      if (session.stream === stream) {
+        trace?.mark("playback_cancelled", sentenceId);
+        interruptSessionPlayback(session);
+      }
     };
     signal?.addEventListener("abort", abortPlayback, { once: true });
     session.player.once(AudioPlayerStatus.Idle, () => signal?.removeEventListener("abort", abortPlayback));
@@ -386,11 +392,14 @@ export function createDiscordVoiceController(options: {
     }
     await waitForFloor?.();
     signal?.throwIfAborted();
+    trace?.mark("playback_enqueued", sentenceId);
     session.player.play(stream.resource);
 
     try {
       await entersState(session.player, AudioPlayerStatus.Playing, 15_000);
+      trace?.mark("playback_started", sentenceId);
     } catch (error) {
+      trace?.mark("playback_failed", sentenceId);
       const message = error instanceof Error ? error.message : String(error);
       options.error?.(
         "[dokja-discord] speech player failed to start",
@@ -419,6 +428,7 @@ export function createDiscordVoiceController(options: {
         AbortSignal.timeout(120_000), ...(signal ? [signal] : []),
       ]);
       await entersState(session.player, AudioPlayerStatus.Idle, done);
+      trace?.mark("playback_finished", sentenceId);
       stream.stop();
     }
     return `Speaking in <#${voiceChannel.id}>`;
@@ -504,14 +514,15 @@ export function createDiscordVoiceController(options: {
         signal: params.signal,
         waitForFloor: params.waitForFloor,
         prepare: async (text) => {
-          const audio = await voiceAudioRequest(options.orchestratorEndpoint, "synthesize", {
+          const sentenceId = randomUUID();
+          const audio = await prepareSpeech(params.trace, sentenceId, () => voiceAudioRequest(options.orchestratorEndpoint, "synthesize", {
             guildId: params.guildId!, userId: params.userId,
             channelId: params.originChannelId ?? params.channelId!, text,
-          }, params.signal);
-          return Buffer.from(audio.audio_bytes_b64 as string, "base64");
+          }, params.signal));
+          return { audio: Buffer.from(audio.audio_bytes_b64 as string, "base64"), sentenceId };
         },
-        play: async (text, preparedAudio) => {
-          await renderSpeech({ ...params, text, preparedAudio, waitForEnd: true });
+        play: async (text, prepared) => {
+          await renderSpeech({ ...params, text, preparedAudio: prepared.audio, sentenceId: prepared.sentenceId, waitForEnd: true });
         },
       });
     },
@@ -726,6 +737,7 @@ export function createListeningSession(params: {
     channelId: params.session.channelId,
     interrupt: () => interruptSessionPlayback(params.session),
     onTurn: params.onTurn,
+    onTiming: event => params.log?.("[dokja-discord] voice timing", JSON.stringify(event)),
     onError: (error) => params.error?.("[dokja-discord] voice reply failed", error),
   });
   // At most two transcriptions run at once; segment buffers and pending work are bounded.
@@ -763,6 +775,7 @@ export function createListeningSession(params: {
       }
       conversation.transcribing(seq);
       jobs.push(async () => {
+        conversation.recognitionStarted(seq);
         try {
           const wav = buildWavFromPCM(audio).toString("base64");
           if (params.activationMode === "wakeword") {
