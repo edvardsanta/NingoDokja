@@ -78,7 +78,7 @@ export function createCommands(
   },
 ): DiscordSlashCommand[] {
   return [
-    ...observerCommands(orchestratorEndpoint, orchestratorTimeoutMs, voice),
+    ...observerCommands(orchestratorEndpoint, orchestratorTimeoutMs, voice, options?.locale),
     createDokjaCommand({
       name: "chat",
       locale: options?.locale,
