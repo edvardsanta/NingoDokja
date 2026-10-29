@@ -12,6 +12,12 @@ Existing infrastructure, contracts and completed migration batches remain in
 place. This record changes the roadmap, not application code, owner data,
 deployment or the canonical layer rules.
 
+The [design-system and agent-interface review](design-system-refactoring-review.md)
+of 2026-10-29 adds pending token, component, task-presentation and rich-answer
+steps `09.6`–`09.9`, plus bounded delegation evaluation `10.5`. These follow the
+existing behavioral gate; `08.2` remains the active application work and no
+provider-owned workflow or new cognitive grouping is approved by the UI review.
+
 ## Functional boundary
 
 Feeds covers the external acquisition/integration wing of Knowledge: source

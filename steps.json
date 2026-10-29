@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-26",
+  "updated_on": "2026-10-29",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "08",
   "status_values": [
@@ -509,7 +509,8 @@
         "Coupling per experiment commit and fault containment recorded; no envelope, schema, existing route or interface command changed; rollback is one composition line per orchestrator experiment.",
         "Real prediction data: 7 hashtag.suggest attempts scored (5 legacy path, 2 task path), 0 resolved over 5 days; Brier and skill not computable; feedback coverage 0/7.",
         "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets.",
-        "2026-10-26: source diagnosis found ordinary reading remains read -> ingest -> classify; generic consolidation 09.3 is pending and cognitive inference remains experimental. Owner selected understanding/application across documents and confirmed Feeds as external Knowledge integration. The original evaluations remain historical, scoped evidence."
+        "2026-10-26: source diagnosis found ordinary reading remains read -> ingest -> classify; generic consolidation 09.3 is pending and cognitive inference remains experimental. Owner selected understanding/application across documents and confirmed Feeds as external Knowledge integration. The original evaluations remain historical, scoped evidence.",
+        "2026-10-29: reviewed design-system-patterns and ui-ux-pro-max against current desktop CSS/components, the conversation archive plan, ADR 0011 and the Cindy source study. Targeted local UX matches cover visible focus, linked form errors and stable/efficient history lists. Added pending steps 09.6-09.9 and delegation evaluation 10.5; active 08.2, gate 08.3 and historical implementation evidence remain intact. Planning evidence only; no visual/runtime acceptance is claimed."
       ],
       "checks": [
         {
@@ -541,7 +542,8 @@
         "dokja_docs/cognitive-realignment.md",
         "dokja_docs/decisions/0005-knowledge-experience-content.md",
         "dokja_docs/decisions/0006-reading-macro-component.md",
-        "dokja_docs/model-assisted-cognition-follow-up.md"
+        "dokja_docs/model-assisted-cognition-follow-up.md",
+        "dokja_docs/design-system-refactoring-review.md"
       ],
       "substeps": [
         {
@@ -607,7 +609,7 @@
           "evidence": []
         }
       ],
-      "next_action": "08.2: freeze the minimum application state/authority contract, representative corpus and evaluation rubric, then implement the cross-document vertical. 08.3 evaluates it before production consolidation/migration resumes."
+      "next_action": "08.2: complete independent semantic/applicability review, the frozen comparison harness and actual outcome/episode contracts using the implemented prepare/assess/propose/measured path. 08.3 evaluates behavior before broad adoption; new design-system and delegation steps remain pending behind that gate."
     },
     {
       "id": "09",
@@ -624,7 +626,8 @@
         "Meme and Digest workflows preserve their facades while remaining cognitive responsibility/grouping decisions follow the reopened evaluation",
         "dokja_domain/dokja_knowledge/classification.go",
         "dokja_domain/dokja_knowledge/classification_test.go",
-        "dokja_docs/step-09-consolidation.md"
+        "dokja_docs/step-09-consolidation.md",
+        "Approved design-system token/component migration and scoped task presentation; opt-in declarative-answer evaluation (09.6-09.9)"
       ],
       "acceptance_criteria": [
         "After the reopened 08.3 gate, start with generic knowledge consolidation 09.3 using the validated cross-document state/behavior contract, then review remaining feature and conversation responsibilities. Preserve existing runtime contracts until retirement scope is resolved.",
@@ -1100,7 +1103,8 @@
             "Persist transcripts across interface and orchestrator restart, with stable conversation/send identities, explicit failed/interrupted states and bounded pagination.",
             "Isolate owner/scope and reading discussions on every operation; prevent duplicate turns after retries and cross-conversation late replies.",
             "Keep archive retention distinct from bounded model context, provider sessions, Knowledge and Experience; archiving replies does not establish learning or resolve experiences.",
-            "Review schema and additive route contracts before implementing; test restart, concurrency, idempotency, delete/retention and shared interface access."
+            "Review schema and additive route contracts before implementing; test restart, concurrency, idempotency, delete/retention and shared interface access.",
+            "Reuse stable product conversation/send identities across provider replacement; keep the transcript, bounded inference context, native provider session and workflow execution distinct. Step 09.8 consumes this archive contract rather than creating another history store."
           ],
           "evidence": [
             "2026-10-27: non-archived chat checkpoints now have a separate versioned dokja_chat_sessions.db beside DOKJA_DB_FILE. Summaries and recent user/assistant turns reload after restart; natural Discord messages share a guild/channel scope with untrusted participant attribution, while DMs and commands remain separate. Verified identity is rebuilt per turn. This checkpoint work does not complete the owner archive/interface rollout, provide full transcript retention, index chat in pgvector, or backfill prior Discord history.",
@@ -1129,16 +1133,204 @@
           "blockers": [],
           "references": [
             "dokja_docs/conversation-history-plan.md",
-            "dokja_docs/realtime-conversation/README.md"
+            "dokja_docs/realtime-conversation/README.md",
+            "dokja_docs/design-system-refactoring-review.md"
           ],
           "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI).",
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"
+        },
+        {
+          "id": "09.6",
+          "title": "Establish compatible design tokens and theme foundations",
+          "status": "pending",
+          "depends_on": [
+            "08.3"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Inventory of implemented tokens and owner-approved identity choices, reconciled with historical proposals",
+            "Primitive -> semantic -> component token mapping with legacy aliases and incremental migration",
+            "Documented dark-theme baseline, focus, spacing, typography and motion roles with visual verification"
+          ],
+          "acceptance_criteria": [
+            "Preserve approved cyberpunk values, cyan buttons, glow, colored-square states, fonts and chamfered panels; do not reinstate rejected mockup alternatives.",
+            "Derive purpose-based semantic roles from existing values; retain compatible aliases while consumers migrate and document deprecation/removal conditions.",
+            "Separate theme values from component behavior without assuming a light palette, a new preference API, external design service or token-generation dependency.",
+            "Verify missing/circular token references, representative visual parity, readable states/focus, reduced motion and forced-color behavior; report visual or native checks not run."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/desktop-ux/design-tokens.md"
+          ],
+          "next_action": "09.6-a foundation batch is complete; review its branch. After 08.3, finish remaining consumer inventory and visual/accessibility acceptance in 09.6-b. The full 09.6 step remains pending.",
+          "worktree": ".worktrees/design-token-foundations",
+          "branch": "refactor/design-token-foundations",
+          "preparation_exception": "2026-10-29: owner requested starting implementation. Compatible token-only preparation may proceed independently without changing cognition, navigation, provider control or public contracts. Full 09.6 acceptance and broader interface adoption still resume after 08.3; active path remains 08.2.",
+          "batches": [
+            {
+              "id": "09.6-a",
+              "title": "Introduce compatible token layers and migrate page, tones and base buttons",
+              "status": "completed",
+              "completed_on": "2026-10-29",
+              "depends_on": [
+                "08.1"
+              ],
+              "deliverables": [
+                "dokja_interfaces/desktop/src/renderer/tokens.css",
+                "Page/state/base-button semantic consumers with legacy aliases",
+                "Token graph and native Electron regression tests",
+                "dokja_docs/desktop-ux/design-tokens.md"
+              ],
+              "evidence": [
+                "Preserved initial dark palette, fonts, geometry, glow and component appearance. Migrated shared page/body styles, state-tone roles and base-button colors/focus; other consumers retain compatible aliases. Root semantic action overrides and component overrides do not recolor working-state indicators."
+              ],
+              "checks": [
+                {
+                  "name": "desktop_regression",
+                  "status": "passed",
+                  "detail": "pnpm test: 258 Node tests and 322 UI tests passed. pnpm typecheck and pnpm build passed with the unchanged lockfile."
+                },
+                {
+                  "name": "native_token_contract",
+                  "status": "passed",
+                  "detail": "node --import tsx --test tests/e2e/design_tokens.e2e.ts: 4 passed with isolated display and synthetic local orchestrator. Default colors/type, independent overrides and resolved legacy aliases verified in Chromium."
+                },
+                {
+                  "name": "computed_style_baseline",
+                  "status": "passed",
+                  "detail": "Before/after Talk and System samples: 37 visible nodes, zero differences in selected computed colors, typography, borders, spacing, dimensions, clipping and text shadows. This is sampled style parity, not pixel acceptance."
+                },
+                {
+                  "name": "screenshot_acceptance",
+                  "status": "blocked",
+                  "detail": "Page.captureScreenshot timed out in the isolated compositor on both capture paths; no screenshot/manual visual acceptance claimed."
+                },
+                {
+                  "name": "full_native_suite",
+                  "status": "skipped",
+                  "detail": "Ran the targeted native token suite only. Existing smoke test assumes five workspaces while current registry has six; no unrelated navigation-test changes included."
+                }
+              ]
+            },
+            {
+              "id": "09.6-b",
+              "title": "Complete consumer inventory and visual/accessibility acceptance",
+              "status": "pending",
+              "depends_on": [
+                "09.6-a",
+                "08.3"
+              ],
+              "resume_gate": "08.3",
+              "acceptance_criteria": [
+                "Inventory remaining palette uses before removing aliases or migrating feature-specific controls.",
+                "Complete all-workspace visual checks plus focus, reduced-motion, forced-color and zoom/text-growth validation; preserve approved visual choices."
+              ],
+              "evidence": []
+            }
+          ]
+        },
+        {
+          "id": "09.7",
+          "title": "Consolidate accessible composable interface primitives",
+          "status": "pending",
+          "depends_on": [
+            "09.6"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Inventory and explicit variant/size/slot APIs for existing controls, panels, tabs, drawers and feedback",
+            "Implementation-backed component/state catalog and representative vertical migration",
+            "Consumer migration map, keyboard/accessibility regressions and rollback guidance"
+          ],
+          "acceptance_criteria": [
+            "Extend existing WorkspacePanel, Drawer, tabs, menus and feedback before adding parallel abstractions or component dependencies.",
+            "Keep native semantics, explicit composition and approved visual identity; preserve portal placement outside panel size containers.",
+            "Cover meaningful loading, empty, ready, stale, unavailable, pending, failed and unsupported states with accessible labels and actions.",
+            "Verify focus entry/return, keyboard operation, modal containment, disabled/pending behavior, long content and narrow panels; migrate consumers in cohesive batches.",
+            "Keep CLI/TUI presentation platform-specific while sharing domain state vocabulary; component extraction does not move policy or canonical state into the renderer.",
+            "Keep focus visible around docks, sticky content and drawers at supported narrow widths and zoom/text growth; do not infer mobile support from responsive desktop layout.",
+            "For failed multi-field submits, preserve input and provide linked inline errors with a focusable summary. Announce relevant errors/status changes without streaming-token repetition."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/cindy-architecture-research.md"
+          ],
+          "next_action": "After token foundations, migrate one representative vertical using existing primitives and verify behavior before expanding."
+        },
+        {
+          "id": "09.8",
+          "title": "Present scoped conversation and task state across interfaces",
+          "status": "pending",
+          "depends_on": [
+            "09.5",
+            "09.7"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Bounded versioned task/progress/control projection grounded in domain lifecycle and existing workflow outcomes",
+            "Desktop conversation/task presentation using shared history identities and UI primitives",
+            "Desktop/CLI/TUI state fixtures, compatibility review and unsupported-control behavior"
+          ],
+          "acceptance_criteria": [
+            "Reuse 09.5 product conversation/send IDs; keep workflow executions and native provider sessions distinct, with scope checked through orchestration.",
+            "Distinguish accepted/queued input, running work, preview, final reply, pending interaction, failure, interruption and unknown only when backend evidence supports them.",
+            "Separate provider availability, capability support and execution state; cancellation and same-turn steering are independent and unsupported actions cannot be simulated.",
+            "Preserve the public event envelope and existing text replies; review additive actions/projections before implementation. No interface calls inference or other services directly.",
+            "Exercise restart, retry idempotency, stale/late reply isolation after navigation, missing/old capabilities and denied actions before effects across operator interfaces.",
+            "Do not imply mobile support, remote-device ownership or multi-agent execution from a shared presentation contract.",
+            "Preserve drafts, focus and manual reading position during progress updates; auto-follow only when appropriate. Use stable message/task keys and measure long-history input/rendering before adopting windowing, retaining accessible order and focus recovery."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/cindy-architecture-research.md"
+          ],
+          "next_action": "After history and component foundations, inventory observable backend states and define projection/compatibility fixtures before adding controls."
+        },
+        {
+          "id": "09.9",
+          "title": "Evaluate bounded declarative answers with text fallback",
+          "status": "pending",
+          "depends_on": [
+            "09.8"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Opt-in versioned rich-answer prototype using approved native components and semantic tokens",
+            "Plain-text projections for CLI/TUI and messaging, preserving existing replies/media",
+            "Bounded parser/action contract, duplicate-submission controls and prototype evaluation"
+          ],
+          "acceptance_criteria": [
+            "Begin with cited text, small tables/status summaries and a narrow form/action subset; demonstrate an operator benefit before broader adoption.",
+            "Bound bytes, nodes/depth and fields; explicitly handle incomplete, invalid, unknown-version and unsupported output as untrusted data.",
+            "Generated content cannot execute arbitrary HTML, JavaScript, CSS or IPC. Actions return through validated ingress/domain policy with stable send identities.",
+            "Verify duplicate submissions, partial content, navigation, unsupported controls and plain-text fallback; preserve archive/context semantics.",
+            "Keep prototype evaluation distinct from cognitive acceptance and do not require a new mobile application or provider-native UI runtime."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/cindy-architecture-research.md"
+          ],
+          "next_action": "Define and test the smallest useful opt-in representation after 09.8; preserve a supported plain-text path."
         }
       ],
       "references": [
-        "dokja_docs/feeds-content-plugins.md"
+        "dokja_docs/feeds-content-plugins.md",
+        "dokja_docs/design-system-refactoring-review.md"
       ],
       "status_before_review": "in_progress",
       "rescheduled_on": "2026-10-26",
@@ -1156,7 +1348,8 @@
       "deliverables": [
         "State ownership and migration decisions",
         "Durable acceptance and recovery for selected workflows",
-        "Workload-driven cognitive storage comparison and evidence-backed engine decision (ADR 0009)"
+        "Workload-driven cognitive storage comparison and evidence-backed engine decision (ADR 0009)",
+        "Bounded domain-owned delegation evaluation with an explicit no-adoption outcome (10.5)"
       ],
       "acceptance_criteria": [
         "Each durable state kind has an owner, migration path, and rollback strategy.",
@@ -1302,7 +1495,8 @@
             "Provider replacement preserves contracts, scope, authorization, state ownership and cumulative task budgets; unsupported capabilities are explicit.",
             "Trace every answering provider/model and consumed evidence/state revision; stale, malformed, unavailable and late results cannot silently mutate task state.",
             "Provider inference cannot directly write memory, control the workflow or execute external actions.",
-            "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration."
+            "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration.",
+            "Expose bounded capability/progress provenance suitable for operator projections. Distinguish provider availability, supported operation and observed runtime state; absence of cancellation or same-turn steering must remain explicit. UI controls cannot grant provider-owned workflow authority."
           ],
           "evidence": [
             "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration.",
@@ -1316,7 +1510,8 @@
           "references": [
             "dokja_docs/decisions/0011-inference-provider-boundaries.md",
             "dokja_docs/model-assisted-cognition-experiment.md",
-            "dokja_docs/model-assisted-cognition-follow-up.md"
+            "dokja_docs/model-assisted-cognition-follow-up.md",
+            "dokja_docs/design-system-refactoring-review.md"
           ],
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
@@ -1402,12 +1597,46 @@
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"
+        },
+        {
+          "id": "10.5",
+          "title": "Evaluate domain-owned delegated tasks against a single-task baseline",
+          "status": "pending",
+          "depends_on": [
+            "10.3",
+            "09.8"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Frozen workload, baseline and adoption/no-adoption criteria for bounded delegation",
+            "Domain-owned parent/child task, scope, budget, report and completion contract",
+            "Deterministic-worker experiment with failure/recovery controls and measured evaluation"
+          ],
+          "acceptance_criteria": [
+            "Evaluate a demonstrated application need before integrating agent teams; compare correctness, latency and cost on frozen cases against the existing single-task path.",
+            "Domain policy owns delegation eligibility and result acceptance; orchestrator sequences approved tasks and services execute bounded capabilities under ADR 0011.",
+            "Distinguish execution completion, report delivery and accepted result. Preserve task/input identities, cumulative budgets and scope across workers.",
+            "Test duplicate/late reports, partial failure, cancellation, restart and unauthorized effects with deterministic workers before any provider-backed evaluation.",
+            "No provider gains arbitrary agent spawning, workflow control, memory writes or external actions. Native agent teams, remote workers and device relays require a separately reviewed requirement.",
+            "Record no-adoption when delegation adds no measured benefit; presence of a team UI is not proof of cognition or reliable outcome reuse."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/cindy-architecture-research.md"
+          ],
+          "next_action": "After inference integration and task projection, define a bounded workload and deterministic-worker controls before considering runtime integration."
         }
       ],
       "status_before_review": "in_progress",
       "rescheduled_on": "2026-10-26",
       "resume_gate": "08.3",
-      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate."
+      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate.",
+      "references": [
+        "dokja_docs/design-system-refactoring-review.md"
+      ]
     },
     {
       "id": "11",
@@ -1538,7 +1767,8 @@
             "Distinguish embeddings, classification, generation and OCR; preserve the fixed approved embedding profile and expose unsupported combinations explicitly.",
             "Persist non-secret operational choices in the shared database; keep credentials and bootstrap information out of operator read projections.",
             "Validate new selections before applying; preserve existing consumers through documented compatibility adapters until each capability migrates.",
-            "Compare provider/capability behavior with reproducible tests and document unavailable live providers without claiming they passed."
+            "Compare provider/capability behavior with reproducible tests and document unavailable live providers without claiming they passed.",
+            "Reuse the approved design-system primitives for provider settings. A configured or discoverable provider does not imply supported task controls or successful observed inference; preserve that distinction in desktop, CLI and TUI."
           ],
           "checks": [
             {
@@ -1685,9 +1915,12 @@
           "resume_gate": "08.3"
         }
       ],
-      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate."
+      "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate.",
+      "references": [
+        "dokja_docs/design-system-refactoring-review.md"
+      ]
     }
   ],
   "next_step": null,
-  "next_action": "08.2: define and implement the owner-selected cross-document understanding/application vertical under the reopened cognitive review; see dokja_docs/cognitive-realignment.md."
+  "next_action": "08.2: continue semantic/applicability review, frozen comparison execution and observed-outcome/episode contracts under dokja_docs/cognitive-realignment.md. Pending design-system/interface steps 09.6-09.9 and delegation evaluation 10.5 are recorded in dokja_docs/design-system-refactoring-review.md; they do not replace the active cognitive vertical."
 }

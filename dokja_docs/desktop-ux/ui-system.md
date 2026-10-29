@@ -1,5 +1,15 @@
 # Ningo desktop: visual system and mockups
 
+Refactoring review (2026-10-29): [design-system migration steps](../design-system-refactoring-review.md)
+track token hierarchy, reusable components and task presentation in steps
+`09.6`–`09.9`. The owner decisions in section 0 take precedence over the
+historical proposal tables and mockup below. Those proposals are not an
+implementation checklist; the migration preserves the approved visual identity.
+
+First implementation batch: [token foundations and verification](design-tokens.md)
+records `09.6-a`, including preserved defaults, legacy aliases and remaining
+visual/accessibility checks. Later sections still contain historical proposals.
+
 Date: 2026-10-23. Author: UI designer agent. Input: `ux-proposal.md` (owner decisions of 2026-10-23
 are binding), the current renderer styles
 (`dokja_interfaces/desktop/src/renderer/styles.css`), and the identity in `README.md` and

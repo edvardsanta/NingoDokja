@@ -1,0 +1,84 @@
+/*
+ * Three layers: palette/measurements -> purpose -> component roles.
+ * The initial mapping preserves the approved dark identity. Legacy names below
+ * keep unmigrated consumers working; new consumers should use semantic roles.
+ */
+:root {
+  /* Primitives: the existing palette and bundled font stacks. */
+  --color-slate-950: #0a1119;
+  --color-slate-900: #101b25;
+  --color-slate-600: #456a80;
+  --color-slate-500: #62768a;
+  --color-slate-300: #8ea3b5;
+  --color-slate-100: #d6e6f3;
+  --color-cyan-400: #3be8f5;
+  --color-magenta-500: #ff3d8b;
+  --color-magenta-400: #ff6aa5;
+  --color-amber-400: #ffb22e;
+  --font-family-mono: "B612 Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  --font-family-display: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Semantic roles: equal defaults do not imply equal responsibilities. */
+  --surface-page: var(--color-slate-900);
+  --surface-panel: var(--color-slate-950);
+  --border-default: var(--color-slate-600);
+  --border-subtle: color-mix(in srgb, var(--border-default) 45%, transparent);
+  --text-primary: var(--color-slate-100);
+  --text-secondary: var(--color-slate-300);
+  --action-primary: var(--color-cyan-400);
+  --text-on-action: var(--surface-panel);
+  --status-ok: var(--color-cyan-400);
+  --status-problem: var(--color-magenta-500);
+  --status-problem-text: var(--color-magenta-400);
+  --status-pending: var(--color-amber-400);
+  --status-off: var(--color-slate-500);
+  --status-off-text: var(--text-secondary);
+  --status-progress: var(--text-primary);
+  --focus-ring: var(--text-primary);
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --font-body: var(--font-family-mono);
+  --font-display: var(--font-family-display);
+  --font-size-body: 0.9375rem;
+  --line-height-body: 1.6;
+  --panel-cut: 12px;
+  --panel-clip: polygon(
+    0 0,
+    calc(100% - var(--panel-cut)) 0,
+    100% var(--panel-cut),
+    100% 100%,
+    var(--panel-cut) 100%,
+    0 calc(100% - var(--panel-cut))
+  );
+
+  /* Component defaults: only the base button is migrated in this batch. */
+  --button-border: var(--action-primary);
+  --button-text: var(--action-primary);
+  --button-hover-bg: var(--action-primary);
+  --button-hover-text: var(--text-on-action);
+  --button-focus-ring: var(--focus-ring);
+
+  /* Compatibility aliases. Remove only after all consumers have migrated. */
+  --static: var(--surface-page);
+  --panel: var(--surface-panel);
+  --edge: var(--border-default);
+  --ink: var(--text-primary);
+  --ink-dim: var(--text-secondary);
+  --cyan: var(--color-cyan-400);
+  --magenta: var(--status-problem);
+  --magenta-text: var(--status-problem-text);
+  --amber: var(--status-pending);
+  --off: var(--status-off);
+  --rule: var(--border-subtle);
+  --mono: var(--font-body);
+  --serif: var(--font-display);
+  --cut: var(--panel-cut);
+  --chamfer: var(--panel-clip);
+}
