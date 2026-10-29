@@ -102,14 +102,17 @@ as Feeds plugins (see `dokja_docs/feeds-content-plugins.md`, "Post readers").
   and erases one left by a crash on the next start. The screen sees those files
   only as `ningo-post://` addresses that the shell serves itself. Nothing is
   fetched from the page.
-- Saving a post copies its files to the posts folder, one folder per post. It then
-  adds the caption, author, date, link and the saved file names to the Library
-  (`knowledge.ingest`) under the post's own id, so saving it again updates the same
-  document.
-- After a save, the screen can open that post's folder in the system's file
-  manager. It only works on a real press, and only for a post saved in this run.
-- `--posts-dir` chooses the posts folder. The default is `saved-posts` in the
-  app's data folder.
+- Saving a post opens the system's own folder window. Choosing a folder is the
+  owner's yes; closing the window saves nothing. The files are copied into a folder
+  named by the post's id inside the chosen folder. The shell then adds the caption,
+  author, date, link and saved file names to the Library (`knowledge.ingest`) under
+  the post's own id, so saving it again updates the same document. If the Library
+  refuses, the folder the save created is removed.
+- After a save, the screen can open the folder the owner chose in the system's
+  file manager. It only works on a real press, and only for a post saved in this run.
+- `--posts-dir` chooses where the folder window opens the first time. The default
+  is `saved-posts` in the app's data folder. After that, it opens where the owner
+  chose last.
 - A reader that hands its files out from a server on this machine needs that one
   origin named with `--post-media-origin` or `DOKJA_POST_MEDIA_ORIGIN` (for example
   `http://127.0.0.1:9000`). The shell never fetches from any other address on this

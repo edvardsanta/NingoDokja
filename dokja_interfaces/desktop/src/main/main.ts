@@ -97,6 +97,19 @@ async function main(): Promise<void> {
     savedRoot: config.postsDir ?? join(app.getPath("userData"), "saved-posts"),
     download: downloadMedia,
     translate: createTranslator(config.locale),
+    // The owner picks the folder in the system's own window; closing it saves nothing.
+    pickFolder: async (defaultPath) => {
+      if (!window) return undefined;
+      const t = createTranslator(config.locale);
+      const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+        title: t("post_pick_title"),
+        message: t("post_pick_title"),
+        buttonLabel: t("post_pick_button"),
+        defaultPath,
+        properties: ["openDirectory", "createDirectory"],
+      });
+      return canceled ? undefined : filePaths[0];
+    },
     ...(config.postMediaOrigin ? { localOrigin: config.postMediaOrigin } : {}),
   });
   usePostStore(posts);

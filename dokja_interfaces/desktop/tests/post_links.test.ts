@@ -119,7 +119,7 @@ test("saving a post copies its files and gives the Library its text, link and id
   const ingest = ACTIONS["knowledge.ingest"];
   assert.equal(ingest.payload({ mode: "post", post: "post-ffffffffffffffff" }), undefined, "only a post this run holds");
   const wire = ingest.payload({ mode: "post", post: DOC, body: "made up" })!;
-  const prepared = await ingest.prepare!(wire);
+  const prepared = (await ingest.prepare!(wire)) as Record<string, unknown>;
   assert.deepEqual(await readdir(join(dirs.saved, DOC)), ["01.png"]);
   assert.equal(prepared!.source_id, DOC);
   assert.equal(prepared!.source_ref, "https://example.com/p/1");
@@ -238,27 +238,35 @@ async function heldStore() {
 const saving = { type: "knowledge.ingest", payload: { mode: "post", post: DOC } };
 const limitsOf = { defaultTimeoutMs: 1000, maxTimeoutMs: 1000 };
 
-test("saving a post is asked in the shell's window, naming it from what the shell held", async () => {
-  const { dirs, store } = await heldStore();
-  assert.equal(needsConfirmation("knowledge.ingest", { title: "t", body: "b" }), false, "a note is not asked");
-  const asked: Array<Record<string, unknown>> = [];
-  const result = await handleRequest(
+test("the owner picks the folder in the system's window, and closing it saves nothing", async () => {
+  const dirs = await folders();
+  const picked: string[] = [];
+  let answer: string | undefined;
+  const store = new PostStore({
+    savedRoot: dirs.saved,
+    tempParent: dirs.root,
+    download: fakeDownload({ "https://media.example/i.png": { type: "image/png", bytes: PNG } }),
+    pickFolder: async (defaultPath) => { picked.push(defaultPath); return answer; },
+  });
+  usePostStore(store);
+  await store.hold(ACTIONS["digest.link.read"].project(okPost([{ kind: "image", url: "https://media.example/i.png" }])));
+  assert.equal(needsConfirmation("knowledge.ingest", { post: DOC }), false, "the folder window is the question");
+  const send = () => handleRequest(
     saving,
-    { async request() { throw new Error("must not be sent"); } },
-    limitsOf,
-    undefined,
-    { recent: () => true },
-    async (_type, wire) => { asked.push(wire); return false; },
+    { async request() { return { status: "ok", result: { workflow: "knowledge", domain: "knowledge", result: { created: true, changed: true } } }; } },
+    limitsOf, undefined, { recent: () => true },
   );
-  assert.equal(result.ok, false);
-  assert.equal(asked.length, 1);
-  assert.deepEqual(asked[0]!.summary, { author: "someone", published: "2026-10-01T13:00:00Z", caption: "First line\nsecond line", url: "https://example.com/p/1", files: 1 });
-  await assert.rejects(stat(join(dirs.saved, DOC)), "nothing is copied when the owner says no");
 
-  const { questionFor } = await import("../src/main/dialogs.js");
-  const question = questionFor("pt", "knowledge.ingest", asked[0]!)!;
-  assert.equal(question.message, "Guardar esta publicação na Biblioteca?");
-  assert.match(question.detail, /^someone, 2026-10-01T13:00:00Z\nFirst line\nsecond line\n\nhttps:\/\/example.com\/p\/1\n\nArquivos a copiar para uma pasta neste computador: 1\./);
+  const cancelled = await send();
+  assert.ok(!cancelled.ok && cancelled.error.code === "cancelled");
+  await assert.rejects(stat(join(dirs.saved, DOC)), "nothing is copied when the owner closes the window");
+
+  answer = join(dirs.root, "chosen");
+  assert.equal((await send()).ok, true);
+  assert.deepEqual(await readdir(join(answer, DOC)), ["01.png"]);
+  assert.equal(await store.savedFolder(DOC), join(answer, DOC));
+  await send();
+  assert.deepEqual(picked, [dirs.saved, dirs.saved, answer], "the window opens where the owner chose last");
   usePostStore(undefined);
   await store.dispose();
 });
@@ -307,6 +315,20 @@ test("only the folder of a post saved in this run can be opened", async () => {
   assert.equal(await store.savedFolder("post-ffffffffffffffff"), undefined);
   await store.unsave(DOC);
   assert.equal(await store.savedFolder(DOC), undefined, "a refused save has no folder");
+  usePostStore(undefined);
+  await store.dispose();
+});
+
+test("a refused save leaves alone a folder that was there before it", async () => {
+  const { dirs, store } = await heldStore();
+  await mkdir(join(dirs.saved, DOC), { recursive: true });
+  const refused = await handleRequest(
+    saving,
+    { async request() { return { status: "error", error: "knowledge refused" }; } },
+    limitsOf, undefined, { recent: () => true },
+  );
+  assert.equal(refused.ok, false);
+  assert.ok((await stat(join(dirs.saved, DOC))).isDirectory());
   usePostStore(undefined);
   await store.dispose();
 });

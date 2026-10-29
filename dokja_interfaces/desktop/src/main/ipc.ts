@@ -83,6 +83,7 @@ export async function handleRequest(
   try {
     if (action.prepare) {
       const prepared = await action.prepare(wire);
+      if (prepared === "cancelled") return fail("cancelled", "the person did not confirm");
       if (!prepared) return fail("invalid", "the payload is not valid for this action");
       wire = prepared;
     }

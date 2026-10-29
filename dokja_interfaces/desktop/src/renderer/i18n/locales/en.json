@@ -532,14 +532,12 @@
   "realtime_connected": "Observer connected",
   "realtime_disconnected": "Observer unavailable",
   "realtime_select": "Select a voice session",
-  "post_confirm_message": "Save this post to the Library?",
-  "post_confirm_detail": "Files to copy to a folder on this computer: {count}.\nThe text, author, date and link are added to the Library.",
-  "post_confirm_accept": "Save",
-  "post_confirm_cancel": "Cancel",
   "post_entry_title": "Post",
   "post_entry_title_by": "Post by {author}",
   "post_entry_author": "Author: {author}",
   "post_entry_published": "Published: {date}",
   "post_entry_link": "Link: {link}",
-  "post_entry_files": "Saved files: {files}"
+  "post_entry_files": "Saved files: {files}",
+  "post_pick_title": "Choose where to save this post",
+  "post_pick_button": "Save here"
 }

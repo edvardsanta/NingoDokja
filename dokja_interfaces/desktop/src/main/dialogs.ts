@@ -1,6 +1,5 @@
 import type { ActionType } from "../shared/actions.js";
 import type { Locale } from "../shared/locale.js";
-import { createTranslator } from "../renderer/i18n/i18n.js";
 
 // The question the shell asks, in a window of its own, before an action that cannot be undone. It is
 // asked by the main process, not by the page: a page that was tricked into asking cannot answer for
@@ -64,19 +63,6 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       detail: `${pt ? "Canal" : "Channel"}: ${String((wire.channel_ids as string[])[0])}\n\n${String(wire.content ?? "")}\n\n${String(wire.attachment_url ?? "")}${wire.force_nsfw === true ? `\n\n${pt ? "AVISO: o envio forçado ignora a triagem de mídia." : "WARNING: force send bypasses media screening."}` : ""}`,
       accept: pt ? "Enviar" : "Send",
       cancel: pt ? "Cancelar" : "Cancel",
-    };
-  }
-  if (type === "knowledge.ingest" && "post" in wire) {
-    // Worded from the screen's own catalogs, named from what the shell held about the post.
-    const t = createTranslator(locale);
-    const summary = (wire.summary ?? {}) as Record<string, unknown>;
-    const said = [summary.author, summary.published].filter((part) => typeof part === "string" && part !== "").join(", ");
-    const head = [said, String(summary.caption ?? "").slice(0, 200)].filter(Boolean).join("\n");
-    return {
-      message: t("post_confirm_message"),
-      detail: `${head ? `${head}\n\n` : ""}${String(summary.url ?? "")}\n\n${t("post_confirm_detail", { count: Number(summary.files ?? 0) })}`,
-      accept: t("post_confirm_accept"),
-      cancel: t("post_confirm_cancel"),
     };
   }
   if (type === "communications.link.reset") {

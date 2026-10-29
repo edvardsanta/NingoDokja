@@ -49,8 +49,8 @@ export type ActionDefinition = {
   // Addresses of pictures and videos in the projected reply that the screen may later ask the shell to preview.
   media?(projected: unknown): string[];
   // Work the shell does on the validated payload just before it is sent (for example, keeping files
-  // on this machine). Undefined means the request cannot go.
-  prepare?(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined>;
+  // on this machine). Undefined means the request cannot go; "cancelled", that the owner said no.
+  prepare?(wire: Record<string, unknown>): Promise<Record<string, unknown> | "cancelled" | undefined>;
   // Work the shell does on the projected reply before the screen sees it (for example, downloading).
   settle?(projected: unknown): Promise<unknown>;
   // Undoes what prepare did when the orchestrator definitely refused the request. Not called when the
@@ -60,7 +60,7 @@ export type ActionDefinition = {
 
 // The posts the owner opened in this run. The shell sets it when it starts; without it, post links
 // cannot be read or saved.
-let posts: Pick<PostStore, "hold" | "has" | "save" | "unsave" | "summary" | "ingestPayload"> | undefined;
+let posts: Pick<PostStore, "hold" | "has" | "save" | "unsave" | "ingestPayload"> | undefined;
 
 export function usePostStore(store: typeof posts): void {
   posts = store;
@@ -100,21 +100,20 @@ function postReply(body: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-// Saving a post: the screen names it by id; the files are copied first, then the Library gets
-// what the shell held, with the names of the files it kept.
+// Saving a post: the screen names it by id; the owner picks a folder in the system's window, the
+// files are copied there, then the Library gets what the shell held, with the names of the files.
 function postIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const documentId = text(raw.post);
-  const summary = POST_ID.test(documentId) ? posts?.summary(documentId) : undefined;
-  // The summary is for the question the shell asks; prepare replaces the whole payload, so it is never sent.
-  return summary ? { post: documentId, summary } : undefined;
+  return POST_ID.test(documentId) && posts?.has(documentId) ? { post: documentId } : undefined;
 }
 
-async function savePost(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
+async function savePost(wire: Record<string, unknown>): Promise<Record<string, unknown> | "cancelled" | undefined> {
   // A note, an address, a file or a reading goes as it was built.
   if (!("post" in wire)) return wire;
   const documentId = text(wire.post);
   if (!posts || !POST_ID.test(documentId)) return undefined;
   const saved = await posts.save(documentId);
+  if (saved === "cancelled") return "cancelled";
   return saved === undefined ? undefined : posts.ingestPayload(documentId, saved);
 }
 

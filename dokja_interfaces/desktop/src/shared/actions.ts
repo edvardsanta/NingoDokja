@@ -99,8 +99,6 @@ export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
 
 export function needsConfirmation(type: ActionType, payload?: Record<string, unknown>): boolean {
   if (type === "communications.send") return payload?.force_nsfw === true;
-  // Saving a post copies files to this machine, so it is asked; a note, an address or a file is not.
-  if (type === "knowledge.ingest") return payload !== undefined && "post" in payload;
   return CONFIRMED_ACTION_TYPES.includes(type);
 }
 

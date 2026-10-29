@@ -37,16 +37,17 @@ type HeldPost = {
   files: HeldFile[];
 };
 
-export type PostSummary = { author: string; published: string; caption: string; url: string; files: number };
-
 export type Download = (url: string, path: string, options?: DownloadOptions) => Promise<Downloaded>;
 
 export type PostStoreOptions = {
-  // Where saved posts are kept, one folder per post.
+  // Where the folder window opens the first time, and where posts go when there is no window.
   savedRoot: string;
   download: Download;
   // The local origin a post reader hands its files out from, if the owner named one.
   localOrigin?: string;
+  // Asks the owner where to save, starting from a folder; undefined when the owner cancelled.
+  // Without it, posts go to savedRoot without asking (tests).
+  pickFolder?: (defaultPath: string) => Promise<string | undefined>;
   // Words the Library entry's labels in the owner's language; English when absent.
   translate?: Translate;
   // Only for tests: where the temporary folder is made.
@@ -59,7 +60,9 @@ export type PostStoreOptions = {
 // folder that stays.
 export class PostStore {
   private readonly posts = new Map<string, HeldPost>();
-  private readonly saved = new Set<string>();
+  private readonly saved = new Map<string, { folder: string; created: boolean }>();
+  // The folder the owner chose last in this run, where the window opens next time.
+  private lastParent?: string;
   private tempRoot?: Promise<string>;
 
   constructor(private readonly options: PostStoreOptions) {}
@@ -162,36 +165,40 @@ export class PostStore {
     };
   }
 
-  // Copies a held post's files to the saved folder, under the post's id, and says which names it kept.
-  async save(documentId: string): Promise<string[] | undefined> {
+  // Asks the owner, in the system's own folder window, where to keep a held post, then copies its
+  // files there, into a folder named by the post's id. Says which names it kept, or "cancelled"
+  // when the owner closed the window: choosing the folder is the owner's yes.
+  async save(documentId: string): Promise<string[] | "cancelled" | undefined> {
     const post = this.posts.get(documentId);
     if (!post) return undefined;
-    const folder = join(this.options.savedRoot, documentId);
+    const parent = this.options.pickFolder
+      ? await this.options.pickFolder(this.lastParent ?? this.options.savedRoot)
+      : this.options.savedRoot;
+    if (!parent) return "cancelled";
+    this.lastParent = parent;
+    const folder = join(parent, documentId);
+    const existed = (await stat(folder).catch(() => undefined))?.isDirectory() === true;
     await mkdir(folder, { recursive: true });
     for (const file of post.files) await copyFile(file.path, join(folder, file.name));
-    this.saved.add(documentId);
+    this.saved.set(documentId, { folder, created: !existed });
     return post.files.map((file) => file.name);
   }
 
   // The folder of a post saved in this run, or nothing: the page cannot name any other folder.
   async savedFolder(documentId: string): Promise<string | undefined> {
-    if (!DOCUMENT_ID.test(documentId) || !this.saved.has(documentId)) return undefined;
-    const folder = join(this.options.savedRoot, documentId);
-    const info = await stat(folder).catch(() => undefined);
-    return info?.isDirectory() ? folder : undefined;
+    const saved = DOCUMENT_ID.test(documentId) ? this.saved.get(documentId) : undefined;
+    if (!saved) return undefined;
+    const info = await stat(saved.folder).catch(() => undefined);
+    return info?.isDirectory() ? saved.folder : undefined;
   }
 
-  // Takes a saved post's folder away again, when the Library refused it.
+  // Takes a saved post's folder away again, when the Library refused it. A folder that was there
+  // before this save (the same post saved there earlier) is left alone.
   async unsave(documentId: string): Promise<void> {
-    if (!DOCUMENT_ID.test(documentId)) return;
+    const saved = this.saved.get(documentId);
+    if (!saved) return;
     this.saved.delete(documentId);
-    await rm(join(this.options.savedRoot, documentId), { recursive: true, force: true });
-  }
-
-  // What the save question names, from what the shell itself held, never from the page.
-  summary(documentId: string): PostSummary | undefined {
-    const post = this.posts.get(documentId);
-    return post && { author: post.author, published: post.published, caption: post.caption, url: post.url, files: post.files.length };
+    if (saved.created) await rm(saved.folder, { recursive: true, force: true });
   }
 
   has(documentId: string): boolean {
