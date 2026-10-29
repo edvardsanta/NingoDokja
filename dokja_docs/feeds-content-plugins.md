@@ -22,6 +22,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `media.library.v1` | `feeds.invoke`, `ingest`, `list`, `fetch`, `status`, `contains`, `mark-sent` | Media intake cache result |
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
 | `audio.resolve.v1` | `feeds.invoke`, `read {url}` or `search {query, limit}` | `handled`, and `refused` or `tracks` (see Music sources) |
+| `social.resolve.v1` | `feeds.invoke`, `read {url}` | `handled`, and `refused` or `post` (see Post readers) |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`
 selects an explicitly named provider. The subprocess receives
@@ -117,6 +118,27 @@ named by the `FEEDS_PLUGIN_REQUIREMENTS` build argument as a path inside the bui
 context (for example `feeds_plugins/requirements.txt`). The default,
 `dokja_services/dokja_feeds/no-plugin-requirements.txt`, lists nothing. The
 example needs `yt-dlp` there. Rebuild Feeds after changing the list.
+
+### Post readers
+
+A post reader is a plugin providing `social.resolve.v1`. It opens a public post
+link without signing in, so the owner can look at it on the desktop. Its one
+action is `read {url}`. Like a music source, it answers `{handled: false}` for a
+link it does not serve, `{handled: true, refused}` for one it cannot open, and
+`{handled: true, post}` otherwise. `refused` is one of `login_required`,
+`unavailable` (private, removed or not found) and `unsupported`.
+
+A `post` has `url`, the canonical address of the post. It may also carry
+`author`, `caption`, `published` (RFC 3339) and `media`. `media` is a list of
+`{kind, url}` objects, where `kind` is `image` or `video`, and each may carry a
+`thumbnail`. A media `url` must be downloadable with a plain GET: no cookies and
+no sign-in. A reader that combines tools does so itself; for example, it may take
+the media from one tool and the caption from another.
+
+The Digest domain asks enabled readers in id order and takes the first that
+handles the link. The repository ships no reader: readers reach third-party
+sites, so they live with the owner's plugins in `feeds_plugins/`, together with
+whatever they need to run.
 
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:
