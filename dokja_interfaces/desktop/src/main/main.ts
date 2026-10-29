@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { pathToFileURL } from "node:url";
 
-import { app, dialog, ipcMain, net, protocol, session, type BrowserWindow } from "electron";
+import { app, dialog, ipcMain, net, protocol, session, shell, type BrowserWindow } from "electron";
 
 import { isRecord } from "../shared/records.js";
 import {
@@ -156,6 +156,16 @@ async function main(): Promise<void> {
       }),
     );
     return result;
+  });
+
+  // Opens a saved post's folder in the file manager: only one saved in this run, only on a real press.
+  ipcMain.handle(CHANNELS.openSavedPost, async (event, documentId: unknown): Promise<TransportResult> => {
+    if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
+    if (!presence.recent()) return { ok: false, error: { code: "denied", message: "opening a folder needs a click or a key press just before it" } };
+    const folder = typeof documentId === "string" ? await posts.savedFolder(documentId) : undefined;
+    if (!folder) return { ok: false, error: { code: "denied", message: "that post was not saved in this run" } };
+    const failed = await shell.openPath(folder);
+    return failed ? { ok: false, error: { code: "unavailable", message: "the folder could not be opened" } } : { ok: true, result: { opened: true } };
   });
 
   console.log(LOG, "orchestrator", JSON.stringify({ endpoint: config.endpoint, locale: config.locale }));

@@ -297,3 +297,16 @@ test("the Library entry's labels follow the owner's language", async () => {
   assert.equal(entry.body, "Autor: someone\nLink: https://example.com/p/1");
   await store.dispose();
 });
+
+test("only the folder of a post saved in this run can be opened", async () => {
+  const { dirs, store } = await heldStore();
+  assert.equal(await store.savedFolder(DOC), undefined, "held but not saved");
+  await store.save(DOC);
+  assert.equal(await store.savedFolder(DOC), join(dirs.saved, DOC));
+  assert.equal(await store.savedFolder("../../etc"), undefined);
+  assert.equal(await store.savedFolder("post-ffffffffffffffff"), undefined);
+  await store.unsave(DOC);
+  assert.equal(await store.savedFolder(DOC), undefined, "a refused save has no folder");
+  usePostStore(undefined);
+  await store.dispose();
+});

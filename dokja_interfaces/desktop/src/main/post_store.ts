@@ -59,6 +59,7 @@ export type PostStoreOptions = {
 // folder that stays.
 export class PostStore {
   private readonly posts = new Map<string, HeldPost>();
+  private readonly saved = new Set<string>();
   private tempRoot?: Promise<string>;
 
   constructor(private readonly options: PostStoreOptions) {}
@@ -168,12 +169,23 @@ export class PostStore {
     const folder = join(this.options.savedRoot, documentId);
     await mkdir(folder, { recursive: true });
     for (const file of post.files) await copyFile(file.path, join(folder, file.name));
+    this.saved.add(documentId);
     return post.files.map((file) => file.name);
+  }
+
+  // The folder of a post saved in this run, or nothing: the page cannot name any other folder.
+  async savedFolder(documentId: string): Promise<string | undefined> {
+    if (!DOCUMENT_ID.test(documentId) || !this.saved.has(documentId)) return undefined;
+    const folder = join(this.options.savedRoot, documentId);
+    const info = await stat(folder).catch(() => undefined);
+    return info?.isDirectory() ? folder : undefined;
   }
 
   // Takes a saved post's folder away again, when the Library refused it.
   async unsave(documentId: string): Promise<void> {
-    if (DOCUMENT_ID.test(documentId)) await rm(join(this.options.savedRoot, documentId), { recursive: true, force: true });
+    if (!DOCUMENT_ID.test(documentId)) return;
+    this.saved.delete(documentId);
+    await rm(join(this.options.savedRoot, documentId), { recursive: true, force: true });
   }
 
   // What the save question names, from what the shell itself held, never from the page.

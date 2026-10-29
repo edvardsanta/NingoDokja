@@ -106,6 +106,8 @@ as Feeds plugins (see `dokja_docs/feeds-content-plugins.md`, "Post readers").
   adds the caption, author, date, link and the saved file names to the Library
   (`knowledge.ingest`) under the post's own id, so saving it again updates the same
   document.
+- After a save, the screen can open that post's folder in the system's file
+  manager. It only works on a real press, and only for a post saved in this run.
 - `--posts-dir` chooses the posts folder. The default is `saved-posts` in the
   app's data folder.
 - A reader that hands its files out from a server on this machine needs that one
