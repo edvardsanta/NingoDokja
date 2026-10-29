@@ -182,6 +182,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "inspect-digest"
 		case "digest.items":
 			return "read-digest"
+		case "digest.link.read":
+			return "read-link"
 		default:
 			return "handle-digest-event"
 		}

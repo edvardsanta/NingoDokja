@@ -22,6 +22,7 @@ func TestAdminEventsAreRoutedAndPlanned(t *testing.T) {
 		{"knowledge.reindex", "knowledge", DomainKnowledge, "reindex-knowledge"},
 		{"digest.status", "digest", DomainDigest, "inspect-digest"},
 		{"digest.items", "digest", DomainDigest, "read-digest"},
+		{"digest.link.read", "digest", DomainDigest, "read-link"},
 		{"digest.refresh", "digest", DomainDigest, "handle-digest-event"},
 		{"memory.record", "memory", DomainMemory, "record-experience"},
 		{"memory.resolve", "memory", DomainMemory, "resolve-experience"},

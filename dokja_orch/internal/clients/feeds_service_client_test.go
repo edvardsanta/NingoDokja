@@ -121,3 +121,18 @@ func TestFeedsClientExtractReturnsTheHostReason(t *testing.T) {
 		t.Fatalf("the reason prefix must reach the caller: %v", err)
 	}
 }
+
+func TestFeedsClientDispatchesAnInvokeWithTheLongerWait(t *testing.T) {
+	cached := &fakeFeedsRequester{response: `{"status":"ok","result":{}}`}
+	onDemand := &fakeFeedsRequester{response: `{"status":"ok","result":{"handled":false}}`}
+	client := &FeedsServiceClient{
+		requesterFactory: func() (repreq.RequesterReply, error) { return cached, nil },
+		extractFactory:   func() (repreq.RequesterReply, error) { return onDemand, nil },
+	}
+	if _, err := client.Dispatch(context.Background(), "feeds.invoke", map[string]any{"capability": "social.resolve.v1"}); err != nil {
+		t.Fatal(err)
+	}
+	if cached.request != "" || !strings.Contains(onDemand.request, `"type":"feeds.invoke"`) {
+		t.Fatalf("cached=%q on-demand=%q", cached.request, onDemand.request)
+	}
+}

@@ -73,7 +73,8 @@ func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, pay
 		return nil, fmt.Errorf("feeds service requester factory is not configured")
 	}
 	factory := c.requesterFactory
-	if eventType == "feeds.refresh" {
+	// A refresh runs collectors and an invoke runs a plugin on demand: both wait as long as a reading.
+	if eventType == "feeds.refresh" || eventType == "feeds.invoke" {
 		factory = c.extractFactory
 	}
 	return c.send(ctx, factory, eventType, payload)
