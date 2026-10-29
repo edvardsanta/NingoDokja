@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { isRecord, text } from "../shared/records.js";
 import { POST_SCHEME, type PostView } from "../shared/posts.js";
 import type { Downloaded, DownloadOptions } from "./media_fetch.js";
+import { createTranslator, type Translate } from "../renderer/i18n/i18n.js";
 
 // The folders a run leaves in the system's temporary directory start with this, so the next run
 // can sweep what a crash left behind.
@@ -36,6 +37,8 @@ type HeldPost = {
   files: HeldFile[];
 };
 
+export type PostSummary = { author: string; published: string; caption: string; url: string; files: number };
+
 export type Download = (url: string, path: string, options?: DownloadOptions) => Promise<Downloaded>;
 
 export type PostStoreOptions = {
@@ -44,6 +47,8 @@ export type PostStoreOptions = {
   download: Download;
   // The local origin a post reader hands its files out from, if the owner named one.
   localOrigin?: string;
+  // Words the Library entry's labels in the owner's language; English when absent.
+  translate?: Translate;
   // Only for tests: where the temporary folder is made.
   tempParent?: string;
   now?: () => number;
@@ -136,16 +141,17 @@ export class PostStore {
   ingestPayload(documentId: string, savedNames: string[]): Record<string, unknown> | undefined {
     const post = this.posts.get(documentId);
     if (!post) return undefined;
+    const t = this.options.translate ?? createTranslator("en");
     const lines = [
       post.caption,
       "",
-      ...(post.author ? [`Author: ${post.author}`] : []),
-      ...(post.published ? [`Published: ${post.published}`] : []),
-      `Link: ${post.url}`,
-      ...(savedNames.length > 0 ? [`Saved files: ${savedNames.join(", ")}`] : []),
+      ...(post.author ? [t("post_entry_author", { author: post.author })] : []),
+      ...(post.published ? [t("post_entry_published", { date: post.published })] : []),
+      t("post_entry_link", { link: post.url }),
+      ...(savedNames.length > 0 ? [t("post_entry_files", { files: savedNames.join(", ") })] : []),
     ];
     const firstLine = post.caption.split("\n").find((line) => line.trim() !== "")?.trim() ?? "";
-    const title = (firstLine || (post.author ? `Post by ${post.author}` : "Post")).slice(0, 300);
+    const title = (firstLine || (post.author ? t("post_entry_title_by", { author: post.author }) : t("post_entry_title"))).slice(0, 300);
     return {
       title,
       body: lines.join("\n").trim(),
@@ -163,6 +169,17 @@ export class PostStore {
     await mkdir(folder, { recursive: true });
     for (const file of post.files) await copyFile(file.path, join(folder, file.name));
     return post.files.map((file) => file.name);
+  }
+
+  // Takes a saved post's folder away again, when the Library refused it.
+  async unsave(documentId: string): Promise<void> {
+    if (DOCUMENT_ID.test(documentId)) await rm(join(this.options.savedRoot, documentId), { recursive: true, force: true });
+  }
+
+  // What the save question names, from what the shell itself held, never from the page.
+  summary(documentId: string): PostSummary | undefined {
+    const post = this.posts.get(documentId);
+    return post && { author: post.author, published: post.published, caption: post.caption, url: post.url, files: post.files.length };
   }
 
   has(documentId: string): boolean {

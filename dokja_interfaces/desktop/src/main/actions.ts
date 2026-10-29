@@ -53,11 +53,14 @@ export type ActionDefinition = {
   prepare?(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined>;
   // Work the shell does on the projected reply before the screen sees it (for example, downloading).
   settle?(projected: unknown): Promise<unknown>;
+  // Undoes what prepare did when the orchestrator definitely refused the request. Not called when the
+  // outcome is unknown (a timeout), since the change may have happened.
+  abandon?(wire: Record<string, unknown>): Promise<void>;
 };
 
 // The posts the owner opened in this run. The shell sets it when it starts; without it, post links
 // cannot be read or saved.
-let posts: Pick<PostStore, "hold" | "has" | "save" | "ingestPayload"> | undefined;
+let posts: Pick<PostStore, "hold" | "has" | "save" | "unsave" | "summary" | "ingestPayload"> | undefined;
 
 export function usePostStore(store: typeof posts): void {
   posts = store;
@@ -101,7 +104,9 @@ function postReply(body: Record<string, unknown>): Record<string, unknown> {
 // what the shell held, with the names of the files it kept.
 function postIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const documentId = text(raw.post);
-  return POST_ID.test(documentId) && posts?.has(documentId) ? { post: documentId } : undefined;
+  const summary = POST_ID.test(documentId) ? posts?.summary(documentId) : undefined;
+  // The summary is for the question the shell asks; prepare replaces the whole payload, so it is never sent.
+  return summary ? { post: documentId, summary } : undefined;
 }
 
 async function savePost(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
@@ -743,6 +748,10 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     maxPayloadChars: 12_000_000,
     payload: (raw) => (raw.mode === "reading" ? readingIngest(raw) : raw.mode === "post" ? postIngest(raw) : buildIngest(raw)),
     prepare: savePost,
+    abandon: async (wire) => {
+      const documentId = text(wire.source_id);
+      if (POST_ID.test(documentId) && wire.kind === "post") await posts?.unsave(documentId);
+    },
     project: (result) => inDomain(result, "knowledge", ingestResult),
   },
   "knowledge.list": {

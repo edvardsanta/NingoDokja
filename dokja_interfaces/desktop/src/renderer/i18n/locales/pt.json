@@ -531,5 +531,15 @@
   "realtime_pending": "As associações semânticas estão pendentes; a ordem cronológica foi preservada.",
   "realtime_connected": "Observador conectado",
   "realtime_disconnected": "Observador indisponível",
-  "realtime_select": "Selecione uma sessão de voz"
+  "realtime_select": "Selecione uma sessão de voz",
+  "post_confirm_message": "Guardar esta publicação na Biblioteca?",
+  "post_confirm_detail": "Arquivos a copiar para uma pasta neste computador: {count}.\nO texto, o autor, a data e o link são adicionados à Biblioteca.",
+  "post_confirm_accept": "Guardar",
+  "post_confirm_cancel": "Cancelar",
+  "post_entry_title": "Publicação",
+  "post_entry_title_by": "Publicação de {author}",
+  "post_entry_author": "Autor: {author}",
+  "post_entry_published": "Publicada em: {date}",
+  "post_entry_link": "Link: {link}",
+  "post_entry_files": "Arquivos guardados: {files}"
 }

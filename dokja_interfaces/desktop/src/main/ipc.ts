@@ -96,13 +96,18 @@ export async function handleRequest(
       if ((type === "knowledge.ingest" || type === "knowledge.reindex") && reply.error?.includes("knowledge_write_outcome_unknown:")) {
         return fail("timeout", "Knowledge did not confirm the write in time; its outcome is unknown.");
       }
+      await action.abandon?.(wire);
       return fail("orchestrator", reply.error || "the orchestrator refused the request");
     }
     const projected = action.project(reply.result);
     if (action.media) media?.remember(action.media(projected));
     return { ok: true, result: action.settle ? await action.settle(projected) : projected };
   } catch (error) {
-    if (error instanceof OrchestratorError) return fail(error.code, error.message);
+    if (error instanceof OrchestratorError) {
+      // Nobody took the request, so nothing changed; a timeout may have changed something.
+      if (error.code === "unavailable") await action.abandon?.(wire).catch(() => undefined);
+      return fail(error.code, error.message);
+    }
     return fail("unexpected", "the reply was not what this action expects");
   }
 }

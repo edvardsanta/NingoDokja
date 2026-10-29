@@ -20,6 +20,7 @@ import { downloadMedia, fetchMedia } from "./media_fetch.js";
 import { POST_SCHEME } from "../shared/posts.js";
 import { usePostStore } from "./actions.js";
 import { PostStore } from "./post_store.js";
+import { createTranslator } from "../renderer/i18n/i18n.js";
 import { MediaGate } from "./media_gate.js";
 import { createPreviewer } from "./media_preview.js";
 import { BridgeChat, BridgeMissing } from "./chat_stream.js";
@@ -95,6 +96,7 @@ async function main(): Promise<void> {
   const posts = new PostStore({
     savedRoot: config.postsDir ?? join(app.getPath("userData"), "saved-posts"),
     download: downloadMedia,
+    translate: createTranslator(config.locale),
     ...(config.postMediaOrigin ? { localOrigin: config.postMediaOrigin } : {}),
   });
   usePostStore(posts);

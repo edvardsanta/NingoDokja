@@ -148,6 +148,7 @@ test("the shell saves first, then sends what it held, never what the page wrote"
     { defaultTimeoutMs: 1000, maxTimeoutMs: 1000 },
     undefined,
     { recent: () => true },
+    async () => true,
   );
   assert.equal(result.ok, true);
   assert.equal(calls.length, 1);
@@ -220,4 +221,79 @@ test("the posts folder and the readers' local origin are read from flags or the 
   assert.equal(config.postsDir, "/data/posts");
   assert.equal(config.postMediaOrigin, "http://127.0.0.1:9000");
   assert.equal(parseConfig(["--post-media-origin=https://media.example"], {}, "en").postMediaOrigin, undefined);
+});
+
+async function heldStore() {
+  const dirs = await folders();
+  const store = new PostStore({
+    savedRoot: dirs.saved,
+    tempParent: dirs.root,
+    download: fakeDownload({ "https://media.example/i.png": { type: "image/png", bytes: PNG } }),
+  });
+  usePostStore(store);
+  await store.hold(ACTIONS["digest.link.read"].project(okPost([{ kind: "image", url: "https://media.example/i.png" }])));
+  return { dirs, store };
+}
+
+const saving = { type: "knowledge.ingest", payload: { mode: "post", post: DOC } };
+const limitsOf = { defaultTimeoutMs: 1000, maxTimeoutMs: 1000 };
+
+test("saving a post is asked in the shell's window, naming it from what the shell held", async () => {
+  const { dirs, store } = await heldStore();
+  assert.equal(needsConfirmation("knowledge.ingest", { title: "t", body: "b" }), false, "a note is not asked");
+  const asked: Array<Record<string, unknown>> = [];
+  const result = await handleRequest(
+    saving,
+    { async request() { throw new Error("must not be sent"); } },
+    limitsOf,
+    undefined,
+    { recent: () => true },
+    async (_type, wire) => { asked.push(wire); return false; },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(asked.length, 1);
+  assert.deepEqual(asked[0]!.summary, { author: "someone", published: "2026-10-01T13:00:00Z", caption: "First line\nsecond line", url: "https://example.com/p/1", files: 1 });
+  await assert.rejects(stat(join(dirs.saved, DOC)), "nothing is copied when the owner says no");
+
+  const { questionFor } = await import("../src/main/dialogs.js");
+  const question = questionFor("pt", "knowledge.ingest", asked[0]!)!;
+  assert.equal(question.message, "Guardar esta publicação na Biblioteca?");
+  assert.match(question.detail, /^someone, 2026-10-01T13:00:00Z\nFirst line\nsecond line\n\nhttps:\/\/example.com\/p\/1\n\nArquivos a copiar para uma pasta neste computador: 1\./);
+  usePostStore(undefined);
+  await store.dispose();
+});
+
+test("a save the Library refuses takes the copied files away, an unknown outcome keeps them", async () => {
+  const { dirs, store } = await heldStore();
+  const refused = await handleRequest(
+    saving,
+    { async request() { return { status: "error", error: "knowledge refused" }; } },
+    limitsOf, undefined, { recent: () => true }, async () => true,
+  );
+  assert.equal(refused.ok, false);
+  await assert.rejects(stat(join(dirs.saved, DOC)));
+
+  const unknown = await handleRequest(
+    saving,
+    { async request() { return { status: "error", error: "knowledge_write_outcome_unknown: slow" }; } },
+    limitsOf, undefined, { recent: () => true }, async () => true,
+  );
+  assert.equal(unknown.ok, false);
+  assert.ok(!unknown.ok && unknown.error.code === "timeout");
+  assert.deepEqual(await readdir(join(dirs.saved, DOC)), ["01.png"]);
+  usePostStore(undefined);
+  await store.dispose();
+});
+
+test("the Library entry's labels follow the owner's language", async () => {
+  const dirs = await folders();
+  const { createTranslator } = await import("../src/renderer/i18n/i18n.js");
+  const store = new PostStore({ savedRoot: dirs.saved, tempParent: dirs.root, download: fakeDownload({}), translate: createTranslator("pt") });
+  await store.hold(ACTIONS["digest.link.read"].project(digestReply({
+    status: "ok", post: { url: "https://example.com/p/1", document_id: DOC, author: "someone", caption: "", media: [] },
+  })));
+  const entry = store.ingestPayload(DOC, [])!;
+  assert.equal(entry.title, "Publicação de someone");
+  assert.equal(entry.body, "Autor: someone\nLink: https://example.com/p/1");
+  await store.dispose();
 });
