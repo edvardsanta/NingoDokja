@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 type voiceStreamGenerator struct{ calls int }
@@ -87,5 +89,57 @@ func TestInterruptedVoiceReplyIsNotSavedAsSpokenHistory(t *testing.T) {
 	state := handler.sessions.items[chatSessionBaseKey(event)]
 	if len(state.messages) != 1 || state.messages[0].Role != "user" {
 		t.Fatal("cancelled reply entered history", state.messages)
+	}
+}
+
+type deadlineKnowledgeSearcher struct {
+	budget    time.Duration
+	cancelled bool
+}
+
+func (s *deadlineKnowledgeSearcher) Search(ctx context.Context, _ string, _ int, _ float64) (map[string]any, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return nil, fmt.Errorf("missing retrieval deadline")
+	}
+	s.budget = time.Until(deadline)
+	<-ctx.Done()
+	s.cancelled = true
+	return nil, ctx.Err()
+}
+
+func TestVoiceReplyContinuesWhenOptionalKnowledgeExceedsBudget(t *testing.T) {
+	searcher := &deadlineKnowledgeSearcher{}
+	handler := NewChatDomainHandler(&plainGenerator{}).WithKnowledge(searcher, nil)
+	event := chatEvent("Ningo, give a short observation about curiosity")
+	event.Context = map[string]any{"voice_turns": []chat.VoiceTurn{{UserID: "u1", Text: "Ningo, give a short observation about curiosity"}}}
+	started := time.Now()
+	result, err := handler.Handle(t.Context(), event, chatStep)
+	if err != nil || chatReplyFromResult(result) == "" {
+		t.Fatalf("reply=%v err=%v", result, err)
+	}
+	if !searcher.cancelled || searcher.budget <= 0 || searcher.budget > 100*time.Millisecond {
+		t.Fatalf("optional lookup did not use voice budget: %+v", searcher)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("voice waited for optional retrieval: %v", elapsed)
+	}
+}
+
+func TestVoiceReplyKeepsKnowledgeThatArrivesWithinBudget(t *testing.T) {
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	searcher := &fakeSearcher{result: knowledgeResult(hit("fixture", "Curiosity", "Curiosity", "Synthetic timely evidence", true))}
+	handler := NewChatDomainHandler(generator).WithKnowledge(searcher, nil)
+	event := chatEvent("Ningo, give a short observation about curiosity")
+	event.Context = map[string]any{"voice_turns": []chat.VoiceTurn{{UserID: "u1", Text: "Ningo, give a short observation about curiosity"}}}
+	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	var contextText string
+	for _, message := range generator.messages {
+		contextText += message["content"]
+	}
+	if searcher.calls != 1 || !strings.Contains(contextText, "Synthetic timely evidence") {
+		t.Fatal("timely optional reference missing from voice context")
 	}
 }

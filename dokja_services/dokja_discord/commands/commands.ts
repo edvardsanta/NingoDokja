@@ -206,7 +206,7 @@ export function createCommands(
                   await turn.waitForFloor?.();
                   const speech = { guildId: context.guildId, userId: turn.userId,
                     channelId: turn.channelId, originChannelId: context.channelId,
-                    text: sentence, signal: turn.signal };
+                    text: sentence, signal: turn.signal, trace: turn.trace };
                   if (voice.speakReply) await voice.speakReply(speech);
                   else await voice.speakText(speech);
                 },
@@ -215,7 +215,7 @@ export function createCommands(
               if (reply.trim()) {
                 const speech = {
                   guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
-                  originChannelId: context.channelId, text: reply, signal: turn.signal,
+                  originChannelId: context.channelId, text: reply, signal: turn.signal, trace: turn.trace,
                   waitForFloor: turn.waitForFloor,
                 };
                 await turn.waitForFloor?.();
@@ -262,7 +262,7 @@ export function createCommands(
                   await turn.waitForFloor?.();
                   const speech = { guildId: context.guildId, userId: turn.userId,
                     channelId: turn.channelId, originChannelId: context.channelId,
-                    text: sentence, signal: turn.signal };
+                    text: sentence, signal: turn.signal, trace: turn.trace };
                   if (voice.speakReply) await voice.speakReply(speech);
                   else await voice.speakText(speech);
                 },
@@ -271,7 +271,7 @@ export function createCommands(
               if (reply.trim()) {
                 const speech = {
                   guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
-                  originChannelId: context.channelId, text: reply, signal: turn.signal,
+                  originChannelId: context.channelId, text: reply, signal: turn.signal, trace: turn.trace,
                   waitForFloor: turn.waitForFloor,
                 };
                 await turn.waitForFloor?.();

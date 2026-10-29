@@ -168,7 +168,13 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if identityReply := chat.OwnerIdentityReply(content, verifiedOwner); identityReply != "" {
 		result = map[string]any{"reply": identityReply}
 	} else {
-		sources = h.lookupKnowledge(ctx, content, anchor)
+		lookupCtx := ctx
+		cancelLookup := func() {}
+		if voice {
+			lookupCtx, cancelLookup = context.WithTimeout(ctx, chat.VoiceKnowledgeLookupBudget)
+		}
+		sources = h.lookupKnowledge(lookupCtx, content, anchor)
+		cancelLookup()
 		result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
 	}
 	if err != nil {

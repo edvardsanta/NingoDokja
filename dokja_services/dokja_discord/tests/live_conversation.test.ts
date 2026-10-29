@@ -61,3 +61,44 @@ test("conversation collected during playback remains bounded",async()=>{
  for(let i=0;i<40;i++)live.finish(live.begin(),{userId:"a",text:`part ${i}`});
  finish();await delay(5);assert.equal(pending!.turns.length,32);assert.equal(overflow,8);live.stop();
 });
+
+
+test("recognition timings follow the response without changing dispatch", async () => {
+ const events: Array<{traceId:string;stage:string}> = []; let traceId: string | undefined;
+ const live = new LiveConversation({channelId:"room", settleMs:1, interrupt(){},
+ onTiming(e){events.push(e);}, onError(e){throw e;},
+ async onTurn(_,turn){traceId=turn.trace?.id;await turn.waitForFloor?.();}});
+ const seq=live.begin(false);live.transcribing(seq);live.recognitionStarted(seq);
+ live.finish(seq,{userId:"person",text:"Ningo, question"});await delay(20);
+ assert.deepEqual(events.map(e=>e.stage),["capture_started","recognition_queued",
+ "recognition_started","transcript_ready","response_dispatched","floor_wait_started",
+ "floor_granted","response_handler_finished"]);
+ assert.ok(events.every(e=>e.traceId===traceId));live.stop();
+});
+
+
+test("reply preparation overlaps later speech but playback waits for quiet", async () => {
+ let prepared = false; let played = false; let release!: () => void;
+ const live = new LiveConversation({channelId:"room",settleMs:1,interrupt(){},onError(e){throw e;},
+ async onTurn(_,turn){prepared=true;await turn.waitForFloor?.();played=true;await new Promise<void>(r=>release=r);}});
+ const question=live.begin();
+ const later=live.begin();
+ live.finish(question,{userId:"a",text:"Ningo, explain curiosity"});
+ await delay(20);
+ assert.equal(prepared,true,"later speech blocked model preparation");
+ assert.equal(played,false,"playback interrupted the later speaker");
+ live.finish(later);
+ await delay(10);assert.equal(played,true);
+ release();live.stop();
+});
+
+
+test("later recognition cannot erase a scheduled finalized reply", async () => {
+ let prepared=false;
+ const live=new LiveConversation({channelId:"room",settleMs:10,interrupt(){},
+ async onTurn(){prepared=true;},onError(e){throw e;}});
+ live.finish(live.begin(),{userId:"a",text:"Ningo, question"});
+ const later=live.begin();live.transcribing(later);
+ await delay(30);assert.equal(prepared,true);
+ live.finish(later);live.stop();
+});
