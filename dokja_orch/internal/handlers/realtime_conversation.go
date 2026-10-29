@@ -31,7 +31,7 @@ func (h *ConversationDomainHandler) realtimeHandle(_ context.Context, event core
 	var err error
 	switch event.Type {
 	case "realtime.start":
-		err = h.realtime.Start(id, guild, payloadString(event.Payload, "voice_channel_id"), event.Channel.ID, event.User.ID)
+		err = h.realtime.StartChannel(id, guild, payloadString(event.Payload, "voice_channel_id"), event.Channel.ID, event.User.ID)
 	case "realtime.join", "realtime.leave":
 		err = h.realtime.Consent(id, guild, event.Channel.ID, event.User.ID, event.Type == "realtime.join")
 	case "realtime.stop":

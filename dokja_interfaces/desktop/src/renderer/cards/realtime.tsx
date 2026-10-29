@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Transport } from "../../shared/transport.js";
 import { observerSnapshot, type ObserverSnapshot } from "../../shared/realtime.js";
-import { useTranslate } from "../i18n/context.js";
+import { useTimes, useTranslate } from "../i18n/context.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 
 // One bounded request at a time. No provider keys, audio, direct database access,
 // provider invocation, or semantic inference belongs in this renderer.
 export function RealtimeCard({transport,active=true}:{transport:Transport;active?:boolean}) {
+ const times=useTimes();
  const t=useTranslate();const [snapshot,setSnapshot]=useState<ObserverSnapshot>({sessions:[]});
  const [selected,setSelected]=useState("");const [connected,setConnected]=useState(false);
  useEffect(()=>{
@@ -35,7 +36,7 @@ export function RealtimeCard({transport,active=true}:{transport:Transport;active
    {session?.messages.length===0&&<p>{t("realtime_no_messages")}</p>}
    <ol>{session?.messages.map(m=><li key={m.message_id}>
     <strong>{t("realtime_speaker",{number:session.consenting_participants.indexOf(m.speaker_id)+1})}</strong>{" "}
-    <time dateTime={m.timestamp_start}>{m.timestamp_start.slice(11,19)}</time>
+    <time dateTime={m.timestamp_start}>{times.clock(m.timestamp_start)}</time>
     <p>{m.text}</p>
    </li>)}</ol>
   </>}

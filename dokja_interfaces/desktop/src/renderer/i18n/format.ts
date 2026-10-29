@@ -34,3 +34,12 @@ export function formatAgo(locale: Locale, iso: string, nowMs: number = Date.now(
   }
   return format.format(0, "second");
 }
+
+// Capture instants stay in UTC on the wire; display uses the desktop timezone.
+export function formatTime(locale: Locale, iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(TAGS[locale], {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).format(date);
+}

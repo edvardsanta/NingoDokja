@@ -4,10 +4,9 @@ import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController } from "../voice/voice.js";
 import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 
-type Observer = { id: string; channel: string; origin: string; users: Set<string>; withdrawn: Set<string> };
+type Observer = { id: string; channel: string; origin: string; active: boolean };
 
-// Each participant grants only their own consent. Rejoining after process restart
-// requires fresh consent; this registry is never a durable authorization source.
+// Sessions are bound to a guild voice channel and stop when the listener stops.
 export function observerCommands(endpoint: string, timeout: number, voice?: DiscordVoiceController, locale = "pt-BR"): DiscordSlashCommand[] {
   const message = (key: Parameters<typeof observerMessage>[1]) => observerMessage(locale, key);
   const rooms = new Map<string, Observer>();
@@ -24,36 +23,31 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
     const guild = context.guildId;
     let room = rooms.get(guild);
     if (name === "conversation_stop") {
-      if (!room || !room.users.has(context.userId)) throw new Error(message("onlyParticipant"));
-      rooms.delete(guild);room.users.clear();
+      if (!room) throw new Error(message("inactive"));
+      const channel = await voice.getVoiceChannelId(guild, context.userId);
+      if (channel !== room.channel || context.channelId !== room.origin) throw new Error(message("joinChannel"));
+      rooms.delete(guild);room.active=false;
       await voice.stopConversation({guildId:guild});
       await send(context,room,"realtime.stop");
       await context.reply(message("stopped"));return;
     }
-    if (name === "conversation_leave") {
-      if (!room) throw new Error(message("inactive"));
-      room.users.delete(context.userId);room.withdrawn.add(context.userId);
-      await send(context,room,"realtime.leave");
-      await context.reply(message("left"));return;
-    }
     const channel = await voice.getVoiceChannelId(guild,context.userId);
     if (name === "conversation_start") {
       if (room) throw new Error(message("alreadyActive"));
-      room={id:randomUUID(),channel,origin:context.channelId,users:new Set(),withdrawn:new Set()};rooms.set(guild,room);
+      room={id:randomUUID(),channel,origin:context.channelId,active:true};rooms.set(guild,room);
       try {
         await send(context,room,"realtime.start");
-        room.users.add(context.userId);
         const selected=room;
         await voice.startConversation({guildId:guild,userId:context.userId,originChannelId:room.origin,
-          consentingUsers:room.users,async onTurn(){},
+          async onTurn(){},
           onStopped() {
             if (rooms.get(guild)!==selected) return;
-            rooms.delete(guild);selected.users.clear();
+            rooms.delete(guild);selected.active=false;
             void send(context,selected,"realtime.stop").catch(()=>{});
             void context.updateReply(message("disconnected")).catch(()=>{});
           },
           async onObservation(observation) {
-            if (rooms.get(guild)!==selected || !selected.users.has(observation.userId)) return;
+            if (rooms.get(guild)!==selected || !selected.active) return;
             try {
               await send({...context,userId:observation.userId},selected,"realtime.observe",{
                 capture_sequence:observation.sequence,message_id:`${selected.id}:${observation.sequence}`,text:observation.text,
@@ -61,7 +55,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
                 transcription_status:"final",revision:1,
               });
             } catch(error) {
-              selected.users.clear();rooms.delete(guild);
+              selected.active=false;rooms.delete(guild);
               await voice.stopConversation({guildId:guild});
               await send(context,selected,"realtime.stop").catch(()=>{});
               await context.updateReply(message("deliveryFailed")).catch(()=>{});
@@ -69,17 +63,11 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
             }
           },
         });
-      } catch(error) {rooms.delete(guild);room.users.clear();await send(context,room,"realtime.stop").catch(()=>{});throw error;}
+      } catch(error) {rooms.delete(guild);room.active=false;await send(context,room,"realtime.stop").catch(()=>{});throw error;}
       await context.reply(message("active"));return;
     }
-    if (!room || room.channel!==channel || context.channelId!==room.origin) throw new Error(message("joinChannel"));
-    if (room.withdrawn.has(context.userId)) throw new Error(message("newSession"));
-    await send(context,room,"realtime.join");
-    if (rooms.get(guild)!==room) throw new Error(message("ended"));
-    room.users.add(context.userId);
-    await context.reply(message("joined"));
   }
-  return (["conversation_start","conversation_join","conversation_leave","conversation_stop"] as const).map(name=>({
+  return (["conversation_start","conversation_stop"] as const).map(name=>({
     name,description: message(name),
     defer:true,
     async handle(context: DiscordCommandContext) {

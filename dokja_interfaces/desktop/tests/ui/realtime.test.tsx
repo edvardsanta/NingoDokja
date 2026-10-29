@@ -13,6 +13,11 @@ test("observer displays actual final evidence and makes semantic limitations vis
  render(<I18nProvider locale="en"><RealtimeCard transport={transport}/></I18nProvider>);
  await screen.findByText("Refresh tokens in Redis");
  expect(screen.getByText("Participant 1")).toBeTruthy();
+ const stamp = document.querySelector("time")!;
+ expect(stamp.getAttribute("datetime")).toBe("2026-10-29T10:00:00Z");
+ expect(stamp.textContent).toBe(new Intl.DateTimeFormat("en", {hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(new Date("2026-10-29T10:00:00Z")));
+ expect(screen.getByText(/Use \/conversation_start/).textContent).toContain("/conversation_stop");
+ expect(document.body.textContent).not.toContain("/conversation_join");
  expect(screen.getByText(/Semantic associations are unresolved/)).toBeTruthy();
  expect(screen.getByText(/Segment-final transcription/)).toBeTruthy();
 });
