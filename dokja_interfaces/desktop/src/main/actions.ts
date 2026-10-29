@@ -7,6 +7,8 @@ import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryRe
 import { buildIngest } from "./ingest.js";
 import { linkImage } from "./link_image.js";
 import { INGEST_ID, INGEST_LIMITS } from "../shared/ingest.js";
+import { POST_REFUSALS, type PostRefusal } from "../shared/posts.js";
+import type { PostStore } from "./post_store.js";
 import type {
   DeleteResult,
   DigestPage,
@@ -46,7 +48,70 @@ export type ActionDefinition = {
   project(result: unknown): unknown;
   // Addresses of pictures and videos in the projected reply that the screen may later ask the shell to preview.
   media?(projected: unknown): string[];
+  // Work the shell does on the validated payload just before it is sent (for example, keeping files
+  // on this machine). Undefined means the request cannot go.
+  prepare?(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined>;
+  // Work the shell does on the projected reply before the screen sees it (for example, downloading).
+  settle?(projected: unknown): Promise<unknown>;
 };
+
+// The posts the owner opened in this run. The shell sets it when it starts; without it, post links
+// cannot be read or saved.
+let posts: Pick<PostStore, "hold" | "has" | "save" | "ingestPayload"> | undefined;
+
+export function usePostStore(store: typeof posts): void {
+  posts = store;
+}
+
+const POST_ID = /^post-[0-9a-f]{16}$/;
+
+function postLink(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const url = webAddress(text(raw.url));
+  return url ? { url } : undefined;
+}
+
+// The Digest domain already bounded and checked the post; this keeps only the fields the shell uses.
+function postReply(body: Record<string, unknown>): Record<string, unknown> {
+  if (body.status !== "ok" || !isRecord(body.post)) {
+    const reason = text(body.refused);
+    const refused: PostRefusal = (POST_REFUSALS as readonly string[]).includes(reason) ? (reason as PostRefusal) : "failed";
+    return { status: "refused", refused };
+  }
+  const post = body.post;
+  const documentId = text(post.document_id);
+  const url = webAddress(text(post.url));
+  if (!POST_ID.test(documentId) || !url) return { status: "refused", refused: "failed" };
+  return {
+    status: "ok",
+    post: {
+      documentId,
+      url,
+      author: shorten(text(post.author), 200),
+      caption: text(post.caption).slice(0, 8000),
+      published: text(post.published),
+      media: records(post.media, (item) => ({
+        kind: item.kind === "video" ? "video" : "image",
+        url: webAddress(text(item.url)),
+      })).filter((item) => item.url !== "").slice(0, 20),
+    },
+  };
+}
+
+// Saving a post: the screen names it by id; the files are copied first, then the Library gets
+// what the shell held, with the names of the files it kept.
+function postIngest(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const documentId = text(raw.post);
+  return POST_ID.test(documentId) && posts?.has(documentId) ? { post: documentId } : undefined;
+}
+
+async function savePost(wire: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
+  // A note, an address, a file or a reading goes as it was built.
+  if (!("post" in wire)) return wire;
+  const documentId = text(wire.post);
+  if (!posts || !POST_ID.test(documentId)) return undefined;
+  const saved = await posts.save(documentId);
+  return saved === undefined ? undefined : posts.ingestPayload(documentId, saved);
+}
 
 const MAX_DETAIL_CHARS = 200;
 
@@ -668,10 +733,16 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     media: (projected) => isRecord(projected) && Array.isArray(projected.items)
       ? projected.items.filter(isRecord).map(item => text(item.mediaUrl)).filter(Boolean) : [],
   },
+  "digest.link.read": {
+    payload: postLink,
+    project: (result) => inDomain(result, "digest", postReply),
+    settle: async (projected) => (posts ? posts.hold(projected) : { status: "refused", refused: "failed" }),
+  },
   "knowledge.ingest": {
     // A file travels as base64 text: the cap is the largest file, a third more.
     maxPayloadChars: 12_000_000,
-    payload: (raw) => (raw.mode === "reading" ? readingIngest(raw) : buildIngest(raw)),
+    payload: (raw) => (raw.mode === "reading" ? readingIngest(raw) : raw.mode === "post" ? postIngest(raw) : buildIngest(raw)),
+    prepare: savePost,
     project: (result) => inDomain(result, "knowledge", ingestResult),
   },
   "knowledge.list": {

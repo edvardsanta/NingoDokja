@@ -17,6 +17,10 @@ export type DesktopConfig = {
   devServerUrl?: string;
   // The orchestrator's HTTP bridge on this machine, where a Talk turn can be streamed.
   bridgeEndpoint?: string;
+  // Where saved posts are kept; the app's own data folder when absent.
+  postsDir?: string;
+  // The one origin on this machine a post reader hands its files out from, if any.
+  postMediaOrigin?: string;
 };
 
 // "30s", "2m", "1500ms"; a bare number is milliseconds.
@@ -57,6 +61,8 @@ export function parseConfig(
       "env-file": { type: "string" },
       lang: { type: "string" },
       timeout: { type: "string" },
+      "posts-dir": { type: "string" },
+      "post-media-origin": { type: "string" },
     },
     strict: false,
     allowPositionals: true,
@@ -78,6 +84,7 @@ export function parseConfig(
   const maxTimeoutMs = parseDuration(flag("timeout")) ?? DEFAULT_MAX_TIMEOUT_MS;
   const devServerUrl = variable("DOKJA_DESKTOP_DEV_URL");
   const bridgeEndpoint = variable("DOKJA_BRIDGE_ENDPOINT");
+  const postMediaOrigin = flag("post-media-origin") ?? variable("DOKJA_POST_MEDIA_ORIGIN");
 
   return {
     ...(flag("runtime-root") ? { runtimeRoot: flag("runtime-root") } : {}),
@@ -88,5 +95,7 @@ export function parseConfig(
     maxTimeoutMs,
     ...(isLocalUrl(devServerUrl) ? { devServerUrl } : {}),
     ...(isLocalUrl(bridgeEndpoint) ? { bridgeEndpoint } : {}),
+    ...(flag("posts-dir") ? { postsDir: flag("posts-dir") } : {}),
+    ...(isLocalUrl(postMediaOrigin) ? { postMediaOrigin: new URL(postMediaOrigin).origin } : {}),
   };
 }

@@ -63,8 +63,9 @@ export async function handleRequest(
     return fail("invalid", "the payload must be a small object");
   }
 
-  const wire = action.payload(payload);
-  if (!wire) return fail("invalid", "the payload is not valid for this action");
+  const built = action.payload(payload);
+  if (!built) return fail("invalid", "the payload is not valid for this action");
+  let wire = built;
   if (action.writes?.(wire) && !presence?.recent()) {
     return fail("denied", "a change needs a click or a key press just before it");
   }
@@ -80,6 +81,11 @@ export async function handleRequest(
   }
 
   try {
+    if (action.prepare) {
+      const prepared = await action.prepare(wire);
+      if (!prepared) return fail("invalid", "the payload is not valid for this action");
+      wire = prepared;
+    }
     const timeoutMs = pickTimeout(raw.options, limits);
     const conversationId = typeof wire.conversation_id === "string" ? wire.conversation_id : "";
     const reply =
@@ -94,7 +100,7 @@ export async function handleRequest(
     }
     const projected = action.project(reply.result);
     if (action.media) media?.remember(action.media(projected));
-    return { ok: true, result: projected };
+    return { ok: true, result: action.settle ? await action.settle(projected) : projected };
   } catch (error) {
     if (error instanceof OrchestratorError) return fail(error.code, error.message);
     return fail("unexpected", "the reply was not what this action expects");

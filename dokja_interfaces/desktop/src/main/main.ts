@@ -1,6 +1,8 @@
 import { join } from "node:path";
 
-import { app, dialog, ipcMain, session, type BrowserWindow } from "electron";
+import { pathToFileURL } from "node:url";
+
+import { app, dialog, ipcMain, net, protocol, session, type BrowserWindow } from "electron";
 
 import { isRecord } from "../shared/records.js";
 import {
@@ -14,7 +16,10 @@ import { DEFAULT_ENDPOINT } from "./config.js";
 import { parseConfig } from "./config.js";
 import { communicationsToken } from "./communications_config.js";
 import { isTrustedSender } from "./guards.js";
-import { fetchMedia } from "./media_fetch.js";
+import { downloadMedia, fetchMedia } from "./media_fetch.js";
+import { POST_SCHEME } from "../shared/posts.js";
+import { usePostStore } from "./actions.js";
+import { PostStore } from "./post_store.js";
 import { MediaGate } from "./media_gate.js";
 import { createPreviewer } from "./media_preview.js";
 import { BridgeChat, BridgeMissing } from "./chat_stream.js";
@@ -26,6 +31,12 @@ import { createConfirmer } from "./dialogs.js";
 import { appPage, blockRemoteRequests, createWindow } from "./window.js";
 
 const LOG = "[dokja-desktop]";
+
+// A post's files are shown from the shell's own scheme, which must be declared before the app is
+// ready. It is secure and streams, so a video can seek.
+protocol.registerSchemesAsPrivileged([
+  { scheme: POST_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } },
+]);
 
 async function main(): Promise<void> {
   await app.whenReady();
@@ -78,6 +89,28 @@ async function main(): Promise<void> {
     return response === 0;
   });
   const preview = createPreviewer({ gate: media, fetchMedia: (url) => fetchMedia(url) });
+
+  // Posts opened in this run live in a temporary folder, erased when the app quits; a saved post is
+  // copied to the posts folder, which stays.
+  const posts = new PostStore({
+    savedRoot: config.postsDir ?? join(app.getPath("userData"), "saved-posts"),
+    download: downloadMedia,
+    ...(config.postMediaOrigin ? { localOrigin: config.postMediaOrigin } : {}),
+  });
+  usePostStore(posts);
+  void posts.sweep();
+  session.defaultSession.protocol.handle(POST_SCHEME, (request) => {
+    const file = posts.file(request.url);
+    if (!file) return new Response(null, { status: 404 });
+    return net.fetch(pathToFileURL(file.path).href, { headers: request.headers });
+  });
+  let disposed = false;
+  app.on("will-quit", (event) => {
+    if (disposed) return;
+    event.preventDefault();
+    disposed = true;
+    void posts.dispose().finally(() => app.quit());
+  });
 
   ipcMain.handle(CHANNELS.bootstrap, (event): Bootstrap | null =>
     isTrustedSender(event.senderFrame?.url, page) ? { locale: config.locale, runtimeControls: runtimeEnabled } : null,

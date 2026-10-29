@@ -7,8 +7,9 @@ const POLICY = [
   "default-src 'none'",
   "script-src 'self'",
   "style-src 'self'",
-  "img-src 'self' data:",
-  "media-src data:",
+  // A post the owner opened shows its files through the shell's own scheme (see post_store.ts).
+  "img-src 'self' data: ningo-post:",
+  "media-src data: ningo-post:",
   "font-src 'self'",
   "base-uri 'none'",
   "form-action 'none'",

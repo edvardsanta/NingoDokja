@@ -41,7 +41,7 @@ from the stored passages and said to be so, asked for alone with `include_text`;
 batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
-document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link.
+document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link in a browser.
 
 System is also where things are switched on and off. Each service the orchestrator can switch
 (`feeds`, `chat`, `knowledge`, `memory`, `scheduler`; legacy mode also lists `meme` and `book`) has a switch, and each scheduled job has a
@@ -90,6 +90,28 @@ list opens by itself when one does.
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--env-file` (communications credential file), `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). For example: `pnpm start --lang=pt`.
+
+## Post links
+
+The shell can open a link to a public post without signing in. It asks the
+orchestrator (`digest.link.read`), which asks the post readers the owner installed
+as Feeds plugins (see `dokja_docs/feeds-content-plugins.md`, "Post readers").
+
+- The shell downloads the post's pictures and videos straight away into a folder
+  in the system's temporary directory. It erases that folder when the app quits,
+  and erases one left by a crash on the next start. The screen sees those files
+  only as `ningo-post://` addresses that the shell serves itself. Nothing is
+  fetched from the page.
+- Saving a post copies its files to the posts folder, one folder per post. It then
+  adds the caption, author, date, link and the saved file names to the Library
+  (`knowledge.ingest`) under the post's own id, so saving it again updates the same
+  document.
+- `--posts-dir` chooses the posts folder. The default is `saved-posts` in the
+  app's data folder.
+- A reader that hands its files out from a server on this machine needs that one
+  origin named with `--post-media-origin` or `DOKJA_POST_MEDIA_ORIGIN` (for example
+  `http://127.0.0.1:9000`). The shell never fetches from any other address on this
+  machine or the local network.
 
 ## Replies as Ningo writes them
 
