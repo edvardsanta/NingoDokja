@@ -43,3 +43,10 @@ export function formatTime(locale: Locale, iso: string): string {
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   }).format(date);
 }
+
+// The day of an RFC 3339 time, as the language writes a date; empty when the text is not a date.
+export function formatDay(locale: Locale, iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(TAGS[locale], { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
