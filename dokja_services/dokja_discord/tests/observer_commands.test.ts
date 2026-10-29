@@ -16,7 +16,7 @@ test("observer transcribes channel speakers with start and stop and never genera
  try{
   await run("conversation_start","a");assert.equal(params.consentingUsers,undefined);
   assert.deepEqual(commands.map(c=>c.name),["conversation_start","conversation_stop"]);
-  assert.ok(replies[0].includes("voice channel is being transcribed"));
+  assert.equal(replies[0], "Transcription started.");
   await params.onObservation({userId:"b",sequence:0,text:"second speaker",startedAt:new Date().toISOString(),endedAt:new Date().toISOString()});
   assert.equal(events.at(-1).event_type,"realtime.observe");assert.equal(events.at(-1).payload.userId,"b");
   await run("conversation_stop","b");assert.equal(stops,1);
@@ -58,14 +58,7 @@ for (const locale of [undefined, "pt-BR", "en", "en-US", "fr"]) {
         : "Start transcribing the voice channel; Ningo stays silent.");
       await run("conversation_start");
       const active = replies.at(-1)!;
-      assert.ok(active.includes(portuguese ? "O canal de voz está sendo transcrito" : "The voice channel is being transcribed"));
-      for (const command of ["/conversation_stop"]) {
-        assert.ok(active.includes(command));
-      }
-      assert.ok(active.includes(portuguese ? "15 minutos de inatividade" : "15 minutes of inactivity"));
-      assert.ok(active.includes(portuguese ? "Ningo não falará" : "Ningo will not speak"));
-      assert.ok(!active.includes("/conversation_join"));
-      assert.ok(!active.includes("/conversation_leave"));
+      assert.equal(active, portuguese ? "Transcrição iniciada." : "Transcription started.");
       params.onStopped();
       assert.ok(updates.at(-1)!.startsWith(portuguese ? "Observador de conversa encerrado." : "Conversation observer stopped."));
       await run("conversation_start");

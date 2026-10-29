@@ -29,8 +29,8 @@ const MESSAGES = {
     en: "Observer stopped because transcript delivery failed. Audio capture is disabled; deletion was requested and remaining ephemeral data expires after inactivity.",
   },
   active: {
-    "pt-BR": "Observador de transcrição ativo. O canal de voz está sendo transcrito. Use /conversation_stop para encerrar e excluir as transcrições. Abra Realtime no Dokja Desktop para ver as transcrições finalizadas de cada segmento. Nenhum áudio bruto é armazenado; as transcrições expiram após 15 minutos de inatividade. Ningo não falará neste modo.",
-    en: "Transcription observer active. The voice channel is being transcribed. Use /conversation_stop to end and delete. Open Realtime in Dokja Desktop to view segment-final transcripts. No raw audio is retained; transcripts expire after 15 minutes of inactivity. Ningo will not speak in this mode.",
+    "pt-BR": "Transcrição iniciada.",
+    en: "Transcription started.",
   },
   joinChannel: {
     "pt-BR": "Entre no canal de voz do observador e use o canal de texto original",
