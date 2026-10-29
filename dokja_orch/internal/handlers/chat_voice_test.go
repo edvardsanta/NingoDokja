@@ -4,9 +4,39 @@ import (
 	"context"
 	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+type voiceStreamGenerator struct{ calls int }
+
+func (g *voiceStreamGenerator) GenerateVoiceMessagesStream(_ context.Context, _ []map[string]string, onText func(string)) (map[string]any, error) {
+	g.calls++
+	onText("A primeira resposta chegou.")
+	onText("A primeira resposta chegou. E a conversa continua.")
+	onText("A primeira resposta chegou. E a conversa continua. Agora cabe um argumento. A quarta espera detalhes.")
+	return map[string]any{"reply": "A primeira resposta chegou. E a conversa continua. Agora cabe um argumento. A quarta espera detalhes."}, nil
+}
+
+func TestAddressedVoiceUsesDedicatedGeneratorAndStreamsOnlyUsableShortSpeech(t *testing.T) {
+	voice := &voiceStreamGenerator{}
+	var spoken []string
+	handler := NewChatDomainHandler(&plainGenerator{}).WithVoiceGenerator(voice)
+	event := chatEvent("Ningo, que bom te ouvir")
+	event.Context = map[string]any{"session_key": "voice-room", "voice_turns": []chat.VoiceTurn{{UserID: "member", Text: "Ningo, que bom te ouvir"}}}
+	ctx := core.WithVoiceSpeech(t.Context(), func(text string) { spoken = append(spoken, text) })
+	result, err := handler.Handle(ctx, event, chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if voice.calls != 1 || !reflect.DeepEqual(spoken, []string{"A primeira resposta chegou.", "E a conversa continua.", "Agora cabe um argumento."}) {
+		t.Fatalf("voice calls=%d streamed=%q", voice.calls, spoken)
+	}
+	if result["reply"] != "A primeira resposta chegou. E a conversa continua. Agora cabe um argumento." {
+		t.Fatalf("spoken final reply was not concise: %#v", result["reply"])
+	}
+}
 
 func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	generator := &plainGenerator{}
@@ -34,6 +64,9 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	}
 	if strings.Contains(personaForEvent(event), discordReplyPresentation) || !strings.Contains(personaForEvent(event), "live Discord voice") {
 		t.Fatal("voice got text formatting instructions")
+	}
+	if !strings.Contains(personaForEvent(event), chatPersona) {
+		t.Fatal("voice lost Ningo's shared personality and conversational judgment")
 	}
 }
 

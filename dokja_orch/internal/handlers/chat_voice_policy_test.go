@@ -51,7 +51,7 @@ func TestPassiveVoiceHistoryDoesNotInferOrCompactButIsUsedWhenAddressed(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g.calls != 1 || result["reply"] != "One sentence." {
+	if g.calls != 1 || result["reply"] != "One sentence. Extra sentence." {
 		t.Fatal("addressed reply was not concise", g.calls, result)
 	}
 	var combined strings.Builder
@@ -69,5 +69,14 @@ func TestPassiveVoiceHistoryDoesNotInferOrCompactButIsUsedWhenAddressed(t *testi
 	result, err = h.Handle(ctx, event, chatStep)
 	if err != nil || result["reply"] != "One sentence. Extra sentence." {
 		t.Fatal("explicit detail was trimmed", result, err)
+	}
+	var prompt strings.Builder
+	for _, message := range g.messages {
+		if message["role"] == "system" {
+			prompt.WriteString(message["content"])
+		}
+	}
+	if !strings.Contains(prompt.String(), "The application has selected this batch for your reply") || strings.Contains(prompt.String(), "[SILENT]") {
+		t.Fatal("accepted followup was instructed to make a second silence decision")
 	}
 }

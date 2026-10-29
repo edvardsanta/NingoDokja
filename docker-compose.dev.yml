@@ -23,6 +23,7 @@ services:
       DOKJA_CONTENT_BACKEND: ${DOKJA_CONTENT_BACKEND:-feeds}
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_VOICE_HTTP_ENDPOINT: ${DOKJA_VOICE_HTTP_ENDPOINT:-}
+      DOKJA_VOICE_CHAT_PROVIDER: ${DOKJA_VOICE_CHAT_PROVIDER:-runtime}
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
       DOKJA_OWNER_DISCORD_USER_ID: ${DOKJA_OWNER_DISCORD_USER_ID:-}
@@ -238,10 +239,12 @@ services:
       context: .
       dockerfile: dokja_services/dokja_voice/Dockerfile.dev
     working_dir: /workspace
-    command: python dokja_services/dokja_voice/main.py
+    command: python dokja_services/dokja_voice/main.py --reload
     environment:
       DOKJA_VOICE_HOST: 0.0.0.0
       DOKJA_VOICE_PORT: 8081
+      DOKJA_VOICE_CHAT_MODEL: ${DOKJA_VOICE_CHAT_MODEL:-qwen3.5:2b}
+      DOKJA_VOICE_CHAT_KEEP_ALIVE: ${DOKJA_VOICE_CHAT_KEEP_ALIVE:--1s}
       DOKJA_VOICE_PROVIDER: ${DOKJA_VOICE_PROVIDER:-stub}
       DOKJA_VOICE_STT_PROVIDER: ${DOKJA_VOICE_STT_PROVIDER:-stub}
       DOKJA_VOICE_DEFAULT_VOICE: ${DOKJA_VOICE_DEFAULT_VOICE:-default}

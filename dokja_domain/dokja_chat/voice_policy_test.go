@@ -69,13 +69,13 @@ func TestVoicePolicyRequestsDetailOnlyWhenExplicit(t *testing.T) {
 			t.Fatal(tc, result)
 		}
 	}
-	if reply := ConciseSpokenReply("The value is 3.14. Another sentence.", false); reply != "The value is 3.14." {
+	if reply := ConciseSpokenReply("The value is 3.14. Another sentence. Third sentence. Fourth sentence.", false); reply != "The value is 3.14. Another sentence. Third sentence." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply("First. Second.", true); reply != "First. Second." {
+	if reply := ConciseSpokenReply("First. Second. Third. Fourth.", true); reply != "First. Second. Third. Fourth." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), false); len(strings.Fields(reply)) != 45 {
+	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), false); len(strings.Fields(reply)) != 90 {
 		t.Fatal("long spoken default was not bounded")
 	}
 }
@@ -118,12 +118,18 @@ func TestStartingVoiceOpensAnExchangeWithoutRepeatingTheName(t *testing.T) {
 	if !p.Decide("room", []VoiceTurn{{UserID: "starter", Text: "teste"}}).Respond {
 		t.Fatal("explicit start did not count as addressing the assistant")
 	}
-	now = now.Add(VoiceFollowupWindow + time.Second)
+	now = now.Add(5 * time.Minute)
 	if p.OpenListener("room", "listener-one", "starter") {
-		t.Fatal("turn metadata reopened an expired listener")
+		t.Fatal("turn metadata reopened the listener")
 	}
-	if p.Decide("room", []VoiceTurn{{UserID: "starter", Text: "teste"}}).Respond {
-		t.Fatal("listener metadata defeated the idle window")
+	if !p.Decide("room", []VoiceTurn{{UserID: "starter", Text: "teste"}}).Respond {
+		t.Fatal("explicit listener starter lost engagement after the follow-up window")
+	}
+	if p.Decide("room", []VoiceTurn{{UserID: "starter", Text: "uhum"}}).Respond {
+		t.Fatal("persistent engagement answered a backchannel")
+	}
+	if p.Decide("room", []VoiceTurn{{UserID: "bystander", Text: "ambient discussion"}}).Respond {
+		t.Fatal("persistent engagement leaked to a bystander")
 	}
 	p.OpenListener("room", "listener-two", "other")
 	if p.Decide("room", []VoiceTurn{{UserID: "starter", Text: "teste"}}).Respond {

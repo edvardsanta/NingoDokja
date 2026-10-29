@@ -14,6 +14,7 @@ export type VoiceTurnContext = {
 export class LiveConversation {
   private active = new Set<number>();
   private voiced = new Set<number>();
+  private recognizing = new Set<number>();
   private pending = new Map<number, VoiceTurn>();
   private next = 0;
   private stopped = false;
@@ -43,9 +44,18 @@ export class LiveConversation {
     clearTimeout(this.timer);
   }
 
+  // Recognition can finish out of order. Hold dispatch until captured segments
+  // finish decoding, without treating decoding work as speech on the floor.
+  transcribing(sequence: number): void {
+    if (this.stopped || !this.active.has(sequence)) return;
+    this.recognizing.add(sequence);
+    clearTimeout(this.timer);
+  }
+
   finish(sequence: number, turn?: Omit<VoiceTurn, "sequence">): void {
     if (this.stopped || !this.active.delete(sequence)) return;
     this.voiced.delete(sequence);
+    this.recognizing.delete(sequence);
     if (turn?.text.trim()) {
       if (this.pending.size >= 32) {
         this.pending.delete(Math.min(...this.pending.keys()));
@@ -64,6 +74,7 @@ export class LiveConversation {
     this.pending.clear();
     this.active.clear();
     this.voiced.clear();
+    this.recognizing.clear();
     for (const wake of [...this.floorWaiters]) wake();
     this.floorWaiters.clear();
     this.options.interrupt();
@@ -86,13 +97,13 @@ export class LiveConversation {
   }
 
   private schedule(): void {
-    if (this.stopped || this.request || this.voiced.size || !this.pending.size) return;
+    if (this.stopped || this.request || this.voiced.size || this.recognizing.size || !this.pending.size) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => { void this.flush(); }, this.options.settleMs ?? 80);
   }
 
   private async flush(): Promise<void> {
-    if (this.stopped || this.request || this.voiced.size || !this.pending.size) return;
+    if (this.stopped || this.request || this.voiced.size || this.recognizing.size || !this.pending.size) return;
     const turns = [...this.pending.values()].sort((a, b) => a.sequence - b.sequence);
     this.pending.clear();
     const last = turns[turns.length - 1];

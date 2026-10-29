@@ -761,6 +761,7 @@ export function createListeningSession(params: {
         params.error?.("[dokja-discord] voice transcription capacity reached");
         return;
       }
+      conversation.transcribing(seq);
       jobs.push(async () => {
         try {
           const wav = buildWavFromPCM(audio).toString("base64");

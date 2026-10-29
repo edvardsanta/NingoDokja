@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { buildBridgePayload } from "../transport/bridge.js";
 import type { VoiceTurnContext } from "./live_conversation.js";
 
-// Heartbeats let the server detect a disconnected/aborted requester and cancel
-// inference even if its CLI has not emitted a token yet. Only a validated final
-// reply can become speech; speculative previews are never spoken.
+// Only complete sentences from the dedicated local voice provider become speech.
+// Ordinary CLI previews remain isolated and are never forwarded here.
 export async function conversationReply(endpoint: string, timeoutMs: number, input: {
   guildId?: string; originChannelId: string; turn: VoiceTurnContext;
   voiceSessionId?: string; voiceStartedBy?: string;
+  onSpeech?(sentence: string): Promise<void>;
 }): Promise<string> {
   const { turn } = input;
   turn.signal.throwIfAborted();
@@ -31,6 +31,7 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
   let buffer = "";
   let decided = false;
   let accepted = false;
+  let spoken = "";
   try {
     while (true) {
       const {value,done} = await reader.read();
@@ -41,7 +42,7 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
       while ((newline=buffer.indexOf("\n"))>=0) {
         const line = buffer.slice(0,newline); buffer=buffer.slice(newline+1);
         if (!line.trim()) continue;
-        const frame = JSON.parse(line) as { heartbeat?: boolean; accepted?: boolean; status?: string; reply?: string; error?: string };
+        const frame = JSON.parse(line) as { heartbeat?: boolean; accepted?: boolean; speech?: string; status?: string; reply?: string; error?: string };
         if (frame.heartbeat) continue;
         if (typeof frame.accepted === "boolean") {
           turn.decide?.(frame.accepted);
@@ -49,11 +50,19 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
           accepted = frame.accepted;
           continue;
         }
+        if (typeof frame.speech === "string") {
+          turn.signal.throwIfAborted();
+          if (!decided || !accepted) throw new Error("Ineligible voice turn returned speech");
+          if (input.onSpeech) await input.onSpeech(frame.speech);
+          spoken += `${frame.speech} `;
+          continue;
+        }
         turn.signal.throwIfAborted();
         if (frame.status!=="ok" || (frame.reply !== undefined && typeof frame.reply!=="string")) throw new Error("Voice reply was refused");
         if (decided && !accepted && frame.reply?.trim()) throw new Error("Ineligible voice turn returned speech");
         if (!decided) turn.decide?.(Boolean(frame.reply?.trim()));
-        return frame.reply ?? "";
+        const reply = frame.reply ?? "";
+        return spoken && reply.startsWith(spoken.trim()) ? reply.slice(spoken.trim().length).trim() : reply;
       }
     }
     throw new Error("Voice reply stream ended without a final reply");

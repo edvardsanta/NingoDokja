@@ -46,11 +46,11 @@ test("stop cancels playback, rejects waiting playback, and suppresses late recog
  live.finish(next,{userId:"b",text:"late"});release();await delay(5);assert.equal(count,1);
 });
 
-test("unconfirmed noise never blocks playback",async()=>{
+test("unconfirmed noise and pending recognition never block playback",async()=>{
  let context:VoiceTurnContext|undefined;let release!:()=>void;
  const live=new LiveConversation({channelId:"room",settleMs:1,interrupt(){},async onTurn(_,turn){context=turn;await new Promise<void>(r=>release=r);},onError(){}});
  live.finish(live.begin(),{userId:"a",text:"Ningo, hello"});await delay(5);
- const keyboard=live.begin(false);await context!.waitForFloor!();assert.equal(context!.signal.aborted,false);
+ const keyboard=live.begin(false);live.transcribing(keyboard);await context!.waitForFloor!();assert.equal(context!.signal.aborted,false);
  live.finish(keyboard);release();live.stop();
 });
 

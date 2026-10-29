@@ -27,16 +27,26 @@ type ChatStreamingGenerator interface {
 	GenerateMessagesStream(ctx context.Context, messages []map[string]string, onPreview func(string)) (map[string]any, error)
 }
 
+type VoiceChatStreamingGenerator interface {
+	GenerateVoiceMessagesStream(ctx context.Context, messages []map[string]string, onText func(string)) (map[string]any, error)
+}
+
 type ChatDomainHandler struct {
-	generator   ChatGenerator
-	reading     func(context.Context, string) (digestdomain.Reference, error)
-	recent      func(context.Context, string, int) ([]digestdomain.Reference, error)
-	sessions    *chatSessionManager
-	voicePolicy *chat.VoicePolicy
+	generator      ChatGenerator
+	voiceGenerator VoiceChatStreamingGenerator
+	reading        func(context.Context, string) (digestdomain.Reference, error)
+	recent         func(context.Context, string, int) ([]digestdomain.Reference, error)
+	sessions       *chatSessionManager
+	voicePolicy    *chat.VoicePolicy
 
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+}
+
+func (h *ChatDomainHandler) WithVoiceGenerator(generator VoiceChatStreamingGenerator) *ChatDomainHandler {
+	h.voiceGenerator = generator
+	return h
 }
 
 func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
@@ -169,6 +179,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 	rawReply := chatReplyFromResult(result)
 	if _, voice := event.Context["voice_turns"]; voice {
+		logger.Info(fmt.Sprintf("voice generation event_id=%s raw_chars=%d silence_marker=%t", event.EventID, len(rawReply), strings.TrimSpace(rawReply) == "[SILENT]"))
 		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision.Detailed)
 		h.voicePolicy.CompleteReply(chatSessionBaseKey(event), voiceDecision, rawReply)
 	}
@@ -230,6 +241,32 @@ func withReplyContext(event core.Event, content string) string {
 }
 
 func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event, content string, history []chatMessage, sources []knowledgeSource, reference string) (map[string]any, error) {
+	voice := event.Context["voice_turns"] != nil
+	if voice && h.voiceGenerator != nil {
+		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
+		if reference != "" {
+			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
+		}
+		messages = withPersona(messages, event)
+		messages = withOwnerIdentity(messages, event)
+		var emitted int
+		stream := func(text string) {
+			callback := core.VoiceSpeech(ctx)
+			if callback == nil {
+				return
+			}
+			complete := strings.Join(completeVoiceSentences(text), " ")
+			sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, boolFromContext(event.Context, "voice_detailed")))
+			for emitted < len(sentences) {
+				if emitted >= chat.VoiceDefaultMaxSentences && !boolFromContext(event.Context, "voice_detailed") {
+					return
+				}
+				callback(sentences[emitted])
+				emitted++
+			}
+		}
+		return h.voiceGenerator.GenerateVoiceMessagesStream(ctx, messages, stream)
+	}
 	if generator, ok := h.generator.(ChatConversationGenerator); ok {
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
 		if reference != "" {
@@ -256,6 +293,22 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		persona += "\n\n" + ownerNote
 	}
 	return h.generator.Generate(ctx, persona+"\n\n"+content)
+}
+
+func completeVoiceSentences(text string) []string {
+	var sentences []string
+	start := 0
+	for index, r := range text {
+		if r != '.' && r != '!' && r != '?' && r != '\n' {
+			continue
+		}
+		end := index + len(string(r))
+		if sentence := strings.TrimSpace(text[start:end]); sentence != "" {
+			sentences = append(sentences, sentence)
+		}
+		start = end
+	}
+	return sentences
 }
 
 func sessionLifecycleNotice(lifecycle chatSessionLifecycle, event core.Event) string {

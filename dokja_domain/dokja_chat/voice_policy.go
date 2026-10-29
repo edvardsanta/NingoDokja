@@ -10,6 +10,8 @@ import (
 
 const VoiceFollowupWindow = 30 * time.Second
 const VoiceHandoffWindow = 12 * time.Second
+const VoiceDefaultMaxSentences = 3
+const VoiceDefaultMaxWords = 90
 
 // VoiceDecision is conversational eligibility, independent of account authority.
 type VoiceDecision struct {
@@ -20,10 +22,11 @@ type VoiceDecision struct {
 }
 
 type voiceRoom struct {
-	listenerID   string
-	engaged      map[string]time.Time
-	handoffUntil time.Time
-	lastSeen     time.Time
+	listenerID      string
+	listenerStarter string
+	engaged         map[string]time.Time
+	handoffUntil    time.Time
+	lastSeen        time.Time
 }
 type VoicePolicy struct {
 	mu    sync.Mutex
@@ -99,7 +102,8 @@ func (p *VoicePolicy) roomLocked(scope string, now time.Time) *voiceRoom {
 }
 
 // OpenListener treats an explicit voice-start command as addressing the assistant.
-// Repeated turn metadata cannot keep extending the same listener's initial window.
+// The starter stays engaged for the listener lifetime; other speakers use the
+// ordinary addressing and follow-up windows. Repeated metadata cannot replace it.
 func (p *VoicePolicy) OpenListener(scope, listenerID, starter string) bool {
 	if listenerID == "" || starter == "" {
 		return false
@@ -112,6 +116,7 @@ func (p *VoicePolicy) OpenListener(scope, listenerID, starter string) bool {
 		return false
 	}
 	room.listenerID = listenerID
+	room.listenerStarter = starter
 	room.lastSeen = now
 	room.engaged = map[string]time.Time{starter: now.Add(VoiceFollowupWindow)}
 	room.handoffUntil = now.Add(VoiceHandoffWindow)
@@ -140,7 +145,8 @@ func (p *VoicePolicy) Decide(scope string, turns []VoiceTurn) VoiceDecision {
 		}
 		addressed := addressedVoice.MatchString(normalizeVoiceAccents.Replace(strings.ToLower(text)))
 
-		if !addressed && !now.Before(room.engaged[turn.UserID]) && !(now.Before(room.handoffUntil) && voiceFollowup(text)) {
+		listenerStarter := room.listenerID != "" && room.listenerStarter == turn.UserID
+		if !listenerStarter && !addressed && !now.Before(room.engaged[turn.UserID]) && !(now.Before(room.handoffUntil) && voiceFollowup(text)) {
 			continue
 		}
 		decision.Respond = true
@@ -187,15 +193,19 @@ func ConciseSpokenReply(reply string, detailed bool) string {
 		return reply
 	}
 	runes := []rune(strings.TrimSpace(reply))
+	sentences := 0
 	for i, r := range runes {
 		if (r == '.' || r == '!' || r == '?') && (i+1 == len(runes) || unicode.IsSpace(runes[i+1])) {
-			reply = string(runes[:i+1])
-			break
+			sentences++
+			if sentences == VoiceDefaultMaxSentences {
+				reply = string(runes[:i+1])
+				break
+			}
 		}
 	}
 	words := strings.Fields(reply)
-	if len(words) > 45 {
-		return strings.Join(words[:45], " ") + "."
+	if len(words) > VoiceDefaultMaxWords {
+		return strings.Join(words[:VoiceDefaultMaxWords], " ") + "."
 	}
 	return reply
 }

@@ -1,10 +1,22 @@
+import json
 import logging
 import os
+import urllib.error
+import urllib.request
+from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Request,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 from audio_utils import wav_bytes_to_mono_16k
 from speech_activity import SpeechDetector
@@ -46,6 +58,10 @@ class WakewordRequest(BaseModel):
     hotword: str = "Ningo"
 
 
+class VoiceChatRequest(BaseModel):
+    messages: list[dict[str, str]] = Field(..., min_length=1, max_length=128)
+
+
 class TTSStreamStartRequest(BaseModel):
     voice: str = "default"
     language: str = "pt-BR"
@@ -76,6 +92,60 @@ class TTSStreamState:
         self.target_buffer_chars = DEFAULT_TARGET_BUFFER_CHARS
         self.pending_text = ""
         self.audio_format_sent = False
+
+
+def voice_chat_keep_alive() -> str:
+    return os.getenv("DOKJA_VOICE_CHAT_KEEP_ALIVE", "-1s").strip() or "-1s"
+
+
+def ollama_chat_stream(messages: list[dict[str, str]], model: str) -> Iterator[str]:
+    endpoint = os.getenv(
+        "DOKJA_VOICE_CHAT_OLLAMA_URL", "http://dokja-ollama:11434"
+    ).rstrip("/")
+    request = urllib.request.Request(
+        endpoint + "/api/chat",
+        data=json.dumps(
+            {
+                "model": model,
+                "messages": messages,
+                "stream": True,
+                "think": False,
+                "keep_alive": voice_chat_keep_alive(),
+                "options": {"temperature": 0.2, "num_predict": 128},
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            for raw_line in response:
+                if not raw_line.strip():
+                    continue
+                frame = json.loads(raw_line)
+                if not isinstance(frame, dict):
+                    yield json.dumps({"error": "invalid local voice chat frame"}) + "\n"
+                    return
+                message = frame.get("message", {})
+                if not isinstance(message, dict):
+                    yield json.dumps({"error": "invalid local voice chat message"}) + "\n"
+                    return
+                if message.get("tool_calls"):
+                    message = {"error": "voice model returned an unsupported tool call"}
+                    yield json.dumps(message) + "\n"
+                    return
+                text = message.get("content", "")
+                if not isinstance(text, str):
+                    yield json.dumps({"error": "invalid local voice chat text"}) + "\n"
+                    return
+                if text:
+                    yield json.dumps({"text": text}, ensure_ascii=False) + "\n"
+                if frame.get("done"):
+                    yield json.dumps({"done": True}) + "\n"
+                    return
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        logger.exception("local voice chat inference failed model=%s", model)
+        yield json.dumps({"error": "local voice chat inference failed"}) + "\n"
 
 
 @asynccontextmanager
@@ -138,7 +208,29 @@ def create_app() -> FastAPI:
             "tts_provider": tts_provider,
             "stt_provider": stt_provider,
             "wakeword_provider": wakeword_provider,
+            "voice_chat_model": os.getenv("DOKJA_VOICE_CHAT_MODEL", "").strip(),
         }
+
+    @app.post("/chat/stream")
+    async def chat_stream(payload: VoiceChatRequest) -> StreamingResponse:
+        model = os.getenv("DOKJA_VOICE_CHAT_MODEL", "").strip()
+        if not model:
+            raise HTTPException(status_code=503, detail="local voice chat model is not configured")
+        messages: list[dict[str, str]] = []
+        total_chars = 0
+        for message in payload.messages:
+            role = message.get("role", "")
+            content = message.get("content", "")
+            if role not in {"system", "user", "assistant"} or not content.strip():
+                raise HTTPException(status_code=400, detail="invalid voice chat message")
+            total_chars += len(content)
+            if total_chars > 65536:
+                raise HTTPException(status_code=413, detail="voice chat context is too large")
+            messages.append({"role": role, "content": content})
+
+        return StreamingResponse(
+            ollama_chat_stream(messages, model), media_type="application/x-ndjson"
+        )
 
     @app.post("/tts")
     async def tts(payload: TTSRequest, request: Request) -> Response:

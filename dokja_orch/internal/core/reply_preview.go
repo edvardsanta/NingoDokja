@@ -16,3 +16,16 @@ func ReplyPreview(ctx context.Context) func(string) {
 	preview, _ := ctx.Value(replyPreviewKey{}).(func(string))
 	return preview
 }
+
+type voiceSpeechKey struct{}
+
+// WithVoiceSpeech carries complete, usable speech segments from the dedicated
+// voice generator to the live voice request. It is separate from chat previews.
+func WithVoiceSpeech(ctx context.Context, speech func(string)) context.Context {
+	return context.WithValue(ctx, voiceSpeechKey{}, speech)
+}
+
+func VoiceSpeech(ctx context.Context) func(string) {
+	speech, _ := ctx.Value(voiceSpeechKey{}).(func(string))
+	return speech
+}
