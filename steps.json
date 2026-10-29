@@ -510,7 +510,8 @@
         "Real prediction data: 7 hashtag.suggest attempts scored (5 legacy path, 2 task path), 0 resolved over 5 days; Brier and skill not computable; feedback coverage 0/7.",
         "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets.",
         "2026-10-26: source diagnosis found ordinary reading remains read -> ingest -> classify; generic consolidation 09.3 is pending and cognitive inference remains experimental. Owner selected understanding/application across documents and confirmed Feeds as external Knowledge integration. The original evaluations remain historical, scoped evidence.",
-        "2026-10-29: reviewed design-system-patterns and ui-ux-pro-max against current desktop CSS/components, the conversation archive plan, ADR 0011 and the Cindy source study. Targeted local UX matches cover visible focus, linked form errors and stable/efficient history lists. Added pending steps 09.6-09.9 and delegation evaluation 10.5; active 08.2, gate 08.3 and historical implementation evidence remain intact. Planning evidence only; no visual/runtime acceptance is claimed."
+        "2026-10-29: reviewed design-system-patterns and ui-ux-pro-max against current desktop CSS/components, the conversation archive plan, ADR 0011 and the Cindy source study. Targeted local UX matches cover visible focus, linked form errors and stable/efficient history lists. Added pending steps 09.6-09.9 and delegation evaluation 10.5; active 08.2, gate 08.3 and historical implementation evidence remain intact. Planning evidence only; no visual/runtime acceptance is claimed.",
+        "2026-10-29 owner correction: prioritize architectural findings from Cindy beyond UI. Reviewed conversation/send archive semantics, fresh per-invocation task/attempt IDs, inference ports and stream outcomes. Added pending 10.6 backend foundations; changed phase 10 to depend on cognitive evaluation 08, made 09.8 consume 10.6 and removed its prerequisite from 10.5. Final deployment 11 still waits for both adoption 09 and backend 10. Planning/source evidence only."
       ],
       "checks": [
         {
@@ -543,7 +544,8 @@
         "dokja_docs/decisions/0005-knowledge-experience-content.md",
         "dokja_docs/decisions/0006-reading-macro-component.md",
         "dokja_docs/model-assisted-cognition-follow-up.md",
-        "dokja_docs/design-system-refactoring-review.md"
+        "dokja_docs/design-system-refactoring-review.md",
+        "dokja_docs/session-task-architecture-review.md"
       ],
       "substeps": [
         {
@@ -1325,7 +1327,8 @@
           "status": "pending",
           "depends_on": [
             "09.5",
-            "09.7"
+            "09.7",
+            "10.6"
           ],
           "resume_gate": "08.3",
           "deliverables": [
@@ -1347,9 +1350,10 @@
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
-            "dokja_docs/cindy-architecture-research.md"
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "After history and component foundations, inventory observable backend states and define projection/compatibility fixtures before adding controls."
+          "next_action": "Consume the backend lifecycle/progress/control contracts from 10.6 together with 09.5 history and 09.7 components. UI projections do not define task authority, dispatch semantics or terminal truth."
         },
         {
           "id": "09.9",
@@ -1383,7 +1387,8 @@
       ],
       "references": [
         "dokja_docs/feeds-content-plugins.md",
-        "dokja_docs/design-system-refactoring-review.md"
+        "dokja_docs/design-system-refactoring-review.md",
+        "dokja_docs/session-task-architecture-review.md"
       ],
       "status_before_review": "in_progress",
       "rescheduled_on": "2026-10-26",
@@ -1396,13 +1401,14 @@
       "title": "Define and implement required durable execution and state ownership",
       "status": "pending",
       "depends_on": [
-        "09"
+        "08"
       ],
       "deliverables": [
         "State ownership and migration decisions",
         "Durable acceptance and recovery for selected workflows",
         "Workload-driven cognitive storage comparison and evidence-backed engine decision (ADR 0009)",
-        "Bounded domain-owned delegation evaluation with an explicit no-adoption outcome (10.5)"
+        "Bounded domain-owned delegation evaluation with an explicit no-adoption outcome (10.5)",
+        "Client-independent application lifecycle, input dispatch and result settlement contracts (10.6)"
       ],
       "acceptance_criteria": [
         "Each durable state kind has an owner, migration path, and rollback strategy.",
@@ -1549,7 +1555,8 @@
             "Trace every answering provider/model and consumed evidence/state revision; stale, malformed, unavailable and late results cannot silently mutate task state.",
             "Provider inference cannot directly write memory, control the workflow or execute external actions.",
             "Run adapter contract tests and repeat causal evidence, observed-outcome reuse and no-memory controls before claiming successful integration.",
-            "Expose bounded capability/progress provenance suitable for operator projections. Distinguish provider availability, supported operation and observed runtime state; absence of cancellation or same-turn steering must remain explicit. UI controls cannot grant provider-owned workflow authority."
+            "Expose bounded capability/progress provenance suitable for operator projections. Distinguish provider availability, supported operation and observed runtime state; absence of cancellation or same-turn steering must remain explicit. UI controls cannot grant provider-owned workflow authority.",
+            "Normalize bounded capability and execution observations at infrastructure/domain ports before client projection. Preserve application task/attempt identity, current revision and cumulative budgets across adapter changes without exposing provider-native workflow control."
           ],
           "evidence": [
             "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration.",
@@ -1564,7 +1571,8 @@
             "dokja_docs/decisions/0011-inference-provider-boundaries.md",
             "dokja_docs/model-assisted-cognition-experiment.md",
             "dokja_docs/model-assisted-cognition-follow-up.md",
-            "dokja_docs/design-system-refactoring-review.md"
+            "dokja_docs/design-system-refactoring-review.md",
+            "dokja_docs/session-task-architecture-review.md"
           ],
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
@@ -1657,7 +1665,7 @@
           "status": "pending",
           "depends_on": [
             "10.3",
-            "09.8"
+            "10.6"
           ],
           "resume_gate": "08.3",
           "deliverables": [
@@ -1678,9 +1686,87 @@
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
-            "dokja_docs/cindy-architecture-research.md"
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "After inference integration and task projection, define a bounded workload and deterministic-worker controls before considering runtime integration."
+          "next_action": "After 08.3, use 10.3 inference integration and 10.6 lifecycle/dispatch/settlement contracts to evaluate deterministic delegated tasks against a single-task baseline. No UI or team-panel implementation is a prerequisite."
+        },
+        {
+          "id": "10.6",
+          "title": "Define application task identity, dispatch and result settlement contracts",
+          "status": "pending",
+          "depends_on": [
+            "08.3"
+          ],
+          "resume_gate": "08.3",
+          "deliverables": [
+            "Versioned relationship between conversation/send identity, application task, execution attempt, provider run and state revision",
+            "Bounded client-independent input admission, ordering and capability/result contracts",
+            "Application-port regression fixtures for stale/duplicate results, cancellation, scope, cumulative budgets and unknown-outcome recovery",
+            "dokja_docs/session-task-architecture-review.md"
+          ],
+          "acceptance_criteria": [
+            "Reuse existing conversation/archive and typed-workspace contracts. Define compatibility before changing the per-invocation RunTask IDs, public envelope, routes, schema or provider APIs; do not introduce another parallel transcript or task store by default.",
+            "Domains own lifecycle, authority and result acceptance. Orchestrator sequences ordered operations and enforces aggregate bounds; providers execute only requested capabilities and interfaces submit/render existing application operations.",
+            "Distinguish accepted, queued, dispatched, executing, awaiting input, ended, report delivered, result accepted and unknown using backend evidence. Normalized progress is bounded/correlated and independent of client/provider wire formats.",
+            "Serialize relevant transitions within a task while allowing independent tasks to progress. Retries, provider replacement and child tasks cannot reset aggregate budgets or create new permissions.",
+            "Correlate every input, attempt, report and side-effect observation with scope/current revision. Duplicate or late results cannot settle a newer attempt; cancellation/timeout does not prove process exit or side-effect failure.",
+            "Review durable state/ownership before choosing persistence and restart behavior. Unknown effects are not automatically replayed; report delivery and accepted completion remain separate.",
+            "Prove lifecycle, capability admission, unsupported operations, dispatch outcomes and recovery through domain/orchestrator/application-port tests before UI or provider-team integration. No mobile or remote-relay runtime is required."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [
+            "dokja_docs/session-task-architecture-review.md",
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/conversation-history-plan.md",
+            "dokja_docs/decisions/0011-inference-provider-boundaries.md"
+          ],
+          "batches": [
+            {
+              "id": "10.6-a",
+              "title": "Specify and verify stable identity and lifecycle compatibility",
+              "status": "pending",
+              "depends_on": [
+                "08.3"
+              ],
+              "deliverables": [
+                "Identity/lifecycle mapping over existing conversation sends and typed workflow attempts",
+                "Compatibility fixtures for retry, revision, terminal and unknown outcomes"
+              ],
+              "evidence": []
+            },
+            {
+              "id": "10.6-b",
+              "title": "Implement bounded input dispatch and capability admission through existing ports",
+              "status": "pending",
+              "depends_on": [
+                "10.6-a"
+              ],
+              "acceptance_criteria": [
+                "Explicit accepted/queued/dispatched outcomes and per-task ordering; independent tasks remain concurrent.",
+                "Unsupported capabilities refuse before effects; cancellation and same-turn steering remain separate capabilities.",
+                "Bounded normalized observations preserve source/attempt/revision provenance and aggregate limits."
+              ],
+              "evidence": []
+            },
+            {
+              "id": "10.6-c",
+              "title": "Validate result settlement and justified durable recovery",
+              "status": "pending",
+              "depends_on": [
+                "10.6-b"
+              ],
+              "acceptance_criteria": [
+                "Reject duplicate/late/foreign reports and distinguish execution end, delivery and accepted result.",
+                "Define required persistence, schema compatibility and restart ownership before storage changes.",
+                "Exercise crash/unknown-effect recovery without automatic replay, plus budget exhaustion and cancellation."
+              ],
+              "evidence": []
+            }
+          ],
+          "next_action": "After the cognitive evaluation gate, begin 10.6-a over existing conversation and task contracts, then implement backend dispatch/settlement before exposing new controls. Preserve 08.2 as the active work."
         }
       ],
       "status_before_review": "in_progress",
@@ -1688,14 +1774,17 @@
       "resume_gate": "08.3",
       "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate.",
       "references": [
-        "dokja_docs/design-system-refactoring-review.md"
-      ]
+        "dokja_docs/design-system-refactoring-review.md",
+        "dokja_docs/session-task-architecture-review.md"
+      ],
+      "next_action": "After 08/08.3, prioritize 10.6 lifecycle/dispatch/settlement and 10.3 provider integration. Then evaluate 10.5 delegation against a single-task baseline; UI 09.8 consumes backend contracts and is not a backend prerequisite."
     },
     {
       "id": "11",
       "title": "Review deployment boundaries and complete the migration",
       "status": "pending",
       "depends_on": [
+        "09",
         "10"
       ],
       "deliverables": [
@@ -1970,10 +2059,11 @@
       ],
       "priority_review": "Remaining architecture work follows reopened step 08; completed batches and historical checks remain unchanged. Independent operational fixes are outside this scheduling gate.",
       "references": [
-        "dokja_docs/design-system-refactoring-review.md"
+        "dokja_docs/design-system-refactoring-review.md",
+        "dokja_docs/session-task-architecture-review.md"
       ]
     }
   ],
   "next_step": null,
-  "next_action": "08.2: continue semantic/applicability review, frozen comparison execution and observed-outcome/episode contracts under dokja_docs/cognitive-realignment.md. Pending design-system/interface steps 09.6-09.9 and delegation evaluation 10.5 are recorded in dokja_docs/design-system-refactoring-review.md; they do not replace the active cognitive vertical."
+  "next_action": "08.2: continue semantic/applicability review, frozen comparison execution and observed-outcome contracts. After 08.3, prioritize 10.6 application lifecycle/dispatch/settlement and 10.3 inference integration; interface projections consume those contracts. See dokja_docs/session-task-architecture-review.md."
 }
