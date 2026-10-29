@@ -13,7 +13,7 @@ type Voice interface {
 }
 
 func VoiceAction(action string) bool {
-	return action == "synthesize-voice" || action == "transcribe-voice" || action == "detect-voice-wakeword"
+	return action == "synthesize-voice" || action == "transcribe-voice" || action == "detect-voice-wakeword" || action == "detect-voice-activity"
 }
 
 func ProcessVoice(ctx context.Context, voice Voice, action string, payload map[string]any) (map[string]any, error) {
@@ -37,7 +37,7 @@ func ProcessVoice(ctx context.Context, voice Voice, action string, payload map[s
 		}
 		request["text"], request["voice"], request["format"] = text, "default", "wav"
 		operation = "tts"
-	case "transcribe-voice", "detect-voice-wakeword":
+	case "transcribe-voice", "detect-voice-wakeword", "detect-voice-activity":
 		encoded, _ := payload["audio_bytes_b64"].(string)
 		if len(encoded) > 2800000 {
 			return nil, fmt.Errorf("voice segment is too large")
@@ -48,6 +48,12 @@ func ProcessVoice(ctx context.Context, voice Voice, action string, payload map[s
 		}
 		request["audio_bytes_b64"], request["audio_format"] = encoded, "wav"
 		operation = "stt"
+		if action == "detect-voice-activity" {
+			if len(data) > 123000 {
+				return nil, fmt.Errorf("voice activity probe is too large")
+			}
+			operation = "activity"
+		}
 		if action == "detect-voice-wakeword" {
 			operation = "wakeword"
 			request["hotword"] = "Ningo"

@@ -11,6 +11,9 @@ COPY dokja_services/dokja_voice /app
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir fastapi uvicorn
 
+COPY dokja_services/dokja_voice/requirements-vad.txt /tmp/dokja_voice_vad_requirements.txt
+RUN pip install --no-cache-dir -r /tmp/dokja_voice_vad_requirements.txt
+
 EXPOSE 8081
 
 CMD ["python", "main.py"]

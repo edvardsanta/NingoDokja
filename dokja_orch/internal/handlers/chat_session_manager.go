@@ -112,7 +112,7 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	plan := chat.PlanContext(state.summary, state.messages, m.maxMsgs, exists && now.Sub(state.lastSeenAt) > m.timeout)
 	if now.Before(state.compactionRetryAt) {
 		lifecycle.CompactionFallback = "retry_cooldown"
-	} else if len(plan.Older) > 0 {
+	} else if len(plan.Older) > 0 && summarize != nil {
 		summary, err := summarize(ctx, plan)
 		// Caller cancellation remains terminal even if the summary provider ignores it.
 		if ctx.Err() != nil {
@@ -136,6 +136,9 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 			lifecycle.Compacted = true
 		}
 	}
+	if _, voice := event.Context["voice_turns"]; voice && summarize == nil {
+		state.messages = chat.BoundedVoiceHistory(state.messages)
+	}
 	state.lastSeenAt = now
 	state.messages = append(state.messages, chatMessage{Role: "user", Content: strings.TrimSpace(content)})
 	if err := m.persist(ctx, baseKey, state); err != nil {
@@ -146,7 +149,7 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 	m.mu.Unlock()
 	lifecycle.SessionID = state.id
 	history := cloneMessages(state.messages)
-	if lifecycle.CompactionFallback != "" {
+	if lifecycle.CompactionFallback != "" || (summarize == nil && len(history) > m.maxMsgs) {
 		// Keep all raw turns in the checkpoint; only the inference projection is reduced.
 		recent, omitted := chat.RecoveryContext(state.messages[:len(state.messages)-1], m.maxMsgs)
 		history = append(recent, state.messages[len(state.messages)-1])

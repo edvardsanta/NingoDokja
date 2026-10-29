@@ -37,6 +37,8 @@ type BridgeRequest struct {
 }
 
 type BridgePayload struct {
+	VoiceSessionID   string           `json:"voiceSessionId"`
+	VoiceStartedBy   string           `json:"voiceStartedBy"`
 	Voice            map[string]any   `json:"voice"`
 	VoiceTurns       []chat.VoiceTurn `json:"voiceTurns"`
 	VoiceChannelID   string           `json:"voiceChannelId"`
@@ -529,7 +531,7 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
-	case "voice.synthesize", "voice.transcribe", "voice.wakeword":
+	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":
 		return strings.TrimSpace(request.EventType), request.Payload.Voice
 	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended":
 		// What follows the command (words, a link, a volume) is read by the Communications

@@ -579,46 +579,80 @@ policy channel; the physical voice room is the conversation scope. Bot audio is
 ignored. A speaker change does not reset history, and only the last speaker's
 account can supply current-turn owner verification.
 
-Capture uses 600 ms of silence and an 80 ms room settling period. Long speech is
-transcribed in eight-second segments while capture continues. At most 16 human
-streams and two transcription requests run at once; queued segments and pending
-transcripts are bounded to 32 each. Capacity errors are logged. Transcripts are
-ordered by capture start, even when recognition finishes out of order. This
-keeps each speaker separate during overlapping speech; it does not make an
-unintelligible recording recoverable.
+Capture uses 600 ms of Discord silence and an 80 ms room settling period.
+WebRTC VAD checks 320 ms probes before allowing microphone activity to hold the
+floor. Speech is also checked before Whisper transcription. Quiet packets,
+isolated impulses and stationary noise are rejected by acoustic guards and VAD;
+VAD quality still needs verification with the actual room and microphones.
+A VAD silence boundary can end an utterance even when Discord continues sending
+background audio. Long speech is transcribed in eight-second segments. At most
+16 human streams and two transcription requests run at once; queued segments
+and pending transcripts are bounded to 32 each. Capacity errors are logged.
 
-Whisper normalizes Discord PCM to mono 16 kHz in memory, skips segments shorter
-than 250 ms and near-digital silence, and bounds deterministic decoding to
-12 tokens per second of audio (16–128 tokens). This prevents short non-speech
-segments consuming the full decoder context. STT runs outside the HTTP event
-loop and serializes access to the shared model. Inspect `dokja_voice.stt` logs
-for audio duration, elapsed time, text length and the token bound; speech text
-is not logged. The existing 15-second client deadline remains unchanged.
+The Chat domain records incidental speech without generating replies or running
+model summaries. Starting `/voice_chat_start` opens the exchange for the person who invoked it,
+so an immediate `teste` works without a second wake phrase. Calling `Ningo` or
+`Dokja` opens or reopens a conversational exchange.
+The addressed speaker can follow up without repeating the name for 30 seconds;
+that window includes estimated playback duration. Another participant can join
+with a clear question or continuation during a 12-second handoff window.
+Acknowledgments such as `uhum`, `ok` and `sim` remain context and do not invoke
+inference or extend engagement. The engagement window is transient; after a
+restart, address Ningo again. This eligibility grants no account authority.
 
-A new voice turn interrupts playback and aborts pending synthesis/reply work.
-The authenticated `/orchestrator/voice/chat/stream` endpoint sends keepalives
-while inference runs so a disconnected requester cancels its inference context
-and releases the shared session lock. Only the validated final CLI reply is
-spoken. This is continuous group listening with speech-turn responses, not a
-native audio-to-audio streaming model. CLI timeout, network and model latency
-still affect response time; no subsecond end-to-end guarantee is established.
+Ningo finishes each spoken reply while continuing to capture human speech.
+Speech heard during generation or playback is combined into the next room turn.
+It does not pause playback, cancel inference, or start overlapping replies.
+`/voice_chat_stop`, explicit session shutdown and transport loss still cancel
+outstanding work. The default spoken answer is one sentence, capped at 45 words;
+explicit requests for detail allow a longer explanation. A long explanation is
+synthesized sentence by sentence with one sentence prepared ahead, so the first
+can play before synthesis of the whole answer finishes.
+
+Only accepted reply text becomes audio. The current CLI adapters expose previews
+that are not validated speech segments, so they still wait for the final reply.
+No token-level speech streaming or subsecond end-to-end guarantee is established.
+The authenticated `/orchestrator/voice/chat/stream` endpoint sends keepalives and
+an optional `accepted` eligibility frame, then the final reply. The gateway
+sends a bounded listener ID and starter identity; repeated metadata for the same
+listener cannot refresh an expired window. Starter identity affects eligibility
+only, never current-speaker verification or permissions. A disconnected
+requester cancels its inference context and releases the room session lock.
+
+The room retains up to 128 recent messages within a bounded checkpoint, with a
+128 KiB bound on older retained messages. Inference uses the existing configured
+recent-context projection (20 messages by default), plus any previous summary;
+older omitted context is identified explicitly. Live voice does not wait for a
+model-generated summary. This keeps incidental listening and context maintenance
+off the reply-generation path while keeping recent participant context.
+
+Whisper normalizes PCM to mono 16 kHz, rejects segments shorter than 250 ms and
+near-digital silence, and requires WebRTC speech activity before decoding. It
+bounds deterministic decoding to 12 tokens per second of audio (16–128 tokens).
+STT runs outside the HTTP event loop and serializes the shared model. Inspect
+`dokja_voice.stt` logs for audio duration, elapsed time, text length and token
+bounds; speech text is not logged. The 15-second transcription deadline is
+unchanged. Activity probes have a separate 1.5-second adapter deadline.
 
 Speech requests follow Interface → Event → Orchestrator → Communications domain
-→ Voice service. The existing authenticated bridge gains optional `voice`
-request/response data for `voice.synthesize`, `.transcribe` and
-`.wakeword`. `DOKJA_VOICE_HTTP_ENDPOINT` now also configures the orchestrator's
-speech client; its default is the internal voice service on port 8081. Deploy the
-orchestrator and Discord adapter together. The production stack needs a reachable
-voice service configured before enabling voice commands; this change does not
-add that optional service to production. Roll back both components together.
+→ Voice service. The authenticated bridge accepts optional `voice` data for
+`voice.synthesize`, `.transcribe`, `.wakeword` and `.activity`; the Voice service
+adds `/activity` for bounded speech probes. Rebuild the Voice image to install
+`requirements-vad.txt`, then restart Voice, the orchestrator and Discord together.
+Both Voice Dockerfiles install the pinned VAD dependency. The orchestrator uses
+`DOKJA_VOICE_HTTP_ENDPOINT`, defaulting to the internal Voice service on port 8081.
+The production stack needs a reachable Voice service before enabling voice
+commands. Roll back the three components together. Existing envelopes, routes,
+commands, schemas, ports and volumes retain their contracts.
 
-Verify with two human accounts speaking in the same voice room: start once,
-confirm both speakers appear in the conversation, overlap a short exchange,
-interrupt a pending/spoken reply, then stop while transcription is running.
-No later speech should play after stop. Check a second room has independent
-history and that another participant using the owner's nickname gains no owner
-status. These Discord microphone and playback checks require a live call;
-synthetic transport tests do not establish them.
+Verify with two human accounts: start once, have an incidental exchange, call
+Ningo, follow up without repeating his name, and say `uhum` while he answers.
+He should finish, retain speech heard meanwhile and address the next turn only
+afterward. Try keyboard noise while he speaks; it must not cancel playback or
+create a model reply. Finally stop while transcription or playback is running;
+no later audio should play. Repeat in another room to verify isolated context.
+These microphone and playback checks require a live Discord call; synthetic
+transport tests and generated speech do not establish them.
 
 Wake-word mode is separate: it requires an installed detector and a matching
 trained model. `/voice_chat_start` does not use the wake-word provider. To restore

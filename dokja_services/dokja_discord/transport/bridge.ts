@@ -6,6 +6,8 @@ export type BridgeRequest = {
     voice?: Record<string, unknown>;
     voiceTurns?: Array<{ userId: string; userName?: string; text: string }>;
     voiceChannelId?: string;
+    voiceSessionId?: string;
+    voiceStartedBy?: string;
     content?: string;
     replyToContent?: string;
     mentionedUserIds?: string[];

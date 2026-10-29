@@ -28,10 +28,11 @@ type ChatStreamingGenerator interface {
 }
 
 type ChatDomainHandler struct {
-	generator ChatGenerator
-	reading   func(context.Context, string) (digestdomain.Reference, error)
-	recent    func(context.Context, string, int) ([]digestdomain.Reference, error)
-	sessions  *chatSessionManager
+	generator   ChatGenerator
+	reading     func(context.Context, string) (digestdomain.Reference, error)
+	recent      func(context.Context, string, int) ([]digestdomain.Reference, error)
+	sessions    *chatSessionManager
+	voicePolicy *chat.VoicePolicy
 
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
@@ -40,8 +41,9 @@ type ChatDomainHandler struct {
 
 func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
 	return &ChatDomainHandler{
-		generator: generator,
-		sessions:  newChatSessionManager(),
+		generator:   generator,
+		sessions:    newChatSessionManager(),
+		voicePolicy: chat.NewVoicePolicy(),
 	}
 }
 
@@ -83,11 +85,39 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 			event.Context["session_key"] = fmt.Sprintf("desktop:%s:%s:%s", event.User.ID, event.Channel.ID, id)
 		}
 	}
+	voiceDecision := chat.VoiceDecision{Respond: true}
+	voiceTurns, voice := event.Context["voice_turns"].([]chat.VoiceTurn)
+	if voice {
+		if _, err := chat.VoiceTranscript(chatSessionBaseKey(event), voiceTurns); err != nil {
+			return nil, err
+		}
+		listenerID, _ := event.Context["voice_session_id"].(string)
+		starter, _ := event.Context["voice_started_by"].(string)
+		opened := h.voicePolicy.OpenListener(chatSessionBaseKey(event), listenerID, starter)
+		voiceDecision = h.voicePolicy.Decide(chatSessionBaseKey(event), voiceTurns)
+		logger.Info(fmt.Sprintf("voice eligibility event_id=%s respond=%t reason=%s listener_opened=%t turns=%d", event.EventID, voiceDecision.Respond, voiceDecision.Reason, opened, len(voiceTurns)))
+		event.Context = cloneChatContext(event.Context)
+		event.Context["voice_detailed"] = voiceDecision.Detailed
+		// Eligibility is reported without acquiring the history lock. Passive
+		// context never starts inference; playback remains owned by the adapter.
+		core.ReportVoiceDecision(ctx, voiceDecision.Respond)
+	}
 	unlock, err := h.sessions.LockTurn(ctx, event)
 	if err != nil {
 		return nil, err
 	}
 	defer unlock()
+	if voice && !voiceDecision.Respond {
+		content, err := chat.VoiceTranscript(chatSessionBaseKey(event), voiceTurns)
+		if err != nil {
+			return nil, err
+		}
+		_, _, err = h.sessions.BeginTurn(ctx, event, content, nil)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"reply": "", "voice_observed": true}, nil
+	}
 	reference, anchor, err := h.readingReference(ctx, event)
 	if err != nil {
 		return nil, err
@@ -112,7 +142,11 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		}
 		turnContent = chat.ParticipantMessage(scope, event.User.ID, name, turnContent)
 	}
-	lifecycle, history, err := h.sessions.BeginTurn(ctx, event, turnContent, h.summarizeContext)
+	summarize := h.summarizeContext
+	if voice {
+		summarize = nil
+	}
+	lifecycle, history, err := h.sessions.BeginTurn(ctx, event, turnContent, summarize)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +169,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 	rawReply := chatReplyFromResult(result)
 	if _, voice := event.Context["voice_turns"]; voice {
-		rawReply = chat.SpokenReply(rawReply)
+		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision.Detailed)
+		h.voicePolicy.CompleteReply(chatSessionBaseKey(event), voiceDecision, rawReply)
 	}
 	if err := h.sessions.CompleteTurn(ctx, event, rawReply); err != nil {
 		return nil, err

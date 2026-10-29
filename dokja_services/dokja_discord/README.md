@@ -125,18 +125,25 @@ Response body:
 
 ## Live group voice
 
-Join a server voice channel and run `/voice_chat_start` once. Ningo listens to all
-human participants in that room, keeps speaker attribution and shared room
-history, and gives brief spoken replies after people pause. New human speech
-interrupts playback and cancels a pending reply. `/voice_chat_stop` stops the
-room listener and outstanding work. Bots are ignored; speech from different
-people is decoded separately rather than mixed into a single recording.
+Join a server voice channel and run `/voice_chat_start` once. Ningo listens to
+all human participants, retaining their attribution and recent room context.
+Starting the command opens your exchange immediately, so you can say `teste`.
+Call `Ningo` or `Dokja` to reopen it after a pause; follow-ups need no name for
+30 seconds after estimated playback. Other participants can join with a clear
+question or continuation during a short handoff window. Incidental conversation
+and acknowledgments are stored without model replies.
 
-Recognition runs incrementally for long speech, with final replies after a
-600 ms pause and a short room settling period. This is a speech-turn pipeline,
-not native audio-to-audio inference. CLI/model latency remains part of response
-time. Piper and Whisper must be configured with real models; stub providers
-produce test audio/transcripts. Speech requests now go through the orchestrator,
-which uses `DOKJA_VOICE_HTTP_ENDPOINT` to reach the Voice service. Deploy the
-orchestrator and Discord adapter together. See the production runbook for
-configuration, limits and live verification.
+Ningo finishes speaking while continuing to listen. Speech heard during an answer
+is combined into the next turn; it never cuts off the current answer. Spoken
+replies default to one short sentence. Ask for detail to get a longer explanation,
+which plays sentence by sentence with the next sentence prepared ahead.
+`/voice_chat_stop` cancels playback and outstanding work.
+
+WebRTC VAD checks short activity probes and gates Whisper transcription; acoustic
+guards reject quiet packets and isolated impulses. Bots are ignored. Rebuild the
+Voice image and restart Voice, the orchestrator and Discord together for this
+version. Speech requests go through the authenticated orchestrator bridge.
+
+The current CLI path supplies a validated final reply, rather than trusted
+partial speech segments. Model latency remains part of response time. See the
+production runbook for configuration, limits and live verification.

@@ -25,6 +25,10 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 	if _, err := chat.VoiceTranscript(request.Payload.VoiceChannelID, request.Payload.VoiceTurns); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{Status: "error", Error: err.Error()})
 	}
+	listenerID, starter := strings.TrimSpace(request.Payload.VoiceSessionID), strings.TrimSpace(request.Payload.VoiceStartedBy)
+	if (listenerID == "") != (starter == "") || len(listenerID) > 100 || len(starter) > 100 {
+		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{Status: "error", Error: "invalid voice listener"})
+	}
 	last := request.Payload.VoiceTurns[len(request.Payload.VoiceTurns)-1]
 	request.Payload.UserID, request.Payload.UserName, request.Payload.Content = last.UserID, last.UserName, last.Text
 	event := bridgeEventFromRequest(request)
@@ -33,6 +37,8 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 	transcript, _ := chat.VoiceTranscript(request.Payload.VoiceChannelID, request.Payload.VoiceTurns)
 	event.Payload = map[string]any{"content": transcript}
 	event.Context["content"] = transcript
+	event.Context["voice_session_id"] = listenerID
+	event.Context["voice_started_by"] = starter
 	event.Context["owner_configured"] = i.discordOwnerID != ""
 	event.Context["is_owner"] = i.discordOwnerID != "" && last.UserID == i.discordOwnerID
 	c.Set("Content-Type", "application/x-ndjson")
@@ -43,6 +49,13 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 			result core.ProcessResult
 			err    error
 		}
+		decisions := make(chan bool, 1)
+		ctx = core.WithVoiceDecision(ctx, func(respond bool) {
+			select {
+			case decisions <- respond:
+			case <-ctx.Done():
+			}
+		})
 		completed := make(chan completion, 1)
 		go func() { result, err := i.service.ProcessWithResult(ctx, event); completed <- completion{result, err} }()
 		tick := time.NewTicker(100 * time.Millisecond)
@@ -65,7 +78,18 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 				if !write(map[string]bool{"heartbeat": true}) {
 					return
 				}
+			case respond := <-decisions:
+				if !write(map[string]bool{"accepted": respond}) {
+					return
+				}
 			case reply := <-completed:
+				select {
+				case respond := <-decisions:
+					if !write(map[string]bool{"accepted": respond}) {
+						return
+					}
+				default:
+				}
 				if reply.err != nil {
 					write(BridgeResponse{Status: "error", Error: "voice reply failed"})
 					return
