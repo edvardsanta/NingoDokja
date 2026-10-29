@@ -1249,3 +1249,33 @@ bash scripts/test_discord_startup.sh dokja-discord-startup-test
 The check uses a fresh disposable project, loads TypeScript and voice dependencies,
 checks lockfile preservation, and rejects a changed manifest before gateway startup.
 It does not recreate application services or test live Discord connectivity.
+
+
+## Realtime conversation observer (development slice)
+
+The additive `/conversation_start`, `/conversation_join`, `/conversation_leave`
+and `/conversation_stop` commands use the existing Discord voice connection and
+speech providers. Start consents only the caller. Other participants must join
+explicitly from the original text channel while in the same voice channel. The
+public start response announces transcription and withdrawal controls. No raw
+audio is retained by the observer. Do not enable it for participants who have
+not been informed and opted in. The legacy voice-chat commands retain their
+previous behavior and do not inherit these new observer consent guarantees.
+
+Dokja Desktop's Realtime workspace uses `realtime.snapshot` through its existing
+read-only shell allowlist. It shows segment-final transcripts with a one-second
+polling interval; partial hypotheses and semantic threads are not implemented in
+this slice. The journal is bounded and process-local, expires after 15 minutes
+of inactivity, and is deleted on stop. A failed stop/deletion request can leave
+a temporary snapshot until its expiry. No PostgreSQL schema, additional service,
+port, volume or environment variable is introduced. Existing speech settings in
+`.env.example` select the real providers; no new example secrets are needed.
+
+See [observer operations and limits](realtime-conversation/README.md) and
+[architecture contracts](realtime-conversation/architecture.md). Rebuild the
+Discord command registry and Desktop before using the new UI. The observer route
+must be present on the orchestrator before the adapter starts capture: only an
+explicit `realtime.accepted` acknowledgment enables consent locally. A skipped
+inbound request or an older server without this result fails closed. An
+orchestrator restart loses all ephemeral journals and requires a new observer
+session and fresh consent. No automatic production rollout is performed.

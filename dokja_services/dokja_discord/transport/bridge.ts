@@ -3,6 +3,7 @@ import type { DiscordAttachment } from "../types.js";
 export type BridgeRequest = {
   event_type: string;
   payload: {
+    realtime?: Record<string, unknown>;
     voice?: Record<string, unknown>;
     voiceTurns?: Array<{ userId: string; userName?: string; text: string }>;
     voiceChannelId?: string;
@@ -40,6 +41,7 @@ type BridgeResponse = {
   attachments?: unknown;
   // a server's queue, after a music command
   music?: unknown;
+  realtime?: { accepted?: boolean };
 };
 
 export type OrchestratorReply = {
@@ -47,6 +49,7 @@ export type OrchestratorReply = {
   notice?: string;
   attachments?: DiscordAttachment[];
   music?: unknown;
+  realtime?: { accepted?: boolean };
 };
 
 export async function dispatchToOrchestrator(
@@ -122,6 +125,7 @@ export async function dispatchToOrchestratorResponse(
       notice: payload.notice,
       ...(attachments.length ? { attachments } : {}),
       ...(payload.music !== undefined ? { music: payload.music } : {}),
+      ...(payload.realtime?.accepted === true ? { realtime: {accepted: true} } : {}),
     };
   } catch (error) {
     console.error(

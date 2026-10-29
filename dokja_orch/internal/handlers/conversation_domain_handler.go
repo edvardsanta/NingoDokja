@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
@@ -15,7 +16,8 @@ import (
 // from the payload, so only the owner's interfaces reach the archive. Sending a turn is the chat
 // handler's, which records it here.
 type ConversationDomainHandler struct {
-	archive *conversation.Archive
+	archive  *conversation.Archive
+	realtime *conversation.ConversationContextEngine
 }
 
 func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDomainHandler {
@@ -27,6 +29,9 @@ func (h *ConversationDomainHandler) Domain() core.Domain {
 }
 
 func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event, _ core.WorkflowStep) (map[string]any, error) {
+	if h != nil && strings.HasPrefix(event.Type, "realtime.") {
+		return h.realtimeHandle(ctx, event)
+	}
 	if h == nil || h.archive == nil {
 		return nil, fmt.Errorf("the conversation archive is unavailable")
 	}

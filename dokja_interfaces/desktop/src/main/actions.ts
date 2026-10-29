@@ -1,3 +1,4 @@
+import { observerSnapshot } from "../shared/realtime.js";
 import { createHash } from "node:crypto";
 import { runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
@@ -615,6 +616,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "memory.list": { payload: memoryListPayload, project: (result) => inDomain(result, "memory", memoryPage) },
   "memory.resolve": { payload: memoryResolvePayload, project: (result) => inDomain(result, "memory", memoryResolution) },
   "memory.get": { payload: memoryGetPayload, project: (result) => inDomain(result, "memory", memoryDetail) },
+  "realtime.snapshot": {payload:noPayload,project:result=>inDomain(result,"conversation",observerSnapshot)},
   "knowledge.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "knowledge", knowledgeStatus),

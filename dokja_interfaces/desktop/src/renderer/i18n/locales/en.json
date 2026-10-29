@@ -518,5 +518,18 @@
   "communications_other_channels": "Other channels",
   "communications_collapse_group": "Collapse {name}",
   "communications_expand_group": "Expand {name}",
-  "communications_servers_unavailable": "Ningo cannot read {count} of the configured servers."
+  "communications_servers_unavailable": "Ningo cannot read {count} of the configured servers.",
+  "nav_realtime": "Realtime",
+  "realtime_intro": "Live observer",
+  "realtime_hint": "Start /conversation_start in Discord. Each speaker opts in with /conversation_join. Ningo stays silent.",
+  "realtime_limits": "Segment-final transcription · 1 second refresh · Ephemeral history · Topic associations pending",
+  "realtime_empty": "No consenting observer sessions are active.",
+  "realtime_session": "Voice session {number}",
+  "realtime_speaker": "Participant {number}",
+  "realtime_messages": "Transcript",
+  "realtime_no_messages": "Waiting for consenting speakers.",
+  "realtime_pending": "Semantic associations are unresolved; chronological order is preserved.",
+  "realtime_connected": "Observer connected",
+  "realtime_disconnected": "Observer unavailable",
+  "realtime_select": "Select a voice session"
 }

@@ -41,6 +41,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     cfg.mode === "voice"
       ? allCommands.filter(
           (entry) =>
+            entry.name.startsWith("conversation_") ||
             entry.name === "speak" ||
             entry.name === "voice_chat_start" ||
             entry.name === "wake_chat" ||

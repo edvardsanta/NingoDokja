@@ -1,3 +1,4 @@
+import { RealtimeCard } from "./realtime.js";
 import type { ComponentType } from "react";
 
 import type { Transport } from "../../shared/transport.js";
@@ -27,6 +28,7 @@ export type CardEntry = {
 // so the sources it reads are a view of the Library rather than a workspace of their own.
 export const CARDS: readonly CardEntry[] = [
   { kind: "assistant", labelId: "nav_assistant", Card: AssistantCard, services: ["chat"] },
+  { kind:"realtime",labelId:"nav_realtime",Card:RealtimeCard,services:["discord","voice"] },
   { kind: "knowledge", labelId: "nav_library", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
   { kind: "memory", labelId: "nav_notebook", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },

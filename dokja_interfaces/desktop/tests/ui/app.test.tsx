@@ -49,6 +49,7 @@ describe("the screen", () => {
     expect(screen.getByRole("tablist", { name: "Áreas de trabalho" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Conversa",
+      "Tempo real",
       "Biblioteca",
       "Caderno",
       "Mensagens",

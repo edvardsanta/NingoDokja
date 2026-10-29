@@ -12,6 +12,13 @@ Bring a document, a question or an argument. Dokja can help you investigate it,
 find relevant passages, or join the conversation. Agreement is earned.
 Expect help, questions and the occasional unnecessary flourish.
 
+## Realtime conversation
+
+The [Realtime Conversation observer](dokja_docs/realtime-conversation/README.md)
+connects consenting Discord voice participants to a live transcript view inside
+Dokja Desktop. Its first slice is silent and temporary; streaming partials,
+semantic threads and persistent contextual memory have explicit follow-up gates.
+
 ## A reader with a personality problem
 
 The project started with a practical question: what if a tool could help us make
