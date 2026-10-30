@@ -121,7 +121,8 @@ export function createMusic(params: {
   };
 
   const run = async (guildId: string, userId: string, channelId: string, eventType: string, content: string) => {
-    lastCommand.set(guildId, { channelId, userId });
+    // Asking for one's own songs is no music command: the panel stays where it is.
+    if (eventType !== "music.history") lastCommand.set(guildId, { channelId, userId });
     const reply = await dispatch(eventType, { content, userId, channelId, guildId });
     const text = musicReplyText(locale, eventType, reply.music, reply.reply);
     try {
@@ -139,6 +140,7 @@ export function createMusic(params: {
     options: any[] = [],
     content: (context: DiscordCommandContext) => string = () => "",
     needsVoice = true,
+    ephemeral = false,
   ): DiscordSlashCommand => ({
     name,
     description,
@@ -151,7 +153,7 @@ export function createMusic(params: {
       }
       // Answer at once: Discord drops a command not answered within three seconds, and a search
       // can take longer.
-      await context.reply(say(locale, eventType === "music.play" ? "looking" : "moment"));
+      await context.reply(say(locale, eventType === "music.play" ? "looking" : "moment"), ephemeral ? { ephemeral: true } : undefined);
       try {
         const refused = await refusal(context.guildId, context.userId, eventType, needsVoice);
         if (refused) {
@@ -199,6 +201,8 @@ export function createMusic(params: {
       command("resume", "Resume the music.", "music.resume"),
       command("stop", "Stop the music and empty the queue.", "music.stop"),
       command("queue", "Show the song playing and the ones waiting.", "music.queue", [], () => "", false),
+      // One person's songs, seen by that person only.
+      command("history", "Show the songs you asked for and how they ended.", "music.history", [], () => "", false, true),
       command("volume", "Set the music volume, from 0 to 100.", "music.volume", [
         { name: "percent", description: "0 to 100", type: ApplicationCommandOptionType.Integer, required: true, min_value: 0, max_value: 100 },
       ], (context) => String(context.getNumber("percent") ?? "")),

@@ -28,7 +28,7 @@ Current capabilities:
 
 ## Music
 
-`/play song:<words or a link>`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue` and
+`/play song:<words or a link>`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue`, `/history` and
 `/volume percent:<0-100>` send `music.*` events through the bridge, from the channel they were
 typed in, so the server and allowed-channel checks apply. The orchestrator keeps the queue; every
 music reply carries it (`music` in the bridge response, with an `epoch` and a `version`), and the
@@ -56,6 +56,8 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
   Stop and volume −10/+10 buttons. It is edited as the queue changes, never posted again for the
   same queue, and loses its buttons when the queue ends. Buttons follow the commands' rule and
   answer only the person who pressed.
+- **`/history`** shows a person the last songs they asked for and how each ended, only to them.
+  Each song is kept in Memory for the person who asked for it, with no time limit.
 - **A remark on the song.** On about one song in three, from the first, the adapter's
   `music.comment` asks for one line in Ningo's voice, written in `DOKJA_DISCORD_LOCALE`. It joins
   the panel a moment later, if that song is still playing. Nothing waits for it: a slow or failed
