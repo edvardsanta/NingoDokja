@@ -280,3 +280,29 @@ test("an answer that comes at once never shows typing, so a switched-off interfa
 
   assert.deepEqual(typing, []);
 });
+
+test("in an allowed group the owner calls the bot with Ningo, or /ningo, and nothing else they write is answered", async () => {
+  const { handler, dispatched, group } = setup();
+  const own = (text: string, messageId: string, overrides: Partial<WhatsAppMessageContext> = {}) =>
+    group({ text, messageId, fromMe: true, mentionsBot: false, senderId: `${owner}@s.whatsapp.net`, senderNumbers: [owner], ...overrides });
+
+  await handler(own("Ningo, what is justice?", "m1"));
+  await handler(own("  /NINGO   and power?", "m2"));
+  await handler(own("ningo,quick one", "m3"));
+  await handler(own("just chatting with friends", "m4"));
+  await handler(own("Ningo is great", "m5"));
+  await handler(own("/ningoX not a call", "m6"));
+  await handler(own("Ningo,", "m7"));
+  await handler(own("Ningo, in another group", "m8", { chatId: "120363000000000009@g.us" }));
+  await handler(own("Ningo, an echo of the bot", "m9", { sentByBot: true }));
+
+  assert.deepEqual(dispatched.map((request) => request.payload.content), ["what is justice?", "and power?", "quick one"]);
+  const allowed = group().chatId;
+  assert.ok(dispatched.every((request) => request.payload.mentionsBot === true && request.payload.channelId === allowed));
+});
+
+test("a member's message starting with the owner's word is still judged by its own mention", async () => {
+  const { handler, dispatched, group } = setup();
+  await handler(group({ text: "Ningo, hi", mentionsBot: false }));
+  assert.deepEqual(dispatched.map((request) => request.payload.mentionsBot), [false], "only the owner's own account uses the word");
+});

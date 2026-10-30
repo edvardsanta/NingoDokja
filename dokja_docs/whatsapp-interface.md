@@ -286,8 +286,13 @@ never deleted by the service.
 - A group message triggers an answer for **anyone** in the group who mentions the bot. There is no
   per-sender limit yet, so allow only groups you trust.
 - On a personal number the bot is you: what the account owner writes in a group is the owner's own
-  message and is ignored, so only other members can summon Ningo there. The owner talks to it in the
-  "message yourself" chat.
+  message and is ignored, so other members summon Ningo there by mentioning it. The owner cannot
+  mention their own account, so in an **allowed** group a message of the owner's that starts with
+  `Ningo,` or `/ningo` calls Ningo instead: the word is removed and the message counts as a mention.
+  Everything else the owner writes in a group stays ignored, and the reply still comes from the
+  owner's account, signed. Group turns are not kept in the owner's conversation archive, and the
+  owner is not recognized by name there. The owner's private conversation is the "message yourself"
+  chat.
 - The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
   archive and continues the conversation the desktop shows, so you can start on the phone and go on
   at the desktop, or the other way round. The phone continues the latest conversation; in the
