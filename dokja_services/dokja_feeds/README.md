@@ -153,6 +153,7 @@ here too.
 | `limits.timeout_ms`, `limits.output_bytes` | required: one run's time (1 s to 5 min) and output (at most 1 MiB) |
 
 A plugin that only extracts may print up to 16 MiB; one that also collects keeps 1 MiB.
+A post reader (`social.resolve.v1`) that does not collect may print up to 23 MiB.
 
 When more than one enabled plugin extracts the same format, none is chosen until one is bound
 explicitly; the order of directories never decides.

@@ -7,7 +7,7 @@ import (
 )
 
 const ActionReadLinkDelivery = "read-link-delivery"
-const MaxDeliveryMediaBytes = 8 << 20
+const MaxDeliveryMediaBytes = 16 << 20
 const MaxDeliveryTotalBytes = 16 << 20
 const MaxDeliveryMedia = 10
 
@@ -39,6 +39,9 @@ func (d *Domain) readLinkDelivery(ctx context.Context, payload map[string]any) (
 		reply, err := d.service.Dispatch(ctx, "feeds.invoke", map[string]any{"capability": SocialCapability, "action": "media", "plugin": reader, "input": map[string]any{"url": row["url"]}})
 		if err != nil {
 			return refused(RefusedUnavailable), nil
+		}
+		if reason, _ := reply["refused"].(string); reason == "media_too_large" {
+			return refused(reason), nil
 		}
 		encoded, _ := reply["data_b64"].(string)
 		mime, _ := reply["content_type"].(string)

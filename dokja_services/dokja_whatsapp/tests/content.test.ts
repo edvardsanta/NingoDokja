@@ -57,6 +57,10 @@ test("publication media is validated, sent with the original caption and signed"
 test("unsafe media and failed deliveries produce a localized failure",async()=>{
  assert.throws(()=>validatedReplyMedia([{filename:"x",content_type:"application/javascript",data_b64:"eA=="}]));
  assert.throws(()=>validatedReplyMedia([{filename:"x",content_type:"video/mp4",data_b64:"not base64"}]));
+ const file=(size:number)=>({filename:"x.mp4",content_type:"video/mp4",data_b64:Buffer.alloc(size).toString("base64")});
+ assert.equal(validatedReplyMedia([file(12*1024*1024)]).length,1);
+ assert.throws(()=>validatedReplyMedia([file(16*1024*1024+1)]));
+ assert.throws(()=>validatedReplyMedia([file(9*1024*1024),file(8*1024*1024)]));
  const replies:string[]=[];
  const handler=createWhatsAppMessageHandler(config,{dispatch:async()=>({reply:"caption",attachments:[{filename:"x",content_type:"video/mp4",data_b64:"eA=="}]})});
  await handler(context({text:"https://example.com/post",replyMedia:async()=>{throw new Error("private transport detail");},reply:async text=>replies.push(text)}));

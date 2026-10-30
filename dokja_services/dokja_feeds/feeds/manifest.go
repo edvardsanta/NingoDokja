@@ -358,6 +358,9 @@ func loadV1(dir, name string, raw []byte, limits Limits) (*Plugin, error) {
 	if seen[CapabilityMediaPerceive] && !seen[CapabilitySourceCollect] {
 		outputCeiling = 28 << 20
 	}
+	if seen[CapabilitySocialResolve] && !seen[CapabilitySourceCollect] {
+		outputCeiling = maxPostOutput
+	}
 	if m.Limits.OutputBytes <= 0 || m.Limits.OutputBytes > outputCeiling {
 		return nil, fmt.Errorf("limits.output_bytes must be between 1 and %d", outputCeiling)
 	}

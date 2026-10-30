@@ -8,5 +8,5 @@
   "enabled": false,
   "command": ["python3", "-I", "-B", "run.py"],
   "env": [],
-  "limits": {"timeout_ms": 120000, "output_bytes": 16777216}
+  "limits": {"timeout_ms": 120000, "output_bytes": 24117248}
 }

@@ -14,7 +14,7 @@ import socket
 import sys
 from urllib.parse import urlsplit
 
-MAX_MEDIA_BYTES = 8 << 20
+MAX_MEDIA_BYTES = 16 << 20
 ROOT = Path(__file__).resolve().parent
 MEDIA_PATH = re.compile(r"/media/[a-f0-9]{48}\.(?:jpg|png|webp|mp4)$")
 
@@ -50,8 +50,10 @@ def invoke(request, config):
         if response.status != 200 or content_type not in ("image/jpeg", "image/png", "image/webp", "video/mp4"):
             raise ValueError("media unavailable or unsupported")
         data = response.read(MAX_MEDIA_BYTES + 1)
-        if not data or len(data) > MAX_MEDIA_BYTES:
-            raise ValueError("media is empty or too large")
+        if not data:
+            raise ValueError("media is empty")
+        if len(data) > MAX_MEDIA_BYTES:
+            return {"refused": "media_too_large"}
         return {"content_type": content_type, "data_b64": base64.b64encode(data).decode("ascii")}
     finally:
         connection.close()
