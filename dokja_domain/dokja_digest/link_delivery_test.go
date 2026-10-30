@@ -10,6 +10,7 @@ import (
 type deliveryReader struct {
 	data, mime string
 	fail       bool
+	refused    string
 	asked      []string
 	media      []any
 }
@@ -28,6 +29,9 @@ func (r *deliveryReader) Dispatch(_ context.Context, event string, payload map[s
 	}
 	if r.fail {
 		return nil, errors.New("media unavailable")
+	}
+	if r.refused != "" {
+		return map[string]any{"refused": r.refused}, nil
 	}
 	return map[string]any{"data_b64": r.data, "content_type": r.mime}, nil
 }
@@ -52,6 +56,31 @@ func TestPostDeliveryRefusesInvalidOrUnavailableMedia(t *testing.T) {
 			reply, err := New(reader).Handle(context.Background(), Request{Action: ActionReadLinkDelivery, Event: Event{Payload: map[string]any{"url": "https://example.com/post"}}})
 			if err != nil || reply["status"] != "refused" || reply["media"] != nil {
 				t.Fatal("invalid media delivered")
+			}
+		})
+	}
+}
+
+func TestPostDeliveryAcceptsAVideoUpToTheFileLimit(t *testing.T) {
+	data := base64.StdEncoding.EncodeToString(make([]byte, MaxDeliveryMediaBytes))
+	reader := &deliveryReader{data: data, mime: "video/mp4", media: []any{map[string]any{"kind": "video", "url": "http://localhost/media/opaque"}}}
+	reply, err := New(reader).Handle(context.Background(), Request{Action: ActionReadLinkDelivery, Event: Event{Payload: map[string]any{"url": "https://example.com/post"}}})
+	if err != nil || reply["status"] != "ok" {
+		t.Fatalf("a video at the limit was refused: %v %+v", err, reply["refused"])
+	}
+}
+
+func TestPostDeliveryReportsOversizedMediaAsTooLarge(t *testing.T) {
+	oversized := base64.StdEncoding.EncodeToString(make([]byte, MaxDeliveryMediaBytes+1))
+	for name, reader := range map[string]*deliveryReader{
+		"refused by the reader":  {refused: "media_too_large"},
+		"returned by the reader": {data: oversized, mime: "video/mp4"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reader.media = []any{map[string]any{"kind": "video", "url": "http://localhost/media/opaque"}}
+			reply, err := New(reader).Handle(context.Background(), Request{Action: ActionReadLinkDelivery, Event: Event{Payload: map[string]any{"url": "https://example.com/post"}}})
+			if err != nil || reply["status"] != "refused" || reply["refused"] != "media_too_large" {
+				t.Fatalf("wrong refusal: %v %+v", err, reply)
 			}
 		})
 	}
