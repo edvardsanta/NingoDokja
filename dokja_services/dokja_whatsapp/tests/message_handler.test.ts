@@ -314,3 +314,10 @@ test("in an allowed group any member calls Ningo by name, and only there", async
     ["just talking", false],
   ]);
 });
+
+test("the orchestrator is told when a call comes from the linked account, and only then", async () => {
+  const { handler, dispatched, group } = setup();
+  await handler(group({ text: "Ningo, who am I?", fromMe: true, mentionsBot: false, messageId: "m1" }));
+  await handler(group({ text: "Ningo, who am I?", mentionsBot: false, messageId: "m2" }));
+  assert.deepEqual(dispatched.map((request) => request.payload.isOwnAccount), [true, false]);
+});

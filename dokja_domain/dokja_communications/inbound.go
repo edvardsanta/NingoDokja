@@ -92,6 +92,11 @@ func equivalentNumbers(number string) []string {
 	return []string{"55" + match[1] + "9" + match[2], "55" + match[1] + match[2]}
 }
 
+// SameNumber says whether any candidate is the number, however WhatsApp spells it.
+func SameNumber(number string, candidates []string) bool {
+	return numberAllowed([]string{number}, candidates)
+}
+
 func numberAllowed(allowed, candidates []string) bool {
 	wanted := map[string]bool{}
 	for _, number := range allowed {

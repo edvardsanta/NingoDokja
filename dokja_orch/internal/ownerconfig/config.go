@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	chat "read_books/dokja_domain/dokja_chat"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -15,8 +16,9 @@ import (
 const DefaultPath = ".dokja/owner.json"
 
 type Config struct {
-	Version int   `json:"version"`
-	Owner   Owner `json:"owner"`
+	Version int             `json:"version"`
+	Owner   Owner           `json:"owner"`
+	Ningo   chat.NingoFacts `json:"ningo"`
 }
 type Owner struct {
 	ID       string            `json:"id"`
@@ -80,6 +82,9 @@ func Load(path string) (Config, error) {
 			return Config{}, fmt.Errorf("owner occupations must be nonempty single-line text of at most 128 bytes")
 		}
 	}
+	if err := validNingo(config.Ningo); err != nil {
+		return Config{}, err
+	}
 	id := config.Owner.Accounts.Discord.UserID
 	if len(id) < 17 || len(id) > 20 || strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
 		return Config{}, fmt.Errorf("owner Discord user_id must contain 17 to 20 ASCII digits")
@@ -89,4 +94,40 @@ func Load(path string) (Config, error) {
 
 func validText(value string, limit int) bool {
 	return strings.TrimSpace(value) != "" && value == strings.TrimSpace(value) && len(value) <= limit && strings.IndexFunc(value, unicode.IsControl) < 0
+}
+
+var (
+	whatsappGroup  = regexp.MustCompile(`^[0-9]+(-[0-9]+)*@g\.us$`)
+	whatsappNumber = regexp.MustCompile(`^[0-9]{7,15}$`)
+)
+
+func validNingo(facts chat.NingoFacts) error {
+	if facts.NamedBy != "" && !validText(facts.NamedBy, 128) {
+		return fmt.Errorf("ningo named_by must be single-line text of at most 128 bytes")
+	}
+	if len(facts.Groups) > 16 || len(facts.People) > 16 {
+		return fmt.Errorf("ningo permits at most 16 groups and 16 people")
+	}
+	for _, group := range facts.Groups {
+		if !whatsappGroup.MatchString(group) {
+			return fmt.Errorf("ningo groups must be WhatsApp group ids")
+		}
+	}
+	for _, person := range facts.People {
+		if !validText(person.Name, 128) {
+			return fmt.Errorf("ningo people need a single-line name of at most 128 bytes")
+		}
+		if person.WhatsApp != "" && !whatsappNumber.MatchString(person.WhatsApp) {
+			return fmt.Errorf("ningo people whatsapp must be 7 to 15 digits")
+		}
+		if len(person.About) > 16 {
+			return fmt.Errorf("ningo people permit at most 16 facts each")
+		}
+		for _, fact := range person.About {
+			if !validText(fact, 128) {
+				return fmt.Errorf("ningo people facts must be single-line text of at most 128 bytes")
+			}
+		}
+	}
+	return nil
 }

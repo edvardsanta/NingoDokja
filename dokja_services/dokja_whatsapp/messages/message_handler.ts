@@ -43,6 +43,8 @@ export type WhatsAppMessageContext = {
   sentByBot: boolean;
   // The bot is mentioned, or the message replies to one of the bot's own messages.
   mentionsBot: boolean;
+  // Someone called Ningo by name in an allowed group, the owner's account included.
+  calledByName?: boolean;
   timestampMs: number;
   reply: (text: string) => Promise<unknown>;
   typing: (active: boolean) => Promise<void>;
@@ -111,6 +113,7 @@ export function createWhatsAppMessageHandler(
           chatKind: context.chatKind,
           senderNumbers: context.senderNumbers,
           isSelfChat: context.isSelfChat,
+          isOwnAccount: context.fromMe,
           mentionsBot: context.mentionsBot,
         }),
       );
@@ -146,7 +149,7 @@ export function nameCall(context: WhatsAppMessageContext, allowedGroups: readonl
   if (context.sentByBot || context.chatKind !== "group" || !allowedGroups.includes(context.chatId) || !nameTrigger.test(context.text)) {
     return context;
   }
-  return { ...context, text: context.text.replace(nameTrigger, ""), fromMe: false, mentionsBot: true };
+  return { ...context, text: context.text.replace(nameTrigger, ""), mentionsBot: true, calledByName: true };
 }
 
 // Returns why a message is not for the bot, or null when it is.
@@ -155,7 +158,7 @@ function ignoreReason(context: WhatsAppMessageContext, now: number): string | nu
     return "not-chat";
   }
   // The echo of a reply, or something the owner typed in another chat.
-  if (context.sentByBot || (context.fromMe && !context.isSelfChat)) {
+  if (context.sentByBot || (context.fromMe && !context.isSelfChat && !context.calledByName)) {
     return "own";
   }
   if (now - context.timestampMs > maxMessageAgeMs) {
