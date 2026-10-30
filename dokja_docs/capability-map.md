@@ -226,7 +226,11 @@ a guarantee that every generated reply will follow them.
 The private, versioned `.dokja/owner.json` supplies owner account mapping and
 profile facts at startup; `DOKJA_OWNER_CONFIG_FILE` selects another path. Owner identity is
 configured exclusively in JSON; an absent file disables owner recognition, and
-invalid files stop startup. Only verified owner turns receive the configured profile. The Chat
+invalid files stop startup. Only verified owner turns receive the configured profile: on Discord
+the gateway verifies the owner's account; the owner's own interfaces (desktop, CLI, TUI) and the
+linked WhatsApp account's "message yourself" chat are the owner's by source, the same rule that lets
+them keep conversations, and the identity note says which. A context that claims owner status or a
+profile is discarded unless the chat handler granted it. The Chat
 domain includes the preferred name in direct identity replies; generated replies
 receive profile facts as private application context. See the
 [configuration and migration guide](production-runbook.md#private-owner-configuration).

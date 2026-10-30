@@ -162,8 +162,14 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 		}
 		reference = recentReadingReference(items)
 	}
-	sources := h.lookupKnowledge(ctx, turn.Content, anchor)
-	result, err := h.generateReply(ctx, event, turn.Content, history, sources, reference)
+	var sources []knowledgeSource
+	var result map[string]any
+	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
+		result = map[string]any{"reply": identity}
+	} else {
+		sources = h.lookupKnowledge(ctx, turn.Content, anchor)
+		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
+	}
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
 	}
