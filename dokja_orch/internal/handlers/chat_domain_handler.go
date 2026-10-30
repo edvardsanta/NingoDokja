@@ -10,6 +10,7 @@ import (
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,8 @@ type ChatDomainHandler struct {
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
+	selfChat sync.Mutex
 	// sends orders the archived sends of each conversation: one is answered at a time, in the order
 	// they were recorded, so each reply sees the replies before it.
 	sends *core.OrderedQueue
@@ -73,6 +76,11 @@ func (h *ChatDomainHandler) WithSessionStore(store chat.SessionStore) *ChatDomai
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
+	}
+	// The owner writing from the phone continues the archived conversation. Without an archive (it
+	// could not be opened) the self-chat answers as before, from the process's own session.
+	if selfChatRequest(event) && h.archive != nil {
+		return h.handleSelfChat(ctx, event, workflow)
 	}
 	// A turn of an archived conversation is recorded there; any other goes on as before.
 	if conversationID, sendID, retryID, archived := archivedRequest(event); archived {
