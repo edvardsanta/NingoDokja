@@ -213,3 +213,27 @@ Content dependency images and real OCR/Book models were not built or exercised
 in this change. The optional processors start a subprocess for each invocation,
 so model startup contributes to their declared timeout. Gitleaks was unavailable
 locally; its required PR check remains outstanding.
+
+### Publication media for communication adapters
+
+A `social.resolve.v1` reader can optionally support `action: "media"` with input
+`{"url": "<one of the media references from its read result>"}`. It returns
+`{"result": {"content_type": "video/mp4", "data_b64": "..."}}` (or the ordinary
+plugin error envelope). Supported delivery MIME types are `image/jpeg`, `image/png`,
+`image/webp` and `video/mp4`. One file must fit within 8 MiB decoded. The caller
+pins requests to the reader selected by `read`; another reader is never allowed
+to interpret its cache references.
+
+This operation lets WhatsApp resend media while keeping the existing
+Interface → Event → Orchestrator → Domain → Service flow. Digest bounds and
+validates all files before returning them to the gateway. Communication adapters
+never fetch plugin-supplied URLs themselves. A metadata-only reader remains valid
+for desktop preview, but publication delivery reports a localized unavailable
+result until that reader supports media transfer.
+
+The optional `plugins.example/post-reader-relay` mechanism bridges an existing
+host-local reader's Unix socket. Its media operation accepts only that reader's
+configured origin and opaque `/media/` paths, then reads the file over the socket.
+It does not issue requests to caller-selected hosts or filesystem paths. Configure
+its private `settings.json`, worker token and 16 MiB output budget outside Git;
+site extraction and browser credentials remain in the owner-local worker.

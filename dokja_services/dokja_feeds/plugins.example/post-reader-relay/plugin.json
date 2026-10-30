@@ -1,0 +1,12 @@
+{
+  "plugin_api": 1,
+  "id": "post-reader-relay",
+  "version": "0.1.0",
+  "name": "Host-local post reader relay",
+  "provides": ["social.resolve.v1"],
+  "runtime": "subprocess",
+  "enabled": false,
+  "command": ["python3", "-I", "-B", "run.py"],
+  "env": [],
+  "limits": {"timeout_ms": 120000, "output_bytes": 16777216}
+}
