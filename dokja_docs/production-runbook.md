@@ -1279,3 +1279,20 @@ explicit `realtime.accepted` acknowledgment enables consent locally. A skipped
 inbound request or an older server without this result fails closed. An
 orchestrator restart loses all ephemeral journals and requires a new observer
 session and fresh consent. No automatic production rollout is performed.
+### Local post-reader startup from the desktop
+
+The host Runtime controller accepts optional companion processes in the checkout's
+ignored `.dokja/host-workers.json`; see
+[host worker configuration](../dokja_services/dokja_runtime/README.md#owner-local-host-workers).
+Start/stop the associated module from System → Runtime to control these processes.
+Rebuild the desktop (which bundles the controller) after upgrading this support;
+an already-running older controller must be restarted before it can read the new
+configuration. This does not deploy a production service or change Compose ports.
+
+For an owner-local post reader, keep the browser and its credentials on the host.
+Expose its worker socket through the existing plugins bind mount, and declare its
+loopback media origin in `.dokja/post-reader.json`. The desktop loads this file
+at startup; no terminal environment variable is required. The reader supplies
+cookie-free local media URLs to the existing post-preview/save flow. A missing
+worker, inaccessible socket or browser dependency is a startup/read error, not a
+successful deployment. Stop the module to stop workers owned by this controller.

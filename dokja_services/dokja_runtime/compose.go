@@ -37,10 +37,11 @@ type Compose struct {
 	startCommand func(context.Context, domain.Module) error
 	outputMu     sync.Mutex
 	output       map[string]*tailBuffer
+	hostWorkers  *hostWorkers
 }
 
 func New(root string) *Compose {
-	c := &Compose{output: map[string]*tailBuffer{}}
+	c := &Compose{output: map[string]*tailBuffer{}, hostWorkers: &hostWorkers{root: root}}
 	execute := func(ctx context.Context, stream io.Writer, args ...string) ([]byte, error) {
 		if err := localEngine(os.Environ()); err != nil {
 			return nil, err
@@ -199,6 +200,9 @@ func (c *Compose) Status(ctx context.Context) (map[string]domain.Container, erro
 		}
 		result[name] = value
 	}
+	if c.hostWorkers != nil {
+		c.hostWorkers.status(result)
+	}
 	return result, nil
 }
 
@@ -227,6 +231,9 @@ func (c *Compose) Stop(ctx context.Context, m domain.Module) error {
 		return fmt.Errorf("unknown service")
 	}
 	_, err := c.Run(ctx, "stop", "--timeout", "20", m.Service)
+	if err == nil && c.hostWorkers != nil {
+		return c.hostWorkers.stop(m.Name)
+	}
 	return err
 }
 func valid(m domain.Module) bool {
@@ -237,6 +244,11 @@ func valid(m domain.Module) bool {
 func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 	if !valid(m) {
 		return fmt.Errorf("unknown service")
+	}
+	if c.hostWorkers != nil {
+		if err := c.hostWorkers.start(parent, m.Name); err != nil {
+			return err
+		}
 	}
 	wait := c.Wait
 	switch m.Name {

@@ -140,6 +140,15 @@ handles the link. The repository ships no reader: readers reach third-party
 sites, so they live with the owner's plugins in `feeds_plugins/`, together with
 whatever they need to run.
 
+An owner-local reader that needs browser resources on the host may declare its
+companion process in `.dokja/host-workers.json` (see the Runtime service README).
+The existing Runtime module start/stop controls manage the process; the reader
+can reach it through a Unix socket in the shared plugins directory. Browser
+profiles stay on the host. The desktop shell discovers the reader's media origin
+from `.dokja/post-reader.json` as `{ "media_origin": "http://127.0.0.1:8791" }`.
+Only a loopback HTTP(S) origin without credentials is accepted. The existing
+`--post-media-origin` flag and `DOKJA_POST_MEDIA_ORIGIN` override that local file.
+
 Browsing and caching work without OCR or model dependencies. To use the shipped
 `document-processor` and `media-perception` compatibility adapters:
 

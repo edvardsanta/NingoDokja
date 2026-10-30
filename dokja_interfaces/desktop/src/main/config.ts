@@ -1,4 +1,6 @@
 import { parseArgs } from "node:util";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { localeFromTag, type Locale } from "../shared/locale.js";
 
@@ -44,6 +46,21 @@ function isLocalUrl(value: string | undefined): value is string {
   } catch {
     return false;
   }
+}
+
+// Owner-local worker configuration is read by the shell, never by the page.
+// An explicit flag or environment variable still takes precedence.
+export function localPostMediaOrigin(root: string | undefined): string | undefined {
+  if (!root) return undefined;
+  try {
+    const raw = readFileSync(join(root, ".dokja", "post-reader.json"), "utf8");
+    if (raw.length > 4096) return undefined;
+    const value: unknown = JSON.parse(raw);
+    const origin = value && typeof value === "object" && "media_origin" in value ? value.media_origin : undefined;
+    if (typeof origin !== "string" || !isLocalUrl(origin)) return undefined;
+    const url = new URL(origin);
+    return url.username || url.password ? undefined : url.origin;
+  } catch { return undefined; }
 }
 
 // Flags win over the environment, like the TUI: --request-endpoint, --lang and --timeout (the

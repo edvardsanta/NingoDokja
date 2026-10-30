@@ -71,7 +71,8 @@ models/
 .dokja/
 
 # Feeds plugins are user-owned and kept out of the repository (the directory compose mounts by default)
-feeds_plugins/
+# Owner-local plugins may be shared with a worktree through a symlink.
+feeds_plugins
 
 # Knowledge base plugins are user-owned and kept out of the repository
 dokja_services/dokja_knowledge/plugins.local/

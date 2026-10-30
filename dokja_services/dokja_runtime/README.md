@@ -66,3 +66,34 @@ Measured inference is opt-in through the Runtime `ChatMeasured` policy and priva
 `/chat/measured` endpoint. It reports structured provider usage and withholds
 results that exceed post-generation acceptance budgets. Existing chat/stream
 contracts remain unchanged. See [limits and compatibility](../../dokja_docs/inference-token-budgets.md).
+## Owner-local host workers
+
+An optional, git-ignored `.dokja/host-workers.json` in the runtime checkout declares
+host companions for known Runtime modules. No command comes from the renderer.
+For example:
+
+```json
+[
+  {
+    "id": "post-reader",
+    "module": "feeds",
+    "directory": "feeds_plugins/post-reader",
+    "command": ["python3", "-I", "-B", "run.py", "--serve"],
+    "ready_socket": "feeds_plugins/post-reader/worker.sock"
+  }
+]
+```
+
+Directory and socket paths are relative to the checkout. Starting the associated
+module through any Runtime client starts its configured workers and waits up to
+five seconds for their local sockets. Stopping the module stops only workers
+started by this controller, including their process groups. A worker already
+listening is used without taking ownership. An owned worker's exit marks its
+module failed. Workers survive closing the desktop because the shared controller
+owns them. After a controller restart, an existing worker remains externally
+owned; stopping the module does not terminate it.
+
+This configuration launches owner-supplied executable code, like installing a
+Feeds plugin. No file means no host workers. Invalid configuration or startup
+failure is reported through the existing module error. Container configuration
+and public event/request contracts are unchanged.

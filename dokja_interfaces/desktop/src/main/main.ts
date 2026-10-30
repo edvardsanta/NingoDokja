@@ -13,7 +13,7 @@ import {
 } from "../shared/transport.js";
 import { RuntimeClient, runtimeRoot, runtimeStateHome } from "./runtime_client.js";
 import { DEFAULT_ENDPOINT } from "./config.js";
-import { parseConfig } from "./config.js";
+import { localPostMediaOrigin, parseConfig } from "./config.js";
 import { communicationsToken } from "./communications_config.js";
 import { isTrustedSender } from "./guards.js";
 import { downloadMedia, fetchMedia } from "./media_fetch.js";
@@ -51,6 +51,7 @@ async function main(): Promise<void> {
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
+  const postMediaOrigin = config.postMediaOrigin ?? localPostMediaOrigin(root);
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint,
     communicationsToken: communicationsToken(process.env, root, config.envFile) });
   const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
@@ -110,7 +111,7 @@ async function main(): Promise<void> {
       });
       return canceled ? undefined : filePaths[0];
     },
-    ...(config.postMediaOrigin ? { localOrigin: config.postMediaOrigin } : {}),
+    ...(postMediaOrigin ? { localOrigin: postMediaOrigin } : {}),
   });
   usePostStore(posts);
   void posts.sweep();
