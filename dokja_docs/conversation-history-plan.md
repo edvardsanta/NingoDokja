@@ -1,7 +1,8 @@
 # Conversation history and resumable Ningo conversations
 
 Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 under
-way (first batch: Talk continues one archived conversation); H4 and H5 planned. Tracks step 09.5.
+way (Talk keeps, restores, lists and reopens archived conversations; rename/delete and a
+queued-waiting state remain); H4 and H5 planned. Tracks step 09.5.
 
 Attempt-settlement correction (2026-10-29):
 [identity/lifecycle compatibility](task-lifecycle-compatibility.md) records the
@@ -158,8 +159,16 @@ again. After any failure the screen reads the archive back instead of inferring
 the outcome. If the archive cannot start a conversation, Talk says so and gives
 the message back unsent; there is no unarchived fallback. The session-notice
 ("started a fresh conversation") no longer appears, because the desktop no longer
-uses the process-local session path. The list, reopen/restore, rename/delete and
-a queued-waiting state follow in later H3 batches.
+uses the process-local session path. H3 second batch (2026-10-30): when the desktop starts, Talk continues the latest
+general conversation that holds turns, read into the already mounted composer so
+focus and a draft survive. A Conversations drawer lists the kept conversations a
+page at a time and reopens one as its own panel; a reply on its way to another is
+dropped. A reopened send still pending is read again every 3 s for up to 2 minutes
+and never resent; an interrupted turn shows a retry. New conversations are titled
+from their first message. Talk also reads the conversation again after each
+settled send and when the window regains focus, so turns added from another
+interface (the phone) appear. The archive's own failure reasons are shown in the
+screen's language. Rename/delete and a queued-waiting state remain.
 
 ### H4: CLI and TUI parity
 
