@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { IDLE, parseQueueState, reconcile, type QueueState } from "../music/reconcile.js";
+import { IDLE, parseComment, parseQueueState, reconcile, type QueueState } from "../music/reconcile.js";
 
 const state = (overrides: Partial<QueueState> = {}): QueueState => ({
   epoch: "e1", version: 1, paused: false, volume: 100, waiting: 0,
@@ -68,4 +68,11 @@ test("the next track is read so it can be made ready, only from an http(s) page"
   assert.deepEqual(parsed?.next, { entry: 2, url: "https://play.example/2" });
   assert.equal(parseQueueState({ ok: true, epoch: "e", version: 1, waiting: [{ entry: 2, url: "file:///x" }] })?.next, undefined);
   assert.equal(parseQueueState({ ok: true, epoch: "e", version: 1, waiting: [] })?.next, undefined);
+});
+
+test("a remark is read only for the entry it was asked for", () => {
+  assert.equal(parseComment({ ok: true, entry: 4, comment: " Again? " }, 4), "Again?");
+  assert.equal(parseComment({ ok: true, entry: 3, comment: "Again?" }, 4), "");
+  assert.equal(parseComment({ ok: false, entry: 4, comment: "Again?" }, 4), "");
+  assert.equal(parseComment(undefined, 4), "");
 });

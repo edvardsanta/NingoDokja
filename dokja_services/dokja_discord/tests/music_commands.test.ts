@@ -67,7 +67,7 @@ test("play answers at once, sends the words, and plays what the queue says", asy
   await find(list, "play").handle(ctx);
   assert.equal(replies[0], "Looking for it...", "answered before searching");
   assert.equal(replies.at(-1), "Now playing: Monalisa – Jorge.");
-  assert.deepEqual(sent, [{ eventType: "music.play", content: "monalisa jorge", userId: "u1", channelId: "text1", guildId: "g1" }]);
+  assert.deepEqual(sent.filter((event) => event.eventType !== "music.comment"), [{ eventType: "music.play", content: "monalisa jorge", userId: "u1", channelId: "text1", guildId: "g1" }]);
   assert.equal(applied.length, 1);
 });
 
@@ -106,7 +106,7 @@ test("a track that ends is reported from the channel of the last command, and wh
   await find(list, "play").handle(context({ song: "x" }).ctx);
   fake.hooks().onEnded(1);
   await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.deepEqual(sent.at(-1), { eventType: "music.ended", content: "1", channelId: "text1", userId: "u1", guildId: "g1" });
+  assert.deepEqual(sent.find((event) => event.eventType === "music.ended"), { eventType: "music.ended", content: "1", channelId: "text1", userId: "u1", guildId: "g1" });
   assert.equal(fake.applied.length, 2, "the next track is played");
   fake.hooks().onGone();
   await new Promise((resolve) => setTimeout(resolve, 10));
@@ -255,4 +255,53 @@ test("failed voice readiness does not claim playback or publish a playing panel"
   assert.match(replies.at(-1)!, /Could not play it/);
   assert.doesNotMatch(replies.at(-1)!, /Now playing/);
   assert.equal(fake.posted.length, 0);
+});
+
+const playingEntry = (entry: number, version: number) => ({
+  ok: true, epoch: "e1", version, paused: false, volume: 100, waiting: [],
+  now_playing: { entry, url: `https://play.example/${entry}`, title: `Song ${entry}` },
+});
+
+test("a remark on the song reaches the panel without holding anything", async () => {
+  const fake = fakeVoice("voice1");
+  const sent: Sent[] = [];
+  const { ctx } = context();
+  let answer: (reply: { reply: string; music?: unknown }) => void = () => {};
+  const remark = new Promise<{ reply: string; music?: unknown }>((resolve) => { answer = resolve; });
+  const list = createMusicCommands({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fake.voice as never, locale: "en",
+    dispatch: async (eventType, request) => {
+      sent.push({ eventType, ...request });
+      return eventType === "music.comment" ? remark : { reply: "", music: playingEntry(1, 1) };
+    },
+  });
+  await find(list, "play").handle(ctx);
+  assert.equal(sent.at(-1)?.eventType, "music.comment");
+  assert.equal(sent.at(-1)?.content, "1 en", "the entry and the people's language");
+  assert.doesNotMatch(fake.posted[0].message.embeds[0].description, /💬/, "the panel does not wait for the model");
+  answer({ reply: "", music: { ok: true, entry: 1, comment: "@everyone, a classic." } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(fake.edited.at(-1)!.message.embeds[0].description, /💬 @\u200beveryone, a classic\./);
+});
+
+test("a remark on a song that already ended is dropped", async () => {
+  const fake = fakeVoice("voice1");
+  const { ctx } = context();
+  let answer: (reply: { reply: string; music?: unknown }) => void = () => {};
+  const remark = new Promise<{ reply: string; music?: unknown }>((resolve) => { answer = resolve; });
+  let plays = 0;
+  const list = createMusicCommands({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fake.voice as never, locale: "en",
+    dispatch: async (eventType) => {
+      if (eventType === "music.comment") return remark;
+      plays += 1;
+      return { reply: "", music: playingEntry(plays, plays) };
+    },
+  });
+  await find(list, "play").handle(ctx);
+  await find(list, "skip").handle(ctx);
+  const edits = fake.edited.length;
+  answer({ reply: "", music: { ok: true, entry: 1, comment: "too late" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fake.edited.length, edits, "the panel of the next song is left alone");
 });

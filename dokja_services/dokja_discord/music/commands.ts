@@ -5,7 +5,7 @@ import { buildBridgePayload, dispatchToOrchestratorResponse, type OrchestratorRe
 import type { DiscordButtonAction, DiscordButtonContext, DiscordCommandContext, DiscordComponentSpec, DiscordReply, DiscordSlashCommand } from "../types.js";
 import type { DiscordVoiceController, MusicHooks } from "../voice/voice.js";
 import { musicReplyText, quiet, say } from "./messages.js";
-import { parseQueueState, type QueueState } from "./reconcile.js";
+import { parseComment, parseQueueState, type QueueState } from "./reconcile.js";
 
 type Dispatch = (eventType: string, request: { content: string; userId: string; channelId: string; guildId: string }) => Promise<OrchestratorReply>;
 
@@ -40,12 +40,16 @@ export function createMusic(params: {
   // The panel of each server: one message, edited as the queue changes.
   const panels = new Map<string, { channelId: string; messageId: string }>();
   const lastState = new Map<string, QueueState>();
+  // Ningo's remark on the song each server is playing.
+  const comments = new Map<string, { epoch: string; entry: number; text: string }>();
 
   const showPanel = async (guildId: string, state: QueueState) => {
     if (!voice) return;
     const origin = lastCommand.get(guildId);
     const panel = panels.get(guildId);
-    const message = panelMessage(state, locale);
+    const comment = comments.get(guildId);
+    const remark = comment?.epoch === state.epoch && comment.entry === state.nowPlaying?.entry ? comment.text : "";
+    const message = panelMessage(state, locale, remark);
     try {
       if (panel && (!origin || panel.channelId === origin.channelId)) {
         await voice.editMessage({ ...panel, message });
@@ -69,6 +73,24 @@ export function createMusic(params: {
     lastState.set(guildId, state);
     await voice.applyMusic({ guildId, userId, state, hooks: hooksFor(guildId) });
     await showPanel(guildId, state);
+    const now = state.nowPlaying;
+    if (now && (previous?.epoch !== state.epoch || previous.nowPlaying?.entry !== now.entry)) askComment(guildId, state.epoch, now.entry);
+  };
+
+  // Asks for a remark on the song that just started. It takes as long as the model does, so nothing
+  // waits for it, and it reaches the panel only if the same song is still playing.
+  const askComment = (guildId: string, epoch: string, entry: number) => {
+    const origin = lastCommand.get(guildId);
+    if (!origin) return;
+    void dispatch("music.comment", { content: `${entry} ${locale}`, guildId, ...origin })
+      .then(async (reply) => {
+        const text = parseComment(reply.music, entry);
+        const state = lastState.get(guildId);
+        if (!text || state?.epoch !== epoch || state.nowPlaying?.entry !== entry) return;
+        comments.set(guildId, { epoch, entry, text });
+        await showPanel(guildId, state);
+      })
+      .catch((error) => console.error("[dokja-discord] music comment failed", error));
   };
 
   // A report the player makes on its own: the track ended (or could not start), or the voice
@@ -201,9 +223,9 @@ export const PANEL = {
   louder: "music_louder_button",
 } as const;
 
-// What the panel says: the song, who asked for it, the volume and the queue, with the controls
+// What the panel says: the song, who asked for it, the volume, the queue and Ningo's remark, with the controls
 // that fit the moment. An ended queue keeps its words and loses its buttons.
-export function panelMessage(state: QueueState, locale = "pt-BR"): DiscordReply {
+export function panelMessage(state: QueueState, locale = "pt-BR", comment = ""): DiscordReply {
   const now = state.nowPlaying;
   if (!now) return { content: say(locale, "queueOver"), components: [], embeds: [] };
   const title = `**${quiet(now.title.trim()) || say(locale, "untitled")}**`;
@@ -227,7 +249,7 @@ export function panelMessage(state: QueueState, locale = "pt-BR"): DiscordReply 
     content: "",
     embeds: [{
       title: say(locale, state.paused ? "panelPaused" : "panelPlaying"),
-      description: `${song}\n${details}`,
+      description: [song, details, comment ? `💬 ${quiet(comment)}` : ""].filter(Boolean).join("\n"),
       ...(now.thumbnail ? { thumbnailUrl: now.thumbnail } : {}),
     }],
     components,

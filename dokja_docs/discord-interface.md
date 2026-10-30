@@ -56,6 +56,10 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
   Stop and volume −10/+10 buttons. It is edited as the queue changes, never posted again for the
   same queue, and loses its buttons when the queue ends. Buttons follow the commands' rule and
   answer only the person who pressed.
+- **A remark on the song.** On about one song in three, from the first, the adapter's
+  `music.comment` asks for one line in Ningo's voice, written in `DOKJA_DISCORD_LOCALE`. It joins
+  the panel a moment later, if that song is still playing. Nothing waits for it: a slow or failed
+  model means no line, and the music goes on.
 - **Alone in the channel.** When nobody but bots is left in Ningo's voice channel, the music
   pauses (apart from the queue's own pause and the pause while Ningo speaks). If someone comes
   back within three minutes it resumes; otherwise Ningo leaves and the queue is reported stopped.
