@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { isRecord } from "../../shared/records.js";
 import type { RuntimeSetting, RuntimeSettings, RuntimeSnapshot } from "../../shared/runtime.js";
 import type { Transport } from "../../shared/transport.js";
+import { GroupDiscovery } from "./group_discovery.js";
 import { displayName } from "../display_names.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -101,14 +102,14 @@ export function SettingsCard({ transport }: { transport: Transport }) {
       {GROUPS.map((group) => <section key={group.id} className="settings-group">
         <h3>{group.name ?? (group.labelId && t(group.labelId))}</h3>
         <ul className="services settings">{data.settings.filter((row) => row.group === group.id).map((row) =>
-          <SettingRow key={row.id} row={row} view={data} busy={data.busy || action.state.phase === "loading"} onSave={(value) => action.start({ id: row.id, value })} />)}</ul>
+          <SettingRow key={row.id} row={row} view={data} transport={transport} busy={data.busy || action.state.phase === "loading"} onSave={(value) => action.start({ id: row.id, value })} />)}</ul>
       </section>)}
       {data.webhookChannels.length > 0 && <p className="note">{t("settings_webhooks_by_hand")}</p>}
     </>}
   </CardFrame>;
 }
 
-function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: View; busy: boolean; onSave: (value: string) => void }) {
+function SettingRow({ row, view, transport, busy, onSave }: { row: RuntimeSetting; view: View; transport: Transport; busy: boolean; onSave: (value: string) => void }) {
   const t = useTranslate();
   const id = useId();
   const [draft, setDraft] = useState<string>();
@@ -124,7 +125,11 @@ function SettingRow({ row, view, busy, onSave }: { row: RuntimeSetting; view: Vi
       : <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
         {row.kind !== "list" && <label htmlFor={id}>{label}</label>}
         {row.kind === "list"
-          ? <ListEditor label={label} values={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy} onChange={(values) => { setDraft(values.join(",")); setReviewing(false); }} />
+          ? <>
+            <ListEditor label={label} values={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy} onChange={(values) => { setDraft(values.join(",")); setReviewing(false); }} />
+            {row.id === "whatsapp.groups" && <GroupDiscovery transport={transport} chosen={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy}
+              onAdd={(id) => { setDraft([...draft.split(",").map((item) => item.trim()).filter(Boolean), id].join(",")); setReviewing(false); }} />}
+          </>
           : row.options.length > 0
           ? <select id={id} value={draft} onChange={(event) => { setDraft(event.target.value); setReviewing(false); }}>
             {row.options.map((option) => <option key={option} value={option}>{optionText(option, t)}</option>)}

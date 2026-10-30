@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	communications "read_books/dokja_domain/dokja_communications"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -112,5 +113,44 @@ func TestLinkErrorsDoNotEchoWhatTheInterfaceSaid(t *testing.T) {
 
 	if err == nil || strings.Contains(err.Error(), "10.0.0.9") {
 		t.Fatalf("expected an error that hides the address, got %v", err)
+	}
+}
+
+type groupLinker struct {
+	fakeLinker
+	groups []communications.LinkedGroup
+}
+
+func (g *groupLinker) Groups(context.Context) ([]communications.LinkedGroup, error) {
+	g.calls = append(g.calls, "groups")
+	return g.groups, g.err
+}
+
+func TestLinkGroupsListsTheAccountsGroupsForTheOwnerToChoose(t *testing.T) {
+	linker := &groupLinker{groups: []communications.LinkedGroup{{ID: "120363000000000001@g.us", Name: "ningo", Members: 1}}}
+	handler, _ := quietHandler(t)
+	handler.WithInterfaceLinks(map[string]InterfaceLinker{"whatsapp": linker})
+	event, step := linkEvent("communications.link.groups", map[string]any{"interface": "whatsapp"})
+	result, err := handler.Handle(context.Background(), event, step)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups, _ := result["groups"].([]communications.LinkedGroup)
+	if len(groups) != 1 || groups[0].Name != "ningo" || result["interface"] != "whatsapp" {
+		t.Fatalf("unexpected reply %#v", result)
+	}
+
+	linker.err = errors.New("dial tcp 10.0.0.5:8094: refused")
+	if _, err := handler.Handle(context.Background(), event, step); err == nil || strings.Contains(err.Error(), "10.0.0.5") {
+		t.Fatal("a failure must say so without the interface's address", err)
+	}
+}
+
+func TestAnInterfaceThatCannotListGroupsSaysSo(t *testing.T) {
+	handler, _ := quietHandler(t)
+	handler.WithInterfaceLinks(map[string]InterfaceLinker{"whatsapp": &fakeLinker{state: "connected"}})
+	event, step := linkEvent("communications.link.groups", map[string]any{"interface": "whatsapp"})
+	if _, err := handler.Handle(context.Background(), event, step); err == nil {
+		t.Fatal("expected a refusal")
 	}
 }

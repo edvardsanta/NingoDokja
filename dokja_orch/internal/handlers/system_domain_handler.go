@@ -241,7 +241,7 @@ func (h *SystemDomainHandler) Handle(ctx context.Context, event core.Event, work
 		return h.handleDiscordSend(ctx, event, workflow)
 	}
 	switch event.Type {
-	case "communications.link.status", "communications.link.start", "communications.link.reset":
+	case "communications.link.status", "communications.link.start", "communications.link.reset", "communications.link.groups":
 		return h.handleInterfaceLink(ctx, event)
 	case "services.set":
 		return h.handleServiceSet(event)

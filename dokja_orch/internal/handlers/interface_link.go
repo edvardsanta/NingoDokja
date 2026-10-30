@@ -17,6 +17,11 @@ type InterfaceLinker interface {
 	Reset(ctx context.Context) (state string, err error)
 }
 
+// InterfaceGroupLister is an interface that can list the groups its linked account takes part in.
+type InterfaceGroupLister interface {
+	Groups(ctx context.Context) ([]communications.LinkedGroup, error)
+}
+
 // WithInterfaceLinks names the interfaces that can be linked from the desktop. Only the ones
 // given here answer the communications.link actions.
 func (h *SystemDomainHandler) WithInterfaceLinks(links map[string]InterfaceLinker) *SystemDomainHandler {
@@ -52,6 +57,17 @@ func (h *SystemDomainHandler) handleInterfaceLink(ctx context.Context, event cor
 		state, err = linker.Start(ctx)
 	case "communications.link.reset":
 		state, err = linker.Reset(ctx)
+	case "communications.link.groups":
+		lister, ok := linker.(InterfaceGroupLister)
+		if !ok {
+			return nil, fmt.Errorf("the %s interface cannot list groups", name)
+		}
+		groups, err := lister.Groups(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("the %s interface could not list its groups; is it connected?", name)
+		}
+		logger.Info(fmt.Sprintf("system handler interface groups event_id=%s interface=%s groups=%d", event.EventID, name, len(groups)))
+		return map[string]any{"interface": name, "groups": groups}, nil
 	default:
 		return nil, fmt.Errorf("unsupported link action")
 	}

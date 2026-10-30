@@ -28,6 +28,8 @@ export type WhatsAppSocketLike = {
   sendPresenceUpdate(type: "composing" | "paused", jid?: string): Promise<void>;
   // Removes this device from the account, on WhatsApp's side as well.
   logout(): Promise<void>;
+  // The groups the account takes part in, by id, with their names.
+  groupFetchAllParticipating?(): Promise<Record<string, { id?: string; subject?: string; size?: number; participants?: unknown[] }>>;
   signalRepository?: { lidMapping?: { getPNForLID(lid: string): Promise<string | null> } };
   end(error: Error | undefined): void;
 };
@@ -84,7 +86,30 @@ export type WhatsAppRuntime = {
   // Sends text into a chat as the linked account, for what the owner asked for by name. It never
   // answers anyone, and refuses while the account is not connected. Gives the id it went out with.
   sendText(jid: string, text: string): Promise<string | undefined>;
+  // The groups the linked account is in, so the owner can choose which to allow without hunting for
+  // their ids. Refuses while the account is not connected.
+  groups(): Promise<WhatsAppGroup[]>;
 };
+
+// A group as the owner chooses it: its id, its name and how many take part.
+export type WhatsAppGroup = { id: string; name: string; members: number };
+
+// At most this many groups are listed, and a name is cut to this length.
+export const maxListedGroups = 256;
+export const maxGroupName = 100;
+
+// Keeps what is a group (its id ends in @g.us), bounds names and count, and sorts by name.
+export function listedGroups(raw: Record<string, { id?: string; subject?: string; size?: number; participants?: unknown[] }>): WhatsAppGroup[] {
+  const groups: WhatsAppGroup[] = [];
+  for (const [key, group] of Object.entries(raw)) {
+    const id = group.id ?? key;
+    if (!/^[0-9-]{1,64}@g\.us$/.test(id)) continue;
+    const name = (group.subject ?? "").replace(/\s+/g, " ").trim().slice(0, maxGroupName);
+    const members = typeof group.size === "number" ? group.size : Array.isArray(group.participants) ? group.participants.length : 0;
+    groups.push({ id, name, members });
+  }
+  return groups.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).slice(0, maxListedGroups);
+}
 
 // The values of Baileys' DisconnectReason this loop reacts to (a test keeps them in step).
 export const disconnectReason = { loggedOut: 401, connectionReplaced: 440, restartRequired: 515 } as const;
@@ -358,6 +383,13 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
     },
     linkCode() {
       return status.state === "waiting_for_link" ? linkCode : undefined;
+    },
+    async groups() {
+      const socket = current;
+      if (!socket || status.state !== "connected" || !socket.groupFetchAllParticipating) {
+        throw new Error("the account is not connected");
+      }
+      return listedGroups(await socket.groupFetchAllParticipating());
     },
     async sendText(jid, text) {
       const socket = current;

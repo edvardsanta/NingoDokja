@@ -71,6 +71,12 @@ An ineligible message receives no reply, and a phone number never reaches the lo
 exception helps with setup: a group the bot is not allowed in is reported **once** with its id and
 the reason `policy`, so the id can be copied into `DOKJA_WHATSAPP_ALLOWED_GROUPS`.
 
+To choose groups without the log, open System › Settings in the desktop, edit **Groups** and press
+**Find my groups**. While the account is linked and connected, it lists every group the account
+takes part in, by name and number of members (`communications.link.groups`, served by the
+interface's internal `GET /link/groups`). **Add** puts a group's id in the draft; nothing changes
+until the setting is reviewed and saved as usual. Listing allows nothing by itself.
+
 ### Replies
 
 The reply is plain text, cut at 8,000 characters. In a group it quotes the message that triggered it.

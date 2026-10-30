@@ -46,7 +46,7 @@ async function main() {
   startStatusServer({
     port: config.statusPort,
     status: () => runtime.status(),
-    link: { code: () => runtime.linkCode(), start: () => runtime.restart(), reset: () => runtime.resetSession() },
+    link: { code: () => runtime.linkCode(), start: () => runtime.restart(), reset: () => runtime.resetSession(), groups: () => runtime.groups() },
     deliver: store
       ? createDeskSender({
           conversations: config.conversations,

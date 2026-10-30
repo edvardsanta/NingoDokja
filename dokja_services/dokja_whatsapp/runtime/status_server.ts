@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { HistoryEntry } from "../history/store.js";
 import type { DeliverOutcome } from "../messages/desk_sender.js";
 import { qrRows } from "./qr.js";
-import type { InterfaceState, RuntimeStatus } from "./whatsapp_runtime.js";
+import type { InterfaceState, RuntimeStatus, WhatsAppGroup } from "./whatsapp_runtime.js";
 
 export type StatusReply = { status: "ok" | "degraded" | "error"; state: InterfaceState; detail: string };
 
@@ -22,6 +22,8 @@ export type LinkControls = {
   start: () => void;
   // Unlinks, erases the saved session and asks for a new code.
   reset: () => Promise<void>;
+  // The groups the linked account is in; refuses while it is not connected.
+  groups: () => Promise<WhatsAppGroup[]>;
 };
 
 // What the desktop's conversations view needs: the named conversations (only their aliases) and
@@ -75,6 +77,13 @@ export function startStatusServer(options: Options): Server {
     if (options.link) {
       if (request.method === "GET" && request.url === "/link") {
         return reply(response, 200, linkReply(options.status(), options.link.code()));
+      }
+      if (request.method === "GET" && request.url === "/link/groups") {
+        try {
+          return reply(response, 200, { state: options.status().state, groups: await options.link.groups() });
+        } catch {
+          return reply(response, 409, { status: "error", message: "the account is not connected" });
+        }
       }
       if (request.method === "POST" && request.url === "/link/start") {
         options.link.start();

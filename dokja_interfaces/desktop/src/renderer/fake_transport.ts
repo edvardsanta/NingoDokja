@@ -384,6 +384,11 @@ export function createFakeTransport(delayMs = 400): Transport {
           { id: "125", name: "general", guildId: "901", guildName: "Second server" },
         ] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
+        case "communications.link.groups":
+          return ok({ groups: [
+            { id: "120363000000000001@g.us", name: "ningo", members: 1 },
+            { id: "120363000000000002@g.us", name: "Reading club", members: 14 },
+          ] });
         case "communications.link.status":
         case "communications.link.start":
         case "communications.link.reset": {
