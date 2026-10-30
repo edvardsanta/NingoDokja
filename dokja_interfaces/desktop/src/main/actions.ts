@@ -237,6 +237,7 @@ function archivedTurn(value: unknown): ArchivedTurn | undefined {
     id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64),
     content: shorten(text(value.content), MAX_TURN_CONTENT_CHARS), reply: shorten(text(value.reply), MAX_TURN_REPLY_CHARS),
     state, reason: shorten(text(value.reason)), attempts: count0(value.attempts),
+    provider: shorten(text(value.provider), 64), model: shorten(text(value.model), 128),
   };
 }
 

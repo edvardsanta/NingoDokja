@@ -19,6 +19,8 @@ export type Turn = {
   reply: string;
   state: ArchivedTurnState | "unknown";
   reason: string;
+  // what the runtime reported answering, which may differ from what is selected now
+  answeredBy?: string;
 };
 
 export type Conversation = {
@@ -46,12 +48,17 @@ export type Conversation = {
   retry: () => void;
 };
 
-const fromArchive = (turn: ArchivedTurn): Turn => ({ sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason });
+const fromArchive = (turn: ArchivedTurn): Turn => ({
+  sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
+  ...(turn.model ? { answeredBy: turn.provider ? `${turn.provider} / ${turn.model}` : turn.model } : {}),
+});
 
 // How often, and for how long, a reopened conversation looks again at a send still on its way: its
 // reply was being written for a screen that is gone, so nothing else will bring it here.
 const PENDING_RECHECK_MS = 3_000;
 const PENDING_RECHECKS = 40;
+// How near the end of the conversation still counts as being at the end.
+const FOLLOW_SLACK_PX = 80;
 // A new conversation is named by the start of its first message.
 const TITLE_CHARS = 60;
 
@@ -230,16 +237,27 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
   const t = useTranslate();
   const { turns, busy, error, preview } = conversation;
   const end = useRef<HTMLDivElement>(null);
+  // The end is followed while the owner is at it. Reading further up stops that until they come back
+  // down or send something; a reply being written never takes the page from under them.
+  const following = useRef(true);
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: "end" });
-  }, [turns.length, busy, error, preview]);
+    const body = end.current?.closest(".wp-body");
+    if (!body) return undefined;
+    const read = () => { following.current = body.scrollHeight - body.scrollTop - body.clientHeight <= FOLLOW_SLACK_PX; };
+    body.addEventListener("scroll", read, { passive: true });
+    return () => body.removeEventListener("scroll", read);
+  }, [conversation.loading, conversation.loadError]);
+  useEffect(() => { if (busy) following.current = true; }, [busy]);
+  useEffect(() => {
+    if (following.current) end.current?.scrollIntoView?.({ block: "end" });
+  }, [turns.length, busy, error, preview, conversation.loading]);
   const latest = turns.at(-1);
   if (conversation.loading) return <Notice announce="polite">{t("assistant_opening")}</Notice>;
   if (conversation.loadError) return <><Problem error={conversation.loadError}/><Button size="compact" onClick={conversation.reload}>{t("assistant_reload")}</Button></>;
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p></li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}

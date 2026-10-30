@@ -373,6 +373,7 @@
   "assistant_prompt_critique": "What is strong or weak about this piece?",
   "assistant_you": "You",
   "assistant_name": "Ningo",
+  "assistant_answered_by": "Answered by {model}",
   "assistant_thinking": "Ningo is thinking…",
   "assistant_queued": "Waiting for the earlier reply in this conversation…",
   "assistant_retry": "Retry the last message",

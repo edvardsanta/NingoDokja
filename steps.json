@@ -1377,15 +1377,23 @@
             "Do not imply mobile support, remote-device ownership or multi-agent execution from a shared presentation contract.",
             "Preserve drafts, focus and manual reading position during progress updates; auto-follow only when appropriate. Use stable message/task keys and measure long-history input/rendering before adopting windowing, retaining accessible order and focus recovery."
           ],
-          "evidence": [],
-          "checks": [],
+          "evidence": [
+            "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch pins a versioned turn projection (view 1) in dokja_orch/internal/handlers/testdata/turn_view_v1.json, read by the orchestrator and desktop tests; Talk shows the provider and model the runtime reported, separate from the selection, and the queued state from 10.6-b; following the end of the conversation stops while the owner reads further up and resumes when they return or send. Cancellation and steering stay absent because no backend capability exists, so nothing is simulated."
+          ],
+          "checks": [
+            {
+              "name": "desktop_turn_projection",
+              "status": "passed",
+              "detail": "Orchestrator go vet and go test -race passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Skipped: CLI/TUI presentation (09.5-H4 pending), long-history measurement and real-app checks."
+            }
+          ],
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "Consume the backend lifecycle/progress/control contracts from 10.6 together with 09.5 history and 09.7 components. UI projections do not define task authority, dispatch semantics or terminal truth."
+          "next_action": "CLI and TUI consume the pinned projection with 09.5-H4; measure long-history rendering before windowing; running-work and pending-interaction states need backend evidence first."
         },
         {
           "id": "09.9",

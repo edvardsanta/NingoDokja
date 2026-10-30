@@ -327,7 +327,7 @@ export function createFakeTransport(delayMs = 400): Transport {
           const retried = held.turns.find((turn) => turn.id === payload?.retry_turn_id);
           const repeated = held.turns.find((turn) => turn.sendId === payload?.send_id);
           if (repeated) return ok({ reply: repeated.reply, replayed: true, turn: structuredClone(repeated) });
-          const turn = retried ?? { id: archiveId(1000 + held.turns.length), seq: held.turns.length + 1, sendId: String(payload?.send_id ?? ""), content: String(payload?.content ?? ""), reply: "", state: "pending" as const, reason: "", attempts: 0 };
+          const turn = retried ?? { id: archiveId(1000 + held.turns.length), seq: held.turns.length + 1, sendId: String(payload?.send_id ?? ""), content: String(payload?.content ?? ""), reply: "", state: "pending" as const, reason: "", attempts: 0, provider: "demo", model: "demo/small:latest" };
           if (!retried) held.turns.push(turn);
           turn.attempts += 1;
           const reply = "Let us look at that together, since you insist on asking.";

@@ -296,6 +296,9 @@ export type ArchivedTurn = {
   state: ArchivedTurnState;
   reason: string;
   attempts: number;
+  // Who answered, as the runtime reported it; empty when it reported nothing.
+  provider: string;
+  model: string;
 };
 
 export type ArchivedConversation = {

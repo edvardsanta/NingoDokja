@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -683,7 +684,7 @@ test("an archived message forwards only its conversation, send id and text, or a
   const message = {content:"explain",conversation_id:conversation,send_id:"send-0001"};
   assert.equal((await handleRequest({type:"message.created",payload:message},client,limits)).ok,false, "a message needs a recent gesture");
   const answer = await handleRequest({type:"message.created",payload:{...message,reading_id:"entry-1",system:"inject"}},client,limits,undefined,present);
-  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",replayed:false,turn:{id:turnId,seq:1,sendId:"send-0001",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1}}});
+  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",replayed:false,turn:{id:turnId,seq:1,sendId:"send-0001",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1,provider:"",model:""}}});
   await handleRequest({type:"message.created",payload:{conversation_id:conversation,retry_turn_id:turnId,content:"ignored",send_id:"send-0002"}},client,limits,undefined,present);
   assert.deepEqual(calls,[
     {type:"message.created",payload:message},
@@ -808,4 +809,17 @@ test("listing WhatsApp groups is a read of the fixed interface, and only group i
   assert.equal(groups[1]!.members,0);
   assert.equal((await handleRequest({type:"communications.link.groups",payload:{interface:"discord"}},client,limits)).ok,false);
   assert.deepEqual(calls,[{type:"communications.link.groups",payload:{interface:"whatsapp"}}]);
+});
+
+test("the shared turn projection is read as the orchestrator pins it, version 1", async () => {
+  const fixture = JSON.parse(readFileSync(new URL("../../../dokja_orch/internal/handlers/testdata/turn_view_v1.json", import.meta.url), "utf8")) as Record<string, unknown>[];
+  const conversation = {id:"e".repeat(32),kind:"general",reading_id:"",title:"",updated_at:"u",revision:1,turns:fixture.length};
+  const client = { async request() { return {status:"ok",result:{domain:"conversation",result:{conversation,turns:fixture}}}; } };
+  const read = await handleRequest({type:"conversation.read",payload:{conversation_id:"e".repeat(32)}},client,{defaultTimeoutMs:15000,maxTimeoutMs:120000});
+  assert.equal(read.ok,true);
+  const turns = (read as {result:{turns:Record<string,unknown>[]}}).result.turns;
+  assert.deepEqual(turns.map((turn) => turn.state),["completed","pending","failed","interrupted"]);
+  assert.deepEqual([turns[0]!.provider,turns[0]!.model,turns[0]!.reply],["ollama","example/model:latest","One who judges."]);
+  assert.equal(turns[1]!.sendId,"wa-0123456789abcdef");
+  assert.deepEqual([turns[2]!.attempts,turns[2]!.reason],[2,"the model returned no reply"]);
 });

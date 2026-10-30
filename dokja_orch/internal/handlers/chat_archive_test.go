@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
@@ -267,5 +271,46 @@ func TestTheCLISendsAndRetriesThroughTheService(t *testing.T) {
 	chat, _ := result.Result["chat"].(map[string]any)
 	if chat["reply"] != "Answered on retry." {
 		t.Fatal(result.Result)
+	}
+}
+
+// The projection every interface reads is pinned in a fixture the desktop's tests read too.
+func TestTheTurnViewMatchesThePinnedProjection(t *testing.T) {
+	raw, err := os.ReadFile("testdata/turn_view_v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []map[string]any
+	if err := json.Unmarshal(raw, &want); err != nil {
+		t.Fatal(err)
+	}
+	at := func(text string) time.Time {
+		value, err := time.Parse(time.RFC3339, text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	for _, expected := range want {
+		turn := conversation.Turn{
+			ID: expected["id"].(string), Seq: int(expected["seq"].(float64)), SendID: expected["send_id"].(string),
+			Content: expected["content"].(string), Reply: expected["reply"].(string), State: conversation.TurnState(expected["state"].(string)),
+			Reason: expected["reason"].(string), Attempts: int(expected["attempts"].(float64)), CreatedAt: at(expected["created_at"].(string)),
+			Provenance: conversation.Provenance{ObservedProvider: expected["provider"].(string), ObservedModel: expected["model"].(string)},
+		}
+		if finished, ok := expected["finished_at"].(string); ok {
+			turn.FinishedAt = at(finished)
+		}
+		encoded, err := json.Marshal(turnView(turn))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(encoded, &got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, expected) {
+			t.Fatalf("the turn view changed; add a version instead:\n got %v\nwant %v", got, expected)
+		}
 	}
 }

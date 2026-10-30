@@ -2695,3 +2695,6 @@ button.cfg-toggle:focus-visible {
     justify-self: start;
   }
 }
+
+/* Which model answered, under the reply: a quiet line, not part of what Ningo said. */
+.assistant-by { display: block; margin-top: var(--space-1); font-size: .75rem; color: var(--ink-dim); }

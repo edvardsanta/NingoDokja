@@ -602,3 +602,69 @@ describe("a send waiting for its turn", () => {
     await screen.findByText("Respondido.");
   });
 });
+
+describe("following the conversation", () => {
+  const scrolled = (element: HTMLElement, atEnd: boolean) => {
+    Object.defineProperty(element, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(element, "clientHeight", { configurable: true, value: 500 });
+    Object.defineProperty(element, "scrollTop", { configurable: true, value: atEnd ? 1500 : 200 });
+    fireEvent.scroll(element);
+  };
+
+  it("does not take the page from under someone reading further up, and follows again when they send", async () => {
+    let listener: ((preview: ChatPreview) => void) | undefined;
+    const pending = [deferred<TransportResult>(), deferred<TransportResult>()];
+    let sends = 0;
+    let conversationId = "";
+    const transport: Transport = {
+      request: (type, payload) => {
+        if (type === "conversation.start") return Promise.resolve(startedConversation());
+        if (type !== "message.created") return Promise.resolve(failure("unavailable"));
+        conversationId = String(payload?.conversation_id);
+        return pending[sends++]!.promise;
+      },
+      preview: async () => ({ ok: false, error: { code: "unavailable", message: "none" } }),
+      onChatPreview: (each) => { listener = each; return () => { listener = undefined; }; },
+    };
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    await renderTalk(transport);
+    const body = field().closest(".wp")?.querySelector(".wp-body") as HTMLElement;
+    fireEvent.change(field(), { target: { value: "first" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await waitFor(() => expect(listener).toBeDefined());
+
+    scrolled(body, false);
+    scroll.mockClear();
+    act(() => listener?.({ conversationId, text: "Writing" }));
+    screen.getByText("Writing");
+    expect(scroll).not.toHaveBeenCalled();
+
+    scrolled(body, true);
+    act(() => listener?.({ conversationId, text: "Writing more" }));
+    expect(scroll).toHaveBeenCalled();
+
+    scrolled(body, false);
+    await act(async () => pending[0]!.resolve(archivedAnswer("Done.", { content: "first" })));
+    await screen.findByText("Done.");
+    scroll.mockClear();
+    fireEvent.change(field(), { target: { value: "second" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
+  });
+});
+
+describe("who answered", () => {
+  it("shows the model the runtime reported, and nothing when it reported none", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 2)),
+      "conversation.read": readOf(3,
+        archivedTurn({ seq: 1, content: "One", reply: "Reported.", sendId: "send-one1", provider: "ollama", model: "example/small" }),
+        archivedTurn({ seq: 2, content: "Two", reply: "Unreported.", sendId: "send-two2" }),
+      ),
+    });
+    await renderTalk(transport, "pt");
+    screen.getByText("Respondido por ollama / example/small");
+    expect(document.querySelectorAll(".assistant-by")).toHaveLength(1);
+  });
+});

@@ -121,11 +121,11 @@ export const archiveId = (n: number) => n.toString(16).padStart(32, "0");
 export const startedConversation = (n = 1, readingId = ""): TransportResult =>
   ok({ conversation: { id: archiveId(n), kind: readingId ? "reading" : "general", readingId, title: "", updatedAt: "", revision: 1, turns: 0 } });
 
-export type TurnFixture = { seq?: number; content?: string; reply?: string; state?: string; reason?: string; attempts?: number; sendId?: string };
+export type TurnFixture = { seq?: number; content?: string; reply?: string; state?: string; reason?: string; attempts?: number; sendId?: string; provider?: string; model?: string };
 
 export const archivedTurn = (turn: TurnFixture = {}) => ({
   id: archiveId(0x100 + (turn.seq ?? 1)), seq: turn.seq ?? 1, sendId: turn.sendId ?? "send-0001", content: turn.content ?? "",
-  reply: turn.reply ?? "", state: turn.state ?? "completed", reason: turn.reason ?? "", attempts: turn.attempts ?? 1,
+  reply: turn.reply ?? "", state: turn.state ?? "completed", reason: turn.reason ?? "", attempts: turn.attempts ?? 1, provider: turn.provider ?? "", model: turn.model ?? "",
 });
 
 // The orchestrator's answer to an archived send: the turn it settled, under the send's own id and text.
