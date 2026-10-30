@@ -31,6 +31,8 @@ func settingLabel(id string) string {
 		return tr("setting_people")
 	case "whatsapp.groups":
 		return tr("setting_groups")
+	case "whatsapp.conversations":
+		return tr("setting_conversations")
 	case "whatsapp.own_chat":
 		return tr("setting_own_chat")
 	case "models.embedding":

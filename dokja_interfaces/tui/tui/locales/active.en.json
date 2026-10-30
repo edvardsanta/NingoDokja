@@ -282,6 +282,7 @@
   "setting_direct_messages": "direct messages",
   "setting_people": "people (phone numbers)",
   "setting_groups": "groups (<digits>@g.us)",
+  "setting_conversations": "Shown in Messages (alias=number or group)",
   "setting_own_chat": "answer own chat",
   "setting_model_embedding": "embedding model",
   "setting_model_book_classifier": "book classifier model",

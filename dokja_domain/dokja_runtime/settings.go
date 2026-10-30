@@ -35,6 +35,7 @@ var (
 	modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 	phoneMark = regexp.MustCompile(`[\s().+-]`)
 	phone     = regexp.MustCompile(`^[0-9]{7,15}$`)
+	aliasName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 )
 
 var settingsCatalog = []Setting{
@@ -44,6 +45,7 @@ var settingsCatalog = []Setting{
 	{ID: "discord.direct_messages", Group: "discord", Env: "DISCORD_DM_POLICY", Default: "open", Kind: "enum", Options: []string{"open", "closed"}, Affects: []string{"orchestrator", "discord"}, parse: oneOf("open", "closed")},
 	{ID: "whatsapp.people", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOW_FROM", Kind: "list", Affects: []string{"orchestrator", "whatsapp"}, parse: listOf(phoneNumber)},
 	{ID: "whatsapp.groups", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOWED_GROUPS", Kind: "list", Affects: []string{"orchestrator", "whatsapp"}, parse: listOf(group)},
+	{ID: "whatsapp.conversations", Group: "whatsapp", Env: "DOKJA_WHATSAPP_CONVERSATIONS", Kind: "list", Affects: []string{"whatsapp"}, parse: conversations},
 	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"orchestrator", "whatsapp"}, parse: oneOf("true", "false")},
 	{ID: "models.embedding", ReadOnly: true, Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
 	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"feeds"}, parse: model},
@@ -85,6 +87,40 @@ func group(value string) (string, error) {
 		return "", fmt.Errorf("not a group id (<digits>@g.us)")
 	}
 	return value, nil
+}
+
+// conversation is one named conversation of the WhatsApp interface: alias=<phone number or group id>.
+func conversation(value string) (string, error) {
+	alias, target, found := strings.Cut(value, "=")
+	alias, target = strings.TrimSpace(alias), strings.TrimSpace(target)
+	if !found || !aliasName.MatchString(alias) {
+		return "", fmt.Errorf("not alias=<phone number or group id>")
+	}
+	if groupID.MatchString(target) {
+		return alias + "=" + target, nil
+	}
+	number, err := phoneNumber(target)
+	if err != nil {
+		return "", fmt.Errorf("not alias=<phone number or group id>")
+	}
+	return alias + "=" + number, nil
+}
+
+// conversations is a list in which an alias and a conversation each appear once, as the interface requires.
+func conversations(value string) (string, error) {
+	list, err := listOf(conversation)(value)
+	if err != nil || list == "" {
+		return list, err
+	}
+	aliases, targets := map[string]bool{}, map[string]bool{}
+	for _, entry := range strings.Split(list, ",") {
+		alias, target, _ := strings.Cut(entry, "=")
+		if aliases[alias] || targets[target] {
+			return "", fmt.Errorf("an alias or a conversation is repeated")
+		}
+		aliases[alias], targets[target] = true, true
+	}
+	return list, nil
 }
 
 func model(value string) (string, error) {
@@ -329,21 +365,51 @@ func (d *Domain) setState(m Module, state, message string) {
 func ImportSettings(env map[string]string) (map[string]string, error) {
 	values := map[string]string{}
 	for _, s := range settingsCatalog {
-		raw := env[s.Env]
-		if raw == "" {
-			values[s.ID] = ""
-			continue
-		}
-		value, err := s.parse(raw)
+		value, err := importSetting(s, env)
 		if err != nil {
-			return nil, fmt.Errorf("invalid legacy setting %s", s.ID)
-		}
-		if s.ReadOnly && value != s.Default {
-			return nil, fmt.Errorf("legacy %s differs from the approved fixed profile", s.ID)
+			return nil, err
 		}
 		values[s.ID] = value
 	}
 	return values, nil
+}
+
+func importSetting(s Setting, env map[string]string) (string, error) {
+	raw := env[s.Env]
+	if raw == "" {
+		return "", nil
+	}
+	value, err := s.parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid legacy setting %s", s.ID)
+	}
+	if s.ReadOnly && value != s.Default {
+		return "", fmt.Errorf("legacy %s differs from the approved fixed profile", s.ID)
+	}
+	return value, nil
+}
+
+// NewSettings adds to a stored configuration the settings the catalog gained after it was created,
+// taking their values from the legacy environment, once: from then on they are stored, and the
+// environment no longer decides them. It reports whether anything was added.
+func NewSettings(stored, env map[string]string) (map[string]string, bool, error) {
+	merged := make(map[string]string, len(stored))
+	for id, value := range stored {
+		merged[id] = value
+	}
+	added := false
+	for _, s := range settingsCatalog {
+		if _, ok := stored[s.ID]; ok {
+			continue
+		}
+		// Only what is missing is read: the rest of the environment no longer matters.
+		value, err := importSetting(s, env)
+		if err != nil {
+			return nil, false, err
+		}
+		merged[s.ID], added = value, true
+	}
+	return merged, added, nil
 }
 
 // SettingsVariables validates stored values again before passing them to Compose.
