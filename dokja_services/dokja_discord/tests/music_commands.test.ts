@@ -305,3 +305,31 @@ test("a remark on a song that already ended is dropped", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fake.edited.length, edits, "the panel of the next song is left alone");
 });
+
+test("history is shown only to who asked, and leaves the panel where it is", async () => {
+  const fake = fakeVoice(undefined);
+  const sent: Sent[] = [];
+  const history = { ok: true, history: [
+    { song: "Monalisa – Jorge", ended: "finished" },
+    { song: "@everyone wake up", ended: "skipped" },
+  ] };
+  const list = commands(fake.voice, { "music.history": { reply: "", music: history } }, sent);
+  const options: unknown[] = [];
+  const { ctx, replies } = context({ reply: async (_message: unknown, option: unknown) => { options.push(option); } } as never);
+  await find(list, "history").handle(ctx);
+  assert.deepEqual(options, [{ ephemeral: true }]);
+  assert.equal(sent[0].eventType, "music.history");
+  assert.equal(sent[0].content, "", "the person is the verified sender, nothing typed");
+  assert.equal(replies.at(-1), "Your latest songs:\n- Monalisa – Jorge (heard to the end)\n- @\u200beveryone wake up (skipped)");
+});
+
+test("history says so when there is nothing, or when memory cannot answer", async () => {
+  const empty = commands(fakeVoice(undefined).voice, { "music.history": { reply: "", music: { ok: true, history: [] } } }, []);
+  const first = context();
+  await find(empty, "history").handle(first.ctx);
+  assert.equal(first.replies.at(-1), "You have not asked for any song yet.");
+  const down = commands(fakeVoice(undefined).voice, { "music.history": { reply: "", music: { ok: false, code: "no_memory", reason: "x" } } }, []);
+  const second = context();
+  await find(down, "history").handle(second.ctx);
+  assert.equal(second.replies.at(-1), "The music memory is not available right now.");
+});

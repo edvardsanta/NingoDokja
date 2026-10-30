@@ -1,7 +1,7 @@
 # Music in voice channels
 
-Date: 2026-10-26. Status: phases 1 to 4 built (sources, queue, playback,
-commands); Memory receipts are later.
+Date: 2026-10-26. Status: all five phases built (sources, queue, playback,
+commands, per-person memory).
 
 Ningo should play music in a voice channel. The main path is a few typed words:
 someone sends the play command with "monalisa jorge", and Ningo finds the song
@@ -25,7 +25,7 @@ both its concept and its ADR 0007 faculty.
 | Decide which result is the song, and whether it may play | Rules | Moderation | The Communications domain (`ResolveTrack`, `BestMatch`) |
 | What plays next: order, repeat, shuffle, who may skip | Action | Action | The Communications domain decides; the queue itself is volatile orchestration state |
 | Play it in the voice channel | Action | Action | The voice adapter, on the voice session it already owns |
-| What played and what was skipped | Memory | Experience | Memory receipts (later) |
+| What each person listened to, and how it ended | Memory | Experience | The Memory domain's `MusicListen`, kept in experience memory |
 
 The orchestrator sequences these steps and keeps the per-guild queue as volatile
 state. [ADR 0003](decisions/0003-state-ownership.md) allows volatile orchestration
@@ -142,7 +142,15 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
 4. **Commands (built).** `/play`, `/skip`, `/pause`, `/resume`, `/stop`,
    `/queue` and `/volume` on Discord. By voice through the existing voice
    conversation, and desktop or CLI controls, can follow.
-5. **Memory.** Played and skipped tracks become episodes.
+5. **Memory (built).** When a song leaves the queue it becomes an experience of
+   the person who asked for it: action `music.listen:<user id>`, the song as the
+   context, how it ended in `detail`. It ends `finished`, `skipped` or `stopped`,
+   settled at once as `accepted`, `replaced` or `ignored`, so it never expires
+   (owner, 2026-10-26: everything, with no time limit). A song that fails to start
+   also reports its end, so it reads as `finished` for now. `/history` shows a
+   person their own last songs, only to them; the id comes from the verified
+   sender, never from what was typed. Memory's own switch turns this off, and slow
+   or stopped memory never touches the music.
 
 Beyond the phases, Ningo remarks on a song now and then: the Communications domain
 decides which (`CommentDue`, about one in three) and bounds the line (`CommentLine`);
