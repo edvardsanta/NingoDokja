@@ -40,7 +40,7 @@ account: whoever can read it controls the account.
 
 - plain text chat in the account's own "message yourself" chat
 - plain text chat in a one-to-one chat with an allowed number
-- plain text chat in an allowed group, when the bot is mentioned
+- plain text chat in an allowed group, when someone calls Ningo by name (`Ningo,` or `/ningo`) or answers one of its messages
 
 No images, voice notes, stickers, reactions or files: a message without text is ignored.
 
@@ -57,8 +57,8 @@ the linked account is usually somebody's own number.
 | Message older than 5 minutes (bot was offline or reconnecting) | ignored |
 | Own "message yourself" chat | answered when `DOKJA_WHATSAPP_SELF_CHAT` is `true` (default) |
 | One-to-one chat | answered only when the sender is in `DOKJA_WHATSAPP_ALLOW_FROM` |
-| Group | answered only when it is in `DOKJA_WHATSAPP_ALLOWED_GROUPS` **and** the bot is mentioned or one of its messages is replied to |
-| Message has no text once the mention is removed | ignored |
+| Group | answered only when it is in `DOKJA_WHATSAPP_ALLOWED_GROUPS` **and** the message starts with `Ningo,` or `/ningo`, or answers one of Ningo's messages |
+| Message has no text once the call word is removed | ignored |
 | Same message delivered twice | answered once (chat id + message id, kept 10 minutes) |
 
 Allowed numbers are matched on the phone number, written any usual way (`+55 (11) 91234-5678`).
@@ -93,7 +93,7 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_WHATSAPP_AUTH_DIR` | WhatsApp interface | Folder of the linked-device session. **Secret.** Required; `/auth/default` in Compose |
 | `DOKJA_WHATSAPP_SELF_CHAT` | Orchestrator and WhatsApp interface | Answer the account's own chat, default `true` |
 | `DOKJA_WHATSAPP_ALLOW_FROM` | Orchestrator and WhatsApp interface | Phone numbers whose direct messages are answered, comma-separated |
-| `DOKJA_WHATSAPP_ALLOWED_GROUPS` | Orchestrator and WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when mentioned, comma-separated |
+| `DOKJA_WHATSAPP_ALLOWED_GROUPS` | Orchestrator and WhatsApp interface | Group ids (`<digits>@g.us`) where the bot answers when called by name, comma-separated |
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
 | `DOKJA_GATEWAY_INGRESS_TOKEN` | Orchestrator and WhatsApp interface | Dedicated bearer credential for the HTTP bridge. Required. |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
@@ -283,23 +283,23 @@ never deleted by the service.
 - The Discord text commands (`meme fetch`, `meme status`, `meme refresh`) are not available from
   WhatsApp: their text goes to the chat as written. The orchestrator bridge enforces this for the
   `whatsapp` interface: its event type is fixed to `message.created`.
-- A group message triggers an answer for **anyone** in the group who mentions the bot. There is no
+- A group message triggers an answer for **anyone** in the group who calls Ningo by name. There is no
   per-sender limit yet, so allow only groups you trust.
-- On a personal number the bot is you: what the account owner writes in a group is the owner's own
-  message and is ignored, so other members summon Ningo there by mentioning it. The owner cannot
-  mention their own account, so in an **allowed** group a message of the owner's that starts with
-  `Ningo,` or `/ningo` calls Ningo instead: the word is removed and the message counts as a mention.
-  Everything else the owner writes in a group stays ignored, and the reply still comes from the
-  owner's account, signed. Group turns are not kept in the owner's conversation archive, and the
-  owner is not recognized by name there. The owner's private conversation is the "message yourself"
-  chat.
+- In an allowed group, people call Ningo **by name**: a message that starts with `Ningo,` or `/ningo`
+  has the word removed and is answered, and answering one of Ningo's messages also counts. Tagging the
+  linked account with `@` does **not** call Ningo: on a personal number the account is the owner, so a
+  tag means the owner and they can be tagged normally (the tag is still removed from what the model
+  sees). The owner calls Ningo the same way; everything else the owner writes in a group stays
+  ignored. Replies come from the linked account, signed. Group turns are not kept in the owner's
+  conversation archive, and nobody is recognized by name there. The owner's private conversation is
+  the "message yourself" chat.
 - The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
   archive and continues the conversation the desktop shows, so you can start on the phone and go on
   at the desktop, or the other way round. The phone continues the latest conversation; in the
   self-chat, `/ajuda` (or `/help`) lists the commands to start, list, open, rename and delete
   conversations. Deleting asks for `/sim` first. Contacts and groups have no commands. Other chats and groups are never kept there. See
   [conversation history](conversation-history-plan.md#phone-the-whatsapp-self-chat).
-- A reply to a bot message counts as a mention only for about 10 minutes after the bot sent it.
+- A reply to a bot message counts as a call only for about 10 minutes after the bot sent it.
 - Baileys 7 is a release candidate that follows WhatsApp's own changes: the version is pinned and a
   test checks the parts of its API that the interface uses, but an upgrade needs a real-account check.
 - Everything here is covered by automated tests against fakes. It has not been connected to a real
