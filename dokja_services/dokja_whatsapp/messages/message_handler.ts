@@ -1,17 +1,25 @@
 import type { WhatsAppConfig } from "../config.js";
-import { buildWhatsAppBridgeRequest, dispatchToOrchestrator } from "../transport/bridge.js";
+import {
+  buildWhatsAppBridgeRequest,
+  dispatchToOrchestratorResponse,
+  type IncomingDocument,
+  type ReplyMedia,
+  type WhatsAppContentReply,
+} from "../transport/bridge.js";
+import { whatsappLocale, whatsappMessage } from "./locales.js";
 import { RecentKeys } from "./recent_keys.js";
 
 // A WhatsApp text message may hold about 64 KB. A chat answer that long is unreadable anyway.
 export const maxReplyLength = 8000;
-export const failureReply = "I could not reach the orchestrator right now. Try again in a moment.";
+export const failureReply = whatsappMessage(undefined, "failure");
 // Every message Ningo writes ends with its signature: on a personal number the replies come from the
 // owner's own account, so the chat has to tell Ningo's words from the owner's. WhatsApp shows
 // _text_ in italics. What the owner sends from the desktop is the owner's and is not signed.
-export const signature = "\n\nAssinado _Ningo Dokja_";
+export const signature = "\n\n" + whatsappMessage(undefined, "signature");
 
 // The reply as it is sent: cut so that the whole message, signature included, stays within bounds.
-export function signed(text: string): string {
+export function signed(text: string, locale?: string): string {
+  const signature = "\n\n" + whatsappMessage(locale, "signature");
   return `${text.trimEnd().slice(0, maxReplyLength - signature.length)}${signature}`;
 }
 // Messages that arrive late (the bot was offline or reconnecting) are not answered.
@@ -22,12 +30,15 @@ export const typingDelayMs = 1000;
 
 export type WhatsAppMessageConfig = Pick<
   WhatsAppConfig,
-  "orchestratorEndpoint" | "orchestratorTimeoutMs" | "selfChat" | "allowedNumbers" | "allowedGroups"
+  "locale" | "orchestratorEndpoint" | "orchestratorTimeoutMs" | "selfChat" | "allowedNumbers" | "allowedGroups"
 >;
 
 export type WhatsAppMessageContext = {
   // The message text with the bot's own mention already removed.
   text: string;
+  document?: IncomingDocument;
+  downloadDocument?: () => Promise<Buffer>;
+  replyMedia?: (media: ReplyMedia, caption: string) => Promise<unknown>;
   messageId: string;
   chatId: string;
   // "other" covers status updates, broadcast lists and channels, which are never answered.
@@ -54,7 +65,11 @@ export type WhatsAppMessageHandler = (context: WhatsAppMessageContext) => Promis
 
 type Dependencies = {
   typingDelayMs?: number;
-  dispatch?: typeof dispatchToOrchestrator;
+  dispatch?: (
+    endpoint: string,
+    timeoutMs: number,
+    body: ReturnType<typeof buildWhatsAppBridgeRequest>,
+  ) => Promise<string | WhatsAppContentReply>;
   recent?: RecentKeys;
   now?: () => number;
   log?: (...args: unknown[]) => void;
@@ -65,7 +80,8 @@ export function createWhatsAppMessageHandler(
   config: WhatsAppMessageConfig,
   deps: Dependencies = {},
 ): WhatsAppMessageHandler {
-  const dispatch = deps.dispatch ?? dispatchToOrchestrator;
+  const dispatch = deps.dispatch ?? dispatchToOrchestratorResponse;
+  const locale = whatsappLocale(config.locale);
   const recent = deps.recent ?? new RecentKeys();
   const now = deps.now ?? Date.now;
   // A group the bot is not allowed in is reported once, so its id can be copied into
@@ -90,6 +106,7 @@ export function createWhatsAppMessageHandler(
     }
 
     let reply: string;
+    let response: WhatsAppContentReply;
     let typing = false;
     const typingTimer = setTimeout(() => {
       typing = true;
@@ -102,21 +119,47 @@ export function createWhatsAppMessageHandler(
       }
     };
     try {
-      reply = await dispatch(
-        config.orchestratorEndpoint,
-        config.orchestratorTimeoutMs,
-        buildWhatsAppBridgeRequest({
-          content: context.text,
-          userId: context.senderId,
-          chatId: context.chatId,
-          messageId: context.messageId,
-          chatKind: context.chatKind,
-          senderNumbers: context.senderNumbers,
-          isSelfChat: context.isSelfChat,
-          isOwnAccount: context.fromMe,
-          mentionsBot: context.mentionsBot,
-        }),
-      );
+      const body = buildWhatsAppBridgeRequest({
+        content: context.text,
+        document: context.document,
+        locale,
+        userId: context.senderId,
+        chatId: context.chatId,
+        messageId: context.messageId,
+        chatKind: context.chatKind,
+        senderNumbers: context.senderNumbers,
+        isSelfChat: context.isSelfChat,
+        isOwnAccount: context.fromMe,
+        mentionsBot: context.mentionsBot,
+      });
+      const normalize = (value: string | WhatsAppContentReply): WhatsAppContentReply =>
+        typeof value === "string" ? { reply: value } : value;
+      response = normalize(await dispatch(config.orchestratorEndpoint, config.orchestratorTimeoutMs, body));
+      // Authorization and format/size checks happen on the metadata-only turn.
+      // Denied input returns an empty response, so its file is never downloaded.
+      if (response.document_required && context.document) {
+        let bytes: Buffer | undefined;
+        try {
+          if (!context.downloadDocument) throw new Error("document download unavailable");
+          bytes = await context.downloadDocument();
+          if (!bytes.length) throw new Error("empty document");
+          if (bytes.length > 10 * 1024 * 1024) {
+            throw Object.assign(new Error("document too large"), { code: "document_too_large" });
+          }
+        } catch (error) {
+          const reason = (error as { code?: string })?.code === "document_too_large"
+            ? "document_too_large" : "document_download_failed";
+          response = { reply: "", content_error: reason };
+          bytes = undefined;
+        }
+        if (bytes) {
+          body.payload.document = { ...context.document, size: bytes.length, data_b64: bytes.toString("base64") };
+          response = normalize(await dispatch(config.orchestratorEndpoint, config.orchestratorTimeoutMs, body));
+        }
+      }
+      reply = response.content_error ? whatsappMessage(locale, response.content_error) : response.reply;
+      if (response.summary_partial) reply = whatsappMessage(locale, "summary_partial") + "\n\n" + reply;
+
     } catch (error) {
       deps.error?.(JSON.stringify({
         message: "dispatch failed",
@@ -124,16 +167,34 @@ export function createWhatsAppMessageHandler(
         error: error instanceof Error ? error.message : String(error),
       }));
       await stopTyping();
-      await context.reply(signed(failureReply));
+      await context.reply(signed(whatsappMessage(locale, "failure"), locale));
       return;
     }
 
     await stopTyping();
+    if (response.attachments?.length) {
+      try {
+        if (!context.replyMedia) throw new Error("media delivery unavailable");
+        const media = validatedReplyMedia(response.attachments);
+        const signatureLength = ("\n\n" + whatsappMessage(locale, "signature")).length;
+        const firstCaption = reply.slice(0, 1000 - signatureLength);
+        for (let index = 0; index < media.length; index++) {
+          await context.replyMedia(media[index]!, signed(index === 0 ? firstCaption : "", locale));
+        }
+        const textLimit = maxReplyLength - signatureLength;
+        for (let offset = firstCaption.length; offset < reply.length; offset += textLimit) {
+          await context.reply(signed(reply.slice(offset, offset + textLimit), locale));
+        }
+      } catch {
+        await context.reply(signed(whatsappMessage(locale, "media_delivery_failed"), locale));
+      }
+      return;
+    }
     if (!reply.trim()) {
       deps.log?.(JSON.stringify({ message: "completed", messageId: context.messageId, replyLength: 0 }));
       return;
     }
-    await context.reply(signed(reply));
+    await context.reply(signed(reply, locale));
     deps.log?.(JSON.stringify({ message: "replied", messageId: context.messageId, replyLength: reply.length }));
   };
 }
@@ -165,8 +226,24 @@ function ignoreReason(context: WhatsAppMessageContext, now: number): string | nu
     return "stale";
   }
 
-  if (!context.text.trim()) {
+  if (!context.text.trim() && !context.document) {
     return "empty";
   }
   return null;
+}
+
+export function validatedReplyMedia(rows: ReplyMedia[]): ReplyMedia[] {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > 10) throw new Error("invalid media count");
+  let total = 0;
+  for (const row of rows) {
+    if (!row || !["image/jpeg", "image/png", "image/webp", "video/mp4"].includes(row.content_type)
+      || typeof row.data_b64 !== "string" || row.data_b64.length > Math.ceil(8 * 1024 * 1024 / 3) * 4) {
+      throw new Error("invalid media");
+    }
+    const bytes = Buffer.from(row.data_b64, "base64");
+    total += bytes.length;
+    if (!bytes.length || bytes.length > 8 * 1024 * 1024 || bytes.toString("base64") !== row.data_b64
+      || total > 16 * 1024 * 1024) throw new Error("invalid media bytes");
+  }
+  return rows;
 }

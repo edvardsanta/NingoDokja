@@ -3,13 +3,16 @@ import path from "node:path";
 
 import makeWASocket, {
   Browsers,
+  downloadContentFromMessage,
   generateMessageIDV2,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from "baileys";
 
+import { readDocumentStream } from "./document_download.js";
 import { SentMessages } from "./sent_messages.js";
-import type { AuthBundle, WhatsAppSocketLike } from "./whatsapp_runtime.js";
+import { documentOf, type InboundMessage } from "./inbound.js";
+import type { WhatsAppSendContent, AuthBundle, WhatsAppSocketLike } from "./whatsapp_runtime.js";
 
 // The only file that talks to Baileys. The session folder holds the keys of a linked device,
 // so only the owner may read it.
@@ -24,7 +27,7 @@ export async function loadAuth(dir: string): Promise<AuthBundle> {
 export type RawSocket = Omit<WhatsAppSocketLike, "sendMessage"> & {
   sendMessage(
     jid: string,
-    content: { text: string },
+    content: WhatsAppSendContent,
     options?: { quoted?: unknown; messageId?: string },
   ): Promise<{ key?: { id?: string | null }; message?: unknown } | undefined>;
 };
@@ -70,6 +73,16 @@ export function adaptSocket(socket: RawSocket, sent: SentMessages<unknown>): Wha
     logout: () => socket.logout(),
     groupFetchAllParticipating: socket.groupFetchAllParticipating ? () => socket.groupFetchAllParticipating!() : undefined,
     end: (reason) => socket.end(reason),
+    async downloadDocument(message, maxBytes) {
+      const document = documentOf(message);
+      if (!document) throw new Error("document missing");
+      const stream = await downloadContentFromMessage(
+        document as Parameters<typeof downloadContentFromMessage>[0],
+        "document",
+        {options: {signal: AbortSignal.timeout(30000)}},
+      );
+      return readDocumentStream(stream, maxBytes);
+    },
     async sendMessage(jid, content, options) {
       const result = await socket.sendMessage(jid, content, options);
       if (result?.key?.id && result.message) {

@@ -1336,3 +1336,37 @@ at startup; no terminal environment variable is required. The reader supplies
 cookie-free local media URLs to the existing post-preview/save flow. A missing
 worker, inaccessible socket or browser dependency is a startup/read error, not a
 successful deployment. Stop the module to stop workers owned by this controller.
+
+### WhatsApp document summaries and publication delivery
+
+The WhatsApp adapter supports document-only messages and standalone publication
+links through the authenticated chat bridge. Set `DOKJA_WHATSAPP_LOCALE=pt-BR`
+(the default) or `en` in the ignored gateway environment configuration. Development
+and lite Compose explicitly forward this setting; the production Compose file
+currently has no WhatsApp service. A separately deployed WhatsApp adapter reads
+the same setting directly.
+
+Rebuild the orchestrator and WhatsApp adapter together. Run Feeds with an enabled
+`document.extract.v1` provider for the requested extension and a
+`social.resolve.v1` reader that supports both `read` and `media` actions. Old
+orchestrators cannot request document bytes or return publication media; old
+adapters ignore the new structured response fields. Existing text message event
+types and eligibility metadata are unchanged. This is an additive content contract,
+not a new operator-command route from WhatsApp.
+
+The bridge accepts up to 15 MiB of JSON for bounded 10 MiB document uploads. Baileys
+downloads only after Communications authorizes the metadata request. Files are not
+implicitly ingested into Knowledge. The first 80,000 extracted Unicode characters
+are summarized, and a localized message explicitly identifies partial summaries.
+Post delivery accepts up to 10 files, 8 MiB each and 16 MiB total. Static messages
+and signatures use the gateway's locale catalogs; original post captions retain
+their source language.
+
+Readers backed by a host-local cache must relay media through their socket rather
+than returning a loopback URL for the container to fetch. See the generic
+`post-reader-relay` example and the
+[post reader contract](feeds-content-plugins.md#post-readers). Use a sufficient
+plugin output budget for base64 media (the relay example uses 16 MiB), and restart
+Feeds after changing its plugin manifests. Preserve
+private settings and browser credentials on the host. No ports, services or
+volumes are added, and no production rollout is performed automatically.

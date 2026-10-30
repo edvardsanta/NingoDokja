@@ -271,6 +271,23 @@ Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),
 [chat handler](../dokja_orch/internal/handlers/chat_domain_handler.go).
 
+### WhatsApp content messages
+
+An eligible WhatsApp document is normalized as `message.created` with optional
+attachment metadata. Communications authorizes the metadata before a structured
+`document_required` reply lets the adapter download bounded bytes. The
+`incoming-content` workflow uses Chat's document policy, the Feeds document
+extractor and the configured inference provider to generate a localized summary.
+Large readings explicitly identify their 80,000-character excerpt limit; no source
+is automatically ingested into the Library.
+
+A standalone publication URL uses the same workflow to ask Digest for
+`read-link-delivery`: select a `social.resolve.v1` reader, retrieve its bounded
+media bytes through that reader's `media` action, and return the original caption,
+source link and files. WhatsApp renders these with locale-catalog signatures and
+errors; it never calls a reading service or model directly. See
+[WhatsApp content behavior](../dokja_services/dokja_whatsapp/README.md#document-summaries-and-publication-links).
+
 ### Digest
 
 `digest.items -> Digest domain -> feeds.items -> cached plugin observations`
