@@ -1335,14 +1335,23 @@
             "Keep focus visible around docks, sticky content and drawers at supported narrow widths and zoom/text growth; do not infer mobile support from responsive desktop layout.",
             "For failed multi-field submits, preserve input and provide linked inline errors with a focusable summary. Announce relevant errors/status changes without streaming-token repetition."
           ],
-          "evidence": [],
-          "checks": [],
+          "evidence": [
+            "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch adds Button (variant/size/type) and Notice (announce/boxed/tone) in cards/ui.tsx with unchanged HTML, rebuilds the card_frame states on them and migrates the Talk vertical. dokja_docs/desktop-ux/component-catalog.md holds the inventory, state catalog, migration map and rollback."
+          ],
+          "checks": [
+            {
+              "name": "primitives_talk_vertical",
+              "status": "passed",
+              "detail": "Primitive unit tests and Drawer focus entry, Tab containment, Escape and focus return pass; Talk suites unchanged. Other verticals, multi-field linked errors elsewhere and real-app long-content/narrow checks remain."
+            }
+          ],
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
-            "dokja_docs/cindy-architecture-research.md"
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/desktop-ux/component-catalog.md"
           ],
-          "next_action": "After token foundations, migrate one representative vertical using existing primitives and verify behavior before expanding."
+          "next_action": "Migrate the remaining verticals in their own batches; real-app narrow and long-content checks belong with 09.6-b."
         },
         {
           "id": "09.8",

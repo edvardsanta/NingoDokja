@@ -8,6 +8,7 @@ import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
 import { latestConversation } from "./conversation_list.js";
+import { Button, Notice } from "./ui.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
 // screen has it; "unknown" is a send whose outcome the screen could not read back.
@@ -233,8 +234,8 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     end.current?.scrollIntoView?.({ block: "end" });
   }, [turns.length, busy, error, preview]);
   const latest = turns.at(-1);
-  if (conversation.loading) return <p role="status">{t("assistant_opening")}</p>;
-  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" className="compact" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
+  if (conversation.loading) return <Notice announce="polite">{t("assistant_opening")}</Notice>;
+  if (conversation.loadError) return <><Problem error={conversation.loadError}/><Button size="compact" onClick={conversation.reload}>{t("assistant_reload")}</Button></>;
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
@@ -243,12 +244,12 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
-    {busy && !preview && <p role="status">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</p>}
-    {!busy && latest?.state === "pending" && <p role="status">{t("assistant_still_pending")}</p>}
-    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
-    {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}
+    {busy && !preview && <Notice announce="polite">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</Notice>}
+    {!busy && latest?.state === "pending" && <Notice announce="polite">{t("assistant_still_pending")}</Notice>}
+    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <Notice announce="assertive">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</Notice>}
+    {conversation.unkept && <Notice announce="assertive">{t("assistant_history_unavailable")}</Notice>}
     {error && <Problem error={error}/>}
-    {!busy && retryable(latest) && <button type="button" className="compact" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
+    {!busy && retryable(latest) && <Button size="compact" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</Button>}
     <div ref={end} />
   </>;
 }
@@ -273,7 +274,7 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts, footer
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
     <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={1} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" className="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
+    <Button type="submit" variant="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</Button>
     {(hint || footer) && <div className="composer-foot">
       {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
       {footer}

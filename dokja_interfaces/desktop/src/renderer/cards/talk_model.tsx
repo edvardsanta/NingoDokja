@@ -6,6 +6,7 @@ import { useTranslate } from "../i18n/context.js";
 import { RuntimeEnabled } from "../runtime_context.js";
 import { useOpenWorkspace } from "../sidebar.js";
 import { Problem } from "./card_frame.js";
+import { Button, Notice } from "./ui.js";
 
 type Choice = { provider: string; model: string; label: string };
 
@@ -58,7 +59,7 @@ export function TalkModel({ transport, busy }: { transport: Transport; busy: boo
   if (!runtime || !current) return null;
   const choices = choicesFrom(providers ?? [], current);
   if (providers && choices.length === 0) {
-    return <p className="detail talk-model">{t("talk_model_none")} <button type="button" className="compact" onClick={() => open("health")}>{t("talk_open_system")}</button></p>;
+    return <p className="detail talk-model">{t("talk_model_none")} <Button size="compact" onClick={() => open("health")}>{t("talk_open_system")}</Button></p>;
   }
 
   const choose = async (value: string) => {
@@ -80,7 +81,7 @@ export function TalkModel({ transport, busy }: { transport: Transport; busy: boo
       {!current.provider && <option value="">{t("chat_provider_missing")}</option>}
       {choices.map((each) => <option key={`${each.provider}|${each.model}`} value={`${each.provider}|${each.model}`}>{each.label}</option>)}
     </select>
-    {saving && <span role="status" className="detail">{t("talk_model_saving")}</span>}
+    {saving && <Notice as="span" announce="polite" extra="detail">{t("talk_model_saving")}</Notice>}
     {error && <Problem error={error}/>}
   </div>;
 }

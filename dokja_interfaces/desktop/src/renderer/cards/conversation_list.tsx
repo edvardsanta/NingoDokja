@@ -5,6 +5,7 @@ import { isRecord } from "../../shared/records.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import { Problem } from "./card_frame.js";
 import { Drawer } from "./drawer.js";
+import { Button, Notice } from "./ui.js";
 
 const PAGE = 20;
 
@@ -82,9 +83,9 @@ export function ConversationsDrawer({ transport, current, onOpen, onDeleted, onC
   };
 
   return <Drawer title={t("conversations_title")} onClose={onClose}>
-    {error && <><Problem error={error}/><button type="button" className="compact" onClick={() => void load()}>{t("assistant_reload")}</button></>}
+    {error && <><Problem error={error}/><Button size="compact" onClick={() => void load()}>{t("assistant_reload")}</Button></>}
     {!error && !loading && items.length === 0 && <p className="detail">{t("conversations_empty")}</p>}
-    {changed && <p role="status">{t("conversation_changed")}</p>}
+    {changed && <Notice announce="polite">{t("conversation_changed")}</Notice>}
     {problem && <Problem error={problem}/>}
     {items.length > 0 && <ul className="conversation-list">{items.map((item) => {
       const title = item.title || t("conversation_untitled");
@@ -94,21 +95,21 @@ export function ConversationsDrawer({ transport, current, onOpen, onDeleted, onC
             <label htmlFor={`rename-${item.id}`}>{t("conversation_title_label")}</label>
             <input id={`rename-${item.id}`} value={renaming.title} maxLength={120} autoFocus onKeyDown={keepEscape}
               onChange={(event) => setRenaming({ id: item.id, title: event.target.value })}/>
-            <button type="submit" className="primary compact" disabled={working}>{t("conversation_save")}</button>
-            <button type="button" className="compact" onClick={() => setRenaming(undefined)}>{t("conversation_cancel")}</button>
+            <Button type="submit" variant="primary" size="compact" disabled={working}>{t("conversation_save")}</Button>
+            <Button size="compact" onClick={() => setRenaming(undefined)}>{t("conversation_cancel")}</Button>
           </form>
-          : <button type="button" className="row-title" aria-current={item.id === current ? "true" : undefined} onClick={() => onOpen(item)}>
+          : <Button extra="row-title" aria-current={item.id === current ? "true" : undefined} onClick={() => onOpen(item)}>
             <strong>{title}</strong>
-          </button>}
+          </Button>}
         <span className="detail conversation-meta">{t(item.kind === "reading" ? "conversation_meta_reading" : "conversation_meta", { turns: String(item.turns), ago: ago(item.updatedAt) })}</span>
         {renaming?.id !== item.id && <span className="conversation-actions">
-          <button type="button" className="quiet compact" disabled={working} aria-label={t("conversation_rename_named", { title })} onClick={() => setRenaming({ id: item.id, title: item.title })}>{t("conversation_rename")}</button>
-          <button type="button" className="quiet compact conversation-delete" disabled={working} aria-label={t("conversation_delete_named", { title })} onClick={() => void remove(item)}>{t("conversation_delete")}</button>
+          <Button variant="quiet" size="compact" disabled={working} aria-label={t("conversation_rename_named", { title })} onClick={() => setRenaming({ id: item.id, title: item.title })}>{t("conversation_rename")}</Button>
+          <Button variant="quiet" size="compact" extra="conversation-delete" disabled={working} aria-label={t("conversation_delete_named", { title })} onClick={() => void remove(item)}>{t("conversation_delete")}</Button>
         </span>}
       </li>;
     })}</ul>}
-    {loading && <p role="status">{t("assistant_opening_list")}</p>}
-    {!loading && !error && next && <button type="button" className="compact" onClick={() => void load(next)}>{t("conversations_more")}</button>}
+    {loading && <Notice announce="polite">{t("assistant_opening_list")}</Notice>}
+    {!loading && !error && next && <Button size="compact" onClick={() => void load(next)}>{t("conversations_more")}</Button>}
   </Drawer>;
 }
 
