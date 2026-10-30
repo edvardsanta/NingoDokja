@@ -2205,3 +2205,7 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 .conversation-list button.row-title[aria-current="true"] strong { color: var(--cyan); }
 .conversation-actions { display: flex; gap: 0.5rem; }
 .conversation-rename { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+/* Which model answers, under the message: a label and its choice on one line. */
+.talk-model { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.talk-model select { max-width: 24rem; }

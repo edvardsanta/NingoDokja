@@ -8,6 +8,7 @@ import { useDiscussion, type Reading } from "../discussion_context.js";
 import { useStatus } from "../status_context.js";
 import { Composer, READING_PROMPTS, Transcript, useConversation } from "./assistant_conversation.js";
 import { ConversationsDrawer } from "./conversation_list.js";
+import { TalkModel } from "./talk_model.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 
 // The beginnings of a question, written as challenges. They fill the message for the owner to finish;
@@ -64,7 +65,10 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
     conversation.setDraft(`${start} `);
     conversation.field.current?.focus();
   };
-  const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K" />;
+  const dock = <>
+    <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K" />
+    <TalkModel transport={transport} busy={conversation.busy} />
+  </>;
   return <WorkspacePanel trail={[t("nav_assistant")]} actions={restart} dock={dock}>
     <section className="talk" aria-label={t("assistant_title")}>
       {pulse === "lost" && <div className="note" data-tone="problem">
