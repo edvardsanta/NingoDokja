@@ -26,6 +26,10 @@ task lifecycle and history interface rollout remain separate work.
   provider profiles are configuration records, not a message history schema.
 - Communications history for Discord/WhatsApp is a separate source-owned feature;
   it must not silently become part of the assistant's local conversation archive.
+  The one exception is the owner's decision of 2026-10-30: the linked WhatsApp
+  account's own "message yourself" chat speaks for the owner and continues the
+  owner's conversation (see "Phone: the WhatsApp self-chat" below). No other
+  WhatsApp chat, group or Discord channel is archived.
 
 ## Intended behavior and boundaries
 
@@ -159,7 +163,9 @@ again. After any failure the screen reads the archive back instead of inferring
 the outcome. If the archive cannot start a conversation, Talk says so and gives
 the message back unsent; there is no unarchived fallback. The session-notice
 ("started a fresh conversation") no longer appears, because the desktop no longer
-uses the process-local session path. H3 second batch (2026-10-30): when the desktop starts, Talk continues the latest
+uses the process-local session path.
+
+H3 second batch (2026-10-30): when the desktop starts, Talk continues the latest
 general conversation that holds turns, read into the already mounted composer so
 focus and a draft survive. A Conversations drawer lists the kept conversations a
 page at a time and reopens one as its own panel; a reply on its way to another is
@@ -169,6 +175,39 @@ from their first message. Talk also reads the conversation again after each
 settled send and when the window regains focus, so turns added from another
 interface (the phone) appear. The archive's own failure reasons are shown in the
 screen's language. Rename/delete and a queued-waiting state remain.
+
+### Phone: the WhatsApp self-chat
+
+The owner talks to Ningo from the phone in WhatsApp's "message yourself" chat of
+the linked account. Each such message is recorded in the archive as a turn of the
+owner's latest general conversation that holds turns, the same rule the desktop
+uses when it starts; with none, a general conversation is started and titled
+from the message. So a conversation begun on the desktop continues on the phone
+and back. Choosing the conversation and recording the turn happen under one
+lock, so two first messages land in one conversation, and the turn waits in order
+behind any earlier turn of that conversation.
+
+- Only sending is allowed from WhatsApp (`SendScopeFor`); listing, reading,
+  renaming and deleting stay with the desktop, CLI and TUI (`ScopeFor`).
+- The send id is `wa-` plus a hash of the chat and WhatsApp message id, so a
+  redelivered message is answered from the archive instead of being asked again.
+  A redelivery whose turn is still being answered gets no second reply; one whose
+  turn completed gets the stored reply again. Deduplication is per conversation:
+  if the desktop starts a new conversation between a delivery and its redelivery,
+  the redelivery is a new turn (the interface's own 10-minute duplicate filter
+  still covers ordinary repeats).
+- There is no new-conversation command or retry on the phone: a new conversation
+  starts only when the desktop starts one, and a failed turn is retried from the
+  desktop. The interface's payload cannot pick a conversation, send id or retry.
+- A self-chat turn is bounded to 170 s, waiting included, below the interface's
+  default 180 s wait, so the archive records a failure before the phone shows one.
+  Setting `DOKJA_ORCHESTRATOR_TIMEOUT_MS` below about 170 s brings back the case
+  where the phone shows a failure and the archive later completes the turn.
+- The bridge refuses every request when `DOKJA_GATEWAY_INGRESS_TOKEN` is unset, so
+  the self-chat flag only arrives from the authenticated interface.
+- On a dedicated bot number, the owner's personal number is a contact: those
+  messages are not archived. If the archive could not be opened, the self-chat
+  answers as before from the process's own session.
 
 ### H4: CLI and TUI parity
 

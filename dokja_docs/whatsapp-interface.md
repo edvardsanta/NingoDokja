@@ -278,6 +278,11 @@ never deleted by the service.
 - On a personal number the bot is you: what the account owner writes in a group is the owner's own
   message and is ignored, so only other members can summon Ningo there. The owner talks to it in the
   "message yourself" chat.
+- The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
+  archive and continues the conversation the desktop shows, so you can start on the phone and go on
+  at the desktop, or the other way round. A new conversation is started from the desktop; the phone
+  always continues the latest one. Other chats and groups are never kept there. See
+  [conversation history](conversation-history-plan.md#phone-the-whatsapp-self-chat).
 - A reply to a bot message counts as a mention only for about 10 minutes after the bot sent it.
 - Baileys 7 is a release candidate that follows WhatsApp's own changes: the version is pinned and a
   test checks the parts of its API that the interface uses, but an upgrade needs a real-account check.
