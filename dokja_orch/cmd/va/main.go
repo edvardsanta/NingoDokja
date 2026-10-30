@@ -34,7 +34,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
-	ownerConfig, err := ownerconfig.Load(os.Getenv("DOKJA_OWNER_CONFIG_FILE"), os.Getenv("DOKJA_OWNER_DISCORD_USER_ID"))
+	ownerConfig, err := ownerconfig.Load(os.Getenv("DOKJA_OWNER_CONFIG_FILE"))
 	if err != nil {
 		logger.Error("load owner configuration", err)
 		os.Exit(1)

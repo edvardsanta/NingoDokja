@@ -224,9 +224,9 @@ regressions verify their delivery across history/owner/streaming boundaries, not
 a guarantee that every generated reply will follow them.
 
 The private, versioned `.dokja/owner.json` supplies owner account mapping and
-profile facts at startup; `DOKJA_OWNER_CONFIG_FILE` selects another path. A present
-file overrides the legacy Discord owner environment setting, and invalid files
-stop startup. Only verified owner turns receive the configured profile. The Chat
+profile facts at startup; `DOKJA_OWNER_CONFIG_FILE` selects another path. Owner identity is
+configured exclusively in JSON; an absent file disables owner recognition, and
+invalid files stop startup. Only verified owner turns receive the configured profile. The Chat
 domain includes the preferred name in direct identity replies; generated replies
 receive profile facts as private application context. See the
 [configuration and migration guide](production-runbook.md#private-owner-configuration).

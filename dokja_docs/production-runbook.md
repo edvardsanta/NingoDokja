@@ -84,8 +84,6 @@ Before starting production, replace placeholder values in [.env.prod](../.env.pr
 
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
-- `DOKJA_OWNER_DISCORD_USER_ID` (optional, legacy): used only when the owner
-  configuration file is absent. The file is authoritative when present.
 
 ### Private owner configuration
 
@@ -107,8 +105,11 @@ Version 1 requires `owner.id`, `owner.profile.name`, and
 `owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD) and `occupations` are
 optional. Unknown fields, unsupported versions, invalid dates, invalid account
 IDs, oversized files and control characters in profile text stop startup.
-An absent file preserves the legacy environment fallback; an invalid file never
-falls back. Account mappings and profile facts cannot be edited by chat messages.
+An absent file disables owner recognition; an invalid file stops startup. The
+removed `DOKJA_OWNER_DISCORD_USER_ID` environment setting is ignored. Migrate its
+account ID into `owner.accounts.discord.user_id` in the JSON file and remove the
+old setting from environment files before restarting. Account mappings and profile
+facts cannot be edited by chat messages.
 
 The authenticated bridge attaches profile facts only to turns from the configured
 Discord account. Other interfaces, mentions and identity claims cannot activate

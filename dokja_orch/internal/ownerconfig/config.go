@@ -30,15 +30,15 @@ type DiscordAccount struct {
 	UserID string `json:"user_id"`
 }
 
-// Load uses the legacy account only when the file is absent. Invalid files never
-// fall back. Error messages deliberately omit configuration values.
-func Load(path, legacyDiscordID string) (Config, error) {
+// Load reads owner identity exclusively from JSON. An absent file disables owner
+// recognition. Error messages deliberately omit configuration values.
+func Load(path string) (Config, error) {
 	if path == "" {
 		path = DefaultPath
 	}
 	file, err := os.Open(path)
 	if os.IsNotExist(err) {
-		return Config{Owner: Owner{Accounts: Accounts{Discord: DiscordAccount{UserID: strings.TrimSpace(legacyDiscordID)}}}}, nil
+		return Config{}, nil
 	}
 	if err != nil {
 		return Config{}, fmt.Errorf("open owner configuration: %w", err)

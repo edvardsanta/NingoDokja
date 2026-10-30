@@ -110,7 +110,7 @@ func TestConfiguredProfileReachesOnlyVerifiedOwner(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
-	config, err := ownerconfig.Load(path, "legacy-owner")
+	config, err := ownerconfig.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,5 +164,13 @@ func TestConfiguredProfileReachesOnlyVerifiedOwner(t *testing.T) {
 				t.Fatal("incorrect deterministic profile reply")
 			}
 		})
+	}
+}
+
+func TestBridgeConstructorIgnoresRemovedOwnerEnvironment(t *testing.T) {
+	t.Setenv("DOKJA_OWNER_DISCORD_USER_ID", "ignored-owner-account")
+	bridge := NewHTTPBridgeIngress(nil, ":8091")
+	if bridge.discordOwnerID != "" {
+		t.Fatal("removed environment setting activated ownership")
 	}
 }

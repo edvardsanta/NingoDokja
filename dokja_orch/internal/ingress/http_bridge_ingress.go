@@ -80,14 +80,13 @@ type BridgeResponse struct {
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
 	return &HTTPBridgeIngress{
-		service:        service,
-		endpoint:       firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
-		token:          os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
-		discordOwnerID: strings.TrimSpace(os.Getenv("DOKJA_OWNER_DISCORD_USER_ID")),
+		service:  service,
+		endpoint: firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
+		token:    os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
 	}
 }
 
-// WithOwnerConfig replaces the legacy environment identity with startup configuration.
+// WithOwnerConfig supplies the identity loaded from the private JSON file.
 func (i *HTTPBridgeIngress) WithOwnerConfig(config ownerconfig.Config) *HTTPBridgeIngress {
 	i.discordOwnerID = config.Owner.Accounts.Discord.UserID
 	i.ownerProfile = config.Owner.Profile

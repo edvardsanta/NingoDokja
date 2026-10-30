@@ -11,23 +11,24 @@ const fixture = `{"version":1,"owner":{"id":"primary-owner","profile":{"name":"A
 
 func TestLoadOwnerConfiguration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "owner.json")
-	fallback, err := Load(path, "legacy-account")
-	if err != nil || fallback.Owner.Accounts.Discord.UserID != "legacy-account" {
-		t.Fatalf("missing-file fallback: %v", err)
+	t.Setenv("DOKJA_OWNER_DISCORD_USER_ID", "ignored-owner-account")
+	config, err := Load(path)
+	if err != nil || config.Owner.Accounts.Discord.UserID != "" {
+		t.Fatalf("absent file must leave owner recognition disabled: %v", err)
 	}
 	if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
 		t.Fatal(err)
 	}
-	config, err := Load(path, "legacy-account")
+	config, err = Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if config.Owner.Profile.Name != "Alex" || config.Owner.Profile.BirthDate != "2000-01-01" || len(config.Owner.Profile.Occupations) != 2 || config.Owner.Accounts.Discord.UserID != "123456789012345678" {
-		t.Fatal("file did not override the complete legacy identity")
+		t.Fatal("file did not provide the complete owner identity")
 	}
 }
 
-func TestInvalidConfigurationNeverFallsBack(t *testing.T) {
+func TestInvalidConfigurationNeverActivatesOwner(t *testing.T) {
 	for name, data := range map[string]string{
 		"malformed": "{", "empty": "", "null": "null",
 		"version":  strings.Replace(fixture, `"version":1`, `"version":2`, 1),
@@ -44,13 +45,13 @@ func TestInvalidConfigurationNeverFallsBack(t *testing.T) {
 			if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 				t.Fatal(err)
 			}
-			config, err := Load(path, "legacy-account")
+			config, err := Load(path)
 			if err == nil || config.Owner.Accounts.Discord.UserID != "" {
 				t.Fatal("invalid file activated an identity")
 			}
 		})
 	}
-	if _, err := Load(t.TempDir(), "legacy-account"); err == nil {
+	if _, err := Load(t.TempDir()); err == nil {
 		t.Fatal("directory treated as absent file")
 	}
 }
