@@ -1,15 +1,20 @@
 import type { Session } from "electron";
+import { isTrustedSender } from "./guards.js";
 
 type PolicyTarget = Pick<
   Session,
   "setPermissionRequestHandler" | "setPermissionCheckHandler" | "setDevicePermissionHandler"
 >;
 
-// Electron approves every permission request (camera, microphone, notifications...) unless the
-// session has a handler, so this session denies them all. The microphone gets its own rule when
-// voice arrives.
-export function installPermissionPolicy(session: PolicyTarget): void {
-  session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.setPermissionCheckHandler(() => false);
+// Fullscreen is available only to the app's own top-level document. Other
+// permissions and requests from subframes retain the default denial.
+export function installPermissionPolicy(session: PolicyTarget, appUrl?: string): void {
+  const trusted = (contents: { getURL(): string } | null, details: { isMainFrame: boolean; requestingUrl?: string }) =>
+    Boolean(appUrl && contents && details.isMainFrame &&
+      isTrustedSender(contents.getURL(), appUrl) && isTrustedSender(details.requestingUrl, appUrl));
+  session.setPermissionRequestHandler((contents, permission, callback, details) =>
+    callback(permission === "fullscreen" && trusted(contents, details)));
+  session.setPermissionCheckHandler((contents, permission, _origin, details) =>
+    permission === "fullscreen" && trusted(contents, details));
   session.setDevicePermissionHandler(() => false);
 }
