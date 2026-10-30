@@ -21,6 +21,10 @@ import type {
   StatusReply,
 } from "../shared/replies.js";
 import type { ChatPreview, PreviewResult, Transport, TransportResult } from "../shared/transport.js";
+import type { ArchivedTurn } from "../shared/replies.js";
+
+// An archive id as the orchestrator makes them: 32 hexadecimal digits.
+const archiveId = (n: number) => n.toString(16).padStart(32, "0");
 
 // Made-up data for `pnpm dev:web`, where there is no orchestrator and no shell. It exists only in
 // development: the built page never includes it.
@@ -285,6 +289,8 @@ export function createFakeTransport(delayMs = 400): Transport {
     sizes: { "demo/embed:latest": "1.2 GB", "demo/small:latest": "2.0 GB" },
     chat: { configurationRevision: 1, provider: "", model: "" },
   };
+  // The demo's conversation archive, kept as the orchestrator keeps it: by its own opaque ids.
+  const archive = new Map<string, { readingId: string; turns: ArchivedTurn[] }>();
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     onChatPreview(listener) {
@@ -296,16 +302,36 @@ export function createFakeTransport(delayMs = 400): Transport {
     async request(type, payload) {
       await sleep(delayMs);
       switch (type) {
+        case "conversation.start": {
+          const id = archiveId(archive.size + 1);
+          archive.set(id, { readingId: String(payload?.reading_id ?? ""), turns: [] });
+          return ok({ conversation: { id, kind: payload?.reading_id ? "reading" : "general", readingId: String(payload?.reading_id ?? ""), title: "", updatedAt: new Date().toISOString(), revision: 1, turns: 0 } });
+        }
+        case "conversation.read": {
+          const held = archive.get(String(payload?.conversation_id ?? ""));
+          if (!held) return { ok: false, error: { code: "orchestrator", message: "conversation not found" } };
+          return ok({ conversation: { id: String(payload?.conversation_id), kind: held.readingId ? "reading" : "general", readingId: held.readingId, title: "", updatedAt: new Date().toISOString(), revision: 1, turns: held.turns.length }, turns: structuredClone(held.turns) });
+        }
         case "message.created": {
-          // The reply arrives a few words at a time, as the shell's stream would hand it over.
-          const reply = "Let us look at that together, since you insist on asking.";
+          // An archived send: the same send id is answered once, and the reply arrives a few words at a
+          // time, as the shell's stream would hand it over.
           const conversationId = String(payload?.conversation_id ?? "");
+          const held = archive.get(conversationId);
+          if (!held) return { ok: false, error: { code: "orchestrator", message: "conversation not found" } };
+          const retried = held.turns.find((turn) => turn.id === payload?.retry_turn_id);
+          const repeated = held.turns.find((turn) => turn.sendId === payload?.send_id);
+          if (repeated) return ok({ reply: repeated.reply, replayed: true, turn: structuredClone(repeated) });
+          const turn = retried ?? { id: archiveId(1000 + held.turns.length), seq: held.turns.length + 1, sendId: String(payload?.send_id ?? ""), content: String(payload?.content ?? ""), reply: "", state: "pending" as const, reason: "", attempts: 0 };
+          if (!retried) held.turns.push(turn);
+          turn.attempts += 1;
+          const reply = "Let us look at that together, since you insist on asking.";
           const words = reply.split(" ");
           for (let count = 1; count < words.length; count++) {
             await sleep(120);
             for (const listener of previewListeners) listener({ conversationId, text: words.slice(0, count).join(" ") });
           }
-          return ok({reply,sessionNotice:""});
+          Object.assign(turn, { reply, state: "completed" });
+          return ok({ reply, replayed: false, turn: structuredClone(turn) });
         }
         case "runtime.logs": return ok({module:payload?.module,text:"[demo] Module output appears here."});
         case "runtime.modules":return ok({modules:structuredClone(modules),busy:false,error:""});

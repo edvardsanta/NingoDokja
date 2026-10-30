@@ -1,15 +1,27 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
+import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
-import type { MessageId } from "../i18n/i18n.js";
+import type { MessageId, Translate } from "../i18n/i18n.js";
 import type { TransportError } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
+import { latestConversation } from "./conversation_list.js";
 
-type Turn = { role: "user" | "assistant"; text: string };
+// A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
+// screen has it; "unknown" is a send whose outcome the screen could not read back.
+export type Turn = {
+  sendId: string;
+  id: string;
+  content: string;
+  reply: string;
+  state: ArchivedTurnState | "unknown";
+  reason: string;
+};
 
 export type Conversation = {
+  // the archive's id once the conversation has been started there, empty before the first message
   id: string;
   turns: readonly Turn[];
   // the reply written so far while it is on its way, when the shell can stream it; never the reply
@@ -18,74 +30,221 @@ export type Conversation = {
   setDraft: (draft: string) => void;
   busy: boolean;
   error: TransportError | undefined;
-  notice: string;
+  // the archive could not start the conversation, so the last message was given back unsent
+  unkept: boolean;
+  // the archive's conversation this one continues, when it was reopened or restored
+  opened: ArchivedConversation | undefined;
+  // a conversation reopened from the archive: its transcript is being read, or could not be
+  loading: boolean;
+  loadError: TransportError | undefined;
+  reload: () => void;
   field: RefObject<HTMLTextAreaElement | null>;
   send: (content: string) => Promise<void>;
   retry: () => void;
 };
 
-// One conversation with Ningo: what was said, what is being written, and the one request on its way.
-// The id is the screen's own, so the orchestrator keeps this conversation's history apart from any
-// other (a reading's discussion, a new conversation).
-export function useConversation(transport: Transport, reading?: Reading): Conversation {
-  const t = useTranslate();
-  const id = useRef(globalThis.crypto?.randomUUID?.() ?? `desktop-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const fromArchive = (turn: ArchivedTurn): Turn => ({ sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason });
+
+// How often, and for how long, a reopened conversation looks again at a send still on its way: its
+// reply was being written for a screen that is gone, so nothing else will bring it here.
+const PENDING_RECHECK_MS = 3_000;
+const PENDING_RECHECKS = 40;
+// A new conversation is named by the start of its first message.
+const TITLE_CHARS = 60;
+
+function titleFrom(message: string): string {
+  const line = message.replace(/\s+/g, " ").trim();
+  return line.length > TITLE_CHARS ? `${line.slice(0, TITLE_CHARS - 1)}…` : line;
+}
+
+// The reasons the archive records in its own words are said in the screen's language; any other
+// reason (a provider's, a reading's) is shown as it was recorded.
+const KNOWN_REASONS: Readonly<Record<string, MessageId>> = {
+  "the request stopped while waiting for the earlier reply": "assistant_reason_stopped_waiting",
+  "the request stopped before the reply": "assistant_reason_stopped",
+  "the model returned no reply": "assistant_reason_no_reply",
+  "the conversation archive could not be read": "assistant_reason_archive",
+};
+
+function reasonText(reason: string, t: Translate): string {
+  const known = KNOWN_REASONS[reason];
+  return known ? t(known) : reason || t("assistant_no_reply_unknown");
+}
+
+function newSendId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `send-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+// What a send still needs: a turn that ended without a reply is retried by the owner, a send whose
+// outcome is unknown is sent again under its own send id (the archive answers it once), and one still
+// on its way is only read again.
+export function retryable(turn: Turn | undefined): boolean {
+  return turn !== undefined && turn.state !== "completed";
+}
+
+// One conversation with Ningo, kept by the orchestrator's archive: it is started there with the first
+// message, every message carries its own send id, and after a failure the screen reads the archive
+// back instead of guessing. A remount (a new conversation) drops whatever was on its way.
+// restore asks it to continue the latest conversation the archive holds, when there is one.
+export function useConversation(transport: Transport, reading?: Reading, opened?: ArchivedConversation, restore = false): Conversation {
+  const id = useRef(opened?.id ?? "");
+  const [conversationId, setConversationId] = useState(opened?.id ?? "");
+  const [held, setHeld] = useState(opened);
+  const [loading, setLoading] = useState(opened !== undefined || restore);
+  const [loadError, setLoadError] = useState<TransportError>();
+  const rechecks = useRef(0);
+  // A panel that was replaced (another conversation, a new one) reads nothing more.
+  const live = useRef(true);
+  useEffect(() => () => { live.current = false; }, []);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<TransportError>();
-  const [notice, setNotice] = useState("");
+  const [unkept, setUnkept] = useState(false);
   const [preview, setPreview] = useState("");
   const field = useRef<HTMLTextAreaElement>(null);
   // Only this conversation's previews, and only while its turn is on its way.
   useEffect(() => {
     if (!busy || !transport.onChatPreview) return undefined;
     return transport.onChatPreview((each) => {
-      if (each.conversationId === id.current) setPreview(each.text);
+      if (id.current && each.conversationId === id.current) setPreview(each.text);
     });
   }, [busy, transport]);
-  const send = async (content: string) => {
-    const message = content.trim();
-    if (!message || busy) return;
-    setTurns((previous) => [...previous, { role: "user", text: message }]);
-    setDraft(""); setBusy(true); setError(undefined); setNotice("");
+
+  const settle = (sendId: string, change: (turn: Turn) => Turn) =>
+    setTurns((previous) => previous.map((turn) => (turn.sendId === sendId ? change(turn) : turn)));
+
+  // The archive's turns replace the screen's; a send it does not hold yet stays as the screen knew it.
+  // A send that could not be read back is unknown; a send already known pending stays pending.
+  const readBack = async (sendId?: string) => {
+    if (!live.current) return false;
+    const read = await transport.request("conversation.read", { conversation_id: id.current });
+    if (!read.ok || !isRecord(read.result) || !Array.isArray(read.result.turns)) {
+      if (sendId) settle(sendId, (turn) => (turn.state === "pending" ? { ...turn, state: "unknown" } : turn));
+      return false;
+    }
+    const archived = (read.result.turns as ArchivedTurn[]).map(fromArchive);
+    setTurns((previous) => [...archived, ...previous.filter((turn) => !archived.some((each) => each.sendId === turn.sendId))]);
+    return true;
+  };
+
+  // A reopened or restored conversation is read from the archive before it can be continued. Without
+  // one to restore, the conversation is a new one.
+  const load = async () => {
+    let target = opened ?? held;
+    setLoading(true); setLoadError(undefined);
+    if (!target && restore) {
+      target = await latestConversation(transport);
+      if (target && !id.current) {
+        id.current = target.id;
+        setConversationId(target.id);
+        setHeld(target);
+      } else target = undefined;
+    }
+    if (!target) { setLoading(false); return; }
+    const read = await transport.request("conversation.read", { conversation_id: target.id }).catch(() => undefined);
+    if (read?.ok && isRecord(read.result) && Array.isArray(read.result.turns)) setTurns((read.result.turns as ArchivedTurn[]).map(fromArchive));
+    else setLoadError(read && !read.ok ? read.error : { code: "unavailable", message: "The conversation could not be read." });
+    setLoading(false);
+  };
+  useEffect(() => { void load(); }, []);
+
+  // Coming back to the window, the conversation is read again: it may have been continued elsewhere.
+  const idle = !busy && !loading;
+  useEffect(() => {
+    if (!idle) return undefined;
+    const again = () => { if (id.current && document.visibilityState !== "hidden") void readBack(); };
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+    return () => { window.removeEventListener("focus", again); document.removeEventListener("visibilitychange", again); };
+  }, [idle]);
+
+  // The latest send still on its way, with nothing here waiting for it, is looked at again for a while.
+  const latestPending = !busy && !loading && turns.at(-1)?.state === "pending";
+  useEffect(() => {
+    if (!latestPending || rechecks.current >= PENDING_RECHECKS) return undefined;
+    const timer = setTimeout(() => { rechecks.current += 1; void readBack(); }, PENDING_RECHECK_MS);
+    return () => clearTimeout(timer);
+  }, [latestPending, turns]);
+
+  const dispatch = async (sendId: string, payload: Record<string, unknown>) => {
+    setBusy(true); setError(undefined);
     try {
-      const answer = await transport.request("message.created", {
-        content: message,
-        conversation_id: id.current,
-        ...(reading ? { reading_id: reading.id } : {}),
-      }, { timeoutMs: 120_000 });
-      if (!answer.ok) { setError(answer.error); return; }
-      const result = answer.result;
-      if (!isRecord(result) || typeof result.reply !== "string" || result.reply.length === 0) {
-        setError({ code: "unexpected", message: "The assistant returned no reply." }); return;
+      const answer = await transport.request("message.created", { conversation_id: id.current, ...payload }, { timeoutMs: 120_000 });
+      const turn = answer.ok && isRecord(answer.result) && isRecord(answer.result.turn) ? (answer.result.turn as unknown as ArchivedTurn) : undefined;
+      if (turn) {
+        settle(sendId, () => fromArchive(turn));
+        // Another interface (the phone) may have added turns meanwhile; the archive's order is kept.
+        await readBack();
+        return;
       }
-      setTurns((previous) => [...previous, { role: "assistant", text: result.reply as string }]);
-      setNotice(result.sessionNotice === "new" || result.sessionNotice === "reset" ? t("assistant_session_reset") : "");
+      setError(answer.ok ? { code: "unexpected", message: "The assistant returned no reply." } : answer.error);
+      await readBack(sendId);
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
+      await readBack(sendId).catch(() => settle(sendId, (turn) => ({ ...turn, state: "unknown" })));
     } finally { setBusy(false); setPreview(""); field.current?.focus(); }
   };
-  const retry = () => void send(turns.at(-1)?.role === "user" ? turns.at(-1)!.text : draft);
-  return { id: id.current, turns, preview, draft, setDraft, busy, error, notice, field, send, retry };
+
+  const send = async (content: string) => {
+    const message = content.trim();
+    if (!message || busy || loading || loadError) return;
+    setDraft(""); setError(undefined); setUnkept(false);
+    if (!id.current) {
+      setBusy(true);
+      const started = await transport.request("conversation.start", { ...(reading ? { reading_id: reading.id } : {}), title: titleFrom(message) }).catch(() => undefined);
+      const conversation = started?.ok && isRecord(started.result) && isRecord(started.result.conversation) ? started.result.conversation : undefined;
+      if (!conversation || typeof conversation.id !== "string") {
+        // Nothing is answered unless it is kept, so the message goes back to the owner unsent.
+        setBusy(false); setDraft(message); setUnkept(true);
+        return;
+      }
+      id.current = conversation.id;
+      setConversationId(conversation.id);
+    }
+    const sendId = newSendId();
+    setTurns((previous) => [...previous, { sendId, id: "", content: message, reply: "", state: "pending", reason: "" }]);
+    await dispatch(sendId, { content: message, send_id: sendId });
+  };
+
+  // Only the latest send is retried, and never by sending its text as a new message.
+  const retry = () => {
+    const latest = turns.at(-1);
+    if (busy || !retryable(latest) || !latest) return;
+    if (latest.state === "pending") { rechecks.current = 0; void readBack(); return; }
+    settle(latest.sendId, (turn) => ({ ...turn, state: "pending", reason: "" }));
+    if ((latest.state === "failed" || latest.state === "interrupted") && latest.id) void dispatch(latest.sendId, { retry_turn_id: latest.id });
+    else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
+  };
+  return { id: conversationId, turns, preview, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
-// conversation grows.
+// conversation grows. A send without a reply says why, and only the latest can be sent again.
 export function Transcript({ conversation }: { conversation: Conversation }) {
   const t = useTranslate();
-  const { turns, busy, notice, error, preview } = conversation;
+  const { turns, busy, error, preview } = conversation;
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end" });
   }, [turns.length, busy, error, preview]);
+  const latest = turns.at(-1);
+  if (conversation.loading) return <p role="status">{t("assistant_opening")}</p>;
+  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
   return <>
-    <ol className="assistant-turns" aria-live="polite">{turns.map((turn, index) => <li key={index} data-role={turn.role}><strong>{t(turn.role === "user" ? "assistant_you" : "assistant_name")}</strong><p>{turn.text}</p></li>)}</ol>
+    <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
+      <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p></li>] : []),
+      ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
+    ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
     {busy && !preview && <p role="status">{t("assistant_thinking")}</p>}
-    {notice && <p role="status">{notice}</p>}
-    {error && <><Problem error={error}/><button type="button" disabled={busy} onClick={conversation.retry}>{t("assistant_retry")}</button></>}
+    {!busy && latest?.state === "pending" && <p role="status">{t("assistant_still_pending")}</p>}
+    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
+    {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}
+    {error && <Problem error={error}/>}
+    {!busy && retryable(latest) && <button type="button" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
     <div ref={end} />
   </>;
 }
@@ -93,7 +252,10 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
 // Where the owner writes. Enter sends and Shift+Enter breaks the line.
 export function Composer({ conversation, placeholder, hint, keyshortcuts }: { conversation: Conversation; placeholder: string; hint?: string; keyshortcuts?: string }) {
   const t = useTranslate();
-  const { id, draft, setDraft, busy, field, send } = conversation;
+  const { id, draft, setDraft, field, send } = conversation;
+  // The field stays usable while a conversation is read, so focus and a draft are kept; only sending waits.
+  const busy = conversation.busy || conversation.loadError !== undefined;
+  const waiting = busy || conversation.loading;
   const fieldId = `assistant-prompt-${id}`;
   const hintId = `${fieldId}-hint`;
   const submit = (event: FormEvent) => { event.preventDefault(); void send(draft); };
@@ -106,7 +268,7 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts }: { co
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
     <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" className="primary" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
+    <button type="submit" className="primary" disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
     {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
   </form>;
 }

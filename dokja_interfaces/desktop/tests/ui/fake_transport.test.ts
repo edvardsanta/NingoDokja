@@ -9,7 +9,11 @@ it("keeps local model controls working while the demo streams a chat reply", asy
   const transport = createFakeTransport(0);
   const previews: ChatPreview[] = [];
   const unsubscribe = transport.onChatPreview!((preview) => previews.push(preview));
-  const reply = transport.request("message.created", { conversation_id: "demo-chat" });
+  const starting = transport.request("conversation.start", {});
+  await vi.advanceTimersByTimeAsync(0);
+  const started = await starting;
+  const conversationId = started.ok ? String((started.result as { conversation: { id: string } }).conversation.id) : "";
+  const reply = transport.request("message.created", { conversation_id: conversationId, content: "hello", send_id: "send-0001" });
   const providers = transport.request("runtime.providers");
   const selection = transport.request("runtime.chat.configure", {
     provider: "ollama", model: "demo/small:latest",
@@ -17,7 +21,7 @@ it("keeps local model controls working while the demo streams a chat reply", asy
 
   await vi.advanceTimersByTimeAsync(500);
   expect(previews.length).toBeGreaterThan(0);
-  expect(previews.every((preview) => preview.conversationId === "demo-chat")).toBe(true);
+  expect(previews.every((preview) => preview.conversationId === conversationId)).toBe(true);
   await expect(providers).resolves.toMatchObject({ ok: true, result: {
     providers: [expect.objectContaining({ id: "ollama", models: expect.arrayContaining(["demo/small:latest"]) }), expect.anything()],
   } });
