@@ -70,7 +70,8 @@ export function createWhatsAppMessageHandler(
   // DOKJA_WHATSAPP_ALLOWED_GROUPS without logging every message of a busy chat.
   const reportedGroups = new Set<string>();
 
-  return async (context) => {
+  return async (received) => {
+    const context = ownerCall(received, config.allowedGroups);
     const ignored = ignoreReason(context, now());
     if (ignored) {
       // Ignored messages are most of what a personal account receives, so they are not logged
@@ -132,6 +133,19 @@ export function createWhatsAppMessageHandler(
     await context.reply(signed(reply));
     deps.log?.(JSON.stringify({ message: "replied", messageId: context.messageId, replyLength: reply.length }));
   };
+}
+
+// On a personal number the owner cannot mention the bot, which is the owner's own account, so what
+// the owner writes in a group is ignored. In a group the owner allowed, a message that starts with
+// "Ningo," or "/ningo" calls the bot instead: the word is taken off and the message counts as a
+// mention. Everything else the owner writes in a group stays ignored.
+export const ownerTrigger = /^\s*(?:\/ningo\b|ningo\s*,)\s*/i;
+
+export function ownerCall(context: WhatsAppMessageContext, allowedGroups: readonly string[]): WhatsAppMessageContext {
+  if (!context.fromMe || context.sentByBot || context.chatKind !== "group" || !allowedGroups.includes(context.chatId) || !ownerTrigger.test(context.text)) {
+    return context;
+  }
+  return { ...context, text: context.text.replace(ownerTrigger, ""), fromMe: false, mentionsBot: true };
 }
 
 // Returns why a message is not for the bot, or null when it is.
