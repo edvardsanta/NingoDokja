@@ -45,7 +45,7 @@ func TestRealtimeObserverFlowsThroughAuthorizationToDesktopWithoutChat(t *testin
 	if result := send(start, "Bearer fixture-credential"); !strings.Contains(result, `"accepted":true`) {
 		t.Fatal(result)
 	}
-	observe := `{"event_type":"realtime.observe","payload":{"userId":"second-speaker","channelId":"control","guildId":"guild","entryKind":"command","isDirectMessage":false,"realtime":{"session_id":"session","message_id":"m","speaker_id":"forged","text":"Redis with expiration","transcription_status":"final","revision":1,"timestamp_start":"2026-10-29T10:00:00Z","timestamp_end":"2026-10-29T10:00:02Z"}}}`
+	observe := `{"event_type":"realtime.observe","payload":{"userId":"second-speaker","userName":"Channel Scholar","channelId":"control","guildId":"guild","entryKind":"command","isDirectMessage":false,"realtime":{"session_id":"session","message_id":"m","speaker_id":"forged","speaker_name":"Forged name","text":"Redis with expiration","transcription_status":"final","revision":1,"timestamp_start":"2026-10-29T10:00:00Z","timestamp_end":"2026-10-29T10:00:02Z"}}}`
 	if result := send(observe, "Bearer fixture-credential"); !strings.Contains(result, `"accepted":true`) {
 		t.Fatal(result)
 	}
@@ -54,7 +54,7 @@ func TestRealtimeObserverFlowsThroughAuthorizationToDesktopWithoutChat(t *testin
 		t.Fatal(err)
 	}
 	sessions := result.Result[string(core.DomainConversation)].(map[string]any)["sessions"].([]conversation.RealtimeSession)
-	if len(sessions) != 1 || len(sessions[0].Messages) != 1 || sessions[0].Messages[0].SpeakerID != "second-speaker" {
+	if len(sessions) != 1 || len(sessions[0].Messages) != 1 || sessions[0].Messages[0].SpeakerID != "second-speaker" || sessions[0].Messages[0].SpeakerName != "Channel Scholar" {
 		t.Fatal("source-derived identity or snapshot lost")
 	}
 }

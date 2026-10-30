@@ -87,7 +87,7 @@ type ListeningSession = {
   stop(): void;
 };
 
-export type VoiceObservation = { userId: string; channelId: string; sequence: number; text: string; startedAt: string; endedAt: string };
+export type VoiceObservation = { userId: string; userName?: string; channelId: string; sequence: number; text: string; startedAt: string; endedAt: string };
 
 type SpeakParams = {
   guildId?: string;
@@ -808,7 +808,7 @@ export function createListeningSession(params: {
           if (!stopped && params.participant(speakingUserId)) {
             const text = String(result.text ?? "").trim();
             if (params.onObservation && text) {
-              await params.onObservation({ userId: participant.userId, channelId: params.session.channelId,
+              await params.onObservation({ userId: participant.userId, userName: participant.userName, channelId: params.session.channelId,
                 sequence: seq, text, startedAt: captureStart, endedAt });
               conversation.finish(seq, undefined, "observed");
             } else if (!params.onObservation) conversation.finish(seq, { ...participant, text });

@@ -12,7 +12,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
   const rooms = new Map<string, Observer>();
   const operations = new Set<string>();
   async function send(context: DiscordCommandContext, room: Observer, type: string, extra = {}) {
-    const body = buildBridgePayload({eventType:type,userId:context.userId,guildId:context.guildId,
+    const body = buildBridgePayload({eventType:type,userId:context.userId,userName:context.userName,guildId:context.guildId,
       channelId:room.origin,messageId:randomUUID()});
     body.payload.realtime={session_id:room.id,voice_channel_id:room.channel,...extra};
     const result=await dispatchToOrchestratorResponse(endpoint, Math.min(timeout,5000), body);
@@ -49,7 +49,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
           async onObservation(observation) {
             if (rooms.get(guild)!==selected || !selected.active) return;
             try {
-              await send({...context,userId:observation.userId},selected,"realtime.observe",{
+              await send({...context,userId:observation.userId,userName:observation.userName},selected,"realtime.observe",{
                 capture_sequence:observation.sequence,message_id:`${selected.id}:${observation.sequence}`,text:observation.text,
                 timestamp_start:observation.startedAt,timestamp_end:observation.endedAt,
                 transcription_status:"final",revision:1,
