@@ -2,6 +2,7 @@ package communications
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -137,5 +138,29 @@ func TestEveryChangeRaisesTheVersionAndARefusalDoesNot(t *testing.T) {
 	}
 	if _, advanced := q.Ended(999); advanced || q.State().Version != last {
 		t.Fatal("an ignored report must not raise the version")
+	}
+}
+
+func TestCommentDueIsAboutOneSongInThreeFromTheFirst(t *testing.T) {
+	var due []int
+	for entry := -1; entry <= 7; entry++ {
+		if CommentDue(entry) {
+			due = append(due, entry)
+		}
+	}
+	if len(due) != 3 || due[0] != 1 || due[1] != 4 || due[2] != 7 {
+		t.Fatal(due)
+	}
+}
+
+func TestCommentLineIsOneBoundedLine(t *testing.T) {
+	if got := CommentLine("  “Two\n\nlines”  "); got != "Two lines" {
+		t.Fatalf("%q", got)
+	}
+	if got := CommentLine("  \n "); got != "" {
+		t.Fatalf("%q", got)
+	}
+	if got := []rune(CommentLine(strings.Repeat("é", 500))); len(got) != maxCommentRunes || got[len(got)-1] != '…' {
+		t.Fatal(len(got))
 	}
 }

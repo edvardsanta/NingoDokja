@@ -23,6 +23,8 @@ const musicResolveTimeout = 150 * time.Second
 type musicDesk struct {
 	sources communications.AudioSources
 	timeout time.Duration
+	// comments writes Ningo's remark on a song; nil means no remarks
+	comments ChatConversationGenerator
 	// epoch names this process's queues: entries and versions start again after a restart, so
 	// whoever plays a queue compares states only within one epoch.
 	epoch string
@@ -34,6 +36,8 @@ type musicDesk struct {
 type guildQueue struct {
 	mu    sync.Mutex
 	queue *communications.MusicQueue
+	// commented is the last entry Ningo remarked on, so a repeated ask costs no second model call
+	commented int
 }
 
 func newMusicDesk(sources communications.AudioSources) *musicDesk {
@@ -62,6 +66,7 @@ func (d *musicDesk) guild(id string) *guildQueue {
 var musicActions = map[string]bool{
 	"play-music": true, "skip-music": true, "pause-music": true, "resume-music": true,
 	"stop-music": true, "show-music-queue": true, "set-music-volume": true, "end-music-track": true,
+	"comment-music-track": true,
 }
 
 // handle answers every refusal as a result the person reads ({ok: false, reason}); an error is
@@ -76,6 +81,9 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 	content, _ := event.Payload["content"].(string)
 	if action == "play-music" {
 		return d.play(ctx, guild, communications.TrackRequestFromText(content), event.User.ID)
+	}
+	if action == "comment-music-track" {
+		return d.comment(ctx, guild, content), nil
 	}
 	guild.mu.Lock()
 	defer guild.mu.Unlock()
