@@ -47,7 +47,7 @@ export type PostStoreOptions = {
   localOrigin?: string;
   // Asks the owner where to save, starting from a folder; undefined when the owner cancelled.
   // Without it, posts go to savedRoot without asking (tests).
-  pickFolder?: (defaultPath: string) => Promise<string | undefined>;
+  pickFolder?: (defaultPath: string, destination: "library" | "computer") => Promise<string | undefined>;
   // Words the Library entry's labels in the owner's language; English when absent.
   translate?: Translate;
   // Only for tests: where the temporary folder is made.
@@ -172,7 +172,7 @@ export class PostStore {
     const post = this.posts.get(documentId);
     if (!post) return undefined;
     const parent = this.options.pickFolder
-      ? await this.options.pickFolder(this.lastParent ?? this.options.savedRoot)
+      ? await this.options.pickFolder(this.lastParent ?? this.options.savedRoot, "library")
       : this.options.savedRoot;
     if (!parent) return "cancelled";
     this.lastParent = parent;
@@ -182,6 +182,35 @@ export class PostStore {
     for (const file of post.files) await copyFile(file.path, join(folder, file.name));
     this.saved.set(documentId, { folder, created: !existed });
     return post.files.map((file) => file.name);
+  }
+
+  // Copies media to a folder chosen on this computer without creating a Library entry.
+  async saveLocally(documentId: string): Promise<number | "cancelled" | undefined> {
+    const post = this.posts.get(documentId);
+    if (!post) return undefined;
+    const parent = this.options.pickFolder
+      ? await this.options.pickFolder(this.lastParent ?? this.options.savedRoot, "computer")
+      : this.options.savedRoot;
+    if (!parent) return "cancelled";
+    this.lastParent = parent;
+
+    const urlPath = new URL(post.url).pathname;
+    const shortcode = urlPath.split("/").filter(Boolean).at(-1) ?? documentId;
+    const stem = /^[A-Za-z0-9_-]{1,100}$/.test(shortcode) ? shortcode : documentId;
+    let folder = join(parent, stem);
+    let suffix = 2;
+    while (await stat(folder).then(() => true, () => false)) {
+      folder = join(parent, `${stem} (${suffix++})`);
+    }
+    await mkdir(folder);
+    try {
+      for (const file of post.files) await copyFile(file.path, join(folder, file.name));
+    } catch (error) {
+      await rm(folder, { recursive: true, force: true });
+      throw error;
+    }
+    this.saved.set(documentId, { folder, created: true });
+    return post.files.length;
   }
 
   // The folder of a post saved in this run, or nothing: the page cannot name any other folder.

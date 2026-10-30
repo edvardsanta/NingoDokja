@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
 import { INGEST_LIMITS } from "../../shared/ingest.js";
+import { isRecord } from "../../shared/records.js";
 import type { PostMedia, PostRefusal, PostReply, PostView } from "../../shared/posts.js";
 import type { IngestResult, Off } from "../../shared/replies.js";
 import type { Transport, TransportError } from "../../shared/transport.js";
@@ -47,7 +48,16 @@ type Trouble = { kind: "off"; reason: string } | { kind: "timeout" } | { kind: "
 type View =
   | { phase: "idle" }
   | { phase: "reading" }
-  | { phase: "shown"; post: PostView; saving: boolean; trouble?: Trouble }
+  | {
+      phase: "shown";
+      post: PostView;
+      saving: boolean;
+      localSaving?: boolean;
+      localFiles?: number;
+      localFailed?: boolean;
+      folderFailed?: boolean;
+      trouble?: Trouble;
+    }
   | { phase: "saved"; id: "post_saved" | "add_unchanged"; title: string; files: number; documentId: string; folderFailed: boolean };
 
 type Props = {
@@ -58,8 +68,8 @@ type Props = {
   onUseAddress?: (url: string) => void;
 };
 
-// A link to one public post: read it, look at it as it will be kept, and save it. Reading and
-// saving each ask the shell, which downloads the files and, for the save, asks the owner first. A
+// A link to one public post: read it, preview it, then save it locally or add it to the Library.
+// Reading and saving ask the shell, which downloads the files and asks where local copies belong. A
 // pressed button is about to be disabled, so the focus moves to the field first; it would
 // otherwise fall out of the drawer.
 export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
@@ -71,7 +81,8 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
   const [view, setView] = useState<View>({ phase: "idle" });
   const field = useRef<HTMLInputElement>(null);
   const save = useRef<HTMLButtonElement>(null);
-  const focusNext = useRef<"field" | "save" | undefined>(undefined);
+  const saveLocal = useRef<HTMLButtonElement>(null);
+  const focusNext = useRef<"field" | "save" | "local" | undefined>(undefined);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -82,7 +93,7 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
   }, []);
 
   const reading = view.phase === "reading";
-  const saving = view.phase === "shown" && view.saving;
+  const saving = view.phase === "shown" && (view.saving || view.localSaving === true);
   const busy = reading || saving;
   useEffect(() => {
     onBusy?.(busy);
@@ -93,7 +104,7 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
   useEffect(() => {
     const next = focusNext.current;
     focusNext.current = undefined;
-    if (next) (next === "save" ? save : field).current?.focus();
+    if (next) (next === "save" ? save : next === "local" ? saveLocal : field).current?.focus();
   }, [view]);
 
   const arrived = (answer: LoadResult<PostReply | Off>) => {
@@ -129,7 +140,15 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
   const kept = (post: PostView, answer: LoadResult<IngestResult | Off>) => {
     const back = (trouble?: Trouble) => {
       focusNext.current = "save";
-      setView({ phase: "shown", post, saving: false, ...(trouble ? { trouble } : {}) });
+      setView((current) => ({
+        phase: "shown",
+        post,
+        saving: false,
+        ...(current.phase === "shown" && current.localFiles !== undefined ? { localFiles: current.localFiles } : {}),
+        ...(current.phase === "shown" && current.localFailed ? { localFailed: true } : {}),
+        ...(current.phase === "shown" && current.folderFailed ? { folderFailed: true } : {}),
+        ...(trouble ? { trouble } : {}),
+      }));
     };
     if (!answer.ok) {
       const { error } = answer;
@@ -154,7 +173,13 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
   const keep = (post: PostView) => {
     if (busy) return;
     field.current?.focus();
-    setView({ phase: "shown", post, saving: true });
+    setView((current) => ({
+      phase: "shown",
+      post,
+      saving: true,
+      ...(current.phase === "shown" && current.localFiles !== undefined ? { localFiles: current.localFiles } : {}),
+      ...(current.phase === "shown" && current.folderFailed ? { folderFailed: true } : {}),
+    }));
     const settle = (answer: LoadResult<IngestResult | Off>) => {
       // The Library's list is worth reading again even if the drawer was closed meanwhile.
       if (answer.ok && !answer.data.off && answer.data.created + answer.data.updated > 0) onAdded?.();
@@ -163,10 +188,49 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
     addToBase(transport, { mode: "post", post: post.documentId }).then(settle, () => settle(UNAVAILABLE));
   };
 
+  const saveOnComputer = (post: PostView) => {
+    if (busy || !transport.savePostLocally) return;
+    field.current?.focus();
+    setView((current) => ({
+      phase: "shown",
+      post,
+      saving: false,
+      localSaving: true,
+      ...(current.phase === "shown" && current.localFiles !== undefined ? { localFiles: current.localFiles } : {}),
+    }));
+    const settle = (result: Awaited<ReturnType<NonNullable<Transport["savePostLocally"]>>>) => {
+      if (!alive.current) return;
+      if (!result.ok && result.error.code === "cancelled") {
+        focusNext.current = "local";
+        setView((current) => current.phase === "shown" ? { ...current, localSaving: false } : current);
+        return;
+      }
+      const files = result.ok && isRecord(result.result) ? result.result.files : undefined;
+      if (typeof files !== "number" || !Number.isInteger(files) || files < 0) {
+        focusNext.current = "local";
+        setView((current) => current.phase === "shown" ? { ...current, localSaving: false, localFailed: true } : current);
+        return;
+      }
+      focusNext.current = "local";
+      setView((current) => current.phase === "shown"
+        ? { ...current, localSaving: false, localFiles: files, localFailed: false, folderFailed: false }
+        : current);
+    };
+    transport.savePostLocally(post.documentId).then(settle, () => {
+      if (!alive.current) return;
+      focusNext.current = "local";
+      setView((current) => current.phase === "shown" ? { ...current, localSaving: false, localFailed: true } : current);
+    });
+  };
+
   const openFolder = (documentId: string) => {
     if (!transport.openSavedPost) return;
     const settle = (opened: boolean) => {
-      if (alive.current) setView((current) => (current.phase === "saved" ? { ...current, folderFailed: !opened } : current));
+      if (alive.current) setView((current) => current.phase === "saved"
+        ? { ...current, folderFailed: !opened }
+        : current.phase === "shown" && current.localFiles !== undefined
+          ? { ...current, folderFailed: !opened }
+          : current);
     };
     transport.openSavedPost(documentId).then((result) => settle(result.ok), () => settle(false));
   };
@@ -233,6 +297,8 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
           <p className="detail">
             {view.saving
               ? t("post_saving")
+              : view.localSaving
+                ? t("post_saving_local")
               : t("post_shown", { title: postTitle(view.post), count: view.post.media.length })}
           </p>
         )}
@@ -261,14 +327,38 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
           {t("post_open_folder_failed")}
         </p>
       )}
+      {view.phase === "shown" && view.localFiles !== undefined && (
+        <>
+          <p className="note" data-tone="ok">
+            {t("post_local_saved", { count: view.localFiles })}
+          </p>
+          {transport.openSavedPost && (
+            <div className="add-post-actions">
+              <button type="button" className="quiet" disabled={busy} onClick={() => openFolder(view.post.documentId)}>
+                {t("post_open_folder")}
+              </button>
+            </div>
+          )}
+          {view.folderFailed && (
+            <p role="alert" className="note" data-tone="problem">{t("post_open_folder_failed")}</p>
+          )}
+        </>
+      )}
+      {view.phase === "shown" && view.localFailed && (
+        <p role="alert" className="note" data-tone="problem">{t("post_local_save_failed")}</p>
+      )}
       {view.phase === "shown" && (
         <PostBlock
           post={view.post}
           saving={view.saving}
+          localSaving={view.localSaving === true}
           trouble={view.trouble}
           saveRef={save}
+          localSaveRef={saveLocal}
+          canSaveLocally={Boolean(transport.savePostLocally)}
           when={view.post.published ? day(view.post.published) : ""}
           onSave={() => keep(view.post)}
+          onSaveLocal={() => saveOnComputer(view.post)}
         />
       )}
     </div>
@@ -320,22 +410,30 @@ function SaveTrouble({ trouble }: { trouble: Trouble }) {
   }
 }
 
-// The post as it will be kept: who, when, what it says, then the files. Save comes before the
-// files so the keyboard reaches it first.
+// The post preview: who, when, what it says, then the files. Save actions come before the files so
+// the keyboard reaches them first.
 function PostBlock({
   post,
   saving,
+  localSaving,
+  canSaveLocally,
   trouble,
   saveRef,
+  localSaveRef,
   when,
   onSave,
+  onSaveLocal,
 }: {
   post: PostView;
   saving: boolean;
+  localSaving: boolean;
+  canSaveLocally: boolean;
   trouble: Trouble | undefined;
   saveRef: RefObject<HTMLButtonElement | null>;
+  localSaveRef: RefObject<HTMLButtonElement | null>;
   when: string;
   onSave: () => void;
+  onSaveLocal: () => void;
 }) {
   const t = useTranslate();
   const title = postTitle(post);
@@ -358,17 +456,30 @@ function PostBlock({
           {t("post_media_missing", { count: post.missing })}
         </p>
       )}
-      <div className="add-post-actions">
+      <div className="add-post-actions" aria-busy={saving || localSaving}>
+        {canSaveLocally && (
+          <button
+            type="button"
+            ref={localSaveRef}
+            className="primary"
+            aria-label={t("post_save_local_named", { title })}
+            aria-busy={localSaving}
+            disabled={saving || localSaving}
+            onClick={onSaveLocal}
+          >
+            {localSaving ? t("post_saving_local") : t("post_save_local")}
+          </button>
+        )}
         <button
           type="button"
           ref={saveRef}
-          className="primary"
-          aria-label={t("reading_save_named", { title })}
+          className="quiet"
+          aria-label={t("post_add_library_named", { title })}
           aria-busy={saving}
-          disabled={saving}
+          disabled={saving || localSaving}
           onClick={onSave}
         >
-          {t("reading_save")}
+          {t("post_add_library")}
         </button>
       </div>
       {trouble && <SaveTrouble trouble={trouble} />}

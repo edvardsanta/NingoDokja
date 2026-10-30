@@ -98,13 +98,13 @@ async function main(): Promise<void> {
     download: downloadMedia,
     translate: createTranslator(config.locale),
     // The owner picks the folder in the system's own window; closing it saves nothing.
-    pickFolder: async (defaultPath) => {
+    pickFolder: async (defaultPath, destination) => {
       if (!window) return undefined;
       const t = createTranslator(config.locale);
       const { canceled, filePaths } = await dialog.showOpenDialog(window, {
-        title: t("post_pick_title"),
-        message: t("post_pick_title"),
-        buttonLabel: t("post_pick_button"),
+        title: t(destination === "computer" ? "post_pick_local_title" : "post_pick_title"),
+        message: t(destination === "computer" ? "post_pick_local_title" : "post_pick_title"),
+        buttonLabel: t(destination === "computer" ? "post_pick_local_button" : "post_pick_button"),
         defaultPath,
         properties: ["openDirectory", "createDirectory"],
       });
@@ -176,6 +176,23 @@ async function main(): Promise<void> {
     if (!folder) return { ok: false, error: { code: "denied", message: "that post was not saved in this run" } };
     const failed = await shell.openPath(folder);
     return failed ? { ok: false, error: { code: "unavailable", message: "the folder could not be opened" } } : { ok: true, result: { opened: true } };
+  });
+
+  // Saves a post's media on this computer without sending it to the Library.
+  ipcMain.handle(CHANNELS.savePostLocally, async (event, documentId: unknown): Promise<TransportResult> => {
+    if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
+    if (!presence.recent()) return { ok: false, error: { code: "denied", message: "saving files needs a click or a key press just before it" } };
+    if (typeof documentId !== "string" || !/^post-[0-9a-f]{16}$/.test(documentId)) {
+      return { ok: false, error: { code: "invalid", message: "the post identifier is invalid" } };
+    }
+    try {
+      const files = await posts.saveLocally(documentId);
+      if (files === "cancelled") return { ok: false, error: { code: "cancelled", message: "folder selection was cancelled" } };
+      if (files === undefined) return { ok: false, error: { code: "denied", message: "that post is not available in this run" } };
+      return { ok: true, result: { files } };
+    } catch {
+      return { ok: false, error: { code: "unavailable", message: "the post files could not be copied" } };
+    }
   });
 
   console.log(LOG, "orchestrator", JSON.stringify({ endpoint: config.endpoint, locale: config.locale }));
