@@ -15,6 +15,9 @@ const (
 	// applies to plugins that only extract; a plugin that also collects keeps maxOutput.
 	maxExtractOutput = 16 << 20
 
+	// maxPostOutput bounds what a post reader may print: one 16 MiB media file in base64.
+	maxPostOutput = 23 << 20
+
 	// MaxExtractInput bounds the file of one on-demand reading, as Knowledge bounds uploads.
 	MaxExtractInput = 20_000_000
 

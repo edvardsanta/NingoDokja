@@ -87,6 +87,23 @@ func TestAVersionedExtractorIsDisabledUntilEnabled(t *testing.T) {
 	}
 }
 
+func TestAPostReaderMayPrintOneBase64MediaFile(t *testing.T) {
+	reader := func(output int) map[string]any {
+		return v1(map[string]any{"provides": []string{CapabilitySocialResolve}, "formats": nil,
+			"limits": map[string]any{"timeout_ms": 5000, "output_bytes": output}})
+	}
+	root := t.TempDir()
+	newPlugin(t, root, "posts", reader(maxPostOutput))
+	if found := discoverOne(t, root); found.Err != nil || found.Plugin.OutputBytes != maxPostOutput {
+		t.Fatalf("post reader budget refused: %#v, %v", found.Plugin, found.Err)
+	}
+	root = t.TempDir()
+	newPlugin(t, root, "posts", reader(maxPostOutput+1))
+	if found := discoverOne(t, root); found.Err == nil {
+		t.Fatal("post reader budget above the ceiling was accepted")
+	}
+}
+
 func TestAVersionedManifestIsValidatedStrictly(t *testing.T) {
 	cases := map[string]map[string]any{
 		"unknown field":            {"colour": "blue"},

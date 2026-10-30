@@ -29,7 +29,7 @@ class RelayTests(unittest.TestCase):
 
     def test_media_rejects_oversized_or_wrong_type_results(self):
         config = {"worker_socket": "worker.sock", "media_origin": "http://localhost:8791", "token": "test"}
-        for mime, data in (("text/html", b"error"), ("video/mp4", b""), ("video/mp4", b"x" * (run.MAX_MEDIA_BYTES + 1))):
+        for mime, data in (("text/html", b"error"), ("video/mp4", b"")):
             response = MagicMock(status=200)
             response.getheader.return_value = mime
             response.read.return_value = data
@@ -38,6 +38,17 @@ class RelayTests(unittest.TestCase):
             with patch("run.http.client.HTTPConnection", return_value=connection), patch("run.socket.socket"):
                 with self.assertRaises(ValueError):
                     run.invoke({"operation": "social.resolve.v1", "action": "media", "payload": {"url": config["media_origin"] + "/media/" + "a" * 48 + ".mp4"}}, config)
+
+    def test_media_over_the_limit_is_refused_as_too_large(self):
+        config = {"worker_socket": "worker.sock", "media_origin": "http://localhost:8791", "token": "test"}
+        response = MagicMock(status=200)
+        response.getheader.return_value = "video/mp4"
+        response.read.return_value = b"x" * (run.MAX_MEDIA_BYTES + 1)
+        connection = MagicMock()
+        connection.getresponse.return_value = response
+        with patch("run.http.client.HTTPConnection", return_value=connection), patch("run.socket.socket"):
+            result = run.invoke({"operation": "social.resolve.v1", "action": "media", "payload": {"url": config["media_origin"] + "/media/" + "a" * 48 + ".mp4"}}, config)
+        self.assertEqual(result, {"refused": "media_too_large"})
 
 
 if __name__ == "__main__":
