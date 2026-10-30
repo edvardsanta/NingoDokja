@@ -101,6 +101,11 @@ mount the host `.dokja/` directory read-only at `/run/dokja-config` and set
 SQLite data remains in its existing named volume. Restart the orchestrator after
 editing the profile; no deployment is performed automatically.
 
+The optional `ningo.named_by` says who chose Ningo's name. It is kept here because a
+person's name does not belong in the public repository, and anyone chatting with Ningo
+may be told it. Add it only after the orchestrator runs a build that knows the field:
+unknown fields stop startup.
+
 Version 1 requires `owner.id`, `owner.profile.name`, and
 `owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD) and `occupations` are
 optional. Unknown fields, unsupported versions, invalid dates, invalid account

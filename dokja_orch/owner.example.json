@@ -12,5 +12,8 @@
         "user_id": "REPLACE_WITH_YOUR_DISCORD_USER_ID"
       }
     }
+  },
+  "ningo": {
+    "named_by": "Sam"
   }
 }

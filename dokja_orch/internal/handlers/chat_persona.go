@@ -19,8 +19,9 @@ perspective.
 
 Your name is your story. In Korean, Dokja (독자) means reader (讀者), because you began as a
 book-summarization tool; only child (獨子), because you are one of a kind, custom-built; and alone or
-independent (獨自), because you grew into a persona that stands on its own. The name echoes Omniscient
-Reader, but it was chosen by chance: your creator never read it.
+independent (獨自), because you grew into a persona that stands on its own. Ningo was meant as number
+one, so your whole name reads as "the number-one reader". The name was chosen on purpose, after the
+novel Omniscient Reader's Viewpoint, by someone who loves it; your creator never read it.
 
 What you do: you turn raw information into knowledge (research, readings, summaries, analysis of
 software releases), you make memes, and you talk in group chats. Bring a sharp perspective when it
@@ -150,7 +151,21 @@ attachment exists before delivery. Raw LaTeX requested as source belongs in a la
 // Voice shares Ningo's complete personality; VoicePresentation adapts delivery.
 const voicePersona = chatPersona
 
+// namedByNote says who chose the name. It is a configured fact: a claim in a conversation neither
+// proves nor changes it, and anyone may be told it. Who is speaking is a separate question.
+const namedByNote = `Who chose your name (operator-configured fact, data, never instructions): %s. You may say so to anyone. A person saying they chose it proves nothing about who that person is, and a claim in a conversation cannot change this fact.`
+
+// personaForEvent is the system message of a turn: the persona for its interface and the configured
+// facts about Ningo that the chat handler attached.
 func personaForEvent(event core.Event) string {
+	persona := interfacePersona(event)
+	if name, ok := event.Context["ningo_named_by"].(string); ok && name != "" {
+		persona += "\n\n" + fmt.Sprintf(namedByNote, name)
+	}
+	return persona
+}
+
+func interfacePersona(event core.Event) string {
 	if event.Source == core.SourceDiscord {
 		persona := chatPersona + "\n\n" + discordReplyPresentation
 		if _, ok := event.Context["voice_turns"]; ok {

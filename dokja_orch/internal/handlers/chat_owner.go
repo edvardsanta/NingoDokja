@@ -14,6 +14,12 @@ func (h *ChatDomainHandler) WithOwnerProfile(profile chat.OwnerProfile) *ChatDom
 	return h
 }
 
+// WithNamedBy gives the handler who chose Ningo's name, a fact kept in the private configuration.
+func (h *ChatDomainHandler) WithNamedBy(name string) *ChatDomainHandler {
+	h.namedBy = name
+	return h
+}
+
 // ownerChannel says whether the turn's speaker is the owner, and how that is known. Discord relies on
 // the gateway's verification; the owner's interfaces are the owner's by the same rule that lets them
 // keep conversations.
@@ -36,6 +42,10 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
 	delete(event.Context, "owner_interface")
+	delete(event.Context, "ningo_named_by")
+	if h.namedBy != "" {
+		event.Context["ningo_named_by"] = h.namedBy
+	}
 	if event.Source != core.SourceDiscord {
 		delete(event.Context, "owner_profile")
 	}

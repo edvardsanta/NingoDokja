@@ -17,6 +17,13 @@ const DefaultPath = ".dokja/owner.json"
 type Config struct {
 	Version int   `json:"version"`
 	Owner   Owner `json:"owner"`
+	Ningo   Ningo `json:"ningo"`
+}
+
+// Ningo holds private facts about the assistant itself, for what must not sit in a public repository.
+type Ningo struct {
+	// NamedBy is who chose Ningo's name.
+	NamedBy string `json:"named_by,omitempty"`
 }
 type Owner struct {
 	ID       string            `json:"id"`
@@ -79,6 +86,9 @@ func Load(path string) (Config, error) {
 		if !validText(occupation, 128) {
 			return Config{}, fmt.Errorf("owner occupations must be nonempty single-line text of at most 128 bytes")
 		}
+	}
+	if config.Ningo.NamedBy != "" && !validText(config.Ningo.NamedBy, 128) {
+		return Config{}, fmt.Errorf("ningo named_by must be single-line text of at most 128 bytes")
 	}
 	id := config.Owner.Accounts.Discord.UserID
 	if len(id) < 17 || len(id) > 20 || strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
