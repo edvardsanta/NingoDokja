@@ -2203,3 +2203,5 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 .conversation-list { display: grid; gap: 0.75rem; margin: 0 0 1rem; padding: 0; list-style: none; }
 .conversation-list li { display: grid; gap: 2px; }
 .conversation-list button.row-title[aria-current="true"] strong { color: var(--cyan); }
+.conversation-actions { display: flex; gap: 0.5rem; }
+.conversation-rename { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }

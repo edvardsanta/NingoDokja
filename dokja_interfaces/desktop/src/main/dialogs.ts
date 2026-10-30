@@ -108,6 +108,17 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       cancel: pt ? "Cancelar" : "Cancel",
     };
   }
+  if (type === "conversation.delete") {
+    const pt = locale === "pt";
+    return {
+      message: pt ? "Apagar esta conversa?" : "Delete this conversation?",
+      detail: `${String(wire.conversation_id)}\n\n${pt
+        ? "As mensagens e as respostas do Ningo saem do arquivo de conversas, em todas as interfaces. As experiências registradas a partir dela continuam. Isso não pode ser desfeito."
+        : "Its messages and Ningo's replies are erased from the conversation archive, in every interface. Experiences recorded from it stay. This cannot be undone."}`,
+      accept: pt ? "Apagar" : "Delete",
+      cancel: pt ? "Cancelar" : "Cancel",
+    };
+  }
   if (type !== "knowledge.delete") return undefined;
   const texts = TEXTS[locale] ?? TEXTS.en;
   return {

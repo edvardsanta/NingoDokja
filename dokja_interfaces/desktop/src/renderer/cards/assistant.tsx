@@ -47,7 +47,7 @@ export function AssistantCard({ transport }: { transport: Transport }) {
   const shown = reading ? undefined : opened;
   return <>
     <Talk key={`${round}-${restarts}`} transport={transport} reading={reading} opened={shown} restore={restore} onRestart={restart} onList={setListing} />
-    {listing !== undefined && <ConversationsDrawer transport={transport} current={listing} onOpen={open} onClose={() => setListing(undefined)} />}
+    {listing !== undefined && <ConversationsDrawer transport={transport} current={listing} onOpen={open} onDeleted={(id) => { if (id === listing) { setListing(""); restart(); } }} onClose={() => setListing(undefined)} />}
   </>;
 }
 
