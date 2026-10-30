@@ -272,6 +272,7 @@ export function createFakeTransport(delayMs = 400): Transport {
     {id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["discord"],note:"",default:""},
     {id:"whatsapp.people",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
     {id:"whatsapp.groups",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
+    {id:"whatsapp.conversations",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
     {id:"whatsapp.own_chat",group:"whatsapp",kind:"flag",options:["true","false"],value:"true",affects:["whatsapp"],note:"",default:""},
     {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:""},
   ];

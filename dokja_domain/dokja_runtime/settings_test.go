@@ -247,3 +247,49 @@ func TestSettingsExposeEffectiveDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestNamedConversationsAreCheckedLikeTheInterfaceChecksThem(t *testing.T) {
+	good := "eu=+55 (11) 91234-5678,ningo=120363000000000001@g.us,team_1=123-456@g.us"
+	got, err := conversations(good)
+	if err != nil || got != "eu=5511912345678,ningo=120363000000000001@g.us,team_1=123-456@g.us" {
+		t.Fatal(got, err)
+	}
+	for _, bad := range []string{
+		"no-separator",
+		"=5511912345678",
+		"Upper=5511912345678",
+		"eu=not-a-number",
+		"eu=$(reboot)",
+		"eu=5511912345678,eu=5511987654321",
+		"a=5511912345678,b=5511912345678",
+		"a=1@g.us,b=1@g.us",
+	} {
+		if _, err := conversations(bad); err == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+}
+
+func TestANewSettingIsImportedOnceAndUnrelatedLegacyValuesAreNotRead(t *testing.T) {
+	stored, err := ImportSettings(map[string]string{"DOKJA_WHATSAPP_ALLOW_FROM": "5511912345678"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(stored, "whatsapp.conversations")
+	stored["whatsapp.people"] = "5511900000000"
+
+	merged, added, err := NewSettings(stored, map[string]string{
+		"DOKJA_WHATSAPP_CONVERSATIONS": "eu=5511912345678",
+		"DOKJA_WHATSAPP_ALLOW_FROM":    "this is no longer valid and must not matter",
+	})
+	if err != nil || !added || merged["whatsapp.conversations"] != "eu=5511912345678" || merged["whatsapp.people"] != "5511900000000" {
+		t.Fatal(merged, added, err)
+	}
+	again, added, err := NewSettings(merged, map[string]string{"DOKJA_WHATSAPP_CONVERSATIONS": "other=5511987654321"})
+	if err != nil || added || again["whatsapp.conversations"] != "eu=5511912345678" {
+		t.Fatal("a stored setting must not be imported again", again, added, err)
+	}
+	if _, _, err := NewSettings(map[string]string{}, map[string]string{"DOKJA_WHATSAPP_CONVERSATIONS": "bad"}); err == nil {
+		t.Fatal("an invalid value for a new setting must be refused")
+	}
+}

@@ -97,7 +97,7 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
 | `DOKJA_GATEWAY_INGRESS_TOKEN` | Orchestrator and WhatsApp interface | Dedicated bearer credential for the HTTP bridge. Required. |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
-| `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing |
+| `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing. Managed as the `whatsapp.conversations` setting (System › Settings, or `dokja-cli settings`): the database decides it, and `.env` only seeds it once |
 | `DOKJA_WHATSAPP_HISTORY_DIR` | WhatsApp interface | Folder of the recorded text. Required when a conversation is named; `/history` (its own volume) in Compose |
 | `DOKJA_WHATSAPP_HISTORY_DAYS` | WhatsApp interface | How long the text is kept, 1 to 365 days, default `30` |
 | `DOKJA_WHATSAPP_STATUS_PORT` | WhatsApp interface | Internal port that answers the interface's state, default `8094`. Never published |
