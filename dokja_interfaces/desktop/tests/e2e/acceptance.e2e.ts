@@ -89,9 +89,11 @@ describe("all workspaces", { skip: hasDisplay ? false : "no display" }, () => {
     for (let index = 0; index < tabs; index += 1) {
       const name = await open(index);
       await page.evaluate(`document.activeElement?.blur?.()`);
+      let inside = 0;
       for (let step = 0; step < 14; step += 1) {
         await page.tab();
         reached.add(await page.evaluate<string>(`document.activeElement === document.body ? '' : document.activeElement.tagName + (document.activeElement.textContent || '').slice(0, 12)`));
+        if (await page.evaluate<boolean>(`Boolean(document.activeElement?.closest('.wp')?.offsetParent)`)) inside += 1;
         const shown = await page.evaluate<string>(`(() => {
           const el = document.activeElement;
           if (!el || el === document.body) return '';
@@ -101,6 +103,9 @@ describe("all workspaces", { skip: hasDisplay ? false : "no display" }, () => {
         })()`);
         if (shown) unseen.push(`${name}: ${shown}`);
       }
+      // A workspace in a synthetic state may have few controls, or none: every one must be reachable.
+      const controls = await page.evaluate<number>(`[...document.querySelectorAll('.wp')].find((each) => each.offsetParent !== null)?.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]').length ?? 0`);
+      assert.ok(inside >= Math.min(3, controls), `${name}: Tab reached ${inside} of ${controls} controls in the open workspace`);
     }
     assert.ok(reached.size > 10, `Tab only reached ${reached.size} elements`);
     assert.deepEqual([...new Set(unseen)], []);

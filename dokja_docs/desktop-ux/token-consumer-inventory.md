@@ -54,8 +54,11 @@ assistive technology, control's accessible name or keyboard traversal path.
 `tests/e2e/acceptance.e2e.ts` now runs every workspace in Electron against a synthetic
 orchestrator: no sideways overflow and a visible dock at 1536x860, 1100x800 and 800x700;
 no overflow with text at 200%; a visible focus ring on what real Tab navigation reaches
-(14 stops per workspace, not every control); and no animation running under reduced
-motion with forced colors on. It found one real defect: a note in a System row widened
+(14 stops per workspace, not every control), with the stops required to land inside the
+open workspace when it has controls; and no animation running under reduced motion with
+forced colors on. Coverage follows the synthetic state: Realtime has no controls there,
+Messages has one and the Library is in its failed state, so those screens were not
+exercised full of content. 800x700 does not reach the layout for narrow panels. It found one real defect: a note in a System row widened
 its column past the panel at 1100x800, fixed by giving the note the whole row. The
 suite locates workspaces by their stable ids instead of their position.
 
