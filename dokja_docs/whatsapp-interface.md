@@ -291,8 +291,9 @@ never deleted by the service.
   tag means the owner and they can be tagged normally (the tag is still removed from what the model
   sees). The owner calls Ningo the same way; everything else the owner writes in a group stays
   ignored. Replies come from the linked account, signed. Group turns are not kept in the owner's
-  conversation archive, and nobody is recognized by name there. The owner's private conversation is
-  the "message yourself" chat.
+  conversation archive. The owner is recognized in groups by the account's own messages, without
+  private profile details being volunteered, and known people by their number in the groups listed
+  in the private configuration. The owner's private conversation is the "message yourself" chat.
 - The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
   archive and continues the conversation the desktop shows, so you can start on the phone and go on
   at the desktop, or the other way round. The phone continues the latest conversation; in the

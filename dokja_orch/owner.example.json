@@ -14,6 +14,10 @@
     }
   },
   "ningo": {
-    "named_by": "Sam"
+    "named_by": "Sam",
+    "groups": ["<group id>@g.us"],
+    "people": [
+      { "name": "Sam", "whatsapp": "REPLACE_WITH_DIGITS_ONLY", "about": ["writer"] }
+    ]
   }
 }

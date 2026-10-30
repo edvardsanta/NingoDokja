@@ -2,6 +2,7 @@ package handlers
 
 import (
 	chat "read_books/dokja_domain/dokja_chat"
+	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
 )
@@ -14,10 +15,55 @@ func (h *ChatDomainHandler) WithOwnerProfile(profile chat.OwnerProfile) *ChatDom
 	return h
 }
 
-// WithNamedBy gives the handler who chose Ningo's name, a fact kept in the private configuration.
-func (h *ChatDomainHandler) WithNamedBy(name string) *ChatDomainHandler {
-	h.namedBy = name
+// WithNingoFacts gives the handler the private facts about Ningo and the people around it. They reach
+// a turn only where privateFactsAllowed says so.
+func (h *ChatDomainHandler) WithNingoFacts(facts chat.NingoFacts) *ChatDomainHandler {
+	h.ningo = facts
 	return h
+}
+
+// privateFactsAllowed is where the owner allowed the private facts: their own WhatsApp chat and the
+// groups they listed. Nowhere else, Discord and the local interfaces included.
+func (h *ChatDomainHandler) privateFactsAllowed(event core.Event) bool {
+	if selfChatRequest(event) {
+		return true
+	}
+	if event.Source != core.SourceWhatsApp || !whatsappGroupTurn(event) {
+		return false
+	}
+	for _, group := range h.ningo.Groups {
+		if group == event.Channel.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func whatsappGroupTurn(event core.Event) bool {
+	kind, _ := event.Context["chat_kind"].(string)
+	return event.Source == core.SourceWhatsApp && kind == "group"
+}
+
+// attachPrivateFacts gives the turn who chose the name, the people Ningo knows, and who of them is
+// speaking, recognized by the number WhatsApp reports. The number itself stays out of the turn.
+func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
+	if !h.privateFactsAllowed(event) {
+		return
+	}
+	if h.ningo.NamedBy != "" {
+		event.Context["ningo_named_by"] = h.ningo.NamedBy
+	}
+	numbers, _ := event.Context["sender_numbers"].([]string)
+	people := make([]chat.KnownPerson, 0, len(h.ningo.People))
+	for _, person := range h.ningo.People {
+		people = append(people, chat.KnownPerson{Name: person.Name, About: person.About})
+		if person.WhatsApp != "" && communications.SameNumber(person.WhatsApp, numbers) {
+			event.Context["known_speaker"] = person.Name
+		}
+	}
+	if len(people) > 0 {
+		event.Context["known_people"] = people
+	}
 }
 
 // ownerChannel says whether the turn's speaker is the owner, and how that is known. Discord relies on
@@ -33,6 +79,10 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 	if selfChatRequest(event) {
 		return chat.OwnerByWhatsApp, true
 	}
+	// WhatsApp marks what the linked account writes as its own; the interface passes that on.
+	if own, _ := event.Context["is_own_account"].(bool); own && whatsappGroupTurn(event) {
+		return chat.OwnerByWhatsAppGroup, true
+	}
 	return "", false
 }
 
@@ -41,11 +91,10 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 // only the Discord gateway attaches a profile for Discord.
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
-	delete(event.Context, "owner_interface")
-	delete(event.Context, "ningo_named_by")
-	if h.namedBy != "" {
-		event.Context["ningo_named_by"] = h.namedBy
+	for _, granted := range []string{"owner_interface", "ningo_named_by", "known_people", "known_speaker"} {
+		delete(event.Context, granted)
 	}
+	h.attachPrivateFacts(event)
 	if event.Source != core.SourceDiscord {
 		delete(event.Context, "owner_profile")
 	}

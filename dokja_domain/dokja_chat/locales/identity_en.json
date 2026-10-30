@@ -1,0 +1,8 @@
+{
+  "owner": "You're my owner.",
+  "owner_named": "You’re {name}, my owner.",
+  "by_discord": "I recognize your Discord account; changing your nickname doesn't change that.",
+  "by_local": "You're talking to me from your own interface, which only you use.",
+  "by_whatsapp": "You're talking to me from your own WhatsApp chat.",
+  "by_whatsapp_group": "I recognize your WhatsApp account; the name in the group doesn't change that."
+}

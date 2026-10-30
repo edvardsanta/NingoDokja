@@ -41,12 +41,30 @@ func TestConfiguredProfileIdentityReply(t *testing.T) {
 	}
 }
 
+func TestBothIdentityCatalogsHoldTheSameMessages(t *testing.T) {
+	pt, en := identityCatalogs["pt"], identityCatalogs["en"]
+	if len(pt) != len(en) || len(pt) == 0 {
+		t.Fatal("catalogs differ", pt, en)
+	}
+	for key := range pt {
+		if strings.TrimSpace(en[key]) == "" || strings.TrimSpace(pt[key]) == "" {
+			t.Errorf("%s is missing or empty", key)
+		}
+	}
+	for _, channel := range []OwnerChannel{OwnerByDiscord, OwnerByLocal, OwnerByWhatsApp, OwnerByWhatsAppGroup} {
+		if pt["by_"+string(channel)] == "" {
+			t.Errorf("no wording for %s", channel)
+		}
+	}
+}
+
 func TestTheIdentityReplySaysHowTheOwnerWasRecognized(t *testing.T) {
 	profile := OwnerProfile{Name: "Alex"}
 	cases := map[OwnerChannel][2]string{
-		OwnerByDiscord:  {"Você é Alex, meu dono. Reconheço sua conta pelo Discord; apelido não muda isso.", "You’re Alex, my owner. I recognize your Discord account; changing your nickname doesn't change that."},
-		OwnerByLocal:    {"Você é Alex, meu dono. Você fala comigo pela sua própria interface, que só você usa.", "You’re Alex, my owner. You're talking to me from your own interface, which only you use."},
-		OwnerByWhatsApp: {"Você é Alex, meu dono. Você fala comigo pela sua própria conversa no WhatsApp.", "You’re Alex, my owner. You're talking to me from your own WhatsApp chat."},
+		OwnerByDiscord:       {"Você é Alex, meu dono. Reconheço sua conta pelo Discord; apelido não muda isso.", "You’re Alex, my owner. I recognize your Discord account; changing your nickname doesn't change that."},
+		OwnerByLocal:         {"Você é Alex, meu dono. Você fala comigo pela sua própria interface, que só você usa.", "You’re Alex, my owner. You're talking to me from your own interface, which only you use."},
+		OwnerByWhatsApp:      {"Você é Alex, meu dono. Você fala comigo pela sua própria conversa no WhatsApp.", "You’re Alex, my owner. You're talking to me from your own WhatsApp chat."},
+		OwnerByWhatsAppGroup: {"Você é Alex, meu dono. Reconheço sua conta do WhatsApp; o nome no grupo não muda isso.", "You’re Alex, my owner. I recognize your WhatsApp account; the name in the group doesn't change that."},
 	}
 	for channel, want := range cases {
 		if got := OwnerProfileIdentityReply("Você sabe quem sou eu?", true, profile, channel); got != want[0] {

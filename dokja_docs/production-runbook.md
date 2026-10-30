@@ -101,10 +101,14 @@ mount the host `.dokja/` directory read-only at `/run/dokja-config` and set
 SQLite data remains in its existing named volume. Restart the orchestrator after
 editing the profile; no deployment is performed automatically.
 
-The optional `ningo.named_by` says who chose Ningo's name. It is kept here because a
-person's name does not belong in the public repository, and anyone chatting with Ningo
-may be told it. Add it only after the orchestrator runs a build that knows the field:
-unknown fields stop startup.
+The optional `ningo` section holds private facts: `named_by` (who chose the name),
+`groups` (WhatsApp group ids) and `people` (`name`, `whatsapp` as digits, `about`).
+They stay here because personal data does not belong in the public repository. They
+reach a conversation only in the linked account's self-chat and the listed groups,
+never on Discord or the local interfaces. A person's number recognizes them in those
+places and never reaches the model. Add this section only after the orchestrator
+runs a build that knows it: unknown fields stop startup. Restart the orchestrator
+from the desktop afterwards.
 
 Version 1 requires `owner.id`, `owner.profile.name`, and
 `owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD) and `occupations` are
