@@ -79,6 +79,9 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [loading, setLoading] = useState(opened !== undefined || restore);
   const [loadError, setLoadError] = useState<TransportError>();
   const rechecks = useRef(0);
+  // A panel that was replaced (another conversation, a new one) reads nothing more.
+  const live = useRef(true);
+  useEffect(() => () => { live.current = false; }, []);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -100,6 +103,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   // The archive's turns replace the screen's; a send it does not hold yet stays as the screen knew it.
   // A send that could not be read back is unknown; a send already known pending stays pending.
   const readBack = async (sendId?: string) => {
+    if (!live.current) return false;
     const read = await transport.request("conversation.read", { conversation_id: id.current });
     if (!read.ok || !isRecord(read.result) || !Array.isArray(read.result.turns)) {
       if (sendId) settle(sendId, (turn) => (turn.state === "pending" ? { ...turn, state: "unknown" } : turn));
@@ -131,6 +135,16 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   };
   useEffect(() => { void load(); }, []);
 
+  // Coming back to the window, the conversation is read again: it may have been continued elsewhere.
+  const idle = !busy && !loading;
+  useEffect(() => {
+    if (!idle) return undefined;
+    const again = () => { if (id.current && document.visibilityState !== "hidden") void readBack(); };
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+    return () => { window.removeEventListener("focus", again); document.removeEventListener("visibilitychange", again); };
+  }, [idle]);
+
   // The latest send still on its way, with nothing here waiting for it, is looked at again for a while.
   const latestPending = !busy && !loading && turns.at(-1)?.state === "pending";
   useEffect(() => {
@@ -146,6 +160,8 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
       const turn = answer.ok && isRecord(answer.result) && isRecord(answer.result.turn) ? (answer.result.turn as unknown as ArchivedTurn) : undefined;
       if (turn) {
         settle(sendId, () => fromArchive(turn));
+        // Another interface (the phone) may have added turns meanwhile; the archive's order is kept.
+        await readBack();
         return;
       }
       setError(answer.ok ? { code: "unexpected", message: "The assistant returned no reply." } : answer.error);

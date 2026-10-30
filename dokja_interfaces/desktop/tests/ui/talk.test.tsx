@@ -172,7 +172,10 @@ describe("the conversation", () => {
     const { transport, calls } = routedTransport({
       "conversation.start": startedConversation(),
       "message.created": [failure("orchestrator", "the provider failed"), async () => ok({ reply: "At last.", replayed: false, turn: archivedTurn({ content: "why?", reply: "At last.", attempts: 2, sendId: sendIdOf(calls) }) })],
-      "conversation.read": async () => ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "failed", reason: "the provider failed", sendId: sendIdOf(calls) })] }),
+      "conversation.read": [
+        async () => ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "failed", reason: "the provider failed", sendId: sendIdOf(calls) })] }),
+        async () => ok({ conversation: {}, turns: [archivedTurn({ content: "why?", reply: "At last.", attempts: 2, sendId: sendIdOf(calls) })] }),
+      ],
     });
     await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "why?" } });
@@ -289,7 +292,10 @@ describe("the kept conversations", () => {
   it("shows a turn a restart cut off and retries it as the same turn", async () => {
     const { transport, calls } = routedTransport({
       "conversation.list": listed(kept(3, 1)),
-      "conversation.read": readOf(3, archivedTurn({ content: "Cut off", state: "interrupted", sendId: "send-cut1" })),
+      "conversation.read": [
+        readOf(3, archivedTurn({ content: "Cut off", state: "interrupted", sendId: "send-cut1" })),
+        readOf(3, archivedTurn({ content: "Cut off", reply: "Written now.", sendId: "send-cut1", attempts: 2 })),
+      ],
       "message.created": async () => ok({ reply: "Written now.", replayed: false, turn: archivedTurn({ content: "Cut off", reply: "Written now.", sendId: "send-cut1", attempts: 2 }) }),
     });
     await renderTalk(transport);
@@ -384,5 +390,34 @@ describe("the kept conversations", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
     expect(calls.filter((call) => call.type === "conversation.read")).toHaveLength(3);
     expect(sent(calls)).toHaveLength(0);
+  });
+});
+
+describe("a conversation continued elsewhere", () => {
+  it("shows the turns another interface added, after a send and when the window comes back", async () => {
+    const phone = archivedTurn({ seq: 2, content: "From the phone", reply: "Answered on the phone.", sendId: "wa-phone" });
+    let archive: ReturnType<typeof archivedTurn>[] = [archivedTurn({ content: "Earlier", reply: "Earlier answer.", sendId: "send-old1" })];
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": async () => ok({ conversation: kept(3, archive.length), turns: structuredClone(archive) }),
+      "message.created": async (payload) => {
+        const answer = archivedTurn({ seq: archive.length + 1, content: String(payload?.content), reply: "Desktop answer.", sendId: String(payload?.send_id) });
+        archive = [...archive, answer];
+        return ok({ reply: "Desktop answer.", replayed: false, turn: answer });
+      },
+    });
+    await renderTalk(transport);
+    screen.getByText("Earlier answer.");
+
+    archive = [...archive, phone];
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    await screen.findByText("Answered on the phone.");
+
+    fireEvent.change(field(), { target: { value: "From the desktop" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Desktop answer.");
+    const shown = [...document.querySelectorAll(".assistant-turns li p")].map((each) => each.textContent);
+    expect(shown).toEqual(["Earlier", "Earlier answer.", "From the phone", "Answered on the phone.", "From the desktop", "Desktop answer."]);
+    expect(sent(calls)).toHaveLength(1);
   });
 });
