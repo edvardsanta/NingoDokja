@@ -13,6 +13,9 @@ const (
 	LinkStatus LinkAction = "communications.link.status"
 	LinkStart  LinkAction = "communications.link.start"
 	LinkReset  LinkAction = "communications.link.reset"
+	// LinkGroups lists the groups the linked account takes part in, so the owner can choose which
+	// to allow. It only reads.
+	LinkGroups LinkAction = "communications.link.groups"
 )
 
 // LinkPolicy authorizes a named, configured platform for a supported operation.
@@ -28,9 +31,17 @@ func (p LinkPolicy) Authorize(action LinkAction, platform string) (string, error
 		return "", fmt.Errorf("interface %q cannot be linked from here", platform)
 	}
 	switch action {
-	case LinkStatus, LinkStart, LinkReset:
+	case LinkStatus, LinkStart, LinkReset, LinkGroups:
 		return platform, nil
 	default:
 		return "", fmt.Errorf("unsupported link action")
 	}
+}
+
+// LinkedGroup is a group the linked account takes part in, as the owner chooses which to allow: its
+// id, its name and how many take part. Listing a group allows nothing by itself.
+type LinkedGroup struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Members int    `json:"members"`
 }

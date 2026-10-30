@@ -2203,3 +2203,8 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 .conversation-list { display: grid; gap: 0.75rem; margin: 0 0 1rem; padding: 0; list-style: none; }
 .conversation-list li { display: grid; gap: 2px; }
 .conversation-list button.row-title[aria-current="true"] strong { color: var(--cyan); }
+
+/* The linked account's groups, under the allowed-groups editor: a name and a button per line. */
+.group-discovery { display: grid; gap: 0.5rem; margin-top: 0.5rem; justify-items: start; }
+.group-discovery-list { display: grid; gap: 0.35rem; width: 100%; margin: 0; padding: 0; list-style: none; }
+.group-discovery-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }

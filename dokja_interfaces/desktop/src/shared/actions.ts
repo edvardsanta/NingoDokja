@@ -40,6 +40,8 @@ export const ACTION_TYPES = [
   "communications.link.status",
   "communications.link.start",
   "communications.link.reset",
+  // Listing the linked account's groups only reads; choosing one still goes through the settings.
+  "communications.link.groups",
   "services.set",
   "scheduler.jobs.set",
   "ningo.status",

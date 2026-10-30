@@ -29,6 +29,9 @@ export type JobState = {
 // of the code as a data URL. The code itself, as text, never reaches the screen.
 export type InterfaceLink = { state: string; image?: string };
 
+// A group the linked WhatsApp account takes part in, for the owner to allow by name.
+export type LinkedGroup = { id: string; name: string; members: number };
+
 export type StatusReply = {
   status: string;
   services: Record<string, ServiceState>;

@@ -60,6 +60,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "start-interface-link"
 		case "communications.link.reset":
 			return "reset-interface-link"
+		case "communications.link.groups":
+			return "list-interface-groups"
 		case "services.set":
 			return "set-service"
 		case "scheduler.jobs.set":

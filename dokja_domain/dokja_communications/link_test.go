@@ -4,7 +4,7 @@ import "testing"
 
 func TestLinkPolicyAuthorizesOnlyConfiguredPlatformsAndKnownActions(t *testing.T) {
 	policy := LinkPolicy{Available: map[string]bool{"whatsapp": true, "disabled": false}}
-	for _, action := range []LinkAction{LinkStatus, LinkStart, LinkReset} {
+	for _, action := range []LinkAction{LinkStatus, LinkStart, LinkReset, LinkGroups} {
 		name, err := policy.Authorize(action, " whatsapp ")
 		if err != nil || name != "whatsapp" {
 			t.Fatalf("%s: got %q, %v", action, name, err)

@@ -106,3 +106,41 @@ it("shows a value from a closed set in words, never as the raw option", async ()
   const options = [...(screen.getByLabelText("Direct messages") as HTMLSelectElement).options];
   expect(options.map((option) => [option.value, option.textContent])).toEqual([["open", "Open"], ["closed", "Closed"]]);
 });
+
+describe("finding the WhatsApp groups to allow", () => {
+  const groups = ok({ groups: [
+    { id: "120363000000000001@g.us", name: "ningo", members: 1 },
+    { id: "120363000000000002@g.us", name: "", members: 14 },
+  ] });
+
+  it("lists the account's groups by name and adds the chosen one to the draft, saving nothing yet", async () => {
+    const { transport, calls } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules, "communications.link.groups": groups });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit Groups/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Find my groups" }));
+
+    const list = await screen.findByRole("list", { name: "Your groups" });
+    expect(list.textContent).toContain("ningo");
+    expect(list.textContent).toContain("Unnamed group");
+    fireEvent.click(screen.getByRole("button", { name: "Add ningo" }));
+    expect(screen.getByText("120363000000000001@g.us")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Add ningo" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(calls.find((call) => call.type === "communications.link.groups")?.payload).toEqual({ interface: "whatsapp" });
+    expect(calls.filter((call) => call.type === "runtime.settings.set")).toHaveLength(0);
+  });
+
+  it("says WhatsApp must be connected when the groups cannot be listed", async () => {
+    const { transport } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules, "communications.link.groups": failure("orchestrator", "the whatsapp interface could not list its groups; is it connected?") });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit Groups/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Find my groups" }));
+    await screen.findByText("WhatsApp must be linked and connected to list your groups.");
+  });
+
+  it("is offered only for the WhatsApp groups", async () => {
+    const { transport } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit Meme channels|^Edit .*channels/ }));
+    expect(screen.queryByRole("button", { name: "Find my groups" })).toBeNull();
+  });
+});
