@@ -25,6 +25,8 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
 
   const keep = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape") {
+      // Chromium uses Escape to leave a video's fullscreen mode first.
+      if (document.fullscreenElement) return;
       event.stopPropagation();
       onClose();
       return;

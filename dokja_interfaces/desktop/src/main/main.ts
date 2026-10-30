@@ -1,8 +1,6 @@
 import { join } from "node:path";
 
-import { pathToFileURL } from "node:url";
-
-import { app, dialog, ipcMain, net, protocol, session, shell, type BrowserWindow } from "electron";
+import { app, dialog, ipcMain, protocol, session, shell, type BrowserWindow } from "electron";
 
 import { isRecord } from "../shared/records.js";
 import {
@@ -20,6 +18,7 @@ import { downloadMedia, fetchMedia } from "./media_fetch.js";
 import { POST_SCHEME } from "../shared/posts.js";
 import { usePostStore } from "./actions.js";
 import { PostStore } from "./post_store.js";
+import { postMediaResponse } from "./post_media.js";
 import { createTranslator } from "../renderer/i18n/i18n.js";
 import { MediaGate } from "./media_gate.js";
 import { createPreviewer } from "./media_preview.js";
@@ -47,7 +46,7 @@ async function main(): Promise<void> {
   const distDir = join(__dirname, "..");
   const page = appPage(config, distDir);
 
-  installPermissionPolicy(session.defaultSession);
+  installPermissionPolicy(session.defaultSession, page);
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
@@ -115,11 +114,8 @@ async function main(): Promise<void> {
   });
   usePostStore(posts);
   void posts.sweep();
-  session.defaultSession.protocol.handle(POST_SCHEME, (request) => {
-    const file = posts.file(request.url);
-    if (!file) return new Response(null, { status: 404 });
-    return net.fetch(pathToFileURL(file.path).href, { headers: request.headers });
-  });
+  session.defaultSession.protocol.handle(POST_SCHEME, (request) =>
+    postMediaResponse(request, posts.file(request.url)));
   let disposed = false;
   app.on("will-quit", (event) => {
     if (disposed) return;

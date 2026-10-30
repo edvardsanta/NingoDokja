@@ -9,8 +9,8 @@ type Target = Parameters<typeof installPermissionPolicy>[0];
 // installs and calls them the way Electron would.
 function fakeSession() {
   const handlers: {
-    request?: (contents: unknown, permission: string, callback: (granted: boolean) => void) => void;
-    check?: () => boolean;
+    request?: (contents: unknown, permission: string, callback: (granted: boolean) => void, details?: { isMainFrame: boolean; requestingUrl?: string }) => void;
+    check?: (contents?: unknown, permission?: string, origin?: string, details?: { isMainFrame: boolean; requestingUrl?: string }) => boolean;
     device?: () => boolean;
   } = {};
   const session = {
@@ -55,4 +55,26 @@ test("the session denies every permission request, check and device", () => {
   }
   assert.equal(handlers.check(), false);
   assert.equal(handlers.device(), false);
+});
+
+test("fullscreen is allowed only for the trusted app main frame", () => {
+  const { handlers, session } = fakeSession();
+  const page = "file:///app/index.html";
+  installPermissionPolicy(session, page);
+  const contents = { getURL: () => page };
+  const details = { isMainFrame: true, requestingUrl: page };
+  const request = (permission: string, frame = details, sender: unknown = contents) => {
+    let granted: boolean | undefined;
+    handlers.request!(sender, permission, (answer: boolean) => { granted = answer; }, frame);
+    return granted;
+  };
+  assert.equal(request("fullscreen"), true);
+  assert.equal(handlers.check!(contents, "fullscreen", "file://", details), true);
+  for (const permission of PERMISSIONS.filter((p) => p !== "fullscreen")) assert.equal(request(permission), false);
+  for (const frame of [{ ...details, isMainFrame: false }, { ...details, requestingUrl: "https://example.com/" }]) {
+    assert.equal(request("fullscreen", frame), false);
+    assert.equal(handlers.check!(contents, "fullscreen", "file://", frame), false);
+  }
+  assert.equal(request("fullscreen", details, null), false);
+  assert.equal(request("fullscreen", details, { getURL: () => "file:///other.html" }), false);
 });
