@@ -311,4 +311,6 @@ export type ArchivedChatReply = { off?: false; reply: string; replayed: boolean;
 
 export type ConversationStarted = { off?: false; conversation: ArchivedConversation };
 
+export type ConversationList = { off?: false; conversations: ArchivedConversation[]; next: string };
+
 export type ConversationRead = { off?: false; conversation: ArchivedConversation; turns: ArchivedTurn[] };

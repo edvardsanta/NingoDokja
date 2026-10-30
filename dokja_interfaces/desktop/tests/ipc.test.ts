@@ -711,15 +711,38 @@ test("a conversation is started with only its reading, and read by its archive i
   } };
   const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
   assert.equal((await handleRequest({type:"conversation.start",payload:{reading_id:"entry-1"}},client,limits)).ok,false, "starting one records it, so it needs a gesture");
-  const started = await handleRequest({type:"conversation.start",payload:{reading_id:"entry-1",title:"ignored"}},client,limits,undefined,{recent:()=>true});
+  const started = await handleRequest({type:"conversation.start",payload:{reading_id:"entry-1",title:"  First   line ",owner:"x"}},client,limits,undefined,{recent:()=>true});
   assert.deepEqual(started,{ok:true,result:{conversation:{id:"c".repeat(32),kind:"reading",readingId:"entry-1",title:"",updatedAt:"t",revision:1,turns:0}}});
   const read = await handleRequest({type:"conversation.read",payload:{conversation_id:"c".repeat(32),limit:5000}},client,limits);
   assert.equal(read.ok,true);
   assert.deepEqual((read as {result:{turns:unknown[]}}).result.turns,[],"a turn in an unknown state is dropped");
   assert.equal((await handleRequest({type:"conversation.read",payload:{conversation_id:"../x"}},client,limits)).ok,false);
+  assert.equal((await handleRequest({type:"conversation.start",payload:{title:"t".repeat(121)}},client,limits,undefined,{recent:()=>true})).ok,false,"a title past the archive's bound is refused");
   assert.deepEqual(calls,[
-    {type:"conversation.start",payload:{reading_id:"entry-1"}},
+    {type:"conversation.start",payload:{reading_id:"entry-1",title:"First line"}},
     {type:"conversation.read",payload:{conversation_id:"c".repeat(32),limit:100}},
+  ]);
+});
+
+test("the conversation list is a bounded read, with only the archive's own cursor", async () => {
+  const calls: unknown[] = [];
+  const item = (n: string) => ({id:n.repeat(32),kind:"general",reading_id:"",title:"t",updated_at:"u",revision:1,turns:2});
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"conversation",result:{conversations:[item("a"),item("b")],next:"12.".concat("f".repeat(32))}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const listed = await handleRequest({type:"conversation.list",payload:{limit:20}},client,limits);
+  assert.equal(listed.ok,true);
+  assert.equal((listed as {result:{conversations:unknown[];next:string}}).result.conversations.length,2);
+  assert.equal((listed as {result:{next:string}}).result.next,"12.".concat("f".repeat(32)));
+  await handleRequest({type:"conversation.list",payload:{cursor:"12.".concat("f".repeat(32)),scope:"other"}},client,limits);
+  for (const payload of [{limit:51},{limit:0},{cursor:"anything"},{limit:2.5}]) {
+    assert.equal((await handleRequest({type:"conversation.list",payload},client,limits)).ok,false,JSON.stringify(payload));
+  }
+  assert.deepEqual(calls,[
+    {type:"conversation.list",payload:{limit:20}},
+    {type:"conversation.list",payload:{cursor:"12.".concat("f".repeat(32)),limit:50}},
   ]);
 });
 

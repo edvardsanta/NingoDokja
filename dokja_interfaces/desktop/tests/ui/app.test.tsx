@@ -23,6 +23,7 @@ const QUIET: Partial<Record<ActionType, Route>> = {
   "digest.status": ok(OFF),
   "memory.status": ok(OFF),
   "knowledge.status": ok(OFF),
+  "conversation.list": ok({ conversations: [], next: "" }),
 };
 
 const screenTransport = (health: Route, overrides: Partial<Record<ActionType, Route | Route[]>> = {}) =>
@@ -92,7 +93,8 @@ describe("the screen", () => {
     render(<App transport={transport} locale="en" />);
 
     await waitFor(() => expect(wordmark().dataset.pulse).toBe("calm"));
-    expect(calls.map((call) => call.type)).toEqual(["ningo.status"]);
+    // Talk, the front door, looks for a conversation to continue; nothing else is asked.
+    expect(calls.map((call) => call.type).sort()).toEqual(["conversation.list", "ningo.status"]);
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
   });
 
@@ -116,7 +118,7 @@ describe("the screen", () => {
     await screen.findByText("It teaches mercy.");
 
     // The conversation is started about the reading; each message only names the conversation.
-    expect(calls.find((call) => call.type === "conversation.start")?.payload).toEqual({ reading_id: "item-1" });
+    expect(calls.find((call) => call.type === "conversation.start")?.payload).toMatchObject({ reading_id: "item-1" });
     const [sent] = calls.filter((call) => call.type === "message.created").map((call) => call.payload);
     expect(sent).toMatchObject({ content: "What does the second reading teach?", conversation_id: archiveId(1) });
     expect(sent).not.toHaveProperty("reading_id");
@@ -146,7 +148,7 @@ describe("the screen", () => {
     await screen.findByText("The second turn keeps the context of this discussion.");
 
     const [first, second] = calls.filter((call) => call.type === "message.created").map((call) => call.payload);
-    expect(calls.filter((call) => call.type === "conversation.start").map((call) => call.payload)).toEqual([{ reading_id: "item-1" }]);
+    expect(calls.filter((call) => call.type === "conversation.start").map((call) => call.payload)).toEqual([{ reading_id: "item-1", title: "Explain the main idea in plain language" }]);
     expect(first).toMatchObject({ content: "Explain the main idea in plain language", conversation_id: archiveId(1) });
     expect(second).toMatchObject({ content: "What should I question?", conversation_id: archiveId(1) });
     expect(second?.conversation_id).toBe(first?.conversation_id);
@@ -203,7 +205,7 @@ describe("the screen", () => {
     await screen.findByRole("heading", { name: "Reading digest" });
 
     await waitFor(() =>
-      expect(calls.map((call) => call.type)).toEqual([
+      expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list")).toEqual([
         "ningo.status",
         "memory.status",
         "knowledge.status",

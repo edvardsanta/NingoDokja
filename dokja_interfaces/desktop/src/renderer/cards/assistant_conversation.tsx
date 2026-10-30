@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
-import type { ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
+import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
 import type { MessageId } from "../i18n/i18n.js";
 import type { TransportError } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
+import { latestConversation } from "./conversation_list.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
 // screen has it; "unknown" is a send whose outcome the screen could not read back.
@@ -31,12 +32,30 @@ export type Conversation = {
   error: TransportError | undefined;
   // the archive could not start the conversation, so the last message was given back unsent
   unkept: boolean;
+  // the archive's conversation this one continues, when it was reopened or restored
+  opened: ArchivedConversation | undefined;
+  // a conversation reopened from the archive: its transcript is being read, or could not be
+  loading: boolean;
+  loadError: TransportError | undefined;
+  reload: () => void;
   field: RefObject<HTMLTextAreaElement | null>;
   send: (content: string) => Promise<void>;
   retry: () => void;
 };
 
 const fromArchive = (turn: ArchivedTurn): Turn => ({ sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason });
+
+// How often, and for how long, a reopened conversation looks again at a send still on its way: its
+// reply was being written for a screen that is gone, so nothing else will bring it here.
+const PENDING_RECHECK_MS = 3_000;
+const PENDING_RECHECKS = 40;
+// A new conversation is named by the start of its first message.
+const TITLE_CHARS = 60;
+
+function titleFrom(message: string): string {
+  const line = message.replace(/\s+/g, " ").trim();
+  return line.length > TITLE_CHARS ? `${line.slice(0, TITLE_CHARS - 1)}…` : line;
+}
 
 function newSendId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `send-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -52,9 +71,14 @@ export function retryable(turn: Turn | undefined): boolean {
 // One conversation with Ningo, kept by the orchestrator's archive: it is started there with the first
 // message, every message carries its own send id, and after a failure the screen reads the archive
 // back instead of guessing. A remount (a new conversation) drops whatever was on its way.
-export function useConversation(transport: Transport, reading?: Reading): Conversation {
-  const id = useRef("");
-  const [conversationId, setConversationId] = useState("");
+// restore asks it to continue the latest conversation the archive holds, when there is one.
+export function useConversation(transport: Transport, reading?: Reading, opened?: ArchivedConversation, restore = false): Conversation {
+  const id = useRef(opened?.id ?? "");
+  const [conversationId, setConversationId] = useState(opened?.id ?? "");
+  const [held, setHeld] = useState(opened);
+  const [loading, setLoading] = useState(opened !== undefined || restore);
+  const [loadError, setLoadError] = useState<TransportError>();
+  const rechecks = useRef(0);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -74,15 +98,46 @@ export function useConversation(transport: Transport, reading?: Reading): Conver
     setTurns((previous) => previous.map((turn) => (turn.sendId === sendId ? change(turn) : turn)));
 
   // The archive's turns replace the screen's; a send it does not hold yet stays as the screen knew it.
-  const readBack = async (sendId: string) => {
+  // A send that could not be read back is unknown; a send already known pending stays pending.
+  const readBack = async (sendId?: string) => {
     const read = await transport.request("conversation.read", { conversation_id: id.current });
     if (!read.ok || !isRecord(read.result) || !Array.isArray(read.result.turns)) {
-      settle(sendId, (turn) => (turn.state === "pending" ? { ...turn, state: "unknown" } : turn));
-      return;
+      if (sendId) settle(sendId, (turn) => (turn.state === "pending" ? { ...turn, state: "unknown" } : turn));
+      return false;
     }
     const archived = (read.result.turns as ArchivedTurn[]).map(fromArchive);
     setTurns((previous) => [...archived, ...previous.filter((turn) => !archived.some((each) => each.sendId === turn.sendId))]);
+    return true;
   };
+
+  // A reopened or restored conversation is read from the archive before it can be continued. Without
+  // one to restore, the conversation is a new one.
+  const load = async () => {
+    let target = opened ?? held;
+    setLoading(true); setLoadError(undefined);
+    if (!target && restore) {
+      target = await latestConversation(transport);
+      if (target && !id.current) {
+        id.current = target.id;
+        setConversationId(target.id);
+        setHeld(target);
+      } else target = undefined;
+    }
+    if (!target) { setLoading(false); return; }
+    const read = await transport.request("conversation.read", { conversation_id: target.id }).catch(() => undefined);
+    if (read?.ok && isRecord(read.result) && Array.isArray(read.result.turns)) setTurns((read.result.turns as ArchivedTurn[]).map(fromArchive));
+    else setLoadError(read && !read.ok ? read.error : { code: "unavailable", message: "The conversation could not be read." });
+    setLoading(false);
+  };
+  useEffect(() => { void load(); }, []);
+
+  // The latest send still on its way, with nothing here waiting for it, is looked at again for a while.
+  const latestPending = !busy && !loading && turns.at(-1)?.state === "pending";
+  useEffect(() => {
+    if (!latestPending || rechecks.current >= PENDING_RECHECKS) return undefined;
+    const timer = setTimeout(() => { rechecks.current += 1; void readBack(); }, PENDING_RECHECK_MS);
+    return () => clearTimeout(timer);
+  }, [latestPending, turns]);
 
   const dispatch = async (sendId: string, payload: Record<string, unknown>) => {
     setBusy(true); setError(undefined);
@@ -103,11 +158,11 @@ export function useConversation(transport: Transport, reading?: Reading): Conver
 
   const send = async (content: string) => {
     const message = content.trim();
-    if (!message || busy) return;
+    if (!message || busy || loading || loadError) return;
     setDraft(""); setError(undefined); setUnkept(false);
     if (!id.current) {
       setBusy(true);
-      const started = await transport.request("conversation.start", reading ? { reading_id: reading.id } : {}).catch(() => undefined);
+      const started = await transport.request("conversation.start", { ...(reading ? { reading_id: reading.id } : {}), title: titleFrom(message) }).catch(() => undefined);
       const conversation = started?.ok && isRecord(started.result) && isRecord(started.result.conversation) ? started.result.conversation : undefined;
       if (!conversation || typeof conversation.id !== "string") {
         // Nothing is answered unless it is kept, so the message goes back to the owner unsent.
@@ -126,12 +181,12 @@ export function useConversation(transport: Transport, reading?: Reading): Conver
   const retry = () => {
     const latest = turns.at(-1);
     if (busy || !retryable(latest) || !latest) return;
-    if (latest.state === "pending") { void readBack(latest.sendId); return; }
+    if (latest.state === "pending") { rechecks.current = 0; void readBack(); return; }
     settle(latest.sendId, (turn) => ({ ...turn, state: "pending", reason: "" }));
     if ((latest.state === "failed" || latest.state === "interrupted") && latest.id) void dispatch(latest.sendId, { retry_turn_id: latest.id });
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
-  return { id: conversationId, turns, preview, draft, setDraft, busy, error, unkept, field, send, retry };
+  return { id: conversationId, turns, preview, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -144,6 +199,8 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     end.current?.scrollIntoView?.({ block: "end" });
   }, [turns.length, busy, error, preview]);
   const latest = turns.at(-1);
+  if (conversation.loading) return <p role="status">{t("assistant_opening")}</p>;
+  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
@@ -165,7 +222,10 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
 // Where the owner writes. Enter sends and Shift+Enter breaks the line.
 export function Composer({ conversation, placeholder, hint, keyshortcuts }: { conversation: Conversation; placeholder: string; hint?: string; keyshortcuts?: string }) {
   const t = useTranslate();
-  const { id, draft, setDraft, busy, field, send } = conversation;
+  const { id, draft, setDraft, field, send } = conversation;
+  // The field stays usable while a conversation is read, so focus and a draft are kept; only sending waits.
+  const busy = conversation.busy || conversation.loadError !== undefined;
+  const waiting = busy || conversation.loading;
   const fieldId = `assistant-prompt-${id}`;
   const hintId = `${fieldId}-hint`;
   const submit = (event: FormEvent) => { event.preventDefault(); void send(draft); };
@@ -178,7 +238,7 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts }: { co
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
     <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" className="primary" disabled={busy || draft.trim() === ""}>{t("assistant_send")}</button>
+    <button type="submit" className="primary" disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
     {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
   </form>;
 }

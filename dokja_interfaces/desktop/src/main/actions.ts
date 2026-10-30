@@ -14,6 +14,7 @@ import type {
   ArchivedConversation,
   ArchivedTurn,
   ArchivedTurnState,
+  ConversationList,
   ConversationRead,
   ConversationStarted,
   DeleteResult,
@@ -257,11 +258,30 @@ function chatReply(result: unknown): ArchivedChatReply | Off {
   });
 }
 
-// A new conversation: general, or about one reading, which it keeps for good.
+// A new conversation: general, or about one reading, which it keeps for good, with an optional title.
 function conversationStartPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const readingId = text(raw.reading_id);
-  if (readingId.length > 512) return undefined;
-  return readingId ? { reading_id: readingId } : {};
+  const title = text(raw.title).replace(/\s+/g, " ");
+  if (readingId.length > 512 || title.length > MAX_TITLE_CHARS) return undefined;
+  return { ...(readingId ? { reading_id: readingId } : {}), ...(title ? { title } : {}) };
+}
+
+// A page of conversations, the most recently changed first; the cursor is the archive's own.
+const LIST_CURSOR = /^[0-9]{1,20}\.[0-9a-f]{32}$/;
+const MAX_CONVERSATIONS_LISTED = 50;
+
+function conversationListPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const cursor = text(raw.cursor);
+  const limit = raw.limit === undefined ? MAX_CONVERSATIONS_LISTED : raw.limit;
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > MAX_CONVERSATIONS_LISTED) return undefined;
+  if (cursor && !LIST_CURSOR.test(cursor)) return undefined;
+  return { ...(cursor ? { cursor } : {}), limit };
+}
+
+function conversationList(body: Record<string, unknown>): ConversationList {
+  const items = Array.isArray(body.conversations) ? body.conversations.slice(0, MAX_CONVERSATIONS_LISTED) : [];
+  const next = text(body.next);
+  return { conversations: items.map(archivedConversation), next: LIST_CURSOR.test(next) ? next : "" };
 }
 
 function conversationReadPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -729,6 +749,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "runtime.logs": { payload: runtimeModule, project: (result) => inDomain(result,"runtime",runtimeLogs) },
   "message.created": { payload: chatPayload, project: chatReply },
   "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
+  "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
   "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },

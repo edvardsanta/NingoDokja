@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/renderer/app.js";
 import { AssistantCard } from "../../src/renderer/cards/assistant.js";
@@ -8,13 +8,19 @@ import type { Locale } from "../../src/shared/locale.js";
 import type { ChatPreview, Transport, TransportResult } from "../../src/shared/transport.js";
 import { answering, archiveId, archivedAnswer, archivedTurn, deferred, failure, ok, routedTransport, startedConversation } from "./support.js";
 
-function renderTalk(transport: Transport, locale: Locale = "en") {
-  return render(
+// Talk first looks for a conversation to continue; with none, it opens on a new one.
+async function renderTalk(transport: Transport, locale: Locale = "en") {
+  const view = render(
     <I18nProvider locale={locale}>
       <AssistantCard transport={transport} />
     </I18nProvider>,
   );
+  await waitFor(() => expect(document.querySelector('[role="status"]')?.textContent ?? "").not.toMatch(/Opening the conversation|Abrindo a conversa/));
+  return view;
 }
+
+// What Talk asked beyond looking for a conversation to continue.
+const asked = (calls: { type: string }[]) => calls.filter((call) => call.type !== "conversation.list");
 
 const field = () => screen.getByRole("textbox", { name: "Your message" }) as HTMLTextAreaElement;
 const sent = (calls: { type: string; payload: Record<string, unknown> | undefined }[]) =>
@@ -23,9 +29,9 @@ const sent = (calls: { type: string; payload: Record<string, unknown> | undefine
 const sendIdOf = (calls: { type: string; payload: Record<string, unknown> | undefined }[]) => String(sent(calls)[0]?.send_id ?? "");
 
 describe("the conversation", () => {
-  it("opens with Ningo's line, then a plain next step, and its message docked at the foot", () => {
+  it("opens with Ningo's line, then a plain next step, and its message docked at the foot", async () => {
     const { transport } = routedTransport({});
-    renderTalk(transport);
+    await renderTalk(transport);
 
     const voice = screen.getByText("I've read more than you'd guess. Ask.");
     expect(voice.className).toBe("voice");
@@ -36,23 +42,23 @@ describe("the conversation", () => {
     expect(screen.getByRole("button", { name: "Send" }).className).toBe("primary");
   });
 
-  it("fills the message from a beginning and sends nothing until the owner does", () => {
+  it("fills the message from a beginning and sends nothing until the owner does", async () => {
     const { transport, calls } = routedTransport({ "message.created": answering("Then argue.") });
-    renderTalk(transport);
+    await renderTalk(transport);
 
     fireEvent.click(screen.getByRole("button", { name: "Argue against:" }));
     expect(field().value).toBe("Argue against: ");
     expect(document.activeElement).toBe(field());
-    expect(calls).toHaveLength(0);
+    expect(asked(calls)).toHaveLength(0);
   });
 
   it("sends on Enter, breaks the line on Shift+Enter, and keeps one id for the whole conversation", async () => {
     const { transport, calls } = routedTransport({ "conversation.start": startedConversation(), "message.created": answering("First answer.", "Second answer.") });
-    renderTalk(transport);
+    await renderTalk(transport);
 
     fireEvent.change(field(), { target: { value: "first" } });
     fireEvent.keyDown(field(), { key: "Enter", shiftKey: true });
-    expect(calls).toHaveLength(0);
+    expect(asked(calls)).toHaveLength(0);
     fireEvent.keyDown(field(), { key: "Enter" });
     await screen.findByText("First answer.");
     expect(screen.queryByText("I've read more than you'd guess. Ask.")).toBeNull();
@@ -92,7 +98,7 @@ describe("the conversation", () => {
         };
       },
     };
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "question" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     await screen.findByText("Ningo is thinking…");
@@ -113,7 +119,7 @@ describe("the conversation", () => {
   it("drops a reply still on its way when a new conversation starts", async () => {
     const late = deferred<TransportResult>();
     const { transport } = routedTransport({ "conversation.start": startedConversation(), "message.created": () => late.promise });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "first" } });
     fireEvent.keyDown(field(), { key: "Enter" });
     await screen.findByText("Ningo is thinking…");
@@ -126,7 +132,7 @@ describe("the conversation", () => {
 
   it("starts a new conversation with a new id and an empty transcript", async () => {
     const { transport, calls } = routedTransport({ "conversation.start": [startedConversation(1), startedConversation(2)], "message.created": answering("Noted.") });
-    renderTalk(transport);
+    await renderTalk(transport);
 
     fireEvent.change(field(), { target: { value: "hello" } });
     fireEvent.keyDown(field(), { key: "Enter" });
@@ -143,16 +149,16 @@ describe("the conversation", () => {
     expect(second?.conversation_id).toBe(archiveId(2));
   });
 
-  it("starts no conversation until the first message, so opening Talk records nothing", () => {
+  it("starts no conversation until the first message, so opening Talk records nothing", async () => {
     const { transport, calls } = routedTransport({});
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
-    expect(calls).toHaveLength(0);
+    expect(asked(calls)).toHaveLength(0);
   });
 
   it("gives the message back unsent when the history is unavailable, and answers nothing unkept", async () => {
     const { transport, calls } = routedTransport({ "conversation.start": failure("unavailable") });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "keep this" } });
     fireEvent.keyDown(field(), { key: "Enter" });
 
@@ -168,7 +174,7 @@ describe("the conversation", () => {
       "message.created": [failure("orchestrator", "the provider failed"), async () => ok({ reply: "At last.", replayed: false, turn: archivedTurn({ content: "why?", reply: "At last.", attempts: 2, sendId: sendIdOf(calls) }) })],
       "conversation.read": async () => ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "failed", reason: "the provider failed", sendId: sendIdOf(calls) })] }),
     });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "why?" } });
     fireEvent.keyDown(field(), { key: "Enter" });
 
@@ -185,7 +191,7 @@ describe("the conversation", () => {
       "message.created": failure("timeout"),
       "conversation.read": async () => ok({ conversation: {}, turns: [archivedTurn({ content: "slow one", reply: "Late, but written.", sendId: sendIdOf(calls) })] }),
     });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "slow one" } });
     fireEvent.keyDown(field(), { key: "Enter" });
 
@@ -201,7 +207,7 @@ describe("the conversation", () => {
       "message.created": [failure("unavailable"), answering("Answered once.")],
       "conversation.read": failure("unavailable"),
     });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "lost?" } });
     fireEvent.keyDown(field(), { key: "Enter" });
 
@@ -221,7 +227,7 @@ describe("the conversation", () => {
         async () => ok({ conversation: {}, turns: [archivedTurn({ content: "wait", reply: "Done now.", sendId: sendIdOf(calls) })] }),
       ],
     });
-    renderTalk(transport);
+    await renderTalk(transport);
     fireEvent.change(field(), { target: { value: "wait" } });
     fireEvent.keyDown(field(), { key: "Enter" });
 
@@ -231,9 +237,9 @@ describe("the conversation", () => {
     expect(sent(calls)).toHaveLength(1);
   });
 
-  it("speaks Portuguese as Ningo, in the first person", () => {
+  it("speaks Portuguese as Ningo, in the first person", async () => {
     const { transport } = routedTransport({});
-    renderTalk(transport, "pt");
+    await renderTalk(transport, "pt");
 
     screen.getByText("Li mais do que você imagina. Pergunte.");
     expect((screen.getByRole("textbox", { name: "Sua mensagem" }) as HTMLTextAreaElement).placeholder).toBe("Pergunte ao Ningo…");
@@ -251,5 +257,132 @@ describe("the conversation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open System" }));
     expect(screen.getByRole("tab", { name: "System" }).getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "System" }));
+  });
+});
+
+const kept = (n: number, turns: number, kind: "general" | "reading" = "general", title = "") =>
+  ({ id: archiveId(n), kind, readingId: kind === "reading" ? "item-1" : "", title, updatedAt: new Date().toISOString(), revision: 1, turns });
+const listed = (...conversations: ReturnType<typeof kept>[]) => ok({ conversations, next: "" });
+const readOf = (n: number, ...turns: ReturnType<typeof archivedTurn>[]) => ok({ conversation: kept(n, turns.length), turns });
+
+describe("the kept conversations", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("continues the latest general conversation when the desktop starts", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(9, 2, "reading"), kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "Earlier question", reply: "Earlier answer.", sendId: "send-old1" })),
+      "message.created": answering("Continued."),
+    });
+    await renderTalk(transport);
+
+    screen.getByText("Earlier answer.");
+    expect(screen.queryByText("I've read more than you'd guess. Ask.")).toBeNull();
+    fireEvent.change(field(), { target: { value: "and now?" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Continued.");
+    expect(sent(calls)[0]?.conversation_id).toBe(archiveId(3));
+    expect(calls.filter((call) => call.type === "conversation.start")).toHaveLength(0);
+    expect(calls.find((call) => call.type === "conversation.read")?.payload).toEqual({ conversation_id: archiveId(3) });
+  });
+
+  it("shows a turn a restart cut off and retries it as the same turn", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "Cut off", state: "interrupted", sendId: "send-cut1" })),
+      "message.created": async () => ok({ reply: "Written now.", replayed: false, turn: archivedTurn({ content: "Cut off", reply: "Written now.", sendId: "send-cut1", attempts: 2 }) }),
+    });
+    await renderTalk(transport);
+
+    screen.getByText("The orchestrator stopped before this reply; nobody knows whether it was written.");
+    fireEvent.click(screen.getByRole("button", { name: "Retry the last message" }));
+    await screen.findByText("Written now.");
+    expect(sent(calls)).toEqual([{ conversation_id: archiveId(3), retry_turn_id: archiveId(0x101) }]);
+    expect(screen.getAllByText("Cut off")).toHaveLength(1);
+  });
+
+  it("opens a new conversation when nothing was kept, or the list cannot be read", async () => {
+    for (const list of [listed(), failure("unavailable"), listed(kept(4, 0))]) {
+      const { transport, calls } = routedTransport({ "conversation.list": list });
+      const view = await renderTalk(transport);
+      screen.getByText("I've read more than you'd guess. Ask.");
+      expect(calls.filter((call) => call.type === "conversation.read")).toHaveLength(0);
+      view.unmount();
+    }
+  });
+
+  it("says when a kept conversation cannot be read, keeps it unsendable, and reads it again on request", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": [failure("unavailable"), readOf(3, archivedTurn({ content: "Back", reply: "Here it is." }))],
+    });
+    await renderTalk(transport);
+
+    expect(field().disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByText("Here it is.");
+    expect(field().disabled).toBe(false);
+    expect(sent(calls)).toHaveLength(0);
+  });
+
+  it("lists the kept conversations and reopens the chosen one, dropping what was on its way", async () => {
+    const late = deferred<TransportResult>();
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1, "general", "On justice"), kept(5, 2, "reading", "A reading")),
+      "conversation.read": [
+        readOf(3, archivedTurn({ content: "What is just?", reply: "Ask Thrasymachus.", sendId: "send-just" })),
+        readOf(5, archivedTurn({ content: "Explain it", reply: "The reading argues for rules.", sendId: "send-read" })),
+      ],
+      "message.created": () => late.promise,
+    });
+    await renderTalk(transport);
+    fireEvent.change(field(), { target: { value: "pending here" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Ningo is thinking…");
+
+    fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
+    const current = await screen.findByRole("button", { name: "On justice" });
+    expect(current.getAttribute("aria-current")).toBe("true");
+    screen.getByText(/Reading discussion · 2 messages/);
+    fireEvent.click(screen.getByRole("button", { name: "A reading" }));
+
+    await screen.findByText("The reading argues for rules.");
+    screen.getByText("A discussion about a reading, reopened from the archive.");
+    expect(screen.queryByRole("button", { name: "A reading" })).toBeNull();
+    await act(async () => late.resolve(archivedAnswer("Late, for the other one.", { content: "pending here" })));
+    expect(screen.queryByText("Late, for the other one.")).toBeNull();
+    expect(calls.filter((call) => call.type === "conversation.read").map((call) => call.payload)).toEqual([
+      { conversation_id: archiveId(3) }, { conversation_id: archiveId(5) },
+    ]);
+  });
+
+  it("says so when no conversation was kept yet", async () => {
+    const { transport } = routedTransport({ "conversation.list": listed() });
+    await renderTalk(transport);
+    fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
+    await screen.findByText("No conversations kept yet.");
+  });
+
+  it("looks again at a reopened message still on its way until its reply is kept, without sending it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": [
+        readOf(3, archivedTurn({ content: "Slow", state: "pending", sendId: "send-slow" })),
+        readOf(3, archivedTurn({ content: "Slow", state: "pending", sendId: "send-slow" })),
+        readOf(3, archivedTurn({ content: "Slow", reply: "Finally.", sendId: "send-slow" })),
+      ],
+    });
+    await renderTalk(transport);
+    screen.getByText("This message is still on its way.");
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    screen.getByText("This message is still on its way.");
+    await act(async () => { await vi.advanceTimersByTimeAsync(3_000); });
+    await screen.findByText("Finally.");
+    expect(calls.filter((call) => call.type === "conversation.read")).toHaveLength(3);
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(calls.filter((call) => call.type === "conversation.read")).toHaveLength(3);
+    expect(sent(calls)).toHaveLength(0);
   });
 });

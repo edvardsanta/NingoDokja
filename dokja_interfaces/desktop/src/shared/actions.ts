@@ -17,6 +17,7 @@ export const ACTION_TYPES = [
   // The owner's conversations with Ningo: starting one records it, so it is a change; reading one is
   // only a read.
   "conversation.start",
+  "conversation.list",
   "conversation.read",
   "runtime.set",
   "runtime.providers",
