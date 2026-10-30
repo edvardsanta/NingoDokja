@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -309,6 +310,29 @@ func TestOneSendIDNamesOneMessage(t *testing.T) {
 	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
 	a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "the question", conversation.Provenance{})
 	if _, _, err := a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "another question", conversation.Provenance{}); !errors.Is(err, conversation.ErrConflict) {
+		t.Fatal(err)
+	}
+}
+
+func TestTouchingMakesAConversationTheLatestAtTheRevisionSeen(t *testing.T) {
+	ctx := context.Background()
+	_, a := open(t, filepath.Join(t.TempDir(), FileName))
+	older, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Older")
+	time.Sleep(2 * time.Millisecond)
+	if _, err := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Newer"); err != nil {
+		t.Fatal(err)
+	}
+	touched, err := a.Touch(ctx, conversation.OwnerScope, older.ID, older.Revision)
+	if err != nil || touched.Revision != older.Revision+1 || touched.Title != "Older" {
+		t.Fatal(touched, err)
+	}
+	if current, _, _ := a.Continued(ctx, conversation.OwnerScope); current.ID != older.ID {
+		t.Fatal("the touched conversation must be the one continued", current)
+	}
+	if _, err := a.Touch(ctx, conversation.OwnerScope, older.ID, older.Revision); !errors.Is(err, conversation.ErrConflict) {
+		t.Fatal("a stale revision must conflict", err)
+	}
+	if _, err := a.Touch(ctx, conversation.OwnerScope, strings.Repeat("f", 32), 1); !errors.Is(err, conversation.ErrNotFound) {
 		t.Fatal(err)
 	}
 }

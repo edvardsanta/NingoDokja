@@ -1,0 +1,23 @@
+{
+  "help": "Commands for this chat:\n/new — start a new conversation\n/conversations — list the latest conversations\n/open N — continue conversation N from the list\n/rename title — rename the current conversation\n/delete N — delete conversation N from the list (asks to confirm)\n/yes — confirm what was asked\n/help — show these commands",
+  "new_started": "New conversation started. Your next message goes to it.",
+  "list_header": "Your latest conversations:",
+  "list_item": "{n}. {title} · {turns} messages · {date}",
+  "list_footer": "Send /open N to continue one, or /delete N to delete it.",
+  "list_current": " (current)",
+  "list_empty": "No conversations are kept yet.",
+  "untitled": "Untitled conversation",
+  "date_layout": "Jan 2, 15:04",
+  "list_needed": "Send /conversations first, then use the number from the list.",
+  "unknown_number": "There is no conversation {n} in the last list. Send /conversations to see it again.",
+  "opened": "We are now continuing: {title}",
+  "renamed": "Conversation renamed to: {title}",
+  "rename_empty": "Give the new title after the command, for example: /rename Justice and power",
+  "rename_too_long": "That title is too long; use up to 120 characters.",
+  "no_current": "There is no conversation to rename yet. Send a message or use /new.",
+  "delete_ask": "Delete “{title}”? Its messages and replies leave the conversation archive, in every interface, and this cannot be undone. Reply /yes within 2 minutes to confirm.",
+  "deleted": "Conversation deleted: {title}",
+  "nothing_to_confirm": "Nothing is waiting for confirmation.",
+  "changed": "That conversation changed elsewhere, so nothing was done. Send /conversations to see it as it is now.",
+  "unavailable": "The conversation archive did not answer just now. Try again in a moment."
+}

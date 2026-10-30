@@ -177,6 +177,13 @@ type ConversationRetryStore interface {
 	RetryTurnInConversation(ctx context.Context, scope Scope, conversationID, turnID string, at time.Time) (Turn, error)
 }
 
+// ConversationTouchStore is the optional capability to mark a conversation as just used, naming the
+// version it saw, without changing its content. A conversation at another revision answers
+// ErrConflict and a missing one ErrNotFound. Touch refuses when this capability is absent.
+type ConversationTouchStore interface {
+	Touch(ctx context.Context, scope Scope, id string, revision uint64, at time.Time) (Conversation, error)
+}
+
 // Archive applies the rules over a Store.
 type Archive struct {
 	store Store
@@ -310,8 +317,9 @@ func (a *Archive) Turns(ctx context.Context, scope Scope, conversationID string,
 }
 
 // Continued is the conversation a send without one of its own continues: the most recently changed
-// general conversation that holds a turn. A reading's discussion is continued only by naming it.
-// None means a new conversation is started.
+// general conversation, even one just started and still empty, so a conversation the owner starts or
+// reopens from the phone is the one the next message goes to. A reading's discussion is continued
+// only by naming it. None means a new conversation is started.
 func (a *Archive) Continued(ctx context.Context, scope Scope) (Conversation, bool, error) {
 	if scope != OwnerScope {
 		return Conversation{}, false, ErrInvalid
@@ -321,11 +329,24 @@ func (a *Archive) Continued(ctx context.Context, scope Scope) (Conversation, boo
 		return Conversation{}, false, err
 	}
 	for _, c := range items {
-		if c.Kind == KindGeneral && c.Turns > 0 {
+		if c.Kind == KindGeneral {
 			return c, true, nil
 		}
 	}
 	return Conversation{}, false, nil
+}
+
+// Touch marks a conversation as just used, so a send without one of its own continues it. It names
+// the version the owner chose, like a rename, and changes nothing else.
+func (a *Archive) Touch(ctx context.Context, scope Scope, id string, revision uint64) (Conversation, error) {
+	if scope != OwnerScope || !opaqueID.MatchString(id) || revision == 0 {
+		return Conversation{}, ErrInvalid
+	}
+	store, ok := a.store.(ConversationTouchStore)
+	if !ok {
+		return Conversation{}, ErrUnavailable
+	}
+	return store.Touch(ctx, scope, id, revision, a.now())
 }
 
 // TitleFrom names a new conversation by the start of its first message.
