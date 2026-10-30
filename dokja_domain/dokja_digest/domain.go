@@ -78,6 +78,8 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return d.service.Dispatch(ctx, "feeds.status", nil)
 	case ActionReadDigest:
 		return d.read(ctx, request.Event.Payload)
+	case ActionReadLink:
+		return d.readLink(ctx, request.Event.Payload)
 	}
 	return nil, fmt.Errorf("unsupported digest action %q for event type %q", request.Action, request.Event.Type)
 }

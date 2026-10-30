@@ -10,8 +10,8 @@ import {
   type TransportResult,
 } from "../shared/transport.js";
 
-// All the page can reach: four functions. It gets no Node, no ipcRenderer and no other channel; the
-// fourth only listens, and what it hears is reduced to two strings.
+// All the page can reach: five functions. It gets no Node, no ipcRenderer and no other channel; the
+// one that only listens hears no more than two strings.
 contextBridge.exposeInMainWorld("dokja", {
   bootstrap: (): Promise<Bootstrap | null> => ipcRenderer.invoke(CHANNELS.bootstrap),
   request: (
@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("dokja", {
     options?: RequestOptions,
   ): Promise<TransportResult> => ipcRenderer.invoke(CHANNELS.request, { type, payload, options }),
   preview: (url: string): Promise<PreviewResult> => ipcRenderer.invoke(CHANNELS.preview, url),
+  openSavedPost: (documentId: string): Promise<TransportResult> => ipcRenderer.invoke(CHANNELS.openSavedPost, documentId),
   onChatPreview: (listener: (preview: ChatPreview) => void): (() => void) => {
     const hear = (_event: unknown, raw: unknown) => {
       const value = (raw ?? {}) as { conversationId?: unknown; text?: unknown };

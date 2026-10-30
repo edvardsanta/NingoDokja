@@ -8,6 +8,7 @@ import { DocumentView } from "./document_view.js";
 import { Drawer } from "./drawer.js";
 import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
 import { AddToBase, type Dropped } from "./knowledge_add.js";
+import type { AddMode } from "./knowledge_add_model.js";
 import {
   parseKnowledgeSearch,
   parseKnowledgeStatus,
@@ -136,6 +137,9 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
   // anywhere on the view opens it and goes to it, as if it had been dropped on the form; the
   // Library's tab comes to the front so the form can be seen.
   const [adding, setAdding] = useState(false);
+  // The drawer is made again each time it opens; it opens on the way of adding last used. A file
+  // dropped before is forgotten when it closes, or it would take that way back on every opening.
+  const [addMode, setAddMode] = useState<AddMode>("note");
   const [dropped, setDropped] = useState<Dropped>();
   const drop = useFileDrop((file) => {
     setCurrent(BASE);
@@ -184,8 +188,8 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
             {t("add_title")}
           </button>
         </div>
-        {adding && <Drawer title={t("add_title")} onClose={() => setAdding(false)}>
-          <AddToBase transport={transport} onAdded={refresh} dropped={dropped} titled={false} />
+        {adding && <Drawer title={t("add_title")} onClose={() => { setAdding(false); setDropped(undefined); }}>
+          <AddToBase transport={transport} onAdded={refresh} dropped={dropped} titled={false} startMode={addMode} onMode={setAddMode} />
         </Drawer>}
         <KnowledgeStatusLines status={status} />
         <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={refresh} />

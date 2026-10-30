@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { formatAgo, formatNumber, formatTime } from "../src/renderer/i18n/format.js";
+import { formatAgo, formatDay, formatNumber, formatTime } from "../src/renderer/i18n/format.js";
 
 test("English writes a decimal point", () => {
   assert.equal(formatNumber("en", 0.081, 3), "0.081");
@@ -71,4 +71,12 @@ test("capture timestamps use the local timezone in either screen language", () =
     if (previous === undefined) delete process.env.TZ;
     else process.env.TZ = previous;
   }
+});
+
+test("a day is written as the language writes a date, and a text that is no date is left out", () => {
+  // noon in UTC is the 20th or the 21st, depending on where the desktop is
+  assert.match(formatDay("en", "2026-10-20T12:00:00Z"), /Oct 2[01], 2026/);
+  assert.match(formatDay("pt", "2026-10-20T12:00:00Z"), /2[01] de out\.? de 2026/);
+  assert.equal(formatDay("en", "not a date"), "");
+  assert.equal(formatDay("pt", ""), "");
 });

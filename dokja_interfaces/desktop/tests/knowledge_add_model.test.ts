@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { check, outcomeOf, parseIngestResult, type Draft } from "../src/renderer/cards/knowledge_add_model.js";
+import {
+  check,
+  checkPostLink,
+  outcomeOf,
+  parseIngestResult,
+  parsePostReply,
+  postOutcome,
+  postTitle,
+  type Draft,
+} from "../src/renderer/cards/knowledge_add_model.js";
 import { INGEST_LIMITS } from "../src/shared/ingest.js";
 
 const draft = (overrides: Partial<Draft> = {}): Draft => ({
@@ -105,4 +114,56 @@ test("a kind, a reference or an id outside the rules is said before sending", ()
   for (const id of ["has space", "a?b", "a".repeat(INGEST_LIMITS.idChars + 1)]) {
     assert.deepEqual(check(draft({ ...base, id })), { ok: false, problem: { id: "add_bad_id", params: { max: INGEST_LIMITS.idChars } } }, id);
   }
+});
+
+test("a post link must be a web address, and is sent trimmed", () => {
+  assert.deepEqual(checkPostLink("  https://example.com/p/1 "), { ok: true, url: "https://example.com/p/1" });
+  assert.deepEqual(checkPostLink(" \n"), { ok: false, problem: "post_need_link" });
+  for (const link of ["example.com/p/1", "plugin:thing", "file:///etc/passwd", "javascript:alert(1)", "https://", "two words"]) {
+    assert.deepEqual(checkPostLink(link), { ok: false, problem: "add_bad_address" }, link);
+  }
+  assert.deepEqual(checkPostLink(`https://example.com/${"a".repeat(INGEST_LIMITS.addressChars)}`), { ok: false, problem: "add_bad_address" });
+});
+
+const POST = {
+  documentId: "post-0123456789abcdef",
+  url: "https://example.com/p/1",
+  author: " Example Author ",
+  caption: "Words.",
+  published: "2026-10-20T12:00:00Z",
+  media: [{ kind: "video", src: "ningo-post://post-0123456789abcdef/0" }, { kind: "other", src: "ningo-post://post-0123456789abcdef/1" }, { kind: "image" }, "x"],
+};
+
+test("a post reply is checked for its shape, and a file with no address is left out", () => {
+  assert.deepEqual(parsePostReply({ status: "ok", post: POST }), {
+    status: "ok",
+    post: {
+      documentId: "post-0123456789abcdef",
+      url: "https://example.com/p/1",
+      author: "Example Author",
+      caption: "Words.",
+      published: "2026-10-20T12:00:00Z",
+      media: [
+        { kind: "video", src: "ningo-post://post-0123456789abcdef/0" },
+        { kind: "image", src: "ningo-post://post-0123456789abcdef/1" },
+      ],
+      missing: 0,
+    },
+  });
+  const partial = parsePostReply({ status: "ok", post: { ...POST, missing: 3.9 } });
+  assert.equal(partial && "post" in partial ? partial.post.missing : -1, 3);
+  assert.deepEqual(parsePostReply({ status: "refused", refused: "login_required" }), { status: "refused", refused: "login_required" });
+  assert.deepEqual(parsePostReply({ off: true, reason: "paused" }), { off: true, reason: "paused" });
+  for (const bad of [null, "text", [], {}, { status: "refused", refused: "because" }, { status: "ok" }, { status: "ok", post: { ...POST, documentId: "" } }, { status: "ok", post: { ...POST, url: 3 } }]) {
+    assert.equal(parsePostReply(bad), undefined, JSON.stringify(bad));
+  }
+});
+
+test("a post is named by its author, else by its link, and saying so depends on something being written", () => {
+  assert.equal(postTitle({ author: "Example Author", url: "https://example.com/p/1" }), "Example Author");
+  assert.equal(postTitle({ author: "", url: "https://example.com/p/1" }), "https://example.com/p/1");
+  const result = { count: 1, created: 0, updated: 0, unchanged: 1, chunks: 0, degraded: false, reason: "" };
+  assert.equal(postOutcome(result), "add_unchanged");
+  assert.equal(postOutcome({ ...result, created: 1 }), "post_saved");
+  assert.equal(postOutcome({ ...result, updated: 1 }), "post_saved");
 });

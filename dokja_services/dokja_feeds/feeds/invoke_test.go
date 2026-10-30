@@ -146,3 +146,30 @@ func TestRefreshWaitingForAnActiveCollectorHonorsCancellation(t *testing.T) {
 		t.Fatal("cancelled refresh ran another collection")
 	}
 }
+
+func TestInvokeReachesASocialProviderNamedByTheCaller(t *testing.T) {
+	root := t.TempDir()
+	for _, id := range []string{"post-reader", "post-reader-alt"} {
+		newPlugin(t, root, id, v1(map[string]any{"id": id, "enabled": true, "formats": nil, "provides": []string{CapabilitySocialResolve}}))
+	}
+	runner := &inputRunner{reply: func(p Plugin) ([]byte, error) {
+		return []byte(`{"result":{"handled":true,"provider":"` + p.ID + `"}}`), nil
+	}}
+	s := extractService(root, runner)
+	payload := map[string]any{"capability": CapabilitySocialResolve, "action": "read", "input": map[string]any{"url": "https://example.com/p/1"}}
+	if _, err := s.Dispatch(context.Background(), "feeds.invoke", payload); err == nil || !strings.HasPrefix(err.Error(), "ambiguous:") {
+		t.Fatal("two social providers must not be chosen by directory order", err)
+	}
+	payload["plugin"] = "post-reader-alt"
+	result, err := s.Dispatch(context.Background(), "feeds.invoke", payload)
+	if err != nil || result["provider"] != "post-reader-alt" {
+		t.Fatal(result, err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(runner.inputs["post-reader-alt"], &request); err != nil {
+		t.Fatal(err)
+	}
+	if request["operation"] != CapabilitySocialResolve || request["action"] != "read" {
+		t.Fatal(request)
+	}
+}

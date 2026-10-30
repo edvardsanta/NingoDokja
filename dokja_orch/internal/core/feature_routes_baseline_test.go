@@ -32,6 +32,7 @@ func TestBaselineFeatureEventsKeepTheirWorkflowAndAction(t *testing.T) {
 		{"conversation.list", "conversation-archive", DomainConversation, "manage-conversation"},
 		{"conversation.read", "conversation-archive", DomainConversation, "manage-conversation"},
 		{"digest.status", "digest", DomainDigest, "inspect-digest"},
+		{"digest.link.read", "digest", DomainDigest, "read-link"},
 		{"knowledge.application.propose.measured", "knowledge", DomainKnowledge, "propose-measured-knowledge-application"},
 		{"knowledge.application.propose", "knowledge", DomainKnowledge, "propose-knowledge-application"},
 		{"knowledge.application.assess", "knowledge", DomainKnowledge, "assess-knowledge-application"},

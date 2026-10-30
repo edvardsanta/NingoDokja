@@ -62,7 +62,7 @@ a cognitive macro-component.
 
 | Capability | Domain/policy owner | Mechanism or service | Existing consumer and operation | Candidate macro responsibility |
 | --- | --- | --- | --- | --- |
-| Reading | Digest owns item selection; Feeds owns collection mechanics | `dokja_services/dokja_feeds` | Digest handler calls `feeds.items` and `feeds.status` | One reading host, scheduled and on demand, absorbing Book and Knowledge extraction (ADR 0006); keep product ranking in Digest |
+| Reading | Digest owns item selection; Feeds owns collection mechanics | `dokja_services/dokja_feeds` | Digest handler calls `feeds.items` and `feeds.status`, and `feeds.invoke` for a post link | One reading host, scheduled and on demand, absorbing Book and Knowledge extraction (ADR 0006); keep product ranking in Digest |
 | Semantic knowledge | `dokja_domain/dokja_knowledge` owns document and [hashtag-example lifecycle rules](hashtag-knowledge.md); consuming workflows decide when to use it | `dokja_services/dokja_knowledge` | Chat retrieves context; hashtag workflow sequences OCR with domain-owned example storage/retrieval; Knowledge commands manage documents | General facts, models and methods with provenance; current document retrieval is the starting mechanism |
 | Experience | `dokja_domain/dokja_memory` interprets episodes/outcomes and owns [hashtag observations](hashtag-experience.md) and [confirmed media receipt policy](media-delivery-receipts.md) | Memory service for experiences; existing media cache for transitional delivery flags | Hashtag workflow sequences prediction/recording and feedback; scheduled/manual sends pass confirmed outcomes to Memory receipt policy | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; receipt storage and durable attempt tracking still need migration |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
@@ -267,8 +267,20 @@ Digest applies freshness, ordering, duplicate removal, and source balancing befo
 paging. Each enabled Feeds plugin runs on its own collection schedule. Reading a
 digest does not invoke the collectors synchronously.
 
+`digest.link.read {url} -> Digest domain -> feeds.invoke social.resolve.v1 -> post reader`
+
+A post link is read on demand. Digest asks the enabled post readers in id order,
+takes the first that handles the link, bounds the post's fields and keeps only
+`image`/`video` media with web addresses. It also gives the post a stable
+`document_id` for the Library. A reader's refusal becomes one fixed reason:
+`unsupported`, `login_required`, `unavailable`, `no_reader` or `failed`. The
+reader's own wording never reaches an interface. The desktop downloads the media
+to a temporary folder, and saving goes through `knowledge.ingest`
+([post readers](feeds-content-plugins.md#post-readers)).
+
 Sources: [Digest handler](../dokja_orch/internal/handlers/digest_domain_handler.go),
 [domain](../dokja_domain/dokja_digest/domain.go),
+[post links](../dokja_domain/dokja_digest/link.go),
 [policy](../dokja_domain/dokja_digest/compose.go),
 [Feeds service](../dokja_services/dokja_feeds/feeds/service.go).
 

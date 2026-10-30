@@ -33,3 +33,40 @@ it("keeps local model controls working while the demo streams a chat reply", asy
   } });
   expect(previews).toHaveLength(count);
 });
+
+it("reads a post link and saves it, so the Post way can be tried without a shell", async () => {
+  const transport = createFakeTransport(0);
+  const link = "https://example.com/p/1";
+
+  const read = await transport.request("digest.link.read", { url: link });
+  expect(read).toMatchObject({ ok: true, result: { status: "ok", post: { url: link, author: "Example Author" } } });
+  const { documentId, media } = (read as { result: { post: { documentId: string; media: unknown[] } } }).result.post;
+  expect(documentId).toMatch(/^post-[0-9a-f]{16}$/);
+  expect(media).toHaveLength(2);
+  // the same link is the same post, so saving it twice updates it
+  const again = await transport.request("digest.link.read", { url: link });
+  expect(again).toMatchObject({ ok: true, result: { post: { documentId } } });
+
+  await expect(transport.request("knowledge.ingest", { mode: "post", post: documentId })).resolves.toMatchObject({
+    ok: true, result: { created: 1, updated: 0 },
+  });
+  await expect(transport.request("knowledge.ingest", { mode: "post", post: documentId })).resolves.toMatchObject({
+    ok: true, result: { created: 0, updated: 1 },
+  });
+  await expect(transport.request("knowledge.ingest", { mode: "post", post: "post-0000000000000000" })).resolves.toMatchObject({
+    ok: false, error: { code: "orchestrator" },
+  });
+  await expect(transport.openSavedPost?.(documentId)).resolves.toMatchObject({ ok: true });
+});
+
+it("refuses the post links whose path names a refusal, and shows a post with no files for /text", async () => {
+  const transport = createFakeTransport(0);
+  const asked = async (path: string) => (await transport.request("digest.link.read", { url: `https://example.com/${path}` })) as { result: Record<string, unknown> };
+
+  expect((await asked("login")).result).toEqual({ status: "refused", refused: "login_required" });
+  expect((await asked("private")).result).toEqual({ status: "refused", refused: "unavailable" });
+  expect((await asked("page")).result).toEqual({ status: "refused", refused: "unsupported" });
+  expect((await asked("broken")).result).toEqual({ status: "refused", refused: "failed" });
+  expect((await asked("reader")).result).toEqual({ status: "refused", refused: "no_reader" });
+  expect((await asked("text")).result).toMatchObject({ status: "ok", post: { media: [] } });
+});

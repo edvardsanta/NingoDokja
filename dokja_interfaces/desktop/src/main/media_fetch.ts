@@ -2,6 +2,7 @@ import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import type { IncomingMessage } from "node:http";
 import http from "node:http";
 import https from "node:https";
+import { open, rm } from "node:fs/promises";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 
 import type { TransportErrorCode } from "../shared/transport.js";
@@ -283,4 +284,108 @@ export async function fetchMedia(rawUrl: string, options: MediaOptions = {}): Pr
     }
     return readMedia(response, options.maxBytes, signal);
   }
+}
+
+// A post's media is kept on disk, not in memory: a clip can be far larger than a meme.
+const MAX_POST_IMAGE_BYTES = 25 * 1024 * 1024;
+const MAX_POST_VIDEO_BYTES = 300 * 1024 * 1024;
+const POST_TIMEOUT_MS = 180_000;
+
+export type DownloadOptions = MediaOptions & {
+  // One origin (scheme, host and port) on this machine the owner named, where a post reader hands
+  // its files out. Only an address on exactly that origin may skip the public-address rule, and a
+  // redirect is checked again.
+  localOrigin?: string;
+};
+
+export type Downloaded = { kind: Kind; type: string; bytes: number };
+
+function originGuard(url: URL, options: DownloadOptions): { ports: number[]; guard: (address: string) => boolean } {
+  const ports = options.ports ?? [80, 443];
+  const guard = options.guard ?? isPublicAddress;
+  if (options.localOrigin && url.origin === options.localOrigin) {
+    const port = url.port !== "" ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
+    return { ports: [...ports, port], guard: () => true };
+  }
+  return { ports, guard };
+}
+
+function checkPostUrl(raw: string, options: DownloadOptions): { url: URL; lookup: LookupFunction } {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new MediaError("invalid", "not an address");
+  }
+  const { ports, guard } = originGuard(parsed, options);
+  return { url: checkUrl(raw, ports, guard), lookup: guardedLookup(guard) };
+}
+
+// Downloads one picture or video of a post into a file, with the same rules as fetchMedia (plain
+// GET, public addresses, three redirects, the bytes must be what the host said), larger caps, and
+// the one local origin the owner named. A file that breaks a rule is removed.
+export async function downloadMedia(rawUrl: string, path: string, options: DownloadOptions = {}): Promise<Downloaded> {
+  const totalMs = options.timeoutMs ?? POST_TIMEOUT_MS;
+  const signal = AbortSignal.timeout(totalMs);
+  let { url, lookup } = checkPostUrl(rawUrl, options);
+  for (let redirects = 0; ; redirects += 1) {
+    const response = await get(url, lookup, signal, Math.min(HEADER_TIMEOUT_MS, totalMs));
+    const status = response.statusCode ?? 0;
+    const next = response.headers.location;
+    if (status >= 300 && status < 400 && next) {
+      response.resume();
+      if (redirects >= MAX_REDIRECTS) throw new MediaError("unexpected", "too many redirects");
+      ({ url, lookup } = checkPostUrl(new URL(next, url).href, options));
+      continue;
+    }
+    if (status !== 200) {
+      response.resume();
+      throw new MediaError("unavailable", `the host answered ${status}`);
+    }
+    try {
+      return await writeMedia(response, path, options.maxBytes, signal);
+    } catch (error) {
+      await rm(path, { force: true });
+      throw error;
+    }
+  }
+}
+
+async function writeMedia(
+  response: IncomingMessage,
+  path: string,
+  maxBytes: number | undefined,
+  signal: AbortSignal,
+): Promise<Downloaded> {
+  const kind = kindOf(String(response.headers["content-type"] ?? "").toLowerCase());
+  if (!kind) {
+    response.destroy();
+    throw new MediaError("unexpected", "that is not a picture or a video");
+  }
+  const cap = maxBytes ?? (kind === "video" ? MAX_POST_VIDEO_BYTES : MAX_POST_IMAGE_BYTES);
+  if (Number(response.headers["content-length"] ?? 0) > cap) {
+    response.destroy();
+    throw new MediaError("unexpected", "that file is too large");
+  }
+  const file = await open(path, "wx");
+  let received = 0;
+  let head = Buffer.alloc(0);
+  try {
+    for await (const chunk of response as AsyncIterable<Buffer>) {
+      received += chunk.length;
+      if (received > cap) {
+        response.destroy();
+        throw new MediaError("unexpected", "that file is too large");
+      }
+      if (head.length < 16) head = Buffer.concat([head, chunk.subarray(0, 16 - head.length)]);
+      await file.write(chunk);
+    }
+  } catch (error) {
+    throw toMediaError(error, signal);
+  } finally {
+    await file.close();
+  }
+  const type = kind === "video" ? sniffVideo(head) : sniffImage(head);
+  if (!type) throw new MediaError("unexpected", "that is not a picture or a video");
+  return { kind, type, bytes: received };
 }

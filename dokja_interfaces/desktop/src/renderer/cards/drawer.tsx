@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 import { useTranslate } from "../i18n/context.js";
 
-const FOCUSABLE = "button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [href], [tabindex]:not([tabindex='-1'])";
+const FOCUSABLE = "button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), video[controls], [href], [tabindex]:not([tabindex='-1'])";
 
 // A side panel over the right of the window for a task that is not the view itself, such as adding to
 // the Library. While it is open the focus stays inside it; Esc, × or a press on the shade behind it

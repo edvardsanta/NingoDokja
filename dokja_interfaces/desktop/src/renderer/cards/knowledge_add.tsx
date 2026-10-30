@@ -1,65 +1,68 @@
 import { useCallback, useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 
-import { INGEST_LIMITS, INGEST_MODES, type IngestMode } from "../../shared/ingest.js";
+import { INGEST_LIMITS, type IngestMode } from "../../shared/ingest.js";
 import type { IngestResult, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { OffNotice, Problem as ErrorLine } from "./card_frame.js";
 import {
+  ADD_MODES,
   DEFAULT_KINDS,
   FILE_MEGABYTES,
   KIND_SUGGESTIONS,
+  addToBase,
   check,
   outcomeOf,
-  parseIngestResult,
   readFile,
+  type AddMode,
   type Draft,
   type FileDraft,
   type Problem,
 } from "./knowledge_add_model.js";
+import { PostPane } from "./knowledge_post.js";
 import { useAction } from "./use_action.js";
-import type { LoadResult } from "./use_card.js";
 
-// A big file can take a while to read, split and index, and the orchestrator answers one request
-// at a time. If the wait runs out the document may still have been added.
-const INGEST_TIMEOUT_MS = 120_000;
-
-const MODE_IDS: Record<IngestMode, MessageId> = {
+const MODE_IDS: Record<AddMode, MessageId> = {
   note: "add_mode_note",
   address: "add_mode_address",
   file: "add_mode_file",
+  post: "add_mode_post",
 };
-
-export async function addToBase(
-  transport: Transport,
-  payload: Record<string, unknown>,
-): Promise<LoadResult<IngestResult | Off>> {
-  const answer = await transport.request("knowledge.ingest", payload, { timeoutMs: INGEST_TIMEOUT_MS });
-  if (!answer.ok) return answer;
-  const result = parseIngestResult(answer.result);
-  return result
-    ? { ok: true, data: result }
-    : { ok: false, error: { code: "unexpected", message: "unexpected ingest reply" } };
-}
 
 const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "", kind: "", reference: "", id: "" };
 
-// A note, an address or a file, added to the research base. The form is off while a request is on
-// its way and never sends again by itself.
+// A note, an address, a file or a post link, added to the research base. The form is off while a
+// request is on its way and never sends again by itself.
 // A file dropped on the view around the form, and how many have been: a second drop of the same file
 // is still a new drop.
 export type Dropped = { file: File; count: number };
 
 // titled is false where something around the form already names it, such as the Add drawer.
-export function AddToBase({ transport, onAdded, dropped, titled = true }: { transport: Transport; onAdded?: () => void; dropped?: Dropped; titled?: boolean }) {
+//
+// startMode and onMode let the view around the form keep the way of adding that was last used, since
+// the drawer is made again each time it opens.
+type Props = {
+  transport: Transport;
+  onAdded?: () => void;
+  dropped?: Dropped;
+  titled?: boolean;
+  startMode?: AddMode;
+  onMode?: (mode: AddMode) => void;
+};
+
+export function AddToBase({ transport, onAdded, dropped, titled = true, startMode = "note", onMode }: Props) {
   const t = useTranslate();
   const ids = useId();
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [mode, setMode] = useState<AddMode>(startMode);
+  const [draft, setDraft] = useState<Draft>({ ...EMPTY, mode: startMode === "post" ? EMPTY.mode : startMode });
   const [problem, setProblem] = useState<Problem | undefined>(undefined);
+  const [reading, setReading] = useState(false);
   const run = useCallback((payload: Record<string, unknown>) => addToBase(transport, payload), [transport]);
   const { state, start } = useAction(run);
   const sending = state.phase === "loading";
+  // a post being read or saved holds the way of adding, as a form being sent does
+  const busy = sending || reading;
 
   const set = <K extends keyof Draft>(field: K, value: Draft[K]) => setDraft((current) => ({ ...current, [field]: value }));
 
@@ -71,6 +74,13 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
     if (state.data.created + state.data.updated > 0) onAdded?.();
     // onAdded is a new function on every render of the card; what matters is a new answer
   }, [state]);
+
+  const pick = (next: AddMode) => {
+    setMode(next);
+    onMode?.(next);
+    setProblem(undefined);
+    if (next !== "post") set("mode", next);
+  };
 
   const choose = (file: File | undefined) => {
     if (!file) return;
@@ -88,10 +98,24 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
     );
   };
 
+  // "Use as address": the link of a post nobody reads goes to the address field, and the focus with it.
+  const address = useRef<HTMLInputElement>(null);
+  const carried = useRef(false);
+  useEffect(() => {
+    if (!carried.current) return;
+    carried.current = false;
+    address.current?.focus();
+  }, [mode]);
+  const carryToAddress = (url: string) => {
+    carried.current = true;
+    set("address", url);
+    pick("address");
+  };
+
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
-    if (!dropped || sending) return;
-    set("mode", "file");
+    if (!dropped || busy) return;
+    pick("file");
     choose(dropped.file);
     form.current?.scrollIntoView?.({ block: "nearest" });
     // a new drop is a new count; the rest is read at that moment
@@ -100,8 +124,8 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
   const onDrop = (event: DragEvent<HTMLFormElement>) => {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
-    if (!file || sending) return;
-    set("mode", "file");
+    if (!file || busy) return;
+    pick("file");
     choose(file);
   };
 
@@ -129,22 +153,14 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
     <section className="add" {...(titled ? { "aria-labelledby": field("title") } : { "aria-label": t("add_title") })}>
       {titled && <h3 id={field("title")}>{t("add_title")}</h3>}
       <div className="scope" role="group" aria-label={t("add_title")}>
-        {INGEST_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            aria-pressed={draft.mode === mode}
-            disabled={sending}
-            onClick={() => {
-              set("mode", mode);
-              setProblem(undefined);
-            }}
-          >
-            {t(MODE_IDS[mode])}
+        {ADD_MODES.map((each) => (
+          <button key={each} type="button" aria-pressed={mode === each} disabled={busy} onClick={() => pick(each)}>
+            {t(MODE_IDS[each])}
           </button>
         ))}
       </div>
-      <form
+      {mode === "post" && <PostPane transport={transport} onAdded={onAdded} onBusy={setReading} onUseAddress={carryToAddress} />}
+      {mode !== "post" && <form
         ref={form}
         className="add-form"
         onSubmit={(event) => {
@@ -155,7 +171,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
         onDrop={onDrop}
       >
         <fieldset disabled={sending}>
-          <label htmlFor={field("name")}>{draft.mode === "note" ? t("add_field_title") : t("add_field_title_optional")}</label>
+          <label htmlFor={field("name")}>{mode === "note" ? t("add_field_title") : t("add_field_title_optional")}</label>
           <input
             id={field("name")}
             value={draft.title}
@@ -164,7 +180,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
             onChange={(event) => set("title", event.target.value)}
           />
 
-          {draft.mode === "note" && (
+          {mode === "note" && (
             <>
               <label htmlFor={field("text")}>{t("add_field_text")}</label>
               <textarea
@@ -177,11 +193,12 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
               />
             </>
           )}
-          {draft.mode === "address" && (
+          {mode === "address" && (
             <>
               <label htmlFor={field("address")}>{t("add_field_address")}</label>
               <input
                 id={field("address")}
+                ref={address}
                 value={draft.address}
                 maxLength={INGEST_LIMITS.addressChars}
                 inputMode="url"
@@ -191,7 +208,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
               />
             </>
           )}
-          {draft.mode === "file" && (
+          {mode === "file" && (
             <>
               <label htmlFor={field("file")}>{t("add_field_file")}</label>
               <input
@@ -258,8 +275,8 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
             <button type="submit">{t("add_submit")}</button>
           </div>
         </fieldset>
-      </form>
-      <div aria-live="polite">
+      </form>}
+      {mode !== "post" && <div aria-live="polite">
         {sending && <p role="status">{t("add_sending")}</p>}
         {problem && <p role="alert">{t(problem.id, problem.params)}</p>}
         {state.phase === "error" &&
@@ -269,7 +286,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true }: { tran
             <ErrorLine error={state.error} />
           ))}
         {state.phase === "ready" && <Outcome result={state.data} />}
-      </div>
+      </div>}
     </section>
   );
 }

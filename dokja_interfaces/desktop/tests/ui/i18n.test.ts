@@ -8,6 +8,8 @@ import en from "../../src/renderer/i18n/locales/en.json";
 import pt from "../../src/renderer/i18n/locales/pt.json";
 
 const RENDERER = join(__dirname, "../../src/renderer");
+// The shell words its own windows and the Library entry of a saved post from the same catalogs.
+const SHELL = join(__dirname, "../../src/main");
 
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -35,13 +37,13 @@ describe("the catalogs", () => {
   });
 
   it("have no id the screen does not use, so nothing goes stale", () => {
-    const code = sources(RENDERER).join("\n");
+    const code = [...sources(RENDERER), ...sources(SHELL)].join("\n");
     const unused = Object.keys(en).filter((id) => !code.includes(`"${id}"`));
     expect(unused).toEqual([]);
   });
 
   // Words that are the same in both languages by nature, not because a message was forgotten.
-  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant", "system_view_status", "models_pull_progress",
+  const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant", "system_view_status", "models_pull_progress", "post_entry_link",
     // product names
     "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme"]);
 

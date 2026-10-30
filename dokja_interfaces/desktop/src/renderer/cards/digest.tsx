@@ -17,7 +17,8 @@ import {
 } from "./digest_model.js";
 import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
-import { Outcome, addToBase } from "./knowledge_add.js";
+import { Outcome } from "./knowledge_add.js";
+import { addToBase } from "./knowledge_add_model.js";
 import { useAction } from "./use_action.js";
 import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";

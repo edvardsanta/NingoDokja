@@ -26,7 +26,7 @@ owner has already moved. The sidebar asks nothing itself.
 | system › status | `ningo.status`, `services.set`, `scheduler.jobs.set` | what needs attention first (every part with a problem or not checked, its state and why), then how every service is doing, with a switch for each one the orchestrator can switch, the chat interfaces (Discord, WhatsApp) under their own heading with their state and a switch, and the scheduled jobs with their own switch and interval; the name's ghost follows it |
 | talk | `message.created` when something is sent | the conversation with Ningo: his opening line, beginnings of a question that fill the message (they never send by themselves), the transcript, and the message docked at the foot (Enter sends, Shift+Enter breaks the line); "Start a new conversation" gives it a new id. With the orchestrator down it says so and offers to open System |
 | notebook (memory) | `memory.status`, `memory.stats` | the experience memory and how well its predictions score |
-| library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its readings view | two views, as tabs (the arrows move between them). **Documents**: a search over the Library first, then its documents, listed as the view opens; **Add to the Library** beside the search opens the form, in a drawer over the right of the window, to add a note, a web address or a file (Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over and opens the drawer; Esc or × closes it). A document's title opens it; its menu (a right click on the row, the Menu key or Shift+F10 on it, or its ⋯ button) holds **Open**, **Classify…**, which opens it with its classification shown, and **Delete…**. **Readings**: source and inclusive date-range filters (UTC), plus text search, are applied by the Digest domain before pagination; explicit dates search all collected cached items, while the unfiltered digest keeps its freshness window. Each entry has an expandable preview of collected full text or a labeled excerpt, and pictures/videos load through the shell only when expanded. **Readings**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened; **Save to the Library** on a reading adds its page to the Library (`knowledge.ingest`): the screen names the reading by id and the shell keeps any full source text and address when it projects the page, then sends the full text with a stable per-reading document id and the address as provenance; when full text is absent it sends the address for fetching; the screen receives bounded plain text for its expandable preview and media references only through the shell preview gate; **Discuss with Ningo** opens Talk on a new conversation about that reading, named above the transcript with **Close discussion**, and every turn carries the reading's id (the list itself has no composer) |
+| library (knowledge) | `knowledge.status`, `knowledge.search`, `knowledge.ingest`, `knowledge.list`, `knowledge.reindex`, `knowledge.delete`; `digest.status`, `digest.items` in its readings view | two views, as tabs (the arrows move between them). **Documents**: a search over the Library first, then its documents, listed as the view opens; **Add to the Library** beside the search opens the form, in a drawer over the right of the window, to add a note, a web address, a file or a post link (**Post**, see [Post links](#post-links); the drawer opens on the way last used; Ctrl+Enter sends a note; a file can be dropped anywhere on the workspace, which lights up while it is dragged over and opens the drawer; Esc or × closes it). A document's title opens it; its menu (a right click on the row, the Menu key or Shift+F10 on it, or its ⋯ button) holds **Open**, **Classify…**, which opens it with its classification shown, and **Delete…**. **Readings**: source and inclusive date-range filters (UTC), plus text search, are applied by the Digest domain before pagination; explicit dates search all collected cached items, while the unfiltered digest keeps its freshness window. Each entry has an expandable preview of collected full text or a labeled excerpt, and pictures/videos load through the shell only when expanded. **Readings**: what the feeds service reads and the first entries it gave, newest first; reading is how knowledge comes in, so it is a view of this workspace, asked only when opened; **Save to the Library** on a reading adds its page to the Library (`knowledge.ingest`): the screen names the reading by id and the shell keeps any full source text and address when it projects the page, then sends the full text with a stable per-reading document id and the address as provenance; when full text is absent it sends the address for fetching; the screen receives bounded plain text for its expandable preview and media references only through the shell preview gate; **Discuss with Ningo** opens Talk on a new conversation about that reading, named above the transcript with **Close discussion**, and every turn carries the reading's id (the list itself has no composer) |
 | messages (communications) | `communications.channels`, `communications.history`, `communications.send` | the text channels of the servers in `DISCORD_GUILD_ID` (grouped under each server's name, with a note when a server cannot be read), the configured Discord channels and the WhatsApp conversations the owner named; any listed channel can be written to by hand, while scheduled memes still go only to their channels; paginated history, text and meme delivery through Ningo to Discord; the conversation fills the workspace, its history scrolling above a one-row composer; the image button beside the field opens the waiting memes in a tray over the history (previews fetched by the shell; **Fetch new memes** at its top asks the sources now, through `meme.pool.refresh`, says how many came and shows the first page again), a click on a picture attaches it (a second click takes it off), and the attached meme stays in a chip with its own × and the force-send option. After a send the tray stays open and reads its page again, so the meme just sent leaves it. Without `DOKJA_COMMUNICATIONS_TOKEN` the workspace says messages are not set up and what to set |
 
 Ctrl+1 to Ctrl+5 open the workspaces in the sidebar's order (System is Ctrl+5), from anywhere, a field
@@ -41,7 +41,7 @@ from the stored passages and said to be so, asked for alone with `include_text`;
 batch of up to 32 pending passages per click, and delete a selected document after a native confirmation
 naming its id. Cancelling leaves the document alone. A timeout asks the person to refresh and check;
 changes are never retried automatically. Adding, indexing and deleting refresh the counts and any open
-document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link.
+document list. The messages workspace sends to Discord through its own confirmed action. Nothing opens an external link in a browser.
 
 System is also where things are switched on and off. Each service the orchestrator can switch
 (`feeds`, `chat`, `knowledge`, `memory`, `scheduler`; legacy mode also lists `meme` and `book`) has a switch, and each scheduled job has a
@@ -90,6 +90,38 @@ list opens by itself when one does.
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--env-file` (communications credential file), `--lang en|pt`, and `--timeout` (the longest a request may wait, default `2m`; the health card asks for
 15 s). For example: `pnpm start --lang=pt`.
+
+## Post links
+
+The shell can open a link to a public post without signing in. It asks the
+orchestrator (`digest.link.read`), which asks the post readers the owner installed
+as Feeds plugins (see `dokja_docs/feeds-content-plugins.md`, "Post readers").
+
+- On screen it is the **Post** way of the Add to the Library drawer: paste the
+  link and press **Show post** to see who wrote it, when, its caption and its files
+  (a clip has controls and never starts by itself), then **Save to the Library**.
+  Editing the link takes the shown post away, so Save always matches what is on
+  screen. A link no reader handles offers **Use as address**.
+- The shell downloads the post's pictures and videos straight away into a folder
+  in the system's temporary directory. It erases that folder when the app quits,
+  and erases one left by a crash on the next start. The screen sees those files
+  only as `ningo-post://` addresses that the shell serves itself. Nothing is
+  fetched from the page.
+- Saving a post opens the system's own folder window. Choosing a folder is the
+  owner's yes; closing the window saves nothing. The files are copied into a folder
+  named by the post's id inside the chosen folder. The shell then adds the caption,
+  author, date, link and saved file names to the Library (`knowledge.ingest`) under
+  the post's own id, so saving it again updates the same document. If the Library
+  refuses, the folder the save created is removed.
+- After a save, the screen can open the folder the owner chose in the system's
+  file manager. It only works on a real press, and only for a post saved in this run.
+- `--posts-dir` chooses where the folder window opens the first time. The default
+  is `saved-posts` in the app's data folder. After that, it opens where the owner
+  chose last.
+- A reader that hands its files out from a server on this machine needs that one
+  origin named with `--post-media-origin` or `DOKJA_POST_MEDIA_ORIGIN` (for example
+  `http://127.0.0.1:9000`). The shell never fetches from any other address on this
+  machine or the local network.
 
 ## Replies as Ningo writes them
 

@@ -51,6 +51,9 @@ export const ACTION_TYPES = [
   "meme.pool.refresh",
   "digest.status",
   "digest.items",
+  // Opening a post link reaches the outside world through a reader and downloads its files, so it
+  // needs a real press, like a change; it changes nothing and asks for no window.
+  "digest.link.read",
   "knowledge.ingest",
   "knowledge.list",
   "knowledge.classify",
@@ -78,6 +81,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "communications.link.reset",
   "services.set",
   "scheduler.jobs.set",
+  "digest.link.read",
   "knowledge.ingest",
   "knowledge.delete",
   "knowledge.reindex",

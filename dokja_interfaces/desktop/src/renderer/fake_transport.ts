@@ -1,3 +1,4 @@
+import type { PostReply, PostView } from "../shared/posts.js";
 import { RUNTIME_MODULES } from "../shared/runtime.js";
 import type {
   DeleteResult,
@@ -205,6 +206,28 @@ function placeholder(url: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+// A post link in the preview. The path says what happens, so every state can be seen: /login,
+// /private, /page, /broken and /reader are refused, /text has no files, anything else is a post with
+// two pictures. A real post has its files behind ningo-post addresses; these are drawn on the spot.
+function fakePost(url: string): PostReply {
+  const path = new URL(url).pathname;
+  const refusals = { login: "login_required", private: "unavailable", page: "unsupported", broken: "failed", reader: "no_reader" } as const;
+  for (const [word, refused] of Object.entries(refusals)) {
+    if (path.includes(word)) return { status: "refused", refused: refused as (typeof refusals)[keyof typeof refusals] };
+  }
+  const digits = Array.from({ length: 16 }, (_, index) => ([...url].reduce((sum, character, at) => sum + character.charCodeAt(0) * (index + at + 1), 0) % 16).toString(16));
+  const post: PostView = {
+    documentId: `post-${digits.join("")}`,
+    url,
+    author: "Example Author",
+    caption: path.includes("text") ? "A thought with no picture to go with it." : "What a post says is short, and is kept with where it came from.\n\nThe pictures come after it.",
+    published: "2026-10-20T12:00:00Z",
+    media: path.includes("text") ? [] : [1, 2].map((number) => ({ kind: "image" as const, src: placeholder(`${url}/${number}`) })),
+    missing: 0,
+  };
+  return { status: "ok", post };
+}
+
 function knowledgeDocuments(): KnowledgeDocument[] {
   const kinds = ["note", "article", "book", "paper", "document"];
   return Array.from({ length: 23 }, (_, index) => {
@@ -249,6 +272,8 @@ export function createFakeTransport(delayMs = 400): Transport {
     {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:""},
   ];
   let documents = knowledgeDocuments();
+  // The posts opened so far: saving one names it by id, as the shell's record of it does.
+  const posts = new Map<string, PostView>();
   const classifications = new Map<string, KnowledgeClassification>();
   // Switches stay where they were put, as the orchestrator keeps them.
   let status = structuredClone(STATUS);
@@ -408,7 +433,28 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok(searchFor(String(payload?.query ?? "")));
         case "meme.status":
           return ok(MEME_STATUS);
+        case "digest.link.read": {
+          const reply = fakePost(String(payload?.url ?? ""));
+          if (reply.status === "ok") posts.set(reply.post.documentId, reply.post);
+          return ok(reply);
+        }
         case "knowledge.ingest": {
+          if (payload?.mode === "post") {
+            const post = posts.get(String(payload.post ?? ""));
+            if (!post) return { ok: false, error: { code: "orchestrator", message: "that post is not held" } };
+            const existing = documents.some((document) => document.id === post.documentId);
+            documents = [
+              {
+                id: post.documentId, title: post.caption.split("\n")[0] ?? post.url, kind: "post", reference: post.url,
+                tags: [], chunks: 1, embedded: 0, updatedAt: new Date().toISOString(),
+              },
+              ...documents.filter((document) => document.id !== post.documentId),
+            ];
+            const saved: IngestResult = {
+              count: 1, created: existing ? 0 : 1, updated: existing ? 1 : 0, unchanged: 0, chunks: 1, degraded: false, reason: "",
+            };
+            return ok(saved);
+          }
           const body = String(payload?.body ?? payload?.content ?? payload?.address ?? "");
           const id = String(payload?.source_id ?? `${String(payload?.kind ?? "note")}:added-${documents.length + 1}`);
           const existing = documents.some((document) => document.id === id);
@@ -524,6 +570,12 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok({ source_url: payload?.url ?? "", hashtag: payload?.hashtag ?? "", embedded: true });
       }
       return ok({});
+    },
+
+    // The folder of a saved post; in the preview there is no file manager to open.
+    async openSavedPost() {
+      await sleep(delayMs);
+      return ok({ opened: true });
     },
 
     async preview(url): Promise<PreviewResult> {

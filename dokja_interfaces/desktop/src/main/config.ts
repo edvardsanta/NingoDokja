@@ -1,4 +1,6 @@
 import { parseArgs } from "node:util";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { localeFromTag, type Locale } from "../shared/locale.js";
 
@@ -17,6 +19,10 @@ export type DesktopConfig = {
   devServerUrl?: string;
   // The orchestrator's HTTP bridge on this machine, where a Talk turn can be streamed.
   bridgeEndpoint?: string;
+  // Where saved posts are kept; the app's own data folder when absent.
+  postsDir?: string;
+  // The one origin on this machine a post reader hands its files out from, if any.
+  postMediaOrigin?: string;
 };
 
 // "30s", "2m", "1500ms"; a bare number is milliseconds.
@@ -42,6 +48,21 @@ function isLocalUrl(value: string | undefined): value is string {
   }
 }
 
+// Owner-local worker configuration is read by the shell, never by the page.
+// An explicit flag or environment variable still takes precedence.
+export function localPostMediaOrigin(root: string | undefined): string | undefined {
+  if (!root) return undefined;
+  try {
+    const raw = readFileSync(join(root, ".dokja", "post-reader.json"), "utf8");
+    if (raw.length > 4096) return undefined;
+    const value: unknown = JSON.parse(raw);
+    const origin = value && typeof value === "object" && "media_origin" in value ? value.media_origin : undefined;
+    if (typeof origin !== "string" || !isLocalUrl(origin)) return undefined;
+    const url = new URL(origin);
+    return url.username || url.password ? undefined : url.origin;
+  } catch { return undefined; }
+}
+
 // Flags win over the environment, like the TUI: --request-endpoint, --lang and --timeout (the
 // longest a request may wait). The locale falls back to the environment, then the system.
 export function parseConfig(
@@ -57,6 +78,8 @@ export function parseConfig(
       "env-file": { type: "string" },
       lang: { type: "string" },
       timeout: { type: "string" },
+      "posts-dir": { type: "string" },
+      "post-media-origin": { type: "string" },
     },
     strict: false,
     allowPositionals: true,
@@ -78,6 +101,7 @@ export function parseConfig(
   const maxTimeoutMs = parseDuration(flag("timeout")) ?? DEFAULT_MAX_TIMEOUT_MS;
   const devServerUrl = variable("DOKJA_DESKTOP_DEV_URL");
   const bridgeEndpoint = variable("DOKJA_BRIDGE_ENDPOINT");
+  const postMediaOrigin = flag("post-media-origin") ?? variable("DOKJA_POST_MEDIA_ORIGIN");
 
   return {
     ...(flag("runtime-root") ? { runtimeRoot: flag("runtime-root") } : {}),
@@ -88,5 +112,7 @@ export function parseConfig(
     maxTimeoutMs,
     ...(isLocalUrl(devServerUrl) ? { devServerUrl } : {}),
     ...(isLocalUrl(bridgeEndpoint) ? { bridgeEndpoint } : {}),
+    ...(flag("posts-dir") ? { postsDir: flag("posts-dir") } : {}),
+    ...(isLocalUrl(postMediaOrigin) ? { postMediaOrigin: new URL(postMediaOrigin).origin } : {}),
   };
 }

@@ -37,6 +37,9 @@ export type Transport = {
   // Listens for the reply of a Talk turn written so far; gives back the way to stop listening. Absent
   // where nothing can stream (a test, a browser).
   onChatPreview?(listener: (preview: ChatPreview) => void): () => void;
+  // Opens the folder of a post saved in this run in the system's file manager, on a real press.
+  // Absent where there is no folder to open (a test, a browser).
+  openSavedPost?(documentId: string): Promise<TransportResult>;
 };
 
 // The reply of a Talk turn written so far, for the conversation that asked. Never the reply.
@@ -49,4 +52,5 @@ export const CHANNELS = {
   request: "dokja:request",
   preview: "dokja:preview",
   chatPreview: "dokja:chat-preview",
+  openSavedPost: "dokja:open-saved-post",
 } as const;
