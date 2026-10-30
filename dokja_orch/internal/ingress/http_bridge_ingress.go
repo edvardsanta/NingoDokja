@@ -10,6 +10,7 @@ import (
 	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
 	"read_books/internal/logger"
+	"read_books/internal/ownerconfig"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ type HTTPBridgeIngress struct {
 	endpoint       string
 	token          string
 	discordOwnerID string
+	ownerProfile   chat.OwnerProfile
 	app            *fiber.App
 }
 
@@ -78,11 +80,17 @@ type BridgeResponse struct {
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
 	return &HTTPBridgeIngress{
-		service:        service,
-		endpoint:       firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
-		token:          os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
-		discordOwnerID: strings.TrimSpace(os.Getenv("DOKJA_OWNER_DISCORD_USER_ID")),
+		service:  service,
+		endpoint: firstNonEmpty(endpoint, os.Getenv("VA_HTTP_ENDPOINT"), defaultHTTPBridgeEndpoint),
+		token:    os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"),
 	}
+}
+
+// WithOwnerConfig supplies the identity loaded from the private JSON file.
+func (i *HTTPBridgeIngress) WithOwnerConfig(config ownerconfig.Config) *HTTPBridgeIngress {
+	i.discordOwnerID = config.Owner.Accounts.Discord.UserID
+	i.ownerProfile = config.Owner.Profile
+	return i
 }
 
 func (i *HTTPBridgeIngress) Name() string {
@@ -166,6 +174,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		event.Context["owner_configured"] = true
 		if event.User.ID == i.discordOwnerID {
 			event.Context["is_owner"] = true
+			event.Context["owner_profile"] = i.ownerProfile
 		}
 		for _, mentionedID := range bridgeRequest.Payload.MentionedUserIDs[:min(len(bridgeRequest.Payload.MentionedUserIDs), 20)] {
 			if mentionedID == i.discordOwnerID {

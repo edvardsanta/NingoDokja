@@ -84,11 +84,42 @@ Before starting production, replace placeholder values in [.env.prod](../.env.pr
 
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_APPLICATION_ID`
-- `DOKJA_OWNER_DISCORD_USER_ID` (optional): the owner's Discord user ID. When
-  configured, the orchestrator marks messages from this account so Ningo knows
-  he is speaking with his owner. Keep the ID in the ignored environment file;
-  never commit it. This identity label does not grant authorization to bypass
-  policy or disclose secrets.
+
+### Private owner configuration
+
+Copy `dokja_orch/owner.example.json` to `.dokja/owner.json` and replace the
+fictional profile and account placeholder with your own values. The Discord
+`user_id` must contain 17–20 ASCII digits. Keep the actual file private and outside
+Git; `.dokja/` is already ignored. The example intentionally cannot activate an
+owner until its placeholder is replaced.
+
+The orchestrator reads this file once at startup. Native runs default to
+`.dokja/owner.json` relative to the working directory; set
+`DOKJA_OWNER_CONFIG_FILE` for another path. All three orchestrator Compose stacks
+mount the host `.dokja/` directory read-only at `/run/dokja-config` and set
+`DOKJA_OWNER_CONFIG_FILE=/run/dokja-config/owner.json`. Production's writable
+SQLite data remains in its existing named volume. Restart the orchestrator after
+editing the profile; no deployment is performed automatically.
+
+Version 1 requires `owner.id`, `owner.profile.name`, and
+`owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD) and `occupations` are
+optional. Unknown fields, unsupported versions, invalid dates, invalid account
+IDs, oversized files and control characters in profile text stop startup.
+An absent file disables owner recognition; an invalid file stops startup. The
+removed `DOKJA_OWNER_DISCORD_USER_ID` environment setting is ignored. Migrate its
+account ID into `owner.accounts.discord.user_id` in the JSON file and remove the
+old setting from environment files before restarting. Account mappings and profile
+facts cannot be edited by chat messages.
+
+The authenticated bridge attaches profile facts only to turns from the configured
+Discord account. Other interfaces, mentions and identity claims cannot activate
+them. Direct identity questions include the preferred name without automatically
+listing the birthday or occupations. Ordinary model generation receives the
+private profile as application context, with instructions not to volunteer private
+facts in shared channels. Those model instructions are not a guarantee of secrecy;
+omit any profile fact you would not want the model to receive. Ownership grants
+no policy bypass or additional action permissions. Tokens remain in the ignored
+environment files.
 
 Do not deploy with `CHANGE_ME_*` values.
 

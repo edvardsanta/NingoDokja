@@ -1114,6 +1114,8 @@
             "H1 (domain contract and storage) is built, not wired. The owner chose its own SQLite file, dokja_conversations.db beside dokja.db and opened by the orchestrator alone, because a migration in the shared dokja.db would make every older orchestrator, CLI, TUI or runtime controller refuse it. dokja_domain/dokja_conversation holds scope, turn states, provenance, bounds, idempotent sends, explicit retry of the latest failed or interrupted turn and the context selection; dokja_orch/internal/infrastructure/conversations is the store.",
             "H1 merged in #128. H2 adds the conversation.start/list/read/rename/delete requests (conversation domain, scope from the event source: desktop and cli) and archived chat turns: a message.created with the archived conversation_id and a send_id is recorded pending, then completed with observed provenance or failed with its reason; context comes from the archive's completed turns within 20 turns and 24,000 characters; a repeated send is answered from the archive; retry_turn_id reopens the latest failed or interrupted turn. The archive opens beside DOKJA_DB_FILE and recovers pending turns at start.",
             "Observer follow-up: start/stop voice-channel Discord final transcript ingestion and a local Desktop live view are implemented separately from the owner archive. Scope, stop/deletion, duplicate/revision and capture-order tests cover the ephemeral journal. Desktop capture timestamps use the local timezone; speakers require no join/leave commands. Semantic threads, partial hypotheses and PostgreSQL persistence remain pending; no archive milestone is declared complete by this observer slice.",
+            "2026-10-29 owner authorized H3 ahead of gate 08.3 and chose an explicit unavailable state over an unarchived fallback. First H3 batch: Talk starts its conversation in the archive with the first message, sends with per-message send ids, retries failed/interrupted turns by retry_turn_id, resends unknown-outcome sends under the same send id, reads the archive back after failures and refuses to answer unkept messages. The shell allow-lists conversation.start (a gesture-gated write) and conversation.read with archive-id validation and bounded projections.",
+            "2026-10-30 owner chose reopening the latest conversation on launch. Second H3 batch: restore into the mounted composer, Conversations drawer (bounded conversation.list), bounded recheck of reopened pending turns, titled new conversations, re-read after each send and on window focus for turns added elsewhere, translated archive failure reasons.",
             "2026-10-30 owner decision: the linked WhatsApp account's self-chat continues the owner's archived conversation. SendScopeFor admits it for sends only; the handler continues the latest general conversation (or starts a titled one) under a lock, derives a hashed send id from the WhatsApp message id, bounds the turn to 170 s and keeps a repeat of a pending turn quiet. Other WhatsApp chats stay unarchived."
           ],
           "checks": [
@@ -1133,6 +1135,21 @@
               "detail": "go test -race ./... in dokja_orch passed. New tests over a real archive file and a stand-in model: an archived turn recorded with provenance; a repeated send answered from the archive without the model; a failed turn kept failed, its replay told to retry, and a retry answering the same turn (attempts 2); context from completed turns only, in order, across a reopened archive and a new handler; a reading conversation grounded by its own reading over a payload's; a Discord message carrying archive fields answered as before; no archive said plainly; start/list/read/rename/delete from desktop and cli, stale revisions refused; other sources refused; routing through core.Service to the conversation-archive workflow."
             },
             {
+              "name": "desktop_h3_batch1",
+              "status": "passed",
+              "detail": "dokja_interfaces/desktop: pnpm test (260 Node, 328 UI tests), pnpm typecheck and pnpm build passed. New UI regressions: lazy start, unavailable archive, single-message retry, timeout read-back, same-send resend, pending check-again; ipc tests cover both payload shapes and refusals."
+            },
+            {
+              "name": "desktop_h3_live",
+              "status": "skipped",
+              "detail": "Not run in Electron against a real orchestrator; list/reopen/rename/delete and the waiting state remain for later H3 batches."
+            },
+            {
+              "name": "desktop_h3_batch2",
+              "status": "passed",
+              "detail": "pnpm test: 282 Node tests passed; vitest 353 passed, 14 failed in tests/ui/knowledge_post.test.tsx, which fail identically on a clean origin/main (pre-existing, unrelated). pnpm typecheck and pnpm build passed. Not run in Electron against a real orchestrator."
+            },
+            {
               "name": "whatsapp_self_chat",
               "status": "passed",
               "detail": "dokja_orch: go vet ./... and go test -race ./... passed; self-chat regressions (continuation, other chats unarchived, titled start skipping reading discussions, redelivery answered once, quiet pending repeat, concurrent first messages, order behind a desktop turn, payload cannot pick a conversation) fail when the routing is disabled. dokja_conversation domain tests passed. Not run against a real WhatsApp account."
@@ -1144,7 +1161,7 @@
             "dokja_docs/realtime-conversation/README.md",
             "dokja_docs/design-system-refactoring-review.md"
           ],
-          "next_action": "H3: the desktop's conversation list, reopen and continue with send ids, retry of a failed turn, rename and a reviewed delete, through the shell's allow-list; then H4 (CLI and TUI).",
+          "next_action": "H3: rename and reviewed delete, then the queued-waiting stream line; H4 (CLI/TUI). WhatsApp self-chat continuation is on feat/whatsapp-owner-conversation and needs this branch merged first to be visible on the desktop.",
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"

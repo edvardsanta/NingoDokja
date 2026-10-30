@@ -87,7 +87,7 @@ export function failure(code: TransportErrorCode, message = ""): TransportResult
   return { ok: false, error: { code, message } };
 }
 
-type Route = TransportResult | (() => Promise<TransportResult>);
+type Route = TransportResult | ((payload?: Record<string, unknown>) => Promise<TransportResult>);
 
 // A transport that answers by action: each action has a reply, or a list of replies used in turn
 // (the last one repeats). An action without a route is refused. Records what it was asked.
@@ -106,7 +106,7 @@ export function routedTransport(
       used.set(type, turn + 1);
       const reply = list[Math.min(turn, list.length - 1)];
       if (!reply) return failure("denied", `no route for ${type}`);
-      return typeof reply === "function" ? reply() : reply;
+      return typeof reply === "function" ? reply(payload) : reply;
     },
     preview,
   };
@@ -114,6 +114,32 @@ export function routedTransport(
 }
 
 export const ok = (result: unknown): TransportResult => ({ ok: true, result });
+
+// The conversation archive's ids are 32 hexadecimal digits.
+export const archiveId = (n: number) => n.toString(16).padStart(32, "0");
+
+export const startedConversation = (n = 1, readingId = ""): TransportResult =>
+  ok({ conversation: { id: archiveId(n), kind: readingId ? "reading" : "general", readingId, title: "", updatedAt: "", revision: 1, turns: 0 } });
+
+export type TurnFixture = { seq?: number; content?: string; reply?: string; state?: string; reason?: string; attempts?: number; sendId?: string };
+
+export const archivedTurn = (turn: TurnFixture = {}) => ({
+  id: archiveId(0x100 + (turn.seq ?? 1)), seq: turn.seq ?? 1, sendId: turn.sendId ?? "send-0001", content: turn.content ?? "",
+  reply: turn.reply ?? "", state: turn.state ?? "completed", reason: turn.reason ?? "", attempts: turn.attempts ?? 1,
+});
+
+// The orchestrator's answer to an archived send: the turn it settled, under the send's own id and text.
+export const archivedAnswer = (reply: string, payload?: Record<string, unknown>, seq = 1): TransportResult =>
+  ok({ reply, replayed: false, turn: archivedTurn({ seq, reply, content: String(payload?.content ?? ""), sendId: String(payload?.send_id ?? "send-0001") }) });
+
+// A route that answers each archived send with the next reply, numbered in order.
+export function answering(...replies: string[]) {
+  let next = 0;
+  return async (payload?: Record<string, unknown>): Promise<TransportResult> => {
+    const index = Math.min(next++, replies.length - 1);
+    return archivedAnswer(replies[index]!, payload, index + 1);
+  };
+}
 
 // The operator switched the service off.
 export const OFF = { off: true, reason: "paused by the operator" };

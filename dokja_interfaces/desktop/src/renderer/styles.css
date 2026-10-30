@@ -2197,3 +2197,9 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
   margin: 0 auto 0.75rem;
   object-fit: contain;
 }
+
+/* The kept conversations, in the drawer: the title opens one, the line under it says what it holds.
+   The one Talk shows is marked like a selected row. */
+.conversation-list { display: grid; gap: 0.75rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.conversation-list li { display: grid; gap: 2px; }
+.conversation-list button.row-title[aria-current="true"] strong { color: var(--cyan); }

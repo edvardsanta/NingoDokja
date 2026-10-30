@@ -177,7 +177,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.CompactionFallback, verifiedOwner, lifecycle.Reason))
 	var sources []knowledgeSource
 	var result map[string]any
-	if identityReply := chat.OwnerIdentityReply(content, verifiedOwner); identityReply != "" {
+	profile, _ := event.Context["owner_profile"].(chat.OwnerProfile)
+	if identityReply := chat.OwnerProfileIdentityReply(content, verifiedOwner, profile); identityReply != "" {
 		result = map[string]any{"reply": identityReply}
 	} else {
 		lookupCtx := ctx

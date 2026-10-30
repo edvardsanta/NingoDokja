@@ -1,7 +1,8 @@
 # Conversation history and resumable Ningo conversations
 
-Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 to H5
-planned. Tracks step 09.5.
+Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 under
+way (Talk keeps, restores, lists and reopens archived conversations; rename/delete and a
+queued-waiting state remain); H4 and H5 planned. Tracks step 09.5.
 
 Attempt-settlement correction (2026-10-29):
 [identity/lifecycle compatibility](task-lifecycle-compatibility.md) records the
@@ -151,6 +152,29 @@ source references without silently replacing an unavailable reading.
 Show loading, empty, unavailable, pending and failed states. Late replies must not
 appear in the wrong conversation after navigation. Retrying a failed send must not
 duplicate the displayed user message or overwrite a completed result.
+
+H3 first batch (2026-10-29): Talk is an archive client. The conversation is
+started in the archive with the first message (a reading discussion is started
+with its reading), so opening Talk records nothing. Each message carries its own
+send id. A failed or interrupted turn is retried with `retry_turn_id`, never sent
+as a new message; a send whose outcome could not be read is sent again under the
+same send id, which the archive answers once; a turn still pending is only read
+again. After any failure the screen reads the archive back instead of inferring
+the outcome. If the archive cannot start a conversation, Talk says so and gives
+the message back unsent; there is no unarchived fallback. The session-notice
+("started a fresh conversation") no longer appears, because the desktop no longer
+uses the process-local session path.
+
+H3 second batch (2026-10-30): when the desktop starts, Talk continues the latest
+general conversation that holds turns, read into the already mounted composer so
+focus and a draft survive. A Conversations drawer lists the kept conversations a
+page at a time and reopens one as its own panel; a reply on its way to another is
+dropped. A reopened send still pending is read again every 3 s for up to 2 minutes
+and never resent; an interrupted turn shows a retry. New conversations are titled
+from their first message. Talk also reads the conversation again after each
+settled send and when the window regains focus, so turns added from another
+interface (the phone) appear. The archive's own failure reasons are shown in the
+screen's language. Rename/delete and a queued-waiting state remain.
 
 ### Phone: the WhatsApp self-chat
 

@@ -48,7 +48,9 @@ test("a refused credential, a stream without a reply and a broken line are said 
 test("only a Talk turn with a conversation is streamed, and its previews name the conversation", async () => {
   const requests: string[] = [];
   const streamed: Array<Record<string, unknown>> = [];
-  const reply: OrchestratorReply = { status: "ok", result: { domain: "chat", result: { reply: "The answer" } } };
+  const conversation = "c".repeat(32);
+  const turn = { id: "d".repeat(32), seq: 1, send_id: "send-0001", content: "q", reply: "The answer", state: "completed", reason: "", attempts: 1 };
+  const reply: OrchestratorReply = { status: "ok", result: { domain: "chat", result: { reply: "The answer", turn } } };
   const orchestrator = {
     async request(type: string) {
       requests.push(type);
@@ -63,15 +65,15 @@ test("only a Talk turn with a conversation is streamed, and its previews name th
   const limits = { defaultTimeoutMs: 1_000, maxTimeoutMs: 120_000 };
   const pressed = { recent: () => true };
   const previews: unknown[] = [];
-  const result = await handleRequest({ type: "message.created", payload: { content: "q", conversation_id: "c-1" } }, orchestrator, limits, undefined, pressed, undefined, (preview) => previews.push(preview));
+  const result = await handleRequest({ type: "message.created", payload: { content: "q", conversation_id: conversation, send_id: "send-0001" } }, orchestrator, limits, undefined, pressed, undefined, (preview) => previews.push(preview));
   assert.equal(result.ok, true);
-  assert.deepEqual(streamed, [{ content: "q", conversation_id: "c-1" }]);
-  assert.deepEqual(previews, [{ conversationId: "c-1", text: "The ans" }]);
+  assert.deepEqual(streamed, [{ content: "q", conversation_id: conversation, send_id: "send-0001" }]);
+  assert.deepEqual(previews, [{ conversationId: conversation, text: "The ans" }]);
   assert.deepEqual(requests, []);
 
-  await handleRequest({ type: "message.created", payload: { content: "q" } }, orchestrator, limits, undefined, pressed, undefined, () => {});
+  assert.equal((await handleRequest({ type: "message.created", payload: { content: "q" } }, orchestrator, limits, undefined, pressed, undefined, () => {})).ok, false, "a message outside a conversation is refused");
   await handleRequest({ type: "ningo.status" }, orchestrator, limits, undefined, pressed, undefined, () => {});
-  assert.deepEqual(requests, ["message.created", "ningo.status"], "without a conversation, or for another action, the request socket is used");
+  assert.deepEqual(requests, ["ningo.status"], "another action uses the request socket");
 });
 
 test("the bridge is used only on this machine", () => {
