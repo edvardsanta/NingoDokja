@@ -758,6 +758,37 @@ test("reading media enters the preview gate without authorizing its article addr
   assert.deepEqual(remembered, [["https://images.example/reading.jpg"]]);
 });
 
+test("renaming needs a press and deleting also the person's yes; both name the version they saw", async () => {
+  const id = "c".repeat(32);
+  const calls: unknown[] = [];
+  const conversation = {id,kind:"general",reading_id:"",title:"New",updated_at:"u",revision:2,turns:1};
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"conversation",result:type==="conversation.delete"?{conversation_id:id,deleted:true}:{conversation}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const present = {recent:()=>true};
+  const rename = {conversation_id:id,revision:1,title:"  New   name "};
+  assert.equal((await handleRequest({type:"conversation.rename",payload:rename},client,limits)).ok,false,"a rename needs a press");
+  const renamed = await handleRequest({type:"conversation.rename",payload:{...rename,scope:"other"}},client,limits,undefined,present);
+  assert.equal(renamed.ok,true);
+  for (const payload of [{conversation_id:id,title:"x"},{conversation_id:id,revision:0,title:"x"},{conversation_id:id,revision:1.5,title:"x"},{conversation_id:"bad",revision:1,title:"x"},{conversation_id:id,revision:1,title:"t".repeat(121)}]) {
+    assert.equal((await handleRequest({type:"conversation.rename",payload},client,limits,undefined,present)).ok,false,JSON.stringify(payload));
+  }
+  const asked: unknown[] = [];
+  const no = async (type: string, wire: Record<string, unknown>) => { asked.push({type,wire}); return false; };
+  const yes = async () => true;
+  const refused = await handleRequest({type:"conversation.delete",payload:{conversation_id:id,revision:2}},client,limits,undefined,present,no);
+  assert.equal(refused.ok,false);
+  assert.deepEqual(asked,[{type:"conversation.delete",wire:{conversation_id:id,revision:2}}]);
+  const deleted = await handleRequest({type:"conversation.delete",payload:{conversation_id:id,revision:2}},client,limits,undefined,present,yes);
+  assert.deepEqual(deleted,{ok:true,result:{deleted:true}});
+  assert.deepEqual(calls,[
+    {type:"conversation.rename",payload:{conversation_id:id,revision:1,title:"New name"}},
+    {type:"conversation.delete",payload:{conversation_id:id,revision:2}},
+  ]);
+});
+
 test("listing WhatsApp groups is a read of the fixed interface, and only group ids reach the screen", async () => {
   const calls: unknown[] = [];
   const client = { async request(type: string, payload: Record<string, unknown>) {

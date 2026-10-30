@@ -8,6 +8,7 @@ import { useDiscussion, type Reading } from "../discussion_context.js";
 import { useStatus } from "../status_context.js";
 import { Composer, READING_PROMPTS, Transcript, useConversation } from "./assistant_conversation.js";
 import { ConversationsDrawer } from "./conversation_list.js";
+import { TalkModel } from "./talk_model.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 
 // The beginnings of a question, written as challenges. They fill the message for the owner to finish;
@@ -47,7 +48,7 @@ export function AssistantCard({ transport }: { transport: Transport }) {
   const shown = reading ? undefined : opened;
   return <>
     <Talk key={`${round}-${restarts}`} transport={transport} reading={reading} opened={shown} restore={restore} onRestart={restart} onList={setListing} />
-    {listing !== undefined && <ConversationsDrawer transport={transport} current={listing} onOpen={open} onClose={() => setListing(undefined)} />}
+    {listing !== undefined && <ConversationsDrawer transport={transport} current={listing} onOpen={open} onDeleted={(id) => { if (id === listing) { setListing(""); restart(); } }} onClose={() => setListing(undefined)} />}
   </>;
 }
 
@@ -57,37 +58,38 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
   const { pulse } = useStatus();
   const open = useOpenWorkspace();
   const restart = <>
-    <button type="button" onClick={() => onList(conversation.id)}>{t("conversations_open")}</button>
-    <button type="button" onClick={onRestart}>{t("assistant_new_conversation")}</button>
+    <button type="button" className="compact" onClick={() => onList(conversation.id)}>{t("conversations_open")}</button>
+    <button type="button" className="compact" onClick={onRestart}>{t("assistant_new_conversation")}</button>
   </>;
   const fill = (start: string) => {
     conversation.setDraft(`${start} `);
     conversation.field.current?.focus();
   };
-  const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K" />;
+  const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K"
+    footer={<TalkModel transport={transport} busy={conversation.busy} />} />;
   return <WorkspacePanel trail={[t("nav_assistant")]} actions={restart} dock={dock}>
     <section className="talk" aria-label={t("assistant_title")}>
       {pulse === "lost" && <div className="note" data-tone="problem">
         <p>{t("talk_offline")}</p>
-        <button type="button" onClick={() => open("health")}>{t("talk_open_system")}</button>
+        <button type="button" className="compact" onClick={() => open("health")}>{t("talk_open_system")}</button>
       </div>}
       {reading && <div className="talk-context">
         <p className="note">{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</p>
-        <button type="button" onClick={onRestart}>{t("assistant_close")}</button>
+        <button type="button" className="compact" onClick={onRestart}>{t("assistant_close")}</button>
         <p className="detail">{t("assistant_excerpt_limit")}</p>
       </div>}
       {conversation.opened?.kind === "reading" && <p className="note">{t("assistant_reading_reopened")}</p>}
       {reading && conversation.turns.length === 0 && <div className="talk-opening">
         <p className="detail">{t("assistant_reading_intro")}</p>
         <div className="talk-starts">
-          {readingPrompts(reading, t).map((prompt) => <button key={prompt} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(prompt)}>{prompt}</button>)}
+          {readingPrompts(reading, t).map((prompt) => <button key={prompt} type="button" className="assistant-prompt compact" disabled={conversation.busy} onClick={() => void conversation.send(prompt)}>{prompt}</button>)}
         </div>
       </div>}
       {!reading && !conversation.opened && !conversation.loading && conversation.turns.length === 0 && <div className="talk-opening">
         <p className="voice">{t("talk_voice_opening")}</p>
         <p className="detail">{t("talk_next_step")}</p>
         <div className="talk-starts">
-          {STARTS.map((id) => <button key={id} type="button" className="assistant-prompt" disabled={conversation.busy} onClick={() => fill(t(id))}>{t(id)}</button>)}
+          {STARTS.map((id) => <button key={id} type="button" className="assistant-prompt compact" disabled={conversation.busy} onClick={() => fill(t(id))}>{t(id)}</button>)}
         </div>
       </div>}
       <Transcript conversation={conversation} />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
 import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
@@ -230,7 +230,7 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
   }, [turns.length, busy, error, preview]);
   const latest = turns.at(-1);
   if (conversation.loading) return <p role="status">{t("assistant_opening")}</p>;
-  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
+  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" className="compact" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
@@ -244,13 +244,14 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
     {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}
     {error && <Problem error={error}/>}
-    {!busy && retryable(latest) && <button type="button" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
+    {!busy && retryable(latest) && <button type="button" className="compact" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
     <div ref={end} />
   </>;
 }
 
-// Where the owner writes. Enter sends and Shift+Enter breaks the line.
-export function Composer({ conversation, placeholder, hint, keyshortcuts }: { conversation: Conversation; placeholder: string; hint?: string; keyshortcuts?: string }) {
+// Where the owner writes. Enter sends and Shift+Enter breaks the line. The field is one line until
+// what is written needs more; footer shares the quiet row under it with the hint.
+export function Composer({ conversation, placeholder, hint, keyshortcuts, footer }: { conversation: Conversation; placeholder: string; hint?: string; keyshortcuts?: string; footer?: ReactNode }) {
   const t = useTranslate();
   const { id, draft, setDraft, field, send } = conversation;
   // The field stays usable while a conversation is read, so focus and a draft are kept; only sending waits.
@@ -266,10 +267,13 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts }: { co
   };
   return <form className="composer" onSubmit={submit}>
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
-    <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={3} disabled={busy} aria-describedby={hint ? hintId : undefined}
+    <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={1} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" className="primary" disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
-    {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
+    <button type="submit" className="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
+    {(hint || footer) && <div className="composer-foot">
+      {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
+      {footer}
+    </div>}
   </form>;
 }
 

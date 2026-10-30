@@ -117,3 +117,14 @@ test("feedback confirmation names the exact reference and observed result in eit
  assert.doesNotMatch(en?.detail??"",/do not show/);
  assert.equal(questionFor("pt","memory.resolve",{ref:"fixture:1",outcome:"ignored"})?.message,"Registrar este feedback?");
 });
+
+test("deleting a conversation names it by its archive id and says what stays, in the screen's language", () => {
+  const id = "a".repeat(32);
+  const en = questionFor("en", "conversation.delete", { conversation_id: id, revision: 3 });
+  const pt = questionFor("pt", "conversation.delete", { conversation_id: id, revision: 3 });
+  assert.equal(en?.message, "Delete this conversation?");
+  assert.match(en?.detail ?? "", new RegExp(`^${id}\\n\\n.*Experiences recorded from it stay`, "s"));
+  assert.equal(pt?.message, "Apagar esta conversa?");
+  assert.match(pt?.detail ?? "", /As experiências registradas a partir dela continuam/);
+  assert.equal(pt?.accept, "Apagar");
+});

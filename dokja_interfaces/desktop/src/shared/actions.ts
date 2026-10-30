@@ -19,6 +19,9 @@ export const ACTION_TYPES = [
   "conversation.start",
   "conversation.list",
   "conversation.read",
+  // Renaming is a change on a real press; deleting also asks in the shell's own window.
+  "conversation.rename",
+  "conversation.delete",
   "runtime.set",
   "runtime.providers",
   "runtime.chat",
@@ -82,6 +85,8 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "runtime.models.remove",
   "message.created",
   "conversation.start",
+  "conversation.rename",
+  "conversation.delete",
   "communications.send",
   "meme.hashtag.tag",
   "meme.pool.refresh",
@@ -98,6 +103,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
 // The ones that cannot be undone: the shell asks the person first, in a window of its own.
 export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
   "memory.resolve",
+  "conversation.delete",
   "communications.send",
   "communications.link.reset",
   "knowledge.delete",

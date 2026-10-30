@@ -174,7 +174,15 @@ and never resent; an interrupted turn shows a retry. New conversations are title
 from their first message. Talk also reads the conversation again after each
 settled send and when the window regains focus, so turns added from another
 interface (the phone) appear. The archive's own failure reasons are shown in the
-screen's language. Rename/delete and a queued-waiting state remain.
+screen's language.
+
+H3 third batch (2026-10-30): the drawer renames a conversation in place and
+deletes one after the shell's own confirmation window, which names it by its id;
+both name the revision listed, so a conversation changed elsewhere is left alone
+and the list is read again. Deleting the conversation on screen opens a new one.
+Talk also offers the chat model under the message (the same declared models as
+System, saved at once) and a readable conversation layout. A queued-waiting state
+remains.
 
 ### Phone: the WhatsApp self-chat
 

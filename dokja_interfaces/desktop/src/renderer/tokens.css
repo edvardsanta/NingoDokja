@@ -83,6 +83,30 @@
   --status-pulse-duration: var(--motion-pulse-duration);
   --drawer-enter-duration: var(--motion-overlay-duration);
 
+  /*
+   * Conversation. One column serves the transcript and the composer, so they share an edge and a
+   * reading measure (about 68 characters of text beside the reply's rule). Ningo's reply is set apart
+   * by a rule on its left; the owner's turn by a plate with a border, pushed to the end of the column.
+   * Neither is a state, so neither takes a neon: the reply's rule is the panel edge, and only
+   * --turn-reply-rule needs to change to light it.
+   */
+  --conversation-column: 43rem;
+  --turn-gap: var(--space-3);
+  --turn-exchange-gap: var(--space-5);
+  --turn-owner-width: 34rem;
+  --turn-owner-surface: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --turn-owner-border: var(--border-default);
+  --turn-owner-text: var(--text-primary);
+  --turn-reply-rule: var(--border-default);
+  --turn-reply-text: var(--text-primary);
+  --turn-label-text: var(--text-secondary);
+  --composer-field-surface: var(--surface-page);
+  --composer-field-border: var(--border-default);
+  --composer-field-min-height: 2.75rem;
+  --composer-field-max-height: 11rem;
+  --button-compact-padding: 0.2rem var(--space-3);
+  --button-compact-size: 0.8125rem;
+
   /* Compatibility aliases. Remove only after all consumers have migrated. */
   --static: var(--surface-page);
   --panel: var(--surface-panel);

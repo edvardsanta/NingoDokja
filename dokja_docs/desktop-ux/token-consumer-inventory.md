@@ -20,6 +20,7 @@ state or a completed accessibility audit. It supplements the
 | Service-progress and workspace-status markers | 1000 ms blink | Native pseudo-element/reduced-motion fixtures |
 | Wordmark | 450 ms stepped transition | Native timing and reduced-motion fixtures |
 | Drawer | 160 ms entry, only with no reduced-motion preference | Native timing, independent overlay-duration override and reduced-motion fixtures |
+| Talk conversation and composer | `--conversation-column`, `--turn-*`, `--composer-field-*`, `--button-compact-*`: one centred column, the reply's rule and the owner's plate as roles, a compact button size; no palette meaning changed (the reply's rule is the panel edge, not a neon) | Design-token graph test, a test that every `var()` in `styles.css` is declared, Talk UI tests, browser screenshots at 800/1024/1536 CSS px, forced-colors and reduced-motion emulation; no native Electron capture |
 
 The source migration replaces 13 solid cyan outline declarations and the inner
 view-tab ink outline. It retains the base-button mapping from `09.6-a`.

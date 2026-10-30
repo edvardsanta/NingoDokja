@@ -290,6 +290,27 @@ function conversationReadPayload(raw: Record<string, unknown>): Record<string, u
   return ARCHIVE_ID.test(id) ? { conversation_id: id, limit: MAX_TURNS_READ } : undefined;
 }
 
+// A rename or a delete names the version of the conversation it saw, so a change made meanwhile
+// elsewhere is refused by the archive instead of being overwritten or deleted unseen.
+function revisionOf(raw: Record<string, unknown>): number | undefined {
+  const revision = raw.revision;
+  return typeof revision === "number" && Number.isInteger(revision) && revision >= 1 && revision <= 1e15 ? revision : undefined;
+}
+
+function conversationRenamePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.conversation_id);
+  const revision = revisionOf(raw);
+  const title = text(raw.title).replace(/\s+/g, " ");
+  if (!ARCHIVE_ID.test(id) || revision === undefined || title.length > MAX_TITLE_CHARS) return undefined;
+  return { conversation_id: id, revision, title };
+}
+
+function conversationDeletePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.conversation_id);
+  const revision = revisionOf(raw);
+  return ARCHIVE_ID.test(id) && revision !== undefined ? { conversation_id: id, revision } : undefined;
+}
+
 function conversationRead(body: Record<string, unknown>): ConversationRead {
   const turns = Array.isArray(body.turns) ? body.turns.slice(0, MAX_TURNS_READ).map(archivedTurn).filter((turn): turn is ArchivedTurn => turn !== undefined) : [];
   return { conversation: archivedConversation(body.conversation), turns };
@@ -762,6 +783,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "message.created": { payload: chatPayload, project: chatReply },
   "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
+  "conversation.rename": { payload: conversationRenamePayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
+  "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
   "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },

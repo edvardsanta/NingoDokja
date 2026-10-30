@@ -436,3 +436,136 @@ describe("a turn without a reply, in Portuguese", () => {
     screen.getByText("Sem resposta: provider says no");
   });
 });
+
+describe("renaming and deleting kept conversations", () => {
+  const openList = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
+    await screen.findByRole("button", { name: "Rename On justice" });
+  };
+
+  it("renames a conversation in place, naming the version it saw", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1, "general", "On justice")),
+      "conversation.read": readOf(3, archivedTurn({ content: "q", reply: "a" })),
+      "conversation.rename": ok({ conversation: { ...kept(3, 1, "general", "Justice, again"), revision: 2 } }),
+    });
+    await renderTalk(transport);
+    await openList();
+    fireEvent.click(screen.getByRole("button", { name: "Rename On justice" }));
+    const title = screen.getByRole("textbox", { name: "Title" }) as HTMLInputElement;
+    expect(document.activeElement).toBe(title);
+    fireEvent.change(title, { target: { value: "Justice, again" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await screen.findByRole("button", { name: "Justice, again" });
+    expect(calls.find((call) => call.type === "conversation.rename")?.payload).toEqual({ conversation_id: archiveId(3), revision: 1, title: "Justice, again" });
+  });
+
+  it("leaves the field with Escape and keeps the drawer open", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1, "general", "On justice")),
+      "conversation.read": readOf(3, archivedTurn({ content: "q", reply: "a" })),
+    });
+    await renderTalk(transport);
+    await openList();
+    fireEvent.click(screen.getByRole("button", { name: "Rename On justice" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Title" }), { key: "Escape" });
+    screen.getByRole("button", { name: "On justice" });
+    expect(calls.filter((call) => call.type === "conversation.rename")).toHaveLength(0);
+  });
+
+  it("reads the list again when the conversation changed elsewhere, and says nothing was done", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": [listed(kept(3, 1, "general", "On justice")), listed(kept(3, 1, "general", "On justice")), listed({ ...kept(3, 2, "general", "On justice"), revision: 3 })],
+      "conversation.read": readOf(3, archivedTurn({ content: "q", reply: "a" })),
+      "conversation.delete": failure("orchestrator", "conversation changed; read it again"),
+    });
+    await renderTalk(transport);
+    await openList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete On justice" }));
+    await screen.findByText("That conversation changed elsewhere, so nothing was done; here it is as it is now.");
+    screen.getByText(/^2 messages/);
+    expect(calls.filter((call) => call.type === "conversation.list")).toHaveLength(3);
+  });
+
+  it("deletes a conversation and, when it was the one on screen, opens a new one", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 1, "general", "On justice"), kept(4, 1, "general", "Other")),
+      "conversation.read": readOf(3, archivedTurn({ content: "What is just?", reply: "Ask again." })),
+      "conversation.delete": ok({ conversation_id: archiveId(3), deleted: true }),
+    });
+    await renderTalk(transport);
+    screen.getByText("Ask again.");
+    await openList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete On justice" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "On justice" })).toBeNull());
+    screen.getByRole("button", { name: "Other" });
+    expect(screen.queryByText("Ask again.")).toBeNull();
+    screen.getByText("I've read more than you'd guess. Ask.");
+    expect(calls.find((call) => call.type === "conversation.delete")?.payload).toEqual({ conversation_id: archiveId(3), revision: 1 });
+  });
+
+  it("keeps the conversation when the owner says no in the shell's window", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1, "general", "On justice")),
+      "conversation.read": readOf(3, archivedTurn({ content: "q", reply: "Still here." })),
+      "conversation.delete": failure("cancelled", "the person did not confirm"),
+    });
+    await renderTalk(transport);
+    await openList();
+    fireEvent.click(screen.getByRole("button", { name: "Delete On justice" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete On justice" }).hasAttribute("disabled")).toBe(false));
+    screen.getByRole("button", { name: "On justice" });
+    screen.getByText("Still here.");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("the conversation's layout", () => {
+  const send = () => screen.getByRole("button", { name: "Send" });
+
+  it("names each author once, before the text, so the owner's turn and Ningo's read apart", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "A question", reply: "An answer.", sendId: "send-lay1" })),
+    });
+    await renderTalk(transport);
+
+    const turns = [...document.querySelectorAll(".assistant-turns li[data-role]")];
+    expect(turns.map((turn) => turn.getAttribute("data-role"))).toEqual(["user", "assistant"]);
+    // The label comes first and the text is one paragraph, so the two registers can be styled apart.
+    expect(turns.map((turn) => turn.firstElementChild?.tagName)).toEqual(["STRONG", "STRONG"]);
+    expect(turns.map((turn) => turn.firstElementChild?.textContent)).toEqual(["You", "Ningo"]);
+    expect(turns.map((turn) => turn.querySelectorAll("p").length)).toEqual([1, 1]);
+  });
+
+  it("keeps the header's two actions compact, so Send is the one main action in the view", async () => {
+    const { transport } = routedTransport({});
+    await renderTalk(transport);
+
+    for (const name of ["Conversations", "Start a new conversation"]) {
+      const action = screen.getByRole("button", { name });
+      expect(action.classList.contains("compact"), name).toBe(true);
+      expect(action.classList.contains("primary"), name).toBe(false);
+    }
+    expect(screen.getAllByRole("button").filter((button) => button.classList.contains("primary")).map((button) => button.textContent)).toEqual(["Send"]);
+  });
+
+  it("starts the field at one line and marks Send busy only while a reply is on its way", async () => {
+    const late = deferred<TransportResult>();
+    const { transport } = routedTransport({ "conversation.start": startedConversation(), "message.created": () => late.promise });
+    await renderTalk(transport);
+    expect(field().rows).toBe(1);
+    expect(send().hasAttribute("aria-busy")).toBe(false);
+
+    fireEvent.change(field(), { target: { value: "question" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Ningo is thinking…");
+    expect(send().getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => late.resolve(archivedAnswer("Done.", { content: "question" })));
+    await screen.findByText("Done.");
+    expect(send().hasAttribute("aria-busy")).toBe(false);
+  });
+});
