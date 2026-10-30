@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { formatAgo, formatDay, formatNumber, formatTime } from "../src/renderer/i18n/format.js";
+import { formatAgo, formatDay, formatList, formatNumber, formatTime } from "../src/renderer/i18n/format.js";
 
 test("English writes a decimal point", () => {
   assert.equal(formatNumber("en", 0.081, 3), "0.081");
@@ -25,6 +25,15 @@ test("a signed number always shows its sign", () => {
 test("the number of digits is kept, rounding the rest", () => {
   assert.equal(formatNumber("en", 0.0814, 3), "0.081");
   assert.equal(formatNumber("pt", 0.2, 3), "0,200");
+});
+
+test("names in a row are joined as the language joins them", () => {
+  assert.equal(formatList("en", ["A", "B", "C"]), "A, B, and C");
+  assert.equal(formatList("pt", ["A", "B", "C"]), "A, B e C");
+  assert.equal(formatList("pt", ["A"]), "A");
+  assert.equal(formatList("pt", []), "");
+  assert.equal(formatList("en", ["A", "B", "C"], true), "A, B, C");
+  assert.equal(formatList("pt", ["A", "B", "C"], true), "A, B, C");
 });
 
 const NOW = Date.parse("2026-10-02T12:00:00Z");

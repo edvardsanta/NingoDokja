@@ -264,17 +264,22 @@ export function createFakeTransport(delayMs = 400): Transport {
   const experiences = structuredClone(EXPERIENCES);
   // What was added, removed and indexed stays for the life of the page, so the list follows.
   const modules=RUNTIME_MODULES.map(name=>({name,state:"stopped",error:"",dependencies:[]}));
-  // Synthetic settings with placeholder ids; the demo keeps what is saved for the life of the page.
+  // Synthetic settings with made-up ids. The channel and group ids have the length of the real ones, so
+  // the demo shows what long lists do to the layout; the demo keeps what is saved for the life of the page.
   const settings=[
-    {id:"discord.meme_channels",group:"discord",kind:"list",options:[],value:"101,102",affects:["orchestrator","communications"],note:"sessions",default:""},
-    {id:"discord.safe_only_channels",group:"discord",kind:"list",options:[],value:"102",affects:["orchestrator"],note:"",default:""},
-    {id:"discord.answer_channels",group:"discord",kind:"list",options:[],value:"",affects:["discord"],note:"",default:""},
-    {id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["discord"],note:"",default:""},
-    {id:"whatsapp.people",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
-    {id:"whatsapp.groups",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
-    {id:"whatsapp.conversations",group:"whatsapp",kind:"list",options:[],value:"",affects:["whatsapp"],note:"",default:""},
-    {id:"whatsapp.own_chat",group:"whatsapp",kind:"flag",options:["true","false"],value:"true",affects:["whatsapp"],note:"",default:""},
-    {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:""},
+    {id:"discord.meme_channels",group:"discord",kind:"list",options:[],value:"1100000000000000001,1100000000000000002,1100000000000000003,1100000000000000004",affects:["orchestrator","communications"],note:"sessions",default:""},
+    {id:"discord.safe_only_channels",group:"discord",kind:"list",options:[],value:"1100000000000000003",affects:["orchestrator"],note:"sessions",default:""},
+    {id:"discord.answer_channels",group:"discord",kind:"list",options:[],value:"",affects:["orchestrator","discord"],note:"",default:""},
+    {id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["orchestrator","discord"],note:"",default:"open"},
+    {id:"whatsapp.people",group:"whatsapp",kind:"list",options:[],value:"5511900000001,5511900000002",affects:["orchestrator","whatsapp"],note:"",default:""},
+    {id:"whatsapp.groups",group:"whatsapp",kind:"list",options:[],value:"120363000000000001@g.us,120363000000000002@g.us,120363000000000009@g.us",affects:["orchestrator","whatsapp"],note:"",default:""},
+    {id:"whatsapp.conversations",group:"whatsapp",kind:"list",options:[],value:"clube=120363000000000002@g.us,eu=5511900000001",affects:["whatsapp"],note:"",default:""},
+    {id:"whatsapp.own_chat",group:"whatsapp",kind:"flag",options:["true","false"],value:"",affects:["orchestrator","whatsapp"],note:"",default:"true"},
+    {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:"bge-m3",readOnly:true},
+    {id:"models.book_classifier",group:"models",kind:"text",options:[],value:"",affects:["feeds"],note:"",default:"typeform/distilbert-base-uncased-mnli"},
+    {id:"models.book_overview",group:"models",kind:"text",options:[],value:"example/overview-small",affects:["feeds"],note:"",default:"sshleifer/distilbart-cnn-12-6"},
+    {id:"models.speech_to_text",group:"models",kind:"text",options:[],value:"",affects:["voice"],note:"",default:"openai/whisper-tiny"},
+    {id:"models.ocr",group:"models",kind:"text",options:[],value:"",affects:["feeds"],note:"",default:""},
   ];
   let documents = knowledgeDocuments();
   // The posts opened so far: saving one names it by id, as the shell's record of it does.
@@ -341,7 +346,7 @@ export function createFakeTransport(delayMs = 400): Transport {
           if(module)module.state=payload?.enabled?"ready":"stopped";
           return ok({modules:structuredClone(modules),busy:false,error:""});
         }
-        case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
+        case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["1100000000000000002"],busy:false,error:""});
         case "runtime.providers": return ok({ configurationRevision: 1, checkedAt: new Date().toISOString(), providers: [
           { id: "ollama", name: "Ollama", enabled: true, declaredModels: [], state: "reachable", reason: "", models: [...local.models], modelSizes: { ...local.sizes }, embeddingModel: "demo/embed:latest", modelDiscovery: "listed", inferenceStatus: "not_tested", truncated: false },
           { id: "codex", name: "Codex", enabled: true, declaredModels: [], state: "installed", reason: "", models: [], modelDiscovery: "unsupported", inferenceStatus: "not_tested", truncated: false },
@@ -377,12 +382,13 @@ export function createFakeTransport(delayMs = 400): Transport {
           for (const [id,value] of Object.entries((payload?.values ?? {}) as Record<string,string>)) {
             const row=settings.find(s=>s.id===id); if(row)row.value=value;
           }
-          return ok({settings:structuredClone(settings),webhookChannels:["102"],busy:false,error:""});
+          return ok({settings:structuredClone(settings),webhookChannels:["1100000000000000002"],busy:false,error:""});
         }
         case "communications.channels": return ok({ channels: [
-          { id: "123", name: "reading-room", guildId: "900", guildName: "Example server" },
-          { id: "124", name: "music", guildId: "900", guildName: "Example server" },
-          { id: "125", name: "general", guildId: "901", guildName: "Second server" },
+          { id: "1100000000000000001", name: "reading-room", guildId: "900", guildName: "Example server" },
+          { id: "1100000000000000002", name: "memes", guildId: "900", guildName: "Example server" },
+          { id: "1100000000000000003", name: "safe-memes", guildId: "900", guildName: "Example server" },
+          { id: "1100000000000000005", name: "general", guildId: "901", guildName: "Second server" },
         ] });
         case "communications.history": return ok({ channelId: String(payload?.channel_id), messages: conversation, before: "" });
         case "communications.link.groups":
