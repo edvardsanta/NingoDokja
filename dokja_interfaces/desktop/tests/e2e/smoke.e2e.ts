@@ -43,8 +43,8 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
   it("shows the health card from what the orchestrator reported", async () => {
     // the screen opens on the conversation; the status is shown on System, the last workspace
-    await page.waitFor("document.querySelectorAll('[role=tab]').length === 5 ? true : null");
-    await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
+    await page.waitFor("document.querySelectorAll('.tab[role=tab]').length >= 6 ? true : null");
+    await page.evaluate("document.querySelector('[id$=-tab-health]').click()");
     const rows = await page.waitFor<string[]>(
       "(() => { const rows = [...document.querySelectorAll('.services li')].map((row) => row.textContent); return rows.length ? rows : null; })()",
     );
@@ -60,7 +60,8 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("asks the orchestrator as the desktop, and only for the workspace that is open", async () => {
-    assert.deepEqual(orchestrator.seen.map((event) => event.type), ["ningo.status"]);
+    // Talk, the front door, looks for a conversation to continue; nothing else is asked.
+    assert.deepEqual(orchestrator.seen.map((event) => event.type).sort(), ["conversation.list", "ningo.status"]);
     assert.ok(orchestrator.seen.every((event) => event.source === "desktop"));
   });
 
@@ -76,12 +77,12 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.equal(orchestrator.seen.length, before);
   });
 
-  it("gives the page no Node and no other door than four functions", async () => {
+  it("gives the page no Node and no other door than the functions it is meant to have", async () => {
     assert.equal(
       await page.evaluate("[typeof require, typeof process, typeof module, typeof Buffer, typeof __dirname].join()"),
       "undefined,undefined,undefined,undefined,undefined",
     );
-    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,onChatPreview,preview,request");
+    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,onChatPreview,openSavedPost,preview,request,savePostLocally");
     assert.equal(await page.evaluate("[typeof window.electron, typeof window.ipcRenderer].join()"), "undefined,undefined");
   });
 
@@ -146,7 +147,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     const ingested = () => orchestrator.seen.filter((event) => event.type === "knowledge.ingest");
 
     it("is refused when nothing real was pressed, even if a script clicks", async () => {
-      await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
+      await page.evaluate("document.querySelector('[id$=-tab-health]').click()");
       const answer = (await ask("knowledge.ingest", note)) as { ok: boolean; error?: { code: string; message: string } };
       assert.equal(answer.ok, false);
       assert.equal(answer.error?.code, "denied");
@@ -235,7 +236,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
 
     it("goes through from the card's own switch right after a real press, with the flag alone", async () => {
       // other tests have opened other workspaces; the switch is on System
-      await page.evaluate("document.querySelectorAll('[role=tab]')[4].click()");
+      await page.evaluate("document.querySelector('[id$=-tab-health]').click()");
       const button = "document.querySelector('button[role=switch][aria-label=\"Memes switch\"]')";
       await page.waitFor(`${button} !== null`);
       // The press is what the shell counts. The button itself is pressed by the script here: in the
@@ -312,7 +313,9 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("shows the digest as text, never as markup", async () => {
-    await page.evaluate("document.querySelectorAll('[role=tab]')[0].click()");
+    await page.evaluate("document.querySelector('[id$=-tab-knowledge]').click()");
+    await page.waitFor("[...document.querySelectorAll('[role=tab]')].some((tab) => tab.textContent === 'Readings') ? true : null");
+    await page.evaluate("[...document.querySelectorAll('[role=tab]')].find((tab) => tab.textContent === 'Readings').click()");
     const titles = await page.waitFor<string[]>(
       "(() => { const titles = [...document.querySelectorAll('.digest li .digest-title')].map((node) => node.textContent); return titles.length ? titles : null; })()",
     );
@@ -323,7 +326,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("browses experience context and feedback as text without writing", async () => {
-    await page.evaluate("document.querySelectorAll('[role=tab]')[2].click()");
+    await page.evaluate("document.querySelector('[id$=-tab-memory]').click()");
     await page.waitFor("document.querySelector('button[aria-label^=\"Inspect fixture:\"]') ? true : null");
     await page.waitFor("document.querySelectorAll('button[aria-label^=\"Inspect fixture:\"]').length === 7 ? true : null");
     await page.evaluate("document.querySelector('button[aria-label=\"Inspect fixture:1\"]').click()");

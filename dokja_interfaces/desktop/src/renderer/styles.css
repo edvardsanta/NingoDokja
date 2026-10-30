@@ -328,6 +328,12 @@ body {
   animation-delay: calc(var(--i, 0) * var(--row-stagger-delay));
 }
 
+/* A note about a row takes the whole row: in a column of its own it would widen that column to the
+   whole sentence and push every row past the panel. */
+.services li > .note {
+  grid-column: 1 / -1;
+}
+
 .service-status {
   color: var(--tone-text);
 }

@@ -1308,7 +1308,25 @@
                 "Complete all-workspace visual checks plus focus, reduced-motion, forced-color and zoom/text-growth validation; preserve approved visual choices."
               ],
               "evidence": [
-                "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed."
+                "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed.",
+                "2026-10-30, owner asked to proceed: native acceptance suite covers all six workspaces for overflow, dock visibility, 200% text, real Tab focus rings, reduced motion and forced colors. It found and fixed a System row overflow. Stale e2e suites were repaired (position-based tabs, the preload list, Readings navigation)."
+              ],
+              "checks": [
+                {
+                  "name": "native_acceptance",
+                  "status": "passed",
+                  "detail": "Under xvfb with a synthetic orchestrator: acceptance 7, smoke 24, design_tokens 8, communications 4, feedback 3, communications_env 1, readings 1, post_video 1 all passed."
+                },
+                {
+                  "name": "native_screenshots",
+                  "status": "blocked",
+                  "detail": "Page.captureScreenshot timed out again in the headless compositor; no native visual acceptance is claimed."
+                },
+                {
+                  "name": "assistive_technology",
+                  "status": "skipped",
+                  "detail": "No screen reader or native high-contrast palette run; menus, drawer focus per workspace and windows under 40rem remain open."
+                }
               ]
             }
           ]
