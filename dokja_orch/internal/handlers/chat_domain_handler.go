@@ -45,6 +45,7 @@ type ChatDomainHandler struct {
 	archive          *conversation.Archive
 	ownerProfile     chat.OwnerProfile
 	incoming         *IncomingContentWorkflow
+	ningo            chat.NingoFacts
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.

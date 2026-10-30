@@ -29,6 +29,7 @@ export type WhatsAppBridgeRequest = {
     chatKind: "direct" | "group" | "other";
     senderNumbers: string[];
     isSelfChat: boolean;
+    isOwnAccount: boolean;
     mentionsBot: boolean;
   };
 };
@@ -60,6 +61,8 @@ export function buildWhatsAppBridgeRequest(params: {
   chatKind: "direct" | "group" | "other";
   senderNumbers: string[];
   isSelfChat: boolean;
+  // WhatsApp marked the message as the linked account's own.
+  isOwnAccount: boolean;
   mentionsBot: boolean;
 }): WhatsAppBridgeRequest {
   return {
@@ -78,6 +81,7 @@ export function buildWhatsAppBridgeRequest(params: {
       chatKind: params.chatKind,
       senderNumbers: params.senderNumbers,
       isSelfChat: params.isSelfChat,
+      isOwnAccount: params.isOwnAccount,
       mentionsBot: params.mentionsBot,
     },
   };

@@ -97,7 +97,7 @@ A failing orchestrator is answered with a short apology.
 | `DOKJA_ORCH_HTTP_ENDPOINT` | WhatsApp interface | Orchestrator bridge, `http://dokja-orchestrator:8091/orchestrator` in Compose |
 | `DOKJA_GATEWAY_INGRESS_TOKEN` | Orchestrator and WhatsApp interface | Dedicated bearer credential for the HTTP bridge. Required. |
 | `DOKJA_ORCHESTRATOR_TIMEOUT_MS` | WhatsApp interface | Wait for the orchestrator, default `180000` |
-| `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing |
+| `DOKJA_WHATSAPP_CONVERSATIONS` | WhatsApp interface | `alias=<phone number or group id>` pairs, comma-separated: the only conversations that are recorded and shown in the desktop. Empty (the default) records nothing. Managed as the `whatsapp.conversations` setting (System › Settings, or `dokja-cli settings`): the database decides it, and `.env` only seeds it once |
 | `DOKJA_WHATSAPP_HISTORY_DIR` | WhatsApp interface | Folder of the recorded text. Required when a conversation is named; `/history` (its own volume) in Compose |
 | `DOKJA_WHATSAPP_HISTORY_DAYS` | WhatsApp interface | How long the text is kept, 1 to 365 days, default `30` |
 | `DOKJA_WHATSAPP_STATUS_PORT` | WhatsApp interface | Internal port that answers the interface's state, default `8094`. Never published |
@@ -291,8 +291,9 @@ never deleted by the service.
   tag means the owner and they can be tagged normally (the tag is still removed from what the model
   sees). The owner calls Ningo the same way; everything else the owner writes in a group stays
   ignored. Replies come from the linked account, signed. Group turns are not kept in the owner's
-  conversation archive, and nobody is recognized by name there. The owner's private conversation is
-  the "message yourself" chat.
+  conversation archive. The owner is recognized in groups by the account's own messages, without
+  private profile details being volunteered, and known people by their number in the groups listed
+  in the private configuration. The owner's private conversation is the "message yourself" chat.
 - The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
   archive and continues the conversation the desktop shows, so you can start on the phone and go on
   at the desktop, or the other way round. The phone continues the latest conversation; in the

@@ -282,6 +282,7 @@
   "setting_direct_messages": "mensagens diretas",
   "setting_people": "pessoas (números)",
   "setting_groups": "grupos (<dígitos>@g.us)",
+  "setting_conversations": "Mostradas em Mensagens (apelido=número ou grupo)",
   "setting_own_chat": "responder o próprio chat",
   "setting_model_embedding": "modelo de embedding",
   "setting_model_book_classifier": "modelo classificador de livros",

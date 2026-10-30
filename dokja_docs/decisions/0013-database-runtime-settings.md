@@ -47,6 +47,12 @@ rewriting input or silently choosing a different model. Later `.env` and shell
 edits do not override the imported managed values. A missing legacy file imports
 empty values, preserving the catalog/Compose defaults.
 
+A setting added to the catalog after the database was created is imported the same
+way, once, on the next read: only the keys the stored configuration lacks are read
+from the legacy environment, so unrelated legacy edits stay irrelevant, and from
+then on the database decides. An older daemon refuses a stored key it does not
+know, so downgrading across a new setting needs the database backup.
+
 Existing services still consume their environment contracts. Immediately before
 a controller Compose command, the adapter projects database values into that
 child's environment, replacing only managed keys. No generated env file or

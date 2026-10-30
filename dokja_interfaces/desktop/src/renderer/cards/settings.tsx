@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { isRecord } from "../../shared/records.js";
 import type { RuntimeSetting, RuntimeSettings, RuntimeSnapshot } from "../../shared/runtime.js";
 import type { Transport } from "../../shared/transport.js";
-import { GroupDiscovery } from "./group_discovery.js";
+import { GroupDiscovery, conversationAlias } from "./group_discovery.js";
 import { displayName } from "../display_names.js";
 import { useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
@@ -26,6 +26,7 @@ const LABELS: Record<string, MessageId> = {
   "discord.direct_messages": "setting_direct_messages",
   "whatsapp.people": "setting_people",
   "whatsapp.groups": "setting_groups",
+  "whatsapp.conversations": "setting_conversations",
   "whatsapp.own_chat": "setting_own_chat",
   "models.embedding": "setting_model_embedding",
   "models.book_classifier": "setting_model_book_classifier",
@@ -117,6 +118,8 @@ function SettingRow({ row, view, transport, busy, onSave }: { row: RuntimeSettin
   const label = t(LABELS[row.id] ?? "settings_title");
   const impact = impactOf(row, view.running);
   const close = () => { setDraft(undefined); setReviewing(false); };
+  const entries = (draft ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+  const change = (values: readonly string[]) => { setDraft(values.join(",")); setReviewing(false); };
   return <li>
     <span className="service-name">{label}</span>
     <span className="service-status">{valueText(row, view, t)}</span>
@@ -126,9 +129,13 @@ function SettingRow({ row, view, transport, busy, onSave }: { row: RuntimeSettin
         {row.kind !== "list" && <label htmlFor={id}>{label}</label>}
         {row.kind === "list"
           ? <>
-            <ListEditor label={label} values={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy} onChange={(values) => { setDraft(values.join(",")); setReviewing(false); }} />
-            {row.id === "whatsapp.groups" && <GroupDiscovery transport={transport} chosen={draft.split(",").map((item) => item.trim()).filter(Boolean)} disabled={busy}
-              onAdd={(id) => { setDraft([...draft.split(",").map((item) => item.trim()).filter(Boolean), id].join(",")); setReviewing(false); }} />}
+            <ListEditor label={label} values={entries} disabled={busy} onChange={change} />
+            {row.id === "whatsapp.groups" && <GroupDiscovery transport={transport} chosen={entries} disabled={busy} onAdd={(group) => change([...entries, group.id])} />}
+            {row.id === "whatsapp.conversations" && <>
+              <p className="detail">{t("setting_conversations_recording")}</p>
+              <GroupDiscovery transport={transport} chosen={entries.map((entry) => entry.slice(entry.indexOf("=") + 1))} disabled={busy}
+                onAdd={(group) => change([...entries, `${conversationAlias(group.name, entries.map((entry) => entry.slice(0, entry.indexOf("="))))}=${group.id}`])} />
+            </>}
           </>
           : row.options.length > 0
           ? <select id={id} value={draft} onChange={(event) => { setDraft(event.target.value); setReviewing(false); }}>

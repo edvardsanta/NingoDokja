@@ -161,3 +161,60 @@ func TestOversizedLegacyLineIsNotSilentlyIgnored(t *testing.T) {
 		t.Fatal("incomplete legacy import accepted")
 	}
 }
+
+func TestASettingNewToAnExistingDatabaseComesFromTheLegacyFileOnceThenTheDatabaseDecides(t *testing.T) {
+	s := databaseFixture(t)
+	if _, _, err := s.Read(); err != nil {
+		t.Fatal(err)
+	}
+	// A database created before the setting existed, and a legacy file that names conversations.
+	c, _, err := s.DB.RuntimeConfiguration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	older := map[string]string{}
+	for id, value := range c.Values {
+		if id != "whatsapp.conversations" {
+			older[id] = value
+		}
+	}
+	path := filepath.Join(t.TempDir(), "older.db")
+	db, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.InitializeRuntimeConfiguration(older); err != nil {
+		t.Fatal(err)
+	}
+	s.DB = db
+	legacy := fixtureEnv + "DOKJA_WHATSAPP_CONVERSATIONS=eu=5511912345678\n"
+	if err := os.WriteFile(s.Legacy.Path, []byte(legacy), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	values, _, err := s.Read()
+	if err != nil || values["DOKJA_WHATSAPP_CONVERSATIONS"] != "eu=5511912345678" {
+		t.Fatal("the existing value must be imported", values, err)
+	}
+	if err := s.Write(map[string]string{"DOKJA_WHATSAPP_CONVERSATIONS": "eu=5511912345678,ningo=120363000000000001@g.us"}); err != nil {
+		t.Fatal(err)
+	}
+	env, err := s.Environment([]string{"DOKJA_WHATSAPP_CONVERSATIONS=from-the-shell", "UNRELATED=kept"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(env, "\n")
+	if !strings.Contains(joined, "DOKJA_WHATSAPP_CONVERSATIONS=eu=5511912345678,ningo=120363000000000001@g.us") || strings.Contains(joined, "from-the-shell") || !strings.Contains(joined, "UNRELATED=kept") {
+		t.Fatal("the database must take precedence over the environment", joined)
+	}
+	if err := s.Write(map[string]string{"DOKJA_WHATSAPP_CONVERSATIONS": ""}); err != nil {
+		t.Fatal(err)
+	}
+	if values, _, err = s.Read(); err != nil || values["DOKJA_WHATSAPP_CONVERSATIONS"] != "" {
+		t.Fatal("clearing the list must not bring the legacy value back", values, err)
+	}
+	if raw, _ := os.ReadFile(s.Legacy.Path); string(raw) != legacy {
+		t.Fatal("the legacy file must not change")
+	}
+}

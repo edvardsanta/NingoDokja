@@ -24,6 +24,7 @@ for(const locale of ["pt-BR","en"]) {
   assert.equal(calls[0].payload.document.data_b64,undefined);
   assert.equal(calls[1].payload.document.data_b64,Buffer.from("pdf").toString("base64"));
   assert.equal(calls[1].payload.locale,locale);
+  assert.equal(calls[0].payload.isOwnAccount,true);
   assert.ok(replies[0]!.endsWith(locale==="en"?"Signed _Ningo Dokja_":"Assinado _Ningo Dokja_"));
  });
  test(`document and publication errors use the configured catalog (${locale})`,async()=>{
@@ -74,7 +75,7 @@ test("document captions, wrappers and lazy download survive inbound normalizatio
 
 test("bridge preserves structured replies while catalog keys match across languages",async()=>{
  assert.deepEqual(Object.keys(pt).sort(),Object.keys(en).sort());
- const body=buildWhatsAppBridgeRequest({content:"",document:{filename:"memo.pdf",content_type:"application/pdf",size:3},locale:"en",userId:"owner",chatId:"self",messageId:"m",chatKind:"direct",senderNumbers:[],isSelfChat:true,mentionsBot:false});
+ const body=buildWhatsAppBridgeRequest({content:"",document:{filename:"memo.pdf",content_type:"application/pdf",size:3},locale:"en",userId:"owner",chatId:"self",messageId:"m",chatKind:"direct",senderNumbers:[],isSelfChat:true,isOwnAccount:true,mentionsBot:false});
  const reply=await dispatchToOrchestratorResponse("http://orchestrator.test",1000,body,async()=>new Response(JSON.stringify({status:"ok",reply:"",document_required:true})));
  assert.equal(reply.document_required,true);assert.equal(body.event_type,"message.created");assert.equal(body.payload.locale,"en");
 });

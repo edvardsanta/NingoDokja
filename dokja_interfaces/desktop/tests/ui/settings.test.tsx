@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { conversationAlias } from "../../src/renderer/cards/group_discovery.js";
 import { SettingsCard, impactOf } from "../../src/renderer/cards/settings.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import { failure, ok, routedTransport } from "./support.js";
@@ -11,6 +12,7 @@ const settings = (value = "open") => ok({
     { id: "discord.meme_channels", group: "discord", kind: "list", options: [], value: "101,102", affects: ["orchestrator", "communications"], note: "sessions" },
     { id: "discord.direct_messages", group: "discord", kind: "enum", options: ["open", "closed"], value, affects: ["discord"], note: "" },
     { id: "whatsapp.groups", group: "whatsapp", kind: "list", options: [], value: "", affects: ["whatsapp"], note: "" },
+    { id: "whatsapp.conversations", group: "whatsapp", kind: "list", options: [], value: "eu=5511900000000", affects: ["whatsapp"], note: "" },
   ],
 });
 const modules = ok({ busy: false, error: "", modules: [{ name: "discord", state: "ready", error: "", dependencies: [] }, { name: "orchestrator", state: "ready", error: "", dependencies: [] }] });
@@ -142,5 +144,31 @@ describe("finding the WhatsApp groups to allow", () => {
     show(transport);
     fireEvent.click(await screen.findByRole("button", { name: /^Edit Meme channels|^Edit .*channels/ }));
     expect(screen.queryByRole("button", { name: "Find my groups" })).toBeNull();
+  });
+});
+
+describe("naming conversations for Messages", () => {
+  const groups = ok({ groups: [{ id: "120363000000000001@g.us", name: "Clube de Leitura!", members: 4 }] });
+
+  it("adds a found group under an alias made from its name, warns about recording, and saves through the setting", async () => {
+    const { transport, calls } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules, "communications.link.groups": groups, "runtime.settings.set": settings() });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit Shown in Messages/ }));
+    screen.getByText(/Everything said in these conversations is recorded/);
+    fireEvent.click(screen.getByRole("button", { name: "Find my groups" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Clube de Leitura!" }));
+    screen.getByText("clube-de-leitura=120363000000000001@g.us");
+    expect((screen.getByRole("button", { name: "Add Clube de Leitura!" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(calls.filter((call) => call.type === "runtime.settings.set")).toHaveLength(0);
+  });
+
+  it("makes aliases the WhatsApp interface accepts, and never repeats one", () => {
+    expect(conversationAlias("Família São João", [])).toBe("familia-sao-joao");
+    expect(conversationAlias("ningo", ["ningo"])).toBe("ningo-2");
+    expect(conversationAlias("ningo", ["ningo", "ningo-2"])).toBe("ningo-3");
+    expect(conversationAlias("🎵🎶", [])).toBe("grupo");
+    const long = conversationAlias("x".repeat(80), []);
+    expect(long.length).toBeLessThanOrEqual(32);
+    expect(long).toMatch(/^[a-z0-9][a-z0-9_-]{0,31}$/);
   });
 });

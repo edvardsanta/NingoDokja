@@ -64,6 +64,7 @@ type BridgePayload struct {
 	Direct           *bool                  `json:"isDirectMessage"`
 	Mentioned        *bool                  `json:"mentionsBot"`
 	ChatKind         string                 `json:"chatKind"`
+	OwnAccount       *bool                  `json:"isOwnAccount"`
 	SelfChat         *bool                  `json:"isSelfChat"`
 	Numbers          []string               `json:"senderNumbers"`
 }
@@ -534,6 +535,9 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 	}
 	if request.Payload.SelfChat != nil {
 		context["is_self_chat"] = *request.Payload.SelfChat
+	}
+	if request.Payload.OwnAccount != nil {
+		context["is_own_account"] = *request.Payload.OwnAccount
 	}
 	if request.Payload.ChatKind != "" {
 		context["chat_kind"] = request.Payload.ChatKind

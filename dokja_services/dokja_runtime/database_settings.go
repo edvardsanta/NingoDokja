@@ -44,9 +44,6 @@ func (s *DatabaseSettings) snapshot() (store.Configuration, []string, error) {
 	if err != nil {
 		return c, nil, fmt.Errorf("cannot read runtime settings database")
 	}
-	if exists {
-		return c, webhooks, nil
-	}
 	if s.Lookup != nil {
 		for _, name := range domain.SettingsEnv() {
 			if name != domain.WebhooksEnv {
@@ -55,6 +52,19 @@ func (s *DatabaseSettings) snapshot() (store.Configuration, []string, error) {
 				}
 			}
 		}
+	}
+	if exists {
+		// A setting added to the catalog since is imported once; after that the database decides it.
+		values, added, err := domain.NewSettings(c.Values, legacy)
+		if err != nil {
+			return c, nil, err
+		}
+		if added {
+			if c, err = s.DB.UpdateRuntimeConfiguration(c.Revision, values); err != nil {
+				return c, nil, fmt.Errorf("cannot save runtime settings; reload before retrying")
+			}
+		}
+		return c, webhooks, nil
 	}
 	values, err := domain.ImportSettings(legacy)
 	if err != nil {

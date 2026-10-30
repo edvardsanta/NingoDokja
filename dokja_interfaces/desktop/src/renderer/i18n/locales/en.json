@@ -434,6 +434,8 @@
   "setting_direct_messages": "Direct messages",
   "setting_people": "People (phone numbers)",
   "setting_groups": "Groups (<digits>@g.us)",
+  "setting_conversations": "Shown in Messages (alias=number or group)",
+  "setting_conversations_recording": "Everything said in these conversations is recorded, by everyone in them, including messages that do not call Ningo. Name a group only if its members would expect that.",
   "setting_own_chat": "Answer own chat",
   "setting_model_embedding": "Embedding model",
   "setting_model_book_classifier": "Book classifier model",

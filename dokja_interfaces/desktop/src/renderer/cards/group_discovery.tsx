@@ -4,14 +4,23 @@ import type { LinkedGroup } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
 import { useTranslate } from "../i18n/context.js";
 
-// Lists the groups the linked WhatsApp account is in, so the owner allows one by its name instead of
+// The alias a named conversation goes by, made from the group's name: lowercase letters, digits, "-"
+// and "_", up to 32, and different from the aliases already taken.
+export function conversationAlias(name: string, taken: readonly string[]): string {
+  const base = name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[-_]+|-+$/g, "").slice(0, 28).replace(/-+$/, "") || "grupo";
+  let alias = base;
+  for (let n = 2; taken.includes(alias); n++) alias = `${base}-${n}`;
+  return alias;
+}
+
+// Lists the groups the linked WhatsApp account is in, so the owner chooses one by its name instead of
 // hunting for its id. Adding only fills the setting's draft; nothing is saved until the owner reviews
 // and saves the setting as usual.
 export function GroupDiscovery({ transport, chosen, disabled, onAdd }: {
   transport: Transport;
   chosen: readonly string[];
   disabled: boolean;
-  onAdd: (id: string) => void;
+  onAdd: (group: LinkedGroup) => void;
 }) {
   const t = useTranslate();
   const [groups, setGroups] = useState<LinkedGroup[]>();
@@ -36,7 +45,7 @@ export function GroupDiscovery({ transport, chosen, disabled, onAdd }: {
       const added = chosen.includes(group.id);
       return <li key={group.id}>
         <span><strong>{name}</strong> <span className="detail">{t("groups_members", { count: String(group.members) })}</span></span>
-        <button type="button" disabled={disabled || added} aria-label={t("groups_add_named", { name })} onClick={() => onAdd(group.id)}>{added ? t("groups_added") : t("groups_add")}</button>
+        <button type="button" disabled={disabled || added} aria-label={t("groups_add_named", { name })} onClick={() => onAdd(group)}>{added ? t("groups_added") : t("groups_add")}</button>
       </li>;
     })}</ul>}
   </div>;
