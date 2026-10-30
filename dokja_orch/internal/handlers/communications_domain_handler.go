@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	communications "read_books/dokja_domain/dokja_communications"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 )
 
@@ -54,6 +55,15 @@ func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSour
 func (h *CommunicationsDomainHandler) WithMusicComments(generator ChatConversationGenerator) *CommunicationsDomainHandler {
 	if h.music != nil {
 		h.music.comments = generator
+	}
+	return h
+}
+
+// WithMusicExperience remembers what each person listened to. enabled is the operator's memory
+// switch.
+func (h *CommunicationsDomainHandler) WithMusicExperience(service memorydomain.Service, enabled func() bool) *CommunicationsDomainHandler {
+	if h.music != nil {
+		h.music.listens = NewMusicExperience(service, enabled)
 	}
 	return h
 }

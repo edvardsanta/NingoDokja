@@ -107,6 +107,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "end-music-track"
 		case "music.comment":
 			return "comment-music-track"
+		case "music.history":
+			return "show-music-history"
 		default:
 			return "unsupported-communications"
 		}

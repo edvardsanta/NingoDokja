@@ -406,6 +406,15 @@ func formatMusicReply(eventType string, music map[string]any) string {
 		volume, _ := intFromValue(music["volume"])
 		return fmt.Sprintf("Volume: %d%%.", volume)
 	}
+	if eventType == "music.history" {
+		history, _ := music["history"].([]any)
+		lines := make([]string, 0, len(history))
+		for _, raw := range history {
+			play, _ := raw.(map[string]any)
+			lines = append(lines, fmt.Sprintf("%s (%s)", stringValue(play["song"]), stringValue(play["ended"])))
+		}
+		return strings.Join(lines, "\n")
+	}
 	if now == nil {
 		return "Nothing is playing."
 	}
@@ -555,7 +564,7 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":
 		return strings.TrimSpace(request.EventType), request.Payload.Voice
-	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended", "music.comment":
+	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended", "music.comment", "music.history":
 		// What follows the command (words, a link, a volume) is read by the Communications
 		// domain; the bridge passes it on as typed.
 		return strings.TrimSpace(request.EventType), map[string]any{"content": content}

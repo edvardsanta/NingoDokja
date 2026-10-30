@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	communications "read_books/dokja_domain/dokja_communications"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 )
 
@@ -25,6 +27,8 @@ type musicDesk struct {
 	timeout time.Duration
 	// comments writes Ningo's remark on a song; nil means no remarks
 	comments ChatConversationGenerator
+	// listens remembers who listened to what; nil means nothing is remembered
+	listens *MusicExperience
 	// epoch names this process's queues: entries and versions start again after a restart, so
 	// whoever plays a queue compares states only within one epoch.
 	epoch string
@@ -66,7 +70,7 @@ func (d *musicDesk) guild(id string) *guildQueue {
 var musicActions = map[string]bool{
 	"play-music": true, "skip-music": true, "pause-music": true, "resume-music": true,
 	"stop-music": true, "show-music-queue": true, "set-music-volume": true, "end-music-track": true,
-	"comment-music-track": true,
+	"comment-music-track": true, "show-music-history": true,
 }
 
 // handle answers every refusal as a result the person reads ({ok: false, reason}); an error is
@@ -85,20 +89,28 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 	if action == "comment-music-track" {
 		return d.comment(ctx, guild, content), nil
 	}
+	if action == "show-music-history" {
+		return d.history(ctx, event.User.ID), nil
+	}
 	guild.mu.Lock()
 	defer guild.mu.Unlock()
 	queue := guild.queue
+	playing := queue.State().NowPlaying
+	ended := ""
 	var err error
 	reply := map[string]any{}
 	switch action {
 	case "skip-music":
-		_, err = queue.Skip()
+		if _, err = queue.Skip(); err == nil {
+			ended = memorydomain.ListenSkipped
+		}
 	case "pause-music":
 		err = queue.Pause()
 	case "resume-music":
 		err = queue.Resume()
 	case "stop-music":
 		queue.Stop()
+		ended = memorydomain.ListenStopped
 	case "set-music-volume":
 		var volume int
 		if volume, err = communications.VolumeFromText(content); err == nil {
@@ -116,11 +128,32 @@ func (d *musicDesk) handle(ctx context.Context, event core.Event, action string)
 		}
 		_, advanced := queue.Ended(int(entry))
 		reply["advanced"] = advanced
+		if advanced {
+			ended = memorydomain.ListenFinished
+		}
 	}
 	if err != nil {
 		return refusedFor(err), nil
 	}
+	if playing != nil && ended != "" {
+		play := fmt.Sprintf("%s/%s/%d", d.epoch, guildID, playing.Entry)
+		d.listens.Listened(play, playing.RequestedBy, playing.Title, playing.Uploader, ended)
+	}
 	return d.musicReply(queue.State(), reply), nil
+}
+
+// history answers with the songs of whoever asks: person is the event's verified sender, so nobody
+// can read another person's songs.
+func (d *musicDesk) history(ctx context.Context, person string) map[string]any {
+	plays, ok := d.listens.History(ctx, person)
+	if !ok {
+		return refusedMusic("no_memory", "music memory is not available")
+	}
+	history := make([]any, len(plays))
+	for i, play := range plays {
+		history[i] = map[string]any{"song": play.Song, "ended": play.Ended}
+	}
+	return map[string]any{"music": map[string]any{"ok": true, "history": history}}
 }
 
 // play checks room before searching, searches without holding the server's queue (a search can
