@@ -13,7 +13,7 @@
   "post_unavailable": "Não consegui obter a mídia dessa publicação. Verifique o leitor e tente novamente.",
   "post_no_reader": "Nenhum leitor de publicações está ativo. Inicie o Feeds e habilite um leitor.",
   "post_failed": "Não consegui ler a publicação. Tente novamente.",
-  "post_media_too_large": "A mídia excede os limites de envio: 8 MiB por arquivo, 16 MiB no total e até 10 arquivos.",
+  "post_media_too_large": "A mídia excede os limites de envio: 16 MiB por arquivo ou no total e até 10 arquivos.",
   "media_delivery_failed": "Não consegui enviar toda a mídia da publicação. Alguns arquivos podem já ter sido enviados.",
   "summary_partial": "Este resumo cobre apenas o trecho inicial do documento, limitado a 80.000 caracteres."
 }

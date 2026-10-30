@@ -62,7 +62,7 @@ link and image/video media. Digest selects an enabled `social.resolve.v1` reader
 then asks that same reader for each file using `action: "media"`. Reader URLs are
 never fetched by the WhatsApp adapter. The reader must return bounded base64 bytes;
 metadata-only readers produce a localized unavailable message. Limits are 10 files,
-8 MiB per file and 16 MiB total, using JPEG, PNG, WebP or MP4. Long captions continue
+16 MiB per file and in total, using JPEG, PNG, WebP or MP4. Long captions continue
 in signed text messages. The adapter quotes the original incoming message and
 remembers outgoing media IDs for echo suppression.
 

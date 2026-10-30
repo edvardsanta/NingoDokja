@@ -220,7 +220,8 @@ A `social.resolve.v1` reader can optionally support `action: "media"` with input
 `{"url": "<one of the media references from its read result>"}`. It returns
 `{"result": {"content_type": "video/mp4", "data_b64": "..."}}` (or the ordinary
 plugin error envelope). Supported delivery MIME types are `image/jpeg`, `image/png`,
-`image/webp` and `video/mp4`. One file must fit within 8 MiB decoded. The caller
+`image/webp` and `video/mp4`. One file must fit within 16 MiB decoded; a reader
+reports a larger one as `{"result": {"refused": "media_too_large"}}`. The caller
 pins requests to the reader selected by `read`; another reader is never allowed
 to interpret its cache references.
 
@@ -235,5 +236,5 @@ The optional `plugins.example/post-reader-relay` mechanism bridges an existing
 host-local reader's Unix socket. Its media operation accepts only that reader's
 configured origin and opaque `/media/` paths, then reads the file over the socket.
 It does not issue requests to caller-selected hosts or filesystem paths. Configure
-its private `settings.json`, worker token and 16 MiB output budget outside Git;
+its private `settings.json`, worker token and 23 MiB output budget outside Git;
 site extraction and browser credentials remain in the owner-local worker.

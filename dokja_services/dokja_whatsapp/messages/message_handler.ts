@@ -237,12 +237,12 @@ export function validatedReplyMedia(rows: ReplyMedia[]): ReplyMedia[] {
   let total = 0;
   for (const row of rows) {
     if (!row || !["image/jpeg", "image/png", "image/webp", "video/mp4"].includes(row.content_type)
-      || typeof row.data_b64 !== "string" || row.data_b64.length > Math.ceil(8 * 1024 * 1024 / 3) * 4) {
+      || typeof row.data_b64 !== "string" || row.data_b64.length > Math.ceil(16 * 1024 * 1024 / 3) * 4) {
       throw new Error("invalid media");
     }
     const bytes = Buffer.from(row.data_b64, "base64");
     total += bytes.length;
-    if (!bytes.length || bytes.length > 8 * 1024 * 1024 || bytes.toString("base64") !== row.data_b64
+    if (!bytes.length || bytes.length > 16 * 1024 * 1024 || bytes.toString("base64") !== row.data_b64
       || total > 16 * 1024 * 1024) throw new Error("invalid media bytes");
   }
   return rows;

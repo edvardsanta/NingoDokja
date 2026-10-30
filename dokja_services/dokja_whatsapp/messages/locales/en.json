@@ -13,7 +13,7 @@
   "post_unavailable": "I could not retrieve this publication’s media. Check the reader and try again.",
   "post_no_reader": "No publication reader is active. Start Feeds and enable a reader.",
   "post_failed": "I could not read the publication. Please try again.",
-  "post_media_too_large": "The media exceeds the delivery limits: 8 MiB per file, 16 MiB total, and up to 10 files.",
+  "post_media_too_large": "The media exceeds the delivery limits: 16 MiB per file or in total, and up to 10 files.",
   "media_delivery_failed": "I could not send all of the publication’s media. Some files may already have been sent.",
   "summary_partial": "This summary covers only the opening excerpt of the document, limited to 80,000 characters."
 }

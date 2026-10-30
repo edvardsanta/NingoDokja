@@ -1358,7 +1358,7 @@ The bridge accepts up to 15 MiB of JSON for bounded 10 MiB document uploads. Bai
 downloads only after Communications authorizes the metadata request. Files are not
 implicitly ingested into Knowledge. The first 80,000 extracted Unicode characters
 are summarized, and a localized message explicitly identifies partial summaries.
-Post delivery accepts up to 10 files, 8 MiB each and 16 MiB total. Static messages
+Post delivery accepts up to 10 files, 16 MiB each and in total. Static messages
 and signatures use the gateway's locale catalogs; original post captions retain
 their source language.
 
@@ -1366,7 +1366,7 @@ Readers backed by a host-local cache must relay media through their socket rathe
 than returning a loopback URL for the container to fetch. See the generic
 `post-reader-relay` example and the
 [post reader contract](feeds-content-plugins.md#post-readers). Use a sufficient
-plugin output budget for base64 media (the relay example uses 16 MiB), and restart
+plugin output budget for base64 media (the relay example uses 23 MiB), and restart
 Feeds after changing its plugin manifests. Preserve
 private settings and browser credentials on the host. No ports, services or
 volumes are added, and no production rollout is performed automatically.
