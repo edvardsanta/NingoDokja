@@ -1,26 +1,12 @@
 import type { ActionType } from "../shared/actions.js";
 import type { Locale } from "../shared/locale.js";
+import { createTranslator, type MessageId } from "../renderer/i18n/i18n.js";
 
 // The question the shell asks, in a window of its own, before an action that cannot be undone. It is
 // asked by the main process, not by the page: a page that was tricked into asking cannot answer for
 // the person, and cannot change what the window says. The window names what is about to be
 // deleted by its id, which is what the shell knows, not by a title the page could make up.
 export type Question = { message: string; detail: string; accept: string; cancel: string };
-
-const TEXTS: Record<Locale, { message: string; detail: (id: string) => string; accept: string; cancel: string }> = {
-  en: {
-    message: "Delete this document?",
-    detail: (id) => `${id}\n\nIts passages are removed from the research base. This cannot be undone.`,
-    accept: "Delete",
-    cancel: "Cancel",
-  },
-  pt: {
-    message: "Apagar este documento?",
-    detail: (id) => `${id}\n\nOs trechos dele saem da base de pesquisa. Isso não pode ser desfeito.`,
-    accept: "Apagar",
-    cancel: "Cancelar",
-  },
-};
 
 // Asks the person, in a window the shell owns, whether to go on. True means yes.
 export type Confirm = (type: ActionType, wire: Record<string, unknown>) => Promise<boolean>;
@@ -45,86 +31,31 @@ export function createConfirmer(locale: Locale, show: ShowQuestion): Confirm {
 }
 
 export function questionFor(locale: Locale, type: ActionType, wire: Record<string, unknown>): Question | undefined {
-  if (type === "communications.send") {
-    const pt = locale === "pt";
-    const channel = String((wire.channel_ids as string[])[0]);
-    if (channel.startsWith("whatsapp:")) {
-      return {
-        message: pt ? "Enviar pelo WhatsApp como você?" : "Send on WhatsApp as you?",
-        detail: `${pt ? "Conversa" : "Conversation"}: ${channel.slice("whatsapp:".length)}\n\n${String(wire.content ?? "")}\n\n${
-          pt ? "A mensagem sai da sua própria conta do WhatsApp." : "The message goes out from your own WhatsApp account."
-        }`,
-        accept: pt ? "Enviar" : "Send",
-        cancel: pt ? "Cancelar" : "Cancel",
-      };
+  const t = createTranslator(locale);
+  const ask = (message: MessageId, detail: string, accept: MessageId): Question =>
+    ({ message: t(message), detail, accept: t(accept), cancel: t("dialog_cancel") });
+  switch (type) {
+    case "communications.send": {
+      const channel = String((wire.channel_ids as string[])[0]);
+      if (channel.startsWith("whatsapp:")) {
+        return ask("dialog_whatsapp_send", t("dialog_whatsapp_send_detail", { conversation: channel.slice("whatsapp:".length), content: String(wire.content ?? "") }), "dialog_send");
+      }
+      const warning = wire.force_nsfw === true ? `\n\n${t("dialog_discord_force_warning")}` : "";
+      return ask("dialog_discord_send", `${t("dialog_discord_send_detail", { channel, content: String(wire.content ?? ""), attachment: String(wire.attachment_url ?? "") })}${warning}`, "dialog_send");
     }
-    return {
-      message: pt ? "Enviar pelo Ningo ao Discord?" : "Send to Discord as Ningo?",
-      detail: `${pt ? "Canal" : "Channel"}: ${String((wire.channel_ids as string[])[0])}\n\n${String(wire.content ?? "")}\n\n${String(wire.attachment_url ?? "")}${wire.force_nsfw === true ? `\n\n${pt ? "AVISO: o envio forçado ignora a triagem de mídia." : "WARNING: force send bypasses media screening."}` : ""}`,
-      accept: pt ? "Enviar" : "Send",
-      cancel: pt ? "Cancelar" : "Cancel",
-    };
+    case "communications.link.reset":
+      return ask("dialog_unlink", t("dialog_unlink_detail"), "dialog_unlink_accept");
+    case "memory.resolve":
+      return ask("dialog_feedback", t("dialog_feedback_detail", { ref: String(wire.ref), observed: String(wire.observed ?? wire.outcome) }), "dialog_feedback_accept");
+    case "runtime.models.pull":
+      return ask("dialog_model_pull", t("dialog_model_pull_detail", { model: String(wire.model) }), "dialog_model_pull_accept");
+    case "runtime.models.remove":
+      return ask("dialog_model_remove", t("dialog_model_remove_detail", { model: String(wire.model) }), "dialog_model_remove_accept");
+    case "conversation.delete":
+      return ask("dialog_conversation_delete", t("dialog_conversation_delete_detail", { id: String(wire.conversation_id) }), "dialog_delete");
+    case "knowledge.delete":
+      return ask("dialog_document_delete", t("dialog_document_delete_detail", { id: String(wire.source_id ?? "") }), "dialog_delete");
+    default:
+      return undefined;
   }
-  if (type === "communications.link.reset") {
-    const pt = locale === "pt";
-    return {
-      message: pt ? "Desvincular o WhatsApp?" : "Unlink WhatsApp?",
-      detail: pt
-        ? "O aparelho vinculado é removido da conta e a sessão salva é apagada. Será preciso escanear um novo código para usar de novo."
-        : "The linked device is removed from the account and the saved session is erased. A new code has to be scanned to use it again.",
-      accept: pt ? "Desvincular" : "Unlink",
-      cancel: pt ? "Cancelar" : "Cancel",
-    };
-  }
-  if (type === "memory.resolve") {
-    const pt = locale === "pt";
-    return {
-      message: pt ? "Registrar este feedback?" : "Record this feedback?",
-      detail: `${String(wire.ref)}\n\n${String(wire.observed ?? wire.outcome)}\n\n${pt
-        ? "O primeiro resultado registrado é mantido. Confira a experiência e o que aconteceu antes de confirmar."
-        : "The first recorded outcome is retained. Check the experience and what happened before confirming."}`,
-      accept: pt ? "Registrar" : "Record", cancel: pt ? "Cancelar" : "Cancel",
-    };
-  }
-  if (type === "runtime.models.pull" || type === "runtime.models.remove") {
-    const pt = locale === "pt";
-    const model = String(wire.model);
-    if (type === "runtime.models.pull") {
-      return {
-        message: pt ? "Baixar este modelo?" : "Download this model?",
-        detail: `${model}\n\n${pt
-          ? "O Ollama baixa o modelo do registro dele. Um modelo pode ocupar vários gigabytes de disco e levar muito tempo numa conexão lenta."
-          : "Ollama downloads it from its registry. A model can take several gigabytes of disk and a long time on a slow connection."}`,
-        accept: pt ? "Baixar" : "Download",
-        cancel: pt ? "Cancelar" : "Cancel",
-      };
-    }
-    return {
-      message: pt ? "Remover este modelo?" : "Remove this model?",
-      detail: `${model}\n\n${pt
-        ? "Ele é apagado desta máquina. Para usá-lo de novo, será preciso baixá-lo outra vez."
-        : "It is deleted from this machine. Using it again means downloading it again."}`,
-      accept: pt ? "Remover" : "Remove",
-      cancel: pt ? "Cancelar" : "Cancel",
-    };
-  }
-  if (type === "conversation.delete") {
-    const pt = locale === "pt";
-    return {
-      message: pt ? "Apagar esta conversa?" : "Delete this conversation?",
-      detail: `${String(wire.conversation_id)}\n\n${pt
-        ? "As mensagens e as respostas do Ningo saem do arquivo de conversas, em todas as interfaces. As experiências registradas a partir dela continuam. Isso não pode ser desfeito."
-        : "Its messages and Ningo's replies are erased from the conversation archive, in every interface. Experiences recorded from it stay. This cannot be undone."}`,
-      accept: pt ? "Apagar" : "Delete",
-      cancel: pt ? "Cancelar" : "Cancel",
-    };
-  }
-  if (type !== "knowledge.delete") return undefined;
-  const texts = TEXTS[locale] ?? TEXTS.en;
-  return {
-    message: texts.message,
-    detail: texts.detail(String(wire.source_id ?? "")),
-    accept: texts.accept,
-    cancel: texts.cancel,
-  };
 }
