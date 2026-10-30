@@ -10,6 +10,7 @@ import (
 	"time"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
+	"read_books/internal/core"
 )
 
 // gatedModel answers each message only once the test releases it, and records the conversation it
@@ -288,5 +289,63 @@ func TestAFullQueueStillAnswersARepeatedSendFromTheArchive(t *testing.T) {
 		if got := awaitHandled(t, ctx, waiting[i]); got.err != nil {
 			t.Fatal(question, got.err)
 		}
+	}
+}
+
+func TestASendThatWaitsSaysSoAndThenThatItWasDispatched(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	previous := queuedReportEvery
+	queuedReportEvery = 5 * time.Millisecond
+	defer func() { queuedReportEvery = previous }()
+	archive := archiveFor(t)
+	model := newGatedModel("First", "Second")
+	handler := NewChatDomainHandler(model).WithArchive(archive)
+	held, _ := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+
+	var mu sync.Mutex
+	var reports []core.SendState
+	seen := func(state core.SendState) int {
+		mu.Lock()
+		defer mu.Unlock()
+		count := 0
+		for _, each := range reports {
+			if each == state {
+				count++
+			}
+		}
+		return count
+	}
+	report := func(state core.SendState) {
+		mu.Lock()
+		defer mu.Unlock()
+		reports = append(reports, state)
+	}
+	first := sendAsync(core.WithSendProgress(ctx, report), handler, held.ID, "send-0001", "First")
+	awaitSignal(t, ctx, model.started["First"], "the first send was not asked")
+	if len(reports) != 0 {
+		t.Fatal("a send with nothing ahead reports nothing", reports)
+	}
+	second := sendAsync(core.WithSendProgress(ctx, report), handler, held.ID, "send-0002", "Second")
+	for seen(core.SendQueued) < 2 { // repeated while it waits, so a stream notices a closed client
+		select {
+		case <-ctx.Done():
+			t.Fatal("the queued state was not repeated", ctx.Err())
+		case <-time.After(time.Millisecond):
+		}
+	}
+	if seen(core.SendDispatched) != 0 {
+		t.Fatal("not dispatched while the first is answered")
+	}
+	close(model.release["First"])
+	awaitHandled(t, ctx, first)
+	awaitSignal(t, ctx, model.started["Second"], "the second send was not asked")
+	close(model.release["Second"])
+	awaitHandled(t, ctx, second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if last := reports[len(reports)-1]; last != core.SendDispatched || len(reports) < 3 {
+		t.Fatal("dispatched must come last", reports)
 	}
 }

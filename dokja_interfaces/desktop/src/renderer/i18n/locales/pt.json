@@ -374,6 +374,7 @@
   "assistant_you": "Você",
   "assistant_name": "Ningo",
   "assistant_thinking": "Ningo está pensando…",
+  "assistant_queued": "Esperando a resposta anterior desta conversa…",
   "assistant_retry": "Tentar a última mensagem novamente",
   "assistant_input_label": "Sua mensagem",
   "assistant_placeholder": "Pergunte ao Ningo…",

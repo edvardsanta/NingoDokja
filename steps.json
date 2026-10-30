@@ -1886,7 +1886,8 @@
                 "Bounded normalized observations preserve source/attempt/revision provenance and aggregate limits."
               ],
               "evidence": [
-                "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min)."
+                "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min).",
+                "2026-10-30: the orchestrator reports a normalized queued/dispatched send state (core.SendState), repeated while waiting so a stream can notice a closed requester; the desktop stream carries it and Talk renders it from the en/pt catalogs without defining it. Other request paths report nothing."
               ],
               "checks": [
                 {
@@ -1903,6 +1904,11 @@
                   "name": "capability_admission",
                   "status": "skipped",
                   "detail": "Unsupported-capability refusal, a normalized queued/dispatched observation and ordering for non-chat workflows remain open in 10.6-b."
+                },
+                {
+                  "name": "queued_observation",
+                  "status": "passed",
+                  "detail": "dokja_orch gofmt, go vet ./... and go test -race ./... passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Regressions cover reports only when blocked, repetition, dispatched last, stream order, unknown states ignored and the Portuguese status. Not run in the real app."
                 }
               ]
             },
@@ -1921,7 +1927,7 @@
               "evidence": []
             }
           ],
-          "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; the first 10.6-b batch orders archived chat sends per conversation. Next: explicit capability admission and a normalized queued/dispatched observation, then logical-task/revision/budget mapping at a workflow consumer. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
+          "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; 10.6-b orders archived sends and reports queued/dispatched. Next: explicit capability admission and ordering beyond archived chat, then logical-task/revision/budget mapping at a workflow consumer. 09.8 can consume the queued/dispatched observation. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
         }
       ],
       "status_before_review": "in_progress",

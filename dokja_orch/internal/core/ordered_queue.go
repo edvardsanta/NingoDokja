@@ -76,6 +76,18 @@ func (q *OrderedQueue) Admit(key string, record func(full bool) (position int, e
 	return ticket, nil
 }
 
+// Blocked says whether an entry at an earlier position is still in the lane, so Wait would wait.
+func (t *QueueTicket) Blocked() bool {
+	t.queue.mu.Lock()
+	defer t.queue.mu.Unlock()
+	for other := range t.queue.lanes[t.key].entries {
+		if other.position < t.position {
+			return true
+		}
+	}
+	return false
+}
+
 // Wait returns once every entry of the lane with an earlier position has been released, or with the
 // context's error. An entry at the same position does not hold it back.
 func (t *QueueTicket) Wait(ctx context.Context) error {

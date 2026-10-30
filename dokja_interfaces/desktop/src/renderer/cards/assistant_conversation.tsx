@@ -26,6 +26,8 @@ export type Conversation = {
   turns: readonly Turn[];
   // the reply written so far while it is on its way, when the shell can stream it; never the reply
   preview: string;
+  // the orchestrator has this send waiting behind earlier turns of the conversation
+  queued: boolean;
   draft: string;
   setDraft: (draft: string) => void;
   busy: boolean;
@@ -102,12 +104,14 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [error, setError] = useState<TransportError>();
   const [unkept, setUnkept] = useState(false);
   const [preview, setPreview] = useState("");
+  const [queued, setQueued] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // Only this conversation's previews, and only while its turn is on its way.
   useEffect(() => {
     if (!busy || !transport.onChatPreview) return undefined;
     return transport.onChatPreview((each) => {
-      if (id.current && each.conversationId === id.current) setPreview(each.text);
+      if (!id.current || each.conversationId !== id.current) return;
+      if (each.queued === undefined) setPreview(each.text); else setQueued(each.queued);
     });
   }, [busy, transport]);
 
@@ -183,7 +187,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
       await readBack(sendId).catch(() => settle(sendId, (turn) => ({ ...turn, state: "unknown" })));
-    } finally { setBusy(false); setPreview(""); field.current?.focus(); }
+    } finally { setBusy(false); setPreview(""); setQueued(false); field.current?.focus(); }
   };
 
   const send = async (content: string) => {
@@ -216,7 +220,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     if ((latest.state === "failed" || latest.state === "interrupted") && latest.id) void dispatch(latest.sendId, { retry_turn_id: latest.id });
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
-  return { id: conversationId, turns, preview, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
+  return { id: conversationId, turns, preview, queued, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -239,7 +243,7 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
-    {busy && !preview && <p role="status">{t("assistant_thinking")}</p>}
+    {busy && !preview && <p role="status">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</p>}
     {!busy && latest?.state === "pending" && <p role="status">{t("assistant_still_pending")}</p>}
     {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
     {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}

@@ -569,3 +569,36 @@ describe("the conversation's layout", () => {
     expect(send().hasAttribute("aria-busy")).toBe(false);
   });
 });
+
+describe("a send waiting for its turn", () => {
+  it("says it is waiting while the orchestrator has it queued, then goes back to thinking, in Portuguese too", async () => {
+    let listener: ((preview: ChatPreview) => void) | undefined;
+    const pending = deferred<TransportResult>();
+    let conversationId = "";
+    let payload: Record<string, unknown> | undefined;
+    const transport: Transport = {
+      request: (type, sent) => {
+        if (type === "conversation.start") return Promise.resolve(startedConversation());
+        if (type !== "message.created") return Promise.resolve(failure("unavailable"));
+        conversationId = String(sent?.conversation_id); payload = sent;
+        return pending.promise;
+      },
+      preview: async () => ({ ok: false, error: { code: "unavailable", message: "none" } }),
+      onChatPreview: (each) => { listener = each; return () => { listener = undefined; }; },
+    };
+    await renderTalk(transport, "pt");
+    fireEvent.change(screen.getByRole("textbox", { name: "Sua mensagem" }), { target: { value: "oi" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Sua mensagem" }), { key: "Enter" });
+    await screen.findByText("Ningo está pensando…");
+    await waitFor(() => expect(listener).toBeDefined());
+
+    act(() => listener?.({ conversationId: "another", text: "", queued: true }));
+    expect(screen.queryByText("Esperando a resposta anterior desta conversa…")).toBeNull();
+    act(() => listener?.({ conversationId, text: "", queued: true }));
+    screen.getByText("Esperando a resposta anterior desta conversa…");
+    act(() => listener?.({ conversationId, text: "", queued: false }));
+    screen.getByText("Ningo está pensando…");
+    await act(async () => pending.resolve(archivedAnswer("Respondido.", payload)));
+    await screen.findByText("Respondido.");
+  });
+});

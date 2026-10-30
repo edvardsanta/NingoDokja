@@ -113,3 +113,22 @@ func TestOrderedQueueForgetsFinishedLanes(t *testing.T) {
 		t.Fatal("finished lanes must be dropped", q.lanes)
 	}
 }
+
+func TestOrderedQueueSaysWhetherAnEntryWouldWait(t *testing.T) {
+	q := NewOrderedQueue(4)
+	first := admitAt(t, q, "a", 1)
+	second := admitAt(t, q, "a", 2)
+	sameAsSecond := admitAt(t, q, "a", 2)
+	if first.Blocked() {
+		t.Fatal("the first entry waits for nobody")
+	}
+	if !second.Blocked() || !sameAsSecond.Blocked() {
+		t.Fatal("entries behind the first must be blocked")
+	}
+	first.Release()
+	if second.Blocked() {
+		t.Fatal("an entry at the same position does not hold another back")
+	}
+	second.Release()
+	sameAsSecond.Release()
+}

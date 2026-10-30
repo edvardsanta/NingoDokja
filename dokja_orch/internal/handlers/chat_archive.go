@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
@@ -119,7 +120,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	// Released once this turn has settled, so the next send's context holds this reply.
 	defer ticket.Release()
-	if err := ticket.Wait(ctx); err != nil {
+	if err := waitForTurn(ctx, ticket); err != nil {
 		if _, failed := h.archive.Fail(context.WithoutCancel(ctx), scope, turn, reasonStoppedWaiting); failed != nil {
 			return nil, fmt.Errorf("%s; and the conversation archive could not record it", reasonStoppedWaiting)
 		}
@@ -219,6 +220,44 @@ func (h *ChatDomainHandler) recordedSend(ctx context.Context, scope conversation
 		return turn, true, nil
 	}
 	return conversation.Turn{}, false, core.ErrQueueFull
+}
+
+// queuedReportEvery repeats the queued report while a send waits. The repetition is also how a stream
+// notices a requester that went away, since a write is the only thing that can fail; that is best
+// effort, because one write can still succeed after the other side has gone.
+var queuedReportEvery = 5 * time.Second
+
+// waitForTurn waits behind the earlier turns of the conversation and tells the requester, if it asked,
+// that the send is queued and then that it was dispatched. A send with nothing ahead reports nothing.
+func waitForTurn(ctx context.Context, ticket *core.QueueTicket) error {
+	progress := core.SendProgress(ctx)
+	if progress == nil || !ticket.Blocked() {
+		return ticket.Wait(ctx)
+	}
+	progress(core.SendQueued)
+	done, stopped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(queuedReportEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				progress(core.SendQueued)
+			}
+		}
+	}()
+	err := ticket.Wait(ctx)
+	close(done)
+	<-stopped // no queued report may follow the dispatched one
+	if err == nil {
+		progress(core.SendDispatched)
+	}
+	return err
 }
 
 // failArchived records why the turn got no reply, so it stays visibly failed, and gives the error
