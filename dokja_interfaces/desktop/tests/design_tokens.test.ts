@@ -21,3 +21,12 @@ test("every design token resolves through a defined, acyclic dependency graph", 
   }
   for (const name of values.keys()) resolve(name);
 });
+
+test("every custom property the stylesheet reads is declared, so none is silently dropped", async () => {
+  const styles = await readFile(new URL("../src/renderer/styles.css", import.meta.url), "utf8");
+  const tokens = await readFile(new URL("../src/renderer/tokens.css", import.meta.url), "utf8");
+  const declared = new Set([...`${styles}\n${tokens}`.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name!));
+  // A reference with a fallback (var(--x, fallback)) may name a property set only where it applies.
+  const missing = [...new Set([...styles.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)].map(([, name]) => name!))].filter((name) => !declared.has(name));
+  assert.deepEqual(missing, []);
+});

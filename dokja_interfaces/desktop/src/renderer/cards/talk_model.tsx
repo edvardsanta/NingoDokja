@@ -58,7 +58,7 @@ export function TalkModel({ transport, busy }: { transport: Transport; busy: boo
   if (!runtime || !current) return null;
   const choices = choicesFrom(providers ?? [], current);
   if (providers && choices.length === 0) {
-    return <p className="detail talk-model">{t("talk_model_none")} <button type="button" onClick={() => open("health")}>{t("talk_open_system")}</button></p>;
+    return <p className="detail talk-model">{t("talk_model_none")} <button type="button" className="compact" onClick={() => open("health")}>{t("talk_open_system")}</button></p>;
   }
 
   const choose = async (value: string) => {

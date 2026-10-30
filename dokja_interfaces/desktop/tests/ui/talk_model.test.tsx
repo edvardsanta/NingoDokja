@@ -43,6 +43,18 @@ describe("choosing the model in Talk", () => {
     expect(select.closest(".wp-dock")).not.toBeNull();
   });
 
+  it("sits in the quiet row under the field, beside the hint, inside the docked form", async () => {
+    const { transport } = routedTransport({ "conversation.list": failure("unavailable"), "runtime.providers": providers, "runtime.chat": binding(7, "codex", "gpt-a") });
+    renderTalk(transport);
+    const select = await picker();
+    const foot = select.closest(".composer-foot");
+    expect(foot).not.toBeNull();
+    expect(foot?.querySelector(".composer-hint")?.textContent).toBe("Enter sends · Shift+Enter breaks the line");
+    expect(foot?.closest("form")?.contains(screen.getByRole("textbox", { name: "Your message" }))).toBe(true);
+    // Its label stays visible: only the field's own label is for screen readers.
+    expect(screen.getByText("Model").closest(".composer > label")).toBeNull();
+  });
+
   it("switches at once, naming the configuration it read just before", async () => {
     const { transport, calls } = routedTransport({
       "conversation.list": failure("unavailable"), "runtime.providers": providers,

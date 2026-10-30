@@ -521,3 +521,51 @@ describe("renaming and deleting kept conversations", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+describe("the conversation's layout", () => {
+  const send = () => screen.getByRole("button", { name: "Send" });
+
+  it("names each author once, before the text, so the owner's turn and Ningo's read apart", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "A question", reply: "An answer.", sendId: "send-lay1" })),
+    });
+    await renderTalk(transport);
+
+    const turns = [...document.querySelectorAll(".assistant-turns li[data-role]")];
+    expect(turns.map((turn) => turn.getAttribute("data-role"))).toEqual(["user", "assistant"]);
+    // The label comes first and the text is one paragraph, so the two registers can be styled apart.
+    expect(turns.map((turn) => turn.firstElementChild?.tagName)).toEqual(["STRONG", "STRONG"]);
+    expect(turns.map((turn) => turn.firstElementChild?.textContent)).toEqual(["You", "Ningo"]);
+    expect(turns.map((turn) => turn.querySelectorAll("p").length)).toEqual([1, 1]);
+  });
+
+  it("keeps the header's two actions compact, so Send is the one main action in the view", async () => {
+    const { transport } = routedTransport({});
+    await renderTalk(transport);
+
+    for (const name of ["Conversations", "Start a new conversation"]) {
+      const action = screen.getByRole("button", { name });
+      expect(action.classList.contains("compact"), name).toBe(true);
+      expect(action.classList.contains("primary"), name).toBe(false);
+    }
+    expect(screen.getAllByRole("button").filter((button) => button.classList.contains("primary")).map((button) => button.textContent)).toEqual(["Send"]);
+  });
+
+  it("starts the field at one line and marks Send busy only while a reply is on its way", async () => {
+    const late = deferred<TransportResult>();
+    const { transport } = routedTransport({ "conversation.start": startedConversation(), "message.created": () => late.promise });
+    await renderTalk(transport);
+    expect(field().rows).toBe(1);
+    expect(send().hasAttribute("aria-busy")).toBe(false);
+
+    fireEvent.change(field(), { target: { value: "question" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Ningo is thinking…");
+    expect(send().getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => late.resolve(archivedAnswer("Done.", { content: "question" })));
+    await screen.findByText("Done.");
+    expect(send().hasAttribute("aria-busy")).toBe(false);
+  });
+});

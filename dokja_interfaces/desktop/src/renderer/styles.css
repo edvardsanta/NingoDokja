@@ -1994,17 +1994,28 @@ button.icon-button[aria-expanded="true"] {
 .runtime-logs { min-width: 0; width: 100%; }
 .runtime-logs pre { max-height: 18rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; padding: .8rem; background: var(--static); }
 
-.assistant-conversation { display: grid; gap: .75rem; min-width: 0; margin-block: 1rem; }
-.assistant-prompts, .assistant-turns li { padding: .85rem; border-left: 3px solid var(--cyan); background: color-mix(in srgb, var(--cyan) 6%, transparent); }
-.assistant-prompts { display: grid; gap: .5rem; }
-.assistant-prompt { justify-self: start; text-align: left; }
-.assistant-turns { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
-.assistant-turns li { padding: .85rem; border-left: 3px solid var(--edge); overflow-wrap: anywhere; }
-.assistant-turns li[data-role="assistant"] { border-left-color: var(--cyan); }
-.assistant-turns p { white-space: pre-wrap; margin-bottom: 0; }
-.composer { display: grid; gap: .5rem; }
-.composer textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; color: inherit; background: var(--static); border: 1px solid var(--edge); padding: .7rem; }
-.composer textarea:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
+/*
+ * The conversation. One centred column holds the transcript and the composer, so both share an edge
+ * and a reading measure; the panel around it stays as wide as the window allows. Two registers, told
+ * apart by more than colour: Ningo's reply is plain text on the panel with a rule on its left, the
+ * owner's turn is a bordered plate pushed to the end of the column, one size smaller.
+ */
+.assistant-turns { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--turn-gap); }
+.assistant-turns li { min-width: 0; overflow-wrap: anywhere; }
+.assistant-turns li[data-role="user"]:not(:first-child) { margin-top: calc(var(--turn-exchange-gap) - var(--turn-gap)); }
+.assistant-turns li > strong { display: block; margin-bottom: .2rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--turn-label-text); }
+.assistant-turns p { margin: 0; white-space: pre-wrap; }
+.assistant-turns li[data-role="user"] { box-sizing: border-box; justify-self: end; max-width: min(100%, var(--turn-owner-width)); padding: .5rem .85rem .6rem; border: 1px solid var(--turn-owner-border); background: var(--turn-owner-surface); color: var(--turn-owner-text); font-size: .875rem; line-height: 1.55; }
+.assistant-turns li[data-role="assistant"] { padding-left: var(--space-4); border-left: 2px solid var(--turn-reply-rule); color: var(--turn-reply-text); line-height: 1.7; }
+.assistant-turns li[data-role="assistant"] > strong { color: var(--turn-reply-text); }
+/* A send that has no reply: said quietly, in the dim of "off", not as a reply. */
+.assistant-turns li.detail[data-role="assistant"] { border-left-color: var(--status-off); color: var(--ink-dim); font-size: .875rem; line-height: 1.5; }
+/* The reply while Ningo writes it: provisional, its rule dashed until it lands, a blinking square beside the name
+   (the "under way" tone) until then. */
+.assistant-turns li.assistant-preview { border-left-style: dashed; }
+.assistant-turns li.assistant-preview > strong::after { content: ""; display: inline-block; width: .5rem; height: .5rem; margin-left: 1ch; background: var(--status-progress); animation: blink var(--status-pulse-duration) steps(2, jump-none) infinite; }
+@media (prefers-reduced-motion: reduce) { .assistant-turns li.assistant-preview > strong::after { animation: none; } }
+@media (forced-colors: active) { .assistant-turns li.assistant-preview > strong::after { background: CanvasText; } }
 
 /*
  * Ningo's own voice: one line, in the face of his name, set apart from what the screen reports. It is
@@ -2012,17 +2023,36 @@ button.icon-button[aria-expanded="true"] {
  */
 .voice { margin: 0 0 .35rem; font: italic 700 1.25rem/1.35 var(--serif); color: var(--ink); }
 
-/* The conversation reads at the width of a page; the composer stays docked under it. */
-.talk { display: grid; gap: .9rem; max-width: 72ch; }
-.talk-opening { display: grid; gap: .5rem; }
-.talk-starts { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .25rem; }
+.talk { display: grid; gap: var(--turn-gap); width: 100%; max-width: var(--conversation-column); min-width: 0; margin-inline: auto; }
 .talk .note { display: grid; gap: .5rem; justify-items: start; }
-.wp-dock .composer { grid-template-columns: minmax(0, 1fr) auto; align-items: end; max-width: 72ch; }
-.wp-dock .composer textarea { grid-column: 1; }
-.wp-dock .composer button { grid-column: 2; }
-.wp-dock .composer-hint { grid-column: 1 / -1; margin: 0; font-size: .8125rem; }
+/* What the screen says while it waits, under the last turn and in line with the text of a reply. */
+.talk > [role="status"] { padding-left: calc(var(--space-4) + 2px); font-size: .875rem; }
+.talk > [role="alert"] { font-size: .875rem; }
+.talk > button { justify-self: start; }
+/* Before the first message: Ningo's line, the plain next step, and the beginnings of a question. */
+.talk-opening { display: grid; gap: .5rem; }
+.talk-opening:has(> .voice) { padding-top: clamp(.5rem, 9vh, 4.5rem); }
+.talk-opening .detail { font-size: .875rem; }
+.talk-starts { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.assistant-prompt { text-align: left; }
+
+/* The composer is docked under the conversation, in the same column: the field and Send on one line,
+   Send as tall as a one-line field and at its foot as the field grows, then a quiet row for the hint and the model. */
+.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-2) var(--space-3); width: 100%; max-width: var(--conversation-column); margin-inline: auto; }
+.composer textarea { grid-column: 1; width: 100%; min-width: 0; min-height: var(--composer-field-min-height); max-height: var(--composer-field-max-height); box-sizing: border-box; padding: .6rem .8rem; border: 1px solid var(--composer-field-border); background: var(--composer-field-surface); color: var(--ink); font: inherit; line-height: 1.5; resize: none; field-sizing: content; }
+/* One line, however narrow: the hint must not make the field taller than what is written in it. */
+.composer textarea::placeholder { color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer textarea:disabled { border-style: dashed; opacity: .7; cursor: not-allowed; }
+.composer textarea:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
+.composer button[type="submit"] { grid-column: 2; min-height: var(--composer-field-min-height); padding-inline: var(--space-5); }
+.composer-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4); }
+.composer-hint { margin: 0; font-size: .75rem; }
 /* The label is for screen readers here: the docked field says what it is by its place and hint. */
-.wp-dock .composer label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.composer > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@container ws (max-width: 30rem) {
+  .composer { grid-template-columns: minmax(0, 1fr); }
+  .composer button[type="submit"] { grid-column: 1; }
+}
 
 /* A provider's models, each with the one thing to do with it: use it for chat. */
 .provider-models {
@@ -2074,9 +2104,6 @@ button.icon-button[aria-expanded="true"] {
 }
 
 
-/* The reply while Ningo writes it: an assistant turn, provisional, its edge dashed until it lands. */
-.assistant-turns li.assistant-preview { border-left-style: dashed; margin-top: .7rem; }
-
 /* The local engine: each model's name takes the room, its size and what to do with it follow. */
 .provider-models li > span:first-child { flex: 1 1 12rem; overflow-wrap: anywhere; }
 .local-models { grid-column: 1 / -1; display: grid; gap: .5rem; margin-top: .75rem; }
@@ -2090,9 +2117,9 @@ button.icon-button[aria-expanded="true"] {
 .model-download input:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
 /* What Talk is about, above the transcript: the reading named, and the way to drop it. */
-.talk-context { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: .75rem; }
-.talk-context .note { flex: 1 1 18rem; margin: 0; }
-.talk-context .detail { flex-basis: 100%; margin: 0; }
+.talk-context { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: .25rem; }
+.talk-context .note { flex: 1 1 18rem; margin: 0; font-size: .875rem; }
+.talk-context .detail { flex-basis: 100%; margin: 0; font-size: .8125rem; }
 
 /* A list row with a menu: the title opens it, the ⋯ at the right and a right click hold the rest. */
 .menu-row { position: relative; padding-right: 2.75rem; outline-offset: var(--focus-offset-tight); }
@@ -2198,14 +2225,30 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
   object-fit: contain;
 }
 
-/* The kept conversations, in the drawer: the title opens one, the line under it says what it holds.
-   The one Talk shows is marked like a selected row. */
-.conversation-list { display: grid; gap: 0.75rem; margin: 0 0 1rem; padding: 0; list-style: none; }
-.conversation-list li { display: grid; gap: 2px; }
+/* The kept conversations, in the drawer: a row each. The title opens it, the line under it says what it
+   holds, and rename and delete wait quietly at the end. The one Talk shows is marked like a selected row. */
+.conversation-list { display: grid; margin: 0 -1.25rem 1rem; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+.conversation-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title actions" "meta actions"; align-items: center; gap: 2px var(--space-3); padding: var(--space-3) 1.25rem var(--space-3) calc(1.25rem - 3px); border-bottom: 1px solid var(--rule); border-left: 3px solid transparent; }
+.conversation-list li:has(> button.row-title[aria-current="true"]) { border-left-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, transparent); }
+/* Forced colours paint a transparent border too, so say which row has the bar: only the current one. */
+@media (forced-colors: active) {
+  .conversation-list li { border-left-color: Canvas; }
+  .conversation-list li:has(> button.row-title[aria-current="true"]) { border-left-color: Highlight; }
+}
+.conversation-list button.row-title { grid-area: title; min-width: 0; overflow-wrap: anywhere; }
 .conversation-list button.row-title[aria-current="true"] strong { color: var(--cyan); }
-.conversation-actions { display: flex; gap: 0.5rem; }
-.conversation-rename { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.conversation-list .conversation-meta { grid-area: meta; font-size: .75rem; }
+.conversation-actions { grid-area: actions; grid-row: 1 / span 2; display: flex; gap: var(--space-1); }
+.conversation-actions button.conversation-delete:hover:not(:disabled) { border-color: var(--magenta); color: var(--magenta-text); }
+.conversation-rename { grid-column: 1 / -1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-1); }
+.conversation-rename label { flex-basis: 100%; font-size: .75rem; color: var(--ink-dim); }
+.conversation-rename input { flex: 1 1 10rem; min-width: 0; padding: .3rem .6rem; border: 1px solid var(--edge); background: var(--static); color: var(--ink); font: inherit; }
+.conversation-rename input:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
-/* Which model answers, under the message: a label and its choice on one line. */
-.talk-model { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-.talk-model select { max-width: 24rem; }
+/* The smaller button, for what sits in a header, a row or a footer: the same look, less of it. */
+button.compact { padding: var(--button-compact-padding); font-size: var(--button-compact-size); line-height: 1.4; }
+
+/* Which model answers, in the quiet row under the field: a label and its choice, small. */
+.talk-model { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; font-size: .75rem; color: var(--ink-dim); }
+.talk-model select { max-width: 18rem; padding: .2rem .4rem; font-size: .75rem; }
+.talk-model [role="alert"] { flex-basis: 100%; padding: .25rem .5rem; }
