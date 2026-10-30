@@ -14,6 +14,11 @@ executes its turns**. Cindy combines this with explicit engine capabilities,
 normalized events, a host-controlled collaboration layer and interfaces that
 route operations to the device owning the task.
 
+The [architecture follow-up](session-task-architecture-review.md) maps these
+patterns to Ningo's existing domains, task runner and provider ports. It gives
+lifecycle/dispatch/settlement contracts priority over their UI projection and
+removes the earlier UI prerequisite from delegation planning.
+
 ## 1. Architecture map
 
 ```mermaid

@@ -1,5 +1,11 @@
 # Design system and agent interface refactoring review
 
+Architecture clarification (2026-10-29): the
+[session/task architecture follow-up](session-task-architecture-review.md)
+supersedes this review's UI-first dependency between `09.8` and `10.5`.
+Backend lifecycle, dispatch and settlement contracts in `10.6` precede their
+presentation; delegation does not depend on implementing the team interface.
+
 Date: 2026-10-29. Scope: review and roadmap additions to the existing
 [refactoring tracker](../steps.json), using the installed
 `design-system-patterns` and `ui-ux-pro-max` skills, and the
@@ -133,7 +139,7 @@ claiming native mobile support from a responsive layout.
 
 ### 09.8 — Expose conversation and task state through shared contracts
 
-Depend on `09.5` and `09.7`, using domain-defined lifecycle policy and existing
+Depend on `09.5`, `09.7` and backend contract `10.6`, using domain-defined lifecycle policy and existing
 orchestrator task outcomes. Keep conversation, send, workflow execution and
 native provider identities distinct. Define a bounded versioned projection for
 supported progress and controls; review additive ingress/action compatibility
@@ -180,7 +186,7 @@ beyond the prototype; no cognitive success claim follows from rich rendering.
 
 ### 10.5 — Evaluate domain-owned delegated tasks before adding agent teams
 
-Depend on `10.3` and `09.8`. Decide whether a real workload benefits from
+Depend on `10.3` and `10.6`; UI step `09.8` is not a prerequisite. Decide whether a real workload benefits from
 delegation compared with the existing bounded single-task workflow. Define a
 parent/child task contract, scoped evidence, permitted operations, acceptance
 rules, cumulative budgets, reporting and cancellation before runtime integration.
@@ -203,8 +209,10 @@ a separately reviewed requirement justifies them.
 1. Continue the remaining `08.2` semantic/application work and `08.3` controls.
 2. Complete validated consolidation and existing history work; token/component
    foundations can proceed after the same evaluation gate without changing it.
-3. Build task-state presentation from the established contracts, then evaluate
-   declarative answers and delegation as separate bounded experiments.
+3. Define backend lifecycle/dispatch/settlement in `10.6` and integrate inference
+   through `10.3`. Task-state presentation consumes those contracts; delegation
+   is evaluated independently of implementing the UI. Declarative answers remain
+   a separate interface experiment.
 4. Run checks for the modules actually changed. Desktop implementation uses its
    existing `pnpm test`, `pnpm typecheck`, `pnpm build` and relevant
    `pnpm test:e2e` scenarios; Go changes use `go test ./...` in each changed

@@ -42,6 +42,9 @@ type ChatDomainHandler struct {
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+	// sends orders the archived sends of each conversation: one is answered at a time, in the order
+	// they were recorded, so each reply sees the replies before it.
+	sends *core.OrderedQueue
 }
 
 func (h *ChatDomainHandler) WithVoiceGenerator(generator VoiceChatStreamingGenerator) *ChatDomainHandler {
@@ -54,6 +57,7 @@ func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
 		generator:   generator,
 		sessions:    newChatSessionManager(),
 		voicePolicy: chat.NewVoicePolicy(),
+		sends:       core.NewOrderedQueue(maxWaitingSends),
 	}
 }
 

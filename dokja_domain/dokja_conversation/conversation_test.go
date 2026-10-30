@@ -14,6 +14,7 @@ type recorder struct {
 	finished []Turn
 	listed   []int
 	renamed  []string
+	retried  []string
 }
 
 func (r *recorder) Create(_ context.Context, _ Scope, c Conversation) (Conversation, error) {
@@ -37,6 +38,7 @@ func (r *recorder) BeginTurn(_ context.Context, _ Scope, t Turn) (Turn, bool, er
 	return t, false, nil
 }
 func (r *recorder) RetryTurn(_ context.Context, _ Scope, id string, _ time.Time) (Turn, error) {
+	r.retried = append(r.retried, id)
 	return Turn{ID: id, State: TurnPending}, nil
 }
 func (r *recorder) FinishTurn(_ context.Context, _ Scope, t Turn) (Turn, error) {
@@ -213,5 +215,61 @@ func TestRetryNamesOneTurnOfTheOwner(t *testing.T) {
 	}
 	if turn, err := a.Retry(context.Background(), OwnerScope, someID); err != nil || turn.State != TurnPending {
 		t.Fatal(turn, err)
+	}
+}
+
+type conversationRetryRecorder struct {
+	recorder
+	requests []struct {
+		scope              Scope
+		conversation, turn string
+	}
+}
+
+func (r *conversationRetryRecorder) RetryTurnInConversation(_ context.Context, scope Scope, conversationID, turnID string, _ time.Time) (Turn, error) {
+	r.requests = append(r.requests, struct {
+		scope              Scope
+		conversation, turn string
+	}{scope, conversationID, turnID})
+	return Turn{ID: turnID, ConversationID: conversationID, State: TurnPending, Attempts: 2}, nil
+}
+
+func TestConversationRetryRequiresAnAtomicScopedCapability(t *testing.T) {
+	store := &recorder{}
+	a := New(store)
+	if _, err := a.RetryInConversation(context.Background(), OwnerScope, someID, someID); err != ErrUnavailable {
+		t.Fatal("unsupported store must refuse scoped retry", err)
+	}
+	if len(store.retried) != 0 {
+		t.Fatal("scoped retry must never fall back to a turn-only mutation", store.retried)
+	}
+}
+
+func TestConversationRetryValidatesBeforeStorageAndPreservesBothIDs(t *testing.T) {
+	store := &conversationRetryRecorder{}
+	a := New(store)
+	for _, invalid := range []struct {
+		scope              Scope
+		conversation, turn string
+	}{
+		{"", someID, someID},
+		{OwnerScope, "", someID},
+		{OwnerScope, "not-an-id", someID},
+		{OwnerScope, someID, "not-an-id"},
+	} {
+		if _, err := a.RetryInConversation(context.Background(), invalid.scope, invalid.conversation, invalid.turn); err != ErrInvalid {
+			t.Fatal(invalid, err)
+		}
+	}
+	if len(store.requests) != 0 || len(store.retried) != 0 {
+		t.Fatal("invalid retry reached storage", store.requests, store.retried)
+	}
+	turnID := strings.Repeat("a", 32)
+	turn, err := a.RetryInConversation(context.Background(), OwnerScope, someID, turnID)
+	if err != nil || turn.ID != turnID || turn.ConversationID != someID || turn.State != TurnPending {
+		t.Fatal(turn, err)
+	}
+	if len(store.requests) != 1 || store.requests[0].scope != OwnerScope || store.requests[0].conversation != someID || store.requests[0].turn != turnID || len(store.retried) != 0 {
+		t.Fatal("request identity was not passed intact to scoped storage", store.requests, store.retried)
 	}
 }

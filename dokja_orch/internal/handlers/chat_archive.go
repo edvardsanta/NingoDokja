@@ -16,7 +16,14 @@ const (
 	archiveContextTurns = 20
 	archiveContextRunes = 24000
 	archiveRecentTurns  = conversation.MaxTurnLimit
+	// maxWaitingSends bounds the sends of one conversation recorded and not yet answered, the one
+	// being answered included. A send past it is refused before it is recorded.
+	maxWaitingSends = 8
 )
+
+// The reason a queued send records when its request stops before its turn came: the model was
+// never asked.
+const reasonStoppedWaiting = "the request stopped while waiting for the earlier reply"
 
 // WithArchive keeps the owner's conversations: a turn that names one by its id, with a send id, is
 // recorded there before the model is asked, and ends there completed or failed.
@@ -51,25 +58,43 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		return nil, archiveError(err)
 	}
 
+	// Recording and queueing happen together, so the queue order is the transcript order. A replayed
+	// send records nothing and asks nothing, so it does not join the queue.
 	var turn conversation.Turn
-	if retryID != "" {
-		turn, err = h.archive.Retry(ctx, scope, retryID)
-		if err != nil {
-			return nil, archiveError(err)
+	var replayed bool
+	ticket, err := h.sends.Admit(held.ID, func(full bool) (int, bool, error) {
+		var err error
+		switch {
+		case full && retryID != "":
+			return 0, false, core.ErrQueueFull
+		case full:
+			// A full conversation records nothing new, but a send it already holds is still answered.
+			turn, replayed, err = h.recordedSend(ctx, scope, held.ID, sendID, chatMessageFromEvent(event))
+			return turn.Seq, false, err
+		case retryID != "":
+			turn, err = h.archive.RetryInConversation(ctx, scope, held.ID, retryID)
+		default:
+			turn, replayed, err = h.archive.Send(ctx, scope, held.ID, sendID, chatMessageFromEvent(event), conversation.Provenance{})
 		}
-		if turn.ConversationID != held.ID {
-			return nil, conversation.ErrNotFound
+		return turn.Seq, err == nil && !replayed, err
+	})
+	if errors.Is(err, core.ErrQueueFull) {
+		return nil, fmt.Errorf("too many messages are waiting for a reply in this conversation; send again once Ningo answers")
+	}
+	if err != nil {
+		return nil, archiveError(err)
+	}
+	// The same send asked again is answered from the archive, never by the model a second time.
+	if replayed {
+		return replayedTurn(workflow, held, turn)
+	}
+	// Released once this turn has settled, so the next send's context holds this reply.
+	defer ticket.Release()
+	if err := ticket.Wait(ctx); err != nil {
+		if _, failed := h.archive.Fail(context.WithoutCancel(ctx), scope, turn, reasonStoppedWaiting); failed != nil {
+			return nil, fmt.Errorf("%s; and the conversation archive could not record it", reasonStoppedWaiting)
 		}
-	} else {
-		var replayed bool
-		turn, replayed, err = h.archive.Send(ctx, scope, held.ID, sendID, chatMessageFromEvent(event), conversation.Provenance{})
-		if err != nil {
-			return nil, archiveError(err)
-		}
-		// The same send asked again is answered from the archive, never by the model a second time.
-		if replayed {
-			return replayedTurn(workflow, held, turn)
-		}
+		return nil, errors.New(reasonStoppedWaiting)
 	}
 
 	// What came before, from the archive: completed turns only, within the budgets.
@@ -138,6 +163,27 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		response["sources"] = sourcesForResult(sources)
 	}
 	return response, nil
+}
+
+// recordedSend finds a send the conversation already holds, without recording anything: the same
+// text is a replay, other text under the same send id conflicts as it would when recorded, and an
+// unknown send cannot join the full queue. The sends that wait are the latest turns, well within
+// the recent turns read.
+func (h *ChatDomainHandler) recordedSend(ctx context.Context, scope conversation.Scope, conversationID, sendID, content string) (conversation.Turn, bool, error) {
+	recent, err := h.archive.Turns(ctx, scope, conversationID, 0, archiveRecentTurns)
+	if err != nil {
+		return conversation.Turn{}, false, err
+	}
+	for _, turn := range recent {
+		if turn.SendID != sendID {
+			continue
+		}
+		if turn.Content != strings.TrimSpace(content) {
+			return conversation.Turn{}, false, conversation.ErrConflict
+		}
+		return turn, true, nil
+	}
+	return conversation.Turn{}, false, core.ErrQueueFull
 }
 
 // failArchived records why the turn got no reply, so it stays visibly failed, and gives the error

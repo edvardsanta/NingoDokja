@@ -91,6 +91,8 @@ type Turn struct {
 	State   TurnState
 	Reason  string
 	// Attempts counts the times the turn was sent: 1, and one more for each retry.
+	// A completion/failure carries this snapshot unchanged; it may settle only
+	// that attempt, never a later retry of the same turn.
 	Attempts   int
 	Provenance Provenance
 	CreatedAt  time.Time
@@ -112,8 +114,9 @@ const (
 var (
 	ErrNotFound = errors.New("conversation not found")
 	// ErrConflict: the version named is not the current one, or the turn already ended.
-	ErrConflict = errors.New("conversation changed; read it again")
-	ErrInvalid  = errors.New("invalid conversation request")
+	ErrConflict    = errors.New("conversation changed; read it again")
+	ErrInvalid     = errors.New("invalid conversation request")
+	ErrUnavailable = errors.New("retrying this conversation is unavailable")
 )
 
 var (
@@ -140,12 +143,22 @@ type Store interface {
 	// one attempt more. Only the conversation's latest turn may be retried; anything else, or a turn
 	// in any other state, is ErrConflict.
 	RetryTurn(ctx context.Context, scope Scope, turnID string, at time.Time) (Turn, error)
-	// FinishTurn ends a pending turn; a turn that already ended answers ErrConflict.
+	// FinishTurn ends the pending turn only if its stored Attempts matches t.Attempts.
+	// A stale attempt or already ended turn answers ErrConflict without mutation.
 	FinishTurn(ctx context.Context, scope Scope, t Turn) (Turn, error)
 	// Turns gives up to limit turns before seq (0: the latest), oldest first.
 	Turns(ctx context.Context, scope Scope, conversationID string, beforeSeq int, limit int) ([]Turn, error)
 	// InterruptPending marks every turn still pending since before the instant as interrupted.
 	InterruptPending(ctx context.Context, before time.Time) (int, error)
+}
+
+// ConversationRetryStore is the optional atomic retry capability for callers
+// that name both a conversation and a turn. A mismatch must not mutate either
+// conversation and returns ErrNotFound; normal retry conflicts stay ErrConflict.
+// It is separate from Store so existing adapters and turn-only callers retain
+// their contract. RetryInConversation refuses when this capability is absent.
+type ConversationRetryStore interface {
+	RetryTurnInConversation(ctx context.Context, scope Scope, conversationID, turnID string, at time.Time) (Turn, error)
 }
 
 // Archive applies the rules over a Store.
@@ -235,6 +248,20 @@ func (a *Archive) Retry(ctx context.Context, scope Scope, turnID string) (Turn, 
 		return Turn{}, ErrInvalid
 	}
 	return a.store.RetryTurn(ctx, scope, turnID, a.now())
+}
+
+// RetryInConversation validates the complete request identity before storage
+// changes a turn. Never fall back to Retry: a post-write conversation check is
+// too late to reject a mismatched request safely.
+func (a *Archive) RetryInConversation(ctx context.Context, scope Scope, conversationID, turnID string) (Turn, error) {
+	if scope != OwnerScope || !opaqueID.MatchString(conversationID) || !opaqueID.MatchString(turnID) {
+		return Turn{}, ErrInvalid
+	}
+	store, ok := a.store.(ConversationRetryStore)
+	if !ok {
+		return Turn{}, ErrUnavailable
+	}
+	return store.RetryTurnInConversation(ctx, scope, conversationID, turnID, a.now())
 }
 
 // Complete records Ningo's reply and the model the runtime says it used.
