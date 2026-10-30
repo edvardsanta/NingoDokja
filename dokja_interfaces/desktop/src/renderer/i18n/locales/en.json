@@ -605,5 +605,15 @@
   "post_files_copied": "Files copied to this computer: {count}.",
   "post_save_failed": "The post could not be saved. Nothing was kept.",
   "post_open_folder": "Open folder",
-  "post_open_folder_failed": "The folder could not be opened."
+  "post_open_folder_failed": "The folder could not be opened.",
+  "groups_discover": "Find my groups",
+  "groups_discovering": "Asking WhatsApp for your groups…",
+  "groups_found": "Your groups",
+  "groups_none": "This account is in no group.",
+  "groups_members": "{count} members",
+  "groups_add": "Add",
+  "groups_add_named": "Add {name}",
+  "groups_added": "Added",
+  "groups_unnamed": "Unnamed group",
+  "groups_not_connected": "WhatsApp must be linked and connected to list your groups."
 }

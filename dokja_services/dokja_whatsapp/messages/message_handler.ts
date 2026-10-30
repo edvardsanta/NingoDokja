@@ -5,6 +5,15 @@ import { RecentKeys } from "./recent_keys.js";
 // A WhatsApp text message may hold about 64 KB. A chat answer that long is unreadable anyway.
 export const maxReplyLength = 8000;
 export const failureReply = "I could not reach the orchestrator right now. Try again in a moment.";
+// Every message Ningo writes ends with its signature: on a personal number the replies come from the
+// owner's own account, so the chat has to tell Ningo's words from the owner's. WhatsApp shows
+// _text_ in italics. What the owner sends from the desktop is the owner's and is not signed.
+export const signature = "\n\nAssinado _Ningo Dokja_";
+
+// The reply as it is sent: cut so that the whole message, signature included, stays within bounds.
+export function signed(text: string): string {
+  return `${text.trimEnd().slice(0, maxReplyLength - signature.length)}${signature}`;
+}
 // Messages that arrive late (the bot was offline or reconnecting) are not answered.
 export const maxMessageAgeMs = 5 * 60_000;
 // "Typing" is shown only when the answer is slow. An interface that is switched off in the desktop
@@ -111,7 +120,7 @@ export function createWhatsAppMessageHandler(
         error: error instanceof Error ? error.message : String(error),
       }));
       await stopTyping();
-      await context.reply(failureReply);
+      await context.reply(signed(failureReply));
       return;
     }
 
@@ -120,7 +129,7 @@ export function createWhatsAppMessageHandler(
       deps.log?.(JSON.stringify({ message: "completed", messageId: context.messageId, replyLength: 0 }));
       return;
     }
-    await context.reply(reply.slice(0, maxReplyLength));
+    await context.reply(signed(reply));
     deps.log?.(JSON.stringify({ message: "replied", messageId: context.messageId, replyLength: reply.length }));
   };
 }

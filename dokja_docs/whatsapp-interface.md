@@ -71,6 +71,12 @@ An ineligible message receives no reply, and a phone number never reaches the lo
 exception helps with setup: a group the bot is not allowed in is reported **once** with its id and
 the reason `policy`, so the id can be copied into `DOKJA_WHATSAPP_ALLOWED_GROUPS`.
 
+To choose groups without the log, open System › Settings in the desktop, edit **Groups** and press
+**Find my groups**. While the account is linked and connected, it lists every group the account
+takes part in, by name and number of members (`communications.link.groups`, served by the
+interface's internal `GET /link/groups`). **Add** puts a group's id in the draft; nothing changes
+until the setting is reviewed and saved as usual. Listing allows nothing by itself.
+
 ### Replies
 
 The reply is plain text, cut at 8,000 characters. In a group it quotes the message that triggered it.
@@ -270,6 +276,10 @@ never deleted by the service.
 ## Limits
 
 - Text only; no cards, buttons, mentions of people, files or streaming.
+- Every reply Ningo writes, the failure notice included, ends with `Assinado _Ningo Dokja_` (shown
+  in italics), so on a personal number the chat tells Ningo's words from the owner's. A message the
+  owner sends from the desktop is the owner's own and is not signed. Long replies are cut so the
+  signature always fits.
 - The Discord text commands (`meme fetch`, `meme status`, `meme refresh`) are not available from
   WhatsApp: their text goes to the chat as written. The orchestrator bridge enforces this for the
   `whatsapp` interface: its event type is fixed to `message.created`.
@@ -278,6 +288,12 @@ never deleted by the service.
 - On a personal number the bot is you: what the account owner writes in a group is the owner's own
   message and is ignored, so only other members can summon Ningo there. The owner talks to it in the
   "message yourself" chat.
+- The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
+  archive and continues the conversation the desktop shows, so you can start on the phone and go on
+  at the desktop, or the other way round. The phone continues the latest conversation; in the
+  self-chat, `/ajuda` (or `/help`) lists the commands to start, list, open, rename and delete
+  conversations. Deleting asks for `/sim` first. Contacts and groups have no commands. Other chats and groups are never kept there. See
+  [conversation history](conversation-history-plan.md#phone-the-whatsapp-self-chat).
 - A reply to a bot message counts as a mention only for about 10 minutes after the bot sent it.
 - Baileys 7 is a release candidate that follows WhatsApp's own changes: the version is pinned and a
   test checks the parts of its API that the interface uses, but an upgrade needs a real-account check.

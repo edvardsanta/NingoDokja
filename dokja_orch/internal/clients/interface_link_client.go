@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	communications "read_books/dokja_domain/dokja_communications"
 	"regexp"
 	"strings"
 	"time"
@@ -55,6 +56,54 @@ func (c *InterfaceLinkClient) Start(ctx context.Context) (string, error) {
 func (c *InterfaceLinkClient) Reset(ctx context.Context) (string, error) {
 	state, _, err := c.call(ctx, http.MethodPost, "/link/reset")
 	return state, err
+}
+
+var (
+	interfaceGroupID   = regexp.MustCompile(`^[0-9-]{1,64}@g\.us$`)
+	interfaceMaxGroups = 256
+	interfaceMaxName   = 100
+)
+
+// Groups lists the groups of the linked account. The interface refuses while it is not connected.
+func (c *InterfaceLinkClient) Groups(ctx context.Context) ([]communications.LinkedGroup, error) {
+	if c == nil || c.httpClient == nil {
+		return nil, fmt.Errorf("interface link client is not configured")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/link/groups", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build interface groups request: %w", err)
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("call interface groups: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("interface groups returned status %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, interfaceLinkMaxBody))
+	if err != nil {
+		return nil, fmt.Errorf("read interface groups: %w", err)
+	}
+	var reply struct {
+		Groups []communications.LinkedGroup `json:"groups"`
+	}
+	if err := json.Unmarshal(body, &reply); err != nil {
+		return nil, fmt.Errorf("decode interface groups: %w", err)
+	}
+	// Only well-formed group ids, bounded names and count reach the caller.
+	groups := make([]communications.LinkedGroup, 0, len(reply.Groups))
+	for _, group := range reply.Groups {
+		if len(groups) == interfaceMaxGroups || !interfaceGroupID.MatchString(group.ID) {
+			continue
+		}
+		name := []rune(strings.Join(strings.Fields(group.Name), " "))
+		if len(name) > interfaceMaxName {
+			name = name[:interfaceMaxName]
+		}
+		groups = append(groups, communications.LinkedGroup{ID: group.ID, Name: string(name), Members: max(group.Members, 0)})
+	}
+	return groups, nil
 }
 
 func (c *InterfaceLinkClient) call(ctx context.Context, method, path string) (string, []string, error) {

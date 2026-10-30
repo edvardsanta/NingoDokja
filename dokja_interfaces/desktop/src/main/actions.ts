@@ -22,6 +22,7 @@ import type {
   DigestStatus,
   IngestResult,
   InterfaceLink,
+  LinkedGroup,
   JobState,
   JobSwitched,
   KnowledgeDocuments,
@@ -325,6 +326,16 @@ function linkProjection(result: unknown): InterfaceLink | Off {
     const state = text(body.state);
     const image = linkImage(body.matrix);
     return { state: INTERFACE_STATE.test(state) ? state : "unknown", ...(image ? { image } : {}) };
+  });
+}
+
+// Only well-formed group ids, with bounded names and count, reach the screen.
+const GROUP_ID = /^[0-9-]{1,64}@g\.us$/;
+function linkedGroups(result: unknown): { groups: LinkedGroup[] } | Off {
+  return inDomain(result, "system", (body) => {
+    const groups = Array.isArray(body.groups) ? body.groups : [];
+    return { groups: groups.filter(isRecord).map((group) => ({ id: text(group.id), name: shorten(text(group.name), 100), members: count(group.members) }))
+      .filter((group) => GROUP_ID.test(group.id)).slice(0, 256) };
   });
 }
 
@@ -727,6 +738,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "communications.link.status": { payload: linkPayload, project: linkProjection },
   "communications.link.start": { payload: linkPayload, project: linkProjection },
   "communications.link.reset": { payload: linkPayload, project: linkProjection },
+  "communications.link.groups": { payload: linkPayload, project: linkedGroups },
   "services.set": {
     payload: (raw) => {
       const name = text(raw.name);

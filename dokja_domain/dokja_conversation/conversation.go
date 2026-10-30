@@ -26,12 +26,28 @@ type Scope string
 const OwnerScope Scope = "owner"
 
 // ownerInterfaces are the sources that speak for the owner. A channel on Discord or WhatsApp is not
-// the owner, and its history belongs to its own platform.
+// the owner, and its history belongs to its own platform; the one exception is below.
 var ownerInterfaces = map[string]bool{"desktop": true, "cli": true, "tui": true}
 
 // ScopeFor answers the scope a source may use, and false when it may use none.
 func ScopeFor(source string) (Scope, bool) {
 	if ownerInterfaces[source] {
+		return OwnerScope, true
+	}
+	return "", false
+}
+
+// SendScopeFor answers the scope a send may be recorded in. Besides the owner's interfaces, the
+// linked WhatsApp account's own "message yourself" chat speaks for the owner, because only that
+// account can write there: the owner chose to continue the same conversation from the phone. It may
+// only send; listing, reading, renaming and deleting stay with the owner's interfaces. Any other
+// WhatsApp chat, a group or a contact's message, is not the owner, and neither is a message to a
+// dedicated bot number from the owner's own phone.
+func SendScopeFor(source string, selfChat bool) (Scope, bool) {
+	if scope, ok := ScopeFor(source); ok {
+		return scope, true
+	}
+	if source == "whatsapp" && selfChat {
 		return OwnerScope, true
 	}
 	return "", false
@@ -159,6 +175,13 @@ type Store interface {
 // their contract. RetryInConversation refuses when this capability is absent.
 type ConversationRetryStore interface {
 	RetryTurnInConversation(ctx context.Context, scope Scope, conversationID, turnID string, at time.Time) (Turn, error)
+}
+
+// ConversationTouchStore is the optional capability to mark a conversation as just used, naming the
+// version it saw, without changing its content. A conversation at another revision answers
+// ErrConflict and a missing one ErrNotFound. Touch refuses when this capability is absent.
+type ConversationTouchStore interface {
+	Touch(ctx context.Context, scope Scope, id string, revision uint64, at time.Time) (Conversation, error)
 }
 
 // Archive applies the rules over a Store.
@@ -292,6 +315,50 @@ func (a *Archive) Turns(ctx context.Context, scope Scope, conversationID string,
 	}
 	return a.store.Turns(ctx, scope, conversationID, beforeSeq, clamp(limit, MaxTurnLimit))
 }
+
+// Continued is the conversation a send without one of its own continues: the most recently changed
+// general conversation, even one just started and still empty, so a conversation the owner starts or
+// reopens from the phone is the one the next message goes to. A reading's discussion is continued
+// only by naming it. None means a new conversation is started.
+func (a *Archive) Continued(ctx context.Context, scope Scope) (Conversation, bool, error) {
+	if scope != OwnerScope {
+		return Conversation{}, false, ErrInvalid
+	}
+	items, _, err := a.store.List(ctx, scope, "", MaxListLimit)
+	if err != nil {
+		return Conversation{}, false, err
+	}
+	for _, c := range items {
+		if c.Kind == KindGeneral {
+			return c, true, nil
+		}
+	}
+	return Conversation{}, false, nil
+}
+
+// Touch marks a conversation as just used, so a send without one of its own continues it. It names
+// the version the owner chose, like a rename, and changes nothing else.
+func (a *Archive) Touch(ctx context.Context, scope Scope, id string, revision uint64) (Conversation, error) {
+	if scope != OwnerScope || !opaqueID.MatchString(id) || revision == 0 {
+		return Conversation{}, ErrInvalid
+	}
+	store, ok := a.store.(ConversationTouchStore)
+	if !ok {
+		return Conversation{}, ErrUnavailable
+	}
+	return store.Touch(ctx, scope, id, revision, a.now())
+}
+
+// TitleFrom names a new conversation by the start of its first message.
+func TitleFrom(content string) string {
+	line := strings.Join(strings.Fields(content), " ")
+	if utf8.RuneCountInString(line) <= titleFromRunes {
+		return line
+	}
+	return string([]rune(line)[:titleFromRunes-1]) + "…"
+}
+
+const titleFromRunes = 60
 
 // Recover marks the turns a stopped orchestrator left pending as interrupted. It runs once at start,
 // for turns begun before it; nothing is sent again.

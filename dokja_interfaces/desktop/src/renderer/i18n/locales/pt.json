@@ -605,5 +605,15 @@
   "post_files_copied": "Arquivos copiados para este computador: {count}.",
   "post_save_failed": "Não foi possível guardar a publicação. Nada foi mantido.",
   "post_open_folder": "Abrir pasta",
-  "post_open_folder_failed": "Não foi possível abrir a pasta."
+  "post_open_folder_failed": "Não foi possível abrir a pasta.",
+  "groups_discover": "Descobrir meus grupos",
+  "groups_discovering": "Pedindo seus grupos ao WhatsApp…",
+  "groups_found": "Seus grupos",
+  "groups_none": "Esta conta não está em nenhum grupo.",
+  "groups_members": "{count} participantes",
+  "groups_add": "Adicionar",
+  "groups_add_named": "Adicionar {name}",
+  "groups_added": "Adicionado",
+  "groups_unnamed": "Grupo sem nome",
+  "groups_not_connected": "O WhatsApp precisa estar vinculado e conectado para listar seus grupos."
 }

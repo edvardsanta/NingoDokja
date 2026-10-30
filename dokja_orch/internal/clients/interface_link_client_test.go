@@ -112,3 +112,35 @@ func TestInterfaceLinkClientIsOffWithoutAnAddress(t *testing.T) {
 		t.Fatal("a nil client must report it is not configured")
 	}
 }
+
+func TestInterfaceGroupsKeepsOnlyWellFormedGroupsWithBoundedNames(t *testing.T) {
+	client, seen := linkServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"state": "connected", "groups": []map[string]any{
+			{"id": "120363000000000001@g.us", "name": "  ningo  ", "members": 1},
+			{"id": "5511900000000@s.whatsapp.net", "name": "a person", "members": 2},
+			{"id": "120363000000000002@g.us", "name": strings.Repeat("x", 150), "members": -3},
+		}})
+	})
+	groups, err := client.Groups(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 2 || groups[0].ID != "120363000000000001@g.us" || groups[0].Name != "ningo" || groups[0].Members != 1 {
+		t.Fatalf("unexpected groups %#v", groups)
+	}
+	if len([]rune(groups[1].Name)) != 100 || groups[1].Members != 0 {
+		t.Fatalf("a name must be bounded and a count never negative: %#v", groups[1])
+	}
+	if (*seen)[0] != "GET /link/groups" {
+		t.Fatal(*seen)
+	}
+}
+
+func TestInterfaceGroupsFailsWhileTheAccountIsNotConnected(t *testing.T) {
+	client, _ := linkServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+	})
+	if _, err := client.Groups(context.Background()); err == nil {
+		t.Fatal("a refusal must be an error")
+	}
+}

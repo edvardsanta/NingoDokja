@@ -68,6 +68,7 @@ export function adaptSocket(socket: RawSocket, sent: SentMessages<unknown>): Wha
     signalRepository: socket.signalRepository,
     sendPresenceUpdate: (type, jid) => socket.sendPresenceUpdate(type, jid),
     logout: () => socket.logout(),
+    groupFetchAllParticipating: socket.groupFetchAllParticipating ? () => socket.groupFetchAllParticipating!() : undefined,
     end: (reason) => socket.end(reason),
     async sendMessage(jid, content, options) {
       const result = await socket.sendMessage(jid, content, options);

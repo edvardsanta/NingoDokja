@@ -788,3 +788,24 @@ test("renaming needs a press and deleting also the person's yes; both name the v
     {type:"conversation.delete",payload:{conversation_id:id,revision:2}},
   ]);
 });
+
+test("listing WhatsApp groups is a read of the fixed interface, and only group ids reach the screen", async () => {
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"system",result:{interface:"whatsapp",groups:[
+      {id:"120363000000000001@g.us",name:"ningo",members:1},
+      {id:"5511900000000@s.whatsapp.net",name:"a person",members:2},
+      {id:"120363000000000002@g.us",name:"x".repeat(300),members:"many"},
+    ]}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const answer = await handleRequest({type:"communications.link.groups",payload:{interface:"whatsapp",extra:"x"}},client,limits);
+  assert.equal(answer.ok,true);
+  const groups = (answer as {result:{groups:{id:string;name:string;members:number}[]}}).result.groups;
+  assert.deepEqual(groups.map((group) => group.id),["120363000000000001@g.us","120363000000000002@g.us"]);
+  assert.equal(groups[1]!.name.length,100);
+  assert.equal(groups[1]!.members,0);
+  assert.equal((await handleRequest({type:"communications.link.groups",payload:{interface:"discord"}},client,limits)).ok,false);
+  assert.deepEqual(calls,[{type:"communications.link.groups",payload:{interface:"whatsapp"}}]);
+});

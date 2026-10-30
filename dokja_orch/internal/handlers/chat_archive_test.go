@@ -19,6 +19,8 @@ type scriptedModel struct {
 	mu      sync.Mutex
 	answers []map[string]any
 	asked   [][]map[string]string
+	// system is the persona and identity note of each request, the conversation left out.
+	system []string
 }
 
 func (m *scriptedModel) Generate(ctx context.Context, message string) (map[string]any, error) {
@@ -28,7 +30,8 @@ func (m *scriptedModel) Generate(ctx context.Context, message string) (map[strin
 func (m *scriptedModel) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(messages) > 0 && messages[0]["content"] == chatPersona {
+	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona) {
+		m.system = append(m.system, messages[0]["content"])
 		messages = messages[1:] // the persona is checked in chat_persona_test.go
 	}
 	m.asked = append(m.asked, messages)

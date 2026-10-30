@@ -10,6 +10,7 @@ import (
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,11 @@ type ChatDomainHandler struct {
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+	ownerProfile     chat.OwnerProfile
+	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
+	selfChat sync.Mutex
+	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.
+	selfChatState selfChatState
 	// sends orders the archived sends of each conversation: one is answered at a time, in the order
 	// they were recorded, so each reply sees the replies before it.
 	sends *core.OrderedQueue
@@ -73,6 +79,12 @@ func (h *ChatDomainHandler) WithSessionStore(store chat.SessionStore) *ChatDomai
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
+	}
+	event = h.withOwnerInterface(event)
+	// The owner writing from the phone continues the archived conversation. Without an archive (it
+	// could not be opened) the self-chat answers as before, from the process's own session.
+	if selfChatRequest(event) && h.archive != nil {
+		return h.handleSelfChat(ctx, event, workflow)
 	}
 	// A turn of an archived conversation is recorded there; any other goes on as before.
 	if conversationID, sendID, retryID, archived := archivedRequest(event); archived {
@@ -164,12 +176,12 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if err != nil {
 		return nil, err
 	}
-	verifiedOwner := event.Source == core.SourceDiscord && boolFromContext(event.Context, "is_owner")
+	_, verifiedOwner := ownerChannel(event)
 	logger.Info(fmt.Sprintf("chat context event_id=%s session=%s messages=%d compacted=%t compaction_fallback=%q owner_verified=%t reset_reason=%q",
 		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.CompactionFallback, verifiedOwner, lifecycle.Reason))
 	var sources []knowledgeSource
 	var result map[string]any
-	if identityReply := chat.OwnerIdentityReply(content, verifiedOwner); identityReply != "" {
+	if identityReply := ownerIdentityReply(event, content); identityReply != "" {
 		result = map[string]any{"reply": identityReply}
 	} else {
 		lookupCtx := ctx

@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import test from "node:test";
 
 import { startStatusServer, statusReply, type ConversationControls, type LinkControls } from "../runtime/status_server.js";
-import type { InterfaceState, RuntimeStatus } from "../runtime/whatsapp_runtime.js";
+import { listedGroups, maxGroupName, type InterfaceState, type RuntimeStatus } from "../runtime/whatsapp_runtime.js";
 
 test("each state maps to a level and carries nothing else", () => {
   const levels: Record<InterfaceState, string> = {
@@ -81,7 +81,7 @@ async function withLink(
 test("the link route gives the code as rows of modules only while the account waits for it", async () => {
   let current: RuntimeStatus = { state: "waiting_for_link", detail: "" };
   let code: string | undefined = "2@ref,noise,identity,adv";
-  await withLink(() => current, { code: () => code, start: () => undefined, reset: async () => undefined }, async (base) => {
+  await withLink(() => current, { code: () => code, start: () => undefined, reset: async () => undefined, groups: async () => [] }, async (base) => {
     const waiting = (await (await fetch(`${base}/link`)).json()) as { state: string; matrix?: string[] };
     assert.equal(waiting.state, "waiting_for_link");
     assert.ok(waiting.matrix && waiting.matrix.length >= 21);
@@ -105,6 +105,7 @@ test("starting a link and resetting the session call the controls and answer the
       code: () => "2@code",
       start: () => void calls.push("start"),
       reset: async () => void calls.push("reset"),
+      groups: async () => [],
     },
     async (base) => {
       assert.deepEqual(await (await fetch(`${base}/link/start`, { method: "POST" })).json(), { state: "connecting" });
@@ -126,6 +127,7 @@ test("a reset that fails answers an error without saying why", async () => {
       reset: async () => {
         throw new Error("EACCES: /auth/default/creds.json");
       },
+      groups: async () => [],
     },
     async (base) => {
       const answer = await fetch(`${base}/link/reset`, { method: "POST" });
@@ -289,4 +291,42 @@ test("without a way to deliver the route does not exist", async () => {
   await withConversations(undefined, async (base) => {
     assert.equal((await fetch(`${base}/deliver`, { method: "POST", body: "{}" })).status, 404);
   });
+});
+
+test("the groups route lists the account's groups while it is connected, and refuses otherwise", async () => {
+  let connected = true;
+  const group = { id: "120363000000000001@g.us", name: "ningo", members: 1 };
+  await withLink(
+    () => ({ state: connected ? "connected" : "reconnecting", detail: "" }),
+    {
+      code: () => undefined, start: () => undefined, reset: async () => undefined,
+      groups: async () => {
+        if (!connected) throw new Error("the account is not connected");
+        return [group];
+      },
+    },
+    async (base) => {
+      assert.deepEqual(await (await fetch(`${base}/link/groups`)).json(), { state: "connected", groups: [group] });
+      assert.equal((await fetch(`${base}/link/groups`, { method: "POST" })).status, 404, "listing is only a GET");
+      connected = false;
+      const refused = await fetch(`${base}/link/groups`);
+      assert.equal(refused.status, 409);
+      assert.deepEqual(await refused.json(), { status: "error", message: "the account is not connected" });
+    },
+  );
+});
+
+test("only groups are listed, by name, with bounded names", () => {
+  const long = "x".repeat(maxGroupName + 20);
+  const listed = listedGroups({
+    "120363000000000002@g.us": { id: "120363000000000002@g.us", subject: "  Zeta   group ", participants: [{}, {}, {}] },
+    "120363000000000001@g.us": { subject: "alpha", size: 12 },
+    "5511900000000@s.whatsapp.net": { subject: "a person" },
+    "status@broadcast": { subject: "status" },
+    "120363000000000003@g.us": { subject: long },
+  });
+  assert.deepEqual(listed.map((group) => group.id), ["120363000000000001@g.us", "120363000000000003@g.us", "120363000000000002@g.us"]);
+  assert.deepEqual(listed[0], { id: "120363000000000001@g.us", name: "alpha", members: 12 });
+  assert.equal(listed[1]!.name.length, maxGroupName);
+  assert.deepEqual(listed[2], { id: "120363000000000002@g.us", name: "Zeta group", members: 3 });
 });

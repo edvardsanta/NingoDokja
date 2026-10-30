@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
@@ -53,7 +54,31 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 	if !ok {
 		return nil, fmt.Errorf("only the owner's interfaces keep conversations")
 	}
-	held, err := h.archive.Get(ctx, scope, conversationID)
+	return h.answerArchived(ctx, event, workflow, archivedSend{scope: scope, conversationID: conversationID, sendID: sendID, retryID: retryID})
+}
+
+// archivedSend is one send to answer in an archived conversation. admitted, when set, runs once the
+// send is recorded or refused, before it waits for earlier turns. quietPending answers a repeat of a
+// send still being answered with no reply, for an interface whose original request will deliver it.
+type archivedSend struct {
+	scope          conversation.Scope
+	conversationID string
+	sendID         string
+	retryID        string
+	admitted       func()
+	quietPending   bool
+}
+
+func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event, workflow core.WorkflowStep, send archivedSend) (map[string]any, error) {
+	var admitOnce sync.Once
+	admitted := func() {
+		if send.admitted != nil {
+			admitOnce.Do(send.admitted)
+		}
+	}
+	defer admitted()
+	scope, sendID, retryID := send.scope, send.sendID, send.retryID
+	held, err := h.archive.Get(ctx, scope, send.conversationID)
 	if err != nil {
 		return nil, archiveError(err)
 	}
@@ -78,6 +103,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		}
 		return turn.Seq, err == nil && !replayed, err
 	})
+	admitted()
 	if errors.Is(err, core.ErrQueueFull) {
 		return nil, fmt.Errorf("too many messages are waiting for a reply in this conversation; send again once Ningo answers")
 	}
@@ -86,6 +112,9 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 	}
 	// The same send asked again is answered from the archive, never by the model a second time.
 	if replayed {
+		if send.quietPending && turn.State == conversation.TurnPending {
+			return map[string]any{"action": workflow.Action, "reply": "", "replayed": true, "conversation_id": held.ID, "turn": turnView(turn)}, nil
+		}
 		return replayedTurn(workflow, held, turn)
 	}
 	// Released once this turn has settled, so the next send's context holds this reply.
@@ -133,8 +162,14 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 		}
 		reference = recentReadingReference(items)
 	}
-	sources := h.lookupKnowledge(ctx, turn.Content, anchor)
-	result, err := h.generateReply(ctx, event, turn.Content, history, sources, reference)
+	var sources []knowledgeSource
+	var result map[string]any
+	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
+		result = map[string]any{"reply": identity}
+	} else {
+		sources = h.lookupKnowledge(ctx, turn.Content, anchor)
+		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
+	}
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
 	}
