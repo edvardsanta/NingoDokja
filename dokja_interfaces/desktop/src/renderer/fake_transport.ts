@@ -578,6 +578,11 @@ export function createFakeTransport(delayMs = 400): Transport {
       return ok({ opened: true });
     },
 
+    async savePostLocally() {
+      await sleep(delayMs);
+      return ok({ files: 3 });
+    },
+
     async preview(url): Promise<PreviewResult> {
       await sleep(150 + (url.length % 7) * 90);
       if (url.includes("broken")) {

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("dokja", {
   ): Promise<TransportResult> => ipcRenderer.invoke(CHANNELS.request, { type, payload, options }),
   preview: (url: string): Promise<PreviewResult> => ipcRenderer.invoke(CHANNELS.preview, url),
   openSavedPost: (documentId: string): Promise<TransportResult> => ipcRenderer.invoke(CHANNELS.openSavedPost, documentId),
+  savePostLocally: (documentId: string): Promise<TransportResult> => ipcRenderer.invoke(CHANNELS.savePostLocally, documentId),
   onChatPreview: (listener: (preview: ChatPreview) => void): (() => void) => {
     const hear = (_event: unknown, raw: unknown) => {
       const value = (raw ?? {}) as { conversationId?: unknown; text?: unknown };
