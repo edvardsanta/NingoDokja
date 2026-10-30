@@ -43,6 +43,10 @@ func (h *ConversationDomainHandler) realtimeHandle(_ context.Context, event core
 			return nil, conversation.ErrRealtime
 		}
 		m.SpeakerID = event.User.ID
+		m.SpeakerName = event.User.Name
+		if m.SpeakerName == m.SpeakerID {
+			m.SpeakerName = ""
+		}
 		err = h.realtime.Observe(guild, event.Channel.ID, m)
 	default:
 		return nil, conversation.ErrRealtime

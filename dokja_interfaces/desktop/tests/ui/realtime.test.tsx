@@ -29,3 +29,18 @@ test("late replies after unmount do not restart polling",async()=>{
  await waitFor(()=>expect(calls).toBe(1));view.unmount();complete({ok:true,result:{sessions:[]}});
  await Promise.resolve();expect(calls).toBe(1);
 });
+
+for (const locale of ["en", "pt"] as const) {
+ test(`observer shows participant display names with a localized unnamed fallback (${locale})`, async () => {
+  const transport: Transport = {preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:true,result:{sessions:[{
+   session_id:"s",consenting_participants:["a","b"],messages:[
+    {message_id:"named",speaker_id:"a",speaker_name:"Jules",text:"Named speech",transcription_status:"final"},
+    {message_id:"unnamed",speaker_id:"b",speaker_name:"  ",text:"Unnamed speech",transcription_status:"final"},
+   ],
+  }]}})};
+  render(<I18nProvider locale={locale}><RealtimeCard transport={transport}/></I18nProvider>);
+  await screen.findByText("Jules");
+  expect(screen.getByText(locale === "en" ? "Participant 2" : "Participante 2")).toBeTruthy();
+  expect(screen.queryByText(locale === "en" ? "Participant 1" : "Participante 1")).toBeNull();
+ });
+}

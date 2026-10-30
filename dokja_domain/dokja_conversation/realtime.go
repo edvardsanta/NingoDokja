@@ -3,8 +3,10 @@ package conversation
 import (
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -15,6 +17,7 @@ type RealtimeMessage struct {
 	MessageID       string    `json:"message_id"`
 	SessionID       string    `json:"session_id"`
 	SpeakerID       string    `json:"speaker_id"`
+	SpeakerName     string    `json:"speaker_name,omitempty"`
 	TimestampStart  time.Time `json:"timestamp_start"`
 	TimestampEnd    time.Time `json:"timestamp_end"`
 	Text            string    `json:"text"`
@@ -136,6 +139,17 @@ func (e *ConversationContextEngine) Observe(guild, origin string, m RealtimeMess
 	if m.CaptureSequence < 0 || m.CaptureSequence > 1000000000 || !bounded(m.MessageID, 128) || !bounded(m.Text, 8000) || !bounded(m.SpeakerID, 100) || m.Status != "final" || m.Revision < 1 || m.TimestampStart.IsZero() || m.TimestampEnd.Before(m.TimestampStart) || m.TimestampEnd.Sub(m.TimestampStart) > 30*time.Second {
 		return ErrRealtime
 	}
+	// A platform display name is optional, bounded presentation text, never identity.
+	if !utf8.ValidString(m.SpeakerName) {
+		return ErrRealtime
+	}
+	name := []rune(strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, m.SpeakerName)))
+	m.SpeakerName = string(name[:min(len(name), 100)])
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.prune()

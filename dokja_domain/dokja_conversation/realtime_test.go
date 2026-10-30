@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -155,4 +156,37 @@ func TestChannelObserverAdmitsSpeakersWithoutJoiningAndRetainsScope(t *testing.T
 	if len(e.Snapshot()) != 0 || e.Observe("guild", "text", m) == nil {
 		t.Fatal("stopped observer admitted evidence")
 	}
+}
+
+func TestRealtimeSpeakerNamesAreOptionalBoundedPresentationText(t *testing.T) {
+	engine := NewConversationContextEngine()
+	if err := engine.StartChannel("session", "guild", "voice", "text", "speaker"); err != nil {
+		t.Fatal(err)
+	}
+	message := finalMessageForNameTest()
+	message.SpeakerName = "  Channel\n Scholar\t  "
+	if err := engine.Observe("guild", "text", message); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := engine.Snapshot()
+	if snapshot[0].Messages[0].SpeakerName != "Channel Scholar" {
+		t.Fatal("display name was not normalized")
+	}
+	message.MessageID = "long"
+	message.SpeakerName = strings.Repeat("界", 150)
+	if err := engine.Observe("guild", "text", message); err != nil {
+		t.Fatal(err)
+	}
+	if len([]rune(engine.Snapshot()[0].Messages[1].SpeakerName)) != 100 {
+		t.Fatal("display name was not bounded")
+	}
+	message.MessageID = "unnamed"
+	message.SpeakerName = ""
+	if err := engine.Observe("guild", "text", message); err != nil {
+		t.Fatal("unnamed legacy observation rejected", err)
+	}
+}
+
+func finalMessageForNameTest() RealtimeMessage {
+	return RealtimeMessage{MessageID: "named", SessionID: "session", SpeakerID: "speaker", Text: "speech", Status: "final", Revision: 1, TimestampStart: time.Unix(100, 0), TimestampEnd: time.Unix(102, 0)}
 }
