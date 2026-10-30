@@ -421,3 +421,18 @@ describe("a conversation continued elsewhere", () => {
     expect(sent(calls)).toHaveLength(1);
   });
 });
+
+describe("a turn without a reply, in Portuguese", () => {
+  it("says the archive's own reasons in the screen's language and keeps any other as recorded", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 2)),
+      "conversation.read": readOf(3,
+        archivedTurn({ seq: 1, content: "Primeira", state: "failed", reason: "the model returned no reply", sendId: "send-one1" }),
+        archivedTurn({ seq: 2, content: "Segunda", state: "failed", reason: "provider says no", sendId: "send-two2" }),
+      ),
+    });
+    await renderTalk(transport, "pt");
+    screen.getByText("Sem resposta: o modelo não devolveu resposta");
+    screen.getByText("Sem resposta: provider says no");
+  });
+});

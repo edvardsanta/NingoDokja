@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type R
 import type { Transport } from "../../shared/transport.js";
 import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
-import type { MessageId } from "../i18n/i18n.js";
+import type { MessageId, Translate } from "../i18n/i18n.js";
 import type { TransportError } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
@@ -55,6 +55,20 @@ const TITLE_CHARS = 60;
 function titleFrom(message: string): string {
   const line = message.replace(/\s+/g, " ").trim();
   return line.length > TITLE_CHARS ? `${line.slice(0, TITLE_CHARS - 1)}…` : line;
+}
+
+// The reasons the archive records in its own words are said in the screen's language; any other
+// reason (a provider's, a reading's) is shown as it was recorded.
+const KNOWN_REASONS: Readonly<Record<string, MessageId>> = {
+  "the request stopped while waiting for the earlier reply": "assistant_reason_stopped_waiting",
+  "the request stopped before the reply": "assistant_reason_stopped",
+  "the model returned no reply": "assistant_reason_no_reply",
+  "the conversation archive could not be read": "assistant_reason_archive",
+};
+
+function reasonText(reason: string, t: Translate): string {
+  const known = KNOWN_REASONS[reason];
+  return known ? t(known) : reason || t("assistant_no_reply_unknown");
 }
 
 function newSendId(): string {
@@ -221,13 +235,13 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
       ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p></li>] : []),
-      ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: turn.reason || t("assistant_no_reply_unknown") })}</li>] : []),
+      ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
     {busy && !preview && <p role="status">{t("assistant_thinking")}</p>}
     {!busy && latest?.state === "pending" && <p role="status">{t("assistant_still_pending")}</p>}
-    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: latest.reason || t("assistant_no_reply_unknown") })}</p>}
+    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
     {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}
     {error && <Problem error={error}/>}
     {!busy && retryable(latest) && <button type="button" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
