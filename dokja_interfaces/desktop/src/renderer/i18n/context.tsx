@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import type { Locale } from "../../shared/locale.js";
-import { formatAgo, formatDay, formatNumber, formatTime } from "./format.js";
+import { formatAgo, formatDay, formatList, formatNumber, formatTime } from "./format.js";
 import { createTranslator, type Translate } from "./i18n.js";
 
 const TranslateContext = createContext<Translate>(createTranslator("en"));
@@ -27,6 +27,12 @@ export function useNumbers() {
     fixed: (value: number, digits: number) => formatNumber(locale, value, digits),
     signed: (value: number, digits: number) => formatNumber(locale, value, digits, { signed: true }),
   };
+}
+
+// Names in a row, joined as the language of the screen joins them.
+export function useLists() {
+  const locale = useContext(LocaleContext);
+  return (items: readonly string[], plain = false) => formatList(locale, items, plain);
 }
 
 // Times as the language of the screen says them.

@@ -638,12 +638,10 @@ button:focus-visible {
   margin-top: 0.5rem;
 }
 
-.settings-group,
 .provider-list {
   max-width: 72rem;
 }
 
-.settings > li > button,
 .provider-list > li > button {
   grid-column: 4;
   justify-self: end;
@@ -2253,7 +2251,447 @@ button.compact { padding: var(--button-compact-padding); font-size: var(--button
 .talk-model select { max-width: 18rem; padding: .2rem .4rem; font-size: .75rem; }
 .talk-model [role="alert"] { flex-basis: 100%; padding: .25rem .5rem; }
 
-/* The linked account's groups, under the allowed-groups editor: a name and a button per line. */
-.group-discovery { display: grid; gap: 0.5rem; margin-top: 0.5rem; justify-items: start; }
-.group-discovery-list { display: grid; gap: 0.35rem; width: 100%; margin: 0; padding: 0; list-style: none; }
-.group-discovery-list li { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
+/*
+ * Settings. One section for each thing the owner sets up, a row that says what it holds and whether it
+ * is set; open, it is the form. A section is not a card: the bar on its left carries its state (the
+ * state's word is always beside it), and the next one is told apart by space. Everything the owner
+ * changes waits in one bar at the foot of the panel until it is reviewed and saved together.
+ * Every cell may shrink and every long id may break, so no list pushes anything off the panel.
+ */
+.cfg-intro {
+  max-width: 72ch;
+}
+
+.cfg-sections {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 58rem;
+  margin-top: var(--space-4);
+}
+
+.cfg-section {
+  min-width: 0;
+  border-left: 3px solid var(--tone);
+}
+
+.wp .cfg-heading {
+  margin: 0;
+  font: inherit;
+}
+
+button.cfg-toggle,
+button.cfg-toggle:hover:not(:disabled) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "title state chevron" "summary summary summary";
+  align-items: baseline;
+  gap: 0.15rem var(--space-3);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.cfg-toggle:hover:not(:disabled) {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--tone) 20%, transparent), transparent 70%),
+    color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+/* A row that spans the section: its ring sits inside it, where nothing cuts it off. */
+button.cfg-toggle:focus-visible {
+  outline: var(--focus-width) solid var(--button-focus-ring);
+  outline-offset: calc(var(--focus-width) * -1);
+}
+
+.cfg-title {
+  grid-area: title;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.cfg-state {
+  grid-area: state;
+  color: var(--tone-text);
+  font-size: 0.8125rem;
+}
+
+.cfg-chevron {
+  grid-area: chevron;
+  color: var(--ink-dim);
+}
+
+/* What the section holds: each setting by name, then its value as it would be saved. */
+.cfg-summary {
+  grid-area: summary;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+  min-width: 0;
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.cfg-sum-label::after {
+  content: ":\00a0";
+}
+
+.cfg-sum > span:last-child {
+  color: var(--ink);
+}
+
+/* The section's tone is for its bar and its word; what is inside it is plain. */
+.cfg-body {
+  --tone: var(--status-off);
+  --tone-text: var(--status-off-text);
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.cfg-body > .cfg-about {
+  margin: calc(var(--space-3) * -1) 0 0;
+  max-width: 62ch;
+  font-size: 0.8125rem;
+}
+
+.cfg-body > .cfg-about + .cfg-about {
+  margin-top: calc(var(--space-4) * -1);
+}
+
+.cfg-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 46rem;
+}
+
+.cfg-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem var(--space-3);
+}
+
+.cfg-label {
+  font-weight: 700;
+}
+
+.cfg-changed {
+  color: var(--amber);
+  font-size: 0.8125rem;
+}
+
+.cfg-help {
+  max-width: 62ch;
+  font-size: 0.8125rem;
+}
+
+.cfg-empty {
+  padding-left: var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--edge) 60%, transparent);
+}
+
+/* The entries of a list, and the choices that wait to be added: a name, what is known of it, one action. */
+.cfg-entries,
+.cfg-known-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cfg-entries li,
+.cfg-known-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  padding: 0.3rem var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--edge) 60%, transparent);
+}
+
+.cfg-entries li[data-state="added"] {
+  border-left-color: var(--cyan);
+}
+
+/* Not only a colour: a dashed bar, a struck name and the words "will be removed". */
+.cfg-entries li[data-state="removed"] {
+  border-left-style: dashed;
+  border-left-color: var(--amber);
+}
+
+.cfg-entries li[data-state="removed"] .cfg-entry-title {
+  color: var(--ink-dim);
+  text-decoration: line-through;
+}
+
+.cfg-entry-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cfg-entry-title {
+  font-weight: 400;
+}
+
+.cfg-entry-detail {
+  font-size: 0.8125rem;
+}
+
+.cfg-entry-state {
+  color: var(--cyan);
+  font-size: 0.8125rem;
+}
+
+.cfg-entries li[data-state="removed"] .cfg-entry-state {
+  color: var(--amber);
+}
+
+.cfg-add,
+.cfg-known,
+.cfg-filter {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cfg-add,
+.cfg-known {
+  max-width: 36rem;
+}
+
+.cfg-add label,
+.cfg-filter label {
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+}
+
+.cfg-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cfg-add-row input {
+  flex: 1 1 12rem;
+}
+
+.cfg-add-pair {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(9rem, 2fr) auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.cfg-add-pair > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.cfg-field input:not([type="radio"]),
+.cfg-add input,
+.cfg-filter input {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.cfg-field input:not([type="radio"]):focus-visible,
+.cfg-add input:focus-visible,
+.cfg-filter input:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+.cfg-field input:not([type="radio"]):disabled,
+.cfg-add input:disabled {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.cfg-field input[aria-invalid="true"],
+.cfg-add input[aria-invalid="true"] {
+  border-color: var(--magenta);
+}
+
+.cfg-discovery {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.cfg-discovery > .cfg-known {
+  justify-self: stretch;
+}
+
+/* Two or three values, each a choice; the chosen one is lit. */
+.cfg-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.cfg-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.cfg-choice input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
+.cfg-choice input:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+.cfg-choice label:has(input:checked) span {
+  color: var(--cyan);
+}
+
+.cfg-choice label:has(input:disabled) {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.cfg-fixed-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.cfg-error {
+  padding: 0.35rem var(--space-3);
+  border-left: 3px solid var(--magenta);
+  color: var(--magenta-text);
+}
+
+/*
+ * What waits to be saved, pinned to the foot of the panel while the sections scroll under it: the
+ * count, then the review of every change and what saving recreates, then the one save. It is a frame
+ * of its own, with an opaque face, so nothing reads through it.
+ */
+.cfg-dock {
+  position: sticky;
+  bottom: var(--space-2);
+  z-index: 2;
+  display: grid;
+  gap: var(--space-2);
+  max-height: 60vh;
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  overflow: auto;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+}
+
+.cfg-dock > .note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.cfg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.cfg-count {
+  color: var(--amber);
+}
+
+.cfg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cfg-review {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.wp .cfg-review h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.cfg-changes,
+.cfg-impact {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.cfg-changes li {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+  gap: 0.1rem var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cfg-change {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+/* A focused field must not end up under the bar: leave room for it when the owner tabs down. */
+.wp-body:has(.cfg-dock) {
+  scroll-padding-bottom: 6rem;
+}
+
+@container ws (max-width: 36rem) {
+  button.cfg-toggle,
+  button.cfg-toggle:hover:not(:disabled) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "title chevron" "state state" "summary summary";
+  }
+
+  .cfg-entries li,
+  .cfg-known-list li {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .cfg-add-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cfg-add-pair > button {
+    justify-self: start;
+  }
+}

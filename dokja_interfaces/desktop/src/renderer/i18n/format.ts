@@ -16,6 +16,12 @@ export function formatNumber(
   }).format(value);
 }
 
+// Names in a row as the language says them: "A, B and C", "A, B e C". Plain leaves the "and" out, for a
+// row that goes on ("A, B, C and 2 more").
+export function formatList(locale: Locale, items: readonly string[], plain = false): string {
+  return new Intl.ListFormat(TAGS[locale], { style: plain ? "narrow" : "long", type: "conjunction" }).format(items);
+}
+
 const AGO_UNITS: ReadonlyArray<readonly [Intl.RelativeTimeFormatUnit, number]> = [
   ["day", 86_400],
   ["hour", 3_600],
