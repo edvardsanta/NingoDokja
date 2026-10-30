@@ -270,6 +270,10 @@ never deleted by the service.
 ## Limits
 
 - Text only; no cards, buttons, mentions of people, files or streaming.
+- Every reply Ningo writes, the failure notice included, ends with `Assinado _Ningo Dokja_` (shown
+  in italics), so on a personal number the chat tells Ningo's words from the owner's. A message the
+  owner sends from the desktop is the owner's own and is not signed. Long replies are cut so the
+  signature always fits.
 - The Discord text commands (`meme fetch`, `meme status`, `meme refresh`) are not available from
   WhatsApp: their text goes to the chat as written. The orchestrator bridge enforces this for the
   `whatsapp` interface: its event type is fixed to `message.created`.

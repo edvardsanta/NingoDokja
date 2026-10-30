@@ -9,6 +9,9 @@ import {
   type WhatsAppMessageConfig,
   type WhatsAppMessageContext,
 } from "../messages/message_handler.js";
+
+// Every reply Ningo writes on WhatsApp is signed, so the owner's chats tell its words from the owner's.
+const SIGNED = "\n\nAssinado _Ningo Dokja_";
 import type { WhatsAppBridgeRequest } from "../transport/bridge.js";
 
 const owner = "5511900000001";
@@ -101,7 +104,7 @@ test("a message from an allowed number goes to the orchestrator and the reply co
   assert.equal(dispatched[0].payload.content, "what is stoicism?");
   assert.equal(dispatched[0].payload.channelId, `${friend}@s.whatsapp.net`);
   assert.equal(dispatched[0].payload.sessionKey, `whatsapp:${friend}@s.whatsapp.net:${friend}@s.whatsapp.net`);
-  assert.deepEqual(replies, ["Hello there."]);
+  assert.deepEqual(replies, ["Hello there." + SIGNED]);
   assert.deepEqual(typing, [true, false]);
 });
 
@@ -137,7 +140,7 @@ test("self-chat identity is sent to the domain regardless of local policy", asyn
   const on = setup();
   await on.handler(on.selfChat());
   assert.equal(on.dispatched.length, 1);
-  assert.deepEqual(on.replies, ["Hello there."]);
+  assert.deepEqual(on.replies, ["Hello there." + SIGNED]);
 
   const off = setup({ selfChat: false });
   await off.handler(off.selfChat());
@@ -227,7 +230,7 @@ test("a failing orchestrator is answered with a short apology and logged without
 
   await handler(context());
 
-  assert.deepEqual(replies, [failureReply]);
+  assert.deepEqual(replies, [failureReply + SIGNED]);
   assert.deepEqual(typing, [true, false]);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /dispatch failed/);
@@ -240,6 +243,7 @@ test("a long reply is cut under the message size limit", async () => {
   await handler(context());
 
   assert.equal(replies[0].length, maxReplyLength);
+  assert.ok(replies[0].endsWith(SIGNED), "the signature survives the cut");
 });
 
 test("an empty reply sends nothing", async () => {
@@ -255,7 +259,7 @@ test("a presence update that fails does not stop the answer", async () => {
 
   await handler(context({ typing: async () => Promise.reject(new Error("presence")) }));
 
-  assert.deepEqual(replies, ["Hello there."]);
+  assert.deepEqual(replies, ["Hello there." + SIGNED]);
 });
 
 test("the log never carries the message text or a phone number", async () => {
