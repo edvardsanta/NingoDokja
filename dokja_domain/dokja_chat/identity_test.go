@@ -21,3 +21,22 @@ func TestOwnerIdentityRequiresVerifiedMetadataAndADirectQuestion(t *testing.T) {
 		}
 	}
 }
+
+func TestConfiguredProfileIdentityReply(t *testing.T) {
+	profile := OwnerProfile{Name: "Alex", BirthDate: "2000-01-01", Occupations: []string{"musician"}}
+	for _, question := range []string{"Who am I?", "Quem sou eu?"} {
+		reply := OwnerProfileIdentityReply(question, true, profile)
+		if !strings.Contains(reply, "Alex") || strings.Contains(reply, profile.BirthDate) || strings.Contains(reply, "musician") {
+			t.Fatalf("unexpected profile disclosure: %q", reply)
+		}
+		if OwnerProfileIdentityReply(question, false, profile) != "" {
+			t.Fatal("unverified speaker acquired profile")
+		}
+		if OwnerProfileIdentityReply(question, true, OwnerProfile{}) != OwnerIdentityReply(question, true) {
+			t.Fatal("legacy reply changed")
+		}
+	}
+	if OwnerProfileIdentityReply("Continue", true, profile) != "" {
+		t.Fatal("ordinary chat intercepted")
+	}
+}

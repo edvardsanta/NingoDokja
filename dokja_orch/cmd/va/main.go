@@ -21,6 +21,7 @@ import (
 	"read_books/internal/infrastructure/conversations"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
+	"read_books/internal/ownerconfig"
 	"strconv"
 	"syscall"
 	"time"
@@ -32,6 +33,12 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+
+	ownerConfig, err := ownerconfig.Load(os.Getenv("DOKJA_OWNER_CONFIG_FILE"))
+	if err != nil {
+		logger.Error("load owner configuration", err)
+		os.Exit(1)
+	}
 
 	controls, err := core.NewControls(os.Getenv("VA_STATE_FILE"))
 	if err != nil {
@@ -221,7 +228,7 @@ func main() {
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))
-	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT"))
+	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT")).WithOwnerConfig(ownerConfig)
 
 	application := app.NewApp(
 		eventIngress,

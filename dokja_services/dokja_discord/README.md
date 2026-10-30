@@ -28,7 +28,8 @@ not every channel message or pre-deployment history. It does not index chat in
 pgvector. Only the verified owner can reset a shared channel snapshot.
 
 Up to 20 mentioned Discord user IDs also travel to the authenticated bridge.
-The orchestrator compares them with optional `DOKJA_OWNER_DISCORD_USER_ID` and
+The orchestrator compares them with `owner.accounts.discord.user_id` from its
+private `.dokja/owner.json` configuration and
 passes only a trusted owner mention fact to chat; the ID itself is not sent to
 the model.
 

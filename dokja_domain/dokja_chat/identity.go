@@ -1,6 +1,29 @@
 package chat
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
+
+// OwnerProfile contains operator-configured personal facts, never account credentials.
+type OwnerProfile struct {
+	Name        string   `json:"name"`
+	BirthDate   string   `json:"birth_date,omitempty"`
+	Occupations []string `json:"occupations,omitempty"`
+}
+
+// OwnerProfileIdentityReply adds only the preferred name to a direct identity reply.
+// Birthdays and other personal facts are not broadcast by this shortcut.
+func OwnerProfileIdentityReply(content string, verified bool, profile OwnerProfile) string {
+	reply := OwnerIdentityReply(content, verified)
+	if reply == "" || profile.Name == "" {
+		return reply
+	}
+	if strings.HasPrefix(reply, "Você") {
+		return fmt.Sprintf("Você é %s, meu dono. Reconheço sua conta pelo Discord; apelido não muda isso.", profile.Name)
+	}
+	return fmt.Sprintf("You’re %s, my owner. I recognize your Discord account; changing your nickname doesn’t change that.", profile.Name)
+}
 
 // OwnerIdentityReply resolves a narrow identity question from verified metadata.
 // It never infers ownership from a name, mention, quotation or identity claim.
