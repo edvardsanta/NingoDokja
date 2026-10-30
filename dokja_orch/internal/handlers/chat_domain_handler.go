@@ -44,6 +44,7 @@ type ChatDomainHandler struct {
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
 	ownerProfile     chat.OwnerProfile
+	incoming         *IncomingContentWorkflow
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.
@@ -79,6 +80,9 @@ func (h *ChatDomainHandler) WithSessionStore(store chat.SessionStore) *ChatDomai
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
+	}
+	if workflow.Action == chat.ActionReadIncomingContent {
+		return h.handleIncomingContent(ctx, event)
 	}
 	event = h.withOwnerInterface(event)
 	// The owner writing from the phone continues the archived conversation. Without an archive (it

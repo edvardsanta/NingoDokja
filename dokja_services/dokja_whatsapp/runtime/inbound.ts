@@ -1,3 +1,4 @@
+import type { ReplyMedia } from "../transport/bridge.js";
 import type { WhatsAppMessageContext } from "../messages/message_handler.js";
 import type { RecentKeys } from "../messages/recent_keys.js";
 
@@ -33,6 +34,8 @@ export type InboundDependencies = {
   // Ids of the messages this bot sent, to recognise their echo and replies to them.
   sent: RecentKeys;
   send: (chatId: string, text: string, options: { messageId: string; quoted?: InboundMessage }) => Promise<unknown>;
+  downloadDocument?: (message: InboundMessage, maxBytes: number) => Promise<Buffer>;
+  sendMedia?: (chatId: string, media: ReplyMedia, caption: string, options: {messageId: string; quoted?: InboundMessage}) => Promise<unknown>;
   presence: (chatId: string, active: boolean) => Promise<void>;
   // Looks up the phone number of an anonymous id; null when it is not known.
   resolveNumber?: (jid: string) => Promise<string | null>;
@@ -86,7 +89,8 @@ export async function toMessageContext(
   const senderNumbers = await phoneNumbersOf(authorJids, deps.resolveNumber);
 
   const content = unwrap(message.message);
-  const contextInfo = content?.extendedTextMessage?.contextInfo ?? undefined;
+  const document = documentOf(message);
+  const contextInfo = content?.extendedTextMessage?.contextInfo ?? document?.contextInfo ?? undefined;
   // On a personal number the account is the owner, so tagging it is tagging the owner, not calling
   // the bot: people call Ningo by name (nameCall in the message handler) or answer
   // one of its messages. The tag itself is still taken out of the text, so the number never reaches
@@ -95,7 +99,27 @@ export async function toMessageContext(
 
   const now = deps.now ?? Date.now;
   return {
-    text: stripOwnMentions(content?.conversation ?? content?.extendedTextMessage?.text ?? "", ownUsers),
+    text: stripOwnMentions(content?.conversation ?? content?.extendedTextMessage?.text ?? document?.caption ?? "", ownUsers),
+    ...(document ? {
+      document: {
+        filename: document.fileName ?? "document",
+        content_type: document.mimetype ?? "application/octet-stream",
+        size: documentSize(document.fileLength),
+      },
+      downloadDocument: () => {
+        if (!deps.downloadDocument) throw new Error("download unavailable");
+        return deps.downloadDocument(message, 10 * 1024 * 1024);
+      },
+    } : {}),
+    replyMedia: async (media, caption) => {
+      if (!deps.sendMedia) throw new Error("media unavailable");
+      const sentId = deps.newMessageId();
+      deps.sent.add(sentId);
+      const result = await deps.sendMedia(chatId, media, caption, {messageId: sentId, quoted: message});
+      const id = (result as {key?: {id?: string}} | undefined)?.key?.id;
+      if (id) deps.sent.add(id);
+      return result;
+    },
     messageId,
     chatId,
     chatKind,
@@ -185,4 +209,23 @@ function stripOwnMentions(text: string, ownUsers: Set<string>): string {
 function timestampMs(value: InboundMessage["messageTimestamp"]): number | undefined {
   const seconds = typeof value === "object" && value !== null ? value.toNumber() : Number(value);
   return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}
+
+type DocumentContent = {
+  fileName?: string;
+  mimetype?: string;
+  fileLength?: number | string | {toNumber(): number};
+  caption?: string;
+  contextInfo?: InboundContextInfo;
+  [key: string]: unknown;
+};
+
+export function documentOf(message: InboundMessage): DocumentContent | undefined {
+  const raw = unwrap(message.message)?.documentMessage;
+  return raw && typeof raw === "object" ? raw as DocumentContent : undefined;
+}
+
+function documentSize(value: DocumentContent["fileLength"]): number {
+  const size = typeof value === "object" && value !== null ? value.toNumber() : Number(value ?? 0);
+  return Number.isSafeInteger(size) && size >= 0 ? size : Number.MAX_SAFE_INTEGER;
 }

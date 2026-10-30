@@ -1,4 +1,5 @@
 export type WhatsAppConfig = {
+  locale?: string;
   // Folder with the linked-device session. Whoever can read it controls the account.
   authDir: string;
   orchestratorEndpoint: string;
@@ -41,6 +42,7 @@ export function buildConfig(source: Environment = process.env): WhatsAppConfig {
 
   const config: WhatsAppConfig = {
     authDir,
+    locale: env("DOKJA_WHATSAPP_LOCALE", "pt-BR", source),
     orchestratorEndpoint: env("DOKJA_ORCH_HTTP_ENDPOINT", "http://dokja-orchestrator:8091/orchestrator", source),
     orchestratorTimeoutMs: Number(env("DOKJA_ORCHESTRATOR_TIMEOUT_MS", "180000", source)),
     statusPort: parsePort("DOKJA_WHATSAPP_STATUS_PORT", 8094, source),

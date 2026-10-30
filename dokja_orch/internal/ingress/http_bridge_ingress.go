@@ -39,41 +39,46 @@ type BridgeRequest struct {
 }
 
 type BridgePayload struct {
-	VoiceSessionID   string           `json:"voiceSessionId"`
-	VoiceStartedBy   string           `json:"voiceStartedBy"`
-	Realtime         map[string]any   `json:"realtime"`
-	Voice            map[string]any   `json:"voice"`
-	VoiceTurns       []chat.VoiceTurn `json:"voiceTurns"`
-	VoiceChannelID   string           `json:"voiceChannelId"`
-	Content          string           `json:"content"`
-	ReplyToContent   string           `json:"replyToContent"`
-	MentionedUserIDs []string         `json:"mentionedUserIds"`
-	Limit            *int             `json:"limit"`
-	MaxItems         *int             `json:"maxItemsPerScraper"`
-	UserID           string           `json:"userId"`
-	UserName         string           `json:"userName"`
-	ChannelID        string           `json:"channelId"`
-	MessageID        string           `json:"messageId"`
-	GuildID          string           `json:"guildId"`
-	SessionKey       string           `json:"sessionKey"`
-	StartChat        bool             `json:"startSession"`
-	AccountID        string           `json:"accountId"`
-	EntryKind        string           `json:"entryKind"`
-	Direct           *bool            `json:"isDirectMessage"`
-	Mentioned        *bool            `json:"mentionsBot"`
-	ChatKind         string           `json:"chatKind"`
-	SelfChat         *bool            `json:"isSelfChat"`
-	Numbers          []string         `json:"senderNumbers"`
+	Document         *chat.IncomingDocument `json:"document,omitempty"`
+	Locale           string                 `json:"locale,omitempty"`
+	VoiceSessionID   string                 `json:"voiceSessionId"`
+	VoiceStartedBy   string                 `json:"voiceStartedBy"`
+	Realtime         map[string]any         `json:"realtime"`
+	Voice            map[string]any         `json:"voice"`
+	VoiceTurns       []chat.VoiceTurn       `json:"voiceTurns"`
+	VoiceChannelID   string                 `json:"voiceChannelId"`
+	Content          string                 `json:"content"`
+	ReplyToContent   string                 `json:"replyToContent"`
+	MentionedUserIDs []string               `json:"mentionedUserIds"`
+	Limit            *int                   `json:"limit"`
+	MaxItems         *int                   `json:"maxItemsPerScraper"`
+	UserID           string                 `json:"userId"`
+	UserName         string                 `json:"userName"`
+	ChannelID        string                 `json:"channelId"`
+	MessageID        string                 `json:"messageId"`
+	GuildID          string                 `json:"guildId"`
+	SessionKey       string                 `json:"sessionKey"`
+	StartChat        bool                   `json:"startSession"`
+	AccountID        string                 `json:"accountId"`
+	EntryKind        string                 `json:"entryKind"`
+	Direct           *bool                  `json:"isDirectMessage"`
+	Mentioned        *bool                  `json:"mentionsBot"`
+	ChatKind         string                 `json:"chatKind"`
+	SelfChat         *bool                  `json:"isSelfChat"`
+	Numbers          []string               `json:"senderNumbers"`
 }
 
 type BridgeResponse struct {
-	Realtime    map[string]any    `json:"realtime,omitempty"`
-	Voice       map[string]any    `json:"voice,omitempty"`
-	Status      string            `json:"status"`
-	Reply       string            `json:"reply,omitempty"`
-	Notice      string            `json:"notice,omitempty"`
-	Error       string            `json:"error,omitempty"`
-	Attachments []chat.Attachment `json:"attachments,omitempty"`
+	SummaryPartial   bool              `json:"summary_partial,omitempty"`
+	ContentError     string            `json:"content_error,omitempty"`
+	DocumentRequired bool              `json:"document_required,omitempty"`
+	Realtime         map[string]any    `json:"realtime,omitempty"`
+	Voice            map[string]any    `json:"voice,omitempty"`
+	Status           string            `json:"status"`
+	Reply            string            `json:"reply,omitempty"`
+	Notice           string            `json:"notice,omitempty"`
+	Error            string            `json:"error,omitempty"`
+	Attachments      []chat.Attachment `json:"attachments,omitempty"`
 	// Music is a server's queue after a music command, for the interface that plays it.
 	Music map[string]any `json:"music,omitempty"`
 }
@@ -108,7 +113,7 @@ func (i *HTTPBridgeIngress) Start() error {
 		return fmt.Errorf("DOKJA_GATEWAY_INGRESS_TOKEN is required")
 	}
 
-	i.app = fiber.New()
+	i.app = fiber.New(fiber.Config{BodyLimit: 15 << 20})
 	i.app.Post("/orchestrator", i.handle)
 	i.app.Post("/orchestrator/chat/stream", i.handleChatStream)
 	i.app.Post("/orchestrator/voice/chat/stream", i.handleVoiceChatStream)
@@ -170,6 +175,13 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	))
 
 	event := bridgeEventFromRequest(bridgeRequest)
+	if event.Source == core.SourceWhatsApp {
+		event.Payload["locale"] = bridgeRequest.Payload.Locale
+		if bridgeRequest.Payload.Document != nil {
+			event.Payload["document"] = bridgeRequest.Payload.Document
+		}
+	}
+
 	if event.Source == core.SourceDiscord && i.discordOwnerID != "" {
 		event.Context["owner_configured"] = true
 		if event.User.ID == i.discordOwnerID {
@@ -205,13 +217,16 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		len(reply),
 	))
 	return c.Status(fiber.StatusOK).JSON(BridgeResponse{
-		Status:      "ok",
-		Reply:       reply,
-		Notice:      notice,
-		Attachments: extractChatAttachments(result),
-		Music:       extractBridgeMusic(result),
-		Voice:       extractBridgeVoice(result),
-		Realtime:    extractBridgeRealtime(result),
+		Status:           "ok",
+		ContentError:     extractContentError(result),
+		DocumentRequired: extractDocumentRequired(result),
+		SummaryPartial:   extractSummaryPartial(result),
+		Reply:            reply,
+		Notice:           notice,
+		Attachments:      extractChatAttachments(result),
+		Music:            extractBridgeMusic(result),
+		Voice:            extractBridgeVoice(result),
+		Realtime:         extractBridgeRealtime(result),
 	})
 }
 
@@ -227,6 +242,23 @@ func extractBridgeVoice(result core.ProcessResult) map[string]any {
 	domain, _ := result.Result[string(core.DomainCommunications)].(map[string]any)
 	voice, _ := domain["voice"].(map[string]any)
 	return voice
+}
+
+func extractSummaryPartial(result core.ProcessResult) bool {
+	response, _ := result.Result[string(core.DomainChat)].(map[string]any)
+	value, _ := response["summary_partial"].(bool)
+	return value
+}
+
+func extractContentError(result core.ProcessResult) string {
+	response, _ := result.Result[string(core.DomainChat)].(map[string]any)
+	value, _ := response["content_error"].(string)
+	return value
+}
+func extractDocumentRequired(result core.ProcessResult) bool {
+	response, _ := result.Result[string(core.DomainChat)].(map[string]any)
+	value, _ := response["document_required"].(bool)
+	return value
 }
 
 func extractChatAttachments(result core.ProcessResult) []chat.Attachment {

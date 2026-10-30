@@ -1,8 +1,25 @@
+export type IncomingDocument = {
+  filename: string;
+  content_type: string;
+  size: number;
+  data_b64?: string;
+};
+export type ReplyMedia = {filename: string; content_type: string; data_b64: string};
+export type WhatsAppContentReply = {
+  reply: string;
+  attachments?: ReplyMedia[];
+  content_error?: string;
+  document_required?: boolean;
+  summary_partial?: boolean;
+};
+
 export type WhatsAppBridgeRequest = {
   event_type: "message.created";
   interface: "whatsapp";
   payload: {
     content: string;
+    document?: IncomingDocument;
+    locale?: string;
     userId: string;
     channelId: string;
     messageId: string;
@@ -17,6 +34,10 @@ export type WhatsAppBridgeRequest = {
 };
 
 type BridgeResponse = {
+  attachments?: ReplyMedia[];
+  content_error?: string;
+  document_required?: boolean;
+  summary_partial?: boolean;
   status?: string;
   reply?: string;
   result?: string;
@@ -31,6 +52,8 @@ type BridgeResponse = {
 // choose how the orchestrator routes the request.
 export function buildWhatsAppBridgeRequest(params: {
   content: string;
+  document?: IncomingDocument;
+  locale?: string;
   userId: string;
   chatId: string;
   messageId: string;
@@ -44,6 +67,8 @@ export function buildWhatsAppBridgeRequest(params: {
     interface: "whatsapp",
     payload: {
       content: params.content,
+      ...(params.document ? {document: params.document} : {}),
+      ...(params.locale ? {locale: params.locale} : {}),
       userId: params.userId,
       channelId: params.chatId,
       messageId: params.messageId,
@@ -58,12 +83,12 @@ export function buildWhatsAppBridgeRequest(params: {
   };
 }
 
-export async function dispatchToOrchestrator(
+export async function dispatchToOrchestratorResponse(
   endpoint: string,
   timeoutMs: number,
   body: WhatsAppBridgeRequest,
   fetchImpl: typeof fetch = fetch,
-): Promise<string> {
+): Promise<WhatsAppContentReply> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -82,8 +107,26 @@ export async function dispatchToOrchestrator(
     if (status !== "ok") {
       throw new Error(payload.error ?? `orchestrator status=${status}`);
     }
-    return payload.reply ?? payload.result ?? payload.payload?.reply ?? payload.payload?.result ?? "";
+    const text = payload.reply ?? payload.result ?? payload.payload?.reply ?? payload.payload?.result ?? "";
+    return {
+      reply: typeof text === "string" ? text : "",
+      attachments: Array.isArray(payload.attachments) ? payload.attachments : undefined,
+      content_error: typeof payload.content_error === "string" ? payload.content_error : undefined,
+      document_required: payload.document_required === true,
+      summary_partial: payload.summary_partial === true,
+    };
+
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// Retained for callers that only need ordinary text replies.
+export async function dispatchToOrchestrator(
+  endpoint: string,
+  timeoutMs: number,
+  body: WhatsAppBridgeRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  return (await dispatchToOrchestratorResponse(endpoint, timeoutMs, body, fetchImpl)).reply;
 }

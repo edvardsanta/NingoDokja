@@ -208,7 +208,7 @@ func main() {
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

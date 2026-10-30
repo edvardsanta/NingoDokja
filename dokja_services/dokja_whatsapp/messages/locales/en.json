@@ -1,0 +1,19 @@
+{
+  "failure": "I could not reach the orchestrator right now. Try again in a moment.",
+  "signature": "Signed _Ningo Dokja_",
+  "document_download_failed": "I could not download the document. Please send the file again.",
+  "document_too_large": "The document exceeds the 10 MiB limit. Please send a smaller file.",
+  "document_unsupported": "That format is not supported yet. Send PDF, DOCX, EPUB, TXT, Markdown, HTML, or XML.",
+  "document_unreadable": "I found no readable text in the document. Scanned PDFs need OCR.",
+  "document_read_failed": "I could not read this document. Check the file and the document reader.",
+  "reader_unavailable": "The reader is unavailable. Start Feeds and try again.",
+  "summary_failed": "I could not generate the summary right now. Please try again shortly.",
+  "post_unsupported": "No reader supports this publication.",
+  "post_login_required": "The reader needs a valid session to access this publication.",
+  "post_unavailable": "I could not retrieve this publication’s media. Check the reader and try again.",
+  "post_no_reader": "No publication reader is active. Start Feeds and enable a reader.",
+  "post_failed": "I could not read the publication. Please try again.",
+  "post_media_too_large": "The media exceeds the delivery limits: 8 MiB per file, 16 MiB total, and up to 10 files.",
+  "media_delivery_failed": "I could not send all of the publication’s media. Some files may already have been sent.",
+  "summary_partial": "This summary covers only the opening excerpt of the document, limited to 80,000 characters."
+}
