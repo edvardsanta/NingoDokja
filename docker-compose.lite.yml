@@ -26,6 +26,7 @@ services:
       DOKJA_VOICE_CHAT_PROVIDER: ${DOKJA_VOICE_CHAT_PROVIDER:-runtime}
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
+      DOKJA_OWNER_CONFIG_FILE: /run/dokja-config/owner.json
       DOKJA_OWNER_DISCORD_USER_ID: ${DOKJA_OWNER_DISCORD_USER_ID:-}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}
@@ -51,6 +52,7 @@ services:
       DOKJA_DB_FILE: /workspace/.dokja/dokja.db
       GOCACHE: /tmp/go-build
     volumes:
+      - ./.dokja:/run/dokja-config:ro
       - ./.dokja/inference:/run/dokja-inference:ro
       - ./:/workspace
     ports:

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "owner": {
+    "id": "primary-owner",
+    "profile": {
+      "name": "Alex",
+      "birth_date": "2000-01-01",
+      "occupations": ["programmer", "musician"]
+    },
+    "accounts": {
+      "discord": {
+        "user_id": "REPLACE_WITH_YOUR_DISCORD_USER_ID"
+      }
+    }
+  }
+}

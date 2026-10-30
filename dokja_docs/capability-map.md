@@ -223,6 +223,14 @@ verified-owner conversation policy remains intact. These are model instructions;
 regressions verify their delivery across history/owner/streaming boundaries, not
 a guarantee that every generated reply will follow them.
 
+The private, versioned `.dokja/owner.json` supplies owner account mapping and
+profile facts at startup; `DOKJA_OWNER_CONFIG_FILE` selects another path. A present
+file overrides the legacy Discord owner environment setting, and invalid files
+stop startup. Only verified owner turns receive the configured profile. The Chat
+domain includes the preferred name in direct identity replies; generated replies
+receive profile facts as private application context. See the
+[configuration and migration guide](production-runbook.md#private-owner-configuration).
+
 Direct owner-identity questions such as `Quem sou eu?` and `Who am I?` have a
 Chat-domain reply derived from the Discord gateway's verified-owner metadata.
 The ordinary chat handler records that reply without asking the model to infer
