@@ -144,6 +144,11 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
    conversation, and desktop or CLI controls, can follow.
 5. **Memory.** Played and skipped tracks become episodes.
 
+Beyond the phases, Ningo remarks on a song now and then: the Communications domain
+decides which (`CommentDue`, about one in three) and bounds the line (`CommentLine`);
+the model writes it through `music.comment`, outside the queue's lock, and a model
+that fails leaves the song playing with no remark.
+
 ## Owner decisions (2026-10-26)
 
 - **The Communications domain decides the queue** (Action: what Ningo is doing on

@@ -49,6 +49,15 @@ func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSour
 	return h
 }
 
+// WithMusicComments lets Ningo remark on a song now and then. Without it, or without music, the
+// songs simply play with no remark.
+func (h *CommunicationsDomainHandler) WithMusicComments(generator ChatConversationGenerator) *CommunicationsDomainHandler {
+	if h.music != nil {
+		h.music.comments = generator
+	}
+	return h
+}
+
 func (h *CommunicationsDomainHandler) WithVoice(voice communications.Voice) *CommunicationsDomainHandler {
 	h.voice = voice
 	return h

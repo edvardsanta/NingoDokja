@@ -240,3 +240,116 @@ func TestEveryMusicRefusalCarriesACodeForTheInterfaceToSayInItsLanguage(t *testi
 		t.Fatal("a source's refusal keeps only its own words", refused)
 	}
 }
+
+// fakeCommentModel writes one remark, counts its calls and can fail or hold a call until released.
+type fakeCommentModel struct {
+	reply    string
+	fail     error
+	calls    int
+	messages []map[string]string
+	hold     chan struct{}
+	started  chan struct{}
+}
+
+func (f *fakeCommentModel) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
+	f.calls++
+	f.messages = messages
+	if f.started != nil {
+		f.started <- struct{}{}
+	}
+	if f.hold != nil {
+		<-f.hold
+	}
+	if f.fail != nil {
+		return nil, f.fail
+	}
+	return map[string]any{"reply": f.reply}, nil
+}
+
+func commentOf(t *testing.T, h *CommunicationsDomainHandler, content string) string {
+	t.Helper()
+	comment, _ := doMusic(t, h, "comment-music-track", content, "guild")["comment"].(string)
+	return comment
+}
+
+func TestNingoRemarksOnTheFirstSongAndEveryThirdAfterIt(t *testing.T) {
+	model := &fakeCommentModel{reply: " \"Monalisa again.\nPredictable.\" "}
+	h := NewCommunicationsDomainHandler(nil, "").WithMusic(&fakeMusicSources{}).WithMusicComments(model)
+	for _, song := range []string{"one", "two", "three", "four"} {
+		doMusic(t, h, "play-music", song, "guild")
+	}
+	if got := commentOf(t, h, "1 en"); got != "Monalisa again. Predictable." {
+		t.Fatalf("one clean line, got %q", got)
+	}
+	if got := commentOf(t, h, "1 en"); got != "" || model.calls != 1 {
+		t.Fatal("a song gets one remark", got, model.calls)
+	}
+	system := model.messages[0]["content"]
+	if !strings.HasPrefix(system, chatPersona) || !strings.Contains(system, "locale en") {
+		t.Fatal("the remark is in Ningo's voice and the people's language", system)
+	}
+	if !strings.Contains(model.messages[1]["content"], `"one"`) {
+		t.Fatal("the song is named to the model", model.messages[1])
+	}
+	for entry := 2; entry <= 4; entry++ {
+		doMusic(t, h, "end-music-track", strconv.Itoa(entry-1), "guild")
+		commentOf(t, h, strconv.Itoa(entry)+" en")
+	}
+	if model.calls != 2 {
+		t.Fatal("songs 2 and 3 pass in silence, song 4 gets a remark", model.calls)
+	}
+}
+
+func TestARemarkIsNeverAskedForASongThatIsNotPlaying(t *testing.T) {
+	model := &fakeCommentModel{reply: "late"}
+	h := NewCommunicationsDomainHandler(nil, "").WithMusic(&fakeMusicSources{}).WithMusicComments(model)
+	if got := commentOf(t, h, "1 en"); got != "" || model.calls != 0 {
+		t.Fatal("nothing plays", got, model.calls)
+	}
+	doMusic(t, h, "play-music", "one", "guild")
+	for _, content := range []string{"7 en", "", "soon"} {
+		if got := commentOf(t, h, content); got != "" || model.calls != 0 {
+			t.Fatal(content, got, model.calls)
+		}
+	}
+}
+
+func TestAFailedRemarkLeavesTheSongPlaying(t *testing.T) {
+	model := &fakeCommentModel{fail: errors.New("no model")}
+	h := NewCommunicationsDomainHandler(nil, "").WithMusic(&fakeMusicSources{}).WithMusicComments(model)
+	doMusic(t, h, "play-music", "one", "guild")
+	if got := commentOf(t, h, "1 en"); got != "" {
+		t.Fatal(got)
+	}
+	if doMusic(t, h, "show-music-queue", "", "guild")["now_playing"] == nil {
+		t.Fatal("the queue is untouched")
+	}
+	plain := NewCommunicationsDomainHandler(nil, "").WithMusic(&fakeMusicSources{})
+	doMusic(t, plain, "play-music", "one", "guild")
+	if got := commentOf(t, plain, "1 en"); got != "" {
+		t.Fatal("no model set up, no remark", got)
+	}
+}
+
+func TestASlowRemarkDoesNotHoldTheQueue(t *testing.T) {
+	model := &fakeCommentModel{reply: "slow", hold: make(chan struct{}), started: make(chan struct{}, 1)}
+	h := NewCommunicationsDomainHandler(nil, "").WithMusic(&fakeMusicSources{}).WithMusicComments(model)
+	doMusic(t, h, "play-music", "one", "guild")
+	done := make(chan string, 1)
+	go func() { done <- commentOf(t, h, "1 en") }()
+	<-model.started
+	skipped := make(chan struct{})
+	go func() {
+		doMusic(t, h, "skip-music", "", "guild")
+		close(skipped)
+	}()
+	select {
+	case <-skipped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a skip waited for the model")
+	}
+	close(model.hold)
+	if got := <-done; got != "slow" {
+		t.Fatal(got)
+	}
+}

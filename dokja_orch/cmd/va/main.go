@@ -173,6 +173,7 @@ func main() {
 	).WithInboundPolicy(inboundPolicy).WithGuilds(os.Getenv("DISCORD_GUILD_ID")).
 		// Voice channel queues find their tracks through the music sources installed as Feeds plugins.
 		WithMusic(clients.NewFeedsAudioSources(feedsClient, communications.AudioCapability)).
+		WithMusicComments(clients.NewChatProviderClient("")).
 		WithVoice(voiceServiceClient)
 	// A nil client must stay a nil interface, so "not configured" is still seen as such.
 	var whatsappSender handlers.WhatsAppSender

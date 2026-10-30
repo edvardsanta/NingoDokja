@@ -555,7 +555,7 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":
 		return strings.TrimSpace(request.EventType), request.Payload.Voice
-	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended":
+	case "music.play", "music.skip", "music.pause", "music.resume", "music.stop", "music.queue", "music.volume", "music.ended", "music.comment":
 		// What follows the command (words, a link, a volume) is read by the Communications
 		// domain; the bridge passes it on as typed.
 		return strings.TrimSpace(request.EventType), map[string]any{"content": content}
