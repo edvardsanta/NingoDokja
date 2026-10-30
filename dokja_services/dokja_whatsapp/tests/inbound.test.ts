@@ -181,7 +181,7 @@ test("typing is shown in the chat the message came from", async () => {
   assert.deepEqual(presence, [[`${friendPn}@s.whatsapp.net`, true], [`${friendPn}@s.whatsapp.net`, false]]);
 });
 
-test("a mention of the bot, in either id form, is recognised and removed from the text", async () => {
+test("tagging the account tags the owner, not the bot: it is no call, and the tag leaves the text", async () => {
   const { deps } = setup();
   const mention = (jid: string, text: string): InboundMessage => ({
     key: { id: "g1", remoteJid: "120363000000000001@g.us", participant: `${friendPn}@s.whatsapp.net` },
@@ -192,9 +192,9 @@ test("a mention of the bot, in either id form, is recognised and removed from th
   const byAnonymousId = await toMessageContext(mention(`${ownLid}@lid`, `hey @${ownLid}  what is stoicism?`), deps);
   const someoneElse = await toMessageContext(mention(`${friendPn}@s.whatsapp.net`, `@${friendPn} what is stoicism?`), deps);
 
-  assert.equal(byNumber.mentionsBot, true);
+  assert.equal(byNumber.mentionsBot, false);
   assert.equal(byNumber.text, "what is stoicism?");
-  assert.equal(byAnonymousId.mentionsBot, true);
+  assert.equal(byAnonymousId.mentionsBot, false);
   assert.equal(byAnonymousId.text, "hey what is stoicism?");
   assert.equal(someoneElse.mentionsBot, false);
   assert.equal(someoneElse.text, `@${friendPn} what is stoicism?`);

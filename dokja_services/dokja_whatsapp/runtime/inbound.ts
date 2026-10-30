@@ -87,7 +87,10 @@ export async function toMessageContext(
 
   const content = unwrap(message.message);
   const contextInfo = content?.extendedTextMessage?.contextInfo ?? undefined;
-  const mentioned = (contextInfo?.mentionedJid ?? []).some((jid) => ownUsers.has(parseJid(jid)?.user ?? ""));
+  // On a personal number the account is the owner, so tagging it is tagging the owner, not calling
+  // the bot: people call Ningo by name (nameCall in the message handler) or answer
+  // one of its messages. The tag itself is still taken out of the text, so the number never reaches
+  // the model.
   const repliesToBot = !!contextInfo?.stanzaId && deps.sent.has(contextInfo.stanzaId);
 
   const now = deps.now ?? Date.now;
@@ -101,7 +104,7 @@ export async function toMessageContext(
     fromMe: message.key.fromMe === true,
     isSelfChat,
     sentByBot: deps.sent.has(messageId),
-    mentionsBot: mentioned || repliesToBot,
+    mentionsBot: repliesToBot,
     timestampMs: timestampMs(message.messageTimestamp) ?? now(),
     reply: async (text) => {
       // The id is remembered before the send: the echo of this message can come back before

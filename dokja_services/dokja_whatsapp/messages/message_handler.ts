@@ -71,7 +71,7 @@ export function createWhatsAppMessageHandler(
   const reportedGroups = new Set<string>();
 
   return async (received) => {
-    const context = ownerCall(received, config.allowedGroups);
+    const context = nameCall(received, config.allowedGroups);
     const ignored = ignoreReason(context, now());
     if (ignored) {
       // Ignored messages are most of what a personal account receives, so they are not logged
@@ -135,17 +135,18 @@ export function createWhatsAppMessageHandler(
   };
 }
 
-// On a personal number the owner cannot mention the bot, which is the owner's own account, so what
-// the owner writes in a group is ignored. In a group the owner allowed, a message that starts with
-// "Ningo," or "/ningo" calls the bot instead: the word is taken off and the message counts as a
-// mention. Everything else the owner writes in a group stays ignored.
-export const ownerTrigger = /^\s*(?:\/ningo\b|ningo\s*,)\s*/i;
+// In a group the owner allowed, anyone calls Ningo by name: a message that starts with "Ningo," or
+// "/ningo" has the word taken off and counts as a mention. On a personal number the bot is the owner's
+// own account, so the owner cannot mention it and tagging the account tags the owner; a name keeps
+// the two apart. The owner's own call is answered too, while everything else the owner writes in a
+// group stays ignored. Answering one of Ningo's messages still counts as calling it.
+export const nameTrigger = /^\s*(?:\/ningo\b|ningo\s*,)\s*/i;
 
-export function ownerCall(context: WhatsAppMessageContext, allowedGroups: readonly string[]): WhatsAppMessageContext {
-  if (!context.fromMe || context.sentByBot || context.chatKind !== "group" || !allowedGroups.includes(context.chatId) || !ownerTrigger.test(context.text)) {
+export function nameCall(context: WhatsAppMessageContext, allowedGroups: readonly string[]): WhatsAppMessageContext {
+  if (context.sentByBot || context.chatKind !== "group" || !allowedGroups.includes(context.chatId) || !nameTrigger.test(context.text)) {
     return context;
   }
-  return { ...context, text: context.text.replace(ownerTrigger, ""), fromMe: false, mentionsBot: true };
+  return { ...context, text: context.text.replace(nameTrigger, ""), fromMe: false, mentionsBot: true };
 }
 
 // Returns why a message is not for the bot, or null when it is.
