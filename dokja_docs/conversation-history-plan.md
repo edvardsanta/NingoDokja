@@ -196,9 +196,21 @@ behind any earlier turn of that conversation.
   if the desktop starts a new conversation between a delivery and its redelivery,
   the redelivery is a new turn (the interface's own 10-minute duplicate filter
   still covers ordinary repeats).
-- There is no new-conversation command or retry on the phone: a new conversation
-  starts only when the desktop starts one, and a failed turn is retried from the
-  desktop. The interface's payload cannot pick a conversation, send id or retry.
+- The self-chat manages its conversation with commands, answered in the language
+  of the name used (catalogs in `dokja_orch/internal/handlers/locales/`):
+  `/nova` (`/new`) starts an empty conversation the next message goes to, named by
+  that message; `/conversas` (`/conversations`) lists the latest eight general
+  conversations, numbered, marking the current one; `/abrir N` (`/open N`) makes
+  conversation N the current one by marking it just used (`Archive.Touch`), so the
+  desktop agrees; `/renomear título` (`/rename`) renames the current one; `/apagar N`
+  (`/delete N`) asks first and only `/sim` (`/yes`) within 2 minutes deletes it;
+  `/ajuda` (`/help`) lists them. Numbers come from the last list for 10 minutes and
+  every change names the revision listed, so a conversation changed meanwhile is
+  left alone. Commands are not turns, contacts and groups have none, and an
+  unknown slash word is an ordinary message. The list and a pending deletion are
+  kept in memory; the current conversation is kept in the archive.
+- There is no retry on the phone: a failed turn is retried from the desktop, or
+  sent again. The interface's payload cannot pick a conversation, send id or retry.
 - A self-chat turn is bounded to 170 s, waiting included, below the interface's
   default 180 s wait, so the archive records a failure before the phone shows one.
   Setting `DOKJA_ORCHESTRATOR_TIMEOUT_MS` below about 170 s brings back the case

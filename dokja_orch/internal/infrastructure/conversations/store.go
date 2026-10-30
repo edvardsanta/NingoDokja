@@ -211,6 +211,19 @@ func (s *Store) Rename(ctx context.Context, scope conversation.Scope, id string,
 	return s.Get(ctx, scope, id)
 }
 
+// Touch marks a conversation as just used at the revision the caller saw, changing nothing else.
+func (s *Store) Touch(ctx context.Context, scope conversation.Scope, id string, revision uint64, at time.Time) (conversation.Conversation, error) {
+	result, err := s.db.ExecContext(ctx, `UPDATE conversations SET revision = revision + 1, updated_at = ?
+		WHERE id = ? AND scope = ? AND revision = ?`, at.UnixNano(), id, string(scope), revision)
+	if err != nil {
+		return conversation.Conversation{}, fmt.Errorf("touch conversation: %w", err)
+	}
+	if err := s.changed(ctx, result, scope, id); err != nil {
+		return conversation.Conversation{}, err
+	}
+	return s.Get(ctx, scope, id)
+}
+
 func (s *Store) Delete(ctx context.Context, scope conversation.Scope, id string, revision uint64) error {
 	result, err := s.db.ExecContext(ctx, `DELETE FROM conversations WHERE id = ? AND scope = ? AND revision = ?`, id, string(scope), revision)
 	if err != nil {

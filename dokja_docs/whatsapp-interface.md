@@ -284,8 +284,9 @@ never deleted by the service.
   "message yourself" chat.
 - The "message yourself" chat is the owner's conversation with Ningo: it is kept in the conversation
   archive and continues the conversation the desktop shows, so you can start on the phone and go on
-  at the desktop, or the other way round. A new conversation is started from the desktop; the phone
-  always continues the latest one. Other chats and groups are never kept there. See
+  at the desktop, or the other way round. The phone continues the latest conversation; in the
+  self-chat, `/ajuda` (or `/help`) lists the commands to start, list, open, rename and delete
+  conversations. Deleting asks for `/sim` first. Contacts and groups have no commands. Other chats and groups are never kept there. See
   [conversation history](conversation-history-plan.md#phone-the-whatsapp-self-chat).
 - A reply to a bot message counts as a mention only for about 10 minutes after the bot sent it.
 - Baileys 7 is a release candidate that follows WhatsApp's own changes: the version is pinned and a

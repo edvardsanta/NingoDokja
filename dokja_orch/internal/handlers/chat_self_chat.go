@@ -69,6 +69,10 @@ func (h *ChatDomainHandler) handleSelfChat(ctx context.Context, event core.Event
 		}
 	}
 	defer unlock()
+	// A command manages the phone's conversation and is answered here; it is no turn of any conversation.
+	if command, locale, argument, ok := parseSelfChatCommand(content); ok {
+		return map[string]any{"action": workflow.Action, "reply": h.selfChatCommandReply(ctx, scope, command, locale, argument), "command": true}, nil
+	}
 	held, found, err := h.archive.Continued(ctx, scope)
 	if err != nil {
 		return nil, archiveError(err)
@@ -77,6 +81,11 @@ func (h *ChatDomainHandler) handleSelfChat(ctx context.Context, event core.Event
 		held, err = h.archive.Start(ctx, scope, conversation.KindGeneral, "", conversation.TitleFrom(content))
 		if err != nil {
 			return nil, archiveError(err)
+		}
+	} else if held.Turns == 0 && held.Title == "" {
+		// A conversation started empty (/nova) is named by its first message, like any other.
+		if renamed, err := h.archive.Rename(ctx, scope, held.ID, held.Revision, conversation.TitleFrom(content)); err == nil {
+			held = renamed
 		}
 	}
 	// The interface's own fields cannot pick a conversation, a send id or a retry.

@@ -1,0 +1,23 @@
+{
+  "help": "Comandos desta conversa:\n/nova — começa uma conversa nova\n/conversas — lista as últimas conversas\n/abrir N — continua a conversa N da lista\n/renomear título — renomeia a conversa atual\n/apagar N — apaga a conversa N da lista (pede confirmação)\n/sim — confirma o que foi pedido\n/ajuda — mostra estes comandos",
+  "new_started": "Conversa nova começada. A próxima mensagem já vai para ela.",
+  "list_header": "Suas últimas conversas:",
+  "list_item": "{n}. {title} · {turns} mensagens · {date}",
+  "list_footer": "Envie /abrir N para continuar uma delas, ou /apagar N para apagar.",
+  "list_current": " (atual)",
+  "list_empty": "Ainda não há conversas guardadas.",
+  "untitled": "Conversa sem título",
+  "date_layout": "02/01 15:04",
+  "list_needed": "Envie /conversas primeiro e depois use o número da lista.",
+  "unknown_number": "Não há conversa {n} na última lista. Envie /conversas para ver a lista de novo.",
+  "opened": "Agora continuamos em: {title}",
+  "renamed": "Conversa renomeada para: {title}",
+  "rename_empty": "Diga o novo título depois do comando, por exemplo: /renomear Justiça e poder",
+  "rename_too_long": "Esse título é longo demais; use até 120 caracteres.",
+  "no_current": "Ainda não há conversa para renomear. Mande uma mensagem ou use /nova.",
+  "delete_ask": "Apagar “{title}”? As mensagens e respostas saem do arquivo de conversas, em todas as interfaces, e isso não pode ser desfeito. Responda /sim em até 2 minutos para confirmar.",
+  "deleted": "Conversa apagada: {title}",
+  "nothing_to_confirm": "Não há nada esperando confirmação.",
+  "changed": "Essa conversa mudou em outro lugar, então nada foi feito. Envie /conversas para ver como ela está agora.",
+  "unavailable": "O arquivo de conversas não respondeu agora. Tente de novo em instantes."
+}

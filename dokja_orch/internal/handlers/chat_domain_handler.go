@@ -46,6 +46,8 @@ type ChatDomainHandler struct {
 	ownerProfile     chat.OwnerProfile
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
+	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.
+	selfChatState selfChatState
 	// sends orders the archived sends of each conversation: one is answered at a time, in the order
 	// they were recorded, so each reply sees the replies before it.
 	sends *core.OrderedQueue
