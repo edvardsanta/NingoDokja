@@ -19,9 +19,15 @@ const MESSAGES = {
   stopped: { "pt-BR": "Parei. A fila está vazia.", en: "Stopped. The queue is empty." },
   volume: { "pt-BR": "Volume: {volume}%.", en: "Volume: {volume}%." },
   nothingPlaying: { "pt-BR": "Nada tocando.", en: "Nothing is playing." },
+  historyTitle: { "pt-BR": "Suas últimas músicas:", en: "Your latest songs:" },
+  historyEmpty: { "pt-BR": "Você ainda não pediu nenhuma música.", en: "You have not asked for any song yet." },
+  ended_finished: { "pt-BR": "ouviu até o fim", en: "heard to the end" },
+  ended_skipped: { "pt-BR": "pulada", en: "skipped" },
+  ended_stopped: { "pt-BR": "interrompida", en: "stopped" },
   queueNow: { "pt-BR": "Tocando agora: {song}", en: "Now playing: {song}" },
   untitled: { "pt-BR": "uma faixa sem título", en: "an untitled track" },
   // refusals, by the orchestrator's code
+  no_memory: { "pt-BR": "A memória de músicas não está disponível agora.", en: "The music memory is not available right now." },
   no_server: { "pt-BR": "Música só toca no canal de voz de um servidor.", en: "Music plays only in a server's voice channel." },
   empty_request: { "pt-BR": "Diga o que tocar: algumas palavras ou um link.", en: "Say what to play: a few words or a link." },
   queue_full: { "pt-BR": "A fila está cheia: espere uma música acabar.", en: "The queue is full: wait for a song to end." },
@@ -60,6 +66,17 @@ export function quiet(text: string): string {
 
 type Track = { title?: unknown; uploader?: unknown };
 
+function historyText(locale: string, history: unknown): string {
+  const plays = Array.isArray(history) ? history.filter(isRecord) : [];
+  if (plays.length === 0) return say(locale, "historyEmpty");
+  const lines = plays.map((play) => {
+    const key = `ended_${String(play.ended)}`;
+    const ended = key in MESSAGES ? ` (${say(locale, key as MessageKey)})` : "";
+    return `- ${quiet(String(play.song))}${ended}`;
+  });
+  return [say(locale, "historyTitle"), ...lines].join("\n");
+}
+
 export function songOf(locale: string, track: Track | undefined): string {
   const title = typeof track?.title === "string" && track.title.trim() ? track.title.trim() : say(locale, "untitled");
   const uploader = typeof track?.uploader === "string" ? track.uploader.trim() : "";
@@ -80,6 +97,8 @@ export function musicReplyText(locale: string, eventType: string, music: unknown
   }
   const now = isRecord(music.now_playing) ? (music.now_playing as Track) : undefined;
   switch (eventType) {
+    case "music.history":
+      return historyText(locale, music.history);
     case "music.play": {
       const added = isRecord(music.added) ? (music.added as Track) : undefined;
       const place = typeof music.place === "number" ? music.place : 0;

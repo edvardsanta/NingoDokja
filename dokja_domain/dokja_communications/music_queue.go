@@ -13,6 +13,9 @@ const MaxWaiting = 3
 // MaxVolume is the loudest a queue plays, in percent.
 const MaxVolume = 100
 
+// maxCommentRunes bounds Ningo's remark on a song: a line on the panel, not a review.
+const maxCommentRunes = 200
+
 // ErrQueueFull refuses a track while MaxWaiting tracks already wait.
 var ErrQueueFull = errors.New("the queue is full")
 
@@ -148,6 +151,21 @@ func (q *MusicQueue) State() QueueState {
 		state.NowPlaying = &now
 	}
 	return state
+}
+
+// CommentDue says whether Ningo remarks on this queue entry: about one song in three, from the first
+// (owner, 2026-10-26: "de vez em quando").
+func CommentDue(entry int) bool { return entry > 0 && (entry-1)%3 == 0 }
+
+// CommentLine is a model's remark as the panel shows it: one line, at most maxCommentRunes, with no
+// surrounding quotes. Nothing usable is an empty line.
+func CommentLine(text string) string {
+	line := strings.Join(strings.Fields(text), " ")
+	line = strings.Trim(line, "\"'“”‘’`")
+	if runes := []rune(line); len(runes) > maxCommentRunes {
+		line = strings.TrimSpace(string(runes[:maxCommentRunes-1])) + "…"
+	}
+	return line
 }
 
 // TrackRequestFromText reads what someone typed after the play command: one link is a link,

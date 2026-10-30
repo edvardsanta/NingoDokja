@@ -27,6 +27,7 @@ test("createCommands exposes dokja slash commands", () => {
       "resume",
       "stop",
       "queue",
+      "history",
       "volume",
     ],
   );

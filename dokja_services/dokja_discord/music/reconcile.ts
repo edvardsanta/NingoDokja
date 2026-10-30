@@ -58,6 +58,12 @@ export function parseQueueState(raw: unknown): QueueState | undefined {
   return state;
 }
 
+// Reads Ningo's remark on an entry from the bridge's music field, or nothing.
+export function parseComment(raw: unknown, entry: number): string {
+  if (!isRecord(raw) || raw.ok !== true || raw.entry !== entry || typeof raw.comment !== "string") return "";
+  return raw.comment.trim().slice(0, 300);
+}
+
 // The actions that bring local playback to the queue's state, in order, and the playback they
 // leave. A state older than the last one applied in the same epoch (a reply that arrived late) is
 // ignored: undefined. A new epoch (the orchestrator restarted) is always newer.

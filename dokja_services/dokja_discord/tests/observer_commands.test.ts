@@ -11,14 +11,14 @@ test("observer transcribes channel speakers with start and stop and never genera
  const voice={getVoiceChannelId:async()=>"voice",startConversation:async(p:any)=>{params=p;return "started";},stopConversation:async()=>{stops++;return "stopped";}} as unknown as DiscordVoiceController;
  const commands=observerCommands("http://orch",1000,voice,"en");
  const replies:string[]=[];
- const context=(id:string):DiscordCommandContext=>({userId:id,guildId:"g",channelId:"text",messageId:"request",getString:()=>"",getNumber:()=>undefined,reply:async m=>{replies.push(String(m));},updateReply:async()=>{},showModal:async()=>{}});
+ const context=(id:string):DiscordCommandContext=>({userId:id,userName:"Starter name",guildId:"g",channelId:"text",messageId:"request",getString:()=>"",getNumber:()=>undefined,reply:async m=>{replies.push(String(m));},updateReply:async()=>{},showModal:async()=>{}});
  const run=async(name:string,id:string)=>commands.find(c=>c.name===name)!.handle(context(id));
  try{
   await run("conversation_start","a");assert.equal(params.consentingUsers,undefined);
   assert.deepEqual(commands.map(c=>c.name),["conversation_start","conversation_stop"]);
   assert.equal(replies[0], "Transcription started.");
-  await params.onObservation({userId:"b",sequence:0,text:"second speaker",startedAt:new Date().toISOString(),endedAt:new Date().toISOString()});
-  assert.equal(events.at(-1).event_type,"realtime.observe");assert.equal(events.at(-1).payload.userId,"b");
+  await params.onObservation({userId:"b",userName:"Channel Scholar",sequence:0,text:"second speaker",startedAt:new Date().toISOString(),endedAt:new Date().toISOString()});
+  assert.equal(events.at(-1).event_type,"realtime.observe");assert.equal(events.at(-1).payload.userId,"b");assert.equal(events.at(-1).payload.userName,"Channel Scholar");
   await run("conversation_stop","b");assert.equal(stops,1);
   const count=events.length;
   await params.onObservation({userId:"a",sequence:1,text:"late",startedAt:new Date().toISOString(),endedAt:new Date().toISOString()});

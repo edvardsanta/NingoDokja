@@ -1,0 +1,5 @@
+{
+  "worker_socket": "../post-reader/worker.sock",
+  "media_origin": "http://127.0.0.1:8791",
+  "token": "CHANGE_ME_WORKER_TOKEN"
+}

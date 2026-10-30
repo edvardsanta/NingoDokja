@@ -11,6 +11,7 @@ const request = buildWhatsAppBridgeRequest({
   chatKind: "direct",
   senderNumbers: ["5511912345678"],
   isSelfChat: false,
+  isOwnAccount: false,
   mentionsBot: false,
 });
 
@@ -29,7 +30,7 @@ test("the request is a WhatsApp chat message with a session per chat and sender"
 });
 
 test("the text of a message cannot change the event type", () => {
-  const forged = buildWhatsAppBridgeRequest({ content: "meme refresh", userId: "u", chatId: "c", messageId: "m", chatKind: "direct", senderNumbers: [], isSelfChat: false, mentionsBot: false });
+  const forged = buildWhatsAppBridgeRequest({ content: "meme refresh", userId: "u", chatId: "c", messageId: "m", chatKind: "direct", senderNumbers: [], isSelfChat: false, isOwnAccount: false, mentionsBot: false });
 
   assert.equal(forged.event_type, "message.created");
 });

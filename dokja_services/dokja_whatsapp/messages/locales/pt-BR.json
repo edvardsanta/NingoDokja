@@ -1,0 +1,19 @@
+{
+  "failure": "Não consegui acessar o orquestrador agora. Tente novamente em instantes.",
+  "signature": "Assinado _Ningo Dokja_",
+  "document_download_failed": "Não consegui baixar o documento. Envie o arquivo novamente.",
+  "document_too_large": "O documento excede o limite de 10 MiB. Envie um arquivo menor.",
+  "document_unsupported": "Esse formato ainda não é compatível. Envie PDF, DOCX, EPUB, TXT, Markdown, HTML ou XML.",
+  "document_unreadable": "Não encontrei texto legível no documento. PDFs digitalizados precisam de OCR.",
+  "document_read_failed": "Não consegui ler esse documento. Verifique o arquivo e o leitor de documentos.",
+  "reader_unavailable": "O leitor está indisponível. Inicie o Feeds e tente novamente.",
+  "summary_failed": "Não consegui gerar o resumo agora. Tente novamente em instantes.",
+  "post_unsupported": "Não há um leitor compatível com essa publicação.",
+  "post_login_required": "O leitor precisa de uma sessão válida para acessar essa publicação.",
+  "post_unavailable": "Não consegui obter a mídia dessa publicação. Verifique o leitor e tente novamente.",
+  "post_no_reader": "Nenhum leitor de publicações está ativo. Inicie o Feeds e habilite um leitor.",
+  "post_failed": "Não consegui ler a publicação. Tente novamente.",
+  "post_media_too_large": "A mídia excede os limites de envio: 16 MiB por arquivo ou no total e até 10 arquivos.",
+  "media_delivery_failed": "Não consegui enviar toda a mídia da publicação. Alguns arquivos podem já ter sido enviados.",
+  "summary_partial": "Este resumo cobre apenas o trecho inicial do documento, limitado a 80.000 caracteres."
+}

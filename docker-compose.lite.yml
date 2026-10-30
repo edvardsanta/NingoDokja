@@ -331,6 +331,7 @@ services:
     working_dir: /workspace/dokja_services/dokja_whatsapp
     command: sh -lc "pnpm install --no-frozen-lockfile && pnpm dev:watch"
     environment:
+      DOKJA_WHATSAPP_LOCALE: ${DOKJA_WHATSAPP_LOCALE:-pt-BR}
       CI: "true"
       DOKJA_WHATSAPP_AUTH_DIR: /auth/default
       DOKJA_WHATSAPP_SELF_CHAT: ${DOKJA_WHATSAPP_SELF_CHAT:-true}

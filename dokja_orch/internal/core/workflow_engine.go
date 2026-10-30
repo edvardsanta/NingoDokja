@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	chat "read_books/dokja_domain/dokja_chat"
+)
 
 type Workflow struct {
 	Name  string
@@ -27,6 +30,9 @@ func (e *DefaultWorkflowEngine) Plan(_ context.Context, event Event, route Route
 	inbound, _ := event.Context["gateway_inbound"].(bool)
 	for index, domain := range route.Domains {
 		action := actionFor(domain, event.Type)
+		if route.Workflow == "incoming-content" && domain == DomainChat {
+			action = chat.ActionReadIncomingContent
+		}
 		// The router puts the inbound authorization first; a later Communications step is the
 		// workflow's own (music, for one).
 		if inbound && index == 0 && domain == DomainCommunications {
@@ -105,6 +111,10 @@ func actionFor(domain Domain, eventType string) string {
 			return "set-music-volume"
 		case "music.ended":
 			return "end-music-track"
+		case "music.comment":
+			return "comment-music-track"
+		case "music.history":
+			return "show-music-history"
 		default:
 			return "unsupported-communications"
 		}

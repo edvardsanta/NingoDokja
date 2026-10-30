@@ -31,6 +31,14 @@ Discord bridge payloads add an optional `realtime` object; those fields are neve
 parsed as text commands. The bridge authenticates and establishes source, actor,
 guild and origin text channel. The domain does not trust a payload speaker ID.
 
+The voice adapter carries the resolved member display name through the existing
+`userName` bridge field. The orchestrator derives optional `speaker_name` from
+that event actor, overriding any name inside the observation payload. The domain
+stores a bounded, single-line name beside the speaker ID; names are presentation
+text and never establish identity or authorization. Desktop shows that name with
+the localized numbered participant label as a fallback for older or unnamed
+observations. No event-envelope field, route, or storage schema changes.
+
 | Operation | Authorized source | Payload | Result |
 | --- | --- | --- | --- |
 | `realtime.start` | Authenticated Discord gateway after inbound policy | `session_id`, `voice_channel_id` | New silent observer for the voice channel |

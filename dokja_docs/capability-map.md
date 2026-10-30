@@ -68,7 +68,7 @@ a cognitive macro-component.
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_runtime/chat.go` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
 | Media perception and meme pool | Meme facade owns intake composition; Moderation interprets media safety observations; Communications owns destination eligibility | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | [Media admissibility](media-admissibility.md) is domain-owned. ADR 0010 still proposes grouping intake under Knowledge, admissibility/relevance under Rules and receipts under Memory; Meme events remain a facade |
-| Music in voice channels | Communications domain resolves tracks (`ResolveTrack`, `BestMatch`) and decides each server's queue (`MusicQueue`, `music.*` events) ([music plan](music-plan.md)) | One Feeds `audio.resolve.v1` plugin per source, the owner's in `feeds_plugins/`; `audio-pages` example; playback planned in the voice adapter | `music.*` events through the bridge; no Discord command sends them yet | A workflow across Knowledge intake, Rules, Action and Memory, not a component |
+| Music in voice channels | Communications domain resolves tracks (`ResolveTrack`, `BestMatch`) and decides each server's queue (`MusicQueue`, `music.*` events) ([music plan](music-plan.md)) | One Feeds `audio.resolve.v1` plugin per source, the owner's in `feeds_plugins/`; `audio-pages` example; playback in the voice adapter; per-person listening as Memory experiences (`music.listen:<user id>`) | `music.*` events through the bridge, sent by the Discord commands and panel | A workflow across Knowledge intake, Rules, Action and Memory, not a component |
 | Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | Feeds `document.process.v1` compatibility plugin; legacy HTTP transport opt-in | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
 | Communications and delivery | Communications domain owns read and inbound eligibility, delivery planning and linking authorization | Communications HTTP read service; Discord and WhatsApp communication adapters | `communications.channels`, `.history`, `.send`, linking, scheduled sends | Read and transport adapters behind explicit eligibility and delivery policy |
 | Voice/audio | Communications domain validates bounded synthesis/transcription requests; Chat domain formats multi-speaker room history | `dokja_services/dokja_voice` | Discord continuously captures human speakers with VAD, records incidental conversation, opens named follow-up exchanges, and finishes playback before the next turn; sentence synthesis is prefetched and replies still depend on CLI latency | Audio perception/output providers; [realtime conversation plan](realtime-conversation-plan.md) proposes scoped PostgreSQL history, background compaction and measured latency gates; implementation pending |
@@ -270,6 +270,23 @@ deployment currently has an active blocking policy.
 Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),
 [chat handler](../dokja_orch/internal/handlers/chat_domain_handler.go).
+
+### WhatsApp content messages
+
+An eligible WhatsApp document is normalized as `message.created` with optional
+attachment metadata. Communications authorizes the metadata before a structured
+`document_required` reply lets the adapter download bounded bytes. The
+`incoming-content` workflow uses Chat's document policy, the Feeds document
+extractor and the configured inference provider to generate a localized summary.
+Large readings explicitly identify their 80,000-character excerpt limit; no source
+is automatically ingested into the Library.
+
+A standalone publication URL uses the same workflow to ask Digest for
+`read-link-delivery`: select a `social.resolve.v1` reader, retrieve its bounded
+media bytes through that reader's `media` action, and return the original caption,
+source link and files. WhatsApp renders these with locale-catalog signatures and
+errors; it never calls a reading service or model directly. See
+[WhatsApp content behavior](../dokja_services/dokja_whatsapp/README.md#document-summaries-and-publication-links).
 
 ### Digest
 

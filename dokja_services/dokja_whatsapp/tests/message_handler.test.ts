@@ -281,7 +281,7 @@ test("an answer that comes at once never shows typing, so a switched-off interfa
   assert.deepEqual(typing, []);
 });
 
-test("in an allowed group the owner calls the bot with Ningo, or /ningo, and nothing else they write is answered", async () => {
+test("the owner calls Ningo by name in an allowed group too, and nothing else they write is answered", async () => {
   const { handler, dispatched, group } = setup();
   const own = (text: string, messageId: string, overrides: Partial<WhatsAppMessageContext> = {}) =>
     group({ text, messageId, fromMe: true, mentionsBot: false, senderId: `${owner}@s.whatsapp.net`, senderNumbers: [owner], ...overrides });
@@ -301,8 +301,23 @@ test("in an allowed group the owner calls the bot with Ningo, or /ningo, and not
   assert.ok(dispatched.every((request) => request.payload.mentionsBot === true && request.payload.channelId === allowed));
 });
 
-test("a member's message starting with the owner's word is still judged by its own mention", async () => {
+test("in an allowed group any member calls Ningo by name, and only there", async () => {
   const { handler, dispatched, group } = setup();
-  await handler(group({ text: "Ningo, hi", mentionsBot: false }));
-  assert.deepEqual(dispatched.map((request) => request.payload.mentionsBot), [false], "only the owner's own account uses the word");
+  await handler(group({ text: "Ningo, what would Kant say?", mentionsBot: false, messageId: "m1" }));
+  await handler(group({ text: "/ningo and Hegel?", mentionsBot: false, messageId: "m2" }));
+  await handler(group({ text: "Ningo, elsewhere", mentionsBot: false, messageId: "m3", chatId: "120363000000000009@g.us" }));
+  await handler(group({ text: "just talking", mentionsBot: false, messageId: "m4" }));
+  assert.deepEqual(dispatched.map((request) => [request.payload.content, request.payload.mentionsBot]), [
+    ["what would Kant say?", true],
+    ["and Hegel?", true],
+    ["Ningo, elsewhere", false],
+    ["just talking", false],
+  ]);
+});
+
+test("the orchestrator is told when a call comes from the linked account, and only then", async () => {
+  const { handler, dispatched, group } = setup();
+  await handler(group({ text: "Ningo, who am I?", fromMe: true, mentionsBot: false, messageId: "m1" }));
+  await handler(group({ text: "Ningo, who am I?", mentionsBot: false, messageId: "m2" }));
+  assert.deepEqual(dispatched.map((request) => request.payload.isOwnAccount), [true, false]);
 });

@@ -130,3 +130,8 @@ test("named conversations need a folder for their history, and the days are boun
     assert.throws(() => buildConfig({ ...base, DOKJA_WHATSAPP_HISTORY_DAYS: days }), /number of days from 1 to 365/, days);
   }
 });
+
+test("WhatsApp locale defaults to Brazilian Portuguese and can be configured",()=>{
+ assert.equal(buildConfig(base).locale,"pt-BR");
+ assert.equal(buildConfig({...base,DOKJA_WHATSAPP_LOCALE:"en"}).locale,"en");
+});

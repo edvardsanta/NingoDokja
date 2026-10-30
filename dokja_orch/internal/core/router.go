@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	chat "read_books/dokja_domain/dokja_chat"
 	"strings"
 )
 
@@ -89,6 +90,8 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 			Workflow: "ningo",
 			Domains:  []Domain{DomainSystem},
 		}, nil
+	case eventType == "message.created" && event.Source == SourceWhatsApp && hasIncomingContent(event):
+		return Route{Workflow: "incoming-content", Domains: []Domain{DomainModeration, DomainChat}}, nil
 	case eventType == "message.created" && event.Source == SourceDesktop:
 		return Route{Workflow: "desktop-conversation", Domains: []Domain{DomainChat}}, nil
 	case strings.HasPrefix(eventType, "message."):
@@ -122,4 +125,10 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 			Domains:  []Domain{DomainChat},
 		}, nil
 	}
+}
+
+func hasIncomingContent(event Event) bool {
+	document, _ := event.Payload["document"].(*chat.IncomingDocument)
+	content, _ := event.Payload["content"].(string)
+	return chat.PlanIncomingContent(content, document).Kind != ""
 }

@@ -37,6 +37,17 @@ func TestBridgeEventFromRequestMapsWhatsAppChat(t *testing.T) {
 	}
 }
 
+func TestBridgeCarriesWhetherTheLinkedAccountWrote(t *testing.T) {
+	event := bridgeEventFromRequest(bridgeRequestFromJSON(t, `{
+		"event_type": "message.created", "interface": "whatsapp",
+		"payload": {"content": "hello", "userId": "u1", "channelId": "group1@g.us", "chatKind": "group",
+			"senderNumbers": [], "isSelfChat": false, "isOwnAccount": true, "mentionsBot": true}
+	}`))
+	if own, ok := event.Context["is_own_account"].(bool); !ok || !own {
+		t.Fatalf("the flag was not carried: %#v", event.Context["is_own_account"])
+	}
+}
+
 func TestBridgeInterfaceResolvesWhatsApp(t *testing.T) {
 	for _, name := range []string{"whatsapp", " WhatsApp "} {
 		if _, source, ok := bridgeInterface(name); !ok || source != core.SourceWhatsApp {

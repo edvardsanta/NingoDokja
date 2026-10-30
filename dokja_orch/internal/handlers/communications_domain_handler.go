@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	communications "read_books/dokja_domain/dokja_communications"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 )
 
@@ -46,6 +47,24 @@ func (h *CommunicationsDomainHandler) Readable(ctx context.Context, channel stri
 // Feeds plugins.
 func (h *CommunicationsDomainHandler) WithMusic(sources communications.AudioSources) *CommunicationsDomainHandler {
 	h.music = newMusicDesk(sources)
+	return h
+}
+
+// WithMusicComments lets Ningo remark on a song now and then. Without it, or without music, the
+// songs simply play with no remark.
+func (h *CommunicationsDomainHandler) WithMusicComments(generator ChatConversationGenerator) *CommunicationsDomainHandler {
+	if h.music != nil {
+		h.music.comments = generator
+	}
+	return h
+}
+
+// WithMusicExperience remembers what each person listened to. enabled is the operator's memory
+// switch.
+func (h *CommunicationsDomainHandler) WithMusicExperience(service memorydomain.Service, enabled func() bool) *CommunicationsDomainHandler {
+	if h.music != nil {
+		h.music.listens = NewMusicExperience(service, enabled)
+	}
 	return h
 }
 

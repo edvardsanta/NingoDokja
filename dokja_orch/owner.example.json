@@ -12,5 +12,12 @@
         "user_id": "REPLACE_WITH_YOUR_DISCORD_USER_ID"
       }
     }
+  },
+  "ningo": {
+    "named_by": "Sam",
+    "groups": ["<group id>@g.us"],
+    "people": [
+      { "name": "Sam", "whatsapp": "REPLACE_WITH_DIGITS_ONLY", "about": ["writer"] }
+    ]
   }
 }

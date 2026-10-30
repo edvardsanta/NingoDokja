@@ -16,15 +16,20 @@ export type SocketEvents = {
   "messages.upsert": { type: string; messages: InboundMessage[] };
 };
 
+export type WhatsAppSendContent =
+  | {text: string}
+  | {image: Buffer; caption: string; mimetype: string}
+  | {video: Buffer; caption: string; mimetype: string};
 // The part of the Baileys socket this adapter uses, so tests can stand in for it.
 export type WhatsAppSocketLike = {
   ev: { on<E extends keyof SocketEvents>(event: E, listener: (update: SocketEvents[E]) => void): unknown };
   user?: { id?: string; lid?: string };
   sendMessage(
     jid: string,
-    content: { text: string },
+    content: WhatsAppSendContent,
     options?: { quoted?: unknown; messageId?: string },
   ): Promise<unknown>;
+  downloadDocument?: (message: InboundMessage, maxBytes: number) => Promise<Buffer>;
   sendPresenceUpdate(type: "composing" | "paused", jid?: string): Promise<void>;
   // Removes this device from the account, on WhatsApp's side as well.
   logout(): Promise<void>;
@@ -178,6 +183,14 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         ownJids: () => [socket.user?.id, socket.user?.lid].filter((jid): jid is string => !!jid),
         sent,
         send: (chatId, text, options) => socket.sendMessage(chatId, { text }, options),
+        downloadDocument: socket.downloadDocument?.bind(socket),
+        sendMedia: (chatId, media, caption, options) => {
+          const bytes = Buffer.from(media.data_b64, "base64");
+          const content: WhatsAppSendContent = media.content_type === "video/mp4"
+            ? {video: bytes, caption, mimetype: media.content_type}
+            : {image: bytes, caption, mimetype: media.content_type};
+          return socket.sendMessage(chatId, content, options);
+        },
         presence: (chatId, active) => socket.sendPresenceUpdate(active ? "composing" : "paused", chatId),
         resolveNumber: socket.signalRepository?.lidMapping
           ? (jid) => socket.signalRepository!.lidMapping!.getPNForLID(jid)

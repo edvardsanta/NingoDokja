@@ -35,7 +35,7 @@ export function RealtimeCard({transport,active=true}:{transport:Transport;active
    <h2>{t("realtime_messages")}</h2><p>{t("realtime_pending")}</p>
    {session?.messages.length===0&&<p>{t("realtime_no_messages")}</p>}
    <ol>{session?.messages.map(m=><li key={m.message_id}>
-    <strong>{t("realtime_speaker",{number:session.consenting_participants.indexOf(m.speaker_id)+1})}</strong>{" "}
+    <strong>{m.speaker_name || t("realtime_speaker",{number:session.consenting_participants.indexOf(m.speaker_id)+1})}</strong>{" "}
     <time dateTime={m.timestamp_start}>{times.clock(m.timestamp_start)}</time>
     <p>{m.text}</p>
    </li>)}</ol>
