@@ -719,5 +719,6 @@
   "facts_delete_named": "Delete {fact}",
   "dialog_fact_delete": "Delete this kept fact?",
   "dialog_fact_delete_detail": "Ningo stops remembering it. The conversation where it was said stays as it is.",
-  "dialog_fact_delete_accept": "Delete"
+  "dialog_fact_delete_accept": "Delete",
+  "assistant_older": "Earlier messages"
 }

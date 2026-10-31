@@ -289,6 +289,40 @@ describe("the kept conversations", () => {
     expect(calls.find((call) => call.type === "conversation.read")?.payload).toEqual({ conversation_id: archiveId(3) });
   });
 
+  it("reads earlier turns on request and keeps them above the latest page", async () => {
+    const turn = (seq: number) => archivedTurn({ seq, content: `Question ${seq}`, reply: `Answer ${seq}`, sendId: `send-${String(seq).padStart(4, "0")}` });
+    const { transport, calls } = routedTransport({
+      "conversation.list": ok({ conversations: [kept(3, 3)], next: "" }),
+      "conversation.read": [readOf(3, turn(101), turn(102)), readOf(3, turn(1), turn(2)), readOf(3, turn(101), turn(102), turn(103))],
+    });
+    renderTalk(transport);
+    await screen.findByText("Question 101");
+    fireEvent.click(screen.getByRole("button", { name: "Earlier messages" }));
+    await screen.findByText("Question 1");
+    expect(calls.filter((call) => call.type === "conversation.read")[1]?.payload).toEqual({ conversation_id: archiveId(3), before_seq: 101 });
+    expect(screen.queryByRole("button", { name: "Earlier messages" })).toBeNull();
+
+    // Coming back to the window reads the latest page again: what was read stays above it, in order.
+    fireEvent.focus(window);
+    await screen.findByText("Question 103");
+    const shown = [...document.querySelectorAll(".assistant-turns [data-role=user] p")].map((node) => node.textContent);
+    expect(shown).toEqual(["Question 1", "Question 2", "Question 101", "Question 102", "Question 103"]);
+  });
+
+  it("says why earlier turns could not be read and keeps the conversation", async () => {
+    const turn = archivedTurn({ seq: 5, content: "Still here", reply: "Yes", sendId: "send-0005" });
+    const { transport } = routedTransport({
+      "conversation.list": ok({ conversations: [kept(3, 1)], next: "" }),
+      "conversation.read": [readOf(3, turn), failure("unavailable")],
+    });
+    renderTalk(transport);
+    await screen.findByText("Still here");
+    fireEvent.click(screen.getByRole("button", { name: "Earlier messages" }));
+    await screen.findByRole("alert");
+    screen.getByText("Still here");
+    expect(screen.getByRole("button", { name: "Earlier messages" })).toBeTruthy();
+  });
+
   it("shows a turn a restart cut off and retries it as the same turn", async () => {
     const { transport, calls } = routedTransport({
       "conversation.list": listed(kept(3, 1)),

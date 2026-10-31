@@ -290,7 +290,12 @@ function conversationList(body: Record<string, unknown>): ConversationList {
 
 function conversationReadPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const id = text(raw.conversation_id);
-  return ARCHIVE_ID.test(id) ? { conversation_id: id, limit: MAX_TURNS_READ } : undefined;
+  if (!ARCHIVE_ID.test(id)) return undefined;
+  // Earlier turns are read a page at a time, from before the first one on screen.
+  const before = raw.before_seq;
+  if (before === undefined) return { conversation_id: id, limit: MAX_TURNS_READ };
+  const valid = typeof before === "number" && Number.isInteger(before) && before >= 1 && before <= 1e15;
+  return valid ? { conversation_id: id, limit: MAX_TURNS_READ, before_seq: before } : undefined;
 }
 
 // A rename or a delete names the version of the conversation it saw, so a change made meanwhile

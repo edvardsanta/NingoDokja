@@ -719,5 +719,6 @@
   "facts_delete_named": "Apagar {fact}",
   "dialog_fact_delete": "Apagar este fato guardado?",
   "dialog_fact_delete_detail": "O Ningo deixa de lembrar. A conversa em que foi dito continua como está.",
-  "dialog_fact_delete_accept": "Apagar"
+  "dialog_fact_delete_accept": "Apagar",
+  "assistant_older": "Mensagens anteriores"
 }
