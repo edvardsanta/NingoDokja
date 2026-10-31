@@ -236,7 +236,10 @@ WhatsApp adapter treats the error like any failed dispatch and posts its generic
 message to the owner's own chat; it does not say the owner stopped the reply.
 
 Talk offers Stop, and an older orchestrator answers it as an unsupported action, so
-desktop and orchestrator are updated together. CLI and TUI do not offer it yet.
+each interface is updated with the orchestrator. The CLI offers `conversations stop <id>`
+and the TUI the `s` key in an open conversation; both name the latest pending send. A
+first message in the TUI cannot be stopped, because its conversation does not exist
+until that send's own request starts it.
 
 Verification: unit tests cover the cause, naming, finished sends and a retry replacing
 an older attempt. Handler regressions use channel-controlled generations for a running
