@@ -9,6 +9,7 @@ import { useAction } from "./use_action.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
+import { Button } from "./ui.js";
 
 type Filter = "all" | "pending" | "resolved";
 
@@ -29,7 +30,7 @@ type PanelProps = {
 // What waits for the owner's verdict: the first thing the Notebook asks of him, so it has no filter.
 export function WaitingVerdictsPanel({ transport, onChanged, revision }: Omit<PanelProps, "initial">) {
   const t = useTranslate();
-  return <section aria-label={t("experiences_waiting_title")}>
+  return <section className="verdicts-waiting" aria-label={t("experiences_waiting_title")}>
     <h3>{t("experiences_waiting_title")}</h3>
     <ExperienceList transport={transport} onChanged={onChanged} revision={revision} filter="pending" emptyId="experiences_waiting_empty" />
   </section>;
@@ -80,12 +81,12 @@ function ExperienceList({ transport, onChanged, revision: outside = 0, filter, e
     {listing.state.phase === "error" && <Problem error={listing.state.error} />}
     {page?.off && <OffNotice reason={page.reason} />}
     {page && !page.off && <>
-      {counted && page.total > 0 && <p>{t("experiences_total", { count: page.total })}</p>}
-      {!page.experiences.length && <p>{t(emptyId)}</p>}
-      <ul className="hits">{page.experiences.map((entry) => <ExperienceRow key={`${filter}-${offset}-${entry.ref}`} entry={entry} transport={transport} onChanged={changed} settled={filter !== "pending"} />)}</ul>
+      {counted && page.total > 0 && <p className="detail">{t("experiences_total", { count: page.total })}</p>}
+      {!page.experiences.length && <p className="detail">{t(emptyId)}</p>}
+      <ul className="decisions">{page.experiences.map((entry) => <ExperienceRow key={`${filter}-${offset}-${entry.ref}`} entry={entry} transport={transport} onChanged={changed} settled={filter !== "pending"} />)}</ul>
       {page.total > 20 && <div className="pager">
-        <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>{t("experiences_previous")}</button>
-        <button type="button" disabled={!page.experiences.length || offset + page.experiences.length >= page.total} onClick={() => setOffset(offset + 20)}>{t("experiences_next")}</button>
+        <Button size="compact" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>{t("experiences_previous")}</Button>
+        <Button size="compact" disabled={!page.experiences.length || offset + page.experiences.length >= page.total} onClick={() => setOffset(offset + 20)}>{t("experiences_next")}</Button>
       </div>}
     </>}
   </>;
@@ -112,16 +113,24 @@ function ExperienceRow({ entry, transport, onChanged, settled }: { entry: Memory
   const { ago } = useTimes();
   const [opened, setOpened] = useState(false);
   const verdict = entry.outcome ? VERDICTS[entry.outcome] : undefined;
+  // Two lines and the way in on the right, so a long queue of waiting verdicts stays short: what he
+  // decided (and what came of it), then when and about what. What waits is the owner's to answer, so
+  // its button keeps the app's own look; in the record of what is settled it is quiet.
   return <li className="decision">
-    <p className="decision-line">
-      <strong>{decisionOf(entry, t)}</strong>
-      {settled && <span className="decision-verdict" data-tone={verdict?.tone ?? (entry.outcome ? "other" : "unchecked")}>
-        {verdict ? t(verdict.id) : entry.outcome || t("experience_verdict_pending")}
-      </span>}
-    </p>
-    <p className="detail" title={`${entry.ref} · ${entry.createdAt}`}>{entry.createdAt ? ago(entry.createdAt) : entry.ref}</p>
-    {entry.contextSnippet && <p className="decision-context">{t("experience_about", { context: entry.contextSnippet })}</p>}
-    <button type="button" className="quiet" aria-expanded={opened} aria-label={t("experience_inspect_named", { ref: entry.ref })} onClick={() => setOpened((value) => !value)}>{t(opened ? "experience_close" : "experience_inspect")}</button>
+    <div className="decision-main">
+      <p className="decision-line">
+        <strong>{decisionOf(entry, t)}</strong>
+        {settled && <span className="decision-verdict" data-tone={verdict?.tone ?? (entry.outcome ? "other" : "unchecked")}>
+          {verdict ? t(verdict.id) : entry.outcome || t("experience_verdict_pending")}
+        </span>}
+      </p>
+      <p className="decision-meta detail" title={`${entry.ref} · ${entry.createdAt}`}>
+        <span>{entry.createdAt ? ago(entry.createdAt) : entry.ref}</span>
+        {entry.contextSnippet && <span className="decision-context">{t("experience_about", { context: entry.contextSnippet })}</span>}
+      </p>
+    </div>
+    <Button variant={settled ? "quiet" : "default"} size="compact" extra="decision-inspect" aria-expanded={opened}
+      aria-label={t("experience_inspect_named", { ref: entry.ref })} onClick={() => setOpened((value) => !value)}>{t(opened ? "experience_close" : "experience_inspect")}</Button>
     {opened && <ExperienceDetail transport={transport} entry={entry} onChanged={onChanged} />}
   </li>;
 }

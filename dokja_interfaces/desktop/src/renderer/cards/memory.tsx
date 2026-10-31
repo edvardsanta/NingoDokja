@@ -69,7 +69,7 @@ function MemoryOpening({ status }: { status: MemoryStatus }) {
   return (
     <div className="memory-opening">
       {voice && <p className="voice">{voice}</p>}
-      <p className={voice ? "detail" : undefined}>
+      <p className="detail">
         {status.experiences === 0
           ? t("memory_empty_next")
           : t("memory_counts", {
