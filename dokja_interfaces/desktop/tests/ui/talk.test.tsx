@@ -763,3 +763,103 @@ describe("who answered", () => {
     expect(document.querySelectorAll(".assistant-by")).toHaveLength(1);
   });
 });
+
+describe("the sources of a reply", () => {
+  const FOOTER = "📚 [1] A very long title about the quiet economics of attention in the age of endless feeds · [2] Notes · on reading slowly";
+  const CITED = `The library holds two texts on this[1], and the second[2] disagrees.\n\n${FOOTER}`;
+  const list = () => screen.getByRole("list", { name: "Sources of this reply" });
+
+  it("lists each document under the reply instead of the text line, and ties the citations to it", async () => {
+    const { transport } = routedTransport({ "conversation.start": startedConversation(), "message.created": answering(CITED) });
+    await renderTalk(transport);
+
+    fireEvent.change(field(), { target: { value: "what does the library say?" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByRole("list", { name: "Sources of this reply" });
+
+    const entries = Array.from(list().querySelectorAll("li"));
+    expect(entries.map((entry) => entry.textContent)).toEqual([
+      "[1]A very long title about the quiet economics of attention in the age of endless feeds",
+      "[2]Notes · on reading slowly",
+    ]);
+    // A cut title is still whole for the pointer and for a reader of the screen.
+    expect(entries[0]?.getAttribute("title")).toBe("A very long title about the quiet economics of attention in the age of endless feeds");
+    const reply = list().closest("li")!;
+    expect(reply.textContent).not.toContain("📚");
+    expect(reply.querySelector("p")?.textContent).toBe("The library holds two texts on this[1], and the second[2] disagrees.");
+    const marks = Array.from(reply.querySelectorAll("p .cite"));
+    expect(marks.map((mark) => mark.textContent)).toEqual(["[1]", "[2]"]);
+    expect(marks[1]?.getAttribute("title")).toBe("Notes · on reading slowly");
+    // The list sits inside the same turn, before who answered.
+    expect(list().parentElement).toBe(reply);
+  });
+
+  it("shows the same list when the conversation is reopened from the archive", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "Earlier question", reply: `${CITED}\n\nKept: you like tea.`, sendId: "send-old1", provider: "demo", model: "small" })),
+    });
+    await renderTalk(transport);
+
+    expect(list().querySelectorAll("li")).toHaveLength(2);
+    expect(list().closest("li")!.textContent).toContain("Kept: you like tea.");
+    expect(list().closest("li")!.textContent).not.toContain("📚");
+    expect(list().nextElementSibling?.textContent).toBe("Answered by demo / small");
+  });
+
+  it("leaves a reply with no sources as it is", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "Q", reply: "No documents, though the array a[0] and [1] stay.", sendId: "send-old1" })),
+    });
+    await renderTalk(transport);
+
+    screen.getByText("No documents, though the array a[0] and [1] stay.");
+    expect(screen.queryByRole("list", { name: "Sources of this reply" })).toBeNull();
+    expect(document.querySelector(".cite")).toBeNull();
+  });
+
+  it("renders a document's title as text and says so in Portuguese", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": listed(kept(3, 1)),
+      "conversation.read": readOf(3, archivedTurn({ content: "Q", reply: "Sim[1].\n\n📚 [1] <img src=x alt=bad>", sendId: "send-old1" })),
+    });
+    await renderTalk(transport, "pt");
+
+    const sources = screen.getByRole("list", { name: "Fontes desta resposta" });
+    expect(sources.textContent).toBe("[1]<img src=x alt=bad>");
+    expect(sources.querySelector("img")).toBeNull();
+  });
+
+  it("keeps the reply as plain text while it is written and shows the documents when it lands", async () => {
+    let listener: ((preview: ChatPreview) => void) | undefined;
+    let answer: (value: TransportResult) => void = () => {};
+    let sentPayload: Record<string, unknown> | undefined;
+    const transport: Transport = {
+      request: (type, payload) => {
+        if (type === "conversation.start") return Promise.resolve(startedConversation());
+        if (type !== "message.created") return Promise.resolve(ok({}));
+        sentPayload = payload;
+        return new Promise((resolve) => (answer = resolve));
+      },
+      preview: async () => ({ ok: false, error: { code: "unavailable", message: "none" } }),
+      onChatPreview: (each) => {
+        listener = each;
+        return () => { listener = undefined; };
+      },
+    };
+    await renderTalk(transport);
+    fireEvent.change(field(), { target: { value: "ask" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await waitFor(() => expect(listener).toBeDefined());
+
+    act(() => listener?.({ conversationId: archiveId(1), text: "The library holds two texts on this[1]" }));
+    screen.getByText("The library holds two texts on this[1]");
+    expect(screen.queryByRole("list", { name: "Sources of this reply" })).toBeNull();
+    expect(document.querySelector(".cite")).toBeNull();
+
+    act(() => answer(archivedAnswer(CITED, sentPayload)));
+    await screen.findByRole("list", { name: "Sources of this reply" });
+    expect(document.querySelectorAll(".cite")).toHaveLength(2);
+  });
+});

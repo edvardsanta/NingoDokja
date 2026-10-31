@@ -8,6 +8,7 @@ import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
 import { latestConversation } from "./conversation_list.js";
+import { ReplyBody } from "./reply_sources.js";
 import { Button, Notice } from "./ui.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
@@ -332,7 +333,7 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}

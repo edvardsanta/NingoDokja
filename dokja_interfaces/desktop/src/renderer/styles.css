@@ -2919,3 +2919,12 @@ button.cfg-toggle:focus-visible {
 
 /* Which model answered, under the reply: a quiet line, not part of what Ningo said. */
 .assistant-by { display: block; margin-top: var(--space-1); font-size: .75rem; color: var(--ink-dim); }
+
+/* The documents a reply drew on, under it and above who answered: a quiet list, one line per document, the
+   title cut with an ellipsis rather than wrapped. A citation in the text wears the numeral of its entry. */
+.cite, .cite-n { color: var(--ink-dim); }
+.cite { font-size: .75em; line-height: 0; vertical-align: .3em; }
+.assistant-turns .reply-sources { list-style: none; display: grid; gap: 0; margin: var(--space-2) 0 0; padding: var(--space-1) 0 0; border-top: 1px dashed var(--rule); font-size: .75rem; line-height: 1.6; color: var(--ink-dim); }
+.assistant-turns .reply-sources li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); overflow-wrap: normal; }
+.reply-source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reply-sources + .assistant-by { margin-top: var(--space-2); }
