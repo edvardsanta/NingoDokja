@@ -601,7 +601,7 @@ func (a *App) chatFields(ctx context.Context, message string, session chatSessio
 	if session.retryID != "" {
 		return map[string]any{"conversation_id": id, "retry_turn_id": session.retryID}, map[string]any{"interface": "cli"}, nil
 	}
-	sendID, err := newSendID()
+	sendID, err := NewSendID()
 	if err != nil {
 		return nil, nil, err
 	}

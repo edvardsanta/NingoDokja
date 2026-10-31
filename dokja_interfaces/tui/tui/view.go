@@ -71,6 +71,8 @@ func (m *Model) View() string {
 			body = m.viewDiscord()
 		case tabHistory:
 			body = m.viewHistory()
+		case tabConversations:
+			body = m.viewConversations()
 		}
 	}
 	return strings.Join([]string{m.viewHeader(), "", body, "", m.viewFooter()}, "\n")
@@ -96,10 +98,11 @@ func (m *Model) viewHeader() string {
 
 func (m *Model) viewFooter() string {
 	hints := map[tab]string{
-		tabPanel:   tr("panel_tab_help"),
-		tabMemes:   tr("meme_tab_help"),
-		tabDiscord: tr("field_space_toggle_channel_ctrl_s_send_f1_f4_tabs_ctrl_c_quit"),
-		tabHistory: tr("tab_1_4_tabs_q_quit"),
+		tabPanel:         tr("panel_tab_help"),
+		tabMemes:         tr("meme_tab_help"),
+		tabDiscord:       tr("field_space_toggle_channel_ctrl_s_send_f1_f4_tabs_ctrl_c_quit"),
+		tabHistory:       tr("tab_1_4_tabs_q_quit"),
+		tabConversations: m.conversationsHint(),
 	}
 	hint := hints[m.tab]
 	switch m.overlay {

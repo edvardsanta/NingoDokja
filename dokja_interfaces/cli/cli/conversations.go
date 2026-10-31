@@ -209,8 +209,8 @@ func startConversation(ask archiveRequest, title string) (string, error) {
 	return started.Conversation.ID, nil
 }
 
-// conversationTitle names a new conversation by the start of its first message.
-func conversationTitle(message string) string {
+// ConversationTitle names a new conversation by the start of its first message.
+func ConversationTitle(message string) string {
 	line := strings.Join(strings.Fields(message), " ")
 	if utf8.RuneCountInString(line) <= titleFromRunes {
 		return line
@@ -218,8 +218,8 @@ func conversationTitle(message string) string {
 	return string([]rune(line)[:titleFromRunes-1]) + "…"
 }
 
-// newSendID names one send, so the archive answers it once.
-func newSendID() (string, error) {
+// NewSendID names one send, so the archive answers it once.
+func NewSendID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -250,7 +250,7 @@ func (t chatTarget) resolve(ask archiveRequest, message string) (string, error) 
 			return id, err
 		}
 	}
-	return startConversation(ask, conversationTitle(message))
+	return startConversation(ask, ConversationTitle(message))
 }
 
 func shortID(id string) string {

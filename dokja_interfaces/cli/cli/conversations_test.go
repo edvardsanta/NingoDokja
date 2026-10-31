@@ -118,7 +118,7 @@ func TestContinueStartsATitledConversationWhenThereIsNone(t *testing.T) {
 }
 
 func TestATitleIsCutToTheStartOfTheMessage(t *testing.T) {
-	title := conversationTitle(strings.Repeat("é", 100))
+	title := ConversationTitle(strings.Repeat("é", 100))
 	if len([]rune(title)) != titleFromRunes || !strings.HasSuffix(title, "…") {
 		t.Fatal(title)
 	}

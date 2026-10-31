@@ -61,8 +61,11 @@ text while running in English. Text that comes from the orchestrator (for exampl
   The option exists only in the TUI and resets whenever the picker is opened.
 - **Discord** (`3`): send text and/or an image to chosen channels (`ctrl+s`).
 - **Histórico** (`4`): what you triggered in this session and how each action ended.
+- **Conversas** (`5`): the conversations the desktop, the phone and the CLI share. `enter` opens one
+  and writes to it, `n` starts one, `e` renames, `d` deletes after a confirmation and, inside a
+  conversation, `R` sends the last unanswered turn again. The TUI keeps nothing of its own.
 
-Anything that posts to Discord asks for confirmation first (`y`/`n`). Keys: `1`-`4`, `tab`, `F1`-`F4`
+Anything that posts to Discord asks for confirmation first (`y`/`n`). Keys: `1`-`5`, `tab`, `F1`-`F5`
 switch tabs (digits are typed, not treated as shortcuts, while a text field is focused).
 
 ## Previews (images and videos)

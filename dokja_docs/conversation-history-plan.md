@@ -2,7 +2,7 @@
 
 Status: H1 (domain contract and storage) and H2 (orchestrator operations) implemented; H3 under
 way (Talk keeps, restores, lists and reopens archived conversations; rename/delete and a
-queued-waiting state remain); H4 in progress (CLI done, retry and TUI remain), H5 planned. Tracks step 09.5.
+queued-waiting state remain); H4 implemented in the CLI and the TUI, H5 planned. Tracks step 09.5.
 
 Attempt-settlement correction (2026-10-29):
 [identity/lifecycle compatibility](task-lifecycle-compatibility.md) records the
@@ -240,7 +240,10 @@ The CLI batch is implemented. `dokja-cli conversations list|read|rename|delete` 
 with source `cli`, and `read` consumes the pinned turn projection (`view: 1`). A plain
 `chat` stays a session of its own, unarchived, so existing use does not change. Short
 ids are resolved against the list and an ambiguous one is refused. Delete asks first and
-names the revision it showed. Retrying a failed turn and the TUI remain.
+names the revision it showed. `conversations retry` sends the last unanswered turn again.
+
+The TUI batch is implemented: a Conversas tab lists, opens, writes to, renames, deletes and
+retries over the same archive, and reads the same projection.
 
 ### H5: Context, retention and evidence validation
 
