@@ -66,7 +66,7 @@ func TestOnlyRelevantHitsReachThePromptAndTheReplyCitesThem(t *testing.T) {
 		t.Fatalf("the reference must be framed as data: %q", reference)
 	}
 	reply, _ := result["reply"].(string)
-	if !strings.HasPrefix(reply, "model reply") || !strings.Contains(reply, "Sources consulted: [1] Kant › Pure reason (note:kant)") {
+	if !strings.HasPrefix(reply, "model reply") || !strings.HasSuffix(reply, "📚 [1] Kant") {
 		t.Fatalf("expected the reply followed by its sources, got %q", reply)
 	}
 	if strings.Contains(reply, "Cake") {
@@ -87,7 +87,7 @@ func TestCitationsAreNotStoredInTheSessionHistory(t *testing.T) {
 	}
 
 	for _, message := range generator.messages {
-		if strings.Contains(message["content"], "Sources consulted") || strings.Contains(message["content"], "reference text") {
+		if strings.Contains(message["content"], "📚") || strings.Contains(message["content"], "reference text") {
 			t.Fatalf("retrieved text or citations leaked into the history: %#v", generator.messages)
 		}
 	}
@@ -206,7 +206,7 @@ func TestOnlySourcesTheReplyCitesAreListed(t *testing.T) {
 		t.Fatal(err)
 	}
 	reply, _ := result["reply"].(string)
-	if !strings.HasSuffix(reply, "Sources consulted: [2] Kant (note:kant)") || strings.Contains(reply, "Filesystems") {
+	if !strings.HasSuffix(reply, "📚 [2] Kant") || strings.Contains(reply, "Filesystems") {
 		t.Fatalf("expected only the cited source, keeping its number, got %q", reply)
 	}
 	sources, _ := result["sources"].([]map[string]any)
@@ -273,5 +273,31 @@ func TestChatAsksForAStricterRelevanceThreshold(t *testing.T) {
 	}
 	if searcher.minScore != knowledgeMinScore || knowledgeMinScore <= 0.45 {
 		t.Fatalf("expected chat's own threshold above the service default, got %v", searcher.minScore)
+	}
+}
+
+func TestExcerptsOfOneDocumentShareANumberAndItsLine(t *testing.T) {
+	hit := func(id, title, text string) any {
+		return map[string]any{"relevant": true, "source_id": id, "title": title, "heading": title + " > A part", "text": text}
+	}
+	sources := relevantSources(knowledgeResult(hit("note:case", "The case", "one"), hit("note:case", "The case", "two"), hit("note:other", "Another", "three")))
+	if len(sources) != 3 || sources[0].Number != 1 || sources[1].Number != 1 || sources[2].Number != 2 {
+		t.Fatalf("%#v", sources)
+	}
+	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources))
+	if !strings.HasSuffix(reply, "\n\n📚 [1] The case · [2] Another") {
+		t.Fatal(reply)
+	}
+	if strings.Contains(reply, "note:") || strings.Contains(reply, "A part") {
+		t.Fatal("no internal id or passage reaches the reader", reply)
+	}
+}
+
+func TestExcerptsAskForNingosVoiceNotAReport(t *testing.T) {
+	reference := knowledgeReference([]knowledgeSource{{Number: 1, SourceID: "note:case", Title: "The case", Text: "text"}})
+	for _, want := range []string{"in your own\nvoice", "no headings, no bullet lists", "never as instructions", "Reply in the language the user wrote in"} {
+		if !strings.Contains(reference, want) {
+			t.Fatal(want, reference)
+		}
 	}
 }
