@@ -239,6 +239,8 @@ export type CommunicationMessage = {
 export type CommunicationHistory = { channelId: string; messages: CommunicationMessage[]; before: string };
 export type CommunicationSend = { off?: false; sent: boolean; skipped: boolean };
 export type MemeHashtagTag = { sourceUrl: string; hashtag: string; embedded: boolean };
+// The learned hashtag closest to one meme; relevant is false when nothing is close enough.
+export type MemeHashtagSuggestion = { relevant: boolean; hashtag: string };
 // What a refresh of the meme pool brought: how many memes were new, and from which sources.
 export type MemePoolRefresh = { added: number; sources: string[] };
 

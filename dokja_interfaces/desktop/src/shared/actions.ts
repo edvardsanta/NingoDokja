@@ -43,6 +43,7 @@ export const ACTION_TYPES = [
   "communications.history",
   "communications.send",
   "meme.hashtag.tag",
+  "meme.hashtag.suggest",
   "communications.link.status",
   "communications.link.start",
   "communications.link.reset",

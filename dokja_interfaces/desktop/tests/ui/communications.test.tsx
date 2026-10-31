@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommunicationsCard } from "../../src/renderer/cards/communications.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
@@ -250,6 +250,65 @@ describe("communications", () => {
     fireEvent.change(input, { target: { value: "" } });
     expect(input.value).toBe("");
     expect((screen.getByRole("textbox", { name: "Message to send as Ningo" }) as HTMLTextAreaElement).value).toBe("");
+  });
+  describe("the suggestion for the selected meme", () => {
+    const memePage = { total: 2, offset: 0, memes: [
+      { url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" },
+      { url: "https://images.example/b.png", title: "Second", tags: "", source: "", createdAt: "", sentAt: "" },
+    ] };
+    const open = async (suggest: unknown) => {
+      const { preview } = previewer();
+      const routed = routedTransport({
+        "communications.channels": ok(channels),
+        "communications.history": ok(history()),
+        "meme.list": ok(memePage),
+        "knowledge.list": ok({ total: 1, offset: 0, documents: [{ id: "meme-hashtag:1", title: "#known", kind: "meme_hashtag", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "" }] }),
+        "memory.list": ok({ total: 0, offset: 0, limit: 100, experiences: [] }),
+        "meme.hashtag.suggest": suggest as never,
+      }, preview);
+      render(view(routed.transport));
+      fireEvent.click(await screen.findByRole("button", { name: "Attach a meme" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Attach First" }));
+      return routed;
+    };
+
+    it("asks about that meme and offers only its answer as the suggestion", async () => {
+      const { calls } = await open(ok({ relevant: true, hashtag: "#reaction" }));
+      const advice = await screen.findByRole("button", { name: "#reaction" });
+      expect(advice.closest("[role=status]")?.getAttribute("aria-label")).toBe("Suggestion");
+      expect(screen.getByLabelText("Your tags").textContent).toContain("#known");
+      expect(screen.getByLabelText("Your tags").textContent).not.toContain("#reaction");
+      expect(calls.filter((call) => call.type === "meme.hashtag.suggest").map((call) => call.payload)).toEqual([{ url: "https://images.example/a.png" }]);
+      fireEvent.click(advice);
+      expect((screen.getByPlaceholderText("#tag") as HTMLInputElement).value).toBe("#reaction");
+    });
+
+    it("asks again when another meme is selected", async () => {
+      const { calls } = await open(ok({ relevant: true, hashtag: "#reaction" }));
+      await screen.findByRole("button", { name: "#reaction" });
+      fireEvent.click(screen.getByRole("button", { name: "Attach Second" }));
+      await waitFor(() => expect(calls.filter((call) => call.type === "meme.hashtag.suggest")).toHaveLength(2));
+      expect(calls.filter((call) => call.type === "meme.hashtag.suggest").at(-1)?.payload).toEqual({ url: "https://images.example/b.png" });
+    });
+
+    it("says when nothing is close, and never offers a tag it did not find", async () => {
+      await open(ok({ relevant: false, hashtag: "#weak" }));
+      await screen.findByText("Nothing close to this meme yet.");
+      expect(screen.queryByRole("button", { name: "#weak" })).toBeNull();
+    });
+
+    it("tells a meme it cannot read from a suggestion that failed", async () => {
+      await open(failure("rejected" as never, "no text was found in the media; provide explicit text"));
+      await screen.findByText("This meme could not be read.");
+      cleanup();
+      await open(failure("unavailable"));
+      await screen.findByText("No suggestion right now.");
+    });
+
+    it("says when suggestions are switched off", async () => {
+      await open(ok({ off: true, reason: "paused" }));
+      await screen.findByText("Suggestions are switched off.");
+    });
   });
   it("fills the composer with the newly created hashtag and meme", async () => {
     const memePage = { total: 1, offset: 0, memes: [

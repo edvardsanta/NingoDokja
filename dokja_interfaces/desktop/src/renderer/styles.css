@@ -1953,6 +1953,16 @@ button.icon-button[aria-expanded="true"] {
   font-size: 0.75rem;
 }
 
+/* The one suggestion for this meme reads apart from the owner's own list. */
+.meme-tag-suggestions .meme-tag-advice {
+  border-color: var(--button-border);
+  color: var(--button-text);
+}
+
+.meme-tag-suggestions .detail {
+  font-size: 0.75rem;
+}
+
 /* A panel too narrow for the rail beside a readable thread: the rail becomes a strip above it. */
 @container ws (max-width: 40rem) {
   .messenger {

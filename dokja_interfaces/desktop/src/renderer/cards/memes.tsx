@@ -4,6 +4,7 @@ import { isRecord, text } from "../../shared/records.js";
 import type { MemeItem, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
+import type { MessageId } from "../i18n/i18n.js";
 import { describeError, needsWrittenText } from "./card_frame.js";
 import { usePreview } from "./use_preview.js";
 import { useAction } from "./use_action.js";
@@ -13,6 +14,26 @@ import type { LoadResult } from "./use_card.js";
 // not a workspace of its own: it is something Ningo sends, so it is picked where messages are
 // written. A click attaches a meme, a click on the attached one takes it off again. The picker has
 // three parts: the page of memes with its pager above, the grid, and the tagging row at the foot.
+
+// What the tray says about the selected meme, under Suggestion.
+type MemeAdvice = { kind: "looking" | "none" | "unreadable" | "failed" | "off" } | { kind: "found"; hashtag: string };
+
+const ADVICE_TEXT: Record<Exclude<MemeAdvice["kind"], "found">, MessageId> = {
+  looking: "memes_suggestion_looking",
+  none: "memes_suggestion_none",
+  unreadable: "memes_suggestion_unreadable",
+  failed: "memes_suggestion_failed",
+  off: "memes_suggestion_off",
+};
+
+function adviceOf(answer: Awaited<ReturnType<Transport["request"]>>): MemeAdvice {
+  if (!answer.ok) return { kind: needsWrittenText(answer.error) ? "unreadable" : "failed" };
+  if (!isRecord(answer.result)) return { kind: "failed" };
+  if (answer.result.off === true) return { kind: "off" };
+  const hashtag = text(answer.result.hashtag).trim();
+  return answer.result.relevant === true && hashtag ? { kind: "found", hashtag } : { kind: "none" };
+}
+
 export function MemePicker({
   transport,
   memes,
@@ -43,9 +64,9 @@ export function MemePicker({
   const [written, setWritten] = useState("");
   const textId = useId();
   const [createdTags, setCreatedTags] = useState<string[]>([]);
+  const [advice, setAdvice] = useState<MemeAdvice>({ kind: "none" });
   const [viewer, setViewer] = useState<{ dataUrl: string; title: string }>();
   const selectedMeme = memes.find((meme) => meme.url === selected);
-  const suggestions = createdTags;
   const loadCreatedTags = useCallback(async () => {
     const [knowledge, memory] = await Promise.all([
       transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 }),
@@ -84,6 +105,17 @@ export function MemePicker({
     setHashtag("");
     setWritten("");
   }, [selected]);
+  // What Ningo would tag this meme with, read from the meme itself. Showing it records nothing: a
+  // suggestion becomes an experience only when it is used.
+  useEffect(() => {
+    if (!selected) return;
+    let current = true;
+    setAdvice({ kind: "looking" });
+    void transport.request("meme.hashtag.suggest", { url: selected }, { timeoutMs: 30_000 }).then((answer) => {
+      if (current) setAdvice(adviceOf(answer));
+    });
+    return () => { current = false; };
+  }, [selected, transport]);
   const askText = tag.state.phase === "error" && needsWrittenText(tag.state.error) || written !== "";
   // a meme with no address cannot be attached
   const attachable = memes.filter((meme) => meme.url !== "");
@@ -175,15 +207,22 @@ export function MemePicker({
             onChange={(event) => setWritten(event.target.value)} />
           <p id={`${textId}-hint`} className="detail">{t("memes_tag_text_hint")}</p>
         </div>}
-        {suggestions.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tag_suggestions")}>
-          <span>{t("memes_tag_suggestions")}</span>
-          {suggestions.map((suggestion) => <button key={suggestion} type="button" className="quiet"
-            onClick={() => { setHashtag(suggestion); onPrepareTagged(suggestion); }}
-            disabled={busy}>{suggestion}</button>)}
+        <div className="meme-tag-suggestions" role="status" aria-label={t("memes_tag_suggestion")}>
+          <span>{t("memes_tag_suggestion")}</span>
+          {advice.kind === "found"
+            ? <button type="button" className="meme-tag-advice" disabled={busy}
+                onClick={() => { setHashtag(advice.hashtag); onPrepareTagged(advice.hashtag); }}>{advice.hashtag}</button>
+            : <span className="detail">{t(ADVICE_TEXT[advice.kind])}</span>}
+        </div>
+        {createdTags.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tags_known")}>
+          <span>{t("memes_tags_known")}</span>
+          {createdTags.map((known) => <button key={known} type="button" className="quiet"
+            onClick={() => { setHashtag(known); onPrepareTagged(known); }}
+            disabled={busy}>{known}</button>)}
         </div>}
       </div>}
       <datalist id="meme-tag-suggestions">
-        {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+        {createdTags.map((known) => <option key={known} value={known} />)}
       </datalist>
       {/* on the page itself, so it covers the window rather than the panel */}
       {viewer && createPortal(<div className="media-viewer-backdrop" role="presentation" onMouseDown={(event) => {
