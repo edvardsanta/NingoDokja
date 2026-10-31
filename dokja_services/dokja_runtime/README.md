@@ -54,7 +54,18 @@ an application message. Identity decisions belong to the authenticated ingress a
 chat policy, not this stateless adapter. Normal, streaming and supported measured
 calls share this prompt transport across provider/model changes. No raw owner ID
 is required in the model's identity note. Updating this adapter requires rebuilding
-and restarting the host runtime controller; it is not loaded from a Compose image.
+the host runtime controller; it is not loaded from a Compose image. A rebuilt
+controller replaces the running one by itself: see "Replacing the controller" below.
+
+## Replacing the controller
+
+The controller looks at its own file every 5 seconds. When a build has put a new file
+there and no request is being answered, it closes its listeners and execs the new file.
+The process id stays, so host workers remain its children and no interface has to be
+open: containers depend on the inference socket, so stopping and waiting for an
+interface to start it again would end chat. Requests arriving during the swap, under a
+second, fail as they would on any restart. A swap needs a controller that already has
+this code; an older one must be stopped once with SIGTERM.
 
 `RenderMath` renders a bounded LaTeX math expression to a PNG using a Go parser,
 without invoking CLI tools, a shell, or a TeX installation. Expressions are
@@ -91,7 +102,8 @@ started by this controller, including their process groups. A worker already
 listening is used without taking ownership. An owned worker's exit marks its
 module failed. Workers survive closing the desktop because the shared controller
 owns them. After a controller restart, an existing worker remains externally
-owned; stopping the module does not terminate it.
+owned; stopping the module does not terminate it. A replaced controller counts as a
+restart here.
 
 This configuration launches owner-supplied executable code, like installing a
 Feeds plugin. No file means no host workers. Invalid configuration or startup
