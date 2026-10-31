@@ -47,7 +47,7 @@ describe("refreshing the Library", () => {
     expect(screen.getByRole("searchbox", { hidden: true })).toBe(field);
     expect(field.value).toBe("free will");
     expect(screen.getByText("On free will")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Title note:one" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Title note:one" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("button", { name: "Close Title note:one" })).toBeTruthy();
     expect(screen.getByText("the text")).toBeTruthy();
     expect(calls.filter((call) => call.type === "knowledge.status")).toHaveLength(2);
@@ -84,7 +84,7 @@ describe("refreshing the Library", () => {
 });
 
 describe("the search of the Library", () => {
-  it("draws what it finds below the toolbar, so Add stays beside the field", async () => {
+  it("draws what it finds below the toolbar, and Add stays in the header of the panel", async () => {
     const { transport } = routedTransport({
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.list": ok(PAGE),
@@ -92,14 +92,18 @@ describe("the search of the Library", () => {
     });
     const view = renderLibrary(transport);
 
+    const add = await screen.findByRole("button", { name: "Add to the Library" });
     fireEvent.change(await screen.findByRole("searchbox"), { target: { value: "free will" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText("On free will");
 
+    // Add is the panel's own action, beside the refresh: nothing a search returns can move it
+    const actions = view.container.querySelector(".wp-actions") as HTMLElement;
+    expect(actions.contains(screen.getByRole("button", { name: "Add to the Library" }))).toBe(true);
+    expect(screen.getByRole("button", { name: "Add to the Library" })).toBe(add);
+    // and the toolbar holds the field and nothing the search returned
     const tools = view.container.querySelector(".library-tools") as HTMLElement;
-    // the toolbar holds the field and Add and nothing the search returned
     expect(tools.contains(screen.getByRole("searchbox"))).toBe(true);
-    expect(tools.contains(screen.getByRole("button", { name: "Add to the Library" }))).toBe(true);
     expect(tools.querySelector(".hits")).toBeNull();
     expect(tools.contains(screen.getByText("On free will"))).toBe(false);
     expect(tools.contains(screen.getByText("A recipe"))).toBe(false);

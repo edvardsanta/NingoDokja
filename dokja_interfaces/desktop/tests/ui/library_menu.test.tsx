@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 
-import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
+import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Transport } from "../../src/shared/transport.js";
 import { KNOWLEDGE_STATUS, ok, routedTransport } from "./support.js";
@@ -12,7 +12,7 @@ const withText = (id: string) => ({ documents: [{ ...listed(id), text: "the text
 const CLASSIFIED = { sourceId: "note:one", revision: "a".repeat(64), form: { value: "note", origin: "user" }, contentKind: { value: "reference", origin: "user" }, needsUserInput: false, questions: [] };
 
 function renderCard(transport: Transport) {
-  return render(<I18nProvider locale="en"><KnowledgeCard transport={transport} /></I18nProvider>);
+  return render(<I18nProvider locale="en"><KnowledgeWorkspace transport={transport} /></I18nProvider>);
 }
 const row = async (title: string) => (await screen.findByText(title)).closest("li") as HTMLLIElement;
 const items = () => screen.getAllByRole("menuitem").map((item) => item.textContent);

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
+import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Transport } from "../../src/shared/transport.js";
 import { KNOWLEDGE_STATUS, failure, ok, routedTransport } from "./support.js";
@@ -13,7 +13,7 @@ const withText = (id: string, text: string, truncated = false) => ({ documents: 
 function renderCard(transport: Transport) {
   return render(
     <I18nProvider locale="en">
-      <KnowledgeCard transport={transport} />
+      <KnowledgeWorkspace transport={transport} />
     </I18nProvider>,
   );
 }
@@ -22,12 +22,14 @@ async function openSecond() {
   fireEvent.click(await screen.findByRole("button", { name: "Open Title note:one" }));
 }
 
-const tabs = () => screen.getByRole("group", { name: "Open documents" });
+// A document is a tab of the strip the views are in, after them.
+const strip = () => screen.getByRole("tablist", { name: "Library" });
+const tabs = () => within(strip()).getAllByRole("tab").map((tab) => tab.textContent);
 const current = () =>
-  within(tabs())
-    .getAllByRole("button")
-    .filter((button) => button.getAttribute("aria-current") === "true")
-    .map((button) => button.textContent);
+  within(strip())
+    .getAllByRole("tab")
+    .filter((tab) => tab.getAttribute("aria-selected") === "true")
+    .map((tab) => tab.textContent);
 
 describe("a document opened from the research base", () => {
   it("opens in a tab of its own, with its text asked for alone and shown as text", async () => {
@@ -43,6 +45,7 @@ describe("a document opened from the research base", () => {
     expect(view.container.querySelector(".document-text b")).toBeNull();
     screen.getByText("Rebuilt from the passages the Library stored: close to the original, not a faithful copy of it.");
     expect(current()).toEqual(["Title note:one"]);
+    expect(tabs()).toEqual(["Documents", "Readings", "Title note:one"]);
     expect(calls.filter((call) => call.type === "knowledge.list").map((call) => call.payload)).toEqual([
       // the Library lists what came from outside, and a document is asked for among the same
       { limit: 20, offset: 0, external: true },
@@ -50,7 +53,7 @@ describe("a document opened from the research base", () => {
     ]);
   });
 
-  it("keeps the base behind its own tab, goes back to the base when closed, and opens once", async () => {
+  it("keeps the list behind its own tab, goes back to it when the document is closed, and opens once", async () => {
     const { transport, calls } = routedTransport({
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.list": [ok(PAGE), ok(withText("note:one", "the text"))],
@@ -58,19 +61,22 @@ describe("a document opened from the research base", () => {
     renderCard(transport);
     await openSecond();
     await screen.findByText("the text");
-    expect(screen.queryByRole("heading", { name: "Documents" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Library › Documents › Title note:one" })).toBeTruthy();
 
-    fireEvent.click(within(tabs()).getByRole("button", { name: "Library" }));
-    expect(current()).toEqual(["Library"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Documents" }));
+    expect(current()).toEqual(["Documents"]);
+    expect(screen.getByRole("region", { name: "Library › Documents" })).toBeTruthy();
     // the list is still there, and opening the same document again goes back to its tab
     fireEvent.click(screen.getByRole("button", { name: "Open Title note:one" }));
     expect(current()).toEqual(["Title note:one"]);
-    expect(within(tabs()).getAllByRole("button", { name: "Title note:one" })).toHaveLength(1);
+    expect(tabs().filter((name) => name === "Title note:one")).toHaveLength(1);
     expect(calls.filter((call) => call.type === "knowledge.list")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Close Title note:one" }));
-    expect(screen.queryByRole("group", { name: "Open documents" })).toBeNull();
-    screen.getByRole("heading", { name: "Documents" });
+    expect(tabs()).toEqual(["Documents", "Readings"]);
+    expect(current()).toEqual(["Documents"]);
+    expect(screen.getByRole("button", { name: "Open Title note:one" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Library › Documents" })).toBeTruthy();
   });
 
   it("says so when another document sits where this one was, instead of showing it", async () => {

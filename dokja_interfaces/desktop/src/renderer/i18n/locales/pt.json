@@ -183,8 +183,6 @@
   "documents_passages": "{indexed} de {count} trechos indexados.",
   "documents_open": "Abrir",
   "documents_open_named": "Abrir {title}",
-  "documents_tabs_label": "Documentos abertos",
-  "view_base": "Biblioteca",
   "view_close_named": "Fechar {title}",
   "document_rebuilt": "Reconstruído a partir dos trechos que a Biblioteca guardou: próximo do original, não uma cópia fiel.",
   "document_no_text": "Nenhum texto guardado para este documento.",

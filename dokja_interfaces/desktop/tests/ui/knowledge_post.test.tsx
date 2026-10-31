@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
+import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
 import { AddToBase } from "../../src/renderer/cards/knowledge_add.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Locale } from "../../src/shared/locale.js";
@@ -447,10 +447,11 @@ describe("the Post way of adding", () => {
 describe("the Post way in the Library's drawer", () => {
   const NO_DOCUMENTS = ok({ documents: [], total: 0, offset: 0 });
 
+  // the drawer belongs to the Library's workspace, not to its Documents view
   function renderCard(transport: Transport) {
     return render(
       <I18nProvider locale="en">
-        <KnowledgeCard transport={transport} />
+        <KnowledgeWorkspace transport={transport} />
       </I18nProvider>,
     );
   }

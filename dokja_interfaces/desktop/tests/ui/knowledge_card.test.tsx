@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { describe, expect, it } from "vitest";
 
 import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
+import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportResult } from "../../src/shared/transport.js";
@@ -20,6 +21,15 @@ function renderCard(transport: Transport, locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
       <KnowledgeCard transport={transport} />
+    </I18nProvider>,
+  );
+}
+
+// Adding and the files dropped on the panel belong to the workspace around the views, not to a view.
+function renderLibrary(transport: Transport, locale: Locale = "en") {
+  return render(
+    <I18nProvider locale={locale}>
+      <KnowledgeWorkspace transport={transport} />
     </I18nProvider>,
   );
 }
@@ -216,9 +226,9 @@ describe("the knowledge card", () => {
     };
     const statuses = (calls: Array<{ type: string }>) => calls.filter((call) => call.type === "knowledge.status");
 
-    it("is offered beside the search and opens on demand, and not when the service is switched off", async () => {
+    it("is offered in the header of the panel and opens on demand, and not when the service is switched off", async () => {
       const on = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
-      const view = renderCard(on.transport);
+      const view = renderLibrary(on.transport);
       const button = await screen.findByRole("button", { name: "Add to the Library" });
       expect(button.getAttribute("aria-expanded")).toBe("false");
       expect(screen.queryByRole("heading", { name: "Add to the Library" })).toBeNull();
@@ -227,7 +237,7 @@ describe("the knowledge card", () => {
       screen.getByRole("heading", { name: "Add to the Library" });
       view.unmount();
 
-      renderCard(routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(OFF) }).transport);
+      renderLibrary(routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(OFF) }).transport);
       await screen.findByText("Switched off.");
       expect(screen.queryByRole("button", { name: "Add to the Library" })).toBeNull();
     });
@@ -237,7 +247,7 @@ describe("the knowledge card", () => {
         "knowledge.status": [ok(KNOWLEDGE_STATUS), ok({ ...KNOWLEDGE_STATUS, documents: 7, chunks: 55 })],
         "knowledge.ingest": ok({ count: 1, created: 1, updated: 0, unchanged: 0, chunks: 3, degraded: false, reason: "" }),
       });
-      renderCard(transport);
+      renderLibrary(transport);
       await screen.findByText("6 documents in 52 passages");
 
       await fill();
@@ -252,7 +262,7 @@ describe("the knowledge card", () => {
         "knowledge.status": ok(KNOWLEDGE_STATUS),
         "knowledge.ingest": ok({ count: 1, created: 0, updated: 0, unchanged: 1, chunks: 0, degraded: false, reason: "" }),
       });
-      renderCard(transport);
+      renderLibrary(transport);
       await screen.findByText("6 documents in 52 passages");
 
       await fill();
@@ -281,7 +291,7 @@ describe("the knowledge card", () => {
 
     it("lights the view while it is over it, and drops it into the form wherever it lands", async () => {
       const { transport, calls } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS), "knowledge.ingest": ok({ created: 1, updated: 0, skipped: 0, chunks: 2 }) });
-      renderCard(transport);
+      renderLibrary(transport);
       const counts = await screen.findByText("6 documents in 52 passages");
       const zone = counts.closest(".drop-zone") as HTMLElement;
 
@@ -303,7 +313,7 @@ describe("the knowledge card", () => {
 
     it("leaves a drag that carries no file to the fields", async () => {
       const { transport } = routedTransport({ "knowledge.list": NO_DOCUMENTS, "knowledge.status": ok(KNOWLEDGE_STATUS) });
-      renderCard(transport);
+      renderLibrary(transport);
       const counts = await screen.findByText("6 documents in 52 passages");
 
       fireEvent.dragEnter(counts, { dataTransfer: { types: ["text/plain"], files: [] } });

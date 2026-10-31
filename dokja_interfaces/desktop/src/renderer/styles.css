@@ -178,10 +178,14 @@ body {
   left: 1.25rem;
   z-index: 1;
   margin: 0;
+  max-width: calc(100% - 3rem);
   padding: 0 0.5rem;
+  overflow: hidden;
   background: var(--static);
   color: var(--ink-dim);
   font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Quiet: the open workspace is already lit in the sidebar. Only where the owner is reads brighter. */
@@ -809,7 +813,9 @@ button:focus-visible {
  */
 .vtabs {
   display: flex;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.25rem;
 }
 
 .vtab {
@@ -834,6 +840,49 @@ button:focus-visible {
 .vtab:focus-visible {
   outline: var(--focus-width) solid var(--tab-focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+/*
+ * What the owner opened from a view is a tab of the same strip, after a rule: the title cut short
+ * with the whole of it in the tooltip, and a close button of its own beside it.
+ */
+.vtab-sep {
+  align-self: stretch;
+  width: 1px;
+  margin-block: 0.4rem;
+  background: var(--edge);
+}
+
+.vtab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.vtab-item .vtab {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.vtab-close,
+button.vtab-close:hover:not(:disabled) {
+  padding: 0 0.4rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+
+button.vtab-close:hover:not(:disabled) {
+  color: var(--magenta-text);
+}
+
+button.vtab-close:focus-visible {
+  outline: var(--focus-width) solid var(--tab-focus-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 button[aria-pressed="true"] {
@@ -1125,56 +1174,6 @@ button.meme-zoom:hover:not(:disabled) {
   justify-self: end;
 }
 
-/* Documents open in tabs on top of Knowledge, after the base's own. The open one is lit like the open
-   workspace; each document tab has its close button beside it. */
-.view-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  margin: 0 0 1.25rem;
-  border-bottom: 1px solid var(--edge);
-}
-
-.view-tab-pair {
-  display: inline-flex;
-  align-items: center;
-}
-
-.view-tabs button.view-tab,
-.view-tabs button.view-tab:hover:not(:disabled) {
-  max-width: 18rem;
-  margin-bottom: -1px;
-  padding: 0.4rem 0.2rem;
-  overflow: hidden;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--ink-dim);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.view-tabs button.view-tab:hover:not(:disabled) {
-  color: var(--ink);
-}
-
-.view-tabs button.view-tab[aria-current="true"] {
-  border-bottom-color: var(--cyan);
-  color: var(--cyan);
-}
-
-.view-tabs button.view-tab-close,
-.view-tabs button.view-tab-close:hover:not(:disabled) {
-  padding: 0 0.35rem;
-  border: 0;
-  background: transparent;
-  color: var(--ink-dim);
-}
-
-.view-tabs button.view-tab-close:hover:not(:disabled) {
-  color: var(--magenta-text);
-}
-
 /* A document's text: as stored, line breaks kept, long lines wrapped. */
 .document-text {
   max-height: 60vh;
@@ -1192,15 +1191,15 @@ button.meme-zoom:hover:not(:disabled) {
   margin-top: 0;
 }
 
-/* Knowledge takes a file dropped anywhere on it: while one is dragged over, the view is outlined and
-   says where it goes. */
+/* The Library takes a file dropped anywhere on its panel, either view: while one is dragged over, the
+   body is outlined and says where it goes. The wrapper only listens; it draws nothing of its own. */
 .drop-zone {
-  position: relative;
+  display: contents;
 }
 
-.drop-zone[data-dragging] {
+.drop-zone[data-dragging] .wp-body {
   outline: 1px dashed var(--cyan);
-  outline-offset: 0.5rem;
+  outline-offset: -0.5rem;
 }
 
 .drop-hint {
