@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
 import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
@@ -15,6 +15,8 @@ import { Button, Notice } from "./ui.js";
 export type Turn = {
   sendId: string;
   id: string;
+  // its place in the conversation, once the archive has it
+  seq?: number;
   content: string;
   reply: string;
   state: ArchivedTurnState | "unknown";
@@ -31,6 +33,11 @@ export type Conversation = {
   preview: string;
   // the orchestrator has this send waiting behind earlier turns of the conversation
   queued: boolean;
+  // the archive holds turns before the first one on screen
+  older: boolean;
+  loadingOlder: boolean;
+  olderError?: TransportError;
+  readOlder: () => Promise<void>;
   draft: string;
   setDraft: (draft: string) => void;
   busy: boolean;
@@ -49,7 +56,7 @@ export type Conversation = {
 };
 
 const fromArchive = (turn: ArchivedTurn): Turn => ({
-  sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
+  sendId: turn.sendId, id: turn.id, seq: turn.seq, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
   ...(turn.model ? { answeredBy: turn.provider ? `${turn.provider} / ${turn.model}` : turn.model } : {}),
 });
 
@@ -88,6 +95,15 @@ function newSendId(): string {
 // What a send still needs: a turn that ended without a reply is retried by the owner, a send whose
 // outcome is unknown is sent again under its own send id (the archive answers it once), and one still
 // on its way is only read again.
+// Reading the latest page again keeps what was read before it, and the sends the archive does not
+// hold yet stay last.
+export function mergedTurns(previous: readonly Turn[], archived: Turn[]): Turn[] {
+  const first = archived[0]?.seq ?? Number.POSITIVE_INFINITY;
+  const earlier = previous.filter((turn) => turn.seq !== undefined && turn.seq < first);
+  const unheld = previous.filter((turn) => !earlier.includes(turn) && !archived.some((each) => each.sendId === turn.sendId));
+  return [...earlier, ...archived, ...unheld];
+}
+
 export function retryable(turn: Turn | undefined): boolean {
   return turn !== undefined && turn.state !== "completed";
 }
@@ -113,6 +129,8 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [unkept, setUnkept] = useState(false);
   const [preview, setPreview] = useState("");
   const [queued, setQueued] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState<TransportError>();
   const field = useRef<HTMLTextAreaElement>(null);
   // Only this conversation's previews, and only while its turn is on its way.
   useEffect(() => {
@@ -136,8 +154,21 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
       return false;
     }
     const archived = (read.result.turns as ArchivedTurn[]).map(fromArchive);
-    setTurns((previous) => [...archived, ...previous.filter((turn) => !archived.some((each) => each.sendId === turn.sendId))]);
+    setTurns((previous) => mergedTurns(previous, archived));
     return true;
+  };
+
+  const firstSeq = turns[0]?.seq;
+  const readOlder = async () => {
+    if (firstSeq === undefined || firstSeq <= 1 || loadingOlder) return;
+    setLoadingOlder(true); setOlderError(undefined);
+    const read = await transport.request("conversation.read", { conversation_id: id.current, before_seq: firstSeq });
+    if (!live.current) return;
+    setLoadingOlder(false);
+    if (read.ok && isRecord(read.result) && Array.isArray(read.result.turns)) {
+      const earlier = (read.result.turns as ArchivedTurn[]).map(fromArchive);
+      setTurns((previous) => [...earlier.filter((turn) => !previous.some((each) => each.sendId === turn.sendId)), ...previous]);
+    } else if (!read.ok) setOlderError(read.error);
   };
 
   // A reopened or restored conversation is read from the archive before it can be continued. Without
@@ -228,7 +259,8 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     if ((latest.state === "failed" || latest.state === "interrupted") && latest.id) void dispatch(latest.sendId, { retry_turn_id: latest.id });
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
-  return { id: conversationId, turns, preview, queued, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
+  const older = firstSeq !== undefined && firstSeq > 1;
+  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -251,10 +283,25 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
   useEffect(() => {
     if (following.current) end.current?.scrollIntoView?.({ block: "end" });
   }, [turns.length, busy, error, preview, conversation.loading]);
+  // Turns added above keep what is on screen where it was.
+  const heightBefore = useRef(0);
+  const firstTurn = turns[0]?.sendId;
+  useLayoutEffect(() => {
+    const body = end.current?.closest(".wp-body");
+    if (body && heightBefore.current > 0) body.scrollTop += body.scrollHeight - heightBefore.current;
+    heightBefore.current = 0;
+  }, [firstTurn]);
+  const readOlder = () => {
+    following.current = false;
+    heightBefore.current = end.current?.closest(".wp-body")?.scrollHeight ?? 0;
+    void conversation.readOlder();
+  };
   const latest = turns.at(-1);
   if (conversation.loading) return <Notice announce="polite">{t("assistant_opening")}</Notice>;
   if (conversation.loadError) return <><Problem error={conversation.loadError}/><Button size="compact" onClick={conversation.reload}>{t("assistant_reload")}</Button></>;
   return <>
+    {conversation.older && <Button size="compact" disabled={conversation.loadingOlder} onClick={readOlder}>{t("assistant_older")}</Button>}
+    {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
       ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),

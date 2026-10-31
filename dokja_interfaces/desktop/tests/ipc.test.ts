@@ -823,3 +823,14 @@ test("the shared turn projection is read as the orchestrator pins it, version 1"
   assert.equal(turns[1]!.sendId,"wa-0123456789abcdef");
   assert.deepEqual([turns[2]!.attempts,turns[2]!.reason],[2,"the model returned no reply"]);
 });
+
+test("reading earlier turns names a position and nothing else", async () => {
+  const seen: Record<string, unknown>[] = [];
+  const client = {request:async (_type:string,payload:Record<string,unknown>) => { seen.push(payload); return {status:"ok",result:{domain:"conversation",result:{conversation:{id:"c".repeat(32),kind:"general",reading_id:"",title:"",updated_at:"t",revision:1,turns:0},turns:[]}}}; }};
+  const id = "c".repeat(32);
+  assert.equal((await handleRequest({type:"conversation.read",payload:{conversation_id:id,before_seq:7,limit:5000}},client as never,{defaultTimeoutMs:1000,maxTimeoutMs:1000})).ok,true);
+  assert.deepEqual(seen[0],{conversation_id:id,limit:100,before_seq:7});
+  for (const before_seq of [0,-1,1.5,"7"]) {
+    assert.equal((await handleRequest({type:"conversation.read",payload:{conversation_id:id,before_seq}},client as never,{defaultTimeoutMs:1000,maxTimeoutMs:1000})).ok,false);
+  }
+});
