@@ -53,6 +53,11 @@ export type Conversation = {
   field: RefObject<HTMLTextAreaElement | null>;
   send: (content: string) => Promise<void>;
   retry: () => void;
+  // The latest send is still on its way, here or from another interface, and can be asked to stop.
+  stoppable: boolean;
+  stopping: boolean;
+  stopFailed: boolean;
+  stop: () => Promise<void>;
 };
 
 const fromArchive = (turn: ArchivedTurn): Turn => ({
@@ -79,6 +84,7 @@ function titleFrom(message: string): string {
 const KNOWN_REASONS: Readonly<Record<string, MessageId>> = {
   "the request stopped while waiting for the earlier reply": "assistant_reason_stopped_waiting",
   "the request stopped before the reply": "assistant_reason_stopped",
+  "the owner stopped this reply": "assistant_reason_owner_stopped",
   "the model returned no reply": "assistant_reason_no_reply",
   "the conversation archive could not be read": "assistant_reason_archive",
 };
@@ -129,6 +135,10 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [unkept, setUnkept] = useState(false);
   const [preview, setPreview] = useState("");
   const [queued, setQueued] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [stopFailed, setStopFailed] = useState(false);
+  // A send this panel is waiting on ends in an error once stopped; the turn says what happened.
+  const stopped = useRef(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState<TransportError>();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -211,7 +221,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   }, [latestPending, turns]);
 
   const dispatch = async (sendId: string, payload: Record<string, unknown>) => {
-    setBusy(true); setError(undefined);
+    setBusy(true); setError(undefined); setStopFailed(false);
     try {
       const answer = await transport.request("message.created", { conversation_id: id.current, ...payload }, { timeoutMs: 120_000 });
       const turn = answer.ok && isRecord(answer.result) && isRecord(answer.result.turn) ? (answer.result.turn as unknown as ArchivedTurn) : undefined;
@@ -221,12 +231,30 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
         await readBack();
         return;
       }
-      setError(answer.ok ? { code: "unexpected", message: "The assistant returned no reply." } : answer.error);
+      if (answer.ok || !stopped.current) setError(answer.ok ? { code: "unexpected", message: "The assistant returned no reply." } : answer.error);
       await readBack(sendId);
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
       await readBack(sendId).catch(() => settle(sendId, (turn) => ({ ...turn, state: "unknown" })));
-    } finally { setBusy(false); setPreview(""); setQueued(false); field.current?.focus(); }
+    } finally { stopped.current = false; setBusy(false); setPreview(""); setQueued(false); field.current?.focus(); }
+  };
+
+  // Stopping only asks: the turn, read from the archive, says how the send ended. A send nothing here
+  // waits on is read back at once, and a stop that came too late needs no apology once it has settled.
+  const stop = async () => {
+    const latest = turns.at(-1);
+    if (stopping || latest?.state !== "pending" || !id.current) return;
+    setStopping(true); setStopFailed(false);
+    const waited = busy;
+    stopped.current = waited;
+    const answer = await transport.request("conversation.stop", { conversation_id: id.current, send_id: latest.sendId }).catch(() => undefined);
+    if (!live.current) return;
+    setStopping(false);
+    if (!answer?.ok) { stopped.current = false; setStopFailed(true); }
+    if (!waited) {
+      await readBack();
+      field.current?.focus();
+    }
   };
 
   const send = async (content: string) => {
@@ -260,7 +288,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
   const older = firstSeq !== undefined && firstSeq > 1;
-  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
+  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry, stoppable: turns.at(-1)?.state === "pending", stopping, stopFailed, stop };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -311,6 +339,7 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
     {busy && !preview && <Notice announce="polite">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</Notice>}
     {!busy && latest?.state === "pending" && <Notice announce="polite">{t("assistant_still_pending")}</Notice>}
+    {conversation.stopFailed && latest?.state === "pending" && <Notice announce="assertive">{t("assistant_stop_failed")}</Notice>}
     {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <Notice announce="assertive">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</Notice>}
     {conversation.unkept && <Notice announce="assertive">{t("assistant_history_unavailable")}</Notice>}
     {error && <Problem error={error}/>}
@@ -340,9 +369,10 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts, footer
     <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={1} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
     <Button type="submit" variant="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</Button>
-    {(hint || footer) && <div className="composer-foot">
+    {(hint || footer || conversation.stoppable) && <div className="composer-foot">
       {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
       {footer}
+      {conversation.stoppable && <Button size="compact" disabled={conversation.stopping} onClick={() => void conversation.stop()}>{t("assistant_stop")}</Button>}
     </div>}
   </form>;
 }

@@ -200,11 +200,59 @@ stream can notice a requester that went away, and then the send fails as stopped
 while waiting. That detection is best effort, because one write can succeed after
 the other side has gone. Other request paths, including WhatsApp, report nothing.
 
+## Stopping a send (`10.6-b`, third batch)
+
+The owner can stop a send of an archived conversation from another request:
+`conversation.stop` takes `conversation_id` and `send_id`, the identities the
+interface already holds, so a send can be stopped before it has a turn on screen.
+The action is additive and goes to the conversation handler like the other
+`conversation.*` actions; the event envelope, schema and configuration do not change.
+
+The orchestrator keeps the running sends, queued ones included, in `core.RunningSends`,
+shared by the chat and conversation handlers. A stop only cancels the send's context.
+The send's own request still settles the turn, so there is one writer and one outcome,
+and the attempt fence above needs no change.
+
+| Situation | Outcome |
+| --- | --- |
+| Queued | Turn fails with `the owner stopped this reply`; the model was never asked |
+| Being answered | Inference is cancelled, which kills the provider's process group; the turn fails with the same reason |
+| Reply already arrived | The reply is recorded: a stop is a request, and the turn says how the send ended |
+| Nothing running under that send, restart included | Conflict; nothing changes |
+| Unknown conversation | Not found; nothing changes |
+| A source that keeps no conversations | Refused |
+| Same-turn steering (`conversation.steer`) | Refused as unsupported; a separate capability that nothing offers |
+
+A stopped turn retries like any failed turn, under the existing rule that only the
+latest turn can be retried, so stopping a turn while a later one is queued leaves it
+unretryable once that later turn exists. Stopping an earlier turn does not stop later
+ones: they are answered next.
+
+The queue admits a send just before it can be stopped, so a stop in that moment
+conflicts. A conflict says nothing about the turn: Talk says the reply could not be
+stopped only while it is still on its way.
+A send from the owner's phone goes through the same path, so Talk can stop it too. The
+WhatsApp adapter treats the error like any failed dispatch and posts its generic failure
+message to the owner's own chat; it does not say the owner stopped the reply.
+
+Talk offers Stop, and an older orchestrator answers it as an unsupported action, so
+each interface is updated with the orchestrator. The CLI offers `conversations stop <id>`
+and the TUI the `s` key in an open conversation; both name the latest pending send. A
+first message in the TUI cannot be stopped, because its conversation does not exist
+until that send's own request starts it.
+
+Verification: unit tests cover the cause, naming, finished sends and a retry replacing
+an older attempt. Handler regressions use channel-controlled generations for a running
+send, a retry, a queued send, nothing running, refused requests leaving a running send
+untouched, and a stop through `core.Service` while the send's request is open. Making
+`Stop` a no-op fails the running, retry and queued regressions. No live provider process
+or real Electron run was exercised; the process kill is the existing cancellation.
+
 ## Remaining architecture work
 
 `10.6-a` remains open for the general logical-task mapping, state-revision and
 attempt relationships, authority and aggregate-budget contract, and compatibility
-at an actual workflow consumer. `10.6-b` still owns explicit capability outcomes and
+at an actual workflow consumer. `10.6-b` still owns a general capability report and
 ordering beyond archived chat. `10.6-c` owns broader result/report settlement and justified
 durable recovery. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.

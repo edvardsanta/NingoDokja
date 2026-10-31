@@ -759,6 +759,26 @@ test("reading media enters the preview gate without authorizing its article addr
   assert.deepEqual(remembered, [["https://images.example/reading.jpg"]]);
 });
 
+test("stopping a send needs a press and names only the conversation and the send", async () => {
+  const id = "c".repeat(32);
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"conversation",result:{conversation_id:id,send_id:"send-0001",stopping:true}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const stop = {conversation_id:id,send_id:"send-0001"};
+  assert.equal((await handleRequest({type:"conversation.stop",payload:stop},client,limits)).ok,false,"a stop needs a press");
+  const present = {recent:()=>true};
+  for (const payload of [{conversation_id:id},{send_id:"send-0001"},{conversation_id:"../x",send_id:"send-0001"},{conversation_id:id,send_id:"bad id"}]) {
+    assert.equal((await handleRequest({type:"conversation.stop",payload},client,limits,undefined,present)).ok,false,JSON.stringify(payload));
+  }
+  assert.deepEqual(calls,[]);
+  const stopped = await handleRequest({type:"conversation.stop",payload:{...stop,scope:"other"}},client,limits,undefined,present);
+  assert.deepEqual(stopped,{ok:true,result:{stopping:true}});
+  assert.deepEqual(calls,[{type:"conversation.stop",payload:stop}]);
+});
+
 test("renaming needs a press and deleting also the person's yes; both name the version they saw", async () => {
   const id = "c".repeat(32);
   const calls: unknown[] = [];

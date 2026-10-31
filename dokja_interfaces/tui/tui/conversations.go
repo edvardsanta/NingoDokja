@@ -33,8 +33,8 @@ type conversationRow struct {
 // conversationTurn reads version 1 of the turn projection, pinned by the orchestrator's
 // testdata/turn_view_v1.json. Provider and model are what answered, not what was selected.
 type conversationTurn struct {
-	View, Seq                                          int
-	ID, Content, Reply, State, Reason, Provider, Model string
+	View, Seq                                                  int
+	ID, SendID, Content, Reply, State, Reason, Provider, Model string
 }
 
 type conversationOpen struct {
@@ -72,6 +72,16 @@ type conversationsView struct {
 	mode conversationMode
 	// scroll is how many lines the transcript sits above its end.
 	scroll int
+	// sending is the send this screen is waiting on, the one a stop reaches first.
+	sending *runningTurn
+	// stopping holds a second stop back while the first is on its way.
+	stopping bool
+}
+
+// runningTurn names a send as the orchestrator knows it. A first message has none until the
+// conversation it starts exists, so it cannot be stopped from here.
+type runningTurn struct {
+	conversationID, sendID string
 }
 
 func (c *conversationsView) writing() bool { return c.mode != conversationBrowsing }
@@ -93,6 +103,13 @@ type conversationOlderMsg struct {
 	id     string
 	turns  []conversationTurn
 	notice string
+}
+
+type conversationStopMsg struct {
+	err error
+	// waited says this screen is waiting on the send, whose answer will show how it ended.
+	waited         bool
+	conversationID string
 }
 
 func (c *conversationsView) applyList(msg conversationsMsg) {
@@ -158,7 +175,7 @@ func parseConversationRow(fields map[string]any) conversationRow {
 
 func parseConversationTurn(fields map[string]any) conversationTurn {
 	return conversationTurn{
-		View: num(fields, "view"), Seq: num(fields, "seq"), ID: str(fields, "id"), Content: str(fields, "content"), Reply: str(fields, "reply"),
+		View: num(fields, "view"), Seq: num(fields, "seq"), ID: str(fields, "id"), SendID: str(fields, "send_id"), Content: str(fields, "content"), Reply: str(fields, "reply"),
 		State: str(fields, "state"), Reason: str(fields, "reason"), Provider: str(fields, "provider"), Model: str(fields, "model"),
 	}
 }
@@ -186,6 +203,42 @@ func retryableTurn(turns []conversationTurn) (conversationTurn, bool) {
 		}
 	}
 	return conversationTurn{}, false
+}
+
+// stoppableTurn is the send a stop reaches: the one this screen waits on, or else one still on its way
+// from another interface. Only the latest turn can be, as in the desktop.
+func (c *conversationsView) stoppableTurn() (runningTurn, bool) {
+	if c.sending != nil {
+		return *c.sending, true
+	}
+	if c.open == nil || c.open.row.ID == "" || len(c.open.turns) == 0 {
+		return runningTurn{}, false
+	}
+	latest := c.open.turns[len(c.open.turns)-1]
+	if latest.State != "pending" || latest.SendID == "" {
+		return runningTurn{}, false
+	}
+	return runningTurn{c.open.row.ID, latest.SendID}, true
+}
+
+// cmdConversationStop goes out even while a turn is awaited, which is when it matters, so it takes no
+// part in begin; every request has its own socket. It only asks: the turn says how the send ended.
+func (m *Model) cmdConversationStop() tea.Cmd {
+	view := &m.conversations
+	target, ok := view.stoppableTurn()
+	if !ok {
+		m.setNotice(tr("nothing_to_stop"), true)
+		return nil
+	}
+	if view.stopping {
+		return nil
+	}
+	view.stopping = true
+	waited := view.sending != nil
+	return func() tea.Msg {
+		_, err := m.request("conversation.stop", map[string]any{"conversation_id": target.conversationID, "send_id": target.sendID})
+		return conversationStopMsg{err: err, waited: waited, conversationID: target.conversationID}
+	}
 }
 
 func (m *Model) cmdConversations(cursor string) tea.Cmd {
@@ -250,9 +303,12 @@ func (m *Model) cmdConversationOlder(open *conversationOpen) tea.Cmd {
 
 // cmdConversationTurn asks for a turn and shows what the archive holds afterwards, whether the turn
 // was answered or not: a failed turn is on the transcript with its reason.
-func (m *Model) cmdConversationTurn(id, title string, payload map[string]any) tea.Cmd {
+func (m *Model) cmdConversationTurn(id, title, sendID string, payload map[string]any) tea.Cmd {
 	if !m.begin(tr("waiting_for_ningo")) {
 		return nil
+	}
+	if id != "" && sendID != "" {
+		m.conversations.sending = &runningTurn{id, sendID}
 	}
 	return func() tea.Msg {
 		if id == "" {
@@ -285,7 +341,7 @@ func (m *Model) cmdConversationSend(text string) tea.Cmd {
 		m.setNotice(err.Error(), true)
 		return nil
 	}
-	return m.cmdConversationTurn(m.conversations.open.row.ID, cli.ConversationTitle(text),
+	return m.cmdConversationTurn(m.conversations.open.row.ID, cli.ConversationTitle(text), sendID,
 		map[string]any{"content": text, "send_id": sendID})
 }
 
@@ -409,7 +465,9 @@ func (m *Model) keyConversationOpen(key string) (tea.Model, tea.Cmd) {
 			m.setNotice(tr("nothing_to_send_again"), true)
 			return m, nil
 		}
-		return m, m.cmdConversationTurn(view.open.row.ID, "", map[string]any{"retry_turn_id": turn.ID})
+		return m, m.cmdConversationTurn(view.open.row.ID, "", turn.SendID, map[string]any{"retry_turn_id": turn.ID})
+	case "s":
+		return m, m.cmdConversationStop()
 	}
 	return m, nil
 }

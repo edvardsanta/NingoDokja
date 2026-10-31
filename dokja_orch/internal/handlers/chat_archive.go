@@ -27,6 +27,9 @@ const (
 // never asked.
 const reasonStoppedWaiting = "the request stopped while waiting for the earlier reply"
 
+// The reason a send records when its owner stopped it, queued or being answered.
+const reasonOwnerStopped = "the owner stopped this reply"
+
 // WithArchive keeps the owner's conversations: a turn that names one by its id, with a send id, is
 // recorded there before the model is asked, and ends there completed or failed.
 func (h *ChatDomainHandler) WithArchive(archive *conversation.Archive) *ChatDomainHandler {
@@ -120,11 +123,18 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	// Released once this turn has settled, so the next send's context holds this reply.
 	defer ticket.Release()
+	// A stopped send ends through this context, and this request still settles its turn.
+	ctx, finished := h.running.Track(ctx, held.ID, turn.SendID)
+	defer finished()
 	if err := waitForTurn(ctx, ticket); err != nil {
-		if _, failed := h.archive.Fail(context.WithoutCancel(ctx), scope, turn, reasonStoppedWaiting); failed != nil {
-			return nil, fmt.Errorf("%s; and the conversation archive could not record it", reasonStoppedWaiting)
+		reason := reasonStoppedWaiting
+		if stoppedByOwner(ctx) {
+			reason = reasonOwnerStopped
 		}
-		return nil, errors.New(reasonStoppedWaiting)
+		if _, failed := h.archive.Fail(context.WithoutCancel(ctx), scope, turn, reason); failed != nil {
+			return nil, fmt.Errorf("%s; and the conversation archive could not record it", reason)
+		}
+		return nil, errors.New(reason)
 	}
 
 	// What came before, from the archive: completed turns only, within the budgets.
@@ -271,13 +281,20 @@ func waitForTurn(ctx context.Context, ticket *core.QueueTicket) error {
 // failArchived records why the turn got no reply, so it stays visibly failed, and gives the error
 // back to the caller. A cancelled request still records its outcome, in plain words.
 func (h *ChatDomainHandler) failArchived(ctx context.Context, scope conversation.Scope, turn conversation.Turn, reason string) error {
-	if ctx.Err() != nil {
+	switch {
+	case stoppedByOwner(ctx):
+		reason = reasonOwnerStopped
+	case ctx.Err() != nil:
 		reason = "the request stopped before the reply"
 	}
 	if _, err := h.archive.Fail(context.WithoutCancel(ctx), scope, turn, reason); err != nil {
 		return fmt.Errorf("%s; and the conversation archive could not record it", reason)
 	}
 	return errors.New(reason)
+}
+
+func stoppedByOwner(ctx context.Context) bool {
+	return errors.Is(context.Cause(ctx), core.ErrSendStopped)
 }
 
 func replayedTurn(workflow core.WorkflowStep, held conversation.Conversation, turn conversation.Turn) (map[string]any, error) {

@@ -65,6 +65,7 @@ func main() {
 	// The owner's conversations live in a file of their own beside the shared database, opened by
 	// the orchestrator alone. Without it, conversations are not kept and chat goes on as before.
 	var archive *conversation.Archive
+	runningSends := core.NewRunningSends()
 	var facts *conversation.Facts
 	if path := os.Getenv("DOKJA_DB_FILE"); path != "" {
 		db, err := store.Open(path)
@@ -223,10 +224,10 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}).WithArchive(archive).WithFacts(facts),
+		}).WithArchive(archive).WithFacts(facts).WithRunningSends(runningSends),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
-		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRealtime(conversation.NewConversationContextEngine()),
+		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 

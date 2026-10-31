@@ -346,11 +346,33 @@ func retryable(turns []archivedTurn) (archivedTurn, bool) {
 	return archivedTurn{}, false
 }
 
+// stopLatest asks the orchestrator to stop the conversation's latest turn, if it is on its way. It only
+// asks: reading the conversation shows how the send ended.
+func stopLatest(ask archiveRequest, out io.Writer, reference string) error {
+	id, err := matchConversation(ask, reference)
+	if err != nil {
+		return err
+	}
+	held, err := readConversation(ask, id, defaultTurnsRead)
+	if err != nil {
+		return err
+	}
+	if len(held.Turns) == 0 || held.Turns[len(held.Turns)-1].State != "pending" {
+		return fmt.Errorf("nothing in this conversation is on its way")
+	}
+	latest := held.Turns[len(held.Turns)-1]
+	if _, err := ask("conversation.stop", map[string]any{"conversation_id": id, "send_id": latest.SendID}); err != nil {
+		return fmt.Errorf("the reply could not be stopped, and it may still arrive: %w", err)
+	}
+	fmt.Fprintln(out, "Asked Ningo to stop. Read the conversation to see how it ended.")
+	return nil
+}
+
 func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
 	command := &cobra.Command{
 		Use:     "conversations",
 		Aliases: []string{"conversation"},
-		Short:   "List, read, rename and delete the conversations the desktop and the phone share",
+		Short:   "List, read, rename, delete and stop the conversations the desktop and the phone share",
 	}
 	var limit int
 	var cursor string
@@ -449,6 +471,15 @@ func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
 		},
 	}
 
-	command.AddCommand(list, read, rename, remove, retry)
+	stop := &cobra.Command{
+		Use:   "stop <id>",
+		Short: "Stop the reply a conversation is waiting for",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return stopLatest(a.archiveRequester(ctx), cmd.OutOrStdout(), args[0])
+		},
+	}
+
+	command.AddCommand(list, read, rename, remove, retry, stop)
 	return command
 }

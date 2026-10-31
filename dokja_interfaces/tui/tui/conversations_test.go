@@ -178,6 +178,77 @@ func TestRetryNamesTheLastUnansweredTurnAndNoNewMessage(t *testing.T) {
 	}
 }
 
+func pendingFixture(id, sendID, content string) map[string]any {
+	turn := turnFixture(id, "pending", content, "", "")
+	turn["send_id"] = sendID
+	return turn
+}
+
+func TestStoppingReachesTheSendThisScreenWaitsOn(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.stop"] = map[string]any{"stopping": true}
+	press(m, "5", "enter")
+	// As while a reply is awaited: the turn is out, and nothing else may start.
+	m.busy, m.conversations.sending = true, &runningTurn{firstConversation, "send-0001"}
+	reads := fake.count("conversation.read")
+	press(m, "s")
+	got := fake.last("conversation.stop").payload
+	if got["conversation_id"] != firstConversation || got["send_id"] != "send-0001" {
+		t.Fatal(got)
+	}
+	if !m.busy || fake.count("conversation.read") != reads {
+		t.Fatal("the awaited turn brings its own outcome", m.busy, fake.count("conversation.read"))
+	}
+	if !strings.Contains(m.notice, "parando a resposta") {
+		t.Fatal(m.notice)
+	}
+}
+
+func TestStoppingASendFromElsewhereReadsHowItEnded(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.stop"] = map[string]any{"stopping": true}
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{pendingFixture("t1", "send-elsewhere", "Agora")},
+	}
+	press(m, "5", "enter")
+	reads := fake.count("conversation.read")
+	press(m, "s")
+	if got := fake.last("conversation.stop").payload; got["send_id"] != "send-elsewhere" {
+		t.Fatal(got)
+	}
+	if fake.count("conversation.read") != reads+1 {
+		t.Fatal("a send nothing here waits on must be read again")
+	}
+}
+
+func TestAWaitedSendIsForgottenOnceItsTurnIsShown(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	press(m, "5", "enter", "enter")
+	m.conversationInput.SetValue("Agora")
+	press(m, "enter")
+	if fake.count("message.created") != 1 || m.conversations.sending != nil {
+		t.Fatal("the settled send must not stay stoppable", m.conversations.sending)
+	}
+	press(m, "s")
+	if fake.count("conversation.stop") != 0 || !strings.Contains(m.notice, "Nenhuma resposta a caminho") {
+		t.Fatal(m.notice)
+	}
+}
+
+func TestAStopThatFailsSaysSoWithoutTheArchivesWords(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{pendingFixture("t1", "send-elsewhere", "Agora")},
+	}
+	fake.errs["conversation.stop"] = errors.New("conversation changed; read it again")
+	press(m, "5", "enter", "s")
+	if !strings.Contains(m.notice, "Não consegui parar a resposta") || m.conversations.stopping {
+		t.Fatal(m.notice, m.conversations.stopping)
+	}
+}
+
 func TestRetryHasNothingToDoAfterAnAnswer(t *testing.T) {
 	m, fake := conversationsTUI(t)
 	press(m, "5", "enter", "R")

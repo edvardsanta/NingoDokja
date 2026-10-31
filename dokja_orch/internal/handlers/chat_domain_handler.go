@@ -54,6 +54,8 @@ type ChatDomainHandler struct {
 	// sends orders the archived sends of each conversation: one is answered at a time, in the order
 	// they were recorded, so each reply sees the replies before it.
 	sends *core.OrderedQueue
+	// running lets another request stop a send of an archived conversation.
+	running *core.RunningSends
 }
 
 func (h *ChatDomainHandler) WithVoiceGenerator(generator VoiceChatStreamingGenerator) *ChatDomainHandler {
@@ -67,7 +69,14 @@ func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
 		sessions:    newChatSessionManager(),
 		voicePolicy: chat.NewVoicePolicy(),
 		sends:       core.NewOrderedQueue(maxWaitingSends),
+		running:     core.NewRunningSends(),
 	}
+}
+
+// WithRunningSends shares the running sends with whoever may stop them.
+func (h *ChatDomainHandler) WithRunningSends(running *core.RunningSends) *ChatDomainHandler {
+	h.running = running
+	return h
 }
 
 func (h *ChatDomainHandler) Domain() core.Domain {
