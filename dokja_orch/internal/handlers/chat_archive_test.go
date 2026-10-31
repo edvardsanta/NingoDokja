@@ -328,3 +328,26 @@ func TestAnArchivedTurnKeepsTheModelTheRuntimeNames(t *testing.T) {
 		t.Fatal(turns, err)
 	}
 }
+
+func TestTheCLIContinuesTheConversationTheDesktopStarted(t *testing.T) {
+	archive := archiveFor(t)
+	model := &scriptedModel{answers: []map[string]any{{"reply": "From the desktop."}, {"reply": "From the terminal."}}}
+	handler := NewChatDomainHandler(model).WithArchive(archive)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "Shared")
+	if _, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": "First", "conversation_id": held.ID, "send_id": "send-0001"}), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+	event := ownerTurn(map[string]any{"content": "Second", "conversation_id": held.ID, "send_id": "cli-0123456789abcdef"})
+	event.Source = core.SourceCLI
+	result, err := handler.Handle(context.Background(), event, archiveStep)
+	if err != nil || result["reply"] != "From the terminal." {
+		t.Fatal(result, err)
+	}
+	turns, err := archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	if err != nil || len(turns) != 2 || turns[1].Content != "Second" || turns[1].SendID != "cli-0123456789abcdef" {
+		t.Fatal("the terminal's turn must join the same conversation", turns, err)
+	}
+	if asked := model.asked[1]; len(asked) != 3 || asked[1]["content"] != "From the desktop." {
+		t.Fatal("the terminal's reply must see the desktop's turns", asked)
+	}
+}

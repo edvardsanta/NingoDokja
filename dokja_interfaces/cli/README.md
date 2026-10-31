@@ -49,7 +49,18 @@ go run ./cmd/dokja-cli discord send --channel 123456789012345678 --text oi --ima
 go run ./cmd/dokja-cli book classify ./test/sample.pdf
 go run ./cmd/dokja-cli book summarize ./test/sample.epub --title "Clean Architecture"
 go run ./cmd/dokja-cli emit message.created --payload content=hello --payload channel=general
+go run ./cmd/dokja-cli conversations list
+go run ./cmd/dokja-cli conversations read 1a2b3c4d
+go run ./cmd/dokja-cli conversations rename 1a2b3c4d Justice and power
+go run ./cmd/dokja-cli conversations delete 1a2b3c4d
+go run ./cmd/dokja-cli chat --continue And from the terminal?
+go run ./cmd/dokja-cli chat --conversation 1a2b3c4d
+go run ./cmd/dokja-cli chat --new A new topic
 ```
+
+Conversations are the archive the desktop and the phone share: `--continue` takes the latest
+general conversation, as the phone does, and without a message opens the REPL there. A plain
+`chat` is a session of its own and is not archived.
 
 Administrative commands:
 
