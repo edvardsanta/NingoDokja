@@ -54,6 +54,7 @@ go run ./cmd/dokja-cli conversations read 1a2b3c4d
 go run ./cmd/dokja-cli conversations rename 1a2b3c4d Justice and power
 go run ./cmd/dokja-cli conversations delete 1a2b3c4d
 go run ./cmd/dokja-cli conversations retry 1a2b3c4d
+go run ./cmd/dokja-cli conversations stop 1a2b3c4d
 go run ./cmd/dokja-cli chat --continue And from the terminal?
 go run ./cmd/dokja-cli chat --conversation 1a2b3c4d
 go run ./cmd/dokja-cli chat --new A new topic

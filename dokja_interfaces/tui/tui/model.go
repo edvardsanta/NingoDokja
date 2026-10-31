@@ -611,6 +611,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case conversationOpenMsg:
 		m.busy = false
+		m.conversations.sending = nil
 		m.conversations.applyOpen(msg)
 		if msg.notice != "" {
 			m.setNotice(msg.notice, true)
@@ -624,6 +625,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setNotice(msg.notice, true)
 		}
 		return m, nil
+
+	case conversationStopMsg:
+		m.conversations.stopping = false
+		if msg.err != nil {
+			m.setNotice(tr("reply_could_not_be_stopped"), true)
+		} else {
+			m.setNotice(tr("stopping_the_reply"), false)
+		}
+		// A send nothing here waits on is read again; an awaited one brings its own outcome.
+		if msg.waited || m.conversations.open == nil || m.conversations.open.row.ID != msg.conversationID {
+			return m, nil
+		}
+		return m, m.cmdConversationOpen(msg.conversationID)
 
 	case memoryListMsg:
 		m.busy = false

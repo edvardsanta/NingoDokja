@@ -227,6 +227,39 @@ func TestDeletingAsksAndNoLeavesTheConversation(t *testing.T) {
 	}
 }
 
+func TestStopNamesTheLatestTurnStillOnItsWay(t *testing.T) {
+	held := conversationID("a")
+	archive := &scriptedArchive{answers: map[string]string{
+		"conversation.read": fmt.Sprintf(`{"conversation":{"id":"%s"},"turns":[{"send_id":"send-old","state":"completed"},{"send_id":"send-0001","state":"pending"}]}`, held),
+		"conversation.stop": fmt.Sprintf(`{"conversation_id":"%s","send_id":"send-0001","stopping":true}`, held),
+	}}
+	var out bytes.Buffer
+	if err := stopLatest(archive.ask, &out, held); err != nil {
+		t.Fatal(err)
+	}
+	last := archive.payload[len(archive.payload)-1]
+	if archive.asked[len(archive.asked)-1] != "conversation.stop" || last["conversation_id"] != held || last["send_id"] != "send-0001" {
+		t.Fatal(archive.asked, last)
+	}
+	if !strings.Contains(out.String(), "Read the conversation") {
+		t.Fatal("a stop only asks, and must not claim the reply ended", out.String())
+	}
+}
+
+func TestStopAsksNothingWhenNoReplyIsOnItsWay(t *testing.T) {
+	held := conversationID("a")
+	archive := &scriptedArchive{answers: map[string]string{
+		"conversation.read": fmt.Sprintf(`{"conversation":{"id":"%s"},"turns":[{"send_id":"send-0001","state":"pending"},{"send_id":"send-0002","state":"completed"}]}`, held),
+	}}
+	var out bytes.Buffer
+	if err := stopLatest(archive.ask, &out, held); err == nil || !strings.Contains(err.Error(), "on its way") {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(archive.asked, " "), "conversation.stop") {
+		t.Fatal("nothing to stop must ask nothing", archive.asked)
+	}
+}
+
 func TestAConversationWithNoTitleIsSaidToHaveNone(t *testing.T) {
 	var out bytes.Buffer
 	printConversations(&out, conversationListing{Conversations: []archivedConversation{{ID: conversationID("a"), Kind: "reading", Turns: 1, UpdatedAt: "2026-10-30T12:00:00Z"}}, Next: "1.a"})
