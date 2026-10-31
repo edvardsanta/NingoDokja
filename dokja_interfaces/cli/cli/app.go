@@ -102,6 +102,7 @@ func (a *App) newRootCommand(ctx context.Context) *cobra.Command {
 	root.AddCommand(a.newSettingsCommand(ctx))
 	root.AddCommand(a.newProvidersCommand(ctx))
 	root.AddCommand(a.newChatCommand(ctx))
+	root.AddCommand(a.newConversationsCommand(ctx))
 	root.AddCommand(a.newKnowledgeCommand(ctx))
 	root.AddCommand(a.newMemoryCommand(ctx))
 	root.AddCommand(a.newEmitCommand(ctx))
@@ -421,6 +422,7 @@ func (a *App) newBookCommand(ctx context.Context) *cobra.Command {
 }
 
 func (a *App) newChatCommand(ctx context.Context) *cobra.Command {
+	var target chatTarget
 	command := &cobra.Command{
 		Use:   "chat [message]",
 		Short: "Send chat messages through the orchestrator",
@@ -430,11 +432,16 @@ func (a *App) newChatCommand(ctx context.Context) *cobra.Command {
 				return a.chatOnce(ctx, strings.Join(args, " "), chatSessionOptions{
 					sessionKey:      fmt.Sprintf("cli:direct:%s:%d", a.emitOpts.userID, time.Now().UTC().UnixNano()),
 					forceNewSession: true,
+					target:          target,
 				})
 			}
-			return a.chatREPL(ctx)
+			return a.chatREPL(ctx, target)
 		},
 	}
+	command.Flags().BoolVar(&target.start, "new", false, "start a conversation in the archive")
+	command.Flags().BoolVar(&target.proceed, "continue", false, "continue the latest conversation, the one the desktop and the phone continue")
+	command.Flags().StringVar(&target.reference, "conversation", "", "continue this conversation")
+	command.MarkFlagsMutuallyExclusive("new", "continue", "conversation")
 
 	command.AddCommand(a.newChatProfileCommand(ctx))
 	return command
@@ -525,6 +532,9 @@ func (a *App) request(ctx context.Context, opts EmitOptions) error {
 type chatSessionOptions struct {
 	sessionKey      string
 	forceNewSession bool
+	target          chatTarget
+	// conversationID is set once the target is known, so a REPL stays in one conversation.
+	conversationID *string
 }
 
 func (a *App) chatOnce(ctx context.Context, message string, session chatSessionOptions) error {
@@ -534,20 +544,19 @@ func (a *App) chatOnce(ctx context.Context, message string, session chatSessionO
 	}
 	defer requester.Close()
 
+	payload, chatContext, err := a.chatFields(ctx, message, session)
+	if err != nil {
+		return err
+	}
+
 	response, err := requester.Request(ctx, BuildEvent(EmitOptions{
 		Type:      "message.created",
 		UserID:    a.emitOpts.userID,
 		UserName:  a.emitOpts.userName,
 		ChannelID: a.emitOpts.channelID,
-		Payload: map[string]any{
-			"content": strings.TrimSpace(message),
-		},
-		Context: map[string]any{
-			"interface":         "cli",
-			"session_key":       strings.TrimSpace(session.sessionKey),
-			"force_new_session": session.forceNewSession,
-		},
-		Source: "cli",
+		Payload:   payload,
+		Context:   chatContext,
+		Source:    "cli",
 	}))
 	if err != nil {
 		return fmt.Errorf("request chat event: %w", err)
@@ -562,12 +571,46 @@ func (a *App) chatOnce(ctx context.Context, message string, session chatSessionO
 	return nil
 }
 
-func (a *App) chatREPL(ctx context.Context) error {
+// chatFields says where a message goes: an archived conversation when one was asked for, and
+// otherwise the session of its own a chat has always had.
+func (a *App) chatFields(ctx context.Context, message string, session chatSessionOptions) (map[string]any, map[string]any, error) {
+	content := strings.TrimSpace(message)
+	if !session.target.archived() {
+		return map[string]any{"content": content}, map[string]any{
+			"interface":         "cli",
+			"session_key":       strings.TrimSpace(session.sessionKey),
+			"force_new_session": session.forceNewSession,
+		}, nil
+	}
+	id := ""
+	if session.conversationID != nil {
+		id = *session.conversationID
+	}
+	if id == "" {
+		resolved, err := session.target.resolve(a.archiveRequester(ctx), content)
+		if err != nil {
+			return nil, nil, err
+		}
+		id = resolved
+		if session.conversationID != nil {
+			*session.conversationID = id
+		}
+	}
+	sendID, err := newSendID()
+	if err != nil {
+		return nil, nil, err
+	}
+	return map[string]any{"content": content, "conversation_id": id, "send_id": sendID},
+		map[string]any{"interface": "cli"}, nil
+}
+
+func (a *App) chatREPL(ctx context.Context, target chatTarget) error {
 	fmt.Println("dokja chat repl")
 	fmt.Println("type 'exit' or 'quit' to stop")
 
 	sessionKey := fmt.Sprintf("cli:repl:%s:%d", a.emitOpts.userID, time.Now().UTC().UnixNano())
 	forceNewSession := true
+	conversationID := ""
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("> ")
@@ -589,6 +632,8 @@ func (a *App) chatREPL(ctx context.Context) error {
 		if err := a.chatOnce(ctx, line, chatSessionOptions{
 			sessionKey:      sessionKey,
 			forceNewSession: forceNewSession,
+			target:          target,
+			conversationID:  &conversationID,
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "chat error: %v\n", err)
 		} else {
