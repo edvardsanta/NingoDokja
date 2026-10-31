@@ -617,6 +617,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case conversationOlderMsg:
+		m.busy = false
+		m.conversations.applyOlder(msg)
+		if msg.notice != "" {
+			m.setNotice(msg.notice, true)
+		}
+		return m, nil
+
 	case memoryListMsg:
 		m.busy = false
 		list := msg.list

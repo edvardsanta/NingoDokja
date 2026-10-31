@@ -6,6 +6,7 @@ package tui
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -275,5 +276,122 @@ func TestF5OpensTheTab(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyF5})
 	if m.tab != tabConversations {
 		t.Fatal(fake.calls)
+	}
+}
+
+// numberedTurns are turns first to last of a conversation, each with its place in it.
+func numberedTurns(first, last int) []any {
+	turns := []any{}
+	for seq := first; seq <= last; seq++ {
+		turn := turnFixture(fmt.Sprintf("t%d", seq), "completed", fmt.Sprintf("pergunta %d", seq), "resposta", "")
+		turn["seq"] = float64(seq)
+		delete(turn, "provider")
+		delete(turn, "model")
+		turns = append(turns, turn)
+	}
+	return turns
+}
+
+func readPage(turns []any) map[string]any {
+	return map[string]any{"conversation": conversationFixture(firstConversation, "general", "Longa", 3), "turns": turns}
+}
+
+func TestEarlierTurnsAreReadOnRequest(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(101, 200))
+	m.height = 24
+	press(m, "5", "enter")
+	for range 500 {
+		press(m, "up")
+	}
+	if !strings.Contains(m.View(), "Turnos anteriores com m.") {
+		t.Fatal("the top of the page says there is more", m.View())
+	}
+	fake.responses["conversation.read"] = readPage(numberedTurns(1, 100))
+	press(m, "m")
+	got := fake.last("conversation.read").payload
+	if got["conversation_id"] != firstConversation || got["before_seq"] != 101 {
+		t.Fatal(got)
+	}
+	if turns := m.conversations.open.turns; len(turns) != 200 || turns[0].Seq != 1 || turns[199].Seq != 200 {
+		t.Fatal(len(turns))
+	}
+	view := m.View()
+	if !strings.Contains(view, "pergunta 101") || strings.Contains(view, "pergunta 100") {
+		t.Fatal("what was on screen stays where it was", view)
+	}
+	for range 500 {
+		press(m, "up")
+	}
+	if strings.Contains(m.View(), "Turnos anteriores com m.") {
+		t.Fatal("the first turn is on screen, there is nothing earlier")
+	}
+}
+
+func TestThereIsNothingEarlierInAShortConversation(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(1, 3))
+	press(m, "5", "enter", "m")
+	if fake.count("conversation.read") != 1 {
+		t.Fatal("nothing to read")
+	}
+	if strings.Contains(m.View(), "Turnos anteriores") {
+		t.Fatal(m.View())
+	}
+}
+
+func TestSendingKeepsTheEarlierTurnsAlreadyRead(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(101, 200))
+	press(m, "5", "enter")
+	fake.responses["conversation.read"] = readPage(numberedTurns(1, 100))
+	press(m, "m")
+	fake.responses["conversation.read"] = readPage(numberedTurns(102, 201))
+	press(m, "enter")
+	typeText(m, "mais uma")
+	press(m, "enter")
+	turns := m.conversations.open.turns
+	if len(turns) != 201 || turns[0].Seq != 1 || turns[100].Seq != 101 || turns[200].Seq != 201 {
+		t.Fatal(len(turns))
+	}
+	if m.conversations.scroll != 0 {
+		t.Fatal("after a send the end is shown")
+	}
+}
+
+func TestARepeatedTurnInAPageIsShownOnce(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(50, 60))
+	press(m, "5", "enter")
+	fake.responses["conversation.read"] = readPage(numberedTurns(40, 50))
+	press(m, "m")
+	if turns := m.conversations.open.turns; len(turns) != 21 || turns[10].Seq != 50 || turns[11].Seq != 51 {
+		t.Fatal(len(turns))
+	}
+}
+
+func TestAPageOfAConversationLeftBehindIsDropped(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(101, 110))
+	press(m, "5", "enter")
+	m.Update(conversationOlderMsg{id: secondConversation, turns: []conversationTurn{{ID: "other", Seq: 1}}})
+	if len(m.conversations.open.turns) != 10 {
+		t.Fatal(m.conversations.open.turns)
+	}
+	m.conversations.open = nil
+	m.Update(conversationOlderMsg{id: firstConversation, turns: []conversationTurn{{ID: "other", Seq: 1}}})
+	if m.conversations.open != nil {
+		t.Fatal("a late page does not reopen what was left")
+	}
+}
+
+func TestEarlierTurnsThatCannotBeReadChangeNothing(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.read"] = readPage(numberedTurns(101, 110))
+	press(m, "5", "enter")
+	fake.errs["conversation.read"] = errors.New("o arquivo não respondeu")
+	press(m, "m")
+	if len(m.conversations.open.turns) != 10 || !strings.Contains(m.View(), "o arquivo não respondeu") {
+		t.Fatal(m.View())
 	}
 }

@@ -243,7 +243,8 @@ ids are resolved against the list and an ambiguous one is refused. Delete asks f
 names the revision it showed. `conversations retry` sends the last unanswered turn again.
 
 The TUI batch is implemented: a Conversas tab lists, opens, writes to, renames, deletes and
-retries over the same archive, and reads the same projection.
+retries over the same archive, and reads the same projection. Earlier turns come a page at a time,
+as in Talk.
 
 ### H5: Context, retention and evidence validation
 

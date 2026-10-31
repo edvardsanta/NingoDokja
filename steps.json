@@ -1224,7 +1224,7 @@
             "dokja_docs/desktop-ux/design-tokens.md",
             "dokja_docs/desktop-ux/token-consumer-inventory.md"
           ],
-          "next_action": "Compatible preparation batches 09.6-a and 09.6-c are complete. Review the focus/motion branch; after 08.3, finish remaining all-workspace visual/accessibility acceptance in 09.6-b. Full 09.6 remains pending and active cognitive path remains 08.2.",
+          "next_action": "Compatible preparation batches 09.6-a and 09.6-c are complete and the focus/motion branch merged in PR 204. After 08.3, finish remaining all-workspace visual/accessibility acceptance in 09.6-b. Full 09.6 remains pending and active cognitive path remains 08.2.",
           "worktree": ".worktrees/desktop-focus-motion",
           "branch": "refactor/desktop-focus-motion",
           "preparation_exception": "2026-10-29: owner requested starting implementation. Compatible token-only preparation may proceed independently without changing cognition, navigation, provider control or public contracts. Full 09.6 acceptance and broader interface adoption still resume after 08.3; active path remains 08.2. Follow-up owner authorization to continue covers compatible focus/motion preparation 09.6-c with unchanged defaults and no new interface capabilities.",
@@ -1427,7 +1427,8 @@
           ],
           "evidence": [
             "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch pins a versioned turn projection (view 1) in dokja_orch/internal/handlers/testdata/turn_view_v1.json, read by the orchestrator and desktop tests; Talk shows the provider and model the runtime reported, separate from the selection, and the queued state from 10.6-b; following the end of the conversation stops while the owner reads further up and resumes when they return or send. Cancellation and steering stay absent because no backend capability exists, so nothing is simulated.",
-            "2026-10-31 long history: Talk reads earlier turns a page at a time, and reading the latest page again keeps them in order. Measured in Electron under xvfb with synthetic turns of about 600 characters, using forced layout because animation frames stall there: at 100, 500 and 2000 turns a page rendered in up to 155 ms, and typing cost 1.3, 2.2 and 5.4 ms (p90) with 656, 3056 and 12056 nodes. Windowing is not justified at these sizes. Not measured: painting, scrolling on a real display, memory."
+            "2026-10-31 long history: Talk reads earlier turns a page at a time, and reading the latest page again keeps them in order. Measured in Electron under xvfb with synthetic turns of about 600 characters, using forced layout because animation frames stall there: at 100, 500 and 2000 turns a page rendered in up to 155 ms, and typing cost 1.3, 2.2 and 5.4 ms (p90) with 656, 3056 and 12056 nodes. Windowing is not justified at these sizes. Not measured: painting, scrolling on a real display, memory.",
+            "2026-10-31 TUI: the Conversas tab reads earlier turns a page at a time with m, keeps the lines on screen where they were, and reading the latest page again keeps what was read. A page that arrives after leaving the conversation is dropped. Tests only; not run against a live orchestrator."
           ],
           "checks": [
             {
@@ -1442,7 +1443,7 @@
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "Earlier turns in the TUI; running-work and pending-interaction states need backend evidence first."
+          "next_action": "Running-work and pending-interaction states need backend evidence first."
         },
         {
           "id": "09.9",
