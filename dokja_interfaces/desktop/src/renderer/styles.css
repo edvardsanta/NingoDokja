@@ -272,6 +272,40 @@ body {
 }
 
 /* A section of the panel is not a card: a heading, and a rule between it and the one before. */
+.kept-person h3 {
+  margin: 1rem 0 0.25rem;
+}
+
+.kept-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kept-facts li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 0 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.kept-fact {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kept-facts .detail {
+  grid-column: 1;
+  margin: 0;
+}
+
+.kept-facts button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
 .wp-section + .wp-section {
   margin-top: 2rem;
   padding-top: 1.5rem;

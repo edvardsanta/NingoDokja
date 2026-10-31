@@ -1,0 +1,16 @@
+{
+  "not_known": "Só guardo isso para quem o dono me apresentou. Não guardei nada.",
+  "unavailable": "Não consegui acessar o que está guardado agora. Nada mudou; tente de novo em instantes.",
+  "remember_how": "Diga o que guardar, assim: guarde isso: o que você quer que eu lembre.",
+  "remembered": "Guardado: {fact}",
+  "too_many": "Já guardei {max} coisas suas. Apague alguma antes com: esquece e o número.",
+  "too_long": "Isso é longo demais para guardar. O limite é de {max} caracteres.",
+  "nothing_kept": "Não tenho nada guardado seu aqui.",
+  "list_header": "O que você me pediu para guardar:",
+  "list_item": "{n}. {fact}",
+  "list_footer": "Para apagar, diga: esquece e o número.",
+  "forget_how": "Diga o que esquecer, assim: esquece isso: parte do texto, ou esquece e o número da lista.",
+  "forget_none": "Não achei isso entre o que guardei aqui. Nada foi apagado.",
+  "forget_many": "{count} coisas guardadas batem com isso. Peça a lista e use o número.",
+  "forgotten": "Esquecido: {fact}"
+}

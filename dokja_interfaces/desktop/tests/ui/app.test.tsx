@@ -22,6 +22,7 @@ type Route = TransportResult | (() => Promise<TransportResult>);
 const QUIET: Partial<Record<ActionType, Route>> = {
   "digest.status": ok(OFF),
   "memory.status": ok(OFF),
+  "conversation.facts": ok({ facts: [] }),
   "knowledge.status": ok(OFF),
   "conversation.list": ok({ conversations: [], next: "" }),
 };
@@ -207,6 +208,7 @@ describe("the screen", () => {
     await waitFor(() =>
       expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list")).toEqual([
         "ningo.status",
+        "conversation.facts",
         "memory.status",
         "knowledge.status",
         "digest.status",

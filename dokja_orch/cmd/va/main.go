@@ -65,6 +65,7 @@ func main() {
 	// The owner's conversations live in a file of their own beside the shared database, opened by
 	// the orchestrator alone. Without it, conversations are not kept and chat goes on as before.
 	var archive *conversation.Archive
+	var facts *conversation.Facts
 	if path := os.Getenv("DOKJA_DB_FILE"); path != "" {
 		db, err := store.Open(path)
 		if err != nil {
@@ -79,6 +80,7 @@ func main() {
 		} else {
 			defer kept.Close()
 			archive = conversation.New(kept)
+			facts = conversation.NewFacts(kept)
 			// Turns a stopped orchestrator left pending are marked interrupted; none is sent again.
 			if n, err := archive.Recover(context.Background(), time.Now().UTC()); err != nil {
 				logger.Error("recover pending conversation turns", err)
@@ -221,10 +223,10 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}).WithArchive(archive),
+		}).WithArchive(archive).WithFacts(facts),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
-		handlers.NewConversationDomainHandler(archive).WithRealtime(conversation.NewConversationContextEngine()),
+		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 

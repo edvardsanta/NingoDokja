@@ -317,6 +317,11 @@ export type ArchivedChatReply = { off?: false; reply: string; replayed: boolean;
 
 export type ConversationStarted = { off?: false; conversation: ArchivedConversation };
 
+// A fact a known person asked Ningo to keep. Where it was kept is told as a platform, never a chat.
+export type KeptFact = { id: string; owner: boolean; person: string; content: string; place: string; createdAt: string };
+
+export type KeptFacts = { off?: false; facts: KeptFact[] };
+
 export type ConversationList = { off?: false; conversations: ArchivedConversation[]; next: string };
 
 export type ConversationRead = { off?: false; conversation: ArchivedConversation; turns: ArchivedTurn[] };

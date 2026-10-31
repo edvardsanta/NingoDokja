@@ -1173,24 +1173,27 @@
         {
           "id": "09.5-M",
           "title": "Remember what known people explicitly ask Ningo to keep",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "09.5"
           ],
           "deliverables": [
-            "Owner decisions, 2026-10-31. Saying 'keep this', 'forget this' or 'what do you know about me' works by explicit command, not the model's guess, for the people named in the private owner configuration, the owner first. A fact belongs to whoever asked, identified by the verified account and never by a typed name, and comes back when that person asks, where they ask. Anyone else saves nothing. Each person sees and deletes their own facts; the owner sees and deletes all of them on the desktop. Facts live in the database, reached through the orchestrator; the owner configuration stays identity only. A fact stays on the platform where its person is known. Private facts never reach a turn in a group unless their owner asks there or marked them for the group."
+            "Owner decisions, 2026-10-31. Saying 'keep this', 'forget this' or 'what do you know about me' works by explicit command, not the model's guess, for the people named in the private owner configuration, the owner first. A fact belongs to whoever asked, identified by the verified account and never by a typed name, and comes back when that person asks, where they ask. Anyone else saves nothing. Each person sees and deletes their own facts; the owner sees and deletes all of them on the desktop. Facts live in the database, reached through the orchestrator; the owner configuration stays identity only. A fact stays on the platform where its person is known. A shared chat only ever shows what was kept in that same chat, even to the person who kept it there; a private place shows all of the person's facts."
           ],
           "acceptance_criteria": [
             "A known person saves a fact and gets it back when they ask; an unknown sender saves nothing.",
             "A fact is tied to the verified account, so a typed name cannot reach another person's facts.",
             "Each person lists and deletes their own facts, the owner lists and deletes all of them, and a deleted fact stops appearing.",
-            "A private fact never reaches a group turn or another platform unless its owner asked for it."
+            "A fact kept in private never reaches a shared chat or its model turn, even when its person asks there; a fact kept in a shared chat stays in that chat."
           ],
-          "evidence": [],
+          "evidence": [
+            "2026-10-31 backend: explicit phrases (pt, en) answered without the model, facts stored beside the archive, known_facts attached per speaker and place, conversation.facts and conversation.fact_delete for the owner's interfaces. Mutation checks: removing the place filter or trusting a claimed known_speaker fails the tests. Not run live.",
+            "2026-10-31 desktop: the Notebook lists every person's kept facts as text and deletes one after the shell's question; it stays usable while the memory service is off."
+          ],
           "checks": [],
           "blockers": [],
           "references": [],
-          "next_action": "Implement after H4 is delivered."
+          "next_action": "Live check in the listed group: a known person keeps, recalls and forgets a fact, a stranger keeps nothing, and a private fact stays out of the group."
         },
         {
           "id": "09.6",

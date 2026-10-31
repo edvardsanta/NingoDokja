@@ -708,5 +708,16 @@
   "dialog_conversation_delete": "Apagar esta conversa?",
   "dialog_conversation_delete_detail": "{id}\n\nAs mensagens e as respostas do Ningo saem do arquivo de conversas, em todas as interfaces. As experiências registradas a partir dela continuam. Isso não pode ser desfeito.",
   "dialog_document_delete": "Apagar este documento?",
-  "dialog_document_delete_detail": "{id}\n\nOs trechos dele saem da base de pesquisa. Isso não pode ser desfeito."
+  "dialog_document_delete_detail": "{id}\n\nOs trechos dele saem da base de pesquisa. Isso não pode ser desfeito.",
+  "facts_title": "O que o Ningo guarda",
+  "facts_about": "O que as pessoas que você apresentou pediram para o Ningo guardar. Elas dizem \"guarde isso\" na conversa; o que foi guardado em um grupo só volta naquele grupo.",
+  "facts_empty": "Nada guardado ainda.",
+  "facts_owner": "Você",
+  "facts_place_private": "Guardado em particular",
+  "facts_place_shared": "Guardado em uma conversa no {place}",
+  "facts_delete": "Apagar",
+  "facts_delete_named": "Apagar {fact}",
+  "dialog_fact_delete": "Apagar este fato guardado?",
+  "dialog_fact_delete_detail": "O Ningo deixa de lembrar. A conversa em que foi dito continua como está.",
+  "dialog_fact_delete_accept": "Apagar"
 }

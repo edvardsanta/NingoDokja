@@ -53,6 +53,8 @@ export function questionFor(locale: Locale, type: ActionType, wire: Record<strin
       return ask("dialog_model_remove", t("dialog_model_remove_detail", { model: String(wire.model) }), "dialog_model_remove_accept");
     case "conversation.delete":
       return ask("dialog_conversation_delete", t("dialog_conversation_delete_detail", { id: String(wire.conversation_id) }), "dialog_delete");
+    case "conversation.fact_delete":
+      return ask("dialog_fact_delete", t("dialog_fact_delete_detail"), "dialog_fact_delete_accept");
     case "knowledge.delete":
       return ask("dialog_document_delete", t("dialog_document_delete_detail", { id: String(wire.source_id ?? "") }), "dialog_delete");
     default:

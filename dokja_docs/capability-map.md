@@ -235,6 +235,14 @@ domain includes the preferred name in direct identity replies; generated replies
 receive profile facts as private application context. See the
 [configuration and migration guide](production-runbook.md#private-owner-configuration).
 
+The owner and the people named in that file can ask Ningo to keep something ("guarde isso: ...",
+"o que você sabe sobre mim?", "esquece 2", and their English forms). The phrases are answered
+without the model. A fact belongs to whoever asked, recognized by the account and never by the
+message, and strangers keep nothing. A fact kept in a shared chat only comes back in that chat, and
+what was kept in private never reaches a shared chat or its model turn, even when its person asks
+there. Facts live beside the conversation archive, are not turns, and the owner sees and deletes
+everyone's on the desktop (`conversation.facts`, `conversation.fact_delete`).
+
 Direct owner-identity questions such as `Quem sou eu?` and `Who am I?` have a
 Chat-domain reply derived from the Discord gateway's verified-owner metadata.
 The ordinary chat handler records that reply without asking the model to infer

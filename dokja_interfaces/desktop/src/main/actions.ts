@@ -15,6 +15,8 @@ import type {
   ArchivedTurn,
   ArchivedTurnState,
   ConversationList,
+  KeptFact,
+  KeptFacts,
   ConversationRead,
   ConversationStarted,
   DeleteResult,
@@ -310,6 +312,26 @@ function conversationDeletePayload(raw: Record<string, unknown>): Record<string,
   const id = text(raw.conversation_id);
   const revision = revisionOf(raw);
   return ARCHIVE_ID.test(id) && revision !== undefined ? { conversation_id: id, revision } : undefined;
+}
+
+const MAX_FACTS_READ = 1000;
+
+function keptFact(raw: unknown): KeptFact | undefined {
+  if (!isRecord(raw) || !ARCHIVE_ID.test(text(raw.id))) return undefined;
+  return {
+    id: text(raw.id), owner: raw.owner === true, person: shorten(text(raw.person)), content: text(raw.content).slice(0, 1000),
+    place: shorten(text(raw.place)), createdAt: shorten(text(raw.created_at)),
+  };
+}
+
+function keptFacts(body: Record<string, unknown>): KeptFacts {
+  const items = Array.isArray(body.facts) ? body.facts.slice(0, MAX_FACTS_READ) : [];
+  return { facts: items.map(keptFact).filter((fact): fact is KeptFact => fact !== undefined) };
+}
+
+function factDeletePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.fact_id);
+  return ARCHIVE_ID.test(id) ? { fact_id: id } : undefined;
 }
 
 function conversationRead(body: Record<string, unknown>): ConversationRead {
@@ -786,6 +808,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
   "conversation.rename": { payload: conversationRenamePayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
+  "conversation.facts": { payload: noPayload, project: (result) => inDomain(result, "conversation", keptFacts) },
+  "conversation.fact_delete": { payload: factDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
   "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },

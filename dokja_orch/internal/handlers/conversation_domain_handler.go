@@ -18,10 +18,17 @@ import (
 type ConversationDomainHandler struct {
 	archive  *conversation.Archive
 	realtime *conversation.ConversationContextEngine
+	facts    *conversation.Facts
 }
 
 func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDomainHandler {
 	return &ConversationDomainHandler{archive: archive}
+}
+
+// WithFacts lets the owner's interfaces see and delete what known people asked to keep.
+func (h *ConversationDomainHandler) WithFacts(facts *conversation.Facts) *ConversationDomainHandler {
+	h.facts = facts
+	return h
 }
 
 func (h *ConversationDomainHandler) Domain() core.Domain {
@@ -89,6 +96,28 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 			return nil, archiveError(err)
 		}
 		return map[string]any{"conversation_id": id, "deleted": true}, nil
+	case "conversation.facts":
+		if h.facts == nil {
+			return nil, conversation.ErrUnavailable
+		}
+		facts, err := h.facts.All(ctx)
+		if err != nil {
+			return nil, archiveError(err)
+		}
+		views := make([]map[string]any, 0, len(facts))
+		for _, fact := range facts {
+			views = append(views, factView(fact))
+		}
+		return map[string]any{"facts": views}, nil
+	case "conversation.fact_delete":
+		if h.facts == nil {
+			return nil, conversation.ErrUnavailable
+		}
+		id := payloadString(payload, "fact_id")
+		if err := h.facts.Delete(ctx, id); err != nil {
+			return nil, archiveError(err)
+		}
+		return map[string]any{"fact_id": id, "deleted": true}, nil
 	default:
 		return nil, fmt.Errorf("unsupported conversation action %q", event.Type)
 	}
@@ -107,6 +136,15 @@ func archiveError(err error) error {
 		return conversation.ErrUnavailable
 	default:
 		return fmt.Errorf("the conversation archive could not be read or written")
+	}
+}
+
+// factView shows a fact to the owner. Where it was said is told as a platform, not as a chat's id.
+func factView(fact conversation.Fact) map[string]any {
+	place, _, _ := strings.Cut(fact.Place, ":")
+	return map[string]any{
+		"id": fact.ID, "owner": fact.Person == conversation.OwnerPerson, "person": conversation.PersonName(fact.Person),
+		"content": fact.Content, "place": place, "created_at": fact.CreatedAt.Format(time.RFC3339Nano),
 	}
 }
 

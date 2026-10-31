@@ -167,6 +167,8 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	var result map[string]any
 	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
 		result = map[string]any{"reply": identity}
+	} else if answer, ok := h.factReply(ctx, event, turn.Content); ok {
+		result = map[string]any{"reply": answer}
 	} else {
 		sources = h.lookupKnowledge(ctx, turn.Content, anchor)
 		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
