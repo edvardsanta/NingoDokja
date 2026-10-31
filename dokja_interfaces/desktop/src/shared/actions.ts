@@ -19,6 +19,8 @@ export const ACTION_TYPES = [
   "conversation.start",
   "conversation.list",
   "conversation.read",
+  // Stopping a reply on its way is a change on a real press, like renaming.
+  "conversation.stop",
   // Renaming is a change on a real press; deleting also asks in the shell's own window.
   "conversation.rename",
   "conversation.delete",
@@ -89,6 +91,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "runtime.models.remove",
   "message.created",
   "conversation.start",
+  "conversation.stop",
   "conversation.rename",
   "conversation.delete",
   "conversation.fact_delete",

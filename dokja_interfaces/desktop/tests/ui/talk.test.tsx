@@ -605,6 +605,67 @@ describe("the conversation's layout", () => {
 });
 
 describe("a send waiting for its turn", () => {
+  it("stops a reply on its way and tells the turn's outcome, not the stream's error, then retries it", async () => {
+    const reply = deferred<TransportResult>();
+    const stoppedTurn = (calls: Parameters<typeof sendIdOf>[0]) => archivedTurn({ content: "why?", state: "failed", reason: "the owner stopped this reply", sendId: sendIdOf(calls) });
+    const { transport, calls } = routedTransport({
+      "conversation.start": startedConversation(),
+      "message.created": async () => reply.promise,
+      "conversation.stop": async () => { reply.resolve(failure("orchestrator", "the owner stopped this reply")); return ok({ stopping: true }); },
+      "conversation.read": async () => ok({ conversation: {}, turns: [stoppedTurn(calls)] }),
+    });
+    await renderTalk(transport);
+    expect(screen.queryByRole("button", { name: "Stop the reply" })).toBeNull();
+    fireEvent.change(field(), { target: { value: "why?" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Stop the reply" }));
+    await screen.findByRole("button", { name: "Retry the last message" });
+    expect(calls.find((call) => call.type === "conversation.stop")?.payload).toEqual({ conversation_id: archiveId(1), send_id: sendIdOf(calls) });
+    expect(screen.queryByRole("button", { name: "Stop the reply" })).toBeNull();
+    // The stream's error is not said on top of the turn's own outcome, and only one send was made.
+    expect(screen.getAllByText(/you stopped this reply/)).toHaveLength(1);
+    expect(sent(calls)).toHaveLength(1);
+  });
+
+  it("stops a send another interface left on its way, and reads how it ended", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": ok({ conversations: [{ id: archiveId(1), kind: "general", reading_id: "", title: "Elsewhere", updated_at: "2026-01-01T00:00:00Z", revision: 1, turns: 1 }], next: "" }),
+      "conversation.read": [
+        ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "pending", sendId: "send-elsewhere" })] }),
+        ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "failed", reason: "the owner stopped this reply", sendId: "send-elsewhere" })] }),
+      ],
+      "conversation.stop": ok({ stopping: true }),
+    });
+    render(<I18nProvider locale="en"><AssistantCard transport={transport} /></I18nProvider>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Stop the reply" }));
+    await screen.findByRole("button", { name: "Retry the last message" });
+    expect(calls.find((call) => call.type === "conversation.stop")?.payload).toEqual({ conversation_id: archiveId(1), send_id: "send-elsewhere" });
+    await waitFor(() => expect(document.activeElement).toBe(field()));
+  });
+
+  it("says when a reply could not be stopped, for as long as it is still on its way, in Portuguese too", async () => {
+    const reply = deferred<TransportResult>();
+    const { transport, calls } = routedTransport({
+      "conversation.start": startedConversation(),
+      "message.created": async () => reply.promise,
+      "conversation.stop": failure("orchestrator", "conversation changed; read it again"),
+      "conversation.read": async () => ok({ conversation: {}, turns: [archivedTurn({ content: "oi", reply: "Chegou.", sendId: sendIdOf(calls) })] }),
+    });
+    await renderTalk(transport, "pt");
+    fireEvent.change(screen.getByRole("textbox", { name: "Sua mensagem" }), { target: { value: "oi" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Sua mensagem" }), { key: "Enter" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Parar a resposta" }));
+    await screen.findByText("Não consegui parar a resposta. Ela ainda pode chegar.");
+    expect(screen.queryByText("conversation changed; read it again")).toBeNull();
+
+    reply.resolve(ok({ reply: "Chegou.", replayed: false, turn: archivedTurn({ content: "oi", reply: "Chegou.", sendId: sendIdOf(calls) }) }));
+    await screen.findByText("Chegou.");
+    expect(screen.queryByText("Não consegui parar a resposta. Ela ainda pode chegar.")).toBeNull();
+  });
+
   it("says it is waiting while the orchestrator has it queued, then goes back to thinking, in Portuguese too", async () => {
     let listener: ((preview: ChatPreview) => void) | undefined;
     const pending = deferred<TransportResult>();

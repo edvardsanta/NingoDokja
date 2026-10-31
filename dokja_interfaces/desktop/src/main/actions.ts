@@ -314,6 +314,13 @@ function conversationRenamePayload(raw: Record<string, unknown>): Record<string,
   return { conversation_id: id, revision, title };
 }
 
+// A send is stopped by the conversation and send id the screen knows it by, even before it has a turn.
+function conversationStopPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.conversation_id);
+  const sendId = text(raw.send_id);
+  return ARCHIVE_ID.test(id) && SEND_ID.test(sendId) ? { conversation_id: id, send_id: sendId } : undefined;
+}
+
 function conversationDeletePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const id = text(raw.conversation_id);
   const revision = revisionOf(raw);
@@ -823,6 +830,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "message.created": { payload: chatPayload, project: chatReply },
   "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
+  "conversation.stop": { payload: conversationStopPayload, project: (result) => inDomain(result, "conversation", (body) => ({ stopping: body.stopping === true })) },
   "conversation.rename": { payload: conversationRenamePayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
   "conversation.facts": { payload: noPayload, project: (result) => inDomain(result, "conversation", keptFacts) },
