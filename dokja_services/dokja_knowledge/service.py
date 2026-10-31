@@ -49,7 +49,11 @@ STOPWORDS = frozenset(
     "a o as os um uma uns umas de do da dos das em no na nos nas por para com sem sobre entre "
     "e ou mas que se como qual quais quem onde quando porque pois ao aos ha ser sao foi era "
     "the of and to in is are was for on with as by at an be this that it from or not what how "
-    "who why when where qual quais isso isto essa esse esta este seu sua meu minha".split()
+    "who why when where qual quais isso isto essa esse esta este seu sua meu minha "
+    # How a question is asked, not what it is about: a document on a case does not say "acha",
+    # so counting these words kept a plain "o que acha do caso X" from finding it.
+    "acha acham achou achar pensa pensam pensou pensar voce voces sabe sabem saber "
+    "fala falar diga dizer explica explique think thinks about you your know".split()
 )
 
 

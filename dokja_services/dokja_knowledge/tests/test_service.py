@@ -1,7 +1,7 @@
 import pytest
 
 from fakes import FakeEmbedder
-from service import KnowledgeService
+from service import KnowledgeService, terms
 from store import Store
 
 KANT = ("Kant and pure reason",
@@ -287,3 +287,21 @@ def test_list_narrows_to_one_document_by_its_id(service):
 def test_list_refuses_an_id_that_is_not_one(service, bad):
     with pytest.raises(ValueError):
         service.list_documents({"source_id": bad})
+
+
+def test_how_a_question_is_asked_does_not_count_against_its_subject(service):
+    # Regression: "Oq acha do caso flavio?" missed a document on the case by a hair, because
+    # "acha" counted as a word the document had to contain.
+    service.ingest({
+        "title": "Caso Flávio pesa nas eleições",
+        "body": "O caso Flávio segue em análise e pesa sobre a campanha do ano que vem.",
+    })
+    assert terms("Oq acha do caso flavio?") == ["caso", "flavio"]
+    assert terms("What do you think about Flávio?") == ["flavio"]
+
+    found = service.search({"query": "Oq acha do caso flavio?", "min_score": 0.99})
+    assert found["hits"][0]["coverage"] == 1.0 and found["hits"][0]["relevant"] is True
+
+    # One subject word alone is still not enough to bring a document into a reply.
+    alone = service.search({"query": "o que voce acha do flavio?", "min_score": 0.99})
+    assert alone["relevant_count"] == 0
