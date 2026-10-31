@@ -13,6 +13,7 @@ import type {
   ArchivedChatReply,
   ArchivedConversation,
   ArchivedTurn,
+  ArchivedTurnSource,
   ArchivedTurnState,
   ConversationList,
   KeptFact,
@@ -213,6 +214,7 @@ const MAX_TURN_CONTENT_CHARS = 12000;
 const MAX_TURN_REPLY_CHARS = 24000;
 const MAX_TITLE_CHARS = 120;
 const MAX_TURNS_READ = 100;
+const MAX_TURN_SOURCES = 8;
 const TURN_STATES = new Set<ArchivedTurnState>(["pending", "completed", "failed", "interrupted"]);
 
 // A message to Ningo is one of two things in an archived conversation: a new message with its send id,
@@ -232,15 +234,25 @@ function count0(value: unknown): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
+function turnSources(value: unknown): ArchivedTurnSource[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_TURN_SOURCES).filter(isRecord).map((source) => ({
+    number: count0(source.number), id: shorten(text(source.source_id), 200), title: shorten(text(source.title), 300),
+    reference: shorten(text(source.reference), 2048), excerpt: shorten(text(source.excerpt), 600),
+  })).filter((source) => source.number > 0 && source.id !== "");
+}
+
 function archivedTurn(value: unknown): ArchivedTurn | undefined {
   if (!isRecord(value) || !ARCHIVE_ID.test(text(value.id))) return undefined;
   const state = text(value.state) as ArchivedTurnState;
   if (!TURN_STATES.has(state)) return undefined;
+  const sources = turnSources(value.sources);
   return {
     id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64),
     content: shorten(text(value.content), MAX_TURN_CONTENT_CHARS), reply: shorten(text(value.reply), MAX_TURN_REPLY_CHARS),
     state, reason: shorten(text(value.reason)), attempts: count0(value.attempts),
     provider: shorten(text(value.provider), 64), model: shorten(text(value.model), 128),
+    ...(sources.length > 0 ? { sources } : {}),
   };
 }
 

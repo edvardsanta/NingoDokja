@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { KnowledgeDocument, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
+import type { MessageId } from "../i18n/i18n.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { parseDocuments } from "./knowledge_documents.js";
 import { KnowledgeClassificationPanel } from "./knowledge_classification.js";
@@ -31,7 +32,7 @@ export async function loadDocument(transport: Transport, id: string, at: number 
 // One document of the research base, in a tab of its own: what the list says of it, and its text.
 // The text is what the service rebuilds from the passages it stored, so it says so: close to the
 // original, not a faithful copy of it. It is shown as text, never as markup.
-export function DocumentView({ transport, id, at, external = false, classify = false }: { transport: Transport; id: string; at?: number; external?: boolean; classify?: boolean }) {
+export function DocumentView({ transport, id, at, external = false, classify = false, missing = "document_moved" }: { transport: Transport; id: string; at?: number; external?: boolean; classify?: boolean; missing?: MessageId }) {
   const t = useTranslate();
   const [classificationOpen, setClassificationOpen] = useState(classify);
   // Classify… on a document already open shows its classification.
@@ -47,7 +48,7 @@ export function DocumentView({ transport, id, at, external = false, classify = f
       {state.phase === "ready" && "off" in state.data && state.data.off && <OffNotice reason={state.data.reason} />}
       {state.phase === "ready" && "moved" in state.data && (
         <p className="note" data-tone="unchecked">
-          {t("document_moved")}
+          {t(missing)}
         </p>
       )}
       {state.phase === "ready" && "document" in state.data && (() => {

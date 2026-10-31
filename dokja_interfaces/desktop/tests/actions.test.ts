@@ -636,6 +636,22 @@ test("meme.hashtag.tag may carry the meme's text the owner wrote, bounded", () =
   assert.equal(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "w".repeat(2001) }), undefined);
 });
 
+test("a turn carries the documents its reply cites, bounded, and only those that name one", () => {
+  const project = ACTIONS["conversation.read"].project;
+  const id = "0".repeat(32);
+  const turn = (sources: unknown) => project({ domain: "conversation", result: {
+    conversation: { id, kind: "general", revision: 1 },
+    turns: [{ id, seq: 1, send_id: "send-0001", content: "q", reply: "a", state: "completed", sources }],
+  } }) as { turns: { sources?: unknown[] }[] };
+  const kept = { number: 1, source_id: "note:one", title: "One", reference: "https://example.com/a", excerpt: "x".repeat(900), secret: "drop" };
+  const [source] = turn([kept, { number: 2, title: "names nothing" }, "junk"]).turns[0]!.sources as { id: string; excerpt: string }[];
+  assert.equal(source!.id, "note:one");
+  assert.ok(source!.excerpt.length <= 601);
+  assert.equal("secret" in source!, false);
+  assert.equal(turn([kept, { number: 2, title: "names nothing" }]).turns[0]!.sources!.length, 1);
+  assert.equal("sources" in turn(undefined).turns[0]!, false, "no sources, no field");
+});
+
 test("meme.hashtag.suggest is a bounded read of one meme, and keeps only its answer", () => {
   const action = ACTIONS["meme.hashtag.suggest"];
   assert.equal(isWriteAction("meme.hashtag.suggest"), false);
