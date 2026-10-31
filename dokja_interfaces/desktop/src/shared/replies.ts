@@ -301,7 +301,11 @@ export type ArchivedTurn = {
   // Who answered, as the runtime reported it; empty when it reported nothing.
   provider: string;
   model: string;
+  // The documents the reply cites; absent on a reply that cites none or was kept before they were.
+  sources?: ArchivedTurnSource[];
 };
+
+export type ArchivedTurnSource = { number: number; id: string; title: string; reference: string; excerpt: string };
 
 export type ArchivedConversation = {
   id: string;

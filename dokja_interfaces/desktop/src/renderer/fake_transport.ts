@@ -336,13 +336,22 @@ export function createFakeTransport(delayMs = 400): Transport {
           const turn = retried ?? { id: archiveId(1000 + held.turns.length), seq: held.turns.length + 1, sendId: String(payload?.send_id ?? ""), content: String(payload?.content ?? ""), reply: "", state: "pending" as const, reason: "", attempts: 0, provider: "demo", model: "demo/small:latest" };
           if (!retried) held.turns.push(turn);
           turn.attempts += 1;
-          const reply = "Let us look at that together, since you insist on asking.";
-          const words = reply.split(" ");
+          // Asking about the library gets a reply that cites made-up documents, the way the orchestrator
+          // closes one: its streamed text is the body alone, the sources line comes with the settled reply.
+          const cited = /library|biblioteca/i.test(turn.content);
+          const body = cited
+            ? "The library holds two texts on this[1], and the second[2] disagrees with the first. Neither is wrong; one is merely less honest."
+            : "Let us look at that together, since you insist on asking.";
+          const reply = cited ? `${body}\n\n📚 [1] A very long title about the quiet economics of attention in the age of endless feeds, part one · [2] Notes · on reading slowly` : body;
+          const words = body.split(" ");
           for (let count = 1; count < words.length; count++) {
             await sleep(120);
             for (const listener of previewListeners) listener({ conversationId, text: words.slice(0, count).join(" ") });
           }
-          Object.assign(turn, { reply, state: "completed" });
+          Object.assign(turn, { reply, state: "completed" }, cited ? { sources: [
+            { number: 1, id: documents[0]?.id ?? "note:attention", title: "A very long title about the quiet economics of attention in the age of endless feeds, part one", reference: "https://www.example.com/attention", excerpt: "Attention is the one budget nobody balances. Every feed is a claim on it, and the claims never expire." },
+            { number: 2, id: "note:reading", title: "Notes · on reading slowly", reference: "", excerpt: "To read slowly is to disagree with the page while it is still speaking." },
+          ] } : {});
           return ok({ reply, replayed: false, turn: structuredClone(turn) });
         }
         case "runtime.logs": return ok({module:payload?.module,text:"[demo] Module output appears here."});

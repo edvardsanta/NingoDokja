@@ -197,6 +197,16 @@ func turnView(t conversation.Turn) map[string]any {
 	if !t.FinishedAt.IsZero() {
 		view["finished_at"] = t.FinishedAt.Format(time.RFC3339Nano)
 	}
+	if len(t.Sources) > 0 {
+		sources := make([]any, len(t.Sources))
+		for i, source := range t.Sources {
+			sources[i] = map[string]any{
+				"number": source.Number, "source_id": source.SourceID, "title": source.Title,
+				"reference": source.Reference, "excerpt": source.Excerpt,
+			}
+		}
+		view["sources"] = sources
+	}
 	return view
 }
 
