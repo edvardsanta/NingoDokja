@@ -138,7 +138,7 @@ describe("the knowledge card", () => {
     expect(screen.queryByText("No relevant match. These are the closest passages.")).toBeNull();
   });
 
-  it("says when nothing is relevant, when nothing matches and when the search is keyword only", async () => {
+  it("says when nothing is relevant, when nothing matches (Ningo's line, then what to do) and when the search is keyword only", async () => {
     const weak = routedTransport({ "knowledge.list": SOME_DOCUMENTS,
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.search": [
@@ -154,7 +154,10 @@ describe("the knowledge card", () => {
     screen.getByText("similarity is down");
 
     await ask("something else");
-    await screen.findByText("Nothing matches.");
+    const voice = await screen.findByText("I have nothing on that yet.");
+    expect(voice.className).toBe("voice");
+    screen.getByText("Add a document, or try other words.");
+    expect(screen.queryByText("Nothing matches.")).toBeNull();
   });
 
   it("does not search for an empty or blank question", async () => {

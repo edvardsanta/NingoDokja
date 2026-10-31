@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { isRecord, text } from "../../shared/records.js";
 import type { KnowledgeDocument, KnowledgeDocuments, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
-import type { MessageId } from "../i18n/i18n.js";
 import { OffNotice, OpenSystem, Problem } from "./card_frame.js";
 import { MenuRow, useRowMenu, type MenuItem } from "./context_menu.js";
 import { KnowledgeLine } from "./knowledge_line.js";
 import { similarityOf } from "./knowledge_model.js";
-import { Button } from "./ui.js";
+import { Button, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
@@ -38,12 +37,15 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
 // filter. `onOpen` opens a document in a tab of its own, given where it sits in the list: its text is
 // asked for there, one document at a time. `status` is what the service reports; with it the panel can
 // tell an empty Library from a list that leaves out what Ningo keeps for himself. `onTotal` hands the
-// list's total up as soon as it is known.
-export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen, status, onTotal }: {
+// list's total up as soon as it is known. `results` takes the list's place while a search is shown
+// (under the same line, which says how well search works): the list, its filter and its pager wait
+// where they were.
+export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen, status, onTotal, results }: {
   transport: Transport; revision: number; onChanged: () => void;
   onOpen?: (document: KnowledgeDocument, at: number, external: boolean, classify: boolean) => void;
   status?: KnowledgeStatus;
   onTotal?: (total: number | undefined) => void;
+  results?: ReactNode;
 }) {
   const t = useTranslate();
   const [offset, setOffset] = useState(0);
@@ -118,6 +120,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   const nothingBrought = total === 0 && !empty && !internal;
   const hidden = page && status && !internal ? status.documents - page.total : 0;
   const similar = status !== undefined && similarityOf(status) === "on";
+  const searching = results !== undefined;
   const row = (document: KnowledgeDocument, index: number) => (
     <DocumentRow key={document.id} document={document} removing={removing} similar={similar}
       tabIndex={Math.min(active, (page?.documents.length ?? 1) - 1) === index ? 0 : -1} onFocus={() => setActive(index)}
@@ -137,11 +140,12 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
         </div>
       </>}
       {shown?.off && <><OffNotice reason={shown.reason} /><OpenSystem /></>}
-      {page && empty && <VoiceBlock voice="library_voice_empty" next="library_empty_next" />}
+      {page && empty && <VoiceBlock voice={t("library_voice_empty")} next={t("library_empty_next")} />}
       {page && !empty && <>
-        {nothingBrought && <VoiceBlock voice="library_voice_empty" next="library_empty_next" />}
+        {nothingBrought && !searching && <VoiceBlock voice={t("library_voice_empty")} next={t("library_empty_next")} />}
         <KnowledgeLine transport={transport} status={status} facts={!nothingBrought} internal={internal}
-          onInternal={(next) => { setInternal(next); setOffset(0); }} hidden={hidden} onChanged={onChanged} />
+          onInternal={searching ? undefined : (next) => { setInternal(next); setOffset(0); }} hidden={searching ? 0 : hidden} onChanged={onChanged} />
+        {searching ? results : <>
         <div className="line-feedback" aria-live="polite">
           {removing && <p role="status">{t("documents_removing")}</p>}
           {deletion.state.phase === "error" && (deletion.state.error.code === "timeout"
@@ -161,19 +165,10 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
           <Button variant="quiet" size="compact" disabled={removing || page.offset + page.documents.length >= page.total || page.documents.length === 0}
             onClick={() => setOffset(page.offset + PAGE_SIZE)}>{t("documents_next")}<span aria-hidden="true"> ›</span></Button>
         </div>}
+        </>}
       </>}
+      {searching && !page && !empty && results}
     </section>
-  );
-}
-
-// Ningo's line, then what to do next in plain words: one unit, the same pair as in Talk and the Notebook.
-function VoiceBlock({ voice, next }: { voice: MessageId; next: MessageId }) {
-  const t = useTranslate();
-  return (
-    <div className="voice-block">
-      <p className="voice">{t(voice)}</p>
-      <p className="detail">{t(next)}</p>
-    </div>
   );
 }
 

@@ -30,13 +30,15 @@ describe("refreshing the Library", () => {
     });
     renderLibrary(transport);
 
-    // a search with a hit, and a document open in its tab
+    // a document open in its tab, then a search with a hit in the Documents behind it
+    fireEvent.click(await screen.findByRole("button", { name: "Open Title note:one" }));
+    await screen.findByText("the text");
+    fireEvent.click(screen.getByRole("tab", { name: "Documents" }));
     const field = (await screen.findByRole("searchbox")) as HTMLInputElement;
     fireEvent.change(field, { target: { value: "free will" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText("On free will");
-    fireEvent.click(await screen.findByRole("button", { name: "Open Title note:one" }));
-    await screen.findByText("the text");
+    fireEvent.click(screen.getByRole("tab", { name: "Title note:one" }));
     await settled();
 
     fireEvent.click(refresh());
@@ -46,6 +48,8 @@ describe("refreshing the Library", () => {
 
     expect(screen.getByRole("searchbox", { hidden: true })).toBe(field);
     expect(field.value).toBe("free will");
+    // the hits are still the list's replacement
+    expect(document.querySelector(".hits.documents")).toBeNull();
     expect(screen.getByText("On free will")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Title note:one" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("button", { name: "Close Title note:one" })).toBeTruthy();

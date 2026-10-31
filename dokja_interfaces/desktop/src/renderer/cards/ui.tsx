@@ -36,3 +36,14 @@ export function Notice({ announce, boxed = false, tone, as: Tag = "p", extra, ch
   const role = announce === "assertive" ? "alert" : announce === "polite" ? "status" : undefined;
   return <Tag role={role} className={classes || undefined} data-tone={boxed ? tone : undefined}>{children}</Tag>;
 }
+
+// Ningo's line, then what to do next in plain words: one unit, the same pair as in Talk and the
+// Notebook. The voice line is one sentence with no number and no button; the plain line follows it.
+export function VoiceBlock({ voice, next }: { voice: string; next: string }) {
+  return (
+    <div className="voice-block">
+      <p className="voice">{voice}</p>
+      <p className="detail">{next}</p>
+    </div>
+  );
+}

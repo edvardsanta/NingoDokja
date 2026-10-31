@@ -688,6 +688,20 @@ button.chip-toggle[aria-pressed="true"]:hover:not(:disabled) {
   color: var(--cyan);
 }
 
+/* Under the field: what the search is doing or found, with the way back to the list at its end. It is
+   always in the page (a screen reader hears what it says change) and takes room only when it says. */
+.results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.results-head[data-active] {
+  margin-top: 0.75rem;
+}
+
 .library-hidden {
   margin-top: 0.35rem;
   font-size: 0.8125rem;

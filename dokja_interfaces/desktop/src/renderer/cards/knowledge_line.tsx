@@ -30,6 +30,8 @@ export function KnowledgeLine({ transport, status, facts, internal, onInternal, 
 }) {
   const t = useTranslate();
   const similarity = status ? similarityOf(status) : undefined;
+  // a line with nothing to say is not drawn: no counts to show, and the filter put away
+  if (!(facts && status) && !onInternal) return null;
   return (
     <>
       <div className="library-line">
