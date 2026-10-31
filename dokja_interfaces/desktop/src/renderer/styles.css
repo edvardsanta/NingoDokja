@@ -1228,6 +1228,45 @@ button[aria-pressed="true"] {
   margin-top: 1.25rem;
 }
 
+/* How the sources are doing, in one line, and the list of them at its end; open, the list takes the row. */
+.sources-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+.sources-strip > .sources {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+.sources-strip > .sources[open] {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+/* Nothing is being followed: Ningo's line, the plain sentence, and what to change as a line apart. */
+.digest-explained {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  max-width: 72ch;
+}
+
+.digest-explained .voice,
+.digest-explained .note,
+.digest-explained .detail {
+  margin: 0;
+}
+
+.digest-explained .detail {
+  font-size: 0.875rem;
+}
+
 .sources summary {
   width: max-content;
   color: var(--ink-dim);
@@ -2610,8 +2649,44 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 .reading-filters label {
   display: grid;
   gap: 0.3rem;
-  flex: 1 1 10rem;
+  flex: 1 1 12rem;
   min-width: 0;
+}
+
+/* The words of the search are its placeholder; the source and the dates keep their labels. */
+.reading-filters .reading-search {
+  flex: 2 1 14rem;
+}
+
+.reading-dates {
+  flex: 0 1 auto;
+}
+
+.reading-dates[open] {
+  flex-basis: 100%;
+}
+
+.reading-dates summary {
+  width: max-content;
+  padding-block: 0.4rem;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.reading-dates summary:hover {
+  color: var(--ink);
+}
+
+.reading-dates summary:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+.reading-filters .reading-dates > label {
+  display: inline-grid;
+  width: 12rem;
+  max-width: 100%;
+  margin: 0.25rem 0.75rem 0.25rem 0;
 }
 
 .reading-filters input, .reading-filters select {
@@ -2638,7 +2713,24 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 }
 
 .reading-preview {
-  margin-block: 0.75rem;
+  margin-block: 0;
+}
+
+.reading-preview[open] {
+  flex-basis: 100%;
+}
+
+/* What can be done with a reading, on one line: discuss it, keep it, look at it. */
+.digest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.digest li .reading-save:not(:empty) {
+  margin-top: 0.35rem;
 }
 
 .reading-preview summary {

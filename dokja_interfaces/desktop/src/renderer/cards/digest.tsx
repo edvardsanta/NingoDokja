@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
 import type { DigestItem, DigestPage, DigestSource, DigestStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
-import { CardFrame, OffNotice, Pending, Problem } from "./card_frame.js";
+import { CardFrame, OffNotice, OpenSystem, Pending, Problem } from "./card_frame.js";
 import {
   MAX_SHOWN,
   SHOW_STEP,
+  countsOf,
   followingOf,
   nextStep,
   parseDigestPage,
@@ -19,6 +20,7 @@ import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { Outcome } from "./knowledge_add.js";
 import { addToBase } from "./knowledge_add_model.js";
+import { Button, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";
@@ -59,12 +61,14 @@ const STATE_IDS: Record<string, MessageId> = {
   unknown: "digest_state_unknown",
 };
 
-// What to say when there is nothing to read because nothing is being followed.
-const EXPLANATIONS: Record<Exclude<Following, "following">, { id: MessageId; tone: Tone }> = {
-  "directory-error": { id: "digest_directory_error", tone: "problem" },
-  "not-configured": { id: "digest_not_configured", tone: "unchecked" },
-  "no-sources": { id: "digest_no_sources", tone: "off" },
-  "none-enabled": { id: "digest_none_enabled", tone: "unchecked" },
+// What to say when there is nothing to read because nothing is being followed: Ningo's line when he is
+// reading nothing, then the plain sentence, then (for the operator) what to change, as a line apart.
+// A directory that cannot be read is a problem, not a quiet shelf, and takes no voice.
+const EXPLANATIONS: Record<Exclude<Following, "following">, { id: MessageId; detail?: MessageId; tone: Tone; voice: boolean }> = {
+  "directory-error": { id: "digest_directory_error", tone: "problem", voice: false },
+  "not-configured": { id: "digest_not_configured", detail: "digest_not_configured_detail", tone: "unchecked", voice: true },
+  "no-sources": { id: "digest_no_sources", tone: "off", voice: true },
+  "none-enabled": { id: "digest_none_enabled", detail: "digest_none_enabled_detail", tone: "unchecked", voice: true },
 };
 
 export function DigestCard({ transport }: { transport: Transport }) {
@@ -74,9 +78,9 @@ export function DigestCard({ transport }: { transport: Transport }) {
 
   // The panel's refresh reads the sources quietly: the page of readings and its filters stay.
   return (
-    <CardFrame title={t("digest_title")} state={state} onReload={reload} onRefresh={poll} refreshing={refreshing}>
+    <CardFrame title={t("digest_title")} quietTitle fix={<OpenSystem />} state={state} onReload={reload} onRefresh={poll} refreshing={refreshing}>
       {(status) =>
-        status.off ? <OffNotice reason={status.reason} /> : <DigestBody transport={transport} status={status} />
+        status.off ? <><OffNotice reason={status.reason} /><OpenSystem /></> : <DigestBody transport={transport} status={status} />
       }
     </CardFrame>
   );
@@ -87,33 +91,51 @@ function DigestBody({ transport, status }: { transport: Transport; status: Diges
   const following = followingOf(status);
   const explanation = following === "following" ? undefined : EXPLANATIONS[following];
 
+  // What the sources are doing, in one line, and the list of them behind it: open by itself when one
+  // of them fails, since that is what explains a reading that does not come.
+  const counts = countsOf(status);
+  const strip = (
+    <>
+      <div className="sources-strip">
+        {counts.length > 0 && <p>{counts.map(({ state, count }) => t(COUNT_IDS[state], { count })).join(" · ")}</p>}
+        {status.sources.length > 0 && (
+          <SourceList sources={status.sources} title="digest_sources_title" open={explanation !== undefined || status.failed + status.invalid > 0} />
+        )}
+      </div>
+      {!!status.providers?.length && (
+        <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some((provider) => provider.state === "failed")} processing />
+      )}
+    </>
+  );
+
   return (
     <>
-      {explanation ? (
-        <p className="note" data-tone={explanation.tone}>
-          {t(explanation.id, { message: status.directoryError })}
-        </p>
-      ) : (
-        <p>
-          {t("digest_sources_line", {
-            ok: status.ok,
-            failed: status.failed,
-            pending: status.pending,
-            disabled: status.disabled,
-            invalid: status.invalid,
-          })}
-        </p>
+      {explanation && (
+        <div className="digest-explained">
+          {explanation.voice && <p className="voice">{t("digest_voice_none")}</p>}
+          <p className="note" data-tone={explanation.tone}>
+            {t(explanation.id, { message: status.directoryError })}
+          </p>
+          {explanation.detail && <p className="detail">{t(explanation.detail)}</p>}
+          {following === "directory-error" && <OpenSystem />}
+        </div>
       )}
-      {following === "following" && <Reading transport={transport} sources={status.sources} />}
-      {!!status.providers?.length && <SourceList sources={status.providers} title="digest_providers_title" open={status.providers.some(provider => provider.state === "failed")} processing />}
-      {status.sources.length > 0 && (
-        <SourceList sources={status.sources} title="digest_sources_title" open={explanation !== undefined || status.failed + status.invalid > 0} />
-      )}
+      {following === "following" ? <Reading transport={transport} sources={status.sources} strip={strip} /> : strip}
     </>
   );
 }
 
-function Reading({ transport, sources }: { transport: Transport; sources: readonly DigestSource[] }) {
+const COUNT_IDS = {
+  ok: "digest_count_ok",
+  failed: "digest_count_failed",
+  pending: "digest_count_pending",
+  disabled: "digest_count_disabled",
+  invalid: "digest_count_invalid",
+} as const satisfies Record<string, MessageId>;
+
+// What the feeds brought: the filters, the strip that says how the sources are doing (given by the card
+// around, since it is about the sources and not about the readings), then the readings themselves.
+function Reading({ transport, sources, strip }: { transport: Transport; sources: readonly DigestSource[]; strip: ReactNode }) {
   const t = useTranslate();
   const { ago } = useTimes();
   const [shown, setShown] = useState(SHOW_STEP);
@@ -128,6 +150,10 @@ function Reading({ transport, sources }: { transport: Transport; sources: readon
     setFilters({ ...draft });
   };
   const reset = () => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setShown(SHOW_STEP); };
+  const anyFilter = Object.values(draft).some(Boolean) || Object.values(filters).some(Boolean);
+  // The dates are put away until they are used: they open when the owner opens them or applies some.
+  const [datesOpen, setDatesOpen] = useState(false);
+  useEffect(() => { if (filters.from || filters.to) setDatesOpen(true); }, [filters.from, filters.to]);
 
   const { state, reload, poll, refreshing } = useCard(load);
   // The panel's refresh reads this page again where it stands: how many were shown and the filters
@@ -140,37 +166,42 @@ function Reading({ transport, sources }: { transport: Transport; sources: readon
     if (state.phase === "ready" && !state.data.off) setKept(state.data);
   }, [state]);
 
-  if (state.phase === "ready" && state.data.off) return <OffNotice reason={state.data.reason} />;
+  if (state.phase === "ready" && state.data.off) return <><OffNotice reason={state.data.reason} /><OpenSystem /></>;
   const page = state.phase === "ready" ? state.data : kept;
   const loading = state.phase === "loading";
 
   return (
     <>
       <form className="reading-filters" onSubmit={apply}>
-        <label>{t("reading_search")}<input type="search" value={draft.query} maxLength={100} onChange={event => setDraft({ ...draft, query: event.target.value })} /></label>
+        <label className="reading-search"><span className="sr-only">{t("reading_search")}</span><input type="search" data-library-search="" placeholder={t("reading_search")} value={draft.query} maxLength={100} onChange={event => setDraft({ ...draft, query: event.target.value })} /></label>
         <label>{t("reading_source")}<select value={draft.source} onChange={event => setDraft({ ...draft, source: event.target.value })}>
           <option value="">{t("reading_all_sources")}</option>
           {sources.map(source => <option key={source.id} value={source.id}>{source.name}</option>)}
         </select></label>
-        <label>{t("reading_from")}<input type="date" value={draft.from} max={draft.to || undefined} onChange={event => setDraft({ ...draft, from: event.target.value })} /></label>
-        <label>{t("reading_to")}<input type="date" value={draft.to} min={draft.from || undefined} onChange={event => setDraft({ ...draft, to: event.target.value })} /></label>
+        <details className="reading-dates" open={datesOpen} onToggle={event => setDatesOpen(event.currentTarget.open)}>
+          <summary>{t("reading_dates")}</summary>
+          <label>{t("reading_from")}<input type="date" value={draft.from} max={draft.to || undefined} onChange={event => setDraft({ ...draft, from: event.target.value })} /></label>
+          <label>{t("reading_to")}<input type="date" value={draft.to} min={draft.from || undefined} onChange={event => setDraft({ ...draft, to: event.target.value })} /></label>
+        </details>
         <div className="reading-filter-actions">
           <button type="submit" disabled={invalidDates}>{t("reading_apply")}</button>
-          <button type="button" onClick={reset}>{t("reading_clear")}</button>
+          {anyFilter && <Button variant="quiet" onClick={reset}>{t("reading_clear")}</Button>}
         </div>
         {invalidDates && <p role="alert">{t("reading_invalid_dates")}</p>}
       </form>
+      {strip}
       {page && !page.off && <>
         {(filters.source || filters.query || filters.from || filters.to) && <p role="status">{t("reading_matches", { count: page.total })}</p>}
-        <DigestList page={page} transport={transport} />
+        <DigestList page={page} transport={transport} filtered={!!(filters.source || filters.query || filters.from || filters.to)} />
       </>}
       {loading && <Pending />}
       {state.phase === "error" && (
         <>
           <Problem error={state.error} />
-          <button type="button" onClick={reload}>
-            {t("retry")}
-          </button>
+          <div className="problem-actions">
+            <Button extra="retry" onClick={reload}>{t("retry")}</Button>
+            <OpenSystem />
+          </div>
         </>
       )}
       {page && !page.off && page.more > 0 &&
@@ -188,38 +219,46 @@ function Reading({ transport, sources }: { transport: Transport; sources: readon
   );
 }
 
-function DigestList({ page, transport }: { page: DigestPage; transport: Transport }) {
+function DigestList({ page, transport, filtered }: { page: DigestPage; transport: Transport; filtered: boolean }) {
   const t = useTranslate();
   const discuss = useDiscuss();
   const { ago } = useTimes();
   if (page.items.length === 0) {
-    return (
-      <p className="note" data-tone="off">
-        {t("digest_empty")}
-      </p>
-    );
+    // a filter that matches nothing has said so above; with none, the sources work and nothing came
+    return filtered ? null : <VoiceBlock voice={t("digest_voice_quiet")} next={t("digest_empty")} />;
   }
   return (
     <ul className="digest">
       {page.items.map((item, index) => {
         const when = item.published === "" ? "" : ago(item.published);
         const meta = [item.source, when].filter((part) => part !== "").join(", ");
-        return (
-          <li key={`${index}-${item.id}`}>
-            <p className="digest-title">{item.title}</p>
-            {meta !== "" && <p className="detail">{meta}</p>}
-            {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
-            <ReadingPreview item={item} transport={transport} />
-            {/* The discussion happens in Talk, the one place with a composer. */}
-            <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title}
-              onClick={() => discuss({ id: item.id, title: item.title, source: item.source, ...(item.prompts ? { prompts: item.prompts } : {}) })}>
-              {t("assistant_continue")}
-            </button>
-            {item.id && <SaveReading transport={transport} id={item.id} title={item.title} />}
-          </li>
-        );
+        return <ReadingItem key={`${index}-${item.id}`} item={item} meta={meta} transport={transport}
+          onDiscuss={() => discuss({ id: item.id, title: item.title, source: item.source, ...(item.prompts ? { prompts: item.prompts } : {}) })} />;
       })}
     </ul>
+  );
+}
+
+// One reading: what it is, then what can be done with it on one line. Discussing it with Ningo is the
+// thing to do (the discussion happens in Talk, the one place with a composer); keeping it in the Library
+// is quieter; the preview opens in place. What saving said stays under the reading.
+function ReadingItem({ item, meta, transport, onDiscuss }: { item: DigestItem; meta: string; transport: Transport; onDiscuss: () => void }) {
+  const t = useTranslate();
+  const save = useSaveReading(transport, item.id, item.title);
+  return (
+    <li>
+      <p className="digest-title">{item.title}</p>
+      {meta !== "" && <p className="detail">{meta}</p>}
+      {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
+      <div className="digest-actions">
+        <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title} onClick={onDiscuss}>
+          {t("assistant_continue")}
+        </button>
+        {item.id && save.button}
+        <ReadingPreview item={item} transport={transport} />
+      </div>
+      {item.id && save.feedback}
+    </li>
   );
 }
 
@@ -249,21 +288,26 @@ function ReadingMedia({ transport, url, title, onRetry }: { transport: Transport
     : <img src={preview.dataUrl} alt={title} loading="lazy" />;
 }
 
-// The screen names the reading; the shell builds the ingest request from cached source data.
-function SaveReading({ transport, id, title }: { transport: Transport; id: string; title: string }) {
+// The screen names the reading; the shell builds the ingest request from cached source data. The button
+// and what it said are apart so the button can sit in the reading's row and the words under the row.
+function useSaveReading(transport: Transport, id: string, title: string) {
   const t = useTranslate();
   const run = useCallback(() => addToBase(transport, { mode: "reading", reading: id }), [transport, id]);
   const { state, start } = useAction(run);
-  return (
-    <div className="reading-save">
-      <button type="button" aria-label={t("reading_save_named", { title })} disabled={state.phase === "loading"} onClick={() => start(undefined)}>
+  return {
+    button: (
+      <Button variant="quiet" aria-label={t("reading_save_named", { title })} disabled={state.phase === "loading"} onClick={() => start(undefined)}>
         {t("reading_save")}
-      </button>
-      {state.phase === "loading" && <p role="status">{t("reading_saving")}</p>}
-      {state.phase === "error" && <Problem error={state.error} />}
-      {state.phase === "ready" && <Outcome result={state.data} />}
-    </div>
-  );
+      </Button>
+    ),
+    feedback: (
+      <div className="reading-save" aria-live="polite">
+        {state.phase === "loading" && <p role="status">{t("reading_saving")}</p>}
+        {state.phase === "error" && <Problem error={state.error} />}
+        {state.phase === "ready" && <Outcome result={state.data} />}
+      </div>
+    ),
+  };
 }
 
 function SourceList({ sources, title, open, processing = false }: { sources: readonly DigestSource[]; title: MessageId; open: boolean; processing?: boolean }) {
