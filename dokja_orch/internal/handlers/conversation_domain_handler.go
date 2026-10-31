@@ -19,6 +19,7 @@ type ConversationDomainHandler struct {
 	archive  *conversation.Archive
 	realtime *conversation.ConversationContextEngine
 	facts    *conversation.Facts
+	running  *core.RunningSends
 }
 
 func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDomainHandler {
@@ -28,6 +29,12 @@ func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDo
 // WithFacts lets the owner's interfaces see and delete what known people asked to keep.
 func (h *ConversationDomainHandler) WithFacts(facts *conversation.Facts) *ConversationDomainHandler {
 	h.facts = facts
+	return h
+}
+
+// WithRunningSends lets the owner's interfaces stop a send being answered.
+func (h *ConversationDomainHandler) WithRunningSends(running *core.RunningSends) *ConversationDomainHandler {
+	h.running = running
 	return h
 }
 
@@ -96,6 +103,23 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 			return nil, archiveError(err)
 		}
 		return map[string]any{"conversation_id": id, "deleted": true}, nil
+	case "conversation.stop":
+		if h.running == nil {
+			return nil, conversation.ErrUnavailable
+		}
+		sendID := payloadString(payload, "send_id")
+		if sendID == "" {
+			return nil, conversation.ErrInvalid
+		}
+		// Reading it first keeps the stop inside the caller's scope.
+		held, err := h.archive.Get(ctx, scope, payloadString(payload, "conversation_id"))
+		if err != nil {
+			return nil, archiveError(err)
+		}
+		if !h.running.Stop(held.ID, sendID) {
+			return nil, conversation.ErrConflict
+		}
+		return map[string]any{"conversation_id": held.ID, "send_id": sendID, "stopping": true}, nil
 	case "conversation.facts":
 		if h.facts == nil {
 			return nil, conversation.ErrUnavailable
