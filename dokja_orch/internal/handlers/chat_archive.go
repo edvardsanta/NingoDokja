@@ -165,11 +165,13 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	var sources []knowledgeSource
 	var result map[string]any
+	var keptLine string
 	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
 		result = map[string]any{"reply": identity}
 	} else if answer, ok := h.factReply(ctx, event, turn.Content); ok {
 		result = map[string]any{"reply": answer}
 	} else {
+		event, keptLine = h.keepInMessage(ctx, event, turn.Content)
 		sources = h.lookupKnowledge(ctx, turn.Content, anchor)
 		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
 	}
@@ -182,7 +184,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	// The transcript keeps what the owner was shown, citations included.
 	sources = citedSources(raw, sources)
-	reply := citeSources(raw, sources)
+	reply := withKeptLine(citeSources(raw, sources), keptLine)
 	provider, _ := result["provider"].(string)
 	// The runtime names the model it ran requested_model; it does not observe another one.
 	model, _ := result["requested_model"].(string)

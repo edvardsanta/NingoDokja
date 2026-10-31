@@ -84,6 +84,55 @@ var factPhrases = []factPhrase{
 	{factForget, "en", regexp.MustCompile(`(?is)^forget\s+this\b` + factSeparator + `(.*)$`)},
 }
 
+// A request can also sit inside a longer message, as a clause of its own: "veio de uma novel, guarde
+// isso, e Ningo veio depois". It still has to be said, so a verb inside a sentence ("ela disse guarde
+// isso") or asked ("..., guarde isso?") keeps nothing. "lembra disso" stays out: in the middle of a
+// message it is a question. What is kept is the message without the request, in the person's words.
+const (
+	factAskPT = `(?:(?:guarde|guarda|anote|anota|salve|salva)\s+(?:isso|isto)(?:\s+(?:para|pra)\s+mim)?|lembre(?:-se)?\s+disso)`
+	factAskEN = `(?:remember|keep|save|note)\s+this(?:\s+for\s+me)?`
+	// minFactWords is what a request needs around it: "sou vegano, guarde isso" says what to keep, and
+	// "boa, guarde isso" points at something said before, which is not in the message.
+	minFactWords = 2
+)
+
+// factInMessagePattern finds ask leading the message, or as a clause between two delimiters. The
+// group holds the delimiter that closes the clause, which stays between what is left around it.
+func factInMessagePattern(ask string) *regexp.Regexp {
+	return regexp.MustCompile(`(?i)^` + ask + `\s*[:,.;!\n—–]|[,.;!?\n—–]\s*(?:(?:e|and|please|por\s+favor|pfv)\s+)?` + ask + `(?:\s+(?:por\s+favor|please))?\s*([,.;!\n—–]|$)`)
+}
+
+var factInMessagePhrases = []struct {
+	locale  string
+	pattern *regexp.Regexp
+}{
+	{"pt", factInMessagePattern(factAskPT)},
+	{"en", factInMessagePattern(factAskEN)},
+}
+
+// parseFactInMessage reads a request to keep something among other words. It gives the phrase's
+// language and the message without the name and the request, empty when that leaves nothing to keep:
+// the request was still made, and is answered as one.
+func parseFactInMessage(content string) (string, string, bool) {
+	content = strings.TrimSpace(factNameCall.ReplaceAllString(content, ""))
+	for _, phrase := range factInMessagePhrases {
+		found := phrase.pattern.FindStringSubmatchIndex(content)
+		if found == nil {
+			continue
+		}
+		closing := ""
+		if found[2] >= 0 {
+			closing = content[found[2]:found[3]]
+		}
+		kept := strings.Trim(content[:found[0]]+closing+content[found[1]:], " ,;\n—–")
+		if len(strings.Fields(kept)) < minFactWords {
+			kept = ""
+		}
+		return phrase.locale, kept, true
+	}
+	return "", "", false
+}
+
 // parseFactCommand reads a phrase. A question is never a request to keep or forget something: "lembra
 // disso?" asks whether Ningo remembers.
 func parseFactCommand(content string) (factCommand, string, string, bool) {
@@ -172,6 +221,42 @@ func (h *ChatDomainHandler) factReply(ctx context.Context, event core.Event, con
 	default:
 		return h.forgetFact(ctx, c, person, place, argument), true
 	}
+}
+
+// keepInMessage keeps what a message asks to keep among other words. The model still answers those
+// words, so the turn it returns tells the model the application has this. The line it returns reports
+// the outcome: it goes after the model's reply and is the application's, so what is said to have been
+// kept was kept.
+func (h *ChatDomainHandler) keepInMessage(ctx context.Context, event core.Event, content string) (core.Event, string) {
+	if _, voice := event.Context["voice_turns"]; voice {
+		return event, ""
+	}
+	locale, fact, ok := parseFactInMessage(content)
+	if !ok {
+		return event, ""
+	}
+	event.Context = cloneChatContext(event.Context)
+	event.Context["fact_in_message"] = true
+	c := factCatalogs[locale]
+	person, known := factSpeaker(event)
+	if !known {
+		return event, c.say("not_known")
+	}
+	if h.facts == nil {
+		return event, c.say("unavailable")
+	}
+	return event, h.rememberFact(ctx, c, person, factPlace(event), fact)
+}
+
+// withKeptLine closes a reply with the line keepInMessage returned.
+func withKeptLine(reply, line string) string {
+	if line == "" {
+		return reply
+	}
+	if strings.TrimSpace(reply) == "" {
+		return line
+	}
+	return reply + "\n\n" + line
 }
 
 func (h *ChatDomainHandler) rememberFact(ctx context.Context, c factCatalog, person, place, argument string) string {

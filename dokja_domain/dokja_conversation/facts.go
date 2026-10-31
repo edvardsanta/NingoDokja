@@ -59,7 +59,8 @@ func NewFacts(store FactStore) *Facts {
 	return &Facts{store: store, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// Remember keeps content for person, as said in place.
+// Remember keeps content for person, as said in place. Saying the same thing in the same place again
+// keeps it once: a turn that failed after keeping runs again when it is retried.
 func (f *Facts) Remember(ctx context.Context, person, place, content string) (Fact, error) {
 	content = strings.Join(strings.Fields(content), " ")
 	if person == "" || place == "" || content == "" || utf8.RuneCountInString(content) > MaxFactRunes {
@@ -68,6 +69,11 @@ func (f *Facts) Remember(ctx context.Context, person, place, content string) (Fa
 	held, err := f.store.PersonFacts(ctx, person)
 	if err != nil {
 		return Fact{}, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	for _, fact := range held {
+		if fact.Place == place && fact.Content == content {
+			return fact, nil
+		}
 	}
 	if len(held) >= MaxFactsPerPerson {
 		return Fact{}, ErrTooManyFacts

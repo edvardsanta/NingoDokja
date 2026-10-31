@@ -238,7 +238,9 @@ receive profile facts as private application context. See the
 The owner and the people named in that file can ask Ningo to keep something ("guarde isso: ...",
 "o que você sabe sobre mim?", "esquece 2", and their English forms). The phrases are answered
 without the model. A fact belongs to whoever asked, recognized by the account and never by the
-message, and strangers keep nothing. A fact kept in a shared chat only comes back in that chat, and
+message, and strangers keep nothing. The keep phrase also works as a clause of its own inside a
+longer message (`..., guarde isso, ...`): the application keeps the message without the phrase, the
+model answers the rest, and the application closes the reply with the outcome. A fact kept in a shared chat only comes back in that chat, and
 what was kept in private never reaches a shared chat or its model turn, even when its person asks
 there. Facts live beside the conversation archive, are not turns, and the owner sees and deletes
 everyone's on the desktop (`conversation.facts`, `conversation.fact_delete`).
