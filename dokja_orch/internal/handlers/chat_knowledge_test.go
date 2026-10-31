@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
 	"strings"
@@ -299,5 +300,24 @@ func TestExcerptsAskForNingosVoiceNotAReport(t *testing.T) {
 		if !strings.Contains(reference, want) {
 			t.Fatal(want, reference)
 		}
+	}
+}
+
+func TestAReplyKeepsEachCitedDocumentOnceForTheArchive(t *testing.T) {
+	kept := turnSources([]knowledgeSource{
+		{Number: 1, SourceID: "note:case", Title: "The case", Text: "first passage", Reference: "https://example.com/a"},
+		{Number: 1, SourceID: "note:case", Title: "The case", Text: "second passage"},
+		{Number: 2, SourceID: "note:other", Title: "Another", Text: "third"},
+	})
+	if len(kept) != 2 || kept[0].Excerpt != "first passage" || kept[0].Reference != "https://example.com/a" || kept[1].SourceID != "note:other" {
+		t.Fatalf("%#v", kept)
+	}
+	view := turnView(conversation.Turn{Sources: kept[:1]})
+	listed, _ := view["sources"].([]any)
+	if len(listed) != 1 || listed[0].(map[string]any)["source_id"] != "note:case" {
+		t.Fatalf("%#v", view)
+	}
+	if _, present := turnView(conversation.Turn{})["sources"]; present {
+		t.Fatal("a reply without sources says nothing about them")
 	}
 }

@@ -273,3 +273,22 @@ func TestConversationRetryValidatesBeforeStorageAndPreservesBothIDs(t *testing.T
 		t.Fatal("request identity was not passed intact to scoped storage", store.requests, store.retried)
 	}
 }
+
+func TestAReplyKeepsItsSourcesWithinBounds(t *testing.T) {
+	store := &recorder{}
+	a := New(store)
+	turn, _, _ := a.Send(context.Background(), OwnerScope, someID, "send-0001", "q", Provenance{})
+	sources := []TurnSource{{Number: 1, SourceID: "note:one", Title: " One ", Excerpt: strings.Repeat("x", maxSourceText+50)}, {Number: 2, Title: "names no document"}}
+	for n := 3; n < 3+MaxTurnSources+2; n++ {
+		sources = append(sources, TurnSource{Number: n, SourceID: "note:more"})
+	}
+	done, err := a.Complete(context.Background(), OwnerScope, turn, "reply [1]", "", "", sources...)
+	if err != nil || len(done.Sources) != MaxTurnSources {
+		t.Fatal(len(done.Sources), err)
+	}
+	first := done.Sources[0]
+	if first.Title != "One" || len([]rune(first.Excerpt)) != maxSourceText || done.Sources[1].Number != 3 {
+		t.Fatalf("%#v", done.Sources[:2])
+	}
+}
+

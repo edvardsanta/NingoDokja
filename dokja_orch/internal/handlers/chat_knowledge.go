@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/logger"
 	"regexp"
 	"strconv"
@@ -55,6 +56,8 @@ type knowledgeSource struct {
 	Title    string
 	Heading  string
 	Text     string
+	// Reference is where the document came from, when it says.
+	Reference string
 }
 
 func (s knowledgeSource) label() string {
@@ -146,11 +149,12 @@ func relevantSources(result map[string]any) []knowledgeSource {
 			numbers[id] = len(numbers) + 1
 		}
 		sources = append(sources, knowledgeSource{
-			Number:   numbers[id],
-			SourceID: id,
-			Title:    firstString(hit, "title"),
-			Heading:  firstString(hit, "heading"),
-			Text:     text,
+			Number:    numbers[id],
+			SourceID:  id,
+			Title:     firstString(hit, "title"),
+			Heading:   firstString(hit, "heading"),
+			Text:      text,
+			Reference: firstString(hit, "source_ref"),
 		})
 		if len(sources) == knowledgeMaxChunks {
 			break
@@ -235,6 +239,24 @@ func citeSources(reply string, sources []knowledgeSource) string {
 		return citation
 	}
 	return strings.TrimSpace(reply) + "\n\n" + citation
+}
+
+// turnSources is what the archive keeps of the documents a reply cites: each once, with the first
+// passage cited, so the owner can see what the reply drew on and open the document.
+func turnSources(sources []knowledgeSource) []conversation.TurnSource {
+	seen := map[int]bool{}
+	kept := make([]conversation.TurnSource, 0, len(sources))
+	for _, source := range sources {
+		if seen[source.Number] {
+			continue
+		}
+		seen[source.Number] = true
+		kept = append(kept, conversation.TurnSource{
+			Number: source.Number, SourceID: source.SourceID, Title: source.Title,
+			Reference: source.Reference, Excerpt: source.Text,
+		})
+	}
+	return kept
 }
 
 func sourcesForResult(sources []knowledgeSource) []map[string]any {
