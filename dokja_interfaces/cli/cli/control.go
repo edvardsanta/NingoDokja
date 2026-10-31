@@ -20,6 +20,7 @@ const (
 var JobNames = []string{
 	"meme.refresh",
 	"meme.dispatch",
+	"knowledge.intake",
 }
 
 // ServiceNames are the services and interfaces that can be switched off, as the orchestrator
@@ -36,6 +37,8 @@ func JobEvent(name string, memeLimit int) (string, map[string]any, error) {
 	case "meme.dispatch":
 		payload, err := buildDispatchPayload(memeLimit)
 		return "meme.dispatch.scheduled", payload, err
+	case "knowledge.intake":
+		return "knowledge.intake.run", map[string]any{}, nil
 	}
 	return "", nil, fmt.Errorf("unknown job %q (known: %s)", name, strings.Join(JobNames, ", "))
 }

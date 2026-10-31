@@ -48,6 +48,7 @@ func testService(t *testing.T, refresh time.Duration, stateFile string) (*Servic
 	return &Service{
 		logger:            log.New(io.Discard, "", 0),
 		refreshInterval:   refresh,
+		intakeInterval:    7 * time.Hour,
 		dispatchInterval:  time.Hour,
 		refreshMaxItems:   20,
 		dispatchMemeLimit: 1,
@@ -168,8 +169,8 @@ func TestAnnounceReportsJobsWithoutClaimingToBeAJobRun(t *testing.T) {
 		t.Fatal("an announce must not carry a schedule stamp, or the orchestrator would gate it as a job run")
 	}
 	entries := events[0].Payload["jobs"].([]map[string]any)
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 jobs, got %d", len(entries))
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 jobs, got %d", len(entries))
 	}
 	for _, entry := range entries {
 		_, hasLast := entry["last_fire"]
@@ -274,13 +275,24 @@ func TestAnIntervalOverrideWrittenWhileRunningTakesEffect(t *testing.T) {
 	}
 }
 
+func TestKnowledgeIntakeIsStampedSoAPauseApplies(t *testing.T) {
+	service, rec := testService(t, time.Hour, "")
+	if err := service.runKnowledgeIntake(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	events := rec.snapshot()
+	if len(events) != 1 || events[0].Type != "knowledge.intake.run" || events[0].Context["schedule"] != "knowledge.intake" {
+		t.Fatalf("unexpected events %+v", events)
+	}
+}
+
 func TestJobNamesMatchWhatTheOrchestratorSwitchesOn(t *testing.T) {
 	service, _ := testService(t, time.Hour, "")
 	got := []string{}
 	for name := range service.JobNames() {
 		got = append(got, name)
 	}
-	want := []string{"meme.refresh", "meme.dispatch"}
+	want := []string{"meme.refresh", "meme.dispatch", "knowledge.intake"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("job names changed: %v", got)
 	}

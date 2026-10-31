@@ -701,6 +701,16 @@ test("saving a collected reading uses its full text and keeps a stable identity 
   assert.notEqual(ingest({ mode: "reading", reading: "daily:2026-10-28" })!.source_id, payload.source_id);
 });
 
+test("a saved reading has the identity automatic intake gives it", () => {
+  // Pinned in dokja_domain/dokja_knowledge/intake_test.go: if the two differ, saving a reading
+  // intake already kept makes a copy.
+  const id = "https://example.com/feed?a=1&b=<2>";
+  const reading = { id, plugin: "example-blog", title: "A post", body: "Its text", url: "https://example.com/post" };
+  ACTIONS["digest.items"].project(compactOf("digest", { items: [reading] }));
+  const payload = ACTIONS["knowledge.ingest"].payload({ mode: "reading", reading: id })!;
+  assert.equal(payload.source_id, "reading:7ee828ae5b30c5673e46f73a29490312dfd301cfc57580e7d96d067f075e47de");
+});
+
 test("reading snapshots support missing links and discard stale text on refresh", () => {
   const project = ACTIONS["digest.items"].project;
   const ingest = ACTIONS["knowledge.ingest"].payload;

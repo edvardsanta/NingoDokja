@@ -19,6 +19,7 @@ const (
 	defaultTopic               = "events"
 	defaultRefreshInterval     = 45 * time.Minute
 	defaultDispatchInterval    = 6 * time.Hour
+	defaultIntakeInterval      = time.Hour
 	defaultBootstrapGrace      = 15 * time.Second
 	defaultRefreshMaxItems     = 20
 	defaultDispatchMemeLimit   = 1
@@ -51,6 +52,7 @@ type Service struct {
 	topic             string
 	refreshInterval   time.Duration
 	dispatchInterval  time.Duration
+	intakeInterval    time.Duration
 	bootstrapGrace    time.Duration
 	refreshMaxItems   int
 	dispatchMemeLimit int
@@ -90,6 +92,11 @@ func NewFromEnv(logger *log.Logger) (*Service, error) {
 		return nil, err
 	}
 
+	intakeInterval, err := durationFromEnv("DOKJA_SCHEDULER_KNOWLEDGE_INTAKE_INTERVAL", defaultIntakeInterval)
+	if err != nil {
+		return nil, err
+	}
+
 	eventEndpoint := firstNonEmpty(os.Getenv("DOKJA_SCHEDULER_EVENT_ENDPOINT"), defaultEventEndpoint)
 	topic := firstNonEmpty(os.Getenv("DOKJA_SCHEDULER_TOPIC"), defaultTopic)
 
@@ -99,6 +106,7 @@ func NewFromEnv(logger *log.Logger) (*Service, error) {
 		topic:             topic,
 		refreshInterval:   refreshInterval,
 		dispatchInterval:  dispatchInterval,
+		intakeInterval:    intakeInterval,
 		bootstrapGrace:    bootstrapGrace,
 		refreshMaxItems:   refreshMaxItems,
 		dispatchMemeLimit: dispatchMemeLimit,
@@ -159,6 +167,18 @@ func (s *Service) runMemeDispatch(ctx context.Context) error {
 	})
 
 	s.logger.Printf("emit type=%s limit=%d", event.Type, s.dispatchMemeLimit)
+	return s.emit(ctx, event)
+}
+
+// runKnowledgeIntake asks the orchestrator to keep what the chosen sources published. Which
+// sources those are is the orchestrator's to know: with none, this does nothing.
+func (s *Service) runKnowledgeIntake(ctx context.Context) error {
+	event := newEvent("knowledge.intake.run", map[string]any{}, map[string]any{
+		"interface": "scheduler",
+		"schedule":  "knowledge.intake",
+	})
+
+	s.logger.Printf("emit type=%s", event.Type)
 	return s.emit(ctx, event)
 }
 

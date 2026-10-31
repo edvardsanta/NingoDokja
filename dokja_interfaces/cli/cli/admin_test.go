@@ -83,8 +83,9 @@ func TestBuildListPayload(t *testing.T) {
 
 func TestJobEventMapsEveryJobToItsEvent(t *testing.T) {
 	want := map[string]string{
-		"meme.refresh":  "meme.pool.refresh",
-		"meme.dispatch": "meme.dispatch.scheduled",
+		"meme.refresh":     "meme.pool.refresh",
+		"meme.dispatch":    "meme.dispatch.scheduled",
+		"knowledge.intake": "knowledge.intake.run",
 	}
 	for _, name := range JobNames {
 		eventType, payload, err := JobEvent(name, 2)

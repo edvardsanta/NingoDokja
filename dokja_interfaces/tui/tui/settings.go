@@ -35,6 +35,8 @@ func settingLabel(id string) string {
 		return tr("setting_conversations")
 	case "whatsapp.own_chat":
 		return tr("setting_own_chat")
+	case "library.intake_sources":
+		return tr("setting_library_intake_sources")
 	case "library.max_file_mb":
 		return tr("setting_library_max_file")
 	case "library.max_text_chars":

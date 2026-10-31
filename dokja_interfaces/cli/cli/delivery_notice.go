@@ -80,6 +80,8 @@ func jobEffect(name string, status any) string {
 		return fmt.Sprintf("posts memes to %d Discord channel(s)", count)
 	case "meme.refresh":
 		return "refreshes the meme pool and posts nothing"
+	case "knowledge.intake":
+		return "keeps what the chosen sources published and posts nothing"
 	}
 	return "runs its scheduled event"
 }

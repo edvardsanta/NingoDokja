@@ -37,6 +37,7 @@ func InterfaceForSource(source EventSource) string {
 var KnownJobs = []string{
 	"meme.refresh",
 	"meme.dispatch",
+	"knowledge.intake",
 }
 
 const (

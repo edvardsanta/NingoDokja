@@ -371,6 +371,28 @@ No service data, environment, port or compose changes are needed. Roll out the
 orchestrator and rebuild/restart the desktop for the updated timeout guidance;
 rolling back restores the earlier client timeout without a database migration.
 
+### Automatic intake from chosen sources
+
+The orchestrator can keep what chosen Feeds sources publish in Knowledge. It is off until you
+list sources in Settings, under the Library section:
+
+- `library.intake_sources`: Feeds plugin ids, empty by default. With none, a run does nothing.
+  The runtime projects it into `DOKJA_KNOWLEDGE_INTAKE_SOURCES` (orchestrator). Stacks started by
+  hand with Compose, production included, read that variable directly, comma-separated.
+- `DOKJA_SCHEDULER_KNOWLEDGE_INTAKE_INTERVAL` (scheduler): how often a run starts, `1h` by default.
+  The `knowledge.intake` job pauses and runs like the others (`dokja-cli jobs run knowledge.intake`).
+
+A run reads what Feeds already holds, without rerunning collectors, and keeps at most 20 documents,
+newest first. It takes only items with full text (`body`), a stable `id` and a `published` date
+from the last 72 hours; the log line `knowledge intake` counts what it left out. A source that
+publishes only excerpts keeps nothing until its plugin provides `body`.
+
+A run goes on in the background, so its job shows as run before it ends: read the log line for
+the result. A failed document is tried again by the next run while it stays in the 72 hours.
+Documents use the identity of "Save to the Library", so saving one does not make a copy.
+Knowledge keeps no record of deletions, so a document you delete comes back if its item is still
+within the 72 hours and the source is still listed. Intake does not classify what it keeps.
+
 ## Experience Memory
 
 `dokja-memory` stores experiences, "in this context the bot took this action, and this was the outcome",
