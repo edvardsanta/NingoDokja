@@ -14,15 +14,53 @@ type Filter = "all" | "pending" | "resolved";
 
 const FILTERS: readonly { id: Filter; labelId: MessageId }[] = [
   { id: "all", labelId: "experiences_all" },
-  { id: "pending", labelId: "experiences_filter_waiting" },
   { id: "resolved", labelId: "experiences_filter_settled" },
 ];
 
-export function MemoryExperiencesPanel({ transport, onChanged }: { transport: Transport; onChanged?: () => void }) {
+type PanelProps = {
+  transport: Transport;
+  onChanged?: () => void;
+  // Goes up when a verdict was given in the other list of the view.
+  revision?: number;
+  // The list opens on this filter.
+  initial?: Filter;
+};
+
+// What waits for the owner's verdict: the first thing the Notebook asks of him, so it has no filter.
+export function WaitingVerdictsPanel({ transport, onChanged, revision }: Omit<PanelProps, "initial">) {
+  const t = useTranslate();
+  return <section aria-label={t("experiences_waiting_title")}>
+    <h3>{t("experiences_waiting_title")}</h3>
+    <ExperienceList transport={transport} onChanged={onChanged} revision={revision} filter="pending" emptyId="experiences_waiting_empty" />
+  </section>;
+}
+
+export function MemoryExperiencesPanel({ transport, onChanged, revision, initial = "all" }: PanelProps) {
+  const t = useTranslate();
+  const [filter, setFilter] = useState<Filter>(initial);
+  return <section className="wp-section" aria-label={t("experiences_title")}>
+    <h2>{t("experiences_title")}</h2>
+    {/* a filter is a mode of the list, so it is a set of pressed buttons, never a switch */}
+    <div className="seg" role="group" aria-label={t("experiences_filter")}>
+      {FILTERS.map(({ id, labelId }) => (
+        <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{t(labelId)}</button>
+      ))}
+    </div>
+    <ExperienceList key={filter} transport={transport} onChanged={onChanged} revision={revision} filter={filter} emptyId="experiences_empty" counted />
+  </section>;
+}
+
+function ExperienceList({ transport, onChanged, revision: outside = 0, filter, emptyId, counted = false }: {
+  transport: Transport;
+  onChanged?: () => void;
+  revision?: number;
+  filter: Filter;
+  emptyId: MessageId;
+  counted?: boolean;
+}) {
   const t = useTranslate();
   const [revision, setRevision] = useState(0);
   const changed = () => { setRevision((value) => value + 1); onChanged?.(); };
-  const [filter, setFilter] = useState<Filter>("all");
   const [offset, setOffset] = useState(0);
   const load = useCallback(async (at: number): Promise<LoadResult<MemoryExperiences | Off>> => {
     const answer = await transport.request("memory.list", { state: filter, limit: 20, offset: at }, { timeoutMs: 15_000 });
@@ -33,31 +71,24 @@ export function MemoryExperiencesPanel({ transport, onChanged }: { transport: Tr
   const listing = useAction(load);
   // What was tried is what the Notebook is for, so it is read when the view opens, again when the
   // filter or the page changes, and with the panel's refresh.
-  useEffect(() => { listing.start(offset); }, [offset, revision, listing.start]);
+  useEffect(() => { listing.start(offset); }, [offset, revision, outside, listing.start]);
   const reread = useCallback(() => listing.start(offset), [listing.start, offset]);
   useWorkspaceRefresh(reread, listing.state.phase === "loading");
   const page = listing.state.phase === "ready" ? listing.state.data : undefined;
-  return <section aria-label={t("experiences_title")}>
-    <h3>{t("experiences_title")}</h3>
-    {/* a filter is a mode of the list, so it is a set of pressed buttons, never a switch */}
-    <div className="seg" role="group" aria-label={t("experiences_filter")}>
-      {FILTERS.map(({ id, labelId }) => (
-        <button key={id} type="button" aria-pressed={filter === id} onClick={() => { setFilter(id); setOffset(0); }}>{t(labelId)}</button>
-      ))}
-    </div>
+  return <>
     {listing.state.phase === "loading" && <Pending />}
     {listing.state.phase === "error" && <Problem error={listing.state.error} />}
     {page?.off && <OffNotice reason={page.reason} />}
     {page && !page.off && <>
-      <p>{t("experiences_total", { count: page.total })}</p>
-      {!page.experiences.length && <p>{t("experiences_empty")}</p>}
-      <ul className="hits">{page.experiences.map((entry) => <ExperienceRow key={`${filter}-${offset}-${entry.ref}`} entry={entry} transport={transport} onChanged={changed} />)}</ul>
-      <div className="pager">
+      {counted && page.total > 0 && <p>{t("experiences_total", { count: page.total })}</p>}
+      {!page.experiences.length && <p>{t(emptyId)}</p>}
+      <ul className="hits">{page.experiences.map((entry) => <ExperienceRow key={`${filter}-${offset}-${entry.ref}`} entry={entry} transport={transport} onChanged={changed} settled={filter !== "pending"} />)}</ul>
+      {page.total > 20 && <div className="pager">
         <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>{t("experiences_previous")}</button>
         <button type="button" disabled={!page.experiences.length || offset + page.experiences.length >= page.total} onClick={() => setOffset(offset + 20)}>{t("experiences_next")}</button>
-      </div>
+      </div>}
     </>}
-  </section>;
+  </>;
 }
 
 // What Ningo decided, said as a decision, and what came of it: experience is how he acted on what
@@ -75,7 +106,8 @@ function decisionOf(entry: MemoryExperience, t: ReturnType<typeof useTranslate>)
   return entry.detail ? `${entry.action}: ${entry.detail}` : entry.action;
 }
 
-function ExperienceRow({ entry, transport, onChanged }: { entry: MemoryExperience; transport: Transport; onChanged: () => void }) {
+// settled is false in the list of what waits, whose title already says so of every row.
+function ExperienceRow({ entry, transport, onChanged, settled }: { entry: MemoryExperience; transport: Transport; onChanged: () => void; settled: boolean }) {
   const t = useTranslate();
   const { ago } = useTimes();
   const [opened, setOpened] = useState(false);
@@ -83,9 +115,9 @@ function ExperienceRow({ entry, transport, onChanged }: { entry: MemoryExperienc
   return <li className="decision">
     <p className="decision-line">
       <strong>{decisionOf(entry, t)}</strong>
-      <span className="decision-verdict" data-tone={verdict?.tone ?? (entry.outcome ? "other" : "unchecked")}>
+      {settled && <span className="decision-verdict" data-tone={verdict?.tone ?? (entry.outcome ? "other" : "unchecked")}>
         {verdict ? t(verdict.id) : entry.outcome || t("experience_verdict_pending")}
-      </span>
+      </span>}
     </p>
     <p className="detail" title={`${entry.ref} · ${entry.createdAt}`}>{entry.createdAt ? ago(entry.createdAt) : entry.ref}</p>
     {entry.contextSnippet && <p className="decision-context">{t("experience_about", { context: entry.contextSnippet })}</p>}
