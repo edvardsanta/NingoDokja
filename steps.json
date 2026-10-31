@@ -1117,7 +1117,8 @@
             "2026-10-29 owner authorized H3 ahead of gate 08.3 and chose an explicit unavailable state over an unarchived fallback. First H3 batch: Talk starts its conversation in the archive with the first message, sends with per-message send ids, retries failed/interrupted turns by retry_turn_id, resends unknown-outcome sends under the same send id, reads the archive back after failures and refuses to answer unkept messages. The shell allow-lists conversation.start (a gesture-gated write) and conversation.read with archive-id validation and bounded projections.",
             "2026-10-30 owner chose reopening the latest conversation on launch. Second H3 batch: restore into the mounted composer, Conversations drawer (bounded conversation.list), bounded recheck of reopened pending turns, titled new conversations, re-read after each send and on window focus for turns added elsewhere, translated archive failure reasons.",
             "2026-10-30 owner decision: the linked WhatsApp account's self-chat continues the owner's archived conversation. SendScopeFor admits it for sends only; the handler continues the latest general conversation (or starts a titled one) under a lock, derives a hashed send id from the WhatsApp message id, bounds the turn to 170 s and keeps a repeat of a pending turn quiet. Other WhatsApp chats stay unarchived.",
-            "2026-10-30 merged: #212 self-chat continues the owner's conversation, #215 self-chat commands, #217 rename, confirmed delete and the Talk model field, #224 conversations as a database setting. Verified live: a self-chat turn reached the archive; a Talk send has not been observed there since the desktop was rebuilt."
+            "2026-10-30 merged: #212 self-chat continues the owner's conversation, #215 self-chat commands, #217 rename, confirmed delete and the Talk model field, #224 conversations as a database setting. Verified live: a self-chat turn reached the archive; a Talk send has not been observed there since the desktop was rebuilt.",
+            "2026-10-30, live: a Talk send and a self-chat message landed in order in one archived conversation, both completed. The same run showed provenance recorded empty, fixed here."
           ],
           "checks": [
             {
@@ -1162,7 +1163,7 @@
             "dokja_docs/realtime-conversation/README.md",
             "dokja_docs/design-system-refactoring-review.md"
           ],
-          "next_action": "Confirm a Talk send lands in the archive, then H4 (CLI/TUI) on the pinned turn projection, then H5.",
+          "next_action": "H4 (CLI/TUI) on the pinned turn projection, then H5.",
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"

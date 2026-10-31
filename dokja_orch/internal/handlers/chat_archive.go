@@ -182,7 +182,11 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	sources = citedSources(raw, sources)
 	reply := citeSources(raw, sources)
 	provider, _ := result["provider"].(string)
-	model, _ := result["model"].(string)
+	// The runtime names the model it ran requested_model; it does not observe another one.
+	model, _ := result["requested_model"].(string)
+	if model == "" {
+		model, _ = result["model"].(string)
+	}
 	done, err := h.archive.Complete(context.WithoutCancel(ctx), scope, turn, reply, provider, model)
 	if errors.Is(err, conversation.ErrInvalid) {
 		// A provenance the archive does not know is left out rather than losing the reply.
