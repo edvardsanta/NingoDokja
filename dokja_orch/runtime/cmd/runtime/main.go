@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -23,13 +25,31 @@ import (
 	service "read_books/dokja_services/dokja_runtime"
 )
 
+// How often the daemon looks at its own file, and how long a replacement waits for a request that
+// arrived just as it began. A stop by signal keeps its shorter wait.
+const (
+	replacementCheckEvery = 5 * time.Second
+	replacementDrain      = 30 * time.Second
+	signalDrain           = 3 * time.Second
+)
+
+// errReplaced ends run with every listener and lock released, for main to start the new file.
+var errReplaced = errors.New("runtime daemon executable replaced")
+
 func main() {
-	if err := run(); err != nil {
+	executable, _ := os.Executable()
+	err := run(executable)
+	if errors.Is(err, errReplaced) {
+		// The same process carries on as the new file: containers depend on the inference socket
+		// and no interface may be open to start a daemon again. Exec keeps the pid and the workers.
+		err = syscall.Exec(executable, os.Args, os.Environ())
+	}
+	if err != nil {
 		log.Print(err)
 		os.Exit(1)
 	}
 }
-func run() error {
+func run(executable string) error {
 	rootFlag := flag.String("root", "", "local repository root (lite stack only)")
 	stateFlag := flag.String("state-dir", "", "private daemon state directory")
 	flag.Parse()
@@ -132,7 +152,8 @@ func run() error {
 	if err := os.Chmod(inferenceSocket, 0600); err != nil {
 		return err
 	}
-	inferenceServer := &http.Server{Handler: orchestration.ChatHandler(d), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 95 * time.Second, IdleTimeout: 15 * time.Second}
+	active := &orchestration.ActiveRequests{}
+	inferenceServer := &http.Server{Handler: active.Track(orchestration.ChatHandler(d)), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 95 * time.Second, IdleTimeout: 15 * time.Second}
 	defer inferenceServer.Close()
 	go func() {
 		if err := inferenceServer.Serve(inferenceListener); err != nil && err != http.ErrServerClosed {
@@ -141,17 +162,51 @@ func run() error {
 	}()
 	hash := sha256.Sum256([]byte(root))
 	project := hex.EncodeToString(hash[:])[:16]
-	server := &http.Server{Handler: orchestration.Handler(d, project), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 15 * time.Second}
+	server := &http.Server{Handler: active.Track(orchestration.Handler(d, project)), ReadHeaderTimeout: 2 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 15 * time.Second}
 	signals, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	stopping, finish := context.WithCancel(signals)
+	defer finish()
+	var replaced atomic.Bool
+	if watch, err := orchestration.WatchExecutable(executable); err != nil {
+		log.Print("cannot watch the runtime daemon executable")
+	} else {
+		go func() {
+			ticker := time.NewTicker(replacementCheckEvery)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopping.Done():
+					return
+				case <-ticker.C:
+					if watch.Replaced() && active.Idle() {
+						replaced.Store(true)
+						finish()
+						return
+					}
+				}
+			}
+		}()
+	}
+	drained := make(chan struct{})
 	go func() {
-		<-signals.Done()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer close(drained)
+		<-stopping.Done()
+		wait := signalDrain
+		if replaced.Load() {
+			wait = replacementDrain
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), wait)
 		defer cancel()
 		server.Shutdown(ctx)
+		inferenceServer.Shutdown(ctx)
 	}()
 	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		return err
+	}
+	<-drained
+	if replaced.Load() {
+		return errReplaced
 	}
 	return nil
 }

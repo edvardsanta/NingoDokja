@@ -1054,9 +1054,10 @@ active chat sessions. A database failure refuses the operation rather than silen
 values. Legacy-file read errors also block projection because webhook channel labels are still
 read there. Services themselves do not query this configuration snapshot.
 
-**Upgrade/rollback:** back up the database and `.env`, rebuild the controller/interfaces, stop
-the existing daemon once with SIGTERM, then reopen a local interface. Application containers
-stay running. The SQLite schema version and profile rows are unchanged. Older daemons and manual
+**Upgrade/rollback:** back up the database and `.env`, then rebuild the controller/interfaces.
+The daemon replaces itself within seconds of the rebuild, between requests, keeping its process
+id; a daemon older than this behavior must be stopped once with SIGTERM before reopening a local
+interface. Application containers stay running. The SQLite schema version and profile rows are unchanged. Older daemons and manual
 Compose commands still use legacy environment configuration: they do not see subsequent database
 edits. Reconcile desired values explicitly before recreating containers with those paths. No
 export command is provided yet. Keep session/history volumes intact.
