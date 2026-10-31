@@ -272,8 +272,17 @@ body {
 }
 
 /* A section of the panel is not a card: a heading, and a rule between it and the one before. */
-.kept-person h3 {
-  margin: 1rem 0 0.25rem;
+.wp .kept-person h3 {
+  margin: var(--space-4) 0 var(--space-1);
+  color: var(--ink-dim);
+}
+
+.wp .kept-person:last-child li:last-child {
+  border-bottom: 0;
+}
+
+.kept-about {
+  max-width: 72ch;
 }
 
 .kept-facts {
@@ -2008,14 +2017,43 @@ button.icon-button[aria-expanded="true"] {
 }
 .classification-panel select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
+/* Ningo's line, then what the record holds in plain words: one unit, the same pair as in Talk. */
+.memory-opening {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 72ch;
+  margin-bottom: var(--space-4);
+}
+
+.memory-opening .voice {
+  margin: 0;
+}
+
+.memory-opening .detail {
+  font-size: 0.875rem;
+}
+
+.wp .verdicts-waiting h3 {
+  margin: var(--space-5) 0 0;
+  color: var(--ink-dim);
+}
+
+/* Closed and quiet; the summary is still a plain, focusable line, not a hidden control. */
 .memory-numbers summary {
   width: fit-content;
+  padding: var(--space-1) 0;
   color: var(--ink-dim);
+  font-size: 0.875rem;
   cursor: pointer;
 }
 
 .memory-numbers summary:hover {
   color: var(--text-primary);
+}
+
+.memory-numbers summary:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 .memory-numbers[open] summary {
@@ -2033,8 +2071,79 @@ button.icon-button[aria-expanded="true"] {
   background: var(--static);
   overflow-wrap: anywhere;
 }
-.experience-detail dt { font-weight: 700; margin-top: 0.75rem; }
-.experience-detail dd { margin-left: 0; }
+/* The record opened: its facts as label and value pairs, then the text it was about, then the verdict. */
+.experience-detail dl {
+  display: grid;
+  grid-template-columns: fit-content(14rem) minmax(0, 1fr);
+  gap: 0.15rem var(--space-5);
+  margin: 0 0 var(--space-3);
+}
+
+.experience-detail dt {
+  color: var(--ink-dim);
+}
+
+.experience-detail dd {
+  margin: 0;
+}
+
+.experience-detail h4 {
+  margin: var(--space-4) 0 var(--space-1);
+  font: 700 0.9375rem/1.3 var(--mono);
+}
+
+.experience-detail .document-text {
+  margin: var(--space-1) 0 0;
+  max-height: 14rem;
+}
+
+.experience-detail fieldset {
+  min-width: 0;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 1px solid var(--rule);
+}
+
+.experience-detail legend {
+  padding: 0 var(--space-2);
+  color: var(--ink-dim);
+}
+
+.experience-detail fieldset > p {
+  margin-bottom: var(--space-2);
+}
+
+.experience-detail form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.experience-detail input {
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.experience-detail input:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+@media (max-width: 40rem) {
+  .experience-detail dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .experience-detail dd + dt {
+    margin-top: var(--space-2);
+  }
+}
 
 /* Module lifecycle and optional request handling share one row. */
 .runtime-modules .service-status { align-self: center; }
@@ -2140,25 +2249,69 @@ button.icon-button[aria-expanded="true"] {
   margin-top: 0.5rem;
 }
 
-/* A decision in the Notebook: what Ningo did, and in its tone what came of it. */
+/*
+ * A decision in the Notebook: what Ningo did, and in its tone what came of it. A row is two lines and
+ * its action, the same shape as a kept fact, so a long queue stays short; the opened record takes the
+ * whole width under it. The context is one line that gives way before the time does.
+ */
+.decisions {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.decision:last-child {
+  border-bottom: 0;
+}
+
+/* The action sits beside the text while the text has room, and drops under it when it has not. */
+.decision-main {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
 .decision-line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.25rem 0.75rem;
+  gap: 0 0.75rem;
+  overflow-wrap: anywhere;
 }
 
 .decision-verdict {
   color: var(--tone-text, var(--ink-dim));
 }
 
+.decision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+  font-size: 0.875rem;
+}
+
 .decision-context {
+  flex: 1 1 12rem;
+  min-width: 0;
   overflow: hidden;
-  color: var(--ink-dim);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+.decision .experience-detail {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin-top: 0;
+}
 
 /* The local engine: each model's name takes the room, its size and what to do with it follow. */
 .provider-models li > span:first-child { flex: 1 1 12rem; overflow-wrap: anywhere; }

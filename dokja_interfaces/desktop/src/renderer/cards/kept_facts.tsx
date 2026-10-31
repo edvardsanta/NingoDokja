@@ -49,7 +49,7 @@ export function KeptFactsPanel({ transport }: { transport: Transport }) {
   return (
     <CardFrame title={t("facts_title")} state={state} onReload={reload}>
       {(facts) => <>
-        <p className="detail">{t("facts_about")}</p>
+        <p className="detail kept-about">{t("facts_about")}</p>
         {problem && <Problem error={problem} />}
         {facts.length === 0 && <p className="detail">{t("facts_empty")}</p>}
         {byPerson(facts).map(([person, held]) => (
