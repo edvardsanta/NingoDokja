@@ -62,6 +62,10 @@ type factPhrase struct {
 	pattern *regexp.Regexp
 }
 
+// factNameCall is Ningo's name opening a message. The WhatsApp interface takes it off in a group, but
+// the owner's own chats keep it, and "Ningo, guarde isso" means the same there.
+var factNameCall = regexp.MustCompile(`(?i)^\s*(?:/ningo\b|ningo\s*[,:])\s*`)
+
 const factSeparator = `[\s:,.\-–—]*`
 
 var factPhrases = []factPhrase{
@@ -83,7 +87,7 @@ var factPhrases = []factPhrase{
 // parseFactCommand reads a phrase. A question is never a request to keep or forget something: "lembra
 // disso?" asks whether Ningo remembers.
 func parseFactCommand(content string) (factCommand, string, string, bool) {
-	content = strings.TrimSpace(content)
+	content = strings.TrimSpace(factNameCall.ReplaceAllString(content, ""))
 	for _, phrase := range factPhrases {
 		match := phrase.pattern.FindStringSubmatch(content)
 		if match == nil || (phrase.command != factList && strings.HasSuffix(content, "?")) {
@@ -131,6 +135,7 @@ func (h *ChatDomainHandler) attachKnownFacts(ctx context.Context, event core.Eve
 	if h.facts == nil || !known {
 		return
 	}
+	event.Context["facts_available"] = true
 	facts, err := h.facts.Recall(ctx, person, factPlace(event))
 	if err != nil {
 		logger.Error("read kept facts", err)

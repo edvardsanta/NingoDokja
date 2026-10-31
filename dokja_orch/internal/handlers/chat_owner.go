@@ -91,7 +91,7 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 // only the Discord gateway attaches a profile for Discord.
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
-	for _, granted := range []string{"owner_interface", "ningo_named_by", "known_people", "known_speaker", "known_facts"} {
+	for _, granted := range []string{"owner_interface", "ningo_named_by", "known_people", "known_speaker", "known_facts", "facts_available"} {
 		delete(event.Context, granted)
 	}
 	h.attachPrivateFacts(event)
