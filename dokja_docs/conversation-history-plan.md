@@ -107,7 +107,8 @@ and restart persistence against disposable databases.
 id behave as before.
 - **Requests.** `conversation.start` (`title?`, `reading_id?` for a reading discussion),
   `conversation.list` (`cursor?`, `limit?`), `conversation.read` (`conversation_id`, `before_seq?`,
-  `limit?`), `conversation.rename` and `conversation.delete` (`conversation_id`, `revision`).
+  `limit?`), `conversation.rename` and `conversation.delete` (`conversation_id`, `revision`),
+  `conversation.stop` (`conversation_id`, `send_id`).
   - The workflow is `conversation-archive`, in the new `conversation` domain.
   - The scope comes from the event's source, never the payload: `desktop` and `cli`, the source the
     TUI also speaks as. Any other source is refused.

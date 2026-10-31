@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-10-29",
+  "updated_on": "2026-10-31",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "08",
   "status_values": [
@@ -1428,7 +1428,8 @@
           "evidence": [
             "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch pins a versioned turn projection (view 1) in dokja_orch/internal/handlers/testdata/turn_view_v1.json, read by the orchestrator and desktop tests; Talk shows the provider and model the runtime reported, separate from the selection, and the queued state from 10.6-b; following the end of the conversation stops while the owner reads further up and resumes when they return or send. Cancellation and steering stay absent because no backend capability exists, so nothing is simulated.",
             "2026-10-31 long history: Talk reads earlier turns a page at a time, and reading the latest page again keeps them in order. Measured in Electron under xvfb with synthetic turns of about 600 characters, using forced layout because animation frames stall there: at 100, 500 and 2000 turns a page rendered in up to 155 ms, and typing cost 1.3, 2.2 and 5.4 ms (p90) with 656, 3056 and 12056 nodes. Windowing is not justified at these sizes. Not measured: painting, scrolling on a real display, memory.",
-            "2026-10-31 TUI: the Conversas tab reads earlier turns a page at a time with m, keeps the lines on screen where they were, and reading the latest page again keeps what was read. A page that arrives after leaving the conversation is dropped. Tests only; not run against a live orchestrator."
+            "2026-10-31 TUI: the Conversas tab reads earlier turns a page at a time with m, keeps the lines on screen where they were, and reading the latest page again keeps what was read. A page that arrives after leaving the conversation is dropped. Tests only; not run against a live orchestrator.",
+            "2026-10-31 stop: Talk can stop the latest send through conversation.stop (10.6-b), for a send of its own or one another interface left on its way, and reports the turn's outcome. Steering stays absent. CLI and TUI do not offer stop."
           ],
           "checks": [
             {
@@ -1954,7 +1955,8 @@
               ],
               "evidence": [
                 "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min).",
-                "2026-10-30: the orchestrator reports a normalized queued/dispatched send state (core.SendState), repeated while waiting so a stream can notice a closed requester; the desktop stream carries it and Talk renders it from the en/pt catalogs without defining it. Other request paths report nothing."
+                "2026-10-30: the orchestrator reports a normalized queued/dispatched send state (core.SendState), repeated while waiting so a stream can notice a closed requester; the desktop stream carries it and Talk renders it from the en/pt catalogs without defining it. Other request paths report nothing.",
+                "2026-10-31, owner chose this batch: conversation.stop names a send by conversation and send id. core.RunningSends only cancels the send's context, so its own request stays the one writer of the outcome: a queued send fails without asking the model, a running one loses its provider process to the existing cancellation, and the turn records 'the owner stopped this reply' and retries as usual. Nothing running conflicts, an unknown conversation is not found, channels are refused and same-turn steering stays refused as unsupported, none of them touching a running send. Talk offers Stop, also for a send left on its way by another interface; CLI and TUI do not offer it yet."
               ],
               "checks": [
                 {
@@ -1970,12 +1972,17 @@
                 {
                   "name": "capability_admission",
                   "status": "skipped",
-                  "detail": "Unsupported-capability refusal, a normalized queued/dispatched observation and ordering for non-chat workflows remain open in 10.6-b."
+                  "detail": "Cancellation is now a real capability for archived sends and steering is refused as unsupported before effects. A general capability report and ordering for non-chat workflows remain open in 10.6-b."
                 },
                 {
                   "name": "queued_observation",
                   "status": "passed",
                   "detail": "dokja_orch gofmt, go vet ./... and go test -race ./... passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Regressions cover reports only when blocked, repetition, dispatched last, stream order, unknown states ignored and the Portuguese status. Not run in the real app."
+                },
+                {
+                  "name": "send_stop",
+                  "status": "passed",
+                  "detail": "dokja_orch gofmt, go vet and go test -race ./... passed; stop regressions passed 3x under -race, including through core.Service with the send still open. With Stop made a no-op the running, retry and queued regressions fail. Desktop pnpm test passed except the 14 tests/ui/knowledge_post.test.tsx failures also recorded on main; typecheck and build passed. Not run: real Electron, a live provider process, CLI and TUI (no control there)."
                 }
               ]
             },
