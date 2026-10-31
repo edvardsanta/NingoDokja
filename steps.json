@@ -1119,7 +1119,8 @@
             "2026-10-30 owner decision: the linked WhatsApp account's self-chat continues the owner's archived conversation. SendScopeFor admits it for sends only; the handler continues the latest general conversation (or starts a titled one) under a lock, derives a hashed send id from the WhatsApp message id, bounds the turn to 170 s and keeps a repeat of a pending turn quiet. Other WhatsApp chats stay unarchived.",
             "2026-10-30 merged: #212 self-chat continues the owner's conversation, #215 self-chat commands, #217 rename, confirmed delete and the Talk model field, #224 conversations as a database setting. Verified live: a self-chat turn reached the archive; a Talk send has not been observed there since the desktop was rebuilt.",
             "2026-10-30, live: a Talk send and a self-chat message landed in order in one archived conversation, both completed. The same run showed provenance recorded empty, fixed here.",
-            "2026-10-31 H4 CLI batch: conversations list/read/rename/delete and chat --new/--continue/--conversation use the archive with source cli; read consumes turn projection view 1, pinned by a CLI test on the orchestrator fixture. A handler test has the terminal continue a desktop conversation and see its turns. Not run against a live orchestrator, to keep the owner's archive clean."
+            "2026-10-31 H4 CLI batch: conversations list/read/rename/delete and chat --new/--continue/--conversation use the archive with source cli; read consumes turn projection view 1, pinned by a CLI test on the orchestrator fixture. A handler test has the terminal continue a desktop conversation and see its turns. Not run against a live orchestrator, to keep the owner's archive clean.",
+            "2026-10-31 H4: CLI retry and a TUI Conversas tab use the same archive and projection; TUI tests cover every turn state from the pinned fixture. Not run against a live orchestrator."
           ],
           "checks": [
             {
@@ -1164,10 +1165,32 @@
             "dokja_docs/realtime-conversation/README.md",
             "dokja_docs/design-system-refactoring-review.md"
           ],
-          "next_action": "H4: retry a failed turn from the CLI, then the TUI; then H5.",
+          "next_action": "Live cross-interface check of H4, then H5.",
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"
+        },
+        {
+          "id": "09.5-M",
+          "title": "Remember what known people explicitly ask Ningo to keep",
+          "status": "pending",
+          "depends_on": [
+            "09.5"
+          ],
+          "deliverables": [
+            "Owner decisions, 2026-10-31. Saying 'keep this', 'forget this' or 'what do you know about me' works by explicit command, not the model's guess, for the people named in the private owner configuration, the owner first. A fact belongs to whoever asked, identified by the verified account and never by a typed name, and comes back when that person asks, where they ask. Anyone else saves nothing. Each person sees and deletes their own facts; the owner sees and deletes all of them on the desktop. Facts live in the database, reached through the orchestrator; the owner configuration stays identity only. A fact stays on the platform where its person is known. Private facts never reach a turn in a group unless their owner asks there or marked them for the group."
+          ],
+          "acceptance_criteria": [
+            "A known person saves a fact and gets it back when they ask; an unknown sender saves nothing.",
+            "A fact is tied to the verified account, so a typed name cannot reach another person's facts.",
+            "Each person lists and deletes their own facts, the owner lists and deletes all of them, and a deleted fact stops appearing.",
+            "A private fact never reaches a group turn or another platform unless its owner asked for it."
+          ],
+          "evidence": [],
+          "checks": [],
+          "blockers": [],
+          "references": [],
+          "next_action": "Implement after H4 is delivered."
         },
         {
           "id": "09.6",

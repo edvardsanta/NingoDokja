@@ -209,8 +209,8 @@ func startConversation(ask archiveRequest, title string) (string, error) {
 	return started.Conversation.ID, nil
 }
 
-// conversationTitle names a new conversation by the start of its first message.
-func conversationTitle(message string) string {
+// ConversationTitle names a new conversation by the start of its first message.
+func ConversationTitle(message string) string {
 	line := strings.Join(strings.Fields(message), " ")
 	if utf8.RuneCountInString(line) <= titleFromRunes {
 		return line
@@ -218,8 +218,8 @@ func conversationTitle(message string) string {
 	return string([]rune(line)[:titleFromRunes-1]) + "…"
 }
 
-// newSendID names one send, so the archive answers it once.
-func newSendID() (string, error) {
+// NewSendID names one send, so the archive answers it once.
+func NewSendID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -250,7 +250,7 @@ func (t chatTarget) resolve(ask archiveRequest, message string) (string, error) 
 			return id, err
 		}
 	}
-	return startConversation(ask, conversationTitle(message))
+	return startConversation(ask, ConversationTitle(message))
 }
 
 func shortID(id string) string {
@@ -331,6 +331,19 @@ func deleteConversation(ask archiveRequest, in io.Reader, out io.Writer, referen
 	}
 	fmt.Fprintf(out, "Deleted: %s\n", name)
 	return nil
+}
+
+// retryable finds the last turn that went unanswered, the one the archive will send again.
+func retryable(turns []archivedTurn) (archivedTurn, bool) {
+	for index := len(turns) - 1; index >= 0; index-- {
+		switch turns[index].State {
+		case "failed", "interrupted":
+			return turns[index], true
+		case "completed":
+			return archivedTurn{}, false
+		}
+	}
+	return archivedTurn{}, false
 }
 
 func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
@@ -414,6 +427,28 @@ func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
 	}
 	remove.Flags().BoolVar(&yes, "yes", false, "do not ask")
 
-	command.AddCommand(list, read, rename, remove)
+	retry := &cobra.Command{
+		Use:   "retry <id>",
+		Short: "Send a conversation's last unanswered turn again",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ask := a.archiveRequester(ctx)
+			id, err := matchConversation(ask, args[0])
+			if err != nil {
+				return err
+			}
+			held, err := readConversation(ask, id, defaultTurnsRead)
+			if err != nil {
+				return err
+			}
+			turn, ok := retryable(held.Turns)
+			if !ok {
+				return fmt.Errorf("the last turn of this conversation has nothing to send again")
+			}
+			return a.chatOnce(ctx, "", chatSessionOptions{retryID: turn.ID, target: chatTarget{reference: id}, conversationID: &id})
+		},
+	}
+
+	command.AddCommand(list, read, rename, remove, retry)
 	return command
 }

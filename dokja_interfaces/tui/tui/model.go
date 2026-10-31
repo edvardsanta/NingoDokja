@@ -22,10 +22,13 @@ const (
 	tabMemes
 	tabDiscord
 	tabHistory
+	tabConversations
 )
 
 // tabTitles is a function, not a variable, so it follows the language chosen at start-up.
-func tabTitles() []string { return []string{tr("panel"), "Memes", "Discord", tr("history")} }
+func tabTitles() []string {
+	return []string{tr("panel"), "Memes", "Discord", tr("history"), tr("conversations")}
+}
 
 type overlayKind int
 
@@ -226,6 +229,8 @@ type Model struct {
 	memoryResult         memoryPredictView
 	memoryFeedbackTarget memoryExperience
 	memoryFeedbackInput  textinput.Model
+	conversationInput    textinput.Model
+	conversations        conversationsView
 
 	// chancePausedUntil is when the hashtag suggestion may ask the memory for a chance again, after
 	// a failure.
@@ -280,6 +285,10 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 	memoryText.CharLimit = 1000
 	memoryText.Width = 52
 
+	conversationText := textinput.New()
+	conversationText.CharLimit = conversationTextLimit
+	conversationText.Width = 70
+
 	var form [4]textinput.Model
 	for i, placeholder := range []string{tr("name_e_g_hosted"), "https://api.example.com/v1", tr("model_placeholder"), tr("token_not_shown_on_screen")} {
 		form[i] = textinput.New()
@@ -304,6 +313,7 @@ func NewModel(client Client, refreshEvery, timeout time.Duration) *Model {
 		hashtagInput:        hashtag,
 		memoryInput:         memoryText,
 		memoryFeedbackInput: feedbackText,
+		conversationInput:   conversationText,
 		images:              newImageState(),
 	}
 }
@@ -361,7 +371,12 @@ type skippedError struct{ reason string }
 func (e *skippedError) Error() string { return tr("refused_by_the_orchestrator") + e.reason }
 
 func (m *Model) request(eventType string, payload map[string]any) (map[string]any, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
+	return m.requestWithin(m.timeout, eventType, payload)
+}
+
+// requestWithin is a request with its own deadline, for a chat turn that outlasts the usual one.
+func (m *Model) requestWithin(timeout time.Duration, eventType string, payload map[string]any) (map[string]any, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	res, err := m.client.Request(ctx, eventType, payload)
 	if err != nil {
@@ -589,6 +604,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.linkTick()
 
+	case conversationsMsg:
+		m.busy = false
+		m.conversations.applyList(msg)
+		return m, nil
+
+	case conversationOpenMsg:
+		m.busy = false
+		m.conversations.applyOpen(msg)
+		if msg.notice != "" {
+			m.setNotice(msg.notice, true)
+		}
+		return m, nil
+
 	case memoryListMsg:
 		m.busy = false
 		list := msg.list
@@ -758,13 +786,15 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if key == "q" {
 			return m, tea.Quit
 		}
+	case tabConversations:
+		return m.keyConversations(msg)
 	}
 	return m, nil
 }
 
 // typing reports whether keystrokes belong to a text field, so digits and q stay text.
 func (m *Model) typing() bool {
-	return m.tab == tabDiscord && m.form.focus <= 1
+	return (m.tab == tabDiscord && m.form.focus <= 1) || (m.tab == tabConversations && m.conversations.writing())
 }
 
 func tabForKey(key string, typing bool) (tab, bool) {
@@ -777,8 +807,10 @@ func tabForKey(key string, typing bool) (tab, bool) {
 		return tabDiscord, true
 	case "f4":
 		return tabHistory, true
+	case "f5":
+		return tabConversations, true
 	}
-	if !typing && len(key) == 1 && key[0] >= '1' && key[0] <= '4' {
+	if !typing && len(key) == 1 && key[0] >= '1' && key[0] <= '5' {
 		return tab(key[0] - '1'), true
 	}
 	return 0, false
@@ -789,6 +821,9 @@ func (m *Model) gotoTab(next tab) tea.Cmd {
 	m.setNotice("", false)
 	if next == tabMemes && !m.memes.loaded {
 		return m.cmdMemes()
+	}
+	if next == tabConversations && !m.conversations.loaded {
+		return m.cmdConversations("")
 	}
 	return m.cmdAnimate()
 }

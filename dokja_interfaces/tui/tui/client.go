@@ -56,6 +56,10 @@ func unwrapResult(raw any) (map[string]any, error) {
 	if !ok {
 		return nil, fmt.Errorf("orchestrator response has no result")
 	}
+	// The conversation domain's own answers hold a "conversation" field, which is not a wrapper.
+	if domain, _ := envelope["domain"].(string); domain == "conversation" {
+		return inner, nil
+	}
 	if len(inner) == 1 {
 		for _, value := range inner {
 			if domain, ok := value.(map[string]any); ok {

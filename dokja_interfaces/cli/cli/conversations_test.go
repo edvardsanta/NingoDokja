@@ -118,7 +118,7 @@ func TestContinueStartsATitledConversationWhenThereIsNone(t *testing.T) {
 }
 
 func TestATitleIsCutToTheStartOfTheMessage(t *testing.T) {
-	title := conversationTitle(strings.Repeat("é", 100))
+	title := ConversationTitle(strings.Repeat("é", 100))
 	if len([]rune(title)) != titleFromRunes || !strings.HasSuffix(title, "…") {
 		t.Fatal(title)
 	}
@@ -239,5 +239,33 @@ func TestAConversationWithNoTitleIsSaidToHaveNone(t *testing.T) {
 	printConversations(&out, conversationListing{})
 	if !strings.Contains(out.String(), "No conversations yet.") {
 		t.Fatal(out.String())
+	}
+}
+
+func TestOnlyTheLastUnansweredTurnIsSentAgain(t *testing.T) {
+	if turn, ok := retryable([]archivedTurn{{ID: "a", State: "failed"}, {ID: "b", State: "completed"}}); ok {
+		t.Fatal("an earlier failure with an answer after it is history", turn)
+	}
+	if turn, ok := retryable([]archivedTurn{{ID: "a", State: "completed"}, {ID: "b", State: "interrupted"}}); !ok || turn.ID != "b" {
+		t.Fatal(turn, ok)
+	}
+	if turn, ok := retryable([]archivedTurn{{ID: "a", State: "failed"}, {ID: "b", State: "pending"}}); !ok || turn.ID != "a" {
+		t.Fatal(turn, ok)
+	}
+	if _, ok := retryable(nil); ok {
+		t.Fatal("no turns, nothing to send")
+	}
+}
+
+func TestARetryNamesTheTurnAndCarriesNoNewMessage(t *testing.T) {
+	held := conversationID("e")
+	payload, _, err := NewApp().chatFields(context.Background(), "", chatSessionOptions{
+		retryID: "turn", target: chatTarget{reference: held}, conversationID: &held,
+	})
+	if err != nil || payload["retry_turn_id"] != "turn" || payload["conversation_id"] != held {
+		t.Fatal(payload, err)
+	}
+	if payload["send_id"] != nil || payload["content"] != nil {
+		t.Fatal("a retry records no new turn", payload)
 	}
 }

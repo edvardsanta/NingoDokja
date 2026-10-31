@@ -535,6 +535,8 @@ type chatSessionOptions struct {
 	target          chatTarget
 	// conversationID is set once the target is known, so a REPL stays in one conversation.
 	conversationID *string
+	// retryID sends a failed turn again instead of a new message.
+	retryID string
 }
 
 func (a *App) chatOnce(ctx context.Context, message string, session chatSessionOptions) error {
@@ -596,7 +598,10 @@ func (a *App) chatFields(ctx context.Context, message string, session chatSessio
 			*session.conversationID = id
 		}
 	}
-	sendID, err := newSendID()
+	if session.retryID != "" {
+		return map[string]any{"conversation_id": id, "retry_turn_id": session.retryID}, map[string]any{"interface": "cli"}, nil
+	}
+	sendID, err := NewSendID()
 	if err != nil {
 		return nil, nil, err
 	}
