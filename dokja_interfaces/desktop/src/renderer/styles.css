@@ -1527,6 +1527,13 @@ button.disclosure[aria-expanded="true"]:hover:not(:disabled) {
   margin-top: 0.4rem;
 }
 
+/* What a disclosure holds stacks like the fields around it: the browser puts it in a box of its own. */
+.add-form .more::details-content {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
 .add-form .more summary {
   width: max-content;
   color: var(--ink-dim);
@@ -1535,6 +1542,19 @@ button.disclosure[aria-expanded="true"]:hover:not(:disabled) {
 
 .add-form .more summary:hover {
   color: var(--ink);
+}
+
+/* The file is chosen with the app's own button, in the app's language, and the line beside it says which. */
+.file-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.file-pick p {
+  margin: 0;
+  font-size: 0.875rem;
 }
 
 .add-form .more summary:focus-visible {

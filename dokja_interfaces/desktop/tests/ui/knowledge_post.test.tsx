@@ -71,7 +71,8 @@ describe("the Post way of adding", () => {
     for (const hidden of ["Title", "Text", "Kind", "Where it came from (optional)", "Tags (optional, separated by commas)"]) {
       expect(screen.queryByLabelText(hidden), hidden).toBeNull();
     }
-    expect(screen.queryByText("More options")).toBeNull();
+    expect(screen.queryByText("Advanced")).toBeNull();
+    expect(screen.queryByText("Details")).toBeNull();
   });
 
   it("keeps what was typed in the other ways while the post is being looked at", () => {
