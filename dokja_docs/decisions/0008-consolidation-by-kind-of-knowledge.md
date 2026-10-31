@@ -38,7 +38,9 @@ Treat these axes separately:
 metadata.** A source can carry a classifier as a reading-host plugin next to its
 extractor. The classification, entities, topics, dates, and classifier provenance
 are separate from free-form request tags. Consolidation, retrieval, and summary
-methods can select on these fields. The source proposes defaults; it does not
+methods can select on these fields. The first consumer is chat: a cited document's form
+and content kind choose how Ningo talks about it (2026-10-31); consolidation and
+summary methods do not read them yet. The source proposes defaults; it does not
 dictate the content kind. This supersedes the initial `kind:<name>` tag encoding.
 
 Order of precedence, independently for each classification axis:
