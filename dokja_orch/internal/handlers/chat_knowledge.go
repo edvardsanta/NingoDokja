@@ -46,7 +46,43 @@ voice and at the length of a conversation: say what you think, and bring in what
 you as part of that. Use no headings, no bullet lists and no sections separating what the text says
 from your own view, and do not talk about "the material", "the excerpts" or "the text". Mark what
 came from an excerpt with its number in square brackets, for example [1], once per point at most;
-excerpts of one document share a number. Reply in the language the user wrote in.`
+excerpts of one document share a number. A line before an excerpt may say how to talk about that
+kind of document: follow it without naming the kind. Reply in the language the user wrote in.`
+
+// How Ningo talks about a document depends on what it is. Only these fixed sentences reach the model:
+// a document's metadata picks one and never adds words of its own.
+var knowledgeRegisters = map[string]string{
+	"news":      "This is news: say when it is from, and treat it as something that may have changed since.",
+	"reference": "This is reference material: state it directly and precisely.",
+	"research":  "This is research: keep what the study showed apart from what you infer, and do not oversell it.",
+	"narrative": "This is a narrative: interpret it and have an opinion, as a reading rather than a fact.",
+}
+
+const (
+	knowledgeMemeRegister = "This is a meme: play along with it instead of analysing it."
+	knowledgeUndatedNews  = "Its date is unknown, so say you do not know how recent it is."
+)
+
+var knowledgeDate = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// knowledgeRegister is the line that tells the model how to talk about a document, empty when the
+// document is not classified. A meme is its form whatever else it says of itself.
+func knowledgeRegister(metadata map[string]any) string {
+	form, _ := metadata["form"].(string)
+	if form == "meme" {
+		return knowledgeMemeRegister
+	}
+	kind, _ := metadata["content_kind"].(string)
+	register := knowledgeRegisters[kind]
+	if kind != "news" {
+		return register
+	}
+	date, _ := metadata["date_anchor"].(string)
+	if !knowledgeDate.MatchString(date) {
+		return register + " " + knowledgeUndatedNews
+	}
+	return fmt.Sprintf("%s It is dated %s.", register, date)
+}
 
 // knowledgeSource is one retrieved chunk that was put in front of the model. Chunks of one document
 // share a Number: the reader cites a document, not its passages.
@@ -58,6 +94,8 @@ type knowledgeSource struct {
 	Text     string
 	// Reference is where the document came from, when it says.
 	Reference string
+	// Register says how to talk about the document, from its classification; often empty.
+	Register string
 }
 
 func (s knowledgeSource) label() string {
@@ -126,6 +164,11 @@ func knowledgeQuery(question, anchor string) string {
 	return question + "\n" + anchor
 }
 
+func registerOf(hit map[string]any) string {
+	metadata, _ := hit["metadata"].(map[string]any)
+	return knowledgeRegister(metadata)
+}
+
 func relevantSources(result map[string]any) []knowledgeSource {
 	hits, _ := result["hits"].([]any)
 	sources := []knowledgeSource{}
@@ -155,6 +198,7 @@ func relevantSources(result map[string]any) []knowledgeSource {
 			Heading:   firstString(hit, "heading"),
 			Text:      text,
 			Reference: firstString(hit, "source_ref"),
+			Register:  registerOf(hit),
 		})
 		if len(sources) == knowledgeMaxChunks {
 			break
@@ -170,8 +214,15 @@ func relevantSources(result map[string]any) []knowledgeSource {
 func knowledgeReference(sources []knowledgeSource) string {
 	var out strings.Builder
 	out.WriteString(knowledgeReferenceBrief + "\n")
+	said := map[int]bool{}
 	for _, source := range sources {
-		out.WriteString("\n" + source.label() + "\n" + knowledgeFence + "\n" + neutralizeFence(source.Text) + "\n" + knowledgeFenceClose + "\n")
+		out.WriteString("\n" + source.label() + "\n")
+		// Said once per document, outside the quote: it comes from the system, not from the document.
+		if source.Register != "" && !said[source.Number] {
+			said[source.Number] = true
+			out.WriteString(source.Register + "\n")
+		}
+		out.WriteString(knowledgeFence + "\n" + neutralizeFence(source.Text) + "\n" + knowledgeFenceClose + "\n")
 	}
 	return out.String()
 }
