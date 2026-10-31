@@ -372,4 +372,3 @@ func TestTheRegisterIsSaidOncePerDocumentOutsideItsQuote(t *testing.T) {
 		t.Fatal(plain)
 	}
 }
-
