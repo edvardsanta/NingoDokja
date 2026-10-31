@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -157,7 +158,7 @@ func TestArchivedRetryCannotChangeAnotherConversation(t *testing.T) {
 				t.Fatal("mismatched conversation must refuse before generation", result, err, len(model.asked))
 			}
 			after, err := archive.Turns(ctx, conversation.OwnerScope, actual.ID, 0, 10)
-			if err != nil || len(after) != 1 || after[0] != before[0] {
+			if err != nil || len(after) != 1 || !reflect.DeepEqual(after[0], before[0]) {
 				t.Fatal("refused retry mutated another conversation's turn", before, after, err)
 			}
 			afterConversation, err := archive.Get(ctx, conversation.OwnerScope, actual.ID)

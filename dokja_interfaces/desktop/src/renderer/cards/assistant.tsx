@@ -93,7 +93,7 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
           {STARTS.map((id) => <Button key={id} size="compact" extra="assistant-prompt" disabled={conversation.busy} onClick={() => fill(t(id))}>{t(id)}</Button>)}
         </div>
       </div>}
-      <Transcript conversation={conversation} />
+      <Transcript conversation={conversation} transport={transport} />
     </section>
   </WorkspacePanel>;
 }

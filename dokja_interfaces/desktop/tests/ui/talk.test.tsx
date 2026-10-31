@@ -862,4 +862,76 @@ describe("the sources of a reply", () => {
     await screen.findByRole("list", { name: "Sources of this reply" });
     expect(document.querySelectorAll(".cite")).toHaveLength(2);
   });
+
+  describe("kept by the archive", () => {
+    const KEPT = [
+      { number: 1, source_id: "note:one", id: "note:one", title: "The first text", reference: "https://www.example.com/one", excerpt: "The passage it drew on." },
+      { number: 2, source_id: "note:two", id: "note:two", title: "The second text", reference: "a book, page 12", excerpt: "" },
+    ];
+    const answerWith = (payload?: Record<string, unknown>) => Promise.resolve(ok({
+      reply: CITED, replayed: false,
+      turn: { ...archivedTurn({ reply: CITED, content: String(payload?.content ?? ""), sendId: String(payload?.send_id ?? "send-0001") }), sources: KEPT },
+    }));
+    const talk = async (extra: Record<string, unknown> = {}) => {
+      const routed = routedTransport({ "conversation.start": startedConversation(), "message.created": answerWith, ...extra } as never);
+      await renderTalk(routed.transport);
+      fireEvent.change(field(), { target: { value: "what does the library say?" } });
+      fireEvent.keyDown(field(), { key: "Enter" });
+      await screen.findByRole("list", { name: "Sources of this reply" });
+      return routed;
+    };
+
+    it("shows the document, its origin and the passage on hover, as text, and hides it after", async () => {
+      await talk();
+      const mark = screen.getAllByRole("button", { name: "Open The first text" })[0]!;
+      fireEvent.mouseEnter(mark);
+      const card = await screen.findByRole("tooltip");
+      expect(card.textContent).toContain("The first text");
+      expect(card.textContent).toContain("example.com");
+      expect(card.textContent).not.toContain("www.");
+      expect(card.textContent).toContain("The passage it drew on.");
+      expect(mark.getAttribute("aria-describedby")).toBe(card.id);
+      fireEvent.mouseLeave(mark);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("shows the card on focus for the keyboard, and Escape puts it away", async () => {
+      await talk();
+      const mark = screen.getAllByRole("button", { name: "Open The second text" })[0]!;
+      fireEvent.focus(mark);
+      expect((await screen.findByRole("tooltip")).textContent).toContain("a book, page 12");
+      fireEvent.keyDown(mark, { key: "Escape" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("opens the document beside the conversation on a press, by its id", async () => {
+      const { calls } = await talk({ "knowledge.list": ok({ total: 1, offset: 0, documents: [
+        { id: "note:one", title: "The first text", kind: "note", reference: "", tags: [], chunks: 1, embedded: 1, updatedAt: "", text: "The whole text of the document." },
+      ] }) });
+      fireEvent.click(screen.getAllByRole("button", { name: "Open The first text" })[0]!);
+      await screen.findByText("The whole text of the document.");
+      expect(calls.find((call) => call.type === "knowledge.list")?.payload).toEqual({ source_id: "note:one", include_text: true });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      screen.getByRole("list", { name: "Sources of this reply" });
+    });
+
+    it("keeps the passage in view, and says so plainly when the document was deleted", async () => {
+      await talk({ "knowledge.list": ok({ total: 0, offset: 0, documents: [] }) });
+      fireEvent.click(screen.getAllByRole("button", { name: "Open The first text" })[0]!);
+      await screen.findByText("This document is no longer in the Library.");
+      const passage = screen.getByRole("region", { name: "Passage used in the reply" });
+      expect(passage.textContent).toContain("The passage it drew on.");
+      expect(document.body.textContent).not.toContain("The list changed");
+    });
+
+    it("keeps a reply from before the archive kept sources as text, with nothing to press", async () => {
+      const { transport } = routedTransport({ "conversation.start": startedConversation(), "message.created": answering(CITED) });
+      await renderTalk(transport);
+      fireEvent.change(field(), { target: { value: "what does the library say?" } });
+      fireEvent.keyDown(field(), { key: "Enter" });
+      await screen.findByRole("list", { name: "Sources of this reply" });
+      expect(screen.queryByRole("button", { name: /^Open / })).toBeNull();
+    });
+  });
 });
+

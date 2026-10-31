@@ -2,7 +2,9 @@
 // [2] Title", and the archive keeps that line in the reply's text, so a reopened turn has nothing else
 // to read it from. Talk takes the line out of the text and shows it as a list under the reply.
 
-export type ReplySource = { number: number; title: string };
+// What the archive kept of a document adds its id, origin and passage; a reply kept before that has
+// only what the line says.
+export type ReplySource = { number: number; title: string; id?: string; reference?: string; excerpt?: string };
 
 // A piece of a reply's text: plain, or a citation of documents that are listed under it.
 export type ReplyPart = string | { cite: readonly number[]; text: string };
@@ -43,6 +45,23 @@ export function splitSources(reply: string): { body: string; sources: ReplySourc
     if (sources.length > 0) return { body: paragraphs.filter((_, each) => each !== at).join("\n\n"), sources };
   }
   return { body: reply, sources: [] };
+}
+
+// The sources to show: what the archive kept when it kept any, or else what the line says.
+export function detailedSources(written: readonly ReplySource[], kept: readonly ReplySource[] | undefined): readonly ReplySource[] {
+  return kept && kept.length > 0 ? kept : written;
+}
+
+// Where a document came from, short enough for a card: a web address's host, or the reference as it is.
+export function originOf(reference: string | undefined): string {
+  if (!reference) return "";
+  try {
+    const { protocol, hostname } = new URL(reference);
+    if (protocol === "http:" || protocol === "https:") return hostname.replace(/^www\./, "");
+  } catch {
+    // not an address: a book and a page, say
+  }
+  return reference;
 }
 
 // The reply's text with the citations of listed documents set apart; any other bracket stays text.

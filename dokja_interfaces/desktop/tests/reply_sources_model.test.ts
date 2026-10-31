@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { citedParts, splitSources } from "../src/renderer/cards/reply_sources_model.js";
+import { citedParts, detailedSources, originOf, splitSources } from "../src/renderer/cards/reply_sources_model.js";
 
 test("a reply closed by the sources line gives its body and its documents, each once", () => {
   const split = splitSources("It holds[1], and so does the other[2].\n\n📚 [1] First text · [2] Second text");
@@ -66,3 +66,20 @@ test("citations of listed documents are marked, any other bracket stays text", (
   ]);
   assert.deepEqual(citedParts("No marks here.", sources), ["No marks here."]);
 });
+
+test("the archive's sources win over the line, and a reply without them keeps the line's", () => {
+  const written = [{ number: 1, title: "From the line" }];
+  const kept = [{ number: 1, title: "Kept", id: "note:one" }];
+  assert.deepEqual(detailedSources(written, kept), kept);
+  assert.deepEqual(detailedSources(written, undefined), written);
+  assert.deepEqual(detailedSources(written, []), written);
+});
+
+test("a document's origin is its host, or the reference as written", () => {
+  assert.equal(originOf("https://www.example.com/some/long/path?x=1"), "example.com");
+  assert.equal(originOf("a book, page 12"), "a book, page 12");
+  assert.equal(originOf("javascript:alert(1)"), "javascript:alert(1)");
+  assert.equal(originOf(""), "");
+  assert.equal(originOf(undefined), "");
+});
+

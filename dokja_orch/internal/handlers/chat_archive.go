@@ -201,10 +201,11 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	if model == "" {
 		model, _ = result["model"].(string)
 	}
-	done, err := h.archive.Complete(context.WithoutCancel(ctx), scope, turn, reply, provider, model)
+	kept := turnSources(sources)
+	done, err := h.archive.Complete(context.WithoutCancel(ctx), scope, turn, reply, provider, model, kept...)
 	if errors.Is(err, conversation.ErrInvalid) {
 		// A provenance the archive does not know is left out rather than losing the reply.
-		done, err = h.archive.Complete(context.WithoutCancel(ctx), scope, turn, reply, "", "")
+		done, err = h.archive.Complete(context.WithoutCancel(ctx), scope, turn, reply, "", "", kept...)
 	}
 	if err != nil {
 		return nil, archiveError(err)

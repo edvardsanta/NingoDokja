@@ -8,7 +8,10 @@ import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
 import { latestConversation } from "./conversation_list.js";
+import { DocumentView } from "./document_view.js";
+import { Drawer } from "./drawer.js";
 import { ReplyBody } from "./reply_sources.js";
+import type { ReplySource } from "./reply_sources_model.js";
 import { Button, Notice } from "./ui.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
@@ -24,6 +27,7 @@ export type Turn = {
   reason: string;
   // what the runtime reported answering, which may differ from what is selected now
   answeredBy?: string;
+  sources?: readonly ReplySource[];
 };
 
 export type Conversation = {
@@ -64,6 +68,7 @@ export type Conversation = {
 const fromArchive = (turn: ArchivedTurn): Turn => ({
   sendId: turn.sendId, id: turn.id, seq: turn.seq, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
   ...(turn.model ? { answeredBy: turn.provider ? `${turn.provider} / ${turn.model}` : turn.model } : {}),
+  ...(turn.sources ? { sources: turn.sources } : {}),
 });
 
 // How often, and for how long, a reopened conversation looks again at a send still on its way: its
@@ -294,7 +299,9 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
 // conversation grows. A send without a reply says why, and only the latest can be sent again.
-export function Transcript({ conversation }: { conversation: Conversation }) {
+export function Transcript({ conversation, transport }: { conversation: Conversation; transport: Transport }) {
+  // The document a source opens: beside the conversation, which stays where it was.
+  const [reading, setReading] = useState<ReplySource>();
   const t = useTranslate();
   const { turns, busy, error, preview } = conversation;
   const end = useRef<HTMLDivElement>(null);
@@ -333,9 +340,16 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
     {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
+    {reading?.id && <Drawer title={reading.title || t("assistant_source_untitled")} onClose={() => setReading(undefined)}>
+      {reading.excerpt && <section className="source-passage" aria-label={t("assistant_source_passage")}>
+        <h3>{t("assistant_source_passage")}</h3>
+        <blockquote>{reading.excerpt}</blockquote>
+      </section>}
+      <DocumentView transport={transport} id={reading.id} missing="assistant_source_gone" />
+    </Drawer>}
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
     {busy && !preview && <Notice announce="polite">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</Notice>}
