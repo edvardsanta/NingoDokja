@@ -348,7 +348,7 @@ export function Transcript({ conversation, transport }: { conversation: Conversa
         <h3>{t("assistant_source_passage")}</h3>
         <blockquote>{reading.excerpt}</blockquote>
       </section>}
-      <DocumentView transport={transport} id={reading.id} missing="assistant_source_gone" />
+      <DocumentView transport={transport} id={reading.id} />
     </Drawer>}
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}

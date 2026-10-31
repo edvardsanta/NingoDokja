@@ -20,8 +20,8 @@ export async function loadKnowledge(transport: Transport): Promise<LoadResult<Kn
     : { ok: false, error: { code: "unexpected", message: "unexpected knowledge reply" } };
 }
 
-// A document opened in a tab: where it sat in the list it came from (a search hit sat nowhere).
-export type OpenDocument = { id: string; title: string; at?: number; external: boolean; classify: boolean };
+// A document opened in a tab. It is read by its id, so a tab does not care how it was opened.
+export type OpenDocument = { id: string; title: string; classify: boolean };
 
 export type Library = {
   transport: Transport;
@@ -38,7 +38,7 @@ export type Library = {
   changed: () => void;
   // Documents opened from the list or from a search hit, each in a tab of the workspace's strip.
   documents: readonly OpenDocument[];
-  open: (document: Pick<KnowledgeDocument, "id" | "title">, at: number | undefined, external: boolean, classify?: boolean) => void;
+  open: (document: Pick<KnowledgeDocument, "id" | "title">, classify?: boolean) => void;
   close: (id: string) => void;
   // Adding is one action of the workspace, not a view of it: the drawer opens on demand, from the
   // header or by a file dropped anywhere on the panel.
@@ -72,11 +72,11 @@ export function useLibraryState(transport: Transport, select: (id: string) => vo
   // opens the document with its classification shown; asking again for an open document shows that.
   const [documents, setDocuments] = useState<OpenDocument[]>([]);
   const open = useCallback<Library["open"]>(
-    (document, at, external, classify = false) => {
+    (document, classify = false) => {
       setDocuments((previous) =>
         previous.some((each) => each.id === document.id)
           ? previous.map((each) => (each.id === document.id && classify ? { ...each, classify } : each))
-          : [...previous, { id: document.id, title: document.title || document.id, at, external, classify }].slice(-MAX_OPEN_DOCUMENTS),
+          : [...previous, { id: document.id, title: document.title || document.id, classify }].slice(-MAX_OPEN_DOCUMENTS),
       );
       select(document.id);
     },

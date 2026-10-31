@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
@@ -47,9 +47,9 @@ describe("a document opened from the research base", () => {
     expect(current()).toEqual(["Title note:one"]);
     expect(tabs()).toEqual(["Documents", "Readings", "Title note:one"]);
     expect(calls.filter((call) => call.type === "knowledge.list").map((call) => call.payload)).toEqual([
-      // the Library lists what came from outside, and a document is asked for among the same
       { limit: 20, offset: 0, external: true },
-      { limit: 1, offset: 1, include_text: true, external: true },
+      // a document is read by its id, not by where the list had it
+      { source_id: "note:one", include_text: true },
     ]);
   });
 
@@ -79,7 +79,21 @@ describe("a document opened from the research base", () => {
     expect(screen.getByRole("region", { name: "Library › Documents" })).toBeTruthy();
   });
 
-  it("says so when another document sits where this one was, instead of showing it", async () => {
+  it("says so when the document is no longer there, instead of showing another", async () => {
+    const { transport } = routedTransport({
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "knowledge.list": [ok(PAGE), ok({ documents: [], total: 1, offset: 0 })],
+    });
+    renderCard(transport);
+    await openSecond();
+
+    await screen.findByText("This document is no longer in the Library.");
+    expect(screen.queryByText(/another document sits/)).toBeNull();
+    // the tab is still there to close
+    screen.getByRole("button", { name: "Close Title note:one" });
+  });
+
+  it("is not fooled by a reply for another document", async () => {
     const { transport } = routedTransport({
       "knowledge.status": ok(KNOWLEDGE_STATUS),
       "knowledge.list": [ok(PAGE), ok(withText("note:other", "not this one"))],
@@ -87,7 +101,7 @@ describe("a document opened from the research base", () => {
     renderCard(transport);
     await openSecond();
 
-    await screen.findByText(/another document sits where this one was/);
+    await screen.findByText("This document is no longer in the Library.");
     expect(screen.queryByText("not this one")).toBeNull();
   });
 
@@ -159,5 +173,85 @@ describe("a document opened from a search hit", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText("a passage");
     expect(screen.queryByRole("button", { name: "Open Nameless" })).toBeNull();
+  });
+});
+
+describe("what a document tab says of the document", () => {
+  const rich = { ...listed("note:one"), reference: "notes/freedom.md", tags: ["ethics"], chunks: 2, embedded: 2, updatedAt: new Date(Date.now() - 125 * 60_000).toISOString(), text: "What we call reason.", truncated: false };
+
+  async function open() {
+    const { transport, calls } = routedTransport({
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "knowledge.list": [ok(PAGE), ok({ documents: [rich], total: 2, offset: 1 }), ok({ documents: [{ ...rich, text: "Read again." }], total: 2, offset: 1 })],
+      "knowledge.classify": ok({ sourceId: "note:one", revision: "a".repeat(64), form: { value: "note", origin: "user" }, contentKind: { value: "reference", origin: "user" }, needsUserInput: false, questions: [] }),
+    });
+    const view = renderCard(transport);
+    await openSecond();
+    await screen.findByText("What we call reason.");
+    return { view, calls };
+  }
+
+  it("says what it is once in one line, with the id only in the tooltip of its title", async () => {
+    const { view } = await open();
+
+    const line = view.container.querySelector(".document-line") as HTMLElement;
+    expect(line.textContent).toBe("note · notes/freedom.md · ethics · updated 2 hours ago · 2 of 2 passages indexed.");
+    expect(screen.getByRole("heading", { name: "Title note:one" }).getAttribute("title")).toBe("note:one");
+    expect(line.textContent).not.toContain("note:one");
+  });
+
+  it("keeps the rebuilt-text note quiet and under the text, and only where there is a text", async () => {
+    const { view } = await open();
+
+    const note = screen.getByText("Rebuilt from the passages the Library stored: close to the original, not a faithful copy of it.");
+    expect(note.getAttribute("data-tone")).toBe("off");
+    const text = view.container.querySelector(".document-text") as HTMLElement;
+    expect(text.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens the classification with a button that says whether it is open", async () => {
+    await open();
+    const button = screen.getByRole("button", { name: "Classification" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.textContent).toContain("▸");
+
+    fireEvent.click(button);
+    await screen.findByText("Classification is complete.");
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(button.textContent).toContain("▾");
+    fireEvent.click(button);
+    expect(screen.queryByText("Classification is complete.")).toBeNull();
+  });
+
+  it("reads the text again, where it stands, when the panel is refreshed", async () => {
+    const { calls } = await open();
+    await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByText("Read again.");
+    // the tab was not closed and the text was not blanked to read it
+    expect(screen.getByRole("tab", { name: "Title note:one" }).getAttribute("aria-selected")).toBe("true");
+    expect(calls.filter((call) => call.payload?.source_id === "note:one")).toHaveLength(2);
+  });
+});
+
+describe("a document deleted from the list", () => {
+  it("does not outlive its deletion: its tab closes and the list is back", async () => {
+    const { transport } = routedTransport({
+      "knowledge.status": ok(KNOWLEDGE_STATUS),
+      "knowledge.list": [ok(PAGE), ok(withText("note:one", "the text")), ok({ documents: [listed("note:zero")], total: 1, offset: 0 })],
+      "knowledge.delete": ok({ deleted: true }),
+    });
+    renderCard(transport);
+    await openSecond();
+    await screen.findByText("the text");
+    fireEvent.click(screen.getByRole("tab", { name: "Documents" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Actions for Title note:one" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete…" }));
+
+    await screen.findByText("Document deleted.");
+    expect(screen.queryByRole("tab", { name: "Title note:one" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Documents" }).getAttribute("aria-selected")).toBe("true");
   });
 });

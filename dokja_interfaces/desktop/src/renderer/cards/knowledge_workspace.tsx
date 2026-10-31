@@ -122,7 +122,7 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
             (id) => {
               const document = library.documents.find((each) => each.id === id);
               return document && (
-                <DocumentView transport={transport} id={document.id} at={document.at} external={document.external} classify={document.classify} />
+                <DocumentView transport={transport} id={document.id} classify={document.classify} />
               );
             },
           )}

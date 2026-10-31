@@ -2,88 +2,108 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { KnowledgeDocument, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
-import { useNumbers, useTranslate } from "../i18n/context.js";
-import type { MessageId } from "../i18n/i18n.js";
+import { useNumbers, useTimes, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { parseDocuments } from "./knowledge_documents.js";
 import { KnowledgeClassificationPanel } from "./knowledge_classification.js";
+import { Button } from "./ui.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { useWorkspaceRefresh } from "./workspace_panel.js";
 
-// The document that sits at `at` in the list, with its text, or word that another one sits there now
-// (the list changed since it was shown).
-type Opened = { document: KnowledgeDocument } | { moved: true } | Off;
+// The document, with its text, or word that it is no longer there (it was deleted since its tab opened).
+type Opened = { document: KnowledgeDocument } | { gone: true } | Off;
 
-// `external` counts the position among what came from outside only, as the list it came from did.
-// A document opened from the list is read at its place there; one opened from a search hit has no
-// place, so it is read by its id.
-export async function loadDocument(transport: Transport, id: string, at: number | undefined, external = false): Promise<LoadResult<Opened>> {
-  const request = at === undefined
-    ? { source_id: id, include_text: true }
-    : { limit: 1, offset: at, include_text: true, ...(external ? { external: true } : {}) };
-  const answer = await transport.request("knowledge.list", request, { timeoutMs: 15_000 });
+// A document is read by its id, whichever way it was opened (a row of the list, a hit, the menu's
+// Classify…): where it sat in a list says nothing once the list changes.
+export async function loadDocument(transport: Transport, id: string): Promise<LoadResult<Opened>> {
+  const answer = await transport.request("knowledge.list", { source_id: id, include_text: true }, { timeoutMs: 15_000 });
   if (!answer.ok) return answer;
   const page = parseDocuments(answer.result);
   if (!page) return { ok: false, error: { code: "unexpected", message: "unexpected knowledge reply" } };
   if (page.off) return { ok: true, data: page };
-  const document = page.documents[0];
-  return { ok: true, data: document && document.id === id ? { document } : { moved: true } };
+  const document = page.documents.find((each) => each.id === id);
+  return { ok: true, data: document ? { document } : { gone: true } };
 }
 
-// One document of the research base, in a tab of its own: what the list says of it, and its text.
-// The text is what the service rebuilds from the passages it stored, so it says so: close to the
-// original, not a faithful copy of it. It is shown as text, never as markup.
-export function DocumentView({ transport, id, at, external = false, classify = false, missing = "document_moved" }: { transport: Transport; id: string; at?: number; external?: boolean; classify?: boolean; missing?: MessageId }) {
+// One document of the Library, in a tab of its own: its title, what the list says of it in one line,
+// and its text. The text is what the service rebuilds from the passages it stored, so it says so,
+// quietly and under the text: close to the original, not a faithful copy of it. It is shown as
+// text, never as markup, in a column a text is comfortable to read in.
+export function DocumentView({ transport, id, classify = false }: { transport: Transport; id: string; classify?: boolean }) {
   const t = useTranslate();
+  const { ago } = useTimes();
+  const { fixed } = useNumbers();
   const [classificationOpen, setClassificationOpen] = useState(classify);
   // Classify… on a document already open shows its classification.
   useEffect(() => { if (classify) setClassificationOpen(true); }, [classify]);
-  const { fixed } = useNumbers();
-  const load = useCallback(() => loadDocument(transport, id, at, external), [transport, id, at, external]);
-  const { state, reload } = useCard(load);
+  const load = useCallback(() => loadDocument(transport, id), [transport, id]);
+  const { state, reload, poll, refreshing } = useCard(load);
+  // The panel's refresh reads the text again where it stands.
+  useWorkspaceRefresh(poll, refreshing || state.phase === "loading");
 
   return (
     <section className="document-view" aria-busy={state.phase === "loading"}>
       {state.phase === "loading" && <Pending />}
-      {state.phase === "error" && <Problem error={state.error} />}
+      {state.phase === "error" && (
+        <>
+          <Problem error={state.error} />
+          {/* the panel's own refresh reads everything; this one only asks again for a text that failed */}
+          <div className="problem-actions">
+            <Button extra="retry" onClick={reload}>{t("retry")}</Button>
+          </div>
+        </>
+      )}
       {state.phase === "ready" && "off" in state.data && state.data.off && <OffNotice reason={state.data.reason} />}
-      {state.phase === "ready" && "moved" in state.data && (
-        <p className="note" data-tone="unchecked">
-          {t(missing)}
+      {state.phase === "ready" && "gone" in state.data && (
+        <p className="note" data-tone="off">
+          {t("document_gone")}
         </p>
       )}
       {state.phase === "ready" && "document" in state.data && (() => {
         const document = state.data.document;
+        const when = document.updatedAt === "" ? "" : ago(document.updatedAt);
+        // what it is, where it came from and when it changed; the id is the operator's, in the tooltip
+        const meta = [
+          document.kind,
+          document.reference,
+          document.tags.join(", "),
+          when === "" ? "" : t("documents_updated", { ago: when }),
+          t("documents_passages", { indexed: document.embedded, count: document.chunks }),
+        ].filter(Boolean);
         return (
           <>
-            <h3>{document.title || document.id}</h3>
-            <p className="detail">
-              {[document.id, document.kind, document.reference, document.tags.join(", ")].filter(Boolean).join(" · ")}
-            </p>
-            <p className="detail">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</p>
-            <button type="button" aria-expanded={classificationOpen} onClick={() => setClassificationOpen((open) => !open)}>{t("classification_title")}</button>
+            <header className="document-head">
+              <h3 title={document.id}>{document.title || document.id}</h3>
+              <button
+                type="button"
+                className="disclosure"
+                aria-expanded={classificationOpen}
+                onClick={() => setClassificationOpen((open) => !open)}
+              >
+                {t("classification_title")}
+                <span aria-hidden="true"> {classificationOpen ? "▾" : "▸"}</span>
+              </button>
+            </header>
+            <p className="detail document-line">{meta.join(" · ")}</p>
             {classificationOpen && <KnowledgeClassificationPanel key={document.id} transport={transport} id={document.id} />}
-            <p className="note" data-tone="unchecked">
-              {t("document_rebuilt")}
-            </p>
             {document.text ? (
-              <pre className="document-text">{document.text}</pre>
+              <>
+                <pre className="document-text">{document.text}</pre>
+                {document.truncated && (
+                  <p className="note" data-tone="off">
+                    {t("document_truncated", { count: fixed(document.text.length, 0) })}
+                  </p>
+                )}
+                <p className="note" data-tone="off">
+                  {t("document_rebuilt")}
+                </p>
+              </>
             ) : (
               <p>{t("document_no_text")}</p>
-            )}
-            {document.truncated && (
-              <p className="note" data-tone="off">
-                {t("document_truncated", { count: fixed(document.text?.length ?? 0, 0) })}
-              </p>
             )}
           </>
         );
       })()}
-      {/* the card's own button refreshes the base; this one only asks again for a text that failed */}
-      {state.phase === "error" && (
-        <button type="button" onClick={reload}>
-          {t("retry")}
-        </button>
-      )}
     </section>
   );
 }

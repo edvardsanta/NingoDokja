@@ -41,7 +41,7 @@ function KnowledgeView() {
 }
 
 function KnowledgeBody({ status }: { status: KnowledgeStatus }) {
-  const { transport, open, changed, revision } = useLibrary();
+  const { transport, open, close, changed, revision } = useLibrary();
   const search = useKnowledgeSearch(transport);
   // An empty Library has nothing to search and nothing to count: the list says so alone. That is
   // known once the list has answered, so a Library that may be empty waits for it.
@@ -61,9 +61,10 @@ function KnowledgeBody({ status }: { status: KnowledgeStatus }) {
         revision={revision}
         onChanged={changed}
         onOpen={open}
+        onRemoved={close}
         status={status}
         onTotal={setTotal}
-        results={search.active && !bare ? <SearchResults search={search} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} /> : undefined}
+        results={search.active && !bare ? <SearchResults search={search} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title })} /> : undefined}
       />
     </>
   );

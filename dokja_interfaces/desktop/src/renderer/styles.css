@@ -1351,6 +1351,7 @@ button.meme-zoom:hover:not(:disabled) {
 
 /* A document's text: as stored, line breaks kept, long lines wrapped. */
 .document-text {
+  max-width: 72ch;
   max-height: 60vh;
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
@@ -1363,7 +1364,48 @@ button.meme-zoom:hover:not(:disabled) {
 }
 
 .document-view h3 {
-  margin-top: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The title, and at its end the one thing to open about it; under them what it is, in one line. */
+.document-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.document-line {
+  margin-top: 0.35rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* A control that opens a part of the page under it: the chevron says which way it goes. */
+button.disclosure,
+button.disclosure:hover:not(:disabled) {
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+button.disclosure:hover:not(:disabled) {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
+
+button.disclosure[aria-expanded="true"],
+button.disclosure[aria-expanded="true"]:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.document-view .note {
+  max-width: 72ch;
 }
 
 /* The Library takes a file dropped anywhere on its panel, either view: while one is dragged over, the

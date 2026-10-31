@@ -34,15 +34,16 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
 }
 
 // The list of what the Library holds, with the line above it: how much, how well it is indexed and the
-// filter. `onOpen` opens a document in a tab of its own, given where it sits in the list: its text is
-// asked for there, one document at a time. `status` is what the service reports; with it the panel can
+// filter. `onOpen` opens a document in a tab of its own, where its text is asked for, one document at
+// a time; `onRemoved` says one was deleted from here, so its tab does not outlive it. `status` is what the service reports; with it the panel can
 // tell an empty Library from a list that leaves out what Ningo keeps for himself. `onTotal` hands the
 // list's total up as soon as it is known. `results` takes the list's place while a search is shown
 // (under the same line, which says how well search works): the list, its filter and its pager wait
 // where they were.
-export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen, status, onTotal, results }: {
+export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen, onRemoved, status, onTotal, results }: {
   transport: Transport; revision: number; onChanged: () => void;
-  onOpen?: (document: KnowledgeDocument, at: number, external: boolean, classify: boolean) => void;
+  onOpen?: (document: KnowledgeDocument, classify: boolean) => void;
+  onRemoved?: (id: string) => void;
   status?: KnowledgeStatus;
   onTotal?: (total: number | undefined) => void;
   results?: ReactNode;
@@ -70,12 +71,13 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
       if (typeof answer.result.deleted !== "boolean") return unexpected();
       // Return to the first page: deleting the last item must not strand an empty final page.
       setOffset(0);
+      onRemoved?.(id);
       onChanged();
       return { ok: true, data: { deleted: answer.result.deleted } };
     } finally {
       busy.current = false;
     }
-  }, [transport, onChanged]);
+  }, [transport, onChanged, onRemoved]);
   const deletion = useAction(remove);
   const removing = deletion.state.phase === "loading";
   // The list is what the Library is for, so it is read when the view opens, and again with the
@@ -124,7 +126,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   const row = (document: KnowledgeDocument, index: number) => (
     <DocumentRow key={document.id} document={document} removing={removing} similar={similar}
       tabIndex={Math.min(active, (page?.documents.length ?? 1) - 1) === index ? 0 : -1} onFocus={() => setActive(index)}
-      onOpen={onOpen && page ? (classify) => onOpen(document, page.offset + index, !internal, classify) : undefined}
+      onOpen={onOpen ? (classify) => onOpen(document, classify) : undefined}
       onDelete={() => { if (!removing) deletion.start(document.id); }} />
   );
 
