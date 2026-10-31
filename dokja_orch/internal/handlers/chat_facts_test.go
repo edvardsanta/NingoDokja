@@ -57,15 +57,18 @@ func say(t *testing.T, handler *ChatDomainHandler, event core.Event) string {
 
 func TestPhrasesAreReadAndEverythingElseIsNot(t *testing.T) {
 	for content, want := range map[string]string{
-		"guarde isso: gosto de chá": "gosto de chá",
-		"Guarda isso pra mim - chá": "chá",
-		"anote - chá":               "chá",
-		"salve que prefiro chá":     "prefiro chá",
-		"lembre disso: chá":         "chá",
-		"remember this: I like tea": "I like tea",
-		"remember that I like tea":  "I like tea",
-		"save: tea":                 "tea",
-		"guarde isso":               "",
+		"guarde isso: gosto de chá":        "gosto de chá",
+		"Guarda isso pra mim - chá":        "chá",
+		"anote - chá":                      "chá",
+		"salve que prefiro chá":            "prefiro chá",
+		"lembre disso: chá":                "chá",
+		"remember this: I like tea":        "I like tea",
+		"remember that I like tea":         "I like tea",
+		"save: tea":                        "tea",
+		"guarde isso":                      "",
+		"Ningo, guarde que gosto de metal": "gosto de metal",
+		"ningo: anote: chá":                "chá",
+		"/ningo guarde isso: chá":          "chá",
 	} {
 		command, _, argument, ok := parseFactCommand(content)
 		if !ok || command != factRemember || argument != want {
@@ -92,6 +95,36 @@ func TestPhrasesAreReadAndEverythingElseIsNot(t *testing.T) {
 		if _, _, _, ok := parseFactCommand(content); ok {
 			t.Errorf("%q must stay an ordinary message", content)
 		}
+	}
+}
+
+func TestTheNameDoesNotMakeAnOrdinaryMessageAPhrase(t *testing.T) {
+	for _, content := range []string{"Ningo, tudo bem?", "Ningo, lembra disso?", "Ningo guarde isso: nada", "Oi Ningo, guarde isso: nada"} {
+		if _, _, _, ok := parseFactCommand(content); ok {
+			t.Errorf("%q must stay an ordinary message", content)
+		}
+	}
+}
+
+func TestTheOwnerKeepsAFactFromTheirOwnChatCallingTheName(t *testing.T) {
+	archive := archiveFor(t)
+	handler := NewChatDomainHandler(&scriptedModel{}).WithArchive(archive).WithFacts(factsFor(t))
+	result, err := handler.Handle(context.Background(), whatsappTurn("Ningo, guarde que eu gosto de heavy metal", "MSG1", true), archiveStep)
+	if err != nil || result["reply"] != "Guardado: eu gosto de heavy metal" {
+		t.Fatal(result, err)
+	}
+	held, _ := handler.facts.All(context.Background())
+	if len(held) != 1 || held[0].Person != conversation.OwnerPerson || held[0].Place != conversation.PlacePrivate {
+		t.Fatal(held)
+	}
+}
+
+func TestOnlyAKnownSpeakerIsToldHowToKeepThings(t *testing.T) {
+	handler, model := factsHandler(t, map[string]any{"reply": "a"}, map[string]any{"reply": "b"})
+	say(t, handler, factGroupTurn("oi", "5511999990000", false))
+	say(t, handler, factGroupTurn("oi", "5511888880000", false))
+	if !strings.Contains(model.system[0], "Keeping facts:") || strings.Contains(model.system[1], "Keeping facts:") {
+		t.Fatal(model.system)
 	}
 }
 
