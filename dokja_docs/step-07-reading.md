@@ -110,7 +110,7 @@ The extractor's last result (`last_run`, `last_ok`, `last_error`) is listed in
   the host's 2-minute request limit, or the task's 3-minute deadline. The
   orchestrator's ingress sets no server-side timeout, so the caller's own client
   timeout is the remaining bound.
-- **Size.** A file is at most 20 MB, as Knowledge's upload limit. The task
+- **Size.** An address is fetched up to 20 MB; a file has no limit unless the owner sets one in Settings. The task
   workspace (64 KiB) never holds the file or its text: the steps keep them
   outside, and the workspace records a hashed reference
   (`file:sha256:<16 hex>`), the reader and its version.

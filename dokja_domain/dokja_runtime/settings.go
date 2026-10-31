@@ -30,12 +30,13 @@ type Setting struct {
 }
 
 var (
-	channelID = regexp.MustCompile(`^[0-9]{1,20}$`)
-	groupID   = regexp.MustCompile(`^[0-9]+(-[0-9]+)*@g\.us$`)
-	modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
-	phoneMark = regexp.MustCompile(`[\s().+-]`)
-	phone     = regexp.MustCompile(`^[0-9]{7,15}$`)
-	aliasName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+	channelID   = regexp.MustCompile(`^[0-9]{1,20}$`)
+	groupID     = regexp.MustCompile(`^[0-9]+(-[0-9]+)*@g\.us$`)
+	modelName   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
+	phoneMark   = regexp.MustCompile(`[\s().+-]`)
+	phone       = regexp.MustCompile(`^[0-9]{7,15}$`)
+	aliasName   = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+	limitNumber = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
 )
 
 var settingsCatalog = []Setting{
@@ -47,6 +48,8 @@ var settingsCatalog = []Setting{
 	{ID: "whatsapp.groups", Group: "whatsapp", Env: "DOKJA_WHATSAPP_ALLOWED_GROUPS", Kind: "list", Affects: []string{"orchestrator", "whatsapp"}, parse: listOf(group)},
 	{ID: "whatsapp.conversations", Group: "whatsapp", Env: "DOKJA_WHATSAPP_CONVERSATIONS", Kind: "list", Affects: []string{"whatsapp"}, parse: conversations},
 	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"orchestrator", "whatsapp"}, parse: oneOf("true", "false")},
+	{ID: "library.max_file_mb", Group: "library", Env: "KNOWLEDGE_MAX_FILE_MB", Kind: "text", Affects: []string{"knowledge"}, parse: wholeNumber},
+	{ID: "library.max_text_chars", Group: "library", Env: "KNOWLEDGE_MAX_TEXT_CHARS", Kind: "text", Affects: []string{"knowledge"}, parse: wholeNumber},
 	{ID: "models.embedding", ReadOnly: true, Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
 	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"feeds"}, parse: model},
 	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"feeds"}, parse: model},
@@ -127,6 +130,18 @@ func model(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value != "" && !modelName.MatchString(value) {
 		return "", fmt.Errorf("not a model name")
+	}
+	return value, nil
+}
+
+// wholeNumber is a limit: a positive count, or nothing for no limit at all.
+func wholeNumber(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if !limitNumber.MatchString(value) {
+		return "", fmt.Errorf("%q is not a whole number", value)
 	}
 	return value, nil
 }

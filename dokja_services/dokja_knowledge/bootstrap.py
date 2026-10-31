@@ -47,6 +47,8 @@ def build_service() -> KnowledgeService:
         embedder=embedder,
         model=model,
         min_score=float(os.getenv("KNOWLEDGE_MIN_SCORE", str(DEFAULT_MIN_SCORE))),
+        max_file_mb=int(os.getenv("KNOWLEDGE_MAX_FILE_MB") or 0),
+        max_text_chars=int(os.getenv("KNOWLEDGE_MAX_TEXT_CHARS") or 0),
         registry=registry,
         fetch_enabled=fetch_enabled,
     )
