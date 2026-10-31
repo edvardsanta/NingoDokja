@@ -33,7 +33,7 @@ type conversationRow struct {
 // conversationTurn reads version 1 of the turn projection, pinned by the orchestrator's
 // testdata/turn_view_v1.json. Provider and model are what answered, not what was selected.
 type conversationTurn struct {
-	View                                               int
+	View, Seq                                          int
 	ID, Content, Reply, State, Reason, Provider, Model string
 }
 
@@ -41,6 +41,17 @@ type conversationOpen struct {
 	row   conversationRow
 	turns []conversationTurn
 }
+
+// firstSeq is the place in the conversation of the first turn on screen, and 0 when that is unknown.
+func (o *conversationOpen) firstSeq() int {
+	if len(o.turns) == 0 {
+		return 0
+	}
+	return o.turns[0].Seq
+}
+
+// older says the archive holds turns before the ones on screen.
+func (o *conversationOpen) older() bool { return o.firstSeq() > 1 }
 
 type conversationMode int
 
@@ -77,6 +88,13 @@ type conversationOpenMsg struct {
 	notice string
 }
 
+// conversationOlderMsg names its conversation: the owner may have left it while the page was read.
+type conversationOlderMsg struct {
+	id     string
+	turns  []conversationTurn
+	notice string
+}
+
 func (c *conversationsView) applyList(msg conversationsMsg) {
 	c.loaded, c.err, c.next = true, msg.err, msg.next
 	if msg.err != "" {
@@ -94,12 +112,41 @@ func (c *conversationsView) applyOpen(msg conversationOpenMsg) {
 	if msg.open == nil {
 		return
 	}
+	// Reading the latest page again keeps the earlier turns already read.
+	if c.open != nil && c.open.row.ID == msg.open.row.ID && len(msg.open.turns) > 0 {
+		var earlier []conversationTurn
+		for _, turn := range c.open.turns {
+			if turn.Seq > 0 && turn.Seq < msg.open.firstSeq() {
+				earlier = append(earlier, turn)
+			}
+		}
+		msg.open.turns = append(earlier, msg.open.turns...)
+	}
 	c.open, c.scroll = msg.open, 0
 	for index := range c.items {
 		if c.items[index].ID == msg.open.row.ID {
 			c.items[index] = msg.open.row
 		}
 	}
+}
+
+// applyOlder puts a page above what is on screen. The scroll counts lines from the end, so what is on
+// screen stays where it was.
+func (c *conversationsView) applyOlder(msg conversationOlderMsg) {
+	if c.open == nil || c.open.row.ID != msg.id {
+		return
+	}
+	held := map[string]bool{}
+	for _, turn := range c.open.turns {
+		held[turn.ID] = true
+	}
+	var earlier []conversationTurn
+	for _, turn := range msg.turns {
+		if !held[turn.ID] {
+			earlier = append(earlier, turn)
+		}
+	}
+	c.open.turns = append(earlier, c.open.turns...)
 }
 
 func parseConversationRow(fields map[string]any) conversationRow {
@@ -111,7 +158,7 @@ func parseConversationRow(fields map[string]any) conversationRow {
 
 func parseConversationTurn(fields map[string]any) conversationTurn {
 	return conversationTurn{
-		View: num(fields, "view"), ID: str(fields, "id"), Content: str(fields, "content"), Reply: str(fields, "reply"),
+		View: num(fields, "view"), Seq: num(fields, "seq"), ID: str(fields, "id"), Content: str(fields, "content"), Reply: str(fields, "reply"),
 		State: str(fields, "state"), Reason: str(fields, "reason"), Provider: str(fields, "provider"), Model: str(fields, "model"),
 	}
 }
@@ -183,6 +230,21 @@ func (m *Model) cmdConversationOpen(id string) tea.Cmd {
 			return conversationOpenMsg{notice: err.Error()}
 		}
 		return conversationOpenMsg{open: open}
+	}
+}
+
+// cmdConversationOlder reads the page before the first turn on screen.
+func (m *Model) cmdConversationOlder(open *conversationOpen) tea.Cmd {
+	if !m.begin(tr("reading_the_conversation")) {
+		return nil
+	}
+	id, before := open.row.ID, open.firstSeq()
+	return func() tea.Msg {
+		res, err := m.request("conversation.read", map[string]any{"conversation_id": id, "limit": conversationTurnsRead, "before_seq": before})
+		if err != nil {
+			return conversationOlderMsg{id: id, notice: err.Error()}
+		}
+		return conversationOlderMsg{id: id, turns: parseConversationOpen(res).turns}
 	}
 }
 
@@ -327,6 +389,10 @@ func (m *Model) keyConversationOpen(key string) (tea.Model, tea.Cmd) {
 		view.scroll++
 	case "down", "j":
 		view.scroll = max(0, view.scroll-1)
+	case "m":
+		if view.open.older() {
+			return m, m.cmdConversationOlder(view.open)
+		}
 	case "enter", "i":
 		return m, m.startWriting(conversationComposing, "", tr("write_to_ningo"))
 	case "e":
@@ -490,6 +556,9 @@ func (m *Model) viewConversationOpen() string {
 	}
 	wrap := lipgloss.NewStyle().Width(width)
 	lines := []string{}
+	if view.open.older() {
+		lines = append(lines, styleDim.Render(tr("earlier_turns")), "")
+	}
 	if len(view.open.turns) == 0 {
 		lines = append(lines, styleDim.Render(tr("nothing_said_yet")))
 	}
