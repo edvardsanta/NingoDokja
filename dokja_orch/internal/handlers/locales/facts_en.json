@@ -1,0 +1,16 @@
+{
+  "not_known": "I only keep this for people the owner introduced me to. Nothing was kept.",
+  "unavailable": "I could not reach what is kept right now. Nothing changed; try again shortly.",
+  "remember_how": "Say what to keep, like this: remember this: what you want me to remember.",
+  "remembered": "Kept: {fact}",
+  "too_many": "I already keep {max} things of yours. Delete one first with: forget and its number.",
+  "too_long": "That is too long to keep. The limit is {max} characters.",
+  "nothing_kept": "I have nothing of yours kept here.",
+  "list_header": "What you asked me to keep:",
+  "list_item": "{n}. {fact}",
+  "list_footer": "To delete one, say: forget and its number.",
+  "forget_how": "Say what to forget, like this: forget this: part of the text, or forget and the number on the list.",
+  "forget_none": "I did not find that among what I kept here. Nothing was deleted.",
+  "forget_many": "{count} kept things match that. Ask for the list and use the number.",
+  "forgotten": "Forgotten: {fact}"
+}

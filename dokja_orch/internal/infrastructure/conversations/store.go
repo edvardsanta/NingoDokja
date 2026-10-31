@@ -64,11 +64,20 @@ var migrations = []string{
 		UNIQUE(conversation_id, send_id)
 	);
 	CREATE INDEX turns_pending ON turns(state, created_at);`,
+	`CREATE TABLE facts (
+		id         TEXT PRIMARY KEY,
+		person     TEXT NOT NULL,
+		content    TEXT NOT NULL,
+		place      TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX facts_of_person ON facts(person, created_at);`,
 }
 
 type Store struct{ db *sql.DB }
 
 var _ conversation.Store = (*Store)(nil)
+var _ conversation.FactStore = (*Store)(nil)
 var _ conversation.ConversationRetryStore = (*Store)(nil)
 
 // Open creates the archive if needed, readable by its owner only, and applies pending migrations. A
@@ -410,4 +419,46 @@ func (s *Store) InterruptPending(ctx context.Context, before time.Time) (int, er
 	}
 	n, err := result.RowsAffected()
 	return int(n), err
+}
+
+func (s *Store) AddFact(ctx context.Context, fact conversation.Fact) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO facts (id, person, content, place, created_at) VALUES (?, ?, ?, ?, ?)`,
+		fact.ID, fact.Person, fact.Content, fact.Place, fact.CreatedAt.UnixNano())
+	return err
+}
+
+func (s *Store) PersonFacts(ctx context.Context, person string) ([]conversation.Fact, error) {
+	return s.facts(ctx, `SELECT id, person, content, place, created_at FROM facts WHERE person = ? ORDER BY created_at, id`, person)
+}
+
+func (s *Store) AllFacts(ctx context.Context) ([]conversation.Fact, error) {
+	return s.facts(ctx, `SELECT id, person, content, place, created_at FROM facts ORDER BY person, created_at, id`)
+}
+
+func (s *Store) facts(ctx context.Context, query string, args ...any) ([]conversation.Fact, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	found := []conversation.Fact{}
+	for rows.Next() {
+		var fact conversation.Fact
+		var created int64
+		if err := rows.Scan(&fact.ID, &fact.Person, &fact.Content, &fact.Place, &created); err != nil {
+			return nil, err
+		}
+		fact.CreatedAt = time.Unix(0, created).UTC()
+		found = append(found, fact)
+	}
+	return found, rows.Err()
+}
+
+func (s *Store) DeleteFact(ctx context.Context, id string) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM facts WHERE id = ?`, id)
+	if err != nil {
+		return false, err
+	}
+	changed, err := result.RowsAffected()
+	return changed > 0, err
 }

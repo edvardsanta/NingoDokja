@@ -127,7 +127,7 @@ func TestPersistenceErrorsDoNotSilentlyFallBackToVolatileHistory(t *testing.T) {
 				store.errorOnSave = errors.New("write unavailable")
 				store.failAt = 2
 			}
-			event := chatEvent("remember this")
+			event := chatEvent("a message worth persisting")
 			if _, err := h.Handle(t.Context(), event, chatStep); err == nil {
 				t.Fatal("failed durable storage silently accepted")
 			}

@@ -43,6 +43,7 @@ type ChatDomainHandler struct {
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+	facts            *conversation.Facts
 	ownerProfile     chat.OwnerProfile
 	incoming         *IncomingContentWorkflow
 	ningo            chat.NingoFacts
@@ -86,6 +87,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		return h.handleIncomingContent(ctx, event)
 	}
 	event = h.withOwnerInterface(event)
+	h.attachKnownFacts(ctx, event)
 	// The owner writing from the phone continues the archived conversation. Without an archive (it
 	// could not be opened) the self-chat answers as before, from the process's own session.
 	if selfChatRequest(event) && h.archive != nil {
@@ -186,6 +188,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.CompactionFallback, verifiedOwner, lifecycle.Reason))
 	var sources []knowledgeSource
 	var result map[string]any
+	if reply, ok := h.factReply(ctx, event, content); ok {
+		return map[string]any{"action": workflow.Action, "reply": reply}, nil
+	}
 	if identityReply := ownerIdentityReply(event, content); identityReply != "" {
 		result = map[string]any{"reply": identityReply}
 	} else {
