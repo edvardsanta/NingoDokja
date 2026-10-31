@@ -297,6 +297,7 @@ export function createFakeTransport(delayMs = 400): Transport {
   };
   // The demo's conversation archive, kept as the orchestrator keeps it: by its own opaque ids.
   const archive = new Map<string, { readingId: string; turns: ArchivedTurn[] }>();
+  let keptFacts = [{ id: "f".repeat(32), owner: true, person: "", content: "Prefers tea to coffee.", place: "private", createdAt: "2026-10-30T12:00:00Z" }];
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     onChatPreview(listener) {
@@ -313,6 +314,11 @@ export function createFakeTransport(delayMs = 400): Transport {
           archive.set(id, { readingId: String(payload?.reading_id ?? ""), turns: [] });
           return ok({ conversation: { id, kind: payload?.reading_id ? "reading" : "general", readingId: String(payload?.reading_id ?? ""), title: "", updatedAt: new Date().toISOString(), revision: 1, turns: 0 } });
         }
+        case "conversation.facts":
+          return ok({ facts: keptFacts });
+        case "conversation.fact_delete":
+          keptFacts = keptFacts.filter((fact) => fact.id !== payload?.fact_id);
+          return ok({ deleted: true });
         case "conversation.read": {
           const held = archive.get(String(payload?.conversation_id ?? ""));
           if (!held) return { ok: false, error: { code: "orchestrator", message: "conversation not found" } };

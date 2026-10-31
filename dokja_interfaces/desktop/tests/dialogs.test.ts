@@ -128,3 +128,11 @@ test("deleting a conversation names it by its archive id and says what stays, in
   assert.match(pt?.detail ?? "", /As experiências registradas a partir dela continuam/);
   assert.equal(pt?.accept, "Apagar");
 });
+
+test("deleting a kept fact asks in the screen's language and says the conversation stays", () => {
+  assert.equal(questionFor("en", "conversation.fact_delete", { fact_id: "a".repeat(32) })?.message, "Delete this kept fact?");
+  const pt = questionFor("pt", "conversation.fact_delete", { fact_id: "a".repeat(32) });
+  assert.equal(pt?.message, "Apagar este fato guardado?");
+  assert.match(pt?.detail ?? "", /A conversa em que foi dito continua/);
+  assert.equal(pt?.accept, "Apagar");
+});

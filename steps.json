@@ -1187,12 +1187,13 @@
             "A fact kept in private never reaches a shared chat or its model turn, even when its person asks there; a fact kept in a shared chat stays in that chat."
           ],
           "evidence": [
-            "2026-10-31 backend: explicit phrases (pt, en) answered without the model, facts stored beside the archive, known_facts attached per speaker and place, conversation.facts and conversation.fact_delete for the owner's interfaces. Mutation checks: removing the place filter or trusting a claimed known_speaker fails the tests. Not run live."
+            "2026-10-31 backend: explicit phrases (pt, en) answered without the model, facts stored beside the archive, known_facts attached per speaker and place, conversation.facts and conversation.fact_delete for the owner's interfaces. Mutation checks: removing the place filter or trusting a claimed known_speaker fails the tests. Not run live.",
+            "2026-10-31 desktop: the Notebook lists every person's kept facts as text and deletes one after the shell's question; it stays usable while the memory service is off."
           ],
           "checks": [],
           "blockers": [],
           "references": [],
-          "next_action": "Show and delete facts on the desktop, then a live check in the group."
+          "next_action": "Live check in the listed group: a known person keeps, recalls and forgets a fact, a stranger keeps nothing, and a private fact stays out of the group."
         },
         {
           "id": "09.6",

@@ -196,6 +196,14 @@ How the code is handled:
 The code is the way to attach a device to the account, so show it only on the screen of the person
 who is linking.
 
+## Asking Ningo to keep something
+
+The owner and the people named in the private owner configuration can write `Ningo, guarde isso: ...`
+in a group the owner listed. `Ningo, o que você sabe sobre mim?` lists what they kept in that group and
+`Ningo, esquece 2` deletes it. Anyone else keeps nothing. What was kept in a group only comes back in
+that group, so it is read by whoever is there. The owner's self-chat shows all of the owner's facts, and
+the desktop's Notebook shows everyone's, with a way to delete each one.
+
 ## Conversations in the Desktop
 
 WhatsApp has no history to read from a server, so what the desktop shows is what this interface

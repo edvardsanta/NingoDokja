@@ -22,6 +22,9 @@ export const ACTION_TYPES = [
   // Renaming is a change on a real press; deleting also asks in the shell's own window.
   "conversation.rename",
   "conversation.delete",
+  // What known people asked Ningo to keep: reading it is a read, deleting asks in the shell's window.
+  "conversation.facts",
+  "conversation.fact_delete",
   "runtime.set",
   "runtime.providers",
   "runtime.chat",
@@ -87,6 +90,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "conversation.start",
   "conversation.rename",
   "conversation.delete",
+  "conversation.fact_delete",
   "communications.send",
   "meme.hashtag.tag",
   "meme.pool.refresh",

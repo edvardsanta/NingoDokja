@@ -708,5 +708,16 @@
   "dialog_conversation_delete": "Delete this conversation?",
   "dialog_conversation_delete_detail": "{id}\n\nIts messages and Ningo's replies are erased from the conversation archive, in every interface. Experiences recorded from it stay. This cannot be undone.",
   "dialog_document_delete": "Delete this document?",
-  "dialog_document_delete_detail": "{id}\n\nIts passages are removed from the research base. This cannot be undone."
+  "dialog_document_delete_detail": "{id}\n\nIts passages are removed from the research base. This cannot be undone.",
+  "facts_title": "What Ningo keeps",
+  "facts_about": "What people you introduced asked Ningo to keep. They say \"keep this\" in a chat; what was kept in a group only comes back in that group.",
+  "facts_empty": "Nothing kept yet.",
+  "facts_owner": "You",
+  "facts_place_private": "Kept in private",
+  "facts_place_shared": "Kept in a chat on {place}",
+  "facts_delete": "Delete",
+  "facts_delete_named": "Delete {fact}",
+  "dialog_fact_delete": "Delete this kept fact?",
+  "dialog_fact_delete_detail": "Ningo stops remembering it. The conversation where it was said stays as it is.",
+  "dialog_fact_delete_accept": "Delete"
 }

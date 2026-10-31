@@ -7,7 +7,14 @@ import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportErrorCode } from "../../src/shared/transport.js";
 import { MEMORY_SCORE, MEMORY_STATUS, OFF, failure, ok, routedTransport } from "./support.js";
 
-function renderCard(transport: Transport, locale: Locale = "en") {
+// The kept facts sit below this card and have their own tests.
+const withFacts = (transport: Transport): Transport => ({
+  ...transport,
+  request: (type, payload, options) => type === "conversation.facts" ? Promise.resolve(ok({ facts: [] })) : transport.request(type, payload, options),
+});
+
+function renderCard(plain: Transport, locale: Locale = "en") {
+  const transport = withFacts(plain);
   return render(
     <I18nProvider locale={locale}>
       <MemoryCard transport={transport} />
