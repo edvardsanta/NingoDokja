@@ -299,7 +299,8 @@ func (i *HTTPBridgeIngress) authorize(c *fiber.Ctx) int {
 const chatStreamTimeout = 120 * time.Second
 
 // handleChatStream takes a desktop chat turn, the same envelope the request socket takes, and answers
-// it as newline-delimited JSON: {"preview": text so far} while Ningo writes, then the response the
+// it as newline-delimited JSON: {"progress": "queued"} and {"progress": "dispatched"} when the send
+// waits behind earlier turns, {"preview": text so far} while Ningo writes, then the response the
 // request socket would give. Only the requester sees the previews; they are never the reply. Anything
 // but a desktop message.created is refused.
 func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
@@ -335,9 +336,12 @@ func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
 				cancel()
 			}
 		}
-		result, err := i.service.ProcessWithResult(core.WithReplyPreview(ctx, func(text string) {
+		turn := core.WithSendProgress(core.WithReplyPreview(ctx, func(text string) {
 			write(map[string]string{"preview": text})
-		}), event)
+		}), func(state core.SendState) {
+			write(map[string]string{"progress": string(state)})
+		})
+		result, err := i.service.ProcessWithResult(turn, event)
 		if err != nil {
 			logger.Error(fmt.Sprintf("http bridge chat stream failed event_id=%s", event.EventID), err)
 			write(RequestResponse{Status: "error", Error: err.Error()})

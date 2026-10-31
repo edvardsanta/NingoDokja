@@ -5,6 +5,7 @@ import { useTranslate } from "../i18n/context.js";
 import type { MessageId, Translate } from "../i18n/i18n.js";
 import type { CardState } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
+import { Notice } from "./ui.js";
 
 const ERROR_IDS: Record<TransportErrorCode, MessageId> = {
   unavailable: "error_unavailable",
@@ -43,7 +44,7 @@ export function needsWrittenText(error: TransportError): boolean {
 // The three states every card body can be in besides showing its data.
 export function Pending() {
   const t = useTranslate();
-  return <p role="status">{t("loading")}</p>;
+  return <Notice announce="polite">{t("loading")}</Notice>;
 }
 
 export function Problem({ error }: { error: TransportError }) {
@@ -55,10 +56,10 @@ export function Problem({ error }: { error: TransportError }) {
 export function OffNotice({ reason }: { reason: string }) {
   const t = useTranslate();
   return (
-    <p className="note" data-tone="off">
+    <Notice boxed tone="off">
       {t("service_off")}
       {reason && <span className="detail"> ({reason})</span>}
-    </p>
+    </Notice>
   );
 }
 

@@ -13,7 +13,7 @@ type Orchestrator = {
     timeoutMs: number,
   ): Promise<OrchestratorReply>;
   // A Talk turn that shows its reply while it is written; absent when the bridge is not configured.
-  streamChat?(payload: Record<string, unknown>, timeoutMs: number, onPreview: (text: string) => void): Promise<OrchestratorReply>;
+  streamChat?(payload: Record<string, unknown>, timeoutMs: number, onPreview: (text: string) => void, onQueued?: (queued: boolean) => void): Promise<OrchestratorReply>;
 };
 
 
@@ -91,7 +91,7 @@ export async function handleRequest(
     const conversationId = typeof wire.conversation_id === "string" ? wire.conversation_id : "";
     const reply =
       type === "message.created" && orchestrator.streamChat && onPreview && conversationId
-        ? await orchestrator.streamChat(wire, timeoutMs, (text) => onPreview({ conversationId, text }))
+        ? await orchestrator.streamChat(wire, timeoutMs, (text) => onPreview({ conversationId, text }), (queued) => onPreview({ conversationId, text: "", queued }))
         : await orchestrator.request(type, wire, timeoutMs);
     if (reply.status !== "ok") {
       if ((type === "knowledge.ingest" || type === "knowledge.reindex") && reply.error?.includes("knowledge_write_outcome_unknown:")) {

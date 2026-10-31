@@ -63,8 +63,8 @@ async function main(): Promise<void> {
     request:(type:string,payload:Record<string,unknown>,timeout:number) =>
       type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout),
     // A bridge that never saw the turn (not listening, or too old to stream) leaves it to the socket.
-    ...(bridge ? { streamChat:(payload:Record<string,unknown>,timeout:number,onPreview:(text:string)=>void) =>
-      bridge.stream(payload,timeout,onPreview).catch((error:unknown) => {
+    ...(bridge ? { streamChat:(payload:Record<string,unknown>,timeout:number,onPreview:(text:string)=>void,onQueued?:(queued:boolean)=>void) =>
+      bridge.stream(payload,timeout,onPreview,onQueued).catch((error:unknown) => {
         if (error instanceof BridgeMissing) return orchestrator.request("message.created",payload,timeout);
         throw error;
       }) } : {}),

@@ -45,7 +45,9 @@ export type Transport = {
 };
 
 // The reply of a Talk turn written so far, for the conversation that asked. Never the reply.
-export type ChatPreview = { conversationId: string; text: string };
+// What the shell hands on while a turn is on its way: the reply written so far, or, with `queued`,
+// whether the orchestrator has it waiting behind earlier turns of the conversation.
+export type ChatPreview = { conversationId: string; text: string; queued?: boolean };
 
 export type Bootstrap = { locale: Locale; runtimeControls?: boolean };
 

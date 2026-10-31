@@ -8,6 +8,7 @@ import { useTranslate } from "../i18n/context.js";
 import type { Reading } from "../discussion_context.js";
 import { Problem } from "./card_frame.js";
 import { latestConversation } from "./conversation_list.js";
+import { Button, Notice } from "./ui.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
 // screen has it; "unknown" is a send whose outcome the screen could not read back.
@@ -18,6 +19,8 @@ export type Turn = {
   reply: string;
   state: ArchivedTurnState | "unknown";
   reason: string;
+  // what the runtime reported answering, which may differ from what is selected now
+  answeredBy?: string;
 };
 
 export type Conversation = {
@@ -26,6 +29,8 @@ export type Conversation = {
   turns: readonly Turn[];
   // the reply written so far while it is on its way, when the shell can stream it; never the reply
   preview: string;
+  // the orchestrator has this send waiting behind earlier turns of the conversation
+  queued: boolean;
   draft: string;
   setDraft: (draft: string) => void;
   busy: boolean;
@@ -43,12 +48,17 @@ export type Conversation = {
   retry: () => void;
 };
 
-const fromArchive = (turn: ArchivedTurn): Turn => ({ sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason });
+const fromArchive = (turn: ArchivedTurn): Turn => ({
+  sendId: turn.sendId, id: turn.id, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
+  ...(turn.model ? { answeredBy: turn.provider ? `${turn.provider} / ${turn.model}` : turn.model } : {}),
+});
 
 // How often, and for how long, a reopened conversation looks again at a send still on its way: its
 // reply was being written for a screen that is gone, so nothing else will bring it here.
 const PENDING_RECHECK_MS = 3_000;
 const PENDING_RECHECKS = 40;
+// How near the end of the conversation still counts as being at the end.
+const FOLLOW_SLACK_PX = 80;
 // A new conversation is named by the start of its first message.
 const TITLE_CHARS = 60;
 
@@ -102,12 +112,14 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [error, setError] = useState<TransportError>();
   const [unkept, setUnkept] = useState(false);
   const [preview, setPreview] = useState("");
+  const [queued, setQueued] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // Only this conversation's previews, and only while its turn is on its way.
   useEffect(() => {
     if (!busy || !transport.onChatPreview) return undefined;
     return transport.onChatPreview((each) => {
-      if (id.current && each.conversationId === id.current) setPreview(each.text);
+      if (!id.current || each.conversationId !== id.current) return;
+      if (each.queued === undefined) setPreview(each.text); else setQueued(each.queued);
     });
   }, [busy, transport]);
 
@@ -183,7 +195,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
       await readBack(sendId).catch(() => settle(sendId, (turn) => ({ ...turn, state: "unknown" })));
-    } finally { setBusy(false); setPreview(""); field.current?.focus(); }
+    } finally { setBusy(false); setPreview(""); setQueued(false); field.current?.focus(); }
   };
 
   const send = async (content: string) => {
@@ -216,7 +228,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     if ((latest.state === "failed" || latest.state === "interrupted") && latest.id) void dispatch(latest.sendId, { retry_turn_id: latest.id });
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
-  return { id: conversationId, turns, preview, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
+  return { id: conversationId, turns, preview, queued, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -225,26 +237,37 @@ export function Transcript({ conversation }: { conversation: Conversation }) {
   const t = useTranslate();
   const { turns, busy, error, preview } = conversation;
   const end = useRef<HTMLDivElement>(null);
+  // The end is followed while the owner is at it. Reading further up stops that until they come back
+  // down or send something; a reply being written never takes the page from under them.
+  const following = useRef(true);
   useEffect(() => {
-    end.current?.scrollIntoView?.({ block: "end" });
-  }, [turns.length, busy, error, preview]);
+    const body = end.current?.closest(".wp-body");
+    if (!body) return undefined;
+    const read = () => { following.current = body.scrollHeight - body.scrollTop - body.clientHeight <= FOLLOW_SLACK_PX; };
+    body.addEventListener("scroll", read, { passive: true });
+    return () => body.removeEventListener("scroll", read);
+  }, [conversation.loading, conversation.loadError]);
+  useEffect(() => { if (busy) following.current = true; }, [busy]);
+  useEffect(() => {
+    if (following.current) end.current?.scrollIntoView?.({ block: "end" });
+  }, [turns.length, busy, error, preview, conversation.loading]);
   const latest = turns.at(-1);
-  if (conversation.loading) return <p role="status">{t("assistant_opening")}</p>;
-  if (conversation.loadError) return <><Problem error={conversation.loadError}/><button type="button" className="compact" onClick={conversation.reload}>{t("assistant_reload")}</button></>;
+  if (conversation.loading) return <Notice announce="polite">{t("assistant_opening")}</Notice>;
+  if (conversation.loadError) return <><Problem error={conversation.loadError}/><Button size="compact" onClick={conversation.reload}>{t("assistant_reload")}</Button></>;
   return <>
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p></li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><p>{turn.reply}</p>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {/* Outside the live list, so a reader of the screen hears the reply once, when it lands. */}
     {busy && preview && <ol className="assistant-turns"><li className="assistant-preview" data-role="assistant" aria-busy="true"><strong>{t("assistant_name")}</strong><p>{preview}</p></li></ol>}
-    {busy && !preview && <p role="status">{t("assistant_thinking")}</p>}
-    {!busy && latest?.state === "pending" && <p role="status">{t("assistant_still_pending")}</p>}
-    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <p role="alert">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</p>}
-    {conversation.unkept && <p role="alert">{t("assistant_history_unavailable")}</p>}
+    {busy && !preview && <Notice announce="polite">{t(conversation.queued ? "assistant_queued" : "assistant_thinking")}</Notice>}
+    {!busy && latest?.state === "pending" && <Notice announce="polite">{t("assistant_still_pending")}</Notice>}
+    {!busy && latest && (latest.state === "failed" || latest.state === "interrupted") && !error && <Notice announce="assertive">{t(latest.state === "interrupted" ? "assistant_interrupted" : "assistant_no_reply", { reason: reasonText(latest.reason, t) })}</Notice>}
+    {conversation.unkept && <Notice announce="assertive">{t("assistant_history_unavailable")}</Notice>}
     {error && <Problem error={error}/>}
-    {!busy && retryable(latest) && <button type="button" className="compact" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</button>}
+    {!busy && retryable(latest) && <Button size="compact" onClick={conversation.retry}>{t(latest?.state === "pending" ? "assistant_check_again" : "assistant_retry")}</Button>}
     <div ref={end} />
   </>;
 }
@@ -269,7 +292,7 @@ export function Composer({ conversation, placeholder, hint, keyshortcuts, footer
     <label htmlFor={fieldId}>{t("assistant_input_label")}</label>
     <textarea id={fieldId} ref={field} value={draft} aria-keyshortcuts={keyshortcuts} maxLength={2000} rows={1} disabled={busy} aria-describedby={hint ? hintId : undefined}
       onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}/>
-    <button type="submit" className="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</button>
+    <Button type="submit" variant="primary" aria-busy={conversation.busy ? "true" : undefined} disabled={waiting || draft.trim() === ""}>{t("assistant_send")}</Button>
     {(hint || footer) && <div className="composer-foot">
       {hint && <p className="detail composer-hint" id={hintId}>{hint}</p>}
       {footer}

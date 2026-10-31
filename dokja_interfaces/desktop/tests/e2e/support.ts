@@ -293,6 +293,19 @@ export class Page {
   }
 
   // A press of the mouse as the browser itself reports it, unlike element.click() from a script.
+  // The window's content size, as the page sees it; no argument goes back to the real one.
+  async resize(width?: number, height?: number): Promise<void> {
+    if (width === undefined) await this.send("Emulation.clearDeviceMetricsOverride", {});
+    else await this.send("Emulation.setDeviceMetricsOverride", { width, height: height ?? 800, deviceScaleFactor: 1, mobile: false });
+  }
+
+  // Real keyboard navigation: without the key code Chromium does not move the focus.
+  async tab(): Promise<void> {
+    const key = { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 };
+    await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...key });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", ...key });
+  }
+
   async click(x: number, y: number): Promise<void> {
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
       await this.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -99,5 +100,34 @@ func TestChatStreamSendsPreviewsThenTheRequestResponse(t *testing.T) {
 	result, _ := lines[2]["result"].(map[string]any)
 	if inner, _ := result["result"].(map[string]any); inner["reply"] != "The answer" {
 		t.Fatal(string(raw))
+	}
+}
+
+type queuedChat struct{}
+
+func (queuedChat) Domain() core.Domain { return core.DomainChat }
+func (queuedChat) Handle(ctx context.Context, _ core.Event, _ core.WorkflowStep) (map[string]any, error) {
+	progress := core.SendProgress(ctx)
+	if progress == nil {
+		return nil, errors.New("the stream must ask for the send's progress")
+	}
+	progress(core.SendQueued)
+	progress(core.SendDispatched)
+	return map[string]any{"reply": "The answer"}, nil
+}
+
+func TestChatStreamSaysWhereTheSendStandsBeforeTheReply(t *testing.T) {
+	app := chatStreamApp(core.DefaultService(queuedChat{}))
+	response, err := app.Test(streamRequest(desktopTurn, "Bearer fixture-gateway-secret"), 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+	if len(lines) != 3 || lines[0] != `{"progress":"queued"}` || lines[1] != `{"progress":"dispatched"}` || !strings.Contains(lines[2], `"status":"ok"`) {
+		t.Fatalf("unexpected stream: %q", lines)
 	}
 }

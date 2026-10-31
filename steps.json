@@ -1116,7 +1116,8 @@
             "Observer follow-up: start/stop voice-channel Discord final transcript ingestion and a local Desktop live view are implemented separately from the owner archive. Scope, stop/deletion, duplicate/revision and capture-order tests cover the ephemeral journal. Desktop capture timestamps use the local timezone; speakers require no join/leave commands. Semantic threads, partial hypotheses and PostgreSQL persistence remain pending; no archive milestone is declared complete by this observer slice.",
             "2026-10-29 owner authorized H3 ahead of gate 08.3 and chose an explicit unavailable state over an unarchived fallback. First H3 batch: Talk starts its conversation in the archive with the first message, sends with per-message send ids, retries failed/interrupted turns by retry_turn_id, resends unknown-outcome sends under the same send id, reads the archive back after failures and refuses to answer unkept messages. The shell allow-lists conversation.start (a gesture-gated write) and conversation.read with archive-id validation and bounded projections.",
             "2026-10-30 owner chose reopening the latest conversation on launch. Second H3 batch: restore into the mounted composer, Conversations drawer (bounded conversation.list), bounded recheck of reopened pending turns, titled new conversations, re-read after each send and on window focus for turns added elsewhere, translated archive failure reasons.",
-            "2026-10-30 owner decision: the linked WhatsApp account's self-chat continues the owner's archived conversation. SendScopeFor admits it for sends only; the handler continues the latest general conversation (or starts a titled one) under a lock, derives a hashed send id from the WhatsApp message id, bounds the turn to 170 s and keeps a repeat of a pending turn quiet. Other WhatsApp chats stay unarchived."
+            "2026-10-30 owner decision: the linked WhatsApp account's self-chat continues the owner's archived conversation. SendScopeFor admits it for sends only; the handler continues the latest general conversation (or starts a titled one) under a lock, derives a hashed send id from the WhatsApp message id, bounds the turn to 170 s and keeps a repeat of a pending turn quiet. Other WhatsApp chats stay unarchived.",
+            "2026-10-30 merged: #212 self-chat continues the owner's conversation, #215 self-chat commands, #217 rename, confirmed delete and the Talk model field, #224 conversations as a database setting. Verified live: a self-chat turn reached the archive; a Talk send has not been observed there since the desktop was rebuilt."
           ],
           "checks": [
             {
@@ -1161,7 +1162,7 @@
             "dokja_docs/realtime-conversation/README.md",
             "dokja_docs/design-system-refactoring-review.md"
           ],
-          "next_action": "H3: rename and reviewed delete, then the queued-waiting stream line; H4 (CLI/TUI). WhatsApp self-chat continuation is on feat/whatsapp-owner-conversation and needs this branch merged first to be visible on the desktop.",
+          "next_action": "Confirm a Talk send lands in the archive, then H4 (CLI/TUI) on the pinned turn projection, then H5.",
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3"
@@ -1308,7 +1309,25 @@
                 "Complete all-workspace visual checks plus focus, reduced-motion, forced-color and zoom/text-growth validation; preserve approved visual choices."
               ],
               "evidence": [
-                "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed."
+                "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed.",
+                "2026-10-30, owner asked to proceed: native acceptance suite covers all six workspaces for overflow, dock visibility, 200% text, real Tab focus rings, reduced motion and forced colors. It found and fixed a System row overflow. Stale e2e suites were repaired (position-based tabs, the preload list, Readings navigation)."
+              ],
+              "checks": [
+                {
+                  "name": "native_acceptance",
+                  "status": "passed",
+                  "detail": "Under xvfb with a synthetic orchestrator: acceptance 7, smoke 24, design_tokens 8, communications 4, feedback 3, communications_env 1, readings 1, post_video 1 all passed."
+                },
+                {
+                  "name": "native_screenshots",
+                  "status": "blocked",
+                  "detail": "Page.captureScreenshot timed out again in the headless compositor; no native visual acceptance is claimed."
+                },
+                {
+                  "name": "assistive_technology",
+                  "status": "skipped",
+                  "detail": "No screen reader or native high-contrast palette run; menus, drawer focus per workspace and windows under 40rem remain open."
+                }
               ]
             }
           ]
@@ -1335,14 +1354,23 @@
             "Keep focus visible around docks, sticky content and drawers at supported narrow widths and zoom/text growth; do not infer mobile support from responsive desktop layout.",
             "For failed multi-field submits, preserve input and provide linked inline errors with a focusable summary. Announce relevant errors/status changes without streaming-token repetition."
           ],
-          "evidence": [],
-          "checks": [],
+          "evidence": [
+            "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch adds Button (variant/size/type) and Notice (announce/boxed/tone) in cards/ui.tsx with unchanged HTML, rebuilds the card_frame states on them and migrates the Talk vertical. dokja_docs/desktop-ux/component-catalog.md holds the inventory, state catalog, migration map and rollback."
+          ],
+          "checks": [
+            {
+              "name": "primitives_talk_vertical",
+              "status": "passed",
+              "detail": "Primitive unit tests and Drawer focus entry, Tab containment, Escape and focus return pass; Talk suites unchanged. Other verticals, multi-field linked errors elsewhere and real-app long-content/narrow checks remain."
+            }
+          ],
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
-            "dokja_docs/cindy-architecture-research.md"
+            "dokja_docs/cindy-architecture-research.md",
+            "dokja_docs/desktop-ux/component-catalog.md"
           ],
-          "next_action": "After token foundations, migrate one representative vertical using existing primitives and verify behavior before expanding."
+          "next_action": "Migrate the remaining verticals in their own batches; real-app narrow and long-content checks belong with 09.6-b."
         },
         {
           "id": "09.8",
@@ -1368,15 +1396,23 @@
             "Do not imply mobile support, remote-device ownership or multi-agent execution from a shared presentation contract.",
             "Preserve drafts, focus and manual reading position during progress updates; auto-follow only when appropriate. Use stable message/task keys and measure long-history input/rendering before adopting windowing, retaining accessible order and focus recovery."
           ],
-          "evidence": [],
-          "checks": [],
+          "evidence": [
+            "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch pins a versioned turn projection (view 1) in dokja_orch/internal/handlers/testdata/turn_view_v1.json, read by the orchestrator and desktop tests; Talk shows the provider and model the runtime reported, separate from the selection, and the queued state from 10.6-b; following the end of the conversation stops while the owner reads further up and resumes when they return or send. Cancellation and steering stay absent because no backend capability exists, so nothing is simulated."
+          ],
+          "checks": [
+            {
+              "name": "desktop_turn_projection",
+              "status": "passed",
+              "detail": "Orchestrator go vet and go test -race passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Skipped: CLI/TUI presentation (09.5-H4 pending), long-history measurement and real-app checks."
+            }
+          ],
           "blockers": [],
           "references": [
             "dokja_docs/design-system-refactoring-review.md",
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "Consume the backend lifecycle/progress/control contracts from 10.6 together with 09.5 history and 09.7 components. UI projections do not define task authority, dispatch semantics or terminal truth."
+          "next_action": "CLI and TUI consume the pinned projection with 09.5-H4; measure long-history rendering before windowing; running-work and pending-interaction states need backend evidence first."
         },
         {
           "id": "09.9",
@@ -1886,7 +1922,8 @@
                 "Bounded normalized observations preserve source/attempt/revision provenance and aggregate limits."
               ],
               "evidence": [
-                "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min)."
+                "2026-10-29 owner authorized implementation ahead of gate 08.3 and chose ordered queueing over refusal. Archived chat sends of one conversation are now recorded and enrolled together in a volatile orchestrator queue and answered one at a time in transcript order, each seeing the earlier reply; independent conversations stay concurrent. A queued request that stops fails without generation, sends past a bound of eight are refused unrecorded, replays bypass the queue even when it is full and restart recovery remains interrupt-only. See dokja_docs/task-lifecycle-compatibility.md. Waiting counts against the request deadline (desktop stream 120 s, CLI 2 min).",
+                "2026-10-30: the orchestrator reports a normalized queued/dispatched send state (core.SendState), repeated while waiting so a stream can notice a closed requester; the desktop stream carries it and Talk renders it from the en/pt catalogs without defining it. Other request paths report nothing."
               ],
               "checks": [
                 {
@@ -1903,6 +1940,11 @@
                   "name": "capability_admission",
                   "status": "skipped",
                   "detail": "Unsupported-capability refusal, a normalized queued/dispatched observation and ordering for non-chat workflows remain open in 10.6-b."
+                },
+                {
+                  "name": "queued_observation",
+                  "status": "passed",
+                  "detail": "dokja_orch gofmt, go vet ./... and go test -race ./... passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Regressions cover reports only when blocked, repetition, dispatched last, stream order, unknown states ignored and the Portuguese status. Not run in the real app."
                 }
               ]
             },
@@ -1921,7 +1963,7 @@
               "evidence": []
             }
           ],
-          "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; the first 10.6-b batch orders archived chat sends per conversation. Next: explicit capability admission and a normalized queued/dispatched observation, then logical-task/revision/budget mapping at a workflow consumer. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
+          "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; 10.6-b orders archived sends and reports queued/dispatched. Next: explicit capability admission and ordering beyond archived chat, then logical-task/revision/budget mapping at a workflow consumer. 09.8 can consume the queued/dispatched observation. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
         }
       ],
       "status_before_review": "in_progress",

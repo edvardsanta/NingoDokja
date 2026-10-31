@@ -112,3 +112,13 @@ test("a bridge that never saw the turn says so, so the turn can go over the sock
   });
   await assert.rejects(broken.stream({}, 5_000, () => {}), (error: unknown) => error instanceof OrchestratorError && error.code === "unavailable", "a turn that may have run is never sent twice");
 });
+
+test("where a send stands is handed on, and a state this build does not know is left alone", async () => {
+  const lines = ['{"progress":"queued"}', '{"progress":"somewhere-new"}', '{"progress":"dispatched"}', '{"preview":"The ans"}', '{"status":"ok","result":{}}'];
+  const body = new Response(`${lines.join("\n")}\n`);
+  const bridge = new BridgeChat({ endpoint: "http://localhost:8091", token: "fixture-token", fetch: (async () => body) as typeof fetch });
+  const seen: unknown[] = [];
+  const reply = await bridge.stream({ content: "q" }, 1_000, (text) => seen.push(text), (queued) => seen.push(queued));
+  assert.equal(reply.status, "ok");
+  assert.deepEqual(seen, [true, false, "The ans"]);
+});

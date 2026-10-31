@@ -32,7 +32,7 @@ export class BridgeChat {
     this.fetch = options.fetch ?? fetch;
   }
 
-  async stream(payload: Record<string, unknown>, timeoutMs: number, onPreview: (text: string) => void): Promise<OrchestratorReply> {
+  async stream(payload: Record<string, unknown>, timeoutMs: number, onPreview: (text: string) => void, onQueued?: (queued: boolean) => void): Promise<OrchestratorReply> {
     let response: Response;
     try {
       response = await this.fetch(this.url, {
@@ -63,7 +63,7 @@ export class BridgeChat {
           const line = pending.slice(0, end).trim();
           pending = pending.slice(end + 1);
           if (line === "") continue;
-          const reply = readLine(line, onPreview);
+          const reply = readLine(line, onPreview, onQueued);
           if (reply) return reply;
         }
         if (Buffer.byteLength(pending) > MAX_LINE_BYTES) throw new OrchestratorError("orchestrator", "the reply is too long");
@@ -85,8 +85,9 @@ function refused(error: unknown): boolean {
   return cause?.code === "ECONNREFUSED";
 }
 
-// A preview is handed on; the response ends the stream. Anything else is not what the bridge sends.
-function readLine(line: string, onPreview: (text: string) => void): OrchestratorReply | undefined {
+// A preview is handed on, and so is where the send stands; the response ends the stream. A state this
+// build does not know is left alone. Anything else is not what the bridge sends.
+function readLine(line: string, onPreview: (text: string) => void, onQueued?: (queued: boolean) => void): OrchestratorReply | undefined {
   let value: unknown;
   try {
     value = JSON.parse(line);
@@ -96,6 +97,10 @@ function readLine(line: string, onPreview: (text: string) => void): Orchestrator
   if (!isRecord(value)) throw new OrchestratorError("orchestrator", "the stream is not valid JSON");
   if (typeof value.preview === "string") {
     onPreview(value.preview.slice(0, MAX_PREVIEW_CHARS));
+    return undefined;
+  }
+  if (typeof value.progress === "string") {
+    if (value.progress === "queued" || value.progress === "dispatched") onQueued?.(value.progress === "queued");
     return undefined;
   }
   if (typeof value.status !== "string") throw new OrchestratorError("orchestrator", "the reply has no status");

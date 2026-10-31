@@ -183,11 +183,28 @@ or pending send ID is still answered from the archive. Making `Wait` a no-op
 fails the ordering and cancellation regressions. `go vet ./...` and
 `go test -race ./...` passed in `dokja_orch`.
 
+## Queued and dispatched observation (`10.6-b`, second batch)
+
+The orchestrator now reports where an accepted send stands, in a vocabulary that
+belongs to it and not to any client or provider (`core.SendState`): `queued` when
+the send waits behind earlier turns of its conversation, then `dispatched` when it
+goes on to be answered. A send with nothing ahead reports neither. Neither state
+proves a reply or an external effect.
+
+An ingress that can deliver the report asks for it (`core.WithSendProgress`). The
+desktop chat stream writes `{"progress":"queued"}` and `{"progress":"dispatched"}`
+lines before the previews, and the desktop only renders them. It ignores a state it
+does not know, but an older desktop refuses the new line, so desktop and orchestrator
+are updated together. `queued` repeats every 5 seconds: a write is the only way the
+stream can notice a requester that went away, and then the send fails as stopped
+while waiting. That detection is best effort, because one write can succeed after
+the other side has gone. Other request paths, including WhatsApp, report nothing.
+
 ## Remaining architecture work
 
 `10.6-a` remains open for the general logical-task mapping, state-revision and
 attempt relationships, authority and aggregate-budget contract, and compatibility
-at an actual workflow consumer. `10.6-b` still owns explicit capability outcomes, a
-normalized queued/dispatched observation and ordering beyond archived chat. `10.6-c` owns broader result/report settlement and justified
+at an actual workflow consumer. `10.6-b` still owns explicit capability outcomes and
+ordering beyond archived chat. `10.6-c` owns broader result/report settlement and justified
 durable recovery. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.

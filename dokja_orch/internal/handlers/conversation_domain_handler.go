@@ -118,9 +118,16 @@ func conversationView(c conversation.Conversation) map[string]any {
 	}
 }
 
+// turnViewVersion names the shape below, the projection of a turn every interface reads. It grows by
+// adding fields; changing or removing one is a new version. testdata/turn_view_v1.json pins it for the
+// orchestrator and for the interfaces. Provider and model are what the runtime reported answering,
+// not what was selected, and they are empty when it reported nothing.
+const turnViewVersion = 1
+
 func turnView(t conversation.Turn) map[string]any {
 	view := map[string]any{
-		"id": t.ID, "seq": t.Seq, "send_id": t.SendID, "content": t.Content, "reply": t.Reply,
+		"view": turnViewVersion,
+		"id":   t.ID, "seq": t.Seq, "send_id": t.SendID, "content": t.Content, "reply": t.Reply,
 		"state": string(t.State), "reason": t.Reason, "attempts": t.Attempts,
 		"provider": t.Provenance.ObservedProvider, "model": t.Provenance.ObservedModel,
 		"created_at": t.CreatedAt.Format(time.RFC3339Nano),

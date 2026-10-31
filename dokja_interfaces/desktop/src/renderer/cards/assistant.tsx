@@ -10,6 +10,7 @@ import { Composer, READING_PROMPTS, Transcript, useConversation } from "./assist
 import { ConversationsDrawer } from "./conversation_list.js";
 import { TalkModel } from "./talk_model.js";
 import { WorkspacePanel } from "./workspace_panel.js";
+import { Button, Notice } from "./ui.js";
 
 // The beginnings of a question, written as challenges. They fill the message for the owner to finish;
 // they never send by themselves.
@@ -58,8 +59,8 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
   const { pulse } = useStatus();
   const open = useOpenWorkspace();
   const restart = <>
-    <button type="button" className="compact" onClick={() => onList(conversation.id)}>{t("conversations_open")}</button>
-    <button type="button" className="compact" onClick={onRestart}>{t("assistant_new_conversation")}</button>
+    <Button size="compact" onClick={() => onList(conversation.id)}>{t("conversations_open")}</Button>
+    <Button size="compact" onClick={onRestart}>{t("assistant_new_conversation")}</Button>
   </>;
   const fill = (start: string) => {
     conversation.setDraft(`${start} `);
@@ -69,27 +70,27 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
     footer={<TalkModel transport={transport} busy={conversation.busy} />} />;
   return <WorkspacePanel trail={[t("nav_assistant")]} actions={restart} dock={dock}>
     <section className="talk" aria-label={t("assistant_title")}>
-      {pulse === "lost" && <div className="note" data-tone="problem">
+      {pulse === "lost" && <Notice as="div" boxed tone="problem">
         <p>{t("talk_offline")}</p>
-        <button type="button" className="compact" onClick={() => open("health")}>{t("talk_open_system")}</button>
-      </div>}
+        <Button size="compact" onClick={() => open("health")}>{t("talk_open_system")}</Button>
+      </Notice>}
       {reading && <div className="talk-context">
-        <p className="note">{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</p>
-        <button type="button" className="compact" onClick={onRestart}>{t("assistant_close")}</button>
+        <Notice boxed>{t("assistant_reading_context", { title: reading.title, source: reading.source || t("assistant_unknown_source") })}</Notice>
+        <Button size="compact" onClick={onRestart}>{t("assistant_close")}</Button>
         <p className="detail">{t("assistant_excerpt_limit")}</p>
       </div>}
-      {conversation.opened?.kind === "reading" && <p className="note">{t("assistant_reading_reopened")}</p>}
+      {conversation.opened?.kind === "reading" && <Notice boxed>{t("assistant_reading_reopened")}</Notice>}
       {reading && conversation.turns.length === 0 && <div className="talk-opening">
         <p className="detail">{t("assistant_reading_intro")}</p>
         <div className="talk-starts">
-          {readingPrompts(reading, t).map((prompt) => <button key={prompt} type="button" className="assistant-prompt compact" disabled={conversation.busy} onClick={() => void conversation.send(prompt)}>{prompt}</button>)}
+          {readingPrompts(reading, t).map((prompt) => <Button key={prompt} size="compact" extra="assistant-prompt" disabled={conversation.busy} onClick={() => void conversation.send(prompt)}>{prompt}</Button>)}
         </div>
       </div>}
       {!reading && !conversation.opened && !conversation.loading && conversation.turns.length === 0 && <div className="talk-opening">
         <p className="voice">{t("talk_voice_opening")}</p>
         <p className="detail">{t("talk_next_step")}</p>
         <div className="talk-starts">
-          {STARTS.map((id) => <button key={id} type="button" className="assistant-prompt compact" disabled={conversation.busy} onClick={() => fill(t(id))}>{t(id)}</button>)}
+          {STARTS.map((id) => <Button key={id} size="compact" extra="assistant-prompt" disabled={conversation.busy} onClick={() => fill(t(id))}>{t(id)}</Button>)}
         </div>
       </div>}
       <Transcript conversation={conversation} />

@@ -8,7 +8,7 @@ describe("desktop experience feedback", { skip: hasDisplay ? false : "no display
  after(async()=>{page?.close();await app?.stop();await orchestrator?.stop();});
  it("inspects an experience and offers controls without resolving it",async()=>{
   await page.waitFor("document.querySelectorAll('[role=tab]').length ? true : null");
-  await page.evaluate("document.querySelectorAll('[role=tab]')[2].click()");
+  await page.evaluate("document.querySelector('[id$=-tab-memory]').click()");
   await page.waitFor("document.querySelector('button[aria-label^=\"Inspect fixture:\"]') ? true : null");
   await page.waitFor("document.querySelector('button[aria-label=\"Inspect fixture:1\"]') ? true : null");
   await page.evaluate("document.querySelector('button[aria-label=\"Inspect fixture:1\"]').click()");
