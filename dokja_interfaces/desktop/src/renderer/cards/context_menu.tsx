@@ -42,7 +42,8 @@ export function useRowMenu(items: readonly MenuItem[], name: string) {
 
 function MenuButton({ name, open, onOpen }: { name: string; open: boolean; onOpen: (at: Place) => void }) {
   const t = useTranslate();
-  return <button type="button" className="row-menu-button" aria-haspopup="menu" aria-expanded={open}
+  // reached with the Menu key on the row, or with a click: the list has one tab stop, not one per button
+  return <button type="button" className="row-menu-button" aria-haspopup="menu" aria-expanded={open} tabIndex={-1}
     aria-label={t("row_menu_named", { name })}
     onClick={(event) => {
       const box = event.currentTarget.getBoundingClientRect();
@@ -97,9 +98,20 @@ function RowMenu({ items, place, name, onClose }: { items: readonly MenuItem[]; 
   </div>, document.body);
 }
 
-// A list row that carries a menu: focusable, so the keyboard can reach the Menu key on it.
-export function MenuRow({ menu, children }: { menu: ReturnType<typeof useRowMenu>; children: ReactNode }) {
-  return <li tabIndex={0} className="menu-row" {...menu.rowProps}>
+// A list row that carries a menu: focusable, so the keyboard can reach the Menu key on it. A list of
+// rows hands the tab stop to one of them (the others are -1, still reached by the arrows or a click).
+export function MenuRow({ menu, children, tabIndex = 0, onFocus, onActivate }: {
+  menu: ReturnType<typeof useRowMenu>; children: ReactNode; tabIndex?: number; onFocus?: () => void;
+  // Enter on the row itself: what the row's title does when it is clicked.
+  onActivate?: () => void;
+}) {
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    menu.rowProps.onKeyDown(event);
+    if (event.defaultPrevented || event.key !== "Enter" || event.target !== event.currentTarget || !onActivate) return;
+    event.preventDefault();
+    onActivate();
+  };
+  return <li tabIndex={tabIndex} className="menu-row" onFocus={onFocus} {...menu.rowProps} onKeyDown={onKeyDown}>
     {children}
     {menu.button}
     {menu.menu}

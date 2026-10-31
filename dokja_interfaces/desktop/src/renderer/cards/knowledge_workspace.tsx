@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
@@ -58,7 +58,7 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
     closeLabel: t("view_close_named", { title: document.title }),
     onClose: () => library.close(document.id),
   }));
-  const { tabs, panels, currentLabel, currentItem, showItem } = useViewTabs(
+  const { tabs, panels, currentLabel, currentItem, show, showItem } = useViewTabs(
     t("nav_library"),
     [
       { id: "documents", label: t("knowledge_view_documents") },
@@ -70,20 +70,47 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
     select.current = showItem;
   });
 
+  // Ctrl+F is the Library's: it goes to the search of the view on screen, or to the Documents' when a
+  // document is shown. Every workspace kept in the background listens too, so only the one on screen
+  // answers, and nothing does while a dialog is open.
+  const zone = useRef<HTMLDivElement>(null);
+  const [asked, setAsked] = useState(0);
+  const findable = () => zone.current?.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden]) [data-library-search]');
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "f") return;
+      if (!zone.current || zone.current.closest("[hidden]") || document.querySelector('[aria-modal="true"]')) return;
+      // a document is on screen: its search is in the list, behind it
+      if (currentItem) show("documents");
+      else if (!findable()) return;
+      event.preventDefault();
+      setAsked((count) => count + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  useEffect(() => {
+    if (asked === 0) return;
+    const field = findable();
+    field?.focus();
+    if (field instanceof HTMLInputElement) field.select();
+  }, [asked]);
+
   // A file dropped anywhere on the panel, on either view, opens the drawer on the way of adding a file.
   const drop = useFileDrop(library.drop, library.ready);
   const trail = currentItem
     ? [t("nav_library"), t("knowledge_view_documents"), currentItem.label]
     : [t("nav_library"), currentLabel];
+  // the words on the button are short; its name still says where it adds
   const add = library.ready ? (
-    <button type="button" className="library-add primary" aria-haspopup="dialog" aria-expanded={library.adding} onClick={library.startAdding}>
-      {t("add_title")}
+    <button type="button" className="library-add primary" aria-label={t("add_title")} aria-haspopup="dialog" aria-expanded={library.adding} onClick={library.startAdding}>
+      {t("library_add")}
     </button>
   ) : undefined;
 
   return (
     <LibraryContext.Provider value={library}>
-      <div className="drop-zone" data-dragging={drop.dragging ? "" : undefined} {...drop.handlers}>
+      <div ref={zone} className="drop-zone" data-dragging={drop.dragging ? "" : undefined} {...drop.handlers}>
         <WorkspacePanel trail={trail} views={tabs} actions={add}>
           {drop.dragging && (
             <p className="drop-hint" aria-hidden="true">

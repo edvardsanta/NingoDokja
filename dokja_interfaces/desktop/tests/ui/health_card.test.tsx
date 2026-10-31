@@ -78,7 +78,7 @@ describe("the health card", () => {
     ["denied", "This screen is not allowed to ask for that."],
     ["invalid", "The request was malformed."],
     ["orchestrator", "The orchestrator answered with an error: switched off"],
-    ["unexpected", "The reply was not what this card expects."],
+    ["unexpected", "The reply was not what this screen expects."],
   ];
   it.each(messages)("explains a %s failure in plain words", async (code, message) => {
     const { transport } = scriptedTransport(failure(code, "switched off"));
@@ -94,7 +94,7 @@ describe("the health card", () => {
     renderCard(transport);
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("The reply was not what this card expects.");
+    expect(alert.textContent).toBe("The reply was not what this screen expects.");
   });
 
   it("tries again on request and then shows the services", async () => {

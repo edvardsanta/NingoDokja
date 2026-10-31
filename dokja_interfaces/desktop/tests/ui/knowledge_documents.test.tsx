@@ -107,7 +107,9 @@ describe("document management in the knowledge card", () => {
     await deleteFromMenu("An example document, number 1");
     await screen.findByText("Document deleted.");
     await waitFor(() => expect(screen.queryByText("An example document, number 1")).toBeNull());
-    await screen.findByText("22 documents in the Library.");
+    // one count: the service's, and the pager's range for the list
+    await screen.findByText(/^22 documents in \d+ passages$/);
+    expect(screen.queryByText(/documents in the Library/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Index pending passages" }));
     await screen.findByText(/passages indexed; 0 still pending/);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Index pending passages" })).toBeNull());

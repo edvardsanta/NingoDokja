@@ -119,8 +119,8 @@ System.
 | Feed items | Readings | Leituras |
 | Feed plugins | Sources | Fontes |
 | Embedded passages | "indexed for similarity search" (plain); "embedding" only in the operator hint | "indexados para busca por similaridade"; "embedding" só na dica de operador |
-| What Knowledge holds (plain strings) | "knowledge" ("Search knowledge…", "Add to knowledge"); never "research base", "knowledge base" or "library" in plain copy | "conhecimento"; nunca "base de pesquisa", "base de conhecimento" ou "biblioteca" em texto plano |
-| Same thing inside a voice line | "shelf" and "library" are allowed only in voice lines | "estante" e "biblioteca" só em linhas de voz |
+| What Knowledge holds (plain strings) | "the Library" ("Search the Library", "Add to the Library"), as the owner named the workspace; never "research base" or "knowledge base". Said once where the workspace already names it, not in every label (2026-10-31: supersedes "knowledge" and "never library in plain copy") | "a Biblioteca"; nunca "base de pesquisa" ou "base de conhecimento". Dito uma vez onde o workspace já o nomeia, não em cada rótulo |
+| Same thing inside a voice line | "shelf" is for voice lines ("The shelf is empty."); plain copy says "Library" | "estante" só em linhas de voz; texto plano diz "Biblioteca" |
 | Ningo in pt | no article before the name ("Ningo não está respondendo", "Conversar com Ningo", "como Ningo") until question 4 is answered | sem artigo antes do nome até a pergunta 4 ser respondida |
 | Memory items | Experiences | Experiências |
 | Predicted vs reference | Predicted acceptance, Baseline | Aceitação prevista, Referência (baseline) |

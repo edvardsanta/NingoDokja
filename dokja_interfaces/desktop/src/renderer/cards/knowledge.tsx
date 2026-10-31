@@ -3,10 +3,10 @@ import { useCallback, useContext, useId, useState } from "react";
 import type { KnowledgeHit, KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
-import { CardFrame, OffNotice, Problem } from "./card_frame.js";
-import { IndexPending, KnowledgeDocumentsPanel } from "./knowledge_documents.js";
+import { CardFrame, OffNotice, OpenSystem, Problem } from "./card_frame.js";
+import { KnowledgeDocumentsPanel } from "./knowledge_documents.js";
 import { LibraryContext, StandaloneLibrary, useLibrary } from "./library_context.js";
-import { parseKnowledgeSearch, similarityOf } from "./knowledge_model.js";
+import { parseKnowledgeSearch } from "./knowledge_model.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 
@@ -54,56 +54,35 @@ function KnowledgeView() {
   return (
     <CardFrame
       title={t("knowledge_title")}
+      quietTitle
+      fix={<OpenSystem />}
       state={library.status}
       onReload={library.reload}
       onRefresh={library.poll}
       refreshing={library.refreshing}
     >
-      {(status) => (status.off ? <OffNotice reason={status.reason} /> : <KnowledgeBody status={status} />)}
+      {(status) => (status.off ? <><OffNotice reason={status.reason} /><OpenSystem /></> : <KnowledgeBody status={status} />)}
     </CardFrame>
   );
 }
 
 function KnowledgeBody({ status }: { status: KnowledgeStatus }) {
-  const t = useTranslate();
   const { transport, open, changed, revision } = useLibrary();
   const search = useKnowledgeSearch(transport);
+  // An empty Library has nothing to search and nothing to count: the list says so alone. That is
+  // known once the list has answered, so a Library that may be empty waits for it.
+  const [total, setTotal] = useState<number>();
+  const bare = status.documents === 0 && (total === undefined || total === 0);
 
   return (
     <>
-      <div className="library-tools">
-        <SearchForm search={search} />
-      </div>
-      <SearchOutcome search={search} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} />
-      <KnowledgeStatusLines status={status} />
-      <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={changed} />
-      <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={changed} onOpen={open} />
-    </>
-  );
-}
-
-function KnowledgeStatusLines({ status }: { status: KnowledgeStatus }) {
-  const t = useTranslate();
-  const similarity = similarityOf(status);
-  return (
-    <>
-      {status.documents === 0 ? (
-        <p className="note" data-tone="off">
-          {t("knowledge_empty")}
-        </p>
-      ) : (
-        <p>{t("knowledge_counts", { documents: status.documents, chunks: status.chunks })}</p>
+      {!bare && (
+        <div className="library-tools">
+          <SearchForm search={search} />
+        </div>
       )}
-      <p className="note" data-tone={similarity === "on" ? "ok" : "unchecked"}>
-        {similarity === "on" && t("knowledge_similarity_on", { model: status.embedModel })}
-        {similarity === "off" && t("knowledge_similarity_off")}
-        {similarity === "down" && t("knowledge_similarity_down")}
-      </p>
-      {status.pendingEmbeddings > 0 && (
-        <p className="note" data-tone="unchecked">
-          {t("knowledge_pending", { count: status.pendingEmbeddings })}
-        </p>
-      )}
+      {!bare && <SearchOutcome search={search} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} />}
+      <KnowledgeDocumentsPanel transport={transport} revision={revision} onChanged={changed} onOpen={open} status={status} onTotal={setTotal} />
     </>
   );
 }
@@ -133,10 +112,12 @@ function SearchForm({ search }: { search: KnowledgeSearchState }) {
         if (asked !== "" && !searching) start(asked);
       }}
     >
-      <label htmlFor={inputId}>{t("knowledge_ask")}</label>
+      <label htmlFor={inputId} className="sr-only">{t("knowledge_ask")}</label>
       <input
         id={inputId}
         type="search"
+        data-library-search=""
+        placeholder={t("knowledge_ask")}
         value={query}
         maxLength={MAX_QUERY_CHARS}
         autoComplete="off"

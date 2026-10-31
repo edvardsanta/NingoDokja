@@ -212,7 +212,7 @@ describe("the Post way of adding", () => {
     fireEvent.click(show());
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The orchestrator is not answering. Is it running?"));
     fireEvent.click(show());
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The reply was not what this card expects."));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The reply was not what this screen expects."));
   });
 
   it("shows a post with no files or no caption plainly, and says what could not be downloaded", async () => {
@@ -445,7 +445,8 @@ describe("the Post way of adding", () => {
 });
 
 describe("the Post way in the Library's drawer", () => {
-  const NO_DOCUMENTS = ok({ documents: [], total: 0, offset: 0 });
+  // what the status counts is listed, so the Library is not the empty one
+  const NO_DOCUMENTS = ok({ documents: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `note:${n}`, title: `Title ${n}`, kind: "note", reference: "", tags: [], chunks: 3, embedded: 3, updatedAt: "" })), total: 6, offset: 0 });
 
   // the drawer belongs to the Library's workspace, not to its Documents view
   function renderCard(transport: Transport) {
