@@ -62,6 +62,7 @@ function replyFor(type: string, payload: Record<string, unknown> = {}): Record<s
     case "memory.stats":
       return wrap("memory", { scored: 0, unscored: 0, min_scored: 30 });
     case "memory.list":
+      if (payload.state === "resolved") return wrap("memory", { experiences: [], total: 0, offset: 0, limit: 20 });
       return wrap("memory", { experiences: Array.from({length: 7}, (_, i) => ({ ref: `fixture:${i+1}`, action: "hashtag.suggest", detail: "#Reading", outcome: "", predicted_p: 0, baseline_p: 0.5, matched_score: 0.9, context_snippet: "A short context", created_at: "2026-10-21T00:00:00Z", feedback: { code: "hashtag_tag", message: "" } })), total: 7, offset: 0, limit: 20 });
     case "memory.get":
       return wrap("memory", { found: true, ref: payload.ref, action: "hashtag.suggest", detail: "#Reading", outcome: "", predicted_p: 0, baseline_p: 0.5, matched_score: 0.9, context: HOSTILE_TITLE + " full experience context", context_truncated: false, feedback: { code: "hashtag_tag", message: "" } });

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import type { MemoryStatus } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -12,7 +12,7 @@ import {
   type MemoryView,
   type ScoreView,
 } from "./memory_model.js";
-import { MemoryExperiencesPanel } from "./memory_experiences.js";
+import { MemoryExperiencesPanel, WaitingVerdictsPanel } from "./memory_experiences.js";
 import { KeptFactsPanel } from "./kept_facts.js";
 import { useCard, type LoadResult } from "./use_card.js";
 
@@ -36,18 +36,27 @@ export async function loadMemory(transport: Transport): Promise<LoadResult<Memor
 export function MemoryCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const load = useCallback(() => loadMemory(transport), [transport]);
-  const { state, reload } = useCard(load);
+  const { state, reload, poll } = useCard(load);
+  const [verdicts, setVerdicts] = useState(0);
+  // A verdict changes the counts and both lists; the owner stays where he is reading.
+  const judged = useCallback(() => { setVerdicts((value) => value + 1); poll(); }, [poll]);
+  const memory = state.phase === "ready" && !state.data.off ? state.data : undefined;
 
+  // What asks something of the owner comes first, what he keeps next, the record after it and the
+  // numbers last. The facts stand outside the memory's frame, so they outlive a stopped service.
   return (
     <WorkspacePanel trail={[t("nav_notebook")]}>
       <CardFrame title={t("memory_title")} state={state} onReload={reload}>
         {(view) => view.off ? <OffNotice reason={view.reason} /> : <>
           <MemoryOpening status={view.status} />
-          <MemoryExperiencesPanel transport={transport} onChanged={reload} />
-          <MemoryBody view={view} />
+          <WaitingVerdictsPanel transport={transport} onChanged={judged} revision={verdicts} />
         </>}
       </CardFrame>
       <KeptFactsPanel transport={transport} />
+      {memory && <>
+        <MemoryExperiencesPanel transport={transport} onChanged={judged} revision={verdicts} initial="resolved" />
+        <MemoryBody view={memory} />
+      </>}
     </WorkspacePanel>
   );
 }
@@ -74,17 +83,16 @@ function MemoryOpening({ status }: { status: MemoryStatus }) {
   );
 }
 
-// How the predictions fare, then what an operator needs to know about the memory itself.
+// How the predictions fare, then what an operator needs to know about the memory itself: closed and
+// quiet, unless the numbers could not be read.
 function MemoryBody({ view }: { view: Extract<MemoryView, { off: false }> }) {
   const t = useTranslate();
   const { status } = view;
   const similarity = similarityOf(status);
   return (
-    <>
-      <h3>{t("memory_score_title")}</h3>
+    <details className="wp-section memory-numbers" open={view.score.kind === "error"}>
+      <summary>{t("memory_score_title")}</summary>
       <ScoreBody score={view.score} />
-      <details className="more">
-        <summary>{t("memory_about")}</summary>
       <p className="note" data-tone={similarity === "on" ? "ok" : "unchecked"}>
         {similarity === "on" && t("memory_similarity_on", { model: status.embedModel })}
         {similarity === "off" && t("memory_similarity_off")}
@@ -95,8 +103,7 @@ function MemoryBody({ view }: { view: Extract<MemoryView, { off: false }> }) {
           {t("memory_needs_reindex", { count: status.needsReindex })}
         </p>
       )}
-      </details>
-    </>
+    </details>
   );
 }
 

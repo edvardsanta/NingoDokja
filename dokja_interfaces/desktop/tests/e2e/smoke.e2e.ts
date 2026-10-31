@@ -336,9 +336,9 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
     assert.equal(await page.evaluate("window.__owned === undefined"), true);
     const detail = await page.evaluate<string>("document.querySelector('.experience-detail').textContent");
     assert.match(detail, /Keeping the suggested hashtag means accepted/);
-    const reads = orchestrator.seen.filter(event => event.type === "memory.list" || event.type === "memory.get");
-    assert.equal(reads.length, 2);
-    assert.deepEqual(reads[1]?.payload, {ref: "fixture:1", include_context: true});
+    const reads = orchestrator.seen.filter(event => event.type === "memory.get");
+    assert.equal(reads.length, 1);
+    assert.deepEqual(reads[0]?.payload, {ref: "fixture:1", include_context: true});
     assert.equal(orchestrator.seen.some(event => event.type === "memory.resolve"), false);
   });
 

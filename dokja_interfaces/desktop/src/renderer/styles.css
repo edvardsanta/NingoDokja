@@ -2008,6 +2008,24 @@ button.icon-button[aria-expanded="true"] {
 }
 .classification-panel select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
+.memory-numbers summary {
+  width: fit-content;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.memory-numbers summary:hover {
+  color: var(--text-primary);
+}
+
+.memory-numbers[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.memory-numbers p {
+  color: var(--ink-dim);
+}
+
 .experience-detail {
   margin-top: 0.75rem;
   padding: 0.75rem 1rem;

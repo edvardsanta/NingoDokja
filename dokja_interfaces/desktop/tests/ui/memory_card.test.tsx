@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { MemoryCard } from "../../src/renderer/cards/memory.js";
@@ -145,9 +145,12 @@ describe("the memory card", () => {
     });
     renderCard(transport);
     await screen.findByText("Skill +0.70: beats the baseline.");
+    // the record below is read once the memory answered, and the panel holds its refresh meanwhile
+    const refresh = screen.getByRole<HTMLButtonElement>("button", { name: "Refresh" });
+    await waitFor(() => expect(refresh.disabled).toBe(false));
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await screen.findByText("Loading…");
+    fireEvent.click(refresh);
+    await screen.findAllByText("Loading…");
     await screen.findByText("Skill +0.70: beats the baseline.");
     expect(reads(calls).map((call) => call.type)).toEqual(["memory.status", "memory.stats", "memory.status", "memory.stats"]);
   });
@@ -203,5 +206,66 @@ describe("the memory card", () => {
 
     await screen.findByText("40 experiences, 0 pending, 25 resolved, 3 expired");
     expect(document.querySelector(".voice")).toBeNull();
+  });
+
+  const listed = (state: unknown) => state === "pending"
+    ? [{ ref: "fixture:wait", action: "hashtag.suggest", detail: "#Wait", outcome: "" }]
+    : [{ ref: "fixture:done", action: "hashtag.suggest", detail: "#Done", outcome: "accepted" }];
+  const notebook = () => {
+    const { transport, calls } = routedTransport({ "memory.status": ok(MEMORY_STATUS), "memory.stats": ok(MEMORY_SCORE), "memory.get": ok({ found: true, experience: { ref: "fixture:wait", action: "hashtag.suggest", detail: "#Wait", outcome: "", predictedP: 0.5, baselineP: 0.5, matchedScore: null, contextSnippet: "", matchedSnippet: "", contextTruncated: false, createdAt: "", resolvedAt: "", feedback: { code: "hashtag_tag", message: "" } } }), "memory.resolve": ok({ found: true, resolved: true, outcome: "accepted" }) });
+    const lists = { pending: 0, resolved: 0 };
+    const request: Transport["request"] = (type, payload, options) => {
+      if (type !== "memory.list") return transport.request(type, payload, options);
+      lists[(payload as { state: "pending" | "resolved" }).state] += 1;
+      return Promise.resolve(ok({ experiences: listed((payload as { state: string }).state), total: 1, offset: 0, limit: 20 }));
+    };
+    return { transport: { ...transport, request }, calls, lists };
+  };
+
+  it("opens on what waits, then what it keeps, the record, and the numbers closed last", async () => {
+    renderCard(notebook().transport);
+    await screen.findByText("Suggested #Wait for a meme");
+    await screen.findByText("Suggested #Done for a meme");
+    const order = ["Waiting for your verdict", "What Ningo keeps", "Saved experiences", "How the predictions fare"].map((label) => text().indexOf(label));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((left, right) => left - right)).toEqual(order);
+    expect(screen.getByText("How the predictions fare").closest("details")?.open).toBe(false);
+  });
+
+  it("shows the numbers open when they could not be read", async () => {
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok(MEMORY_STATUS), "memory.stats": failure("timeout", "no answer") });
+    renderCard(transport);
+    const problem = await screen.findByText("The score could not be read: no answer");
+    expect(problem.closest("details")?.open).toBe(true);
+  });
+
+  it("keeps what Ningo keeps when the memory is switched off, without the record or the numbers", async () => {
+    const { transport } = routedTransport({ "memory.status": ok(OFF) });
+    renderCard(transport);
+    await screen.findByText("Switched off.");
+    await screen.findByText("Nothing kept yet.");
+    expect(text()).not.toContain("Saved experiences");
+    expect(text()).not.toContain("How the predictions fare");
+  });
+
+  it("says when nothing waits", async () => {
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok({ ...MEMORY_STATUS, pending: 0 }), "memory.stats": ok(MEMORY_SCORE) });
+    renderCard(transport);
+    await screen.findByText("Nothing waits for your verdict.");
+  });
+
+  it("rereads both lists and the counts after a verdict, without blanking the view", async () => {
+    const { transport, calls, lists } = notebook();
+    renderCard(transport);
+    fireEvent.click(await screen.findByRole("button", { name: "Inspect fixture:wait" }));
+    await screen.findByText("Suggested #Done for a meme");
+    const history = screen.getByRole("region", { name: "Saved experiences" });
+    fireEvent.click(await screen.findByRole("button", { name: "Accept result" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Refresh memory" }));
+
+    await waitFor(() => expect(lists).toEqual({ pending: 2, resolved: 2 }));
+    await waitFor(() => expect(calls.filter((call) => call.type === "memory.status")).toHaveLength(2));
+    expect(calls.some((call) => call.type === "memory.resolve")).toBe(true);
+    expect(history.isConnected).toBe(true);
   });
 });
