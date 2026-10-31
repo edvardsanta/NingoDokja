@@ -135,7 +135,7 @@ describe("the memory card", () => {
     const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok({ nothing: "here" }) });
     renderCard(transport);
 
-    expect((await screen.findByRole("alert")).textContent).toBe("The reply was not what this card expects.");
+    expect((await screen.findByRole("alert")).textContent).toBe("The reply was not what this screen expects.");
   });
 
   it("refreshes both reads", async () => {

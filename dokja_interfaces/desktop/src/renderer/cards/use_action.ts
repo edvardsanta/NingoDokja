@@ -11,6 +11,7 @@ export type ActionState<T> =
 
 // Runs a request when the screen asks for one (a search, say) and keeps the latest answer. An
 // answer that arrives after a newer request started, or after the card went away, is dropped.
+// reset() forgets the answer and any request still on its way, as if none had been made.
 // `run` must be stable (wrap it in useCallback).
 export function useAction<A, T>(run: (argument: A) => Promise<LoadResult<T>>) {
   const [state, setState] = useState<ActionState<T>>({ phase: "idle" });
@@ -44,5 +45,10 @@ export function useAction<A, T>(run: (argument: A) => Promise<LoadResult<T>>) {
     [run],
   );
 
-  return { state, start };
+  const reset = useCallback(() => {
+    latest.current++;
+    setState({ phase: "idle" });
+  }, []);
+
+  return { state, start, reset };
 }

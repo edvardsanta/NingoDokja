@@ -170,7 +170,7 @@ describe("the screen", () => {
     const field = (await screen.findByRole("searchbox")) as HTMLInputElement;
     fireEvent.change(field, { target: { value: "stoics" } });
     fireEvent.click(screen.getByRole("tab", { name: "Readings" }));
-    await screen.findByRole("heading", { name: "Reading digest" });
+    await screen.findByRole("heading", { name: "Readings" });
     fireEvent.click(screen.getByRole("tab", { name: "Documents" }));
 
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("stoics");
@@ -190,7 +190,7 @@ describe("the screen", () => {
     const readings = screen.getByRole("tab", { name: "Readings" });
     expect(readings.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(readings);
-    await screen.findByRole("heading", { name: "Reading digest" });
+    await screen.findByRole("heading", { name: "Readings" });
     expect(screen.getByRole("region", { name: "Library › Readings" })).toBeTruthy();
   });
 
@@ -203,7 +203,7 @@ describe("the screen", () => {
     fireEvent.click(tabNamed("Library"));
     await screen.findByRole("heading", { name: "Library" });
     fireEvent.click(screen.getByRole("tab", { name: "Readings" }));
-    await screen.findByRole("heading", { name: "Reading digest" });
+    await screen.findByRole("heading", { name: "Readings" });
 
     await waitFor(() =>
       expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list")).toEqual([

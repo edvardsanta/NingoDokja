@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   MAX_SHOWN,
   SHOW_STEP,
+  countsOf,
   followingOf,
   nextStep,
   parseDigestPage,
@@ -75,4 +76,13 @@ test("the button offers one step, or what is left when that is less", () => {
   assert.equal(nextStep(page(3)), 3);
   assert.equal(nextStep(page(0)), 0);
   assert.ok(MAX_SHOWN >= SHOW_STEP && MAX_SHOWN % SHOW_STEP !== 1);
+});
+
+test("the counts say each state the sources are in, in order, and leave out a state none is in", () => {
+  assert.deepEqual(countsOf(status({ ok: 2, failed: 1, pending: 0, disabled: 1, invalid: 0 })), [
+    { state: "ok", count: 2 },
+    { state: "failed", count: 1 },
+    { state: "disabled", count: 1 },
+  ]);
+  assert.deepEqual(countsOf(status()), []);
 });

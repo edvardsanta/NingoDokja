@@ -65,3 +65,16 @@ describe("useAction", () => {
     expect(result.current.state).toEqual({ phase: "loading" });
   });
 });
+
+describe("useAction reset", () => {
+  it("forgets the answer, and a request still on its way no longer lands", async () => {
+    const slow = deferred<LoadResult<string>>();
+    const { result } = renderHook(() => useAction((_: string) => slow.promise));
+
+    act(() => result.current.start("q"));
+    act(() => result.current.reset());
+    expect(result.current.state).toEqual({ phase: "idle" });
+    await act(async () => slow.resolve(answer("too late")));
+    expect(result.current.state).toEqual({ phase: "idle" });
+  });
+});

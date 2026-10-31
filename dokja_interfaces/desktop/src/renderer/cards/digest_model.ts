@@ -93,6 +93,21 @@ export function followingOf(status: DigestStatus): Following {
   return "following";
 }
 
+// How many sources are in each state worth saying, in the order the owner cares about them. A state
+// no source is in is left out: "0 starting" says nothing.
+export type SourceCount = { state: "ok" | "failed" | "pending" | "disabled" | "invalid"; count: number };
+
+export function countsOf(status: DigestStatus): SourceCount[] {
+  const all: SourceCount[] = [
+    { state: "ok", count: status.ok },
+    { state: "failed", count: status.failed },
+    { state: "pending", count: status.pending },
+    { state: "disabled", count: status.disabled },
+    { state: "invalid", count: status.invalid },
+  ];
+  return all.filter((entry) => entry.count > 0);
+}
+
 export function sourceTone(state: string): Tone {
   switch (state) {
     case "ok":

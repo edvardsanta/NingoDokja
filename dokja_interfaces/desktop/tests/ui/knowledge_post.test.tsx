@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { KnowledgeCard } from "../../src/renderer/cards/knowledge.js";
+import { KnowledgeWorkspace } from "../../src/renderer/cards/knowledge_workspace.js";
 import { AddToBase } from "../../src/renderer/cards/knowledge_add.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Locale } from "../../src/shared/locale.js";
@@ -71,7 +71,8 @@ describe("the Post way of adding", () => {
     for (const hidden of ["Title", "Text", "Kind", "Where it came from (optional)", "Tags (optional, separated by commas)"]) {
       expect(screen.queryByLabelText(hidden), hidden).toBeNull();
     }
-    expect(screen.queryByText("More options")).toBeNull();
+    expect(screen.queryByText("Advanced")).toBeNull();
+    expect(screen.queryByText("Details")).toBeNull();
   });
 
   it("keeps what was typed in the other ways while the post is being looked at", () => {
@@ -212,7 +213,7 @@ describe("the Post way of adding", () => {
     fireEvent.click(show());
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The orchestrator is not answering. Is it running?"));
     fireEvent.click(show());
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The reply was not what this card expects."));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The reply was not what this screen expects."));
   });
 
   it("shows a post with no files or no caption plainly, and says what could not be downloaded", async () => {
@@ -445,12 +446,14 @@ describe("the Post way of adding", () => {
 });
 
 describe("the Post way in the Library's drawer", () => {
-  const NO_DOCUMENTS = ok({ documents: [], total: 0, offset: 0 });
+  // what the status counts is listed, so the Library is not the empty one
+  const NO_DOCUMENTS = ok({ documents: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `note:${n}`, title: `Title ${n}`, kind: "note", reference: "", tags: [], chunks: 3, embedded: 3, updatedAt: "" })), total: 6, offset: 0 });
 
+  // the drawer belongs to the Library's workspace, not to its Documents view
   function renderCard(transport: Transport) {
     return render(
       <I18nProvider locale="en">
-        <KnowledgeCard transport={transport} />
+        <KnowledgeWorkspace transport={transport} />
       </I18nProvider>,
     );
   }

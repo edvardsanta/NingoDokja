@@ -56,7 +56,7 @@ describe("adding to the research base", () => {
     type("Text", "Something to keep.");
     type("Kind", "idea");
     type("Where it came from (optional)", " Book, p. 12 ");
-    fireEvent.click(screen.getByText("More options"));
+    fireEvent.click(screen.getByText("Advanced"));
     type("Id (optional)", "my:thought-1");
     send();
 
@@ -91,7 +91,7 @@ describe("adding to the research base", () => {
     send();
     expect(screen.getByRole("alert").textContent).toBe("A kind is one lowercase word, such as note, article or book.");
     type("Kind", "idea");
-    fireEvent.click(screen.getByText("More options"));
+    fireEvent.click(screen.getByText("Advanced"));
     type("Id (optional)", "has space");
     send();
     expect(screen.getByRole("alert").textContent).toBe("An id uses letters, digits and . _ : / # @ - (up to 200 characters).");
@@ -100,7 +100,7 @@ describe("adding to the research base", () => {
 
   it("warns that an id that already exists replaces that document", () => {
     renderForm(routedTransport({}).transport);
-    fireEvent.click(screen.getByText("More options"));
+    fireEvent.click(screen.getByText("Advanced"));
 
     screen.getByText("Leave it empty and the id is made from what you add. Giving an id that already exists replaces that document.");
   });
@@ -317,5 +317,83 @@ describe("adding to the research base", () => {
 
     await screen.findByText("Adicionado. Trechos guardados: 2.");
     within(screen.getByRole("group", { name: "Adicionar à Biblioteca" })).getByRole("button", { name: "Endereço" });
+  });
+
+  describe("what is put away", () => {
+    const summaries = () => [...document.querySelectorAll("details.more")] as HTMLDetailsElement[];
+    const holding = (label: string) => summaries().find((details) => details.contains(screen.getByLabelText(label)));
+
+    it("puts Add right after the main fields, before the kind, the source, the tags and the id", () => {
+      renderForm(routedTransport({}).transport);
+
+      const add = screen.getByRole("button", { name: "Add" });
+      for (const label of ["Title", "Text"]) {
+        expect(screen.getByLabelText(label).compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING, label).toBeTruthy();
+      }
+      for (const label of ["Kind", "Where it came from (optional)", "Tags (optional, separated by commas)", "Id (optional)"]) {
+        expect(add.compareDocumentPosition(screen.getByLabelText(label)) & Node.DOCUMENT_POSITION_FOLLOWING, label).toBeTruthy();
+      }
+    });
+
+    it("keeps the kind, the source and the tags under Details, and the id under Advanced, both closed", () => {
+      renderForm(routedTransport({}).transport);
+
+      expect(summaries().map((details) => [details.querySelector("summary")?.textContent, details.open])).toEqual([["Details", false], ["Advanced", false]]);
+      for (const label of ["Kind", "Where it came from (optional)", "Tags (optional, separated by commas)"]) {
+        expect(holding(label)?.querySelector("summary")?.textContent, label).toBe("Details");
+      }
+      expect(holding("Id (optional)")?.querySelector("summary")?.textContent).toBe("Advanced");
+    });
+
+    it("opens the one a refusal is about, so the field the sentence names can be seen", () => {
+      renderForm(routedTransport({}).transport);
+      type("Title", "T");
+      type("Text", "text");
+
+      type("Kind", "Two Words");
+      send();
+      expect(screen.getByRole("alert").textContent).toBe("A kind is one lowercase word, such as note, article or book.");
+      expect(holding("Kind")?.open).toBe(true);
+      expect(holding("Id (optional)")?.open).toBe(false);
+
+      type("Kind", "idea");
+      type("Id (optional)", "has space");
+      send();
+      expect(holding("Id (optional)")?.open).toBe(true);
+    });
+
+    it("still sends what was typed under a closed Details", async () => {
+      const { transport, calls } = routedTransport({ "knowledge.ingest": ok(CREATED) });
+      renderForm(transport);
+      type("Title", "A thought");
+      type("Text", "Something to keep.");
+      type("Tags (optional, separated by commas)", "a, b");
+      send();
+
+      await screen.findByText("Added. Passages stored: 2.");
+      expect(sent(calls)[0]?.payload).toMatchObject({ title: "A thought", tags: ["a", "b"] });
+    });
+  });
+
+  describe("choosing a file", () => {
+    it("is done with the app's own button, in the app's language, and the line beside it says which file", async () => {
+      renderForm(routedTransport({}).transport, "pt");
+      fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
+
+      const picker = screen.getByRole("button", { name: "Escolher arquivo" });
+      // the browser's own picker, with its words and its place in the tab order, is put away
+      const input = screen.getByLabelText("Arquivo") as HTMLInputElement;
+      expect(input.type).toBe("file");
+      expect(input.getAttribute("aria-hidden")).toBe("true");
+      expect(input.tabIndex).toBe(-1);
+      expect(input.accept).toContain(".pdf");
+      let opened = 0;
+      input.addEventListener("click", () => { opened += 1; });
+      fireEvent.click(picker);
+      expect(opened).toBe(1);
+
+      fireEvent.change(input, { target: { files: [new File(["hello"], "notes.md")] } });
+      await screen.findByText("notes.md, 1 KB");
+    });
   });
 });

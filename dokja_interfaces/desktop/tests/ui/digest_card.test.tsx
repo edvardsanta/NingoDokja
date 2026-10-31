@@ -46,7 +46,9 @@ describe("the digest card", () => {
     });
     renderCard(transport);
 
-    await screen.findByText("2 working, 1 failing, 0 starting, 1 off, 0 unusable");
+    // what each state has, joined; a state with none is not said
+    await screen.findByText("2 working · 1 failing · 1 off");
+    expect(screen.queryByText(/starting|unusable/)).toBeNull();
     await screen.findByText("Entry 1");
     expect(titles()).toEqual(["Entry 1", "Entry 2"]);
     screen.getByText("Alpha source, 2 hours ago");
@@ -220,12 +222,18 @@ describe("the digest card", () => {
 
     it("says the service has no plugins directory", async () => {
       quiet({ configured: false });
-      await screen.findByText("The feeds service has no plugins directory (FEEDS_PLUGINS_DIR is not set).");
+      expect((await screen.findByText("I'm reading nothing right now.")).className).toBe("voice");
+      await screen.findByText("The feeds service has no plugins directory.");
+      // what the operator sets is a line of its own
+      expect(screen.getByText("FEEDS_PLUGINS_DIR is not set.").className).toBe("detail");
     });
 
     it("says why the directory cannot be read", async () => {
       quiet({ directoryError: "permission denied" });
       await screen.findByText("The plugins directory cannot be read: permission denied");
+      // a directory that cannot be read is a problem, not a quiet shelf: no voice, and the fix is in System
+      expect(screen.queryByText("I'm reading nothing right now.")).toBeNull();
+      screen.getByRole("button", { name: "Open System" });
     });
 
     it("says no source is enabled, and shows the sources, open", async () => {
@@ -233,7 +241,9 @@ describe("the digest card", () => {
         disabled: 1,
         sources: [digestSource("idle", { name: "Idle one", state: "disabled" })],
       });
-      await screen.findByText("No source is enabled. Set \"enabled\": true in a plugin's manifest.");
+      await screen.findByText("I'm reading nothing right now.");
+      await screen.findByText("No source is enabled.");
+      expect(screen.getByText("Set \"enabled\": true in a plugin's manifest.").className).toBe("detail");
       expect(((await screen.findByText("Sources")).closest("details") as HTMLDetailsElement).open).toBe(true);
       expect(calls.map((call) => call.type)).toEqual(["digest.status"]);
     });
@@ -243,7 +253,8 @@ describe("the digest card", () => {
     const { transport } = routedTransport({ "digest.status": ok(DIGEST_STATUS), "digest.items": ok(digestPage([])) });
     renderCard(transport);
 
-    await screen.findByText("Nothing to read yet.");
+    expect((await screen.findByText("Nothing has reached me yet.")).className).toBe("voice");
+    screen.getByText("Nothing to read yet.");
   });
 
   it("says a switched-off service is switched off and asks for no items", async () => {
@@ -284,8 +295,57 @@ describe("the digest card", () => {
     await screen.findByText("Entry 1");
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Entry 2");
-    expect(calls.map((call) => call.type)).toEqual(["digest.status", "digest.items", "digest.status", "digest.items"]);
+    // the first pair is the opening; the refresh asks for both again, in whichever order the
+    // sections' effects run (the readings are below the card and run first)
+    expect(calls.slice(0, 2).map((call) => call.type)).toEqual(["digest.status", "digest.items"]);
+    expect(calls.slice(2).map((call) => call.type).toSorted()).toEqual(["digest.items", "digest.status"]);
     expect(titles()).toEqual(["Entry 2"]);
+  });
+
+  describe("refreshing", () => {
+    const many = (count: number) => Array.from({ length: count }, (_, index) => digestItem(index + 1));
+
+    it("keeps the page that was loaded and the filters that were typed, and reads that page again", async () => {
+      const { transport, calls } = routedTransport({
+        "digest.status": ok(DIGEST_STATUS),
+        "digest.items": (payload) =>
+          Promise.resolve(ok(digestPage(many(Number(payload?.limit)), { total: 30, more: 30 - Number(payload?.limit) }))),
+      });
+      renderCard(transport);
+      await screen.findByText("Entry 8");
+      fireEvent.click(screen.getByRole("button", { name: "Show 8 more" }));
+      await screen.findByText("Entry 16");
+      const search = screen.getByLabelText("Search readings") as HTMLInputElement;
+      fireEvent.change(search, { target: { value: "stoics" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(calls.filter((call) => call.type === "digest.status")).toHaveLength(2));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
+
+      // the same input is still there with its text, and the 16 are still shown
+      expect(screen.getByLabelText("Search readings")).toBe(search);
+      expect(search.value).toBe("stoics");
+      expect(titles()).toHaveLength(16);
+      expect(itemCalls(calls).at(-1)).toEqual({ limit: 16, offset: 0 });
+    });
+
+    it("keeps the readings on screen while the answer is on its way, and holds the refresh", async () => {
+      const slow = deferred<TransportResult>();
+      const { transport } = routedTransport({
+        "digest.status": [ok(DIGEST_STATUS), () => slow.promise],
+        "digest.items": ok(digestPage([digestItem(1)])),
+      });
+      renderCard(transport);
+      await screen.findByText("Entry 1");
+
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(true));
+      expect(titles()).toEqual(["Entry 1"]);
+      expect(screen.queryByText("Loading…")).toBeNull();
+
+      await act(async () => slow.resolve(ok(DIGEST_STATUS)));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
+    });
   });
 
   it("shows what a source wrote as text, never as markup", async () => {
@@ -319,8 +379,8 @@ describe("the digest card", () => {
     });
     renderCard(transport, "pt");
 
-    await screen.findByText("2 funcionando, 1 com falha, 0 iniciando, 1 desligadas, 0 inválidas");
-    screen.getByRole("heading", { name: "Resumo de leituras" });
+    await screen.findByText("2 funcionando · 1 com falha · 1 desligadas");
+    screen.getByRole("heading", { name: "Leituras" });
     await screen.findByText("Alpha source, há 2 horas");
     screen.getByRole("button", { name: "Mostrar mais 5" });
     screen.getByText("atualizado há 10 minutos");

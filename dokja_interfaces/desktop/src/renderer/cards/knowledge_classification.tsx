@@ -37,12 +37,14 @@ export function KnowledgeClassificationPanel({ transport, id }: { transport: Tra
 function ClassificationEditor({ transport, initial, reload }: { transport: Transport; initial: KnowledgeClassification; reload: () => void }) {
   const t = useTranslate();
   const ids = useId();
+  // Who decided, said only for an axis that has a value: an axis without one says it awaits an
+  // answer once, in its value, and has no origin worth printing.
   const originLabel = (origin: string) => {
     switch (origin) {
       case "user": return t("classification_origin_user");
       case "classifier": return t("classification_origin_classifier");
       case "source_default": return t("classification_origin_source");
-      default: return t("classification_unresolved");
+      default: return "";
     }
   };
   const [current, setCurrent] = useState(initial);
@@ -83,7 +85,7 @@ function ClassificationEditor({ transport, initial, reload }: { transport: Trans
           <div key={field}>
             <dt>{t(field === "form" ? "classification_form" : "classification_kind")}</dt>
             <dd>{choice.value ?? t("classification_unresolved")}
-              {choice.origin && <span className="detail"> · {originLabel(choice.origin)}{choice.classifierId ? ` (${choice.classifierId}@${choice.classifierVersion})` : ""}</span>}
+              {choice.value !== null && originLabel(choice.origin) && <span className="detail"> · {originLabel(choice.origin)}{choice.classifierId ? ` (${choice.classifierId}@${choice.classifierVersion})` : ""}</span>}
             </dd>
           </div>
         ))}

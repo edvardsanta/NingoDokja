@@ -21,6 +21,7 @@ import {
   type Problem,
 } from "./knowledge_add_model.js";
 import { PostPane } from "./knowledge_post.js";
+import { Button } from "./ui.js";
 import { useAction } from "./use_action.js";
 
 const MODE_IDS: Record<AddMode, MessageId> = {
@@ -29,6 +30,11 @@ const MODE_IDS: Record<AddMode, MessageId> = {
   file: "add_mode_file",
   post: "add_mode_post",
 };
+
+// What is wrong with a field put away under a disclosure opens it, so the owner sees the field the
+// sentence is about.
+const DETAILS_PROBLEMS: ReadonlySet<MessageId> = new Set(["add_too_many_tags", "add_tag_too_long", "add_bad_kind", "add_ref_too_long"]);
+const ADVANCED_PROBLEMS: ReadonlySet<MessageId> = new Set(["add_bad_id"]);
 
 const EMPTY: Draft = { mode: "note", title: "", body: "", address: "", tags: "", kind: "", reference: "", id: "" };
 
@@ -58,6 +64,10 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
   const [draft, setDraft] = useState<Draft>({ ...EMPTY, mode: startMode === "post" ? EMPTY.mode : startMode });
   const [problem, setProblem] = useState<Problem | undefined>(undefined);
   const [reading, setReading] = useState(false);
+  // The kind, the source and the tags (details) and the id (advanced) are put away: Add comes first.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
   const run = useCallback((payload: Record<string, unknown>) => addToBase(transport, payload), [transport]);
   const { state, start } = useAction(run);
   const sending = state.phase === "loading";
@@ -134,6 +144,8 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
     const checked = check(draft);
     if (!checked.ok) {
       setProblem(checked.problem);
+      if (DETAILS_PROBLEMS.has(checked.problem.id)) setDetailsOpen(true);
+      if (ADVANCED_PROBLEMS.has(checked.problem.id)) setAdvancedOpen(true);
       return;
     }
     setProblem(undefined);
@@ -211,55 +223,71 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
           {mode === "file" && (
             <>
               <label htmlFor={field("file")}>{t("add_field_file")}</label>
+              {/* the browser's own picker says its words in the browser's language: the app's button
+                  stands for it, and the input stays, out of sight and of the tab order, to hold the file */}
               <input
                 id={field("file")}
+                ref={picker}
                 type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
                 accept=".txt,.md,.rst,.html,.htm,.docx,.epub,.pdf,.xml,.rss,.atom"
                 onChange={(event) => choose(event.target.files?.[0])}
               />
-              <p className="detail">
-                {draft.file
-                  ? t("add_file_chosen", { name: draft.file.filename, kb: Math.max(1, Math.round(draft.file.bytes / 1024)) })
-                  : t("add_file_hint", { size: FILE_MEGABYTES })}
-              </p>
+              <div className="file-pick">
+                <Button onClick={() => picker.current?.click()}>{t("add_file_choose")}</Button>
+                <p className="detail">
+                  {draft.file
+                    ? t("add_file_chosen", { name: draft.file.filename, kb: Math.max(1, Math.round(draft.file.bytes / 1024)) })
+                    : t("add_file_hint", { size: FILE_MEGABYTES })}
+                </p>
+              </div>
             </>
           )}
 
-          <label htmlFor={field("kind")}>{t("add_field_kind")}</label>
-          <input
-            id={field("kind")}
-            list={field("kinds")}
-            value={draft.kind}
-            maxLength={INGEST_LIMITS.kindChars}
-            placeholder={DEFAULT_KINDS[draft.mode]}
-            autoComplete="off"
-            onChange={(event) => set("kind", event.target.value)}
-          />
-          <datalist id={field("kinds")}>
-            {KIND_SUGGESTIONS.map((kind) => (
-              <option key={kind} value={kind} />
-            ))}
-          </datalist>
+          <div>
+            <button type="submit">{t("add_submit")}</button>
+          </div>
 
-          <label htmlFor={field("reference")}>{t("add_field_reference")}</label>
-          <input
-            id={field("reference")}
-            value={draft.reference}
-            maxLength={INGEST_LIMITS.referenceChars}
-            placeholder={t("add_reference_placeholder")}
-            autoComplete="off"
-            onChange={(event) => set("reference", event.target.value)}
-          />
+          <details className="more" open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+            <summary>{t("add_details")}</summary>
+            <label htmlFor={field("kind")}>{t("add_field_kind")}</label>
+            <input
+              id={field("kind")}
+              list={field("kinds")}
+              value={draft.kind}
+              maxLength={INGEST_LIMITS.kindChars}
+              placeholder={DEFAULT_KINDS[draft.mode]}
+              autoComplete="off"
+              onChange={(event) => set("kind", event.target.value)}
+            />
+            <datalist id={field("kinds")}>
+              {KIND_SUGGESTIONS.map((kind) => (
+                <option key={kind} value={kind} />
+              ))}
+            </datalist>
 
-          <label htmlFor={field("tags")}>{t("add_field_tags")}</label>
-          <input
-            id={field("tags")}
-            value={draft.tags}
-            autoComplete="off"
-            onChange={(event) => set("tags", event.target.value)}
-          />
+            <label htmlFor={field("reference")}>{t("add_field_reference")}</label>
+            <input
+              id={field("reference")}
+              value={draft.reference}
+              maxLength={INGEST_LIMITS.referenceChars}
+              placeholder={t("add_reference_placeholder")}
+              autoComplete="off"
+              onChange={(event) => set("reference", event.target.value)}
+            />
 
-          <details className="more">
+            <label htmlFor={field("tags")}>{t("add_field_tags")}</label>
+            <input
+              id={field("tags")}
+              value={draft.tags}
+              autoComplete="off"
+              onChange={(event) => set("tags", event.target.value)}
+            />
+          </details>
+
+          <details className="more" open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
             <summary>{t("add_more")}</summary>
             <label htmlFor={field("id")}>{t("add_field_id")}</label>
             <input
@@ -271,9 +299,6 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
             />
             <p className="detail">{t("add_id_hint")}</p>
           </details>
-          <div>
-            <button type="submit">{t("add_submit")}</button>
-          </div>
         </fieldset>
       </form>}
       {mode !== "post" && <div aria-live="polite">

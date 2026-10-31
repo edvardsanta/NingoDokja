@@ -178,10 +178,14 @@ body {
   left: 1.25rem;
   z-index: 1;
   margin: 0;
+  max-width: calc(100% - 3rem);
   padding: 0 0.5rem;
+  overflow: hidden;
   background: var(--static);
   color: var(--ink-dim);
   font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Quiet: the open workspace is already lit in the sidebar. Only where the owner is reads brighter. */
@@ -624,6 +628,181 @@ button:focus-visible {
   color: var(--panel);
 }
 
+/*
+ * The one line under the search: counts, how well search works, what waits to be indexed, and at its
+ * end the filter. A chip is a fact in a small frame; the frame takes the tone of the fact. A chip that
+ * is a button (the filter) is lit like any pressed thing, and says so with a mark as well as a color.
+ */
+.library-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+.library-line .note {
+  margin: 0;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--tone, var(--edge)) 55%, transparent);
+  color: var(--tone-text, var(--ink-dim));
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip[data-tone="ok"] {
+  color: var(--ink-dim);
+}
+
+button.chip-toggle,
+button.chip-toggle:hover:not(:disabled) {
+  padding: 0 0.6rem;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* at the end of the line when there is something before it, at its start when it is alone */
+.library-line > button.chip-toggle:not(:first-child) {
+  margin-left: auto;
+}
+
+button.chip-toggle:hover:not(:disabled) {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
+
+button.chip-toggle[aria-pressed="true"],
+button.chip-toggle[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  color: var(--cyan);
+}
+
+/* Under the field: what the search is doing or found, with the way back to the list at its end. It is
+   always in the page (a screen reader hears what it says change) and takes room only when it says. */
+.results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.results-head[data-active] {
+  margin-top: 0.75rem;
+}
+
+.library-hidden {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+}
+
+/* What a button of the line just did: a row of its own under the line, and no row while it is quiet. */
+.line-feedback {
+  flex-basis: 100%;
+}
+
+.line-feedback:empty {
+  display: none;
+}
+
+.line-feedback p {
+  margin-top: 0.35rem;
+}
+
+/* A failure's way out: try again, or go where the fix lives. */
+.problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.wp-section .problem-actions .retry {
+  margin-top: 0;
+}
+
+.library-documents > .problem-actions {
+  margin-top: 0.5rem;
+}
+
+/* The list: a row is two lines, set apart by a hairline, not boxed. */
+.hits.documents {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.hits.documents li {
+  padding: 0.4rem 2.75rem 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid transparent;
+}
+
+.hits.documents li:hover,
+.hits.documents li:focus-within {
+  border-left-color: var(--edge);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.document-title {
+  min-width: 0;
+}
+
+.document-title button.row-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 1rem;
+  font-size: 0.875rem;
+}
+
+/* How far it is indexed, when it is not all the way: in the tone of an unchecked thing, in the line. */
+.document-meta .note {
+  display: inline;
+  margin: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.document-meta .note::before {
+  content: " · ";
+  color: var(--ink-dim);
+}
+
+.document-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.library-documents .pager {
+  justify-content: center;
+}
+
+.library-documents .pager > span {
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
 .search input {
   min-width: 0;
   padding: 0.35rem 0.6rem;
@@ -809,7 +988,9 @@ button:focus-visible {
  */
 .vtabs {
   display: flex;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.25rem;
 }
 
 .vtab {
@@ -834,6 +1015,49 @@ button:focus-visible {
 .vtab:focus-visible {
   outline: var(--focus-width) solid var(--tab-focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+/*
+ * What the owner opened from a view is a tab of the same strip, after a rule: the title cut short
+ * with the whole of it in the tooltip, and a close button of its own beside it.
+ */
+.vtab-sep {
+  align-self: stretch;
+  width: 1px;
+  margin-block: 0.4rem;
+  background: var(--edge);
+}
+
+.vtab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.vtab-item .vtab {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.vtab-close,
+button.vtab-close:hover:not(:disabled) {
+  padding: 0 0.4rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+
+button.vtab-close:hover:not(:disabled) {
+  color: var(--magenta-text);
+}
+
+button.vtab-close:focus-visible {
+  outline: var(--focus-width) solid var(--tab-focus-ring);
+  outline-offset: var(--focus-offset-tight);
 }
 
 button[aria-pressed="true"] {
@@ -1004,6 +1228,45 @@ button[aria-pressed="true"] {
   margin-top: 1.25rem;
 }
 
+/* How the sources are doing, in one line, and the list of them at its end; open, the list takes the row. */
+.sources-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  margin-top: 0.75rem;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+.sources-strip > .sources {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+.sources-strip > .sources[open] {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+/* Nothing is being followed: Ningo's line, the plain sentence, and what to change as a line apart. */
+.digest-explained {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  max-width: 72ch;
+}
+
+.digest-explained .voice,
+.digest-explained .note,
+.digest-explained .detail {
+  margin: 0;
+}
+
+.digest-explained .detail {
+  font-size: 0.875rem;
+}
+
 .sources summary {
   width: max-content;
   color: var(--ink-dim);
@@ -1125,58 +1388,9 @@ button.meme-zoom:hover:not(:disabled) {
   justify-self: end;
 }
 
-/* Documents open in tabs on top of Knowledge, after the base's own. The open one is lit like the open
-   workspace; each document tab has its close button beside it. */
-.view-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  margin: 0 0 1.25rem;
-  border-bottom: 1px solid var(--edge);
-}
-
-.view-tab-pair {
-  display: inline-flex;
-  align-items: center;
-}
-
-.view-tabs button.view-tab,
-.view-tabs button.view-tab:hover:not(:disabled) {
-  max-width: 18rem;
-  margin-bottom: -1px;
-  padding: 0.4rem 0.2rem;
-  overflow: hidden;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--ink-dim);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.view-tabs button.view-tab:hover:not(:disabled) {
-  color: var(--ink);
-}
-
-.view-tabs button.view-tab[aria-current="true"] {
-  border-bottom-color: var(--cyan);
-  color: var(--cyan);
-}
-
-.view-tabs button.view-tab-close,
-.view-tabs button.view-tab-close:hover:not(:disabled) {
-  padding: 0 0.35rem;
-  border: 0;
-  background: transparent;
-  color: var(--ink-dim);
-}
-
-.view-tabs button.view-tab-close:hover:not(:disabled) {
-  color: var(--magenta-text);
-}
-
 /* A document's text: as stored, line breaks kept, long lines wrapped. */
 .document-text {
+  max-width: 72ch;
   max-height: 60vh;
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
@@ -1189,18 +1403,59 @@ button.meme-zoom:hover:not(:disabled) {
 }
 
 .document-view h3 {
-  margin-top: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
-/* Knowledge takes a file dropped anywhere on it: while one is dragged over, the view is outlined and
-   says where it goes. */
+/* The title, and at its end the one thing to open about it; under them what it is, in one line. */
+.document-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.document-line {
+  margin-top: 0.35rem;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* A control that opens a part of the page under it: the chevron says which way it goes. */
+button.disclosure,
+button.disclosure:hover:not(:disabled) {
+  padding: 0.2rem 0.75rem;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 0.875rem;
+}
+
+button.disclosure:hover:not(:disabled) {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
+
+button.disclosure[aria-expanded="true"],
+button.disclosure[aria-expanded="true"]:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.document-view .note {
+  max-width: 72ch;
+}
+
+/* The Library takes a file dropped anywhere on its panel, either view: while one is dragged over, the
+   body is outlined and says where it goes. The wrapper only listens; it draws nothing of its own. */
 .drop-zone {
-  position: relative;
+  display: contents;
 }
 
-.drop-zone[data-dragging] {
+.drop-zone[data-dragging] .wp-body {
   outline: 1px dashed var(--cyan);
-  outline-offset: 0.5rem;
+  outline-offset: -0.5rem;
 }
 
 .drop-hint {
@@ -1272,6 +1527,13 @@ button.meme-zoom:hover:not(:disabled) {
   margin-top: 0.4rem;
 }
 
+/* What a disclosure holds stacks like the fields around it: the browser puts it in a box of its own. */
+.add-form .more::details-content {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
 .add-form .more summary {
   width: max-content;
   color: var(--ink-dim);
@@ -1280,6 +1542,19 @@ button.meme-zoom:hover:not(:disabled) {
 
 .add-form .more summary:hover {
   color: var(--ink);
+}
+
+/* The file is chosen with the app's own button, in the app's language, and the line beside it says which. */
+.file-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.file-pick p {
+  margin: 0;
+  font-size: 0.875rem;
 }
 
 .add-form .more summary:focus-visible {
@@ -2027,19 +2302,23 @@ button.icon-button[aria-expanded="true"] {
 }
 .classification-panel select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
 
-/* Ningo's line, then what the record holds in plain words: one unit, the same pair as in Talk. */
-.memory-opening {
+/* Ningo's line, then what the record holds in plain words: one unit, the same pair as in Talk. The
+   Library's empty shelf says itself the same way. */
+.memory-opening,
+.voice-block {
   display: grid;
   gap: 0.35rem;
   max-width: 72ch;
   margin-bottom: var(--space-4);
 }
 
-.memory-opening .voice {
+.memory-opening .voice,
+.voice-block .voice {
   margin: 0;
 }
 
-.memory-opening .detail {
+.memory-opening .detail,
+.voice-block .detail {
   font-size: 0.875rem;
 }
 
@@ -2347,6 +2626,11 @@ button.row-title, button.row-title:hover:not(:disabled) { padding: 0; border: 0;
 button.row-title:hover:not(:disabled) strong { text-decoration: underline; text-underline-offset: 3px; color: var(--cyan); }
 button.row-menu-button { position: absolute; top: .25rem; right: 0; padding: .1rem .55rem; border-color: transparent; background: transparent; color: var(--ink-dim); line-height: 1; }
 button.row-menu-button:hover:not(:disabled), button.row-menu-button[aria-expanded="true"] { border-color: var(--rule); color: var(--ink); }
+/* The ⋯ waits out of sight until the row is pointed at or has the focus; it is still there to click. */
+.hits.documents button.row-menu-button { top: 0.3rem; opacity: 0; }
+.hits.documents li:hover button.row-menu-button, .hits.documents li:focus-within button.row-menu-button,
+.hits.documents button.row-menu-button[aria-expanded="true"] { opacity: 1; }
+@media (forced-colors: active), (hover: none) { .hits.documents button.row-menu-button { opacity: 1; } }
 
 /* The menu itself: a small panel at the pointer, one action per line. */
 .row-menu { position: fixed; z-index: 30; display: grid; min-width: 11rem; padding: .25rem; border: 1px solid var(--edge); background: var(--panel); box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / .45); }
@@ -2385,8 +2669,44 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 .reading-filters label {
   display: grid;
   gap: 0.3rem;
-  flex: 1 1 10rem;
+  flex: 1 1 12rem;
   min-width: 0;
+}
+
+/* The words of the search are its placeholder; the source and the dates keep their labels. */
+.reading-filters .reading-search {
+  flex: 2 1 14rem;
+}
+
+.reading-dates {
+  flex: 0 1 auto;
+}
+
+.reading-dates[open] {
+  flex-basis: 100%;
+}
+
+.reading-dates summary {
+  width: max-content;
+  padding-block: 0.4rem;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.reading-dates summary:hover {
+  color: var(--ink);
+}
+
+.reading-dates summary:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+.reading-filters .reading-dates > label {
+  display: inline-grid;
+  width: 12rem;
+  max-width: 100%;
+  margin: 0.25rem 0.75rem 0.25rem 0;
 }
 
 .reading-filters input, .reading-filters select {
@@ -2413,7 +2733,24 @@ button.drawer-close { padding: .1rem .6rem; border-color: transparent; backgroun
 }
 
 .reading-preview {
-  margin-block: 0.75rem;
+  margin-block: 0;
+}
+
+.reading-preview[open] {
+  flex-basis: 100%;
+}
+
+/* What can be done with a reading, on one line: discuss it, keep it, look at it. */
+.digest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.digest li .reading-save:not(:empty) {
+  margin-top: 0.35rem;
 }
 
 .reading-preview summary {
