@@ -279,3 +279,141 @@ func TestTheOwnersInterfacesSeeAndDeleteEveryonesFacts(t *testing.T) {
 		t.Fatal(held)
 	}
 }
+
+// nameStory is Portuguese on purpose: the phrases being read are Portuguese.
+const nameStory = "Ningo, a escolha surgiu por causa de uma novel que gosto, Dokja pode significa filho único, ou leitor, guarde isso, e Ningo surge pq queria que fosse o número 1 ou seja o leitor número um"
+
+func TestARequestAmongOtherWordsIsRead(t *testing.T) {
+	for content, want := range map[string]string{
+		nameStory:                          "a escolha surgiu por causa de uma novel que gosto, Dokja pode significa filho único, ou leitor, e Ningo surge pq queria que fosse o número 1 ou seja o leitor número um",
+		"Sou vegano, guarde isso":          "Sou vegano",
+		"Odeio coentro. Guarde isso.":      "Odeio coentro.",
+		"meu filme é Stalker, guarde isso": "meu filme é Stalker",
+		"meu filme é Stalker, e anota isso pra mim, por acaso":   "meu filme é Stalker, por acaso",
+		"Moro em Santos. Guarde isso. Qual praia você indica?":   "Moro em Santos. Qual praia você indica?",
+		"qual o melhor? guarda isso por favor, gosto de chá":     "qual o melhor, gosto de chá",
+		"guarde isso: gosto de chá preto. Qual o melhor?":        "gosto de chá preto. Qual o melhor?",
+		"my film is Stalker, remember this, what about Solaris?": "my film is Stalker, what about Solaris?",
+		"gosto de chá preto\nlembre-se disso\ne você?":           "gosto de chá preto\ne você?",
+	} {
+		if _, kept, ok := parseFactInMessage(content); !ok || kept != want {
+			t.Errorf("%q: %q %v", content, kept, ok)
+		}
+	}
+	if locale, _, _ := parseFactInMessage("my film is Stalker, remember this"); locale != "en" {
+		t.Error("the outcome is told in the language of the phrase")
+	}
+}
+
+func TestWordsThatDoNotAskStayAnOrdinaryMessage(t *testing.T) {
+	for _, content := range []string{
+		"Ana disse guarde isso: nada", "Ana me pediu que guarde isso, mas esqueci", "não guarde isso, é bobagem de verdade",
+		"gosto de chá preto, guarde isso?", "fomos lá ontem à noite, lembra disso, foi ótimo", "gosto de chá preto, guarde isso: nada",
+		"esse guarda-chuva novo, guarda isso aqui no armário",
+		"Oi Ningo, guarde isso: nada", "lembra disso?", "I will keep this, it is fine",
+	} {
+		if _, kept, ok := parseFactInMessage(content); ok {
+			t.Errorf("%q must keep nothing, got %q", content, kept)
+		}
+	}
+}
+
+func TestKeepingAndAnsweringHappenInOneMessage(t *testing.T) {
+	handler, model := factsHandler(t, map[string]any{"reply": "Um nome de leitor. Pretensioso."})
+	reply := say(t, handler, factGroupTurn(nameStory, "5511999990000", false))
+	held, _ := handler.facts.All(context.Background())
+	if len(held) != 1 || strings.Contains(held[0].Content, "guarde isso") || strings.Contains(held[0].Content, "Ningo,") ||
+		held[0].Person != conversation.PersonKey("Ana") {
+		t.Fatal(held)
+	}
+	if reply != "Um nome de leitor. Pretensioso.\n\nGuardado: "+held[0].Content {
+		t.Fatal(reply)
+	}
+	if !strings.Contains(model.system[0], "reports the outcome itself") {
+		t.Fatal("the model must leave the outcome to the application", model.system[0])
+	}
+}
+
+func TestARequestWithNothingToKeepIsAnsweredAsOne(t *testing.T) {
+	for _, content := range []string{"boa, guarde isso", "guarde isso, tá?"} {
+		handler, model := factsHandler(t, map[string]any{"reply": "Hm."})
+		if reply := say(t, handler, factGroupTurn(content, "5511999990000", false)); !strings.HasPrefix(reply, "Hm.\n\nDiga o que guardar") {
+			t.Fatal(content, reply)
+		}
+		if held, _ := handler.facts.All(context.Background()); len(held) != 0 {
+			t.Fatal(content, held)
+		}
+		if !strings.Contains(model.system[0], "reports the outcome itself") {
+			t.Fatal("the model must not claim it kept this", content)
+		}
+	}
+}
+
+func TestAnOrdinaryTurnIsNotToldAboutAnOutcome(t *testing.T) {
+	handler, model := factsHandler(t, map[string]any{"reply": "ok"})
+	event := factGroupTurn("oi", "5511999990000", false)
+	event.Context["fact_in_message"] = true
+	if reply := say(t, handler, event); reply != "ok" {
+		t.Fatal(reply)
+	}
+	if strings.Contains(model.system[0], "reports the outcome itself") {
+		t.Fatal("an interface does not grant this")
+	}
+}
+
+func TestAStrangerIsAnsweredAndToldNothingWasKept(t *testing.T) {
+	handler, _ := factsHandler(t, map[string]any{"reply": "Quem é você?"})
+	reply := say(t, handler, factGroupTurn("meu filme é Stalker, guarde isso, e o seu?", "5511888880000", false))
+	if !strings.HasPrefix(reply, "Quem é você?\n\nSó guardo isso") {
+		t.Fatal(reply)
+	}
+	if held, _ := handler.facts.All(context.Background()); len(held) != 0 {
+		t.Fatal(held)
+	}
+}
+
+func TestAMessageTooLongToKeepIsStillAnswered(t *testing.T) {
+	handler, _ := factsHandler(t, map[string]any{"reply": "Li."})
+	long := strings.Repeat("palavra ", conversation.MaxFactRunes/8+1) + ", guarde isso"
+	if reply := say(t, handler, factGroupTurn(long, "5511999990000", false)); !strings.HasPrefix(reply, "Li.\n\nIsso é longo demais") {
+		t.Fatal(reply)
+	}
+	if held, _ := handler.facts.All(context.Background()); len(held) != 0 {
+		t.Fatal(held)
+	}
+}
+
+func TestVoiceKeepsNothingFromAClause(t *testing.T) {
+	handler, _ := factsHandler(t)
+	event, line := handler.keepInMessage(context.Background(), core.Event{Context: map[string]any{"voice_turns": []chat.VoiceTurn{}}}, "gosto de chá preto, guarde isso")
+	if line != "" || event.Context["fact_in_message"] != nil {
+		t.Fatal(line, event.Context)
+	}
+}
+
+func TestARetriedTurnAnswersAndKeepsTheFactOnce(t *testing.T) {
+	archive := archiveFor(t)
+	model := &scriptedModel{answers: []map[string]any{nil, {"reply": "Bom gosto."}}}
+	handler := NewChatDomainHandler(model).WithArchive(archive).WithFacts(factsFor(t))
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	event := ownerTurn(map[string]any{"content": "meu filme é Stalker, guarde isso, e o seu?", "conversation_id": held.ID, "send_id": "send-0001"})
+	if _, err := handler.Handle(context.Background(), event, archiveStep); err == nil {
+		t.Fatal("the model failed")
+	}
+	if facts, _ := handler.facts.All(context.Background()); len(facts) != 1 {
+		t.Fatal("what was asked stays kept when the answer fails", facts)
+	}
+	turns, _ := archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	retry := ownerTurn(map[string]any{"conversation_id": held.ID, "retry_turn_id": turns[0].ID})
+	result, err := handler.Handle(context.Background(), retry, archiveStep)
+	if err != nil || result["reply"] != "Bom gosto.\n\nGuardado: meu filme é Stalker, e o seu?" {
+		t.Fatal(result, err)
+	}
+	if facts, _ := handler.facts.All(context.Background()); len(facts) != 1 {
+		t.Fatal("a retry keeps the fact once", facts)
+	}
+	turns, _ = archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	if !strings.Contains(turns[len(turns)-1].Reply, "Guardado:") {
+		t.Fatal("the transcript keeps what the owner was shown", turns)
+	}
+}

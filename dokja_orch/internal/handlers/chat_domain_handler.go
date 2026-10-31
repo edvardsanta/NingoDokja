@@ -188,12 +188,14 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		event.EventID, lifecycle.SessionID, len(history), lifecycle.Compacted, lifecycle.CompactionFallback, verifiedOwner, lifecycle.Reason))
 	var sources []knowledgeSource
 	var result map[string]any
+	var keptLine string
 	if reply, ok := h.factReply(ctx, event, content); ok {
 		return map[string]any{"action": workflow.Action, "reply": reply}, nil
 	}
 	if identityReply := ownerIdentityReply(event, content); identityReply != "" {
 		result = map[string]any{"reply": identityReply}
 	} else {
+		event, keptLine = h.keepInMessage(ctx, event, content)
 		lookupCtx := ctx
 		cancelLookup := func() {}
 		if voice {
@@ -222,7 +224,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
-	reply := citeSources(presentation.text, sources)
+	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
 	if presentation.failed {
 		logger.Info(fmt.Sprintf("chat formula rendering incomplete event_id=%s rendered=%d", event.EventID, len(presentation.attachments)))
 	}

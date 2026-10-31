@@ -166,7 +166,11 @@ const knownFactsNote = `What the current speaker asked you to keep (their own wo
 
 // factsAvailableNote keeps the model honest about keeping things: the application does it, and the
 // model neither claims it did nor says it cannot.
-const factsAvailableNote = `Keeping facts: this speaker can have you keep something for good by writing "guarde isso: ..." or "remember this: ...", which the application handles before you see it. Asking to list ("o que você sabe sobre mim?") and to delete ("esquece 2") work the same way. You keep nothing yourself: if they ask in other words, tell them the phrase instead of claiming you kept it or saying it cannot be done.`
+const factsAvailableNote = `Keeping facts: this speaker can have you keep something for good by writing "guarde isso: ..." or "remember this: ...", or the same words as a clause of their own inside a longer message ("..., guarde isso, ..."), which keeps that message. The application does the keeping. It also answers requests to list ("o que você sabe sobre mim?") and to delete ("esquece 2") before you see them. You keep nothing yourself: if they ask in other words, tell them the phrase instead of claiming you kept it or saying it cannot be done.`
+
+// factInMessageNote stops the model reporting an outcome it did not produce: the application closes
+// the reply with the real one, which may be a refusal.
+const factInMessageNote = `This message includes a request to keep something. The application has handled it and reports the outcome itself right after your reply. Answer the rest of the message and say nothing about keeping it, whether or not it worked.`
 
 // personaForEvent is the system message of a turn: the persona for its interface and the private
 // facts the chat handler attached, only where the owner allowed them.
@@ -184,6 +188,9 @@ func personaForEvent(event core.Event) string {
 	}
 	if available, _ := event.Context["facts_available"].(bool); available {
 		persona += "\n\n" + factsAvailableNote
+	}
+	if asked, _ := event.Context["fact_in_message"].(bool); asked {
+		persona += "\n\n" + factInMessageNote
 	}
 	if facts, ok := event.Context["known_facts"].([]string); ok && len(facts) > 0 {
 		encoded, _ := json.Marshal(facts)

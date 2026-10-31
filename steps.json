@@ -1188,7 +1188,8 @@
           ],
           "evidence": [
             "2026-10-31 backend: explicit phrases (pt, en) answered without the model, facts stored beside the archive, known_facts attached per speaker and place, conversation.facts and conversation.fact_delete for the owner's interfaces. Mutation checks: removing the place filter or trusting a claimed known_speaker fails the tests. Not run live.",
-            "2026-10-31 desktop: the Notebook lists every person's kept facts as text and deletes one after the shell's question; it stays usable while the memory service is off."
+            "2026-10-31 desktop: the Notebook lists every person's kept facts as text and deletes one after the shell's question; it stays usable while the memory service is off.",
+            "2026-10-31 request inside a message: the keep phrase is read as a clause of its own among other words, the message without it is kept, the model answers and the application closes the reply with the outcome. Still explicit, never inferred. Tests cover both turn paths and a retry after the model failed. Not run live."
           ],
           "checks": [],
           "blockers": [],

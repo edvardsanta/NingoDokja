@@ -74,13 +74,31 @@ func TestRememberRefusesWhatItCannotKeep(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for range MaxFactsPerPerson {
-		if _, err := facts.Remember(ctx, OwnerPerson, PlacePrivate, "x"); err != nil {
+	for index := range MaxFactsPerPerson {
+		if _, err := facts.Remember(ctx, OwnerPerson, PlacePrivate, strings.Repeat("x", index+1)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := facts.Remember(ctx, OwnerPerson, PlacePrivate, "one more"); !errors.Is(err, ErrTooManyFacts) {
 		t.Fatal(err)
+	}
+}
+
+func TestTheSameFactInTheSamePlaceIsKeptOnce(t *testing.T) {
+	facts := NewFacts(&memoryFacts{})
+	ctx := context.Background()
+	first, err := facts.Remember(ctx, "owner", "whatsapp:a", "gosto  de chá")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := facts.Remember(ctx, "owner", "whatsapp:a", "gosto de chá")
+	if err != nil || again.ID != first.ID {
+		t.Fatal(again, err)
+	}
+	facts.Remember(ctx, "owner", "whatsapp:b", "gosto de chá")
+	facts.Remember(ctx, "person:Ana", "whatsapp:a", "gosto de chá")
+	if held, _ := facts.All(ctx); len(held) != 3 {
+		t.Fatal("another place or person is another fact", held)
 	}
 }
 

@@ -201,7 +201,9 @@ who is linking.
 The owner and the people named in the private owner configuration can write `Ningo, guarde isso: ...`
 in a group the owner listed. `Ningo, o que você sabe sobre mim?` lists what they kept in that group and
 `Ningo, esquece 2` deletes it. Anyone else keeps nothing. What was kept in a group only comes back in
-that group, so it is read by whoever is there. In the self-chat the same phrases work with or without
+that group, so it is read by whoever is there. The request can also sit in the middle of a longer
+message, between commas or periods (`Ningo, gosto de Stalker, guarde isso, e o que acha de Solaris?`):
+Ningo keeps the message without the request, answers it and says at the end what was kept. In the self-chat the same phrases work with or without
 the name. The owner's self-chat shows all of the owner's facts, and
 the desktop's Notebook shows everyone's, with a way to delete each one.
 
