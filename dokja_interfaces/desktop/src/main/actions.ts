@@ -33,6 +33,7 @@ import type {
   KnowledgeSearch,
   KnowledgeStatus,
   MemePage,
+  MemeHashtagSuggestion,
   MemeHashtagTag,
   MemePoolRefresh,
   MemeStatus,
@@ -761,6 +762,17 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       sourceUrl: text(body.source_url),
       hashtag: text(body.hashtag),
       embedded: body.embedded === true,
+    })),
+  },
+  "meme.hashtag.suggest": {
+    payload: (raw) => {
+      const url = text(raw.url).trim();
+      if (!/^https?:\/\//.test(url) || url.length > 2048) return undefined;
+      return { url };
+    },
+    project: (result) => inDomain(result, "meme", (body): MemeHashtagSuggestion => ({
+      relevant: body.relevant === true,
+      hashtag: text(body.hashtag),
     })),
   },
   "communications.link.status": { payload: linkPayload, project: linkProjection },

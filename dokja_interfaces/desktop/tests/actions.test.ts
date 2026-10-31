@@ -636,6 +636,17 @@ test("meme.hashtag.tag may carry the meme's text the owner wrote, bounded", () =
   assert.equal(payload({ url: "https://images.example/a.png", hashtag: "#x", text: "w".repeat(2001) }), undefined);
 });
 
+test("meme.hashtag.suggest is a bounded read of one meme, and keeps only its answer", () => {
+  const action = ACTIONS["meme.hashtag.suggest"];
+  assert.equal(isWriteAction("meme.hashtag.suggest"), false);
+  assert.deepEqual(action.payload({ url: " https://images.example/a.png ", min_score: 0, text: "x" }), { url: "https://images.example/a.png" });
+  assert.equal(action.payload({ url: "file:///etc/hosts" }), undefined);
+  assert.equal(action.payload({ url: `https://images.example/${"a".repeat(2048)}` }), undefined);
+  const projected = action.project({ domain: "meme", result: { relevant: true, hashtag: "#x", score: 0.9, matched_text: "private" } });
+  assert.deepEqual(projected, { relevant: true, hashtag: "#x" });
+  assert.deepEqual(action.project({ domain: "meme", result: { skipped: true, reason: "paused" } }), { off: true, reason: "paused" });
+});
+
 test("meme.pool.refresh is a change the screen cannot size, and keeps only counts and source names", () => {
   assert.equal(isWriteAction("meme.pool.refresh"), true);
   assert.equal(needsConfirmation("meme.pool.refresh"), false);
