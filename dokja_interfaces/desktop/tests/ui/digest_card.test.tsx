@@ -284,8 +284,57 @@ describe("the digest card", () => {
     await screen.findByText("Entry 1");
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Entry 2");
-    expect(calls.map((call) => call.type)).toEqual(["digest.status", "digest.items", "digest.status", "digest.items"]);
+    // the first pair is the opening; the refresh asks for both again, in whichever order the
+    // sections' effects run (the readings are below the card and run first)
+    expect(calls.slice(0, 2).map((call) => call.type)).toEqual(["digest.status", "digest.items"]);
+    expect(calls.slice(2).map((call) => call.type).toSorted()).toEqual(["digest.items", "digest.status"]);
     expect(titles()).toEqual(["Entry 2"]);
+  });
+
+  describe("refreshing", () => {
+    const many = (count: number) => Array.from({ length: count }, (_, index) => digestItem(index + 1));
+
+    it("keeps the page that was loaded and the filters that were typed, and reads that page again", async () => {
+      const { transport, calls } = routedTransport({
+        "digest.status": ok(DIGEST_STATUS),
+        "digest.items": (payload) =>
+          Promise.resolve(ok(digestPage(many(Number(payload?.limit)), { total: 30, more: 30 - Number(payload?.limit) }))),
+      });
+      renderCard(transport);
+      await screen.findByText("Entry 8");
+      fireEvent.click(screen.getByRole("button", { name: "Show 8 more" }));
+      await screen.findByText("Entry 16");
+      const search = screen.getByLabelText("Search readings") as HTMLInputElement;
+      fireEvent.change(search, { target: { value: "stoics" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(calls.filter((call) => call.type === "digest.status")).toHaveLength(2));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
+
+      // the same input is still there with its text, and the 16 are still shown
+      expect(screen.getByLabelText("Search readings")).toBe(search);
+      expect(search.value).toBe("stoics");
+      expect(titles()).toHaveLength(16);
+      expect(itemCalls(calls).at(-1)).toEqual({ limit: 16, offset: 0 });
+    });
+
+    it("keeps the readings on screen while the answer is on its way, and holds the refresh", async () => {
+      const slow = deferred<TransportResult>();
+      const { transport } = routedTransport({
+        "digest.status": [ok(DIGEST_STATUS), () => slow.promise],
+        "digest.items": ok(digestPage([digestItem(1)])),
+      });
+      renderCard(transport);
+      await screen.findByText("Entry 1");
+
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(true));
+      expect(titles()).toEqual(["Entry 1"]);
+      expect(screen.queryByText("Loading…")).toBeNull();
+
+      await act(async () => slow.resolve(ok(DIGEST_STATUS)));
+      await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
+    });
   });
 
   it("shows what a source wrote as text, never as markup", async () => {

@@ -22,6 +22,7 @@ import { addToBase } from "./knowledge_add_model.js";
 import { useAction } from "./use_action.js";
 import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";
+import { useWorkspaceRefresh } from "./workspace_panel.js";
 
 const TIMEOUT_MS = 20_000;
 
@@ -69,10 +70,11 @@ const EXPLANATIONS: Record<Exclude<Following, "following">, { id: MessageId; ton
 export function DigestCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const load = useCallback(() => loadDigestStatus(transport), [transport]);
-  const { state, reload } = useCard(load);
+  const { state, reload, poll, refreshing } = useCard(load);
 
+  // The panel's refresh reads the sources quietly: the page of readings and its filters stay.
   return (
-    <CardFrame title={t("digest_title")} state={state} onReload={reload}>
+    <CardFrame title={t("digest_title")} state={state} onReload={reload} onRefresh={poll} refreshing={refreshing}>
       {(status) =>
         status.off ? <OffNotice reason={status.reason} /> : <DigestBody transport={transport} status={status} />
       }
@@ -127,7 +129,10 @@ function Reading({ transport, sources }: { transport: Transport; sources: readon
   };
   const reset = () => { setDraft(EMPTY_FILTERS); setFilters(EMPTY_FILTERS); setShown(SHOW_STEP); };
 
-  const { state, reload } = useCard(load);
+  const { state, reload, poll, refreshing } = useCard(load);
+  // The panel's refresh reads this page again where it stands: how many were shown and the filters
+  // stay, and the page stays on screen until the new one lands.
+  useWorkspaceRefresh(poll, refreshing || state.phase === "loading");
 
   // Asking for a longer page must not blank the list: the last page stays until the new one lands.
   const [kept, setKept] = useState<DigestPage | undefined>(undefined);

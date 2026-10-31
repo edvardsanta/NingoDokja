@@ -26,6 +26,20 @@ const renderPanel = (transport: Parameters<typeof KnowledgeClassificationPanel>[
 );
 
 describe("answering classification from a document", () => {
+  it("says an axis awaits an answer once, and names who decided only for an axis that has a value", async () => {
+    const { transport } = routedTransport({ "knowledge.classify": ok(partial) });
+    renderPanel(transport);
+
+    await screen.findByText("Content kind");
+    // the form has a value from the owner; the content kind has none
+    expect(screen.getAllByText("Awaiting your answer")).toHaveLength(1);
+    expect(screen.queryByText(/Awaiting your answer · /)).toBeNull();
+    const kind = screen.getByText("Content kind").nextElementSibling as HTMLElement;
+    expect(kind.textContent).toBe("Awaiting your answer");
+    const form = screen.getByText("Form").nextElementSibling as HTMLElement;
+    expect(form.textContent).toBe("book · Your answer");
+  });
+
   it("leaves answers blank and submits only chosen axes with the current revision", async () => {
     const { transport, calls } = routedTransport({ "knowledge.classify": [ok(pending), ok(partial), ok(complete)] });
     renderPanel(transport);

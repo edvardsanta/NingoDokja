@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useId, useState, type DragEvent } from "react";
 
 import type { KnowledgeDocument, KnowledgeHit, KnowledgeSearch, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -52,10 +52,11 @@ export async function searchKnowledge(
 export function KnowledgeCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const load = useCallback(() => loadKnowledge(transport), [transport]);
-  const { state, reload } = useCard(load);
+  const { state, reload, poll, refreshing } = useCard(load);
 
+  // The panel's refresh reads the counts quietly: what the owner has open stays where it is.
   return (
-    <CardFrame title={t("knowledge_title")} state={state} onReload={reload}>
+    <CardFrame title={t("knowledge_title")} state={state} onReload={reload} onRefresh={poll} refreshing={refreshing}>
       {(status) =>
         status.off ? (
           <OffNotice reason={status.reason} />
@@ -101,11 +102,14 @@ function useFileDrop(onFile: (file: File) => void) {
   return { dragging: depth > 0, handlers };
 }
 
-// The counts are read once when the card opens; adding a document reads them again, quietly, so
-// they do not stay behind what the search now finds.
+// The counts are read when the card opens and with the panel's refresh; adding a document reads them
+// again, quietly, so they do not stay behind what the search now finds.
 function KnowledgeBody({ transport, initial }: { transport: Transport; initial: KnowledgeStatus }) {
   const t = useTranslate();
   const [status, setStatus] = useState(initial);
+  // a quiet refresh hands over new counts while this body stays mounted
+  useEffect(() => setStatus(initial), [initial]);
+  const search = useKnowledgeSearch(transport);
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => {
     setRevision((value) => value + 1);
@@ -183,11 +187,12 @@ function KnowledgeBody({ transport, initial }: { transport: Transport; initial: 
       )}
       <div hidden={current !== BASE}>
         <div className="library-tools">
-          <SearchBox transport={transport} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} />
+          <SearchForm search={search} />
           <button type="button" className="library-add primary" aria-haspopup="dialog" aria-expanded={adding} onClick={() => setAdding(true)}>
             {t("add_title")}
           </button>
         </div>
+        <SearchOutcome search={search} onOpen={(hit) => open({ id: hit.sourceId, title: hit.title }, undefined, false)} />
         {adding && <Drawer title={t("add_title")} onClose={() => { setAdding(false); setDropped(undefined); }}>
           <AddToBase transport={transport} onAdded={refresh} dropped={dropped} titled={false} startMode={addMode} onMode={setAddMode} />
         </Drawer>}
@@ -230,43 +235,56 @@ function KnowledgeStatusLines({ status }: { status: KnowledgeStatus }) {
   );
 }
 
-function SearchBox({ transport, onOpen }: { transport: Transport; onOpen: (hit: KnowledgeHit) => void }) {
-  const t = useTranslate();
-  const inputId = useId();
+// The search lives in the body, not in its form: the field sits in the toolbar beside Add, and what it
+// finds is drawn below the toolbar, so nothing the search returns can push Add out of place.
+function useKnowledgeSearch(transport: Transport) {
   const [query, setQuery] = useState("");
   const run = useCallback((asked: string) => searchKnowledge(transport, asked), [transport]);
   const { state, start } = useAction(run);
+  return { query, setQuery, state, start };
+}
+type KnowledgeSearchState = ReturnType<typeof useKnowledgeSearch>;
+
+function SearchForm({ search }: { search: KnowledgeSearchState }) {
+  const t = useTranslate();
+  const inputId = useId();
+  const { query, setQuery, state, start } = search;
   const searching = state.phase === "loading";
   const asked = query.trim();
 
   return (
-    <>
-      <form
-        className="search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (asked !== "" && !searching) start(asked);
-        }}
-      >
-        <label htmlFor={inputId}>{t("knowledge_ask")}</label>
-        <input
-          id={inputId}
-          type="search"
-          value={query}
-          maxLength={MAX_QUERY_CHARS}
-          autoComplete="off"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <button type="submit" disabled={searching || asked === ""}>
-          {t("knowledge_search")}
-        </button>
-      </form>
-      <div aria-live="polite">
-        {searching && <p role="status">{t("knowledge_searching")}</p>}
-        {state.phase === "error" && <Problem error={state.error} />}
-        {state.phase === "ready" && <SearchResults search={state.data} onOpen={onOpen} />}
-      </div>
-    </>
+    <form
+      className="search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (asked !== "" && !searching) start(asked);
+      }}
+    >
+      <label htmlFor={inputId}>{t("knowledge_ask")}</label>
+      <input
+        id={inputId}
+        type="search"
+        value={query}
+        maxLength={MAX_QUERY_CHARS}
+        autoComplete="off"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <button type="submit" disabled={searching || asked === ""}>
+        {t("knowledge_search")}
+      </button>
+    </form>
+  );
+}
+
+function SearchOutcome({ search, onOpen }: { search: KnowledgeSearchState; onOpen: (hit: KnowledgeHit) => void }) {
+  const t = useTranslate();
+  const { state } = search;
+  return (
+    <div aria-live="polite">
+      {state.phase === "loading" && <p role="status">{t("knowledge_searching")}</p>}
+      {state.phase === "error" && <Problem error={state.error} />}
+      {state.phase === "ready" && <SearchResults search={state.data} onOpen={onOpen} />}
+    </div>
   );
 }
 

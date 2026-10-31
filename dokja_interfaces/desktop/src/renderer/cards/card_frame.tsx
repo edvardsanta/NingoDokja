@@ -66,7 +66,12 @@ export function OffNotice({ reason }: { reason: string }) {
 type CardFrameProps<T> = {
   title: string;
   state: CardState<T>;
+  // Reads again from the start: the Try again after a failure, which may blank the section.
   onReload: () => void;
+  // What the workspace's refresh runs, when it should not blank the section (useCard's poll). The
+  // refresh stays held while that read is on its way. Left out, the refresh runs onReload.
+  onRefresh?: () => void;
+  refreshing?: boolean;
   children: (data: T) => ReactNode;
   supplement?: ReactNode;
 };
@@ -74,10 +79,10 @@ type CardFrameProps<T> = {
 // The anatomy every section of a workspace shares: its title, then its body or why there is none.
 // It is not a card of its own: the workspace's panel frames it and its one refresh reads this
 // section again too. When the read failed, the section offers to try again where the failure is.
-export function CardFrame<T>({ title, state, onReload, children, supplement }: CardFrameProps<T>) {
+export function CardFrame<T>({ title, state, onReload, onRefresh, refreshing = false, children, supplement }: CardFrameProps<T>) {
   const t = useTranslate();
   const titleId = useId();
-  useWorkspaceRefresh(onReload, state.phase === "loading");
+  useWorkspaceRefresh(onRefresh ?? onReload, state.phase === "loading" || refreshing);
   return (
     <section className="wp-section" aria-labelledby={titleId} aria-busy={state.phase === "loading"}>
       <h2 id={titleId}>{title}</h2>

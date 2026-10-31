@@ -24,6 +24,21 @@ function Section({ name, reads, answer }: { name: string; reads: string[]; answe
   );
 }
 
+// A section that reads again quietly: its body stays on screen, and it says so while it waits.
+function QuietSection({ name, reads, answer }: { name: string; reads: string[]; answer: () => Promise<TransportResult> }) {
+  const load = useCallback(async () => {
+    reads.push(name);
+    const result = await answer();
+    return result.ok ? { ok: true as const, data: String(result.result) } : result;
+  }, [name, reads, answer]);
+  const { state, reload, poll, refreshing } = useCard(load);
+  return (
+    <CardFrame title={name} state={state} onReload={reload} onRefresh={poll} refreshing={refreshing}>
+      {(text) => <p>{text}</p>}
+    </CardFrame>
+  );
+}
+
 const now = (value: string) => async (): Promise<TransportResult> => ({ ok: true, result: value });
 
 function renderPanel(sections: { name: string; answer: () => Promise<TransportResult> }[]) {
@@ -76,6 +91,32 @@ describe("the workspace panel", () => {
     gate.resolve({ ok: true, result: "slow" });
     await screen.findByText("slow");
     expect(refresh.disabled).toBe(false);
+  });
+
+  it("reads a quiet section again without taking its body away, and holds the refresh meanwhile", async () => {
+    const reads: string[] = [];
+    const gate = deferred<TransportResult>();
+    let turn = 0;
+    const answer = () => (turn++ === 0 ? Promise.resolve<TransportResult>({ ok: true, result: "first" }) : gate.promise);
+    render(
+      <I18nProvider locale="en">
+        <WorkspacePanel trail={["Library"]}>
+          <QuietSection name="Quiet" reads={reads} answer={answer} />
+        </WorkspacePanel>
+      </I18nProvider>,
+    );
+    const body = await screen.findByText("first");
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(true));
+    // the same element, still there: nothing was unmounted to read again
+    expect(screen.getByText("first")).toBe(body);
+    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(reads).toEqual(["Quiet", "Quiet"]);
+
+    gate.resolve({ ok: true, result: "second" });
+    await screen.findByText("second");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(false));
   });
 
   it("offers to try again inside the section that failed", async () => {
