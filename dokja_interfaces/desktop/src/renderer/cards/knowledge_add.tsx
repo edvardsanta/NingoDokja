@@ -9,7 +9,6 @@ import { OffNotice, Problem as ErrorLine } from "./card_frame.js";
 import {
   ADD_MODES,
   DEFAULT_KINDS,
-  FILE_MEGABYTES,
   KIND_SUGGESTIONS,
   addToBase,
   check,
@@ -101,7 +100,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
         set("file", undefined);
         setProblem(
           error instanceof RangeError
-            ? { id: "add_file_too_big", params: { size: FILE_MEGABYTES } }
+            ? { id: "add_file_too_big" }
             : { id: "add_file_unreadable" },
         );
       },
@@ -199,7 +198,6 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
                 id={field("text")}
                 rows={6}
                 value={draft.body}
-                maxLength={INGEST_LIMITS.noteChars}
                 onChange={(event) => set("body", event.target.value)}
                 onKeyDown={onNoteKey}
               />
@@ -240,7 +238,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
                 <p className="detail">
                   {draft.file
                     ? t("add_file_chosen", { name: draft.file.filename, kb: Math.max(1, Math.round(draft.file.bytes / 1024)) })
-                    : t("add_file_hint", { size: FILE_MEGABYTES })}
+                    : t("add_file_hint")}
                 </p>
               </div>
             </>
@@ -325,6 +323,9 @@ export function Outcome({ result }: { result: IngestResult | Off }) {
       <p className="note" data-tone="ok">
         {t(outcome.id, outcome.params)}
       </p>
+      {(result.pendingEmbeddings ?? 0) > 0 && !result.degraded && (
+        <p className="detail">{t("add_indexing", { count: result.pendingEmbeddings ?? 0 })}</p>
+      )}
       {result.degraded && (
         <p className="note" data-tone="unchecked">
           {t("add_degraded")}

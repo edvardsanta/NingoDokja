@@ -33,15 +33,18 @@ logger = logging.getLogger("dokja_knowledge.service")
 
 SOURCE_ID = re.compile(r"^[A-Za-z0-9._:/#@-]{1,200}$")
 KIND = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
-MAX_BODY_CHARS = 2_000_000
 MAX_TITLE_CHARS = 300
 MAX_QUERY_CHARS = 2_000
-MAX_UPLOAD_BYTES = 20_000_000
 CANDIDATES = 30
 RRF_K = 60
 # Provisional: measured with bge-m3 on a three-document corpus (see README).
 DEFAULT_MIN_SCORE = 0.45
 DEFAULT_LEXICAL_COVERAGE = 0.75
+# An ingest embeds this much before answering, which covers an article or a note. A book's remaining
+# chunks are embedded in the background, a few at a time, so one request never waits for a whole book.
+INGEST_EMBED_CHUNKS = 32
+# Measured at about two chunks a second on a local CPU, so a request waits about two seconds at most.
+BACKGROUND_EMBED_CHUNKS = 4
 
 # Portuguese and English function words: they carry no meaning for keyword matching, and the
 # knowledge base is used with documents in both languages.
@@ -106,9 +109,13 @@ class KnowledgeService:
     def __init__(self, store: Store, embedder=None, model: str = "bge-m3",
                  min_score: float = DEFAULT_MIN_SCORE,
                  lexical_coverage: float = DEFAULT_LEXICAL_COVERAGE,
-                 registry: Registry | None = None, fetch_enabled: bool = True, fetcher=None):
+                 registry: Registry | None = None, fetch_enabled: bool = True, fetcher=None,
+                 max_file_mb: int = 0, max_text_chars: int = 0):
         self.registry = registry if registry is not None else default_registry()
         self.fetch_enabled = fetch_enabled
+        # The owner's limits from Settings; zero means none, because books are as large as they are.
+        self.max_file_mb = max_file_mb
+        self.max_text_chars = max_text_chars
         self._fetch = fetcher if fetcher is not None else fetcher_module.fetch
         self.store = store
         self.embedder = embedder
@@ -199,10 +206,11 @@ class KnowledgeService:
 
         embedded, degraded, reason = 0, False, ""
         if any(result["changed"] for result in results):
-            embedded, degraded, reason = self._embed_pending()
+            embedded, degraded, reason = self._embed_pending(INGEST_EMBED_CHUNKS)
+        pending = len(self.store.chunks_needing_embedding(self.model)) if embedded == INGEST_EMBED_CHUNKS else 0
         for result in results:
             if result["changed"]:
-                result.update(embedded=embedded, degraded=degraded)
+                result.update(embedded=embedded, degraded=degraded, pending_embeddings=pending)
                 if reason:
                     result["reason"] = reason
         if len(results) == 1:
@@ -212,7 +220,7 @@ class KnowledgeService:
             "created": sum(1 for r in results if r["created"]),
             "unchanged": sum(1 for r in results if not r["changed"] and not r.get("metadata_changed")),
             "chunks": sum(r.get("chunks", 0) for r in results),
-            "embedded": embedded, "degraded": degraded,
+            "embedded": embedded, "degraded": degraded, "pending_embeddings": pending,
         }
         if reason:
             summary["reason"] = reason
@@ -225,8 +233,8 @@ class KnowledgeService:
             raise ValueError(f"title is required (up to {MAX_TITLE_CHARS} characters)")
         if not body.strip():
             raise ValueError("body is required")
-        if len(body) > MAX_BODY_CHARS:
-            raise ValueError(f"body is larger than {MAX_BODY_CHARS} characters")
+        if self.max_text_chars and len(body) > self.max_text_chars:
+            raise ValueError(f"the text is over the limit set in Settings ({self.max_text_chars} characters)")
         digest = hashlib.sha256(
             json.dumps([title, kind, source_ref, tags, body], ensure_ascii=False).encode()
         ).hexdigest()
@@ -276,12 +284,12 @@ class KnowledgeService:
         name = posixpath.basename(filename.replace("\\", "/")).strip()
         if not name:
             raise ValueError("filename is required with content_b64")
-        if len(encoded) > MAX_UPLOAD_BYTES * 4 // 3 + 16:
-            raise ValueError(f"the file is larger than {MAX_UPLOAD_BYTES} bytes")
         try:
             data = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError) as err:
             raise ValueError("content_b64 is not valid base64") from err
+        if self.max_file_mb and len(data) > self.max_file_mb * 1024 * 1024:
+            raise ValueError(f"the file is over the limit set in Settings ({self.max_file_mb} MB)")
         extracted = self.registry.extract(name, data)
         base = "file:" + _safe(name)
         return self._wrap(extracted, title, base, "")
@@ -354,6 +362,10 @@ class KnowledgeService:
             return 0, True, str(err)
         self.store.set_embeddings([row["id"] for row in pending], matrix, self.model)
         return len(pending), False, ""
+
+    def embed_some(self) -> int:
+        """Embed a few waiting chunks, for the server's idle moments; how many it embedded."""
+        return self._embed_pending(BACKGROUND_EMBED_CHUNKS)[0]
 
     def reindex(self, payload: dict) -> dict:
         """Embed everything still missing a vector, for example after Ollama was down."""

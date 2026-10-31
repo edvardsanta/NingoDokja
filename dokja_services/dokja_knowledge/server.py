@@ -11,6 +11,11 @@ from bootstrap import build_service
 
 logger = logging.getLogger("dokja_knowledge.server")
 
+# With nothing to embed the server looks again now and then; with more waiting it only checks for a
+# request between batches.
+IDLE_POLL_MS = 15_000
+BUSY_POLL_MS = 10
+
 
 class KnowledgeServiceServer:
     def __init__(self, endpoint: str | None = None, service=None):
@@ -23,12 +28,32 @@ class KnowledgeServiceServer:
         self.socket.bind(self.endpoint)
         logger.info("knowledge service listening endpoint=%s", self.endpoint)
         try:
+            wait = IDLE_POLL_MS
             while True:
-                raw_request = self.socket.recv_string()
-                self.socket.send_string(json.dumps(self.handle_request(raw_request)))
+                wait = self.turn(wait)
         finally:
             self.socket.close()
             self.context.term()
+
+    def turn(self, wait: int) -> int:
+        """Answer a request, or embed a little while none waits; how long to wait next.
+
+        The service keeps one store connection and answers one request at a time, so embedding
+        shares this loop instead of a thread: a request waits for one small batch at most.
+        """
+        if self.socket.poll(wait):
+            raw_request = self.socket.recv_string()
+            self.socket.send_string(json.dumps(self.handle_request(raw_request)))
+            return BUSY_POLL_MS
+        return BUSY_POLL_MS if self.embed_waiting() else IDLE_POLL_MS
+
+    def embed_waiting(self) -> int:
+        try:
+            return self.service.embed_some()
+        except Exception as err:
+            # Background work must never stop the service from answering. Only the type is logged.
+            logger.warning("background embedding failed error_type=%s", type(err).__name__)
+            return 0
 
     def handle_request(self, raw_request: str) -> dict:
         try:

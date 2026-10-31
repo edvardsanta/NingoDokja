@@ -273,6 +273,8 @@ export function createFakeTransport(delayMs = 400): Transport {
     {id:"discord.direct_messages",group:"discord",kind:"enum",options:["open","closed"],value:"open",affects:["orchestrator","discord"],note:"",default:"open"},
     {id:"whatsapp.people",group:"whatsapp",kind:"list",options:[],value:"5511900000001,5511900000002",affects:["orchestrator","whatsapp"],note:"",default:""},
     {id:"whatsapp.groups",group:"whatsapp",kind:"list",options:[],value:"120363000000000001@g.us,120363000000000002@g.us,120363000000000009@g.us",affects:["orchestrator","whatsapp"],note:"",default:""},
+    {id:"library.max_file_mb",group:"library",kind:"text",options:[],value:"",affects:["knowledge"],note:"",default:""},
+    {id:"library.max_text_chars",group:"library",kind:"text",options:[],value:"",affects:["knowledge"],note:"",default:""},
     {id:"whatsapp.conversations",group:"whatsapp",kind:"list",options:[],value:"clube=120363000000000002@g.us,eu=5511900000001",affects:["whatsapp"],note:"",default:""},
     {id:"whatsapp.own_chat",group:"whatsapp",kind:"flag",options:["true","false"],value:"",affects:["orchestrator","whatsapp"],note:"",default:"true"},
     {id:"models.embedding",group:"models",kind:"text",options:[],value:"",affects:["embedding_init","memory","knowledge"],note:"reindex",default:"bge-m3",readOnly:true},

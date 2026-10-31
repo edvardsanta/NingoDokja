@@ -967,6 +967,7 @@ one row per adapter, its state and routing control. See the adapter docs for sta
 - `ningo.status` is not authenticated and the request port is published, so it carries only these
   states. Anything that would carry a link code, history or a send travels under the
   `communications.` event types, which need the communications credential.
+- **Library limits.** `KNOWLEDGE_MAX_FILE_MB` and `KNOWLEDGE_MAX_TEXT_CHARS` cap what Knowledge accepts; empty means no limit, the default. They are set under Settings, Library, on the desktop, CLI or TUI. A long document is stored at once and its passages are indexed in the background while the service is idle.
 - **WhatsApp conversations in the communications tab.** Name them in `DOKJA_WHATSAPP_CONVERSATIONS`
   (`alias=<number or group id>`); only those are recorded, as text, in the `dokja-whatsapp-history`
   volume for `DOKJA_WHATSAPP_HISTORY_DAYS` days (30 by default). The orchestrator reads them from the

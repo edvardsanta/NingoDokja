@@ -293,3 +293,22 @@ func TestANewSettingIsImportedOnceAndUnrelatedLegacyValuesAreNotRead(t *testing.
 		t.Fatal("an invalid value for a new setting must be refused")
 	}
 }
+
+func TestALibraryLimitIsAWholeNumberOrNothing(t *testing.T) {
+	for value, want := range map[string]string{"": "", " 64 ": "64", "30000000": "30000000"} {
+		if got, err := wholeNumber(value); err != nil || got != want {
+			t.Fatal(value, got, err)
+		}
+	}
+	for _, value := range []string{"0", "-1", "1.5", "64MB", "1; rm"} {
+		if _, err := wholeNumber(value); err == nil {
+			t.Fatal(value)
+		}
+	}
+	for _, id := range []string{"library.max_file_mb", "library.max_text_chars"} {
+		setting, ok := lookupSetting(id)
+		if !ok || len(setting.Affects) != 1 || setting.Affects[0] != "knowledge" {
+			t.Fatal(id, setting)
+		}
+	}
+}

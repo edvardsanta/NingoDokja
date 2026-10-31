@@ -135,7 +135,7 @@ describe("adding to the research base", () => {
     type("Title", "T");
     send();
     expect(screen.getByRole("alert").textContent).toBe("Write the text of the note.");
-    type("Text", "x".repeat(INGEST_LIMITS.noteChars));
+    type("Text", "some text");
     mode("Address");
     send();
     expect(screen.getByRole("alert").textContent).toBe("Write a web address.");
@@ -217,12 +217,13 @@ describe("adding to the research base", () => {
     expect(sent(calls)[0]?.payload?.filename).toBe("dropped.md");
   });
 
-  it("refuses a file that is too big or empty, saying why", async () => {
+  it("takes a file far past the old limit, and refuses an empty one, saying why", async () => {
     renderForm(routedTransport({}).transport);
     mode("File");
 
-    chooseFile(new File([new Uint8Array(INGEST_LIMITS.fileBytes + 1)], "big.pdf"));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The file is larger than 8 MB."));
+    chooseFile(new File([new Uint8Array(9 * 1024 * 1024)], "big.pdf"));
+    await screen.findByText(/big\.pdf, \d+ KB/);
+    expect(screen.queryByRole("alert")).toBeNull();
     chooseFile(new File([], "empty.txt"));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("The file could not be read."));
     expect(screen.queryByText(/KB$/)).toBeNull();
@@ -395,5 +396,23 @@ describe("adding to the research base", () => {
       fireEvent.change(input, { target: { files: [new File(["hello"], "notes.md")] } });
       await screen.findByText("notes.md, 1 KB");
     });
+  });
+
+  it("says a long document can be searched while the rest is indexed", async () => {
+    const { transport } = routedTransport({ "knowledge.ingest": ok({ count: 1, created: 1, updated: 0, unchanged: 0, chunks: 4200, pendingEmbeddings: 4168, degraded: false, reason: "" }) });
+    renderForm(transport);
+    type("Title", "A book");
+    type("Text", "some text");
+    send();
+    await screen.findByText(/4168 passages are still being indexed by meaning in the background/);
+  });
+
+  it("names the limit set in Settings when a document passes it", async () => {
+    const { transport } = routedTransport({ "knowledge.ingest": failure("orchestrator", "dispatch knowledge: the file is over the limit set in Settings (64 MB)") });
+    renderForm(transport);
+    type("Title", "A book");
+    type("Text", "some text");
+    send();
+    expect((await screen.findByRole("alert")).textContent).toBe("Over the limit set in Settings, under Library: 64 MB.");
   });
 });

@@ -1,4 +1,4 @@
-import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, INGEST_MODES, base64Length, type IngestMode } from "../../shared/ingest.js";
+import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, INGEST_MODES, type IngestMode } from "../../shared/ingest.js";
 import { POST_REFUSALS, type PostMedia, type PostReply, type PostView } from "../../shared/posts.js";
 import { isRecord, text } from "../../shared/records.js";
 import type { IngestResult, Off } from "../../shared/replies.js";
@@ -60,8 +60,6 @@ const refuse = (id: MessageId, params?: Record<string, number>): Checked => ({
   problem: params ? { id, params } : { id },
 });
 
-export const FILE_MEGABYTES = LIMITS.fileBytes / (1024 * 1024);
-
 function tagsOf(raw: string): string[] {
   const tags: string[] = [];
   for (const item of raw.split(",")) {
@@ -107,7 +105,6 @@ export function check(draft: Draft): Checked {
     case "note":
       if (title === "") return refuse("add_need_title");
       if (draft.body.trim() === "") return refuse("add_need_text");
-      if (draft.body.length > LIMITS.noteChars) return refuse("add_text_too_long", { max: LIMITS.noteChars });
       return { ok: true, payload: { ...common, body: draft.body } };
     case "address": {
       const address = draft.address.trim();
@@ -121,20 +118,28 @@ export function check(draft: Draft): Checked {
   }
 }
 
-// Reads a file into base64 text. Refuses what is too big before reading it.
+// Reads a file into base64 text. Only the machine's memory bounds its size: a file too large for
+// a string in memory fails here as a RangeError.
 export function readFile(file: File): Promise<FileDraft> {
   return new Promise((resolve, reject) => {
-    if (file.size > LIMITS.fileBytes) return reject(new RangeError("too big"));
     if (file.size === 0) return reject(new Error("empty"));
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("unreadable"));
     reader.onload = () => {
-      const result = String(reader.result);
-      const content = result.slice(result.indexOf(",") + 1);
-      if (content === "" || content.length > base64Length(LIMITS.fileBytes)) return reject(new Error("unreadable"));
-      resolve({ filename: file.name, content, bytes: file.size });
+      try {
+        const result = String(reader.result);
+        const content = result.slice(result.indexOf(",") + 1);
+        if (content === "") return reject(new Error("unreadable"));
+        resolve({ filename: file.name, content, bytes: file.size });
+      } catch (error) {
+        reject(error);
+      }
     };
-    reader.readAsDataURL(file);
+    try {
+      reader.readAsDataURL(file);
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
@@ -150,6 +155,7 @@ export function parseIngestResult(value: unknown): IngestResult | Off | undefine
     updated: num(value.updated),
     unchanged: num(value.unchanged),
     chunks: num(value.chunks),
+    ...(num(value.pendingEmbeddings) > 0 ? { pendingEmbeddings: num(value.pendingEmbeddings) } : {}),
     degraded: value.degraded === true,
     reason: text(value.reason),
   };

@@ -78,7 +78,6 @@ def test_epub_and_pdf_uploads_work_and_a_title_override_wins(service):
         ({"content_b64": b64(b"x"), "filename": "a.docx"}, "not a valid archive"),
         ({"content_b64": b64(b"x"), "filename": "a.unknown"}, "unsupported file type"),
         ({"content_b64": b64(make_pdf(None)), "filename": "scan.pdf"}, "no text layer"),
-        ({"content_b64": "A" * (20_000_000 * 4 // 3 + 100), "filename": "big.pdf"}, "larger than"),
         ({"body": "text", "title": "T", "source": "inbox:x"}, "exactly one"),
         ({"title": "T"}, "exactly one"),
         ({"source": "not a source"}, "no fetcher is registered"),

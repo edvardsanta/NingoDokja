@@ -556,7 +556,7 @@ function rememberReading(item: Record<string, unknown>): void {
   READINGS.delete(id);
   const address = webAddress(text(item.url));
   const body = typeof item.body === "string" ? item.body.trim() : "";
-  const payload = body && body.length <= INGEST_LIMITS.noteChars
+  const payload = body
     ? buildIngest({
       mode: "note", title: shorten(text(item.title), 300), body,
       kind: "article", reference: address,
@@ -627,6 +627,7 @@ function ingestResult(body: Record<string, unknown>): IngestResult {
     chunks: count(body.chunks),
     degraded: body.degraded === true,
     reason: shorten(text(body.reason)),
+    ...(count(body.pending_embeddings) > 0 ? { pendingEmbeddings: count(body.pending_embeddings) } : {}),
   };
 }
 
@@ -929,8 +930,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     settle: async (projected) => (posts ? posts.hold(projected) : { status: "refused", refused: "failed" }),
   },
   "knowledge.ingest": {
-    // A file travels as base64 text: the cap is the largest file, a third more.
-    maxPayloadChars: 12_000_000,
+    // A book travels whole as base64 text, however large it is.
+    maxPayloadChars: Number.POSITIVE_INFINITY,
     payload: (raw) => (raw.mode === "reading" ? readingIngest(raw) : raw.mode === "post" ? postIngest(raw) : buildIngest(raw)),
     prepare: savePost,
     abandon: async (wire) => {

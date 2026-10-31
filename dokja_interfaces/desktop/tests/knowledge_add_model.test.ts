@@ -24,10 +24,7 @@ test("a note needs a title and a text; both are sent trimmed where it matters", 
   });
   assert.deepEqual(check(draft({ body: "text" })), { ok: false, problem: { id: "add_need_title" } });
   assert.deepEqual(check(draft({ title: "T", body: "  \n " })), { ok: false, problem: { id: "add_need_text" } });
-  assert.deepEqual(check(draft({ title: "T", body: "x".repeat(INGEST_LIMITS.noteChars + 1) })), {
-    ok: false,
-    problem: { id: "add_text_too_long", params: { max: INGEST_LIMITS.noteChars } },
-  });
+  assert.equal(check(draft({ title: "T", body: "x".repeat(3_000_000) })).ok, true, "a note can be as long as a book");
   assert.deepEqual(check(draft({ title: "x".repeat(INGEST_LIMITS.titleChars + 1), body: "text" })), {
     ok: false,
     problem: { id: "add_title_too_long", params: { max: INGEST_LIMITS.titleChars } },

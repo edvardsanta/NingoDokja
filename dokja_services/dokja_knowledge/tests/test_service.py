@@ -1,7 +1,9 @@
+import base64
+
 import pytest
 
 from fakes import FakeEmbedder
-from service import KnowledgeService, terms
+from service import BACKGROUND_EMBED_CHUNKS, INGEST_EMBED_CHUNKS, KnowledgeService, terms
 from store import Store
 
 KANT = ("Kant and pure reason",
@@ -305,3 +307,38 @@ def test_how_a_question_is_asked_does_not_count_against_its_subject(service):
     # One subject word alone is still not enough to bring a document into a reply.
     alone = service.search({"query": "o que voce acha do flavio?", "min_score": 0.99})
     assert alone["relevant_count"] == 0
+
+
+def test_a_book_of_any_size_is_stored_at_once_and_indexed_in_the_background(service):
+    # Regression: a 1.7 MB book was refused for passing 2 million characters.
+    chapter = "Um processo e um programa em execucao, com sua memoria e seus registradores. " * 4
+    body = "\n\n".join(f"Capitulo {n}. {chapter}" for n in range(9000))
+    assert len(body) > 2_000_000
+
+    added = service.ingest({"title": "Sistemas operacionais", "body": body, "kind": "book"})
+    assert added["created"] is True and added["embedded"] == INGEST_EMBED_CHUNKS
+    assert added["pending_embeddings"] == added["chunks"] - INGEST_EMBED_CHUNKS > 0
+    assert service.search({"query": "registradores"})["hits"], "words are found before the meaning is indexed"
+
+    batches = 0
+    while service.embed_some():
+        batches += 1
+    assert batches >= added["pending_embeddings"] // BACKGROUND_EMBED_CHUNKS
+    assert service.status()["pending_embeddings"] == 0
+
+
+def test_a_short_document_is_indexed_whole_before_the_answer(service):
+    added = add(service, KANT)
+    assert added["pending_embeddings"] == 0 and added["embedded"] == added["chunks"]
+    assert service.embed_some() == 0
+
+
+def test_the_limits_set_in_settings_are_the_only_ones(embedder):
+    limited = KnowledgeService(Store(":memory:"), embedder=embedder, model="fake", max_file_mb=1, max_text_chars=20)
+    with pytest.raises(ValueError, match=r"limit set in Settings \(20 characters\)"):
+        limited.ingest({"title": "T", "body": "x" * 21})
+    assert limited.ingest({"title": "T", "body": "x" * 20})["created"] is True
+    big = base64.b64encode(b"x" * (1024 * 1024 + 1)).decode()
+    with pytest.raises(ValueError, match=r"limit set in Settings \(1 MB\)"):
+        limited.ingest({"content_b64": big, "filename": "big.txt"})
+

@@ -34,6 +34,8 @@ export function knownFailure(error: TransportError): Known | undefined {
   // The image's host refused the download that went around the missing reader.
   const blocked = /attachment fetch failed \((\d{3})\)/.exec(error.message);
   if (blocked) return { id: "error_attachment_blocked", values: { status: blocked[1] ?? "" } };
+  const limit = /over the limit set in Settings \(([^)]+)\)/.exec(error.message);
+  if (limit) return { id: "error_library_limit", values: { limit: limit[1] ?? "" } };
   return undefined;
 }
 
