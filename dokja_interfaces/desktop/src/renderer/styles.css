@@ -2919,3 +2919,63 @@ button.cfg-toggle:focus-visible {
 
 /* Which model answered, under the reply: a quiet line, not part of what Ningo said. */
 .assistant-by { display: block; margin-top: var(--space-1); font-size: .75rem; color: var(--ink-dim); }
+
+/* The documents a reply drew on, under it and above who answered: a quiet list, one line per document, the
+   title cut with an ellipsis rather than wrapped. A citation in the text wears the numeral of its entry. */
+.cite, .cite-n { color: var(--ink-dim); }
+.assistant-turns button.cite, .assistant-turns button.reply-source {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  box-shadow: none;
+  cursor: pointer;
+}
+.assistant-turns button.cite { color: var(--ink-dim); font-size: .75em; }
+.assistant-turns button.cite:hover, .assistant-turns button.reply-source:hover { color: var(--text-primary); }
+.assistant-turns button.reply-source {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+}
+.source-passage { margin-bottom: var(--space-4); }
+.source-passage blockquote {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--button-border);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.source-card {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: min(340px, calc(100vw - 16px));
+  padding: var(--space-3);
+  border: 1px solid var(--button-border);
+  background: var(--surface-panel);
+  pointer-events: none;
+}
+.source-card strong { font-size: .875rem; overflow-wrap: anywhere; }
+.source-card small { color: var(--ink-dim); overflow-wrap: anywhere; }
+.source-card p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: .8125rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+.cite { font-size: .75em; line-height: 0; vertical-align: .3em; }
+.assistant-turns .reply-sources { list-style: none; display: grid; gap: 0; margin: var(--space-2) 0 0; padding: var(--space-1) 0 0; border-top: 1px dashed var(--rule); font-size: .75rem; line-height: 1.6; color: var(--ink-dim); }
+.assistant-turns .reply-sources li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); overflow-wrap: normal; }
+.reply-source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reply-sources + .assistant-by { margin-top: var(--space-2); }

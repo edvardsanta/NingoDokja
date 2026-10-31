@@ -111,8 +111,19 @@ type Turn struct {
 	// that attempt, never a later retry of the same turn.
 	Attempts   int
 	Provenance Provenance
+	// Sources are the documents the reply cites, kept so the owner can read what it drew on.
+	Sources    []TurnSource
 	CreatedAt  time.Time
 	FinishedAt time.Time
+}
+
+// TurnSource is one document a reply cites, with the passage it drew on.
+type TurnSource struct {
+	Number    int    `json:"number"`
+	SourceID  string `json:"source_id"`
+	Title     string `json:"title"`
+	Reference string `json:"reference,omitempty"`
+	Excerpt   string `json:"excerpt,omitempty"`
 }
 
 // Bounds. A conversation's text is the owner's, and a reply is bounded like the chat reply itself.
@@ -121,6 +132,10 @@ const (
 	MaxContentRunes = 12000
 	MaxReplyRunes   = 24000
 	MaxReasonRunes  = 300
+	MaxTurnSources  = 8
+	maxSourceTitle  = 300
+	maxSourceRef    = 2048
+	maxSourceText   = 600
 	MaxReadingID    = 512
 	MaxListLimit    = 50
 	MaxTurnLimit    = 100
@@ -288,15 +303,32 @@ func (a *Archive) RetryInConversation(ctx context.Context, scope Scope, conversa
 }
 
 // Complete records Ningo's reply and the model the runtime says it used.
-func (a *Archive) Complete(ctx context.Context, scope Scope, turn Turn, reply string, observedProvider, observedModel string) (Turn, error) {
+func (a *Archive) Complete(ctx context.Context, scope Scope, turn Turn, reply string, observedProvider, observedModel string, sources ...TurnSource) (Turn, error) {
 	reply = strings.TrimSpace(reply)
 	if scope != OwnerScope || !opaqueID.MatchString(turn.ID) || reply == "" || !validProvenance(observedProvider, observedModel) {
 		return Turn{}, ErrInvalid
 	}
 	turn.Reply, turn.State, turn.Reason = truncate(reply, MaxReplyRunes), TurnCompleted, ""
 	turn.Provenance.ObservedProvider, turn.Provenance.ObservedModel = observedProvider, observedModel
+	turn.Sources = boundedSources(sources)
 	turn.FinishedAt = a.now()
 	return a.store.FinishTurn(ctx, scope, turn)
+}
+
+// boundedSources keeps a reply's sources from growing the archive, and leaves out one that names no
+// document, which nothing could open.
+func boundedSources(sources []TurnSource) []TurnSource {
+	kept := make([]TurnSource, 0, len(sources))
+	for _, source := range sources {
+		if strings.TrimSpace(source.SourceID) == "" || len(kept) == MaxTurnSources {
+			continue
+		}
+		source.Title = truncate(strings.TrimSpace(source.Title), maxSourceTitle)
+		source.Reference = truncate(strings.TrimSpace(source.Reference), maxSourceRef)
+		source.Excerpt = truncate(strings.TrimSpace(source.Excerpt), maxSourceText)
+		kept = append(kept, source)
+	}
+	return kept
 }
 
 // Fail records that the turn got no reply, with a plain reason for the owner.

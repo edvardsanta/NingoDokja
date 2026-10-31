@@ -336,3 +336,58 @@ func TestTouchingMakesAConversationTheLatestAtTheRevisionSeen(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAReplysSourcesSurviveARestartAndARetryClearsThem(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	s, a := open(t, path)
+	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	turn, _, _ := a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "q", conversation.Provenance{})
+	cited := conversation.TurnSource{Number: 1, SourceID: "note:one", Title: "One", Reference: "https://example.com/a", Excerpt: "passage"}
+	if _, err := a.Complete(ctx, conversation.OwnerScope, turn, "reply [1]", "", "", cited); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+
+	_, again := open(t, path)
+	turns, err := again.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
+	if err != nil || len(turns) != 1 || len(turns[0].Sources) != 1 || turns[0].Sources[0] != cited {
+		t.Fatalf("%#v %v", turns, err)
+	}
+}
+
+// Regression guard for the owner's own file: an archive made before sources existed opens, keeps its
+// conversations, and its turns simply have none.
+func TestAnArchiveFromBeforeSourcesUpgradesAndKeepsItsTurns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	s, a := open(t, path)
+	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Old")
+	turn, _, _ := a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "q", conversation.Provenance{})
+	a.Complete(ctx, conversation.OwnerScope, turn, "old reply", "", "")
+	for _, statement := range []string{`ALTER TABLE turns DROP COLUMN sources`, fmt.Sprintf(`PRAGMA user_version = %d`, len(migrations)-1)} {
+		if _, err := s.db.Exec(statement); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.Close()
+
+	_, again := open(t, path)
+	turns, err := again.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
+	if err != nil || len(turns) != 1 || turns[0].Reply != "old reply" || turns[0].Sources != nil {
+		t.Fatalf("%#v %v", turns, err)
+	}
+}
+
+func TestATurnWhoseSourcesCannotBeReadStillGivesItsReply(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	s, a := open(t, path)
+	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	turn, _, _ := a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "q", conversation.Provenance{})
+	a.Complete(ctx, conversation.OwnerScope, turn, "reply", "", "")
+	if _, err := s.db.Exec(`UPDATE turns SET sources = 'not json'`); err != nil {
+		t.Fatal(err)
+	}
+	turns, err := a.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
+	if err != nil || len(turns) != 1 || turns[0].Reply != "reply" {
+		t.Fatalf("%#v %v", turns, err)
+	}
+}

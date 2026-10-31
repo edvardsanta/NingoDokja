@@ -8,6 +8,7 @@ package conversations
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -72,6 +73,7 @@ var migrations = []string{
 		created_at INTEGER NOT NULL
 	);
 	CREATE INDEX facts_of_person ON facts(person, created_at);`,
+	`ALTER TABLE turns ADD COLUMN sources TEXT NOT NULL DEFAULT '';`,
 }
 
 type Store struct{ db *sql.DB }
@@ -257,10 +259,15 @@ func scanTurn(row interface{ Scan(...any) error }) (conversation.Turn, error) {
 	var t conversation.Turn
 	var state string
 	var created, finished int64
+	var sources string
 	err := row.Scan(&t.ID, &t.ConversationID, &t.Seq, &t.SendID, &t.Content, &t.Reply, &state, &t.Reason, &t.Attempts,
-		&t.Provenance.SelectedProvider, &t.Provenance.SelectedModel, &t.Provenance.ObservedProvider, &t.Provenance.ObservedModel, &created, &finished)
+		&t.Provenance.SelectedProvider, &t.Provenance.SelectedModel, &t.Provenance.ObservedProvider, &t.Provenance.ObservedModel, &created, &finished, &sources)
 	if err != nil {
 		return t, err
+	}
+	// Sources add to a reply, so a row whose list cannot be read still gives its turn.
+	if sources != "" {
+		_ = json.Unmarshal([]byte(sources), &t.Sources)
 	}
 	t.State, t.CreatedAt = conversation.TurnState(state), time.Unix(0, created).UTC()
 	if finished > 0 {
@@ -284,7 +291,7 @@ func (s *Store) BeginTurn(ctx context.Context, scope conversation.Scope, t conve
 	if exists == 0 {
 		return conversation.Turn{}, false, conversation.ErrNotFound
 	}
-	earlier, err := scanTurn(tx.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at FROM turns WHERE conversation_id = ? AND send_id = ?`, t.ConversationID, t.SendID))
+	earlier, err := scanTurn(tx.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns WHERE conversation_id = ? AND send_id = ?`, t.ConversationID, t.SendID))
 	if err == nil {
 		// One send ID names one message; other text under it is an interface's mistake, not a retry.
 		if earlier.Content != t.Content {
@@ -315,9 +322,17 @@ func (s *Store) BeginTurn(ctx context.Context, scope conversation.Scope, t conve
 // FinishTurn ends only the named pending attempt. The attempt comparison is in
 // the update, so an old executor cannot settle a turn reopened by RetryTurn.
 func (s *Store) FinishTurn(ctx context.Context, scope conversation.Scope, t conversation.Turn) (conversation.Turn, error) {
-	result, err := s.db.ExecContext(ctx, `UPDATE turns SET reply = ?, state = ?, reason = ?, observed_provider = ?, observed_model = ?, finished_at = ?
+	sources := ""
+	if len(t.Sources) > 0 {
+		encoded, err := json.Marshal(t.Sources)
+		if err != nil {
+			return conversation.Turn{}, fmt.Errorf("encode turn sources: %w", err)
+		}
+		sources = string(encoded)
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE turns SET reply = ?, state = ?, reason = ?, observed_provider = ?, observed_model = ?, finished_at = ?, sources = ?
 		WHERE id = ? AND attempts = ? AND state = 'pending' AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)`,
-		t.Reply, string(t.State), t.Reason, t.Provenance.ObservedProvider, t.Provenance.ObservedModel, t.FinishedAt.UnixNano(), t.ID, t.Attempts, string(scope))
+		t.Reply, string(t.State), t.Reason, t.Provenance.ObservedProvider, t.Provenance.ObservedModel, t.FinishedAt.UnixNano(), sources, t.ID, t.Attempts, string(scope))
 	if err != nil {
 		return conversation.Turn{}, fmt.Errorf("finish turn: %w", err)
 	}
@@ -341,7 +356,7 @@ func (s *Store) RetryTurnInConversation(ctx context.Context, scope conversation.
 
 func (s *Store) retryTurn(ctx context.Context, scope conversation.Scope, turnID string, at time.Time, conversationID string) (conversation.Turn, error) {
 	result, err := s.db.ExecContext(ctx, `UPDATE turns SET state = 'pending', reply = '', reason = '', observed_provider = '', observed_model = '',
-			finished_at = 0, attempts = attempts + 1
+			sources = '', finished_at = 0, attempts = attempts + 1
 		WHERE id = ? AND state IN ('failed', 'interrupted')
 			AND (? = '' OR conversation_id = ?)
 			AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)
@@ -366,7 +381,7 @@ func (s *Store) retryTurn(ctx context.Context, scope conversation.Scope, turnID 
 // reread gives back the turn after a conditional update: ErrNotFound when the scope has no such
 // turn, and the stored turn with ErrConflict when the update's condition did not hold.
 func (s *Store) reread(ctx context.Context, scope conversation.Scope, turnID string, result sql.Result) (conversation.Turn, error) {
-	stored, err := scanTurn(s.db.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at FROM turns
+	stored, err := scanTurn(s.db.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns
 		WHERE id = ? AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)`, turnID, string(scope)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return conversation.Turn{}, conversation.ErrNotFound
@@ -388,7 +403,7 @@ func (s *Store) Turns(ctx context.Context, scope conversation.Scope, conversatio
 	if beforeSeq <= 0 {
 		beforeSeq = math.MaxInt
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at FROM turns
+	rows, err := s.db.QueryContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns
 		WHERE conversation_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`, conversationID, beforeSeq, limit)
 	if err != nil {
 		return nil, fmt.Errorf("read turns: %w", err)
