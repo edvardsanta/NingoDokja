@@ -314,3 +314,17 @@ func TestTheTurnViewMatchesThePinnedProjection(t *testing.T) {
 		}
 	}
 }
+
+func TestAnArchivedTurnKeepsTheModelTheRuntimeNames(t *testing.T) {
+	archive := archiveFor(t)
+	model := &scriptedModel{answers: []map[string]any{{"reply": "Answered.", "provider": "codex", "requested_model": "example-model"}}}
+	handler := NewChatDomainHandler(model).WithArchive(archive)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	if _, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": "Who answers?", "conversation_id": held.ID, "send_id": "send-0001"}), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+	turns, err := archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	if err != nil || len(turns) != 1 || turns[0].Provenance.ObservedProvider != "codex" || turns[0].Provenance.ObservedModel != "example-model" {
+		t.Fatal(turns, err)
+	}
+}
