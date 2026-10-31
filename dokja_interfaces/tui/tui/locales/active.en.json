@@ -284,6 +284,8 @@
   "setting_groups": "groups (<digits>@g.us)",
   "setting_conversations": "Shown in Messages (alias=number or group)",
   "setting_own_chat": "answer own chat",
+  "setting_library_max_file": "Largest file (MB)",
+  "setting_library_max_text": "Largest text (characters)",
   "setting_model_embedding": "embedding model",
   "setting_model_book_classifier": "book classifier model",
   "setting_model_book_overview": "book overview model",

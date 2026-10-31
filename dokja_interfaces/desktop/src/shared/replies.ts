@@ -191,6 +191,8 @@ export type IngestResult = {
   updated: number;
   unchanged: number;
   chunks: number;
+  // A long document's passages still being indexed in the background.
+  pendingEmbeddings?: number;
   // true when the passages could not be indexed by meaning yet; they are still found by keywords
   degraded: boolean;
   reason: string;

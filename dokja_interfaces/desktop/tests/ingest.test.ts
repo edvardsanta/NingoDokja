@@ -44,11 +44,10 @@ test("a note needs a title and a text and has a size", () => {
     { mode: "note", title: "T", body: "   \n " },
     { mode: "note", title: "T", body: 5 },
     { mode: "note", title: "x".repeat(INGEST_LIMITS.titleChars + 1), body: "text" },
-    { mode: "note", title: "T", body: "x".repeat(INGEST_LIMITS.noteChars + 1) },
   ]) {
     assert.equal(build(raw), undefined, JSON.stringify(raw).slice(0, 80));
   }
-  assert.ok(build({ mode: "note", title: "T", body: "x".repeat(INGEST_LIMITS.noteChars) }));
+  assert.ok(build({ mode: "note", title: "T", body: "x".repeat(3_000_000) }), "a note can be as long as a book");
   assert.ok(build({ mode: "note", title: "x".repeat(INGEST_LIMITS.titleChars), body: "text" }));
 });
 
@@ -81,14 +80,12 @@ test("a file is a name, a content and an id made of both", () => {
   assert.equal(build({ mode: "file", filename: "My Reading.PDF", content: "QUJD" })?.source_id, sent?.source_id);
 });
 
-test("a file is refused when its content is not base64, empty or too big, or its name is not a name", () => {
-  const big = "A".repeat(Math.ceil(INGEST_LIMITS.fileBytes / 3) * 4 + 4);
+test("a file is refused when its content is not base64 or empty, or its name is not a name", () => {
   for (const raw of [
     { mode: "file", filename: "a.txt", content: "" },
     { mode: "file", filename: "a.txt", content: "not base64 !!" },
     { mode: "file", filename: "a.txt", content: "QUJD\nQUJD" },
     { mode: "file", filename: "a.txt", content: "=QUJD" },
-    { mode: "file", filename: "a.txt", content: big },
     { mode: "file", filename: "a.txt" },
     { mode: "file", content: "QUJD" },
     { mode: "file", filename: "", content: "QUJD" },
@@ -98,7 +95,7 @@ test("a file is refused when its content is not base64, empty or too big, or its
   ]) {
     assert.equal(build(raw), undefined, JSON.stringify(raw).slice(0, 80));
   }
-  assert.ok(build({ mode: "file", filename: "a.txt", content: "A".repeat(Math.ceil(INGEST_LIMITS.fileBytes / 3) * 4) }));
+  assert.ok(build({ mode: "file", filename: "a.txt", content: "A".repeat(16 * 1024 * 1024) }), "a large book has no limit");
 });
 
 test("only the name of a file is sent, never the path in front of it", () => {

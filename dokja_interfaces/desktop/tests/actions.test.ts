@@ -652,6 +652,13 @@ test("a turn carries the documents its reply cites, bounded, and only those that
   assert.equal("sources" in turn(undefined).turns[0]!, false, "no sources, no field");
 });
 
+test("an ingest says how many passages are still being indexed, and nothing when none are", () => {
+  const project = ACTIONS["knowledge.ingest"].project;
+  const reply = (pending: number) => project({ domain: "knowledge", result: { created: true, changed: true, chunks: 4200, pending_embeddings: pending } }) as { pendingEmbeddings?: number };
+  assert.equal(reply(4168).pendingEmbeddings, 4168);
+  assert.equal("pendingEmbeddings" in reply(0), false);
+});
+
 test("meme.hashtag.suggest is a bounded read of one meme, and keeps only its answer", () => {
   const action = ACTIONS["meme.hashtag.suggest"];
   assert.equal(isWriteAction("meme.hashtag.suggest"), false);

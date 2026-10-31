@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, INGEST_MODES, base64Length } from "../shared/ingest.js";
+import { INGEST_ID, INGEST_KIND, INGEST_LIMITS as LIMITS, INGEST_MODES } from "../shared/ingest.js";
 import { text } from "../shared/records.js";
 
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -103,7 +103,7 @@ export function buildIngest(raw: Record<string, unknown>): Record<string, unknow
   switch (mode) {
     case "note": {
       const body = typeof raw.body === "string" ? raw.body : "";
-      if (title === "" || body.trim() === "" || body.length > LIMITS.noteChars) return undefined;
+      if (title === "" || body.trim() === "") return undefined;
       return {
         ...common,
         body,
@@ -118,7 +118,7 @@ export function buildIngest(raw: Record<string, unknown>): Record<string, unknow
     default: {
       const filename = baseName(raw.filename);
       const content = typeof raw.content === "string" ? raw.content : "";
-      if (!filename || content === "" || content.length > base64Length(LIMITS.fileBytes) || !BASE64.test(content)) {
+      if (!filename || content === "" || !BASE64.test(content)) {
         return undefined;
       }
       const stem = filename.replace(/\.[^.]*$/, "");

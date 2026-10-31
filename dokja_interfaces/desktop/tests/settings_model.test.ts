@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { answersNobody, changesOf, checkAlias, checkChannel, checkGroup, checkPhone, checkTarget, parseList, problemsOf, refusedSetting, sectionsOf, valuesOf } from "../src/renderer/cards/settings_model.js";
+import { FIELDS, answersNobody, changesOf, checkAlias, checkChannel, checkGroup, checkPhone, checkTarget, parseList, problemsOf, refusedSetting, sectionsOf, valuesOf } from "../src/renderer/cards/settings_model.js";
 import type { RuntimeSetting } from "../src/shared/runtime.js";
 
 const row = (id: string, value: string, extra: Partial<RuntimeSetting> = {}): RuntimeSetting =>
@@ -51,3 +51,11 @@ test("a refusal naming a setting points to it, and one that names none points no
   assert.equal(refusedSetting("whatsapp.people: entry 2 is not a phone number", ["whatsapp.people", "whatsapp.groups"]), "whatsapp.people");
   assert.equal(refusedSetting("the database is busy", ["whatsapp.people"]), undefined);
 });
+
+test("the Library's limits have their own section and read as no limit while empty", () => {
+  const sections = sectionsOf([row("library.max_file_mb", ""), row("library.max_text_chars", "")]);
+  assert.deepEqual(sections.map((section) => section.id), ["library"]);
+  assert.deepEqual(sections[0]?.rows.map((each) => each.id), ["library.max_file_mb", "library.max_text_chars"]);
+  assert.equal(FIELDS["library.max_file_mb"]?.unset, "setting_no_limit");
+});
+

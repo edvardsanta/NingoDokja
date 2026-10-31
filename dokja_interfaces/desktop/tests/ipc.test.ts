@@ -313,17 +313,14 @@ test("reading needs no input: only a change does", async () => {
   assert.equal(result.ok, true);
 });
 
-test("a file may weigh what a file weighs, a note not", async () => {
+test("a file or a note may weigh what a book weighs: only Settings can bound it", async () => {
   const { orchestrator, calls } = recorder({ status: "ok", result: ingested });
-  const file = { mode: "file", filename: "reading.txt", content: "QUJD".repeat(2_000_000) };
+  const file = { mode: "file", filename: "reading.txt", content: "QUJD".repeat(4_000_000) };
   const big = await handleRequest({ type: "knowledge.ingest", payload: file }, orchestrator, limits, undefined, here);
-  assert.equal(big.ok, true, "a file of about 6 MB passes the outer bound");
-
-  const huge = { ...file, content: "QUJD".repeat(3_100_000) };
-  assert.equal(failure(await handleRequest({ type: "knowledge.ingest", payload: huge }, orchestrator, limits, undefined, here)).code, "invalid");
+  assert.equal(big.ok, true, "a file past the old 8 MB passes");
   const longNote = { mode: "note", title: "T", body: "x".repeat(200_001) };
-  assert.equal(failure(await handleRequest({ type: "knowledge.ingest", payload: longNote }, orchestrator, limits, undefined, here)).code, "invalid");
-  assert.equal(calls.length, 1);
+  assert.equal((await handleRequest({ type: "knowledge.ingest", payload: longNote }, orchestrator, limits, undefined, here)).ok, true);
+  assert.equal(calls.length, 2);
 
   // the rest of the actions keep the small bound
   const bigRead = { limit: 3, filler: "x".repeat(20_000) };
