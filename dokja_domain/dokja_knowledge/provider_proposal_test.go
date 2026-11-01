@@ -136,3 +136,15 @@ func TestProviderProposalPreservesExplicitSelectionPins(t *testing.T) {
 		t.Fatal("accepted a different explicitly pinned source")
 	}
 }
+
+// Goal facts have no source to quote. As uncited claims they left correct proposals at
+// needs_evidence, which no semantic review could accept.
+func TestProposalPromptTreatsGoalFactsAsGiven(t *testing.T) {
+	prompt, err := BuildProposalPrompt("task", map[string]any{"contract": ApplicationContract})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prompt.Instructions, "Facts the goal states are given") {
+		t.Fatal("goal facts are no longer distinguished from unresolved prerequisites")
+	}
+}

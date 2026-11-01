@@ -229,6 +229,9 @@ func TestReviewPromptLeavesOutTheProposerAccount(t *testing.T) {
 	if len(candidate) != 2 || candidate["claims"] == nil || candidate["method"] == nil || strings.Contains(prompt.Data, "summary") {
 		t.Fatal(prompt.Data)
 	}
+	if !strings.Contains(prompt.Instructions, "in method, never in claims") {
+		t.Fatal("reviewer may list the method as a claim, which the decoder refuses")
+	}
 	if !strings.Contains(prompt.Instructions, "before weighing the candidate") {
 		t.Fatal("reviewer no longer derives conditions first")
 	}
