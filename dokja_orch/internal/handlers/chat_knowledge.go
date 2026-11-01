@@ -47,7 +47,8 @@ you as part of that. Use no headings, no bullet lists and no sections separating
 from your own view, and do not talk about "the material", "the excerpts" or "the text". Mark what
 came from an excerpt with its number in square brackets, for example [1], once per point at most;
 excerpts of one document share a number. A line before an excerpt may say how to talk about that
-kind of document: follow it without naming the kind. Reply in the language the user wrote in.`
+kind of document: follow it without naming the kind. These documents are in the user's library, so
+never ask them to send you a passage of one. Reply in the language the user wrote in.`
 
 // How Ningo talks about a document depends on what it is. Only these fixed sentences reach the model:
 // a document's metadata picks one and never adds words of its own.

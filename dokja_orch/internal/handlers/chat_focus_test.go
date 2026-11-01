@@ -6,6 +6,7 @@ import (
 	"read_books/internal/core"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 const bookPassage = "Basta ser mulher para baixar-me as asas, e digo isso sem\nqueixa alguma do Senhor."
@@ -59,6 +60,83 @@ func TestAFollowUpSearchesTheDocumentACitedReplyWasAbout(t *testing.T) {
 	}
 	if !strings.HasPrefix(base.scoped[0], "file:book|visões\nwhat am I missing") {
 		t.Fatalf("scoped query: %q", base.scoped[0])
+	}
+}
+
+// From a real conversation about Malthus: neither the question nor the first question of the
+// conversation names the poor laws, so the search reached the book's birth tables and Ningo said
+// the book did not hold the argument. Only its own previous reply had the words. The text is in
+// Portuguese because that is the case being reproduced.
+func TestAFollowUpSearchesWithWhatWasJustSaid(t *testing.T) {
+	base := &documentBase{hits: []any{bookHit(true)}}
+	handler := focusHandler(base)
+	citedBook(handler, "Viu Ensaio sobre o Princípio da População?")
+	turn := focusedTurn(handler, "O que sao pessoas felizes na população?")
+	handler.focus.remember(turn, "O que sao pessoas felizes na população?", []knowledgeSource{{Number: 1, SourceID: "file:book", Title: "The book"}})
+	handler.focus.rememberReply(turn, "Sem as leis dos pobres, tal conjunto de pessoas felizes seria maior.")
+
+	question := "Como ele explica essa ideia do estimulo aos nascimentos?"
+	handler.lookupForTurn(context.Background(), question, "", focusedTurn(handler, question))
+
+	if len(base.scoped) != 1 || !strings.Contains(base.scoped[0], question+"\nSem as leis dos pobres") {
+		t.Fatalf("scoped query: %v", base.scoped)
+	}
+	if strings.Contains(base.scoped[0], "Viu Ensaio") {
+		t.Fatalf("the old subject outweighed the reply: %q", base.scoped[0])
+	}
+}
+
+func TestTheLastReplySurvivesATurnWithoutCitations(t *testing.T) {
+	base := &documentBase{hits: []any{bookHit(true)}}
+	handler := focusHandler(base)
+	citedBook(handler, "the book")
+	turn := focusedTurn(handler, "and that?")
+	handler.focus.remember(turn, "and that?", nil)
+	handler.focus.rememberReply(turn, "The poor laws, from memory.")
+
+	handler.lookupForTurn(context.Background(), "from the text", "", focusedTurn(handler, "from the text"))
+
+	if len(base.scoped) != 1 || !strings.Contains(base.scoped[0], "The poor laws, from memory.") {
+		t.Fatalf("scoped query: %v", base.scoped)
+	}
+}
+
+func TestTheRememberedReplyIsBounded(t *testing.T) {
+	handler := focusHandler(&documentBase{})
+	citedBook(handler, "the book")
+	turn := focusedTurn(handler, "more")
+	handler.focus.rememberReply(turn, strings.Repeat("é", knowledgeMaxAnchorLen+50))
+	focus, _ := handler.focus.current(turn.key)
+	if utf8.RuneCountInString(focus.lastReply) != knowledgeMaxAnchorLen {
+		t.Fatal(utf8.RuneCountInString(focus.lastReply))
+	}
+}
+
+func TestAReplyWithoutAFocusLeavesNoFocus(t *testing.T) {
+	handler := focusHandler(&documentBase{})
+	turn := focusedTurn(handler, "hello")
+	handler.focus.rememberReply(turn, "Hello.")
+	if _, ok := handler.focus.current(turn.key); ok {
+		t.Fatal("a reply created a focus")
+	}
+}
+
+func TestAskingForFragmentsIsAskingForTheText(t *testing.T) {
+	for _, content := range []string{"de fragmentos", "me dá um fragmento"} {
+		if !focusedTurn(focusHandler(&documentBase{}), content).text {
+			t.Fatal(content)
+		}
+	}
+	if focusedTurn(focusHandler(&documentBase{}), "isso causa fragmentação de memória?").text {
+		t.Fatal("a word sharing the root is not a request for text")
+	}
+}
+
+func TestBriefsNeverAskForWhatTheLibraryHolds(t *testing.T) {
+	for _, brief := range []string{knowledgeReferenceBrief, knowledgeTextBrief} {
+		if !strings.Contains(brief, "never ask them to send you a passage") {
+			t.Fatal(brief)
+		}
 	}
 }
 

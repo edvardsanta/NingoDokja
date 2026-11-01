@@ -278,7 +278,8 @@ as a stop instruction. This is a workflow transition gap, not evidence that ever
 deployment currently has an active blocking policy.
 
 A document a reply cites becomes the conversation's focus: follow-ups search inside it, with the
-question that brought it up, until three replies pass without it. The focus lives in the
+start of Ningo's previous reply, or the question that brought it up when there is none yet, until
+three replies pass without it. The reply only guides the search and is never evidence. The focus lives in the
 orchestrator's memory, so a restart only loses it until the next question about the document. A
 turn about the text itself (quotes, passages) brings more passages and a text-first brief. Quotes
 of four words or more are checked against the document, all of them in such a turn and those
