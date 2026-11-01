@@ -85,6 +85,8 @@ Held-out evaluation, including of the [semantic review](knowledge-semantic-revie
 Experience-removal, eligible/inapplicable episode and restart/reuse controls are
 additional required evaluations when those application capabilities exist.
 
+The harness is [`dokja_orch/cmd/knowledge-comparison`](knowledge-comparison.md).
+
 ## Implemented application path
 
 `knowledge.application.assess` is an additive orchestrator request type. Send it

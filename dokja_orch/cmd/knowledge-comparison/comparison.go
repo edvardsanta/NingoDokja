@@ -10,10 +10,13 @@ import (
 	"path/filepath"
 	knowledge "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
+	"strings"
+	"sync"
 	"time"
 )
 
 const reportContract = "knowledge.application.comparison.run.v1"
+const headerContract = "knowledge.application.comparison.header.v1"
 const protocolRevision = 2
 const frozenRuns = 2
 const maxStrategyCalls = 64
@@ -25,8 +28,72 @@ const frozenCorpusDigest = "sha256:ceb5ec1712d6440352f59975d1cd87e58ad319f12139a
 
 type options struct {
 	fixtures, split, strategy, out, caseID string
+	provider, model                        string
 	runs                                   int
 	review, allowHeldOut                   bool
+}
+
+// reportHeader is written before any provider call, so the binding a comparison claims
+// to measure is on record first. Each run is then checked against it.
+type reportHeader struct {
+	Contract         string    `json:"contract"`
+	ProtocolRevision int       `json:"protocol_revision"`
+	Split            string    `json:"split"`
+	Strategy         string    `json:"strategy"`
+	Provider         string    `json:"provider"`
+	Model            string    `json:"requested_model"`
+	Cases            []string  `json:"cases"`
+	Runs             int       `json:"runs_per_case"`
+	CasesDigest      string    `json:"cases_digest"`
+	CorpusDigest     string    `json:"corpus_digest"`
+	StartedAt        time.Time `json:"started_at"`
+}
+
+type rawReply struct {
+	Port  string `json:"port"`
+	Body  string `json:"body"`
+	Error string `json:"error,omitempty"`
+}
+
+// replyRecorder sits at the inference port, so a reply the workflow refused is kept too.
+type replyRecorder struct {
+	inner   inferencePort
+	mu      sync.Mutex
+	replies []rawReply
+}
+
+type inferencePort interface {
+	knowledge.ApplicationProposer
+	knowledge.ApplicationReviewer
+}
+
+func (r *replyRecorder) record(port string, response knowledge.ProposalResponse, err error) (knowledge.ProposalResponse, error) {
+	reply := rawReply{Port: port, Body: response.Body}
+	if err != nil {
+		reply.Error = err.Error()
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.replies = append(r.replies, reply)
+	return response, err
+}
+
+func (r *replyRecorder) Propose(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+	response, err := r.inner.Propose(ctx, prompt)
+	return r.record("propose", response, err)
+}
+
+func (r *replyRecorder) Review(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+	response, err := r.inner.Review(ctx, prompt)
+	return r.record("review", response, err)
+}
+
+func (r *replyRecorder) drain() []rawReply {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	replies := r.replies
+	r.replies = nil
+	return replies
 }
 
 type comparisonCase struct {
@@ -81,6 +148,8 @@ type runRecord struct {
 	Inference        any            `json:"inference"`
 	Proposal         map[string]any `json:"proposal,omitempty"`
 	Review           *reviewRecord  `json:"review,omitempty"`
+	RawReplies       []rawReply     `json:"raw_replies"`
+	BindingMismatch  bool           `json:"binding_mismatch,omitempty"`
 	Rubric           string         `json:"rubric"`
 }
 
@@ -106,10 +175,12 @@ type summary struct {
 	Split            string                  `json:"split"`
 	Strategy         string                  `json:"strategy"`
 	Report           string                  `json:"report"`
+	ReviewSheet      string                  `json:"review_sheet"`
 	Runs             int                     `json:"runs"`
 	StrategyCalls    int                     `json:"strategy_calls"`
 	ReviewCalls      int                     `json:"review_calls"`
 	UnknownUsage     int                     `json:"unknown_usage_calls"`
+	BindingMismatch  int                     `json:"binding_mismatches"`
 	InputTokens      int64                   `json:"input_tokens"`
 	OutputTokens     int64                   `json:"output_tokens"`
 	Cases            map[string]*caseSummary `json:"cases"`
@@ -130,6 +201,9 @@ func validate(o options) error {
 	}
 	if o.split == "held_out" && (o.runs != frozenRuns || o.caseID != "") {
 		return fmt.Errorf("held_out runs are every case, %d times each", frozenRuns)
+	}
+	if o.split == "held_out" && (o.provider == "" || o.model == "") {
+		return fmt.Errorf("held_out runs need -provider and -model recorded before the first call")
 	}
 	if o.out == "" {
 		return fmt.Errorf("-out is required")
@@ -196,7 +270,7 @@ func loadFixtures(dir, split, caseID string) (fixtures, string, string, error) {
 	return loaded, casesDigest, corpusDigest, nil
 }
 
-func run(ctx context.Context, o options, process processor) (summary, error) {
+func run(ctx context.Context, o options, process processor, recorder *replyRecorder) (summary, error) {
 	if err := validate(o); err != nil {
 		return summary{}, err
 	}
@@ -214,22 +288,94 @@ func run(ctx context.Context, o options, process processor) (summary, error) {
 	}
 	defer report.Close()
 	encoder := json.NewEncoder(report)
+	header := reportHeader{Contract: headerContract, ProtocolRevision: protocolRevision, Split: o.split, Strategy: o.strategy, Provider: o.provider, Model: o.model, Runs: o.runs, CasesDigest: casesDigest, CorpusDigest: corpusDigest, StartedAt: time.Now().UTC()}
+	for _, c := range loaded.cases {
+		header.Cases = append(header.Cases, c.ID)
+	}
+	if err := encoder.Encode(header); err != nil {
+		return summary{}, err
+	}
 	store := &fixtureStore{documents: loaded.documents}
-	result := summary{ProtocolRevision: protocolRevision, Split: o.split, Strategy: o.strategy, Report: o.out, Cases: map[string]*caseSummary{}, Rubric: "pending"}
+	sheetPath := strings.TrimSuffix(o.out, filepath.Ext(o.out)) + ".review.md"
+	result := summary{ProtocolRevision: protocolRevision, Split: o.split, Strategy: o.strategy, Report: o.out, ReviewSheet: sheetPath, Cases: map[string]*caseSummary{}, Rubric: "pending"}
+	sheet := reviewSheet{}
 	for _, c := range loaded.cases {
 		tally := &caseSummary{Statuses: map[string]int{}, Dispositions: map[string]int{}, Applicability: map[string]int{}, Reviews: map[string]int{}}
 		result.Cases[c.ID] = tally
 		for number := 1; number <= o.runs; number++ {
 			record := runCase(ctx, o, store, process, c, number)
 			record.CasesDigest, record.CorpusDigest = casesDigest, corpusDigest
+			record.RawReplies = recorder.drain()
+			record.BindingMismatch = bindingMismatch(o, record)
 			// Written per run, so an interrupted comparison still accounts for what ran.
 			if err := encoder.Encode(record); err != nil {
 				return result, err
 			}
 			account(&result, tally, record)
+			sheet.add(c, record)
 		}
 	}
+	// Exclusive for the same reason as the report: a sheet may already hold human scores.
+	if err := writeNew(sheetPath, sheet.String()); err != nil {
+		return result, err
+	}
 	return result, nil
+}
+
+func bindingMismatch(o options, record runRecord) bool {
+	metadata, _ := record.Inference.(map[string]any)
+	provider, _ := metadata["provider"].(string)
+	model, _ := metadata["requested_model"].(string)
+	if o.provider == "" || provider == "" {
+		return false
+	}
+	return provider != o.provider || model != o.model
+}
+
+func writeNew(path, content string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.WriteString(content)
+	return err
+}
+
+// reviewSheet is for a scorer who did not write the proposals. It holds the expected
+// answer, which never reaches a model, and leaves out the model reviewer's verdict.
+type reviewSheet struct{ text strings.Builder }
+
+func (s *reviewSheet) String() string {
+	return `# Semantic review
+
+Fill this in without having written the proposals. A run passes only with every box ticked.
+` + s.text.String()
+}
+
+func (s *reviewSheet) add(c comparisonCase, record runRecord) {
+	disposition, summaryText := "", ""
+	if record.Proposal != nil {
+		disposition, _ = record.Proposal["disposition"].(string)
+		summaryText, _ = record.Proposal["summary"].(string)
+	}
+	fmt.Fprintf(&s.text, "\n## %s, %s, run %d\n\nExpected: %s\n\nStatus: %s %s\n\nDisposition: %s\n\nSummary: %s\n\n", c.ID, record.Strategy, record.Run, c.Expected, record.Status, record.Reason, disposition, summaryText)
+	if assessment, ok := record.Proposal["assessment"].(map[string]any); ok {
+		method, _ := assessment["method"].(map[string]any)
+		fmt.Fprintf(&s.text, "Method: %v\n\n", method["description"])
+		claims, _ := assessment["claims"].([]any)
+		for _, claim := range claims {
+			item, _ := claim.(map[string]any)
+			fmt.Fprintf(&s.text, "- Claim (%v): %v\n", item["citation_state"], item["statement"])
+		}
+		s.text.WriteString("\n")
+	}
+	s.text.WriteString(`- [ ] Correct disposition
+- [ ] All necessary prerequisites
+- [ ] Supported method and limits, with citations
+- [ ] Explicit uncertainty
+- [ ] No invented outcome
+`)
 }
 
 func runCase(ctx context.Context, o options, store *fixtureStore, process processor, c comparisonCase, number int) runRecord {
@@ -329,6 +475,9 @@ func taskReason(output map[string]any) string {
 func account(total *summary, tally *caseSummary, record runRecord) {
 	total.Runs++
 	tally.Runs++
+	if record.BindingMismatch {
+		total.BindingMismatch++
+	}
 	tally.Statuses[record.Status]++
 	total.StrategyCalls += countCalls(record.Inference)
 	countUsage(total, record.Inference)

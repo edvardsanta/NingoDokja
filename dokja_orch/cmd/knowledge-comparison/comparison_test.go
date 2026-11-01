@@ -76,14 +76,21 @@ func fixtureInference(t *testing.T, calls *[]string) inferenceFunc {
 	}
 }
 
-func handlerProcessor(inference inferenceFunc) processor {
+func handlerProcessor(inference inferenceFunc) (processor, *replyRecorder) {
+	recorder := &replyRecorder{inner: inference}
 	return func(ctx context.Context, store *fixtureStore, event core.Event) (map[string]any, error) {
-		result, err := core.DefaultService(handlers.NewKnowledgeDomainHandler(store).WithMeasuredApplicationProposer(inference).WithApplicationReviewer(inference)).ProcessWithResult(ctx, event)
+		result, err := core.DefaultService(handlers.NewKnowledgeDomainHandler(store).WithMeasuredApplicationProposer(recorder).WithApplicationReviewer(recorder)).ProcessWithResult(ctx, event)
 		if err != nil {
 			return nil, err
 		}
 		return result.Result["knowledge"].(map[string]any), nil
-	}
+	}, recorder
+}
+
+func runWith(t *testing.T, o options, inference inferenceFunc) (summary, error) {
+	t.Helper()
+	process, recorder := handlerProcessor(inference)
+	return run(t.Context(), o, process, recorder)
 }
 
 func testOptions(t *testing.T) options {
@@ -100,6 +107,7 @@ func readRecords(t *testing.T, path string) []runRecord {
 	records := []runRecord{}
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 1<<20), 1<<20)
+	scanner.Scan() // The header line.
 	for scanner.Scan() {
 		var record runRecord
 		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
@@ -113,7 +121,7 @@ func readRecords(t *testing.T, path string) []runRecord {
 func TestComparisonRunsThroughTheRealApplicationPath(t *testing.T) {
 	calls := []string{}
 	o := testOptions(t)
-	result, err := run(t.Context(), o, handlerProcessor(fixtureInference(t, &calls)))
+	result, err := runWith(t, o, fixtureInference(t, &calls))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +147,7 @@ func TestComparisonReportsFailuresAndUnknownUsage(t *testing.T) {
 	failing := inferenceFunc(func(context.Context, knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
 		return knowledge.ProposalResponse{Provider: "fixture", RequestedModel: "fixture-model", BudgetStatus: "provider_error"}, fmt.Errorf("private diagnostic")
 	})
-	result, err := run(t.Context(), o, handlerProcessor(failing))
+	result, err := runWith(t, o, failing)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +155,7 @@ func TestComparisonReportsFailuresAndUnknownUsage(t *testing.T) {
 		t.Fatalf("%+v", result)
 	}
 	for _, record := range readRecords(t, o.out) {
-		if record.Status != "not_proposed" || record.Reason != "provider_unavailable" || record.Proposal != nil || strings.Contains(fmt.Sprint(record), "private diagnostic") {
+		if record.Status != "not_proposed" || record.Reason != "provider_unavailable" || record.Proposal != nil || record.Error != "" || len(record.RawReplies) != 1 {
 			t.Fatalf("%+v", record)
 		}
 	}
@@ -183,12 +191,13 @@ func TestComparisonRefusesUnfrozenOrUnsafeRuns(t *testing.T) {
 		"overwritten report":       func(o *options) { o.out = existing },
 		"unknown case":             func(o *options) { o.caseID = "foreign" },
 		"call ceiling":             func(o *options) { o.runs = 33 },
+		"held-out without binding": func(o *options) { o.split, o.allowHeldOut = "held_out", true },
 		"no report":                func(o *options) { o.out = "" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			o := testOptions(t)
 			mutate(&o)
-			if _, err := run(t.Context(), o, never); err == nil {
+			if _, err := run(t.Context(), o, never, &replyRecorder{}); err == nil {
 				t.Fatal("run accepted")
 			}
 		})
@@ -202,5 +211,84 @@ func TestFixtureStoreRefusesAnyOtherKnowledgeOperation(t *testing.T) {
 	store := &fixtureStore{documents: map[string]fixtureDocument{}}
 	if _, err := store.Dispatch(t.Context(), "knowledge.ingest", map[string]any{}); err == nil {
 		t.Fatal("corpus mutation allowed")
+	}
+}
+
+func TestComparisonRecordsTheBindingBeforeAnyCall(t *testing.T) {
+	o := testOptions(t)
+	o.provider, o.model = "fixture", "another-model"
+	calls := []string{}
+	inference := fixtureInference(t, &calls)
+	result, err := runWith(t, o, func(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+		raw, readErr := os.ReadFile(o.out)
+		if readErr != nil || !strings.Contains(string(raw), `"requested_model":"another-model"`) {
+			t.Error("a provider call came before the header", readErr)
+		}
+		return inference(ctx, prompt)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.BindingMismatch != 4 {
+		t.Fatalf("%+v", result)
+	}
+}
+
+func TestComparisonKeepsRawRepliesEvenWhenRefused(t *testing.T) {
+	o := testOptions(t)
+	o.runs = 1
+	result, err := runWith(t, o, func(context.Context, knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+		return knowledge.ProposalResponse{Body: "not a proposal", Provider: "fixture", RequestedModel: "fixture-model", BudgetStatus: "ok"}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := readRecords(t, o.out)
+	if result.Cases["dev-supported"].Statuses["not_proposed"] != 1 || len(records[0].RawReplies) != 1 || records[0].RawReplies[0].Body != "not a proposal" || records[0].Reason != "invalid_provider_proposal" {
+		t.Fatalf("%+v", records[0])
+	}
+}
+
+func TestReviewSheetIsForAnIndependentScorer(t *testing.T) {
+	calls := []string{}
+	o := testOptions(t)
+	result, err := runWith(t, o, fixtureInference(t, &calls))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(result.ReviewSheet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sheet := string(raw)
+	if strings.Count(sheet, "- [ ] Correct disposition") != 4 || !strings.Contains(sheet, "Expected: Ask for key age") || !strings.Contains(sheet, "Method: Back off") || strings.Contains(sheet, "accepted") {
+		t.Fatal(sheet)
+	}
+	o.out = filepath.Join(filepath.Dir(o.out), "other.jsonl")
+	if err := os.WriteFile(strings.TrimSuffix(o.out, ".jsonl")+".review.md", []byte("scored"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runWith(t, o, fixtureInference(t, &calls)); err == nil {
+		t.Fatal("a scored sheet was overwritten")
+	}
+}
+
+func TestNoExpectedAnswerReachesAModel(t *testing.T) {
+	loaded, _, _, err := loadFixtures(fixtureDir, "development", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := []string{}
+	inference := fixtureInference(t, &calls)
+	o := testOptions(t)
+	if _, err := runWith(t, o, func(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+		for _, c := range loaded.cases {
+			if strings.Contains(prompt.Data, c.Expected) || strings.Contains(prompt.Instructions, c.Expected) {
+				t.Errorf("a model saw the expected answer of %s", c.ID)
+			}
+		}
+		return inference(ctx, prompt)
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

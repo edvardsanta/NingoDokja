@@ -37,7 +37,8 @@ go run ./cmd/knowledge-comparison -split development -runs 2 -out ../test_report
 | `-case` | all | One case, development only |
 | `-review` | true | Also request a semantic review, reported apart |
 | `-allow-held-out` | false | Required for `held_out` |
-| `-out` | required | New JSONL report |
+| `-provider`, `-model` | none | Binding recorded before the first call; required for `held_out` |
+| `-out` | required | New JSONL report; the sheet goes beside it as `.review.md` |
 | `-fixtures` | repository path | Frozen fixture directory |
 
 `DOKJA_INFERENCE_SOCKET` selects the Runtime socket, as it does for the orchestrator.
@@ -52,10 +53,18 @@ go run ./cmd/knowledge-comparison -split development -runs 2 -out ../test_report
   `knowledge.list`, so a run cannot read or change the Library.
 - Failed runs stay in the report. Unknown usage is counted on its own, never as zero.
 
+The report opens with a header holding the protocol revision, split, strategy, binding,
+cases and fixture digests, written before any provider call. A run whose reply names
+another binding is flagged and counted in `binding_mismatches`.
+
 A record holds the case, run, protocol revision, fixture digests, status, stable
-reason, provider, requested model, usage, elapsed time, the proposal and its review.
-`rubric: pending` marks every record, because the answer rubric needs independent
-scoring. `strategy_calls` counts attempts, so it includes calls refused before launch.
+reason, provider, requested model, usage, elapsed time, the proposal, its review and
+every raw reply, including refused ones. `rubric: pending` marks every record, because
+the answer rubric needs independent scoring.
+
+The `.review.md` sheet is for a scorer who did not write the proposals. It holds the
+expected answer, which never reaches a model, and the rubric boxes. It leaves out the
+model reviewer's verdict. Neither file is overwritten. `strategy_calls` counts attempts, so it includes calls refused before launch.
 
 ## Development run
 
@@ -82,7 +91,7 @@ question. The rubric has not been applied to these answers.
 
 - The adaptive strategy does not exist, so no comparison has run.
 - Held-out cases have not been run. Run them once the adaptive strategy exists.
-- Rubric scoring is manual and independent, and nothing here automates it.
+- Rubric scoring is manual and independent. The sheet prepares it and nothing automates it.
 
 Implementation: [harness](../dokja_orch/cmd/knowledge-comparison/comparison.go) and
 [tests](../dokja_orch/cmd/knowledge-comparison/comparison_test.go).
