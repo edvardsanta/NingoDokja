@@ -138,6 +138,12 @@ func (c *KnowledgeServiceClient) Search(ctx context.Context, query string, k int
 	return c.Dispatch(ctx, "knowledge.search", payload)
 }
 
+// SearchDocument asks for the k closest chunks inside one document and its parts. It takes every
+// hit the service found: the document was chosen, so the threshold is the caller's to apply.
+func (c *KnowledgeServiceClient) SearchDocument(ctx context.Context, query, sourceID string, k int) (map[string]any, error) {
+	return c.Dispatch(ctx, "knowledge.search", map[string]any{"query": query, "source_id": sourceID, "k": k})
+}
+
 // Status reports the knowledge base's counts and whether its embedder answers.
 func (c *KnowledgeServiceClient) Status(ctx context.Context) (map[string]any, error) {
 	return c.Dispatch(ctx, "knowledge.status", nil)

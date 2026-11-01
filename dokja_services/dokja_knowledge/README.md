@@ -20,7 +20,7 @@ meaning and by keyword, with a citable source.
 | `knowledge.ingest` | one of `body` (with `title`), `content_b64` (with `filename`) or `source`; plus `title?`, `kind?`, `source_id?`, `source_ref?`, `tags?`, `metadata?` | `created`, `changed`, `chunks`, `embedded`, `degraded` (several entries: `documents[]`, `count`) |
 | `knowledge.metadata.get` (internal) | `source_id` | stored `metadata`, title and revision |
 | `knowledge.metadata.patch` (internal) | `source_id`, `revision`, validated `patch` | effective metadata, new revision, `metadata_changed`; content `changed: false` |
-| `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?` | `hits[]`, `relevant_count`, `threshold`, `degraded` |
+| `knowledge.search` | `query`, `k?` (1-20), `min_score?`, `kind?`, `source_id?` (one document and its parts) | `hits[]`, `relevant_count`, `threshold`, `degraded` |
 | `knowledge.list` | `limit?`, `offset?`, `kind?`, `exclude_kinds?`, `include_text?`, `source_id?` (narrows the list to that one document) | `documents[]`, `total` |
 | `knowledge.delete` | `source_id` | `deleted` |
 | `knowledge.status` | none | counts, `storage_backend`, `embed_model`, `embedder_reachable`, `formats`, `fetchers` |
