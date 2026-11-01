@@ -17,6 +17,16 @@ func NewMeasuredKnowledgeProposalClient(chat measuredProposalTransport) *Measure
 	return &MeasuredKnowledgeProposalClient{chat: chat}
 }
 func (c *MeasuredKnowledgeProposalClient) Propose(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+	return c.generate(ctx, prompt, knowledge.MaxProposalPromptBytes, knowledge.ProposalMaxInputTokens, knowledge.ProposalMaxOutputTokens)
+}
+
+// Review reuses the same measured call. Its prompt also carries the candidate and its
+// reply judges every part of it, so only the size and token bounds differ.
+func (c *MeasuredKnowledgeProposalClient) Review(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+	return c.generate(ctx, prompt, knowledge.MaxReviewPromptBytes, knowledge.ReviewMaxInputTokens, knowledge.ReviewMaxOutputTokens)
+}
+
+func (c *MeasuredKnowledgeProposalClient) generate(ctx context.Context, prompt knowledge.ProposalPrompt, maxPromptBytes int, maxInputTokens, maxOutputTokens int64) (knowledge.ProposalResponse, error) {
 	reply := knowledge.ProposalResponse{BudgetMode: "post_generation"}
 	if c == nil || c.chat == nil {
 		return reply, fmt.Errorf("measured application inference is not configured")
@@ -24,10 +34,10 @@ func (c *MeasuredKnowledgeProposalClient) Propose(ctx context.Context, prompt kn
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
 	}
-	if strings.TrimSpace(prompt.Instructions) == "" || strings.TrimSpace(prompt.Data) == "" || len(prompt.Instructions)+len(prompt.Data) > knowledge.MaxProposalPromptBytes {
+	if strings.TrimSpace(prompt.Instructions) == "" || strings.TrimSpace(prompt.Data) == "" || len(prompt.Instructions)+len(prompt.Data) > maxPromptBytes {
 		return reply, fmt.Errorf("invalid application inference prompt")
 	}
-	result, err := c.chat.GenerateMeasuredMessages(ctx, []map[string]string{{"role": "system", "content": prompt.Instructions}, {"role": "user", "content": prompt.Data}}, map[string]int64{"max_input_tokens": knowledge.ProposalMaxInputTokens, "max_output_tokens": knowledge.ProposalMaxOutputTokens})
+	result, err := c.chat.GenerateMeasuredMessages(ctx, []map[string]string{{"role": "system", "content": prompt.Instructions}, {"role": "user", "content": prompt.Data}}, map[string]int64{"max_input_tokens": maxInputTokens, "max_output_tokens": maxOutputTokens})
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
 	}
@@ -65,7 +75,7 @@ func (c *MeasuredKnowledgeProposalClient) Propose(ctx context.Context, prompt kn
 		reply.BudgetStatus = "usage_unavailable"
 		return reply, fmt.Errorf("measured inference lacks valid usage")
 	}
-	if *reply.InputTokens > knowledge.ProposalMaxInputTokens || *reply.OutputTokens > knowledge.ProposalMaxOutputTokens {
+	if *reply.InputTokens > maxInputTokens || *reply.OutputTokens > maxOutputTokens {
 		reply.BudgetStatus = "over_budget"
 		return reply, fmt.Errorf("measured inference exceeds acceptance budget")
 	}

@@ -87,27 +87,9 @@ func BuildProposalPrompt(taskID string, application map[string]any) (ProposalPro
 // DecodeProviderProposal binds a single reply to the current task and loaded
 // observations, anchors unique quotes, then applies the existing domain policy.
 func DecodeProviderProposal(taskID string, request ApplicationRequest, application map[string]any, body string) (map[string]any, error) {
-	if len(body) > MaxProposalReplyBytes {
-		return nil, fmt.Errorf("proposal reply exceeds supported size")
-	}
-	var fields map[string]json.RawMessage
-	if json.Unmarshal([]byte(body), &fields) != nil {
-		return nil, fmt.Errorf("invalid proposal JSON")
-	}
-	for _, field := range []string{"contract", "task_id", "revision", "disposition", "summary", "proposal"} {
-		if _, exists := fields[field]; !exists {
-			return nil, fmt.Errorf("missing proposal field")
-		}
-	}
 	var reply ProviderProposal
-	decoder := json.NewDecoder(bytes.NewBufferString(body))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&reply) != nil {
-		return nil, fmt.Errorf("invalid proposal JSON")
-	}
-	var extra any
-	if decoder.Decode(&extra) != io.EOF {
-		return nil, fmt.Errorf("trailing proposal data")
+	if err := decodeProviderReply(body, []string{"contract", "task_id", "revision", "disposition", "summary", "proposal"}, &reply); err != nil {
+		return nil, err
 	}
 	if reply.Contract != ProposalContract || taskID == "" || reply.TaskID != taskID || reply.Revision != 1 {
 		return nil, fmt.Errorf("stale or incompatible provider proposal")
@@ -134,41 +116,15 @@ func DecodeProviderProposal(taskID string, request ApplicationRequest, applicati
 		return nil, fmt.Errorf("invalid proposal observations")
 	}
 	request.Sources = append([]ApplicationSelection(nil), request.Sources...)
-	texts, versions := map[string]string{}, map[string]string{}
-	for i, observation := range observations {
-		source, ok := observation.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("invalid proposal observation")
-		}
-		id, ok := source["source_id"].(string)
-		if !ok || id != request.Sources[i].SourceID {
-			return nil, fmt.Errorf("invalid proposal source identity")
-		}
-		texts[id], _ = source["text"].(string)
-		versions[id], _ = source["text_version"].(string)
-		if request.Sources[i].TextVersion != "" && request.Sources[i].TextVersion != versions[id] {
-			return nil, fmt.Errorf("proposal source selection changed")
-		}
-		request.Sources[i].TextVersion = versions[id]
+	texts, versions, err := indexObservations(request, observations)
+	if err != nil {
+		return nil, err
+	}
+	for i := range request.Sources {
+		request.Sources[i].TextVersion = versions[request.Sources[i].SourceID]
 	}
 	anchor := func(quoted []QuotedCitation) ([]SourceCitation, error) {
-		if len(quoted) > 8 {
-			return nil, fmt.Errorf("too many quoted citations")
-		}
-		citations := make([]SourceCitation, 0, len(quoted))
-		for _, q := range quoted {
-			text, known := texts[q.SourceID]
-			if !known || versions[q.SourceID] == "" || q.TextVersion != versions[q.SourceID] || len(q.Quote) == 0 || len(q.Quote) > 1000 {
-				return nil, fmt.Errorf("invalid quoted source reference")
-			}
-			start := strings.Index(text, q.Quote)
-			// Search starting one byte later to reject overlapping duplicate matches too.
-			if start < 0 || strings.Contains(text[start+1:], q.Quote) {
-				return nil, fmt.Errorf("quotation is missing or ambiguous")
-			}
-			citations = append(citations, SourceCitation{SourceID: q.SourceID, TextVersion: q.TextVersion, Quote: q.Quote, Relation: q.Relation, Start: start, End: start + len(q.Quote)})
-		}
-		return citations, nil
+		return anchorQuotes(texts, versions, quoted, 8)
 	}
 	if len(reply.Proposal.Claims) > 16 {
 		return nil, fmt.Errorf("too many candidate claims")
@@ -193,4 +149,73 @@ func DecodeProviderProposal(taskID string, request ApplicationRequest, applicati
 	}
 	result["assessment"] = assessment
 	return result, nil
+}
+
+// decodeProviderReply accepts exactly one JSON object holding every required field.
+func decodeProviderReply(body string, required []string, reply any) error {
+	if len(body) > MaxProposalReplyBytes {
+		return fmt.Errorf("provider reply exceeds supported size")
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(body), &fields) != nil {
+		return fmt.Errorf("invalid provider JSON")
+	}
+	for _, field := range required {
+		if _, exists := fields[field]; !exists {
+			return fmt.Errorf("missing provider reply field")
+		}
+	}
+	decoder := json.NewDecoder(bytes.NewBufferString(body))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(reply) != nil {
+		return fmt.Errorf("invalid provider JSON")
+	}
+	var extra any
+	if decoder.Decode(&extra) != io.EOF {
+		return fmt.Errorf("trailing provider data")
+	}
+	return nil
+}
+
+// indexObservations ties loaded texts to the caller's selection and its pins.
+func indexObservations(request ApplicationRequest, observations []any) (map[string]string, map[string]string, error) {
+	texts, versions := map[string]string{}, map[string]string{}
+	for i, observation := range observations {
+		source, ok := observation.(map[string]any)
+		if !ok {
+			return nil, nil, fmt.Errorf("invalid proposal observation")
+		}
+		id, ok := source["source_id"].(string)
+		if !ok || id != request.Sources[i].SourceID {
+			return nil, nil, fmt.Errorf("invalid proposal source identity")
+		}
+		texts[id], _ = source["text"].(string)
+		versions[id], _ = source["text_version"].(string)
+		if request.Sources[i].TextVersion != "" && request.Sources[i].TextVersion != versions[id] {
+			return nil, nil, fmt.Errorf("proposal source selection changed")
+		}
+	}
+	return texts, versions, nil
+}
+
+// anchorQuotes turns model quotations into byte spans. A quote must be verbatim and
+// unique in its source, so a reply cannot point at a passage it did not reproduce.
+func anchorQuotes(texts, versions map[string]string, quoted []QuotedCitation, limit int) ([]SourceCitation, error) {
+	if len(quoted) > limit {
+		return nil, fmt.Errorf("too many quoted citations")
+	}
+	citations := make([]SourceCitation, 0, len(quoted))
+	for _, q := range quoted {
+		text, known := texts[q.SourceID]
+		if !known || versions[q.SourceID] == "" || q.TextVersion != versions[q.SourceID] || len(q.Quote) == 0 || len(q.Quote) > 1000 {
+			return nil, fmt.Errorf("invalid quoted source reference")
+		}
+		start := strings.Index(text, q.Quote)
+		// Search starting one byte later to reject overlapping duplicate matches too.
+		if start < 0 || strings.Contains(text[start+1:], q.Quote) {
+			return nil, fmt.Errorf("quotation is missing or ambiguous")
+		}
+		citations = append(citations, SourceCitation{SourceID: q.SourceID, TextVersion: q.TextVersion, Quote: q.Quote, Relation: q.Relation, Start: start, End: start + len(q.Quote)})
+	}
+	return citations, nil
 }
