@@ -84,6 +84,13 @@ Held-out evaluation and independent semantic review remain pending in `08.3`.
 Experience-removal, eligible/inapplicable episode and restart/reuse controls are
 additional required evaluations when those application capabilities exist.
 
+The fixed strategy's harness is `TestApplicationComparison*` in
+`dokja_orch/internal/handlers/application_comparison_test.go`. It goes through the real orchestrator
+path with the frozen corpus behind a stand-in Knowledge, records every run, failure and raw reply,
+and writes a sheet for the semantic review. Held-out cases need an explicit
+`DOKJA_APPLICATION_SCOPE=all`. The adaptive strategy does not exist yet, so no comparison between the
+two can be run.
+
 ## Implemented application path
 
 `knowledge.application.assess` is an additive orchestrator request type. Send it
