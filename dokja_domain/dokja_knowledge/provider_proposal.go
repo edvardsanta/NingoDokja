@@ -11,6 +11,7 @@ import (
 
 const ActionProposeMeasuredApplication = "propose-measured-knowledge-application"
 const ProposalMaxInputTokens int64 = 12000
+
 // ProposalMaxOutputTokens follows protocol revision 2: reported output includes model
 // thinking, and real proposals used 3188..3867 tokens against the original 2000.
 const ProposalMaxOutputTokens int64 = 6000
