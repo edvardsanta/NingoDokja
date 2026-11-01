@@ -176,13 +176,17 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	var sources []knowledgeSource
 	var result map[string]any
 	var keptLine string
+	var reading knowledgeTurn
 	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
 		result = map[string]any{"reply": identity}
 	} else if answer, ok := h.factReply(ctx, event, turn.Content); ok {
 		result = map[string]any{"reply": answer}
 	} else {
 		event, keptLine = h.keepInMessage(ctx, event, turn.Content)
-		sources = h.lookupKnowledge(ctx, turn.Content, anchor)
+		// An archived conversation reads like any other turn; its focus is keyed by the conversation.
+		reading = h.planTurnReading("archive:"+held.ID, turn.Content)
+		reading.previousReply = previousReply(history)
+		sources = h.lookupForTurn(ctx, turn.Content, anchor, reading)
 		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
 	}
 	if err != nil {
@@ -192,8 +196,11 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	if raw == "" {
 		return nil, h.failArchived(ctx, scope, turn, "the model returned no reply")
 	}
+	// Checked before the transcript keeps it, so a false quote is not repeated as a fact later.
+	raw = h.verifyQuotes(ctx, raw, sources, reading)
 	// The transcript keeps what the owner was shown, citations included.
 	sources = citedSources(raw, sources)
+	h.focus.remember(reading, turn.Content, sources)
 	reply := withKeptLine(citeSources(raw, sources), keptLine)
 	provider, _ := result["provider"].(string)
 	// The runtime names the model it ran requested_model; it does not observe another one.

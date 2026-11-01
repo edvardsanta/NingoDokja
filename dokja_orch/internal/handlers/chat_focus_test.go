@@ -55,11 +55,11 @@ func TestAFollowUpSearchesTheDocumentACitedReplyWasAbout(t *testing.T) {
 	// Shorter than a general search accepts: only the focus gives it a subject.
 	sources := handler.lookupForTurn(context.Background(), "visões", "", focusedTurn(handler, "visões"))
 
-	if len(sources) != 1 || len(base.searches) != 0 || len(base.scoped) != 1 {
+	if len(sources) != 1 || len(base.searches) != 0 || len(base.scoped) != 2 {
 		t.Fatalf("sources=%v searches=%v scoped=%v", sources, base.searches, base.scoped)
 	}
-	if !strings.HasPrefix(base.scoped[0], "file:book|visões\nwhat am I missing") {
-		t.Fatalf("scoped query: %q", base.scoped[0])
+	if base.scoped[0] != "file:book|visões" || !strings.HasPrefix(base.scoped[1], "file:book|visões\nwhat am I missing") {
+		t.Fatalf("scoped queries: %q", base.scoped)
 	}
 }
 
@@ -79,12 +79,59 @@ func TestAFollowUpSearchesWithWhatWasJustSaid(t *testing.T) {
 	turn.previousReply = malthusReply
 	handler.lookupForTurn(context.Background(), question, "", turn)
 
-	if len(base.scoped) != 1 || !strings.Contains(base.scoped[0], question+"\nSem as leis dos pobres") {
-		t.Fatalf("scoped query: %v", base.scoped)
+	if len(base.scoped) != 2 || !strings.Contains(base.scoped[1], question+"\nSem as leis dos pobres") {
+		t.Fatalf("scoped queries: %v", base.scoped)
 	}
-	if strings.Contains(base.scoped[0], "Viu Ensaio") {
-		t.Fatalf("the old subject outweighed the reply: %q", base.scoped[0])
+	if strings.Contains(base.scoped[1], "Viu Ensaio") {
+		t.Fatalf("the old subject outweighed the reply: %q", base.scoped[1])
 	}
+}
+
+// From the same book: "me mostra o trecho sobre casamento" found 8 passages on marriage by itself
+// and 2 with a long reply added, so a question with its own subject must keep its own search.
+func TestAQuestionWithItsOwnSubjectKeepsItsOwnSearch(t *testing.T) {
+	hit := func(position int, text string) map[string]any {
+		return map[string]any{"text": text, "source_id": "file:book", "title": "The book", "position": position, "relevant": true}
+	}
+	own := map[string]any{"hits": []any{hit(66, "marriage one"), hit(67, "marriage two"), hit(85, "shared")}}
+	guided := map[string]any{"hits": []any{hit(331, "argument one"), hit(85, "shared"), hit(329, "argument two")}}
+
+	merged := interleaveHits(own, guided)
+
+	order := []string{}
+	for _, raw := range merged {
+		order = append(order, raw.(map[string]any)["text"].(string))
+	}
+	if strings.Join(order, ",") != "marriage one,argument one,marriage two,shared,argument two" {
+		t.Fatal(order)
+	}
+}
+
+func TestAFailedGuidedSearchKeepsTheFirstOne(t *testing.T) {
+	base := &failingSecondSearch{}
+	base.hits = []any{bookHit(true)}
+	handler := focusHandler(&base.documentBase)
+	handler.knowledge = base
+	citedBook(handler, "the book")
+
+	sources := handler.lookupForTurn(context.Background(), "visões", "", focusedTurn(handler, "visões"))
+
+	if len(sources) != 1 || base.calls != 2 {
+		t.Fatalf("sources=%v calls=%d", sources, base.calls)
+	}
+}
+
+type failingSecondSearch struct {
+	documentBase
+	calls int
+}
+
+func (b *failingSecondSearch) SearchDocument(ctx context.Context, query, sourceID string, k int) (map[string]any, error) {
+	b.calls++
+	if b.calls == 2 {
+		return nil, errors.New("timed out")
+	}
+	return b.documentBase.SearchDocument(ctx, query, sourceID, k)
 }
 
 // documentAfterRestart is a base where only the words of the previous reply find the book.
