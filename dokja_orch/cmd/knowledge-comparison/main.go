@@ -18,7 +18,7 @@ func main() {
 	options := options{}
 	flag.StringVar(&options.fixtures, "fixtures", "../dokja_domain/dokja_knowledge/testdata/application", "frozen fixture directory")
 	flag.StringVar(&options.split, "split", "development", "development or held_out")
-	flag.StringVar(&options.strategy, "strategy", "fixed", "comparison strategy; only fixed exists")
+	flag.StringVar(&options.strategy, "strategy", "fixed", "comparison strategy: fixed or adaptive")
 	flag.StringVar(&options.out, "out", "", "new JSONL report file")
 	flag.StringVar(&options.caseID, "case", "", "run only this case")
 	flag.StringVar(&options.provider, "provider", "", "provider expected from Runtime, recorded before the first call")

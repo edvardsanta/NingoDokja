@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	knowledge "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -17,9 +19,12 @@ import (
 
 const reportContract = "knowledge.application.comparison.run.v1"
 const headerContract = "knowledge.application.comparison.header.v1"
-const protocolRevision = 2
+const protocolRevision = 3
 const frozenRuns = 2
 const maxStrategyCalls = 64
+
+// strategyCalls is the most a run of each strategy may call a provider.
+var strategyCalls = map[string]int{"fixed": 1, "adaptive": knowledge.AdaptiveMaxProposals}
 
 // Digests of the fixtures frozen in 8b9f331. A changed fixture is a new corpus or case
 // version with separate results, never a silent input to this harness.
@@ -106,6 +111,7 @@ type comparisonCase struct {
 type fixtures struct {
 	cases     []comparisonCase
 	documents map[string]fixtureDocument
+	order     []string
 }
 
 type fixtureDocument struct {
@@ -116,9 +122,53 @@ type fixtureDocument struct {
 
 // fixtureStore serves the frozen corpus at the Knowledge port, so no run can read or
 // change the operator's Library.
-type fixtureStore struct{ documents map[string]fixtureDocument }
+type fixtureStore struct {
+	documents map[string]fixtureDocument
+	order     []string
+}
+
+var searchTerm = regexp.MustCompile(`[a-z0-9]{3,}`)
+
+func searchTerms(text string) map[string]bool {
+	terms := map[string]bool{}
+	for _, term := range searchTerm.FindAllString(strings.ToLower(text), -1) {
+		terms[term] = true
+	}
+	return terms
+}
+
+// search stands in for the hybrid Knowledge search: distinct shared terms, with corpus
+// order breaking ties. It is deterministic so runs compare the strategy, but it is not
+// the real ranking, and protocol revision 3 records that as a limit of the comparison.
+func (s *fixtureStore) search(query string) map[string]any {
+	wanted := searchTerms(query)
+	type scored struct {
+		id    string
+		score int
+	}
+	ranked := []scored{}
+	for _, id := range s.order {
+		score := 0
+		for term := range searchTerms(s.documents[id].Text) {
+			if wanted[term] {
+				score++
+			}
+		}
+		ranked = append(ranked, scored{id, score})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].score > ranked[j].score })
+	hits := []any{}
+	for rank, item := range ranked {
+		hits = append(hits, map[string]any{"rank": rank + 1, "source_id": item.id, "kind": "note", "relevant": item.score >= 2, "shared_terms": item.score})
+	}
+	return map[string]any{"query": query, "hits": hits, "degraded": true, "reason": "frozen corpus stand-in search"}
+}
 
 func (s *fixtureStore) Dispatch(_ context.Context, event string, payload map[string]any) (map[string]any, error) {
+	if event == "knowledge.search" {
+		query, _ := payload["query"].(string)
+		return s.search(query), nil
+	}
 	if event != "knowledge.list" {
 		return nil, fmt.Errorf("comparison refuses Knowledge operation %s", event)
 	}
@@ -190,8 +240,8 @@ type summary struct {
 type processor func(context.Context, *fixtureStore, core.Event) (map[string]any, error)
 
 func validate(o options) error {
-	if o.strategy != "fixed" {
-		return fmt.Errorf("strategy %q does not exist yet; compare only implemented strategies", o.strategy)
+	if strategyCalls[o.strategy] == 0 {
+		return fmt.Errorf("strategy %q does not exist", o.strategy)
 	}
 	if o.split != "development" && o.split != "held_out" {
 		return fmt.Errorf("unknown split %q", o.split)
@@ -266,6 +316,7 @@ func loadFixtures(dir, split, caseID string) (fixtures, string, string, error) {
 	}
 	for _, document := range corpus.Sources {
 		loaded.documents[document.SourceID] = document
+		loaded.order = append(loaded.order, document.SourceID)
 	}
 	return loaded, casesDigest, corpusDigest, nil
 }
@@ -278,7 +329,7 @@ func run(ctx context.Context, o options, process processor, recorder *replyRecor
 	if err != nil {
 		return summary{}, err
 	}
-	if len(loaded.cases)*o.runs > maxStrategyCalls {
+	if len(loaded.cases)*o.runs*strategyCalls[o.strategy] > maxStrategyCalls {
 		return summary{}, fmt.Errorf("run plan exceeds the %d provider call ceiling", maxStrategyCalls)
 	}
 	// O_EXCL keeps an earlier report: results are never overwritten or merged.
@@ -295,7 +346,7 @@ func run(ctx context.Context, o options, process processor, recorder *replyRecor
 	if err := encoder.Encode(header); err != nil {
 		return summary{}, err
 	}
-	store := &fixtureStore{documents: loaded.documents}
+	store := &fixtureStore{documents: loaded.documents, order: loaded.order}
 	sheetPath := strings.TrimSuffix(o.out, filepath.Ext(o.out)) + ".review.md"
 	result := summary{ProtocolRevision: protocolRevision, Split: o.split, Strategy: o.strategy, Report: o.out, ReviewSheet: sheetPath, Cases: map[string]*caseSummary{}, Rubric: "pending"}
 	sheet := reviewSheet{}
@@ -388,6 +439,12 @@ func runCase(ctx context.Context, o options, store *fixtureStore, process proces
 	event := comparisonEvent(fmt.Sprintf("%s-%d", c.ID, number), "knowledge.application.propose.measured", map[string]any{
 		"contract": knowledge.ApplicationContract, "goal": c.Goal, "constraints": []any{}, "sources": sources,
 	})
+	if o.strategy == "adaptive" {
+		// The case's selection stays out of it: adaptive finds its evidence from the goal.
+		event = comparisonEvent(fmt.Sprintf("%s-%d", c.ID, number), "knowledge.application.propose.adaptive", map[string]any{
+			"contract": knowledge.AdaptiveContract, "goal": c.Goal, "constraints": []any{},
+		})
+	}
 	output, err := process(ctx, store, event)
 	record.ElapsedMS = time.Since(started).Milliseconds()
 	if err != nil {
@@ -509,6 +566,9 @@ func countCalls(inference any) int {
 
 // countUsage never adds an unknown count as zero: it is reported on its own.
 func countUsage(total *summary, inference any) {
+	if countCalls(inference) == 0 {
+		return
+	}
 	metadata, _ := inference.(map[string]any)
 	input, inputKnown := metadata["input_tokens"].(int64)
 	output, outputKnown := metadata["output_tokens"].(int64)

@@ -43,6 +43,7 @@ func fixtureInference(t *testing.T, calls *[]string) inferenceFunc {
 		var data struct {
 			Contract    string `json:"contract"`
 			TaskID      string `json:"task_id"`
+			Revision    int    `json:"revision"`
 			Application struct {
 				Goal    string           `json:"goal"`
 				Sources []map[string]any `json:"sources"`
@@ -61,15 +62,19 @@ func fixtureInference(t *testing.T, calls *[]string) inferenceFunc {
 				Conflicts:          []knowledge.ReviewConflict{}, Verdict: "accepted", Reason: "fixture",
 			}), nil
 		}
-		reply := knowledge.ProviderProposal{Contract: knowledge.ProposalContract, TaskID: data.TaskID, Revision: 1, Disposition: "clarify", Summary: "Need the key age"}
+		reply := knowledge.ProviderProposal{Contract: knowledge.ProposalContract, TaskID: data.TaskID, Revision: data.Revision, Disposition: "clarify", Summary: "Need the key age"}
 		if !strings.Contains(data.Application.Goal, "were not supplied") {
-			version := data.Application.Sources[0]["text_version"].(string)
-			id := data.Application.Sources[0]["source_id"].(string)
-			quote := knowledge.QuotedCitation{SourceID: id, TextVersion: version, Quote: "Use bounded exponential backoff with jitter.", Relation: "supports"}
-			reply.Disposition, reply.Summary = "propose", "Retry"
-			reply.Proposal = &knowledge.QuotedProposal{
-				Claims: []knowledge.QuotedClaim{{ID: "claim", Statement: "Backoff applies", Citations: []knowledge.QuotedCitation{quote}}},
-				Method: knowledge.QuotedMethod{ID: "method", Description: "Back off", Prerequisites: []string{"claim"}, Citations: []knowledge.QuotedCitation{quote}},
+			const backoff = "Use bounded exponential backoff with jitter."
+			for _, source := range data.Application.Sources {
+				if !strings.Contains(source["text"].(string), backoff) {
+					continue
+				}
+				quote := knowledge.QuotedCitation{SourceID: source["source_id"].(string), TextVersion: source["text_version"].(string), Quote: backoff, Relation: "supports"}
+				reply.Disposition, reply.Summary = "propose", "Retry"
+				reply.Proposal = &knowledge.QuotedProposal{
+					Claims: []knowledge.QuotedClaim{{ID: "claim", Statement: "Backoff applies", Citations: []knowledge.QuotedCitation{quote}}},
+					Method: knowledge.QuotedMethod{ID: "method", Description: "Back off", Prerequisites: []string{"claim"}, Citations: []knowledge.QuotedCitation{quote}},
+				}
 			}
 		}
 		return measuredReply(t, reply), nil
@@ -133,7 +138,7 @@ func TestComparisonRunsThroughTheRealApplicationPath(t *testing.T) {
 		t.Fatalf("%+v %+v", supported, missing)
 	}
 	records := readRecords(t, o.out)
-	if len(records) != 4 || records[0].CorpusDigest != frozenCorpusDigest || records[0].ProtocolRevision != 2 || records[0].Rubric != "pending" {
+	if len(records) != 4 || records[0].CorpusDigest != frozenCorpusDigest || records[0].ProtocolRevision != 3 || records[0].Rubric != "pending" {
 		t.Fatalf("%+v", records)
 	}
 	if records[0].Review == nil || records[0].Review.Review["independence"] != "same_model" {
@@ -186,7 +191,7 @@ func TestComparisonRefusesUnfrozenOrUnsafeRuns(t *testing.T) {
 	for name, mutate := range map[string]func(*options){
 		"held-out without consent": func(o *options) { o.split = "held_out" },
 		"partial held-out":         func(o *options) { o.split, o.allowHeldOut, o.caseID = "held_out", true, "held-1" },
-		"missing strategy":         func(o *options) { o.strategy = "adaptive" },
+		"missing strategy":         func(o *options) { o.strategy = "other" },
 		"changed fixture":          func(o *options) { o.fixtures = changed },
 		"overwritten report":       func(o *options) { o.out = existing },
 		"unknown case":             func(o *options) { o.caseID = "foreign" },
@@ -290,5 +295,47 @@ func TestNoExpectedAnswerReachesAModel(t *testing.T) {
 		return inference(ctx, prompt)
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAdaptiveFindsItsOwnEvidenceFromTheFrozenCorpus(t *testing.T) {
+	calls := []string{}
+	inference := fixtureInference(t, &calls)
+	o := testOptions(t)
+	o.strategy, o.runs = "adaptive", 1
+	o.review = false
+	seen := 0
+	result, err := runWith(t, o, func(ctx context.Context, prompt knowledge.ProposalPrompt) (knowledge.ProposalResponse, error) {
+		seen++
+		return inference(ctx, prompt)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Strategy != "adaptive" || result.Runs != 2 || seen < 2 || result.StrategyCalls != seen {
+		t.Fatalf("%+v %d", result, seen)
+	}
+	records := readRecords(t, o.out)
+	rounds, _ := records[0].Proposal["rounds"].([]any)
+	first, _ := rounds[0].(map[string]any)
+	if retrieved, _ := first["retrieved"].([]any); len(rounds) != 2 || len(retrieved) != knowledge.AdaptiveInitialDocuments {
+		t.Fatalf("%+v", records[0].Proposal)
+	}
+}
+
+func TestStandInSearchIsDeterministicAndRanksSharedTerms(t *testing.T) {
+	loaded, _, _, err := loadFixtures(fixtureDir, "development", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &fixtureStore{documents: loaded.documents, order: loaded.order}
+	first := fmt.Sprint(store.search(loaded.cases[0].Goal))
+	for range 5 {
+		if fmt.Sprint(store.search(loaded.cases[0].Goal)) != first {
+			t.Fatal("search order changed between runs")
+		}
+	}
+	if answer := store.search("zzz"); answer["hits"].([]any)[0].(map[string]any)["relevant"] != false {
+		t.Fatal("a query sharing nothing was relevant")
 	}
 }
