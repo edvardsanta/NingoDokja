@@ -367,6 +367,8 @@ acceptance limits with retained usage; it does not enforce provider billing caps
 `knowledge.application.review` is a separate measured action that asks for one model
 opinion on a candidate and derives a rule-based outcome. It verifies nothing and
 disables execution; see [semantic review](knowledge-semantic-review.md).
+`cmd/knowledge-comparison` runs the frozen cases through this path for scoring; see
+[the comparison harness](knowledge-comparison.md).
 
 ### Automatic intake
 

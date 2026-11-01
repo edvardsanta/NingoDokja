@@ -102,8 +102,7 @@ Stable reasons are `provider_unavailable`, `token_budget_exceeded`,
 | Provider attempts | Exactly 1, no retries or fallback |
 | Canonical writes / external actions | 0 / 0 |
 
-These budgets are separate from the frozen proposal ceilings of 12000 and 2000, which
-are unchanged. A full 40 KiB prompt plus the CLI's own context does not fit 12000 input
+These budgets are separate from the proposal ceilings of 12000 and 6000. A full 40 KiB prompt plus the CLI's own context does not fit 12000 input
 tokens, so the shared ceiling would spend a call and then always refuse large reviews. The review path is measured only, so it needs `codex` or `claude_code`;
 `ollama` is refused before launch, like the measured proposal path.
 
@@ -148,14 +147,14 @@ rerun. The other two ended `needs_revision`, at 39 seconds, about 7300 input and
 to 4900 output tokens. One flagged effective dates the candidate never mentions and
 one flagged an endpoint the goal never names. No real proposal was accepted, so
 this review is strict on these cases, and whether it is too strict is unmeasured.
+The [comparison harness](knowledge-comparison.md) later ran two more reviews through the
+Runtime path, with the corrected instruction. Both decoded and ended `needs_revision`.
 
 ## What this does not establish
 
 - That the review is reliable. Repeated runs, held-out cases and same-model
   proposals belong to `08.3`.
 - That a review improves decisions over the proposal alone.
-- That real proposals fit the frozen token ceiling. On development cases they do not;
-  see [real proposals](knowledge-provider-proposals.md#real-proposals-on-the-development-cases).
 
 Implementation: [domain contract and rule](../dokja_domain/dokja_knowledge/semantic_review.go),
 [application workflow](../dokja_orch/internal/handlers/knowledge_application.go),
