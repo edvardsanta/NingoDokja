@@ -208,6 +208,8 @@ func main() {
 			clients.NewKnowledgeProposalClient(clients.NewChatProviderClient("")),
 		).WithMeasuredApplicationProposer(
 			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
+		).WithApplicationReviewer(
+			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
 		).WithReading(handlers.NewReadingTask(
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)).WithIntake(handlers.NewIntakeTask(

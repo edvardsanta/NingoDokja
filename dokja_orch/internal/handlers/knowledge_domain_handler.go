@@ -14,6 +14,7 @@ type KnowledgeDomainHandler struct {
 	intake           *IntakeTask
 	proposer         knowledgedomain.ApplicationProposer
 	measuredProposer knowledgedomain.ApplicationProposer
+	reviewer         knowledgedomain.ApplicationReviewer
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
@@ -43,6 +44,11 @@ func (h *KnowledgeDomainHandler) WithMeasuredApplicationProposer(proposer knowle
 	return h
 }
 
+func (h *KnowledgeDomainHandler) WithApplicationReviewer(reviewer knowledgedomain.ApplicationReviewer) *KnowledgeDomainHandler {
+	h.reviewer = reviewer
+	return h
+}
+
 func (h *KnowledgeDomainHandler) Domain() core.Domain {
 	return core.DomainKnowledge
 }
@@ -57,6 +63,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionReviewApplication {
+		return h.reviewApplication(ctx, event)
+	}
 	if workflow.Action == knowledgedomain.ActionProposeMeasuredApplication {
 		return h.proposeApplicationWith(ctx, event, h.measuredProposer)
 	}

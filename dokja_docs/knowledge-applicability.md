@@ -80,7 +80,7 @@ Freeze the following comparison protocol before any provider run:
 These are evaluation ceilings and provisional acceptance criteria, not a claim
 of general reliability. Provider/model/settings and fixture commit must be
 recorded before comparison, with all raw proposals and failures accounted for.
-Held-out evaluation and independent semantic review remain pending in `08.3`.
+Held-out evaluation, including of the [semantic review](knowledge-semantic-review.md), remains pending in `08.3`.
 Experience-removal, eligible/inapplicable episode and restart/reuse controls are
 additional required evaluations when those application capabilities exist.
 
@@ -153,7 +153,8 @@ Both module race suites and static checks pass.
 This is an argument-integrity assessor. A caller can cite a real passage while
 misinterpreting it or omitting a prerequisite or contradiction. The assessor
 retains that proposal as semantically unverified; it cannot discover every such
-error. The subsequent provider proposal path adds extraction; independent semantic review, additional
+error. The subsequent provider proposal path adds extraction and the
+[semantic review](knowledge-semantic-review.md) adds a separate model opinion; additional
 retrieval/revision, concepts/relationships, actual outcomes and durable episode
 reuse remain in `08.2`. No canonical claims, procedures or learning are written.
 The simulation-only inference experience contract remains separate.

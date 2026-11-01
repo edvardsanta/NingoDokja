@@ -357,13 +357,16 @@ explicit caller proposal of cited claims and method prerequisites. It exposes
 missing/conflicting/contradicted support and conditional applicability, with
 semantic meaning unverified and execution disabled.
 `knowledge.application.propose` now obtains a task-bound model proposal through
-Runtime, anchors unique quotations and runs that assessor. Semantic acceptance,
-actual outcomes and learned episode reuse remain pending in `08.2`.
+Runtime, anchors unique quotations and runs that assessor. Actual outcomes and
+learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
 [provider proposal bounds](knowledge-provider-proposals.md), and
 [measured inference](inference-token-budgets.md). The separate
 `knowledge.application.propose.measured` action applies post-generation token
 acceptance limits with retained usage; it does not enforce provider billing caps.
+`knowledge.application.review` is a separate measured action that asks for one model
+opinion on a candidate and derives a rule-based outcome. It verifies nothing and
+disables execution; see [semantic review](knowledge-semantic-review.md).
 
 ### Automatic intake
 
