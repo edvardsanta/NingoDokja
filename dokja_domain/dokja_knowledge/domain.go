@@ -93,6 +93,9 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return nil, fmt.Errorf("knowledge service is not configured")
 	}
 
+	if request.Action == ActionProposeAdaptiveApplication {
+		return nil, fmt.Errorf("knowledge.application.propose.adaptive needs the application host")
+	}
 	if request.Action == ActionReviewApplication {
 		return nil, fmt.Errorf("knowledge.application.review needs the application host")
 	}

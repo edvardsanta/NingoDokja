@@ -159,6 +159,8 @@ func actionFor(domain Domain, eventType string) string {
 		}
 	case DomainKnowledge:
 		switch eventType {
+		case "knowledge.application.propose.adaptive":
+			return "propose-adaptive-knowledge-application"
 		case "knowledge.application.review":
 			return "review-knowledge-application"
 		case "knowledge.application.propose.measured":

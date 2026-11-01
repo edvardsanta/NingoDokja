@@ -77,10 +77,16 @@ The method has id, description, prerequisites (claim IDs), citations (support on
 The host verifies argument integrity, not semantic truth or authorization. It will never execute the proposed method from this reply.`
 
 func BuildProposalPrompt(taskID string, application map[string]any) (ProposalPrompt, error) {
-	if taskID == "" || len(taskID) > 100 || application["contract"] != ApplicationContract {
+	return BuildProposalRevisionPrompt(taskID, 1, application)
+}
+
+// BuildProposalRevisionPrompt binds a later attempt to its revision, so a reply meant for
+// an earlier attempt of the same task is refused.
+func BuildProposalRevisionPrompt(taskID string, revision int, application map[string]any) (ProposalPrompt, error) {
+	if revision < 1 || revision > AdaptiveMaxProposals || taskID == "" || len(taskID) > 100 || application["contract"] != ApplicationContract {
 		return ProposalPrompt{}, fmt.Errorf("invalid proposal context")
 	}
-	data, err := json.Marshal(map[string]any{"contract": ProposalContract, "task_id": taskID, "revision": 1, "application": application})
+	data, err := json.Marshal(map[string]any{"contract": ProposalContract, "task_id": taskID, "revision": revision, "application": application})
 	if err != nil || len(data)+len(proposalInstructions) > MaxProposalPromptBytes {
 		return ProposalPrompt{}, fmt.Errorf("proposal prompt exceeds supported size")
 	}
@@ -90,17 +96,22 @@ func BuildProposalPrompt(taskID string, application map[string]any) (ProposalPro
 // DecodeProviderProposal binds a single reply to the current task and loaded
 // observations, anchors unique quotes, then applies the existing domain policy.
 func DecodeProviderProposal(taskID string, request ApplicationRequest, application map[string]any, body string) (map[string]any, error) {
+	return DecodeProposalRevision(taskID, 1, request, application, body)
+}
+
+// DecodeProposalRevision applies the same rules to a reply bound to a given revision.
+func DecodeProposalRevision(taskID string, revision int, request ApplicationRequest, application map[string]any, body string) (map[string]any, error) {
 	var reply ProviderProposal
 	if err := decodeProviderReply(body, []string{"contract", "task_id", "revision", "disposition", "summary", "proposal"}, &reply); err != nil {
 		return nil, err
 	}
-	if reply.Contract != ProposalContract || taskID == "" || reply.TaskID != taskID || reply.Revision != 1 {
+	if reply.Contract != ProposalContract || taskID == "" || reply.TaskID != taskID || reply.Revision != revision {
 		return nil, fmt.Errorf("stale or incompatible provider proposal")
 	}
 	if strings.TrimSpace(reply.Summary) == "" || len(reply.Summary) > 1200 {
 		return nil, fmt.Errorf("invalid proposal summary")
 	}
-	result := map[string]any{"contract": ProposalContract, "task_id": taskID, "revision": 1, "disposition": reply.Disposition, "summary": reply.Summary, "semantic_status": "unverified", "can_execute": false, "requires_semantic_review": true, "experience_status": "not_consulted"}
+	result := map[string]any{"contract": ProposalContract, "task_id": taskID, "revision": revision, "disposition": reply.Disposition, "summary": reply.Summary, "semantic_status": "unverified", "can_execute": false, "requires_semantic_review": true, "experience_status": "not_consulted"}
 	switch reply.Disposition {
 	case "clarify", "abstain":
 		if reply.Proposal != nil {

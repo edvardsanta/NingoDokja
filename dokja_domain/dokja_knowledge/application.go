@@ -50,16 +50,8 @@ func ParseApplicationRequest(payload map[string]any) (ApplicationRequest, error)
 	if request.Contract != ApplicationContract {
 		return request, fmt.Errorf("unsupported application contract")
 	}
-	if strings.TrimSpace(request.Goal) == "" || len(request.Goal) > 2000 {
-		return request, fmt.Errorf("goal must contain 1..2000 bytes")
-	}
-	if len(request.Constraints) > 16 {
-		return request, fmt.Errorf("at most 16 constraints")
-	}
-	for _, constraint := range request.Constraints {
-		if strings.TrimSpace(constraint) == "" || len(constraint) > 500 {
-			return request, fmt.Errorf("constraints must contain 1..500 bytes")
-		}
+	if err := validateApplicationTask(request.Goal, request.Constraints); err != nil {
+		return request, err
 	}
 	if len(request.Sources) == 0 || len(request.Sources) > MaxApplicationSources {
 		return request, fmt.Errorf("select 1..%d sources", MaxApplicationSources)
@@ -75,6 +67,21 @@ func ParseApplicationRequest(payload map[string]any) (ApplicationRequest, error)
 		}
 	}
 	return request, nil
+}
+
+func validateApplicationTask(goal string, constraints []string) error {
+	if strings.TrimSpace(goal) == "" || len(goal) > 2000 {
+		return fmt.Errorf("goal must contain 1..2000 bytes")
+	}
+	if len(constraints) > 16 {
+		return fmt.Errorf("at most 16 constraints")
+	}
+	for _, constraint := range constraints {
+		if strings.TrimSpace(constraint) == "" || len(constraint) > 500 {
+			return fmt.Errorf("constraints must contain 1..500 bytes")
+		}
+	}
+	return nil
 }
 
 // LoadApplicationSource uses the existing store port. Knowledge remains unscoped:
