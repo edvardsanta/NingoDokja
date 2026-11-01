@@ -86,6 +86,66 @@ func TestAnArchivedTurnIsRecordedAndAnsweredWithItsProvenance(t *testing.T) {
 	}
 }
 
+// The desktop's conversations are archived, and this path once searched on its own: the focus, the
+// text mode and the quote check never ran there, so a book in the Library looked out of reach.
+func TestAnArchivedConversationReadsItsDocumentLikeAnyOtherTurn(t *testing.T) {
+	archive := archiveFor(t)
+	base := &documentBase{hits: []any{bookHit(true)}}
+	model := &scriptedModel{answers: []map[string]any{
+		{"reply": "She writes under scrutiny [1]."},
+		{"reply": "She says \"Basta ser mulher para baixar-me as asas\" [1], and \"as visões vieram todas numa noite\" [1]."},
+	}}
+	handler := NewChatDomainHandler(model).WithArchive(archive).WithKnowledge(base, nil)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	send := func(content, id string) map[string]any {
+		t.Helper()
+		result, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": content, "conversation_id": held.ID, "send_id": id}), archiveStep)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+
+	send("what am I missing about the book of life", "send-0001")
+	if _, ok := handler.focus.current("archive:" + held.ID); !ok {
+		t.Fatal("a cited reply left no focus on the conversation")
+	}
+	second := send("me mostra o trecho sobre as visões", "send-0002")
+
+	// Both searches of the follow-up, then the quote check's.
+	if len(base.scoped) < 2 || !strings.HasPrefix(base.scoped[0], "file:book|me mostra o trecho") {
+		t.Fatalf("the follow-up did not search the document: %v", base.scoped)
+	}
+	asked := model.asked[1]
+	if brief := asked[len(asked)-2]["content"]; !strings.Contains(brief, "let the text speak first") {
+		t.Fatalf("a request for the text got the usual brief: %q", brief)
+	}
+	reply, _ := second["reply"].(string)
+	if !strings.Contains(reply, "Basta ser mulher") || strings.Contains(reply, "vieram todas") {
+		t.Fatalf("the quotes were not checked: %q", reply)
+	}
+}
+
+func TestAnArchivedFollowUpFindsTheDocumentAfterARestart(t *testing.T) {
+	archive := archiveFor(t)
+	base := &documentAfterRestart{}
+	model := &scriptedModel{answers: []map[string]any{{"reply": "As leis dos pobres, de memória."}, {"reply": "Do texto [1]."}}}
+	handler := NewChatDomainHandler(model).WithArchive(archive).WithKnowledge(base, nil)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	if _, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": "Argumente contra Malthus sem citar nada", "conversation_id": held.ID, "send_id": "send-0001"}), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+
+	handler.focus = newChatFocus() // what a restart leaves
+	if _, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": "de fragmentos", "conversation_id": held.ID, "send_id": "send-0002"}), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := handler.focus.current("archive:" + held.ID); !ok {
+		t.Fatalf("the reply cited the document and the focus did not come back: %q", base.searches)
+	}
+}
+
 func TestTheSameSendIsAnsweredFromTheArchiveNeverByTheModelAgain(t *testing.T) {
 	archive := archiveFor(t)
 	model := &scriptedModel{answers: []map[string]any{{"reply": "Once."}}}

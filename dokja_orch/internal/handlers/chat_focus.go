@@ -99,7 +99,12 @@ func (h *ChatDomainHandler) planKnowledgeTurn(event core.Event, content string, 
 	if voice {
 		return knowledgeTurn{}
 	}
-	turn := knowledgeTurn{key: chatSessionBaseKey(event), planned: true, text: asksForText.MatchString(content)}
+	return h.planTurnReading(chatSessionBaseKey(event), content)
+}
+
+// planTurnReading is the plan for a conversation known by key.
+func (h *ChatDomainHandler) planTurnReading(key, content string) knowledgeTurn {
+	turn := knowledgeTurn{key: key, planned: true, text: asksForText.MatchString(content)}
 	if focus, ok := h.focus.current(turn.key); ok {
 		turn.focus = &focus
 		if focus.wantsText && utf8.RuneCountInString(strings.TrimSpace(content)) <= knowledgeTopicRunes {
@@ -148,21 +153,55 @@ func (h *ChatDomainHandler) lookupFocused(ctx context.Context, question string, 
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
 	defer cancel()
-	recent := turn.previousReply
-	if recent == "" {
-		recent = turn.focus.Subject
-	}
-	query := knowledgeQuery(question, recent)
 	k, chunks, chars := knowledgeMaxChunks+2, knowledgeMaxChunks, knowledgeMaxChars
 	if turn.text {
 		k, chunks, chars = knowledgeTextSearch, knowledgeTextChunks, knowledgeTextChars
 	}
-	result, err := searcher.SearchDocument(lookupCtx, boundQuery(query), turn.focus.SourceID, k)
+	own, err := searcher.SearchDocument(lookupCtx, boundQuery(strings.TrimSpace(question)), turn.focus.SourceID, k)
 	if err != nil {
 		logger.Info(fmt.Sprintf("focused knowledge lookup skipped: %v", err))
 		return nil
 	}
-	return selectSources(result, chunks, chars, !turn.text)
+	recent := turn.previousReply
+	if recent == "" {
+		recent = turn.focus.Subject
+	}
+	if strings.TrimSpace(recent) == "" {
+		return selectSources(own, chunks, chars, !turn.text)
+	}
+	guided, err := searcher.SearchDocument(lookupCtx, boundQuery(knowledgeQuery(question, recent)), turn.focus.SourceID, k)
+	if err != nil {
+		logger.Info(fmt.Sprintf("focused knowledge lookup kept its first search: %v", err))
+		return selectSources(own, chunks, chars, !turn.text)
+	}
+	return selectSources(map[string]any{"hits": interleaveHits(own, guided)}, chunks, chars, !turn.text)
+}
+
+// interleaveHits alternates two searches, each hit once. A question with its own subject is found
+// by its own words, which a long reply would drown out; a vague one is found by the reply. Neither
+// can be told from the other beforehand, so each search gets a fair share of the budget.
+func interleaveHits(own, guided map[string]any) []any {
+	first, _ := own["hits"].([]any)
+	second, _ := guided["hits"].([]any)
+	merged := make([]any, 0, len(first)+len(second))
+	seen := map[string]bool{}
+	add := func(raw any) {
+		hit, _ := raw.(map[string]any)
+		key := fmt.Sprintf("%v#%v#%v", hit["source_id"], hit["position"], firstString(hit, "text"))
+		if !seen[key] {
+			seen[key] = true
+			merged = append(merged, raw)
+		}
+	}
+	for i := 0; i < len(first) || i < len(second); i++ {
+		if i < len(first) {
+			add(first[i])
+		}
+		if i < len(second) {
+			add(second[i])
+		}
+	}
+	return merged
 }
 
 // isFollowUp is a short message after a reply, or a request for the text. Only those fall back on
