@@ -239,6 +239,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
 	h.focus.remember(turn, content, sources)
+	h.focus.rememberReply(turn, rawReply)
 	presentation := h.presentMath(ctx, event, rawReply)
 	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
 	if presentation.failed {

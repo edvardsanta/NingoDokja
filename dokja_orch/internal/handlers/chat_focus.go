@@ -43,17 +43,22 @@ for example [1]. Quote only from these excerpts: never from memory, never a para
 marks, and every quote is checked against the document, so an inexact one will be removed. If they
 hold fewer passages than asked for, give the ones there are and say how many. There are no page
 numbers here, so do not give any. These are only some passages of the document: a quote from earlier
-in the conversation that is missing here may still be in it, so do not take one back for that. Reply
-in the language the user wrote in.`
+in the conversation that is missing here may still be in it, so do not take one back for that. The
+whole document is in the user's library: never ask them to send you a passage of it, and if these
+excerpts miss the point, say so and ask which part to look for. Reply in the language the user wrote
+in.`
 
 // asksForText recognizes a question about the text itself, in the languages Ningo is spoken to in.
-var asksForText = regexp.MustCompile(`(?i)(^|[^\p{L}])(cita[çc][ãa]o|cita[çc][õo]es|citar|cite|frases?|trechos?|passagens?|excertos?|literalmente|textualmente|quotes?|quotations?|passages?|excerpts?|sentences?|verbatim)($|[^\p{L}])`)
+var asksForText = regexp.MustCompile(`(?i)(^|[^\p{L}])(cita[çc][ãa]o|cita[çc][õo]es|citar|cite|frases?|trechos?|passagens?|excertos?|fragmentos?|literalmente|textualmente|quotes?|quotations?|passages?|excerpts?|sentences?|verbatim)($|[^\p{L}])`)
 
 // knowledgeFocus is the document a conversation is about: the last one a reply cited.
 type knowledgeFocus struct {
 	SourceID string
 	// Subject is what the user asked when the document came up, which a follow-up leaves unsaid.
 	Subject string
+	// lastReply is the start of Ningo's previous reply. A follow-up points at what was just said
+	// ("that idea"), and only the reply names it, so it searches better than the first question.
+	lastReply string
 	// wantsText is whether the last turn was about the text: "which topic?" is answered in one word.
 	wantsText bool
 	idle      int
@@ -139,7 +144,11 @@ func (h *ChatDomainHandler) lookupFocused(ctx context.Context, question string, 
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
 	defer cancel()
-	query := knowledgeQuery(question, turn.focus.Subject)
+	recent := turn.focus.lastReply
+	if recent == "" {
+		recent = turn.focus.Subject
+	}
+	query := knowledgeQuery(question, recent)
 	k, chunks, chars := knowledgeMaxChunks+2, knowledgeMaxChunks, knowledgeMaxChars
 	if turn.text {
 		k, chunks, chars = knowledgeTextSearch, knowledgeTextChunks, knowledgeTextChars
@@ -173,6 +182,26 @@ func boundQuery(query string) string {
 		return string([]rune(query)[:knowledgeMaxQueryLen])
 	}
 	return query
+}
+
+// rememberReply keeps what the reply said for the next turn's search, and only for that: it is a
+// way to find the passage, never evidence of what the document says.
+func (f *chatFocus) rememberReply(turn knowledgeTurn, reply string) {
+	if f == nil || !turn.planned || turn.key == "" {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	focus, ok := f.items[turn.key]
+	if !ok {
+		return
+	}
+	reply = strings.TrimSpace(reply)
+	if utf8.RuneCountInString(reply) > knowledgeMaxAnchorLen {
+		reply = string([]rune(reply)[:knowledgeMaxAnchorLen])
+	}
+	focus.lastReply = reply
+	f.items[turn.key] = focus
 }
 
 // documentOf is the id of a whole document: a part is stored as <source_id>#<key>.
