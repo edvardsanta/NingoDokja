@@ -11,6 +11,7 @@ import (
 type KnowledgeDomainHandler struct {
 	domain           *knowledgedomain.Domain
 	reading          *ReadingTask
+	intake           *IntakeTask
 	proposer         knowledgedomain.ApplicationProposer
 	measuredProposer knowledgedomain.ApplicationProposer
 }
@@ -23,6 +24,12 @@ func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomain
 // refused and every other knowledge event is unchanged.
 func (h *KnowledgeDomainHandler) WithReading(task *ReadingTask) *KnowledgeDomainHandler {
 	h.reading = task
+	return h
+}
+
+// WithIntake serves knowledge.intake.run. Without it, the event is refused.
+func (h *KnowledgeDomainHandler) WithIntake(task *IntakeTask) *KnowledgeDomainHandler {
+	h.intake = task
 	return h
 }
 
@@ -67,6 +74,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 			return nil, fmt.Errorf("knowledge.reclassify needs the reading host")
 		}
 		return h.reading.Reclassify(ctx, event)
+	}
+	if workflow.Action == knowledgedomain.ActionIntakeKnowledge && h.intake != nil {
+		return h.intake.Start(event)
 	}
 	if workflow.Action == knowledgedomain.ActionReadKnowledge && h.reading != nil {
 		return h.reading.Read(ctx, event)

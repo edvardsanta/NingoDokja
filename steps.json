@@ -813,6 +813,31 @@
           "next_action": "Use the accepted cross-document representation and measured application cycle to implement generic consolidation; summary/classification alone is not the acceptance criterion."
         },
         {
+          "id": "09.3-I",
+          "title": "Keep what chosen sources publish in Knowledge, so learning has real material",
+          "status": "in_progress",
+          "deliverables": [
+            "Opt-in scheduled intake from Feeds into Knowledge through knowledge.ingest"
+          ],
+          "acceptance_criteria": [
+            "No source is taken unless the owner lists it; with none, a run does nothing.",
+            "A kept reading has the identity a manual save gives it, so saving it does not make a copy.",
+            "Feeds never calls Knowledge, and a run does not rerun collectors.",
+            "A live run keeps a chosen source and repeats without changing the document."
+          ],
+          "evidence": [
+            "2026-10-31: owner selected automatic intake from opt-in sources as the source of real material, ahead of the 08.3 gate because it stores documents and claims no learning. Implemented the library.intake_sources setting, the knowledge.intake job and knowledge.intake.run. Covered by unit tests only; no live run yet."
+          ],
+          "checks": [],
+          "blockers": [],
+          "limitations": [
+            "Storing is not assimilation: this adds no concepts, claims or methods (08.2, 09.3).",
+            "Only items with full text, a stable id and a date within 72 hours are kept. A document the owner deletes returns while its item stays in that window, because Knowledge keeps no record of deletions.",
+            "Kept documents are not classified by this path."
+          ],
+          "next_action": "Live check with chosen sources. Then use the real flow as additional evidence for 08.2/08.3 and 09.3, beside the frozen comparison, which stays frozen. Predictions confirmed by later items wait until after 08.3."
+        },
+        {
           "id": "09.4",
           "title": "Migrate Meme, Digest, delivery and conversation responsibilities to the four concepts (ADR 0010, proposed)",
           "status": "pending",

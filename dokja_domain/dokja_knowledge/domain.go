@@ -116,6 +116,9 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 	if request.Action == ActionReadKnowledge {
 		return nil, fmt.Errorf("knowledge.read needs the reading host, which is not configured")
 	}
+	if request.Action == ActionIntakeKnowledge {
+		return nil, fmt.Errorf("knowledge.intake.run needs the reading host, which is not configured")
+	}
 	eventType, ok := eventTypes[request.Action]
 	if !ok {
 		return nil, fmt.Errorf("unsupported knowledge action %q for event type %q", request.Action, request.Event.Type)

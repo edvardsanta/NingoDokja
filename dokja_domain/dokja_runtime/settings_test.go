@@ -312,3 +312,18 @@ func TestALibraryLimitIsAWholeNumberOrNothing(t *testing.T) {
 		}
 	}
 }
+
+func TestIntakeSourcesAreFeedPluginIDsForTheOrchestrator(t *testing.T) {
+	setting, ok := lookupSetting("library.intake_sources")
+	if !ok || setting.Env != "DOKJA_KNOWLEDGE_INTAKE_SOURCES" || len(setting.Affects) != 1 || setting.Affects[0] != "orchestrator" {
+		t.Fatal(setting)
+	}
+	if got, err := setting.parse(" daily-reading, example_blog ,daily-reading"); err != nil || got != "daily-reading,example_blog" {
+		t.Fatal(got, err)
+	}
+	for _, value := range []string{"Upper", "a b", "../plugin", strings.Repeat("a", 41)} {
+		if _, err := setting.parse(value); err == nil {
+			t.Fatal(value)
+		}
+	}
+}

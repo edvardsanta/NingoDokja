@@ -284,6 +284,7 @@
   "setting_groups": "groups (<digits>@g.us)",
   "setting_conversations": "Shown in Messages (alias=number or group)",
   "setting_own_chat": "answer own chat",
+  "setting_library_intake_sources": "Sources kept on their own",
   "setting_library_max_file": "Largest file (MB)",
   "setting_library_max_text": "Largest text (characters)",
   "setting_model_embedding": "embedding model",

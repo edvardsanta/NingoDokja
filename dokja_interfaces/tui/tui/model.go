@@ -1666,6 +1666,8 @@ func jobService(job string) string {
 	switch {
 	case strings.HasPrefix(job, "meme."):
 		return "meme"
+	case strings.HasPrefix(job, "knowledge."):
+		return "knowledge"
 	}
 	return ""
 }

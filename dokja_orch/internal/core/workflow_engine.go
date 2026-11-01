@@ -175,6 +175,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "classify-knowledge"
 		case "knowledge.read":
 			return "read-knowledge"
+		case "knowledge.intake.run":
+			return "intake-knowledge"
 		case "knowledge.search":
 			return "search-knowledge"
 		case "knowledge.list":

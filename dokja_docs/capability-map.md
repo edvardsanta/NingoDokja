@@ -365,6 +365,14 @@ See [preparation](knowledge-application.md), [assessment/evaluation inputs](know
 `knowledge.application.propose.measured` action applies post-generation token
 acceptance limits with retained usage; it does not enforce provider billing caps.
 
+### Automatic intake
+
+`scheduler (knowledge.intake) -> knowledge.intake.run -> intake task in the background: collect (feeds.items) -> Knowledge domain selects -> ingest (knowledge.ingest per document)`
+
+Off until the `library.intake_sources` setting lists Feeds plugins. The Knowledge domain decides what is
+taken (`dokja_domain/dokja_knowledge/intake.go`); Feeds never calls Knowledge. Storing is not
+assimilation: this path adds documents, not concepts, claims or methods.
+
 ### On-demand reading
 
 `knowledge.read -> reading task: read (feeds.extract -> document.extract.v1 plugin) -> ingest (Knowledge domain -> knowledge.ingest per document) -> classify (feeds.classify -> document.classify.v1 plugin -> Knowledge domain -> knowledge.metadata.get/patch per new document)`

@@ -83,6 +83,10 @@ pages whose visible content comes from a client application or an API. Supply a 
 for each edition, such as `daily:2026-10-27`, even when editions share a homepage. Omit `body`
 when only an excerpt is available; saving then fetches the original page as before.
 
+The orchestrator can also keep a source's items in Knowledge on its own, for the plugin ids listed
+in the `library.intake_sources` setting (see the production runbook). Only items with `body`, a stable
+`id` and a `published` date from the last 72 hours are kept; Feeds itself never calls Knowledge.
+
 Only `title` is required. Every field is a string, except `prompts`: an optional list of up to 3
 questions the plugin suggests for discussing the item, written from its own text (for a liturgy,
 "O que Lc 13,10-17 ensina?"). The desktop offers them when a conversation about the item opens,

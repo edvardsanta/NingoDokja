@@ -11,6 +11,7 @@ import (
 	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	memedomain "read_books/dokja_domain/dokja_meme"
 	store "read_books/dokja_store"
 	"read_books/internal/app"
@@ -209,6 +210,9 @@ func main() {
 			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
 		).WithReading(handlers.NewReadingTask(
 			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
+		)).WithIntake(handlers.NewIntakeTask(
+			feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
+			func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 		)),
 		handlers.NewDigestDomainHandler(feedsClient),
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(

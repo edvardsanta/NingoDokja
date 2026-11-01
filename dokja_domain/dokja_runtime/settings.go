@@ -37,6 +37,7 @@ var (
 	phone       = regexp.MustCompile(`^[0-9]{7,15}$`)
 	aliasName   = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 	limitNumber = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
+	feedPlugin  = regexp.MustCompile(`^[a-z0-9_-]{1,40}$`)
 )
 
 var settingsCatalog = []Setting{
@@ -50,6 +51,7 @@ var settingsCatalog = []Setting{
 	{ID: "whatsapp.own_chat", Group: "whatsapp", Env: "DOKJA_WHATSAPP_SELF_CHAT", Default: "true", Kind: "flag", Options: []string{"true", "false"}, Affects: []string{"orchestrator", "whatsapp"}, parse: oneOf("true", "false")},
 	{ID: "library.max_file_mb", Group: "library", Env: "KNOWLEDGE_MAX_FILE_MB", Kind: "text", Affects: []string{"knowledge"}, parse: wholeNumber},
 	{ID: "library.max_text_chars", Group: "library", Env: "KNOWLEDGE_MAX_TEXT_CHARS", Kind: "text", Affects: []string{"knowledge"}, parse: wholeNumber},
+	{ID: "library.intake_sources", Group: "library", Env: "DOKJA_KNOWLEDGE_INTAKE_SOURCES", Kind: "list", Affects: []string{"orchestrator"}, parse: listOf(feedSource)},
 	{ID: "models.embedding", ReadOnly: true, Group: "models", Env: "DOKJA_EMBED_MODEL", Default: "bge-m3", Kind: "text", Affects: []string{"embedding_init", "memory", "knowledge"}, Note: "reindex", parse: model},
 	{ID: "models.book_classifier", Group: "models", Env: "DOKJA_BOOK_CLASSIFIER_MODEL", Default: "typeform/distilbert-base-uncased-mnli", Kind: "text", Affects: []string{"feeds"}, parse: model},
 	{ID: "models.book_overview", Group: "models", Env: "DOKJA_BOOK_OVERVIEW_MODEL", Default: "sshleifer/distilbart-cnn-12-6", Kind: "text", Affects: []string{"feeds"}, parse: model},
@@ -73,6 +75,14 @@ const WebhooksEnv = "DOKJA_DISCORD_WEBHOOKS"
 func channel(value string) (string, error) {
 	if !channelID.MatchString(value) {
 		return "", fmt.Errorf("not a channel id")
+	}
+	return value, nil
+}
+
+// feedSource is the id of a Feeds plugin, as its manifest must spell it.
+func feedSource(value string) (string, error) {
+	if !feedPlugin.MatchString(value) {
+		return "", fmt.Errorf("not a source id")
 	}
 	return value, nil
 }
