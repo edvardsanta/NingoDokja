@@ -61,12 +61,12 @@ commit establishes the freeze. Contract tests may validate file structure;
 assessor regression tests use development examples and adversarial mutations,
 not held-out provider answers. This batch does not run a model comparison.
 
-Freeze the following comparison protocol before any provider run. It is at revision 2;
-see [the comparison harness](knowledge-comparison.md) for the one change and its reason:
+Freeze the following comparison protocol before any provider run. It is at revision 3;
+see [the comparison harness](knowledge-comparison.md) for each change and its reason:
 
 | Item | Bound or criterion |
 | --- | --- |
-| Strategies | Fixed selected-document context vs bounded adaptive retrieval |
+| Strategies | Fixed selected-document context vs bounded adaptive retrieval, defined in revision 3 |
 | Cases / repeats | All 8 cases, 2 independent runs per strategy: 32 runs |
 | Provider calls | Fixed: 1 per run; adaptive: at most 3; total ceiling 64 |
 | Per-call token ceilings | 12000 input / 6000 output (2000 in revision 1); overflow is a recorded failure |
@@ -84,6 +84,8 @@ recorded before comparison, with all raw proposals and failures accounted for.
 Held-out evaluation, including of the [semantic review](knowledge-semantic-review.md), remains pending in `08.3`.
 Experience-removal, eligible/inapplicable episode and restart/reuse controls are
 additional required evaluations when those application capabilities exist.
+
+The harness is [`dokja_orch/cmd/knowledge-comparison`](knowledge-comparison.md).
 
 ## Implemented application path
 

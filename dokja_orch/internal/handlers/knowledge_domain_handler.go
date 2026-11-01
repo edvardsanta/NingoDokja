@@ -63,6 +63,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		event.EventID, event.Type, workflow.Action, event.Source, len(event.Payload),
 	))
 
+	if workflow.Action == knowledgedomain.ActionProposeAdaptiveApplication {
+		return h.proposeAdaptively(ctx, event)
+	}
 	if workflow.Action == knowledgedomain.ActionReviewApplication {
 		return h.reviewApplication(ctx, event)
 	}
