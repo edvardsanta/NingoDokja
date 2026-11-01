@@ -20,6 +20,28 @@ evidence is [these development measurements](knowledge-provider-proposals.md#rea
 The corpus, cases, input ceiling, call ceilings, run counts, rubric and pass target are
 unchanged, and no held-out answer informed the change.
 
+## Protocol revision 3
+
+Revision 1 said "bounded adaptive retrieval, at most 3 calls" and did not define what
+adaptive starts from. That choice decides what the comparison measures, so the owner
+fixed it before any comparison run. No held-out goal or answer informed this definition.
+
+| Item | Definition |
+| --- | --- |
+| Start | The goal alone. The case's document selection is not used |
+| First retrieval | Search on the goal, then read the top 3 relevant documents |
+| Gap | By rule: `needs_evidence`, or `clarify`. Conflicted, blocked and abstained are not gaps |
+| Second retrieval | One search on the gap's own text, reading at most 2 new documents |
+| Provider calls | At most 2, inside the original ceiling of 3 |
+| Search in the comparison | Deterministic stand-in over the 6 frozen documents |
+
+Real proposals take about 30 seconds, so a third call would not fit the unchanged
+90-second run. A gap is found by rule for the same reason, and costs no call.
+
+The stand-in ranks by distinct shared terms, with corpus order breaking ties. It keeps
+runs comparable, but it is not the real hybrid search, so results say nothing about
+real ranking quality. Treat that as a limit of every adaptive result.
+
 ## Running it
 
 From `dokja_orch`, with a measured provider selected in Runtime (`codex` or
@@ -32,7 +54,7 @@ go run ./cmd/knowledge-comparison -split development -runs 2 -out ../test_report
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `-split` | `development` | `development` or `held_out` |
-| `-strategy` | `fixed` | Only `fixed` exists; others are refused |
+| `-strategy` | `fixed` | `fixed` or `adaptive` |
 | `-runs` | 2 | Independent runs per case |
 | `-case` | all | One case, development only |
 | `-review` | true | Also request a semantic review, reported apart |
@@ -47,10 +69,11 @@ go run ./cmd/knowledge-comparison -split development -runs 2 -out ../test_report
 
 - Fixture digests must match the frozen files, or the run is refused.
 - `held_out` needs explicit consent and runs every case exactly twice.
-- A plan above the 64-call ceiling is refused. Review calls are counted apart.
+- A plan above the 64-call ceiling is refused, counting each strategy's maximum calls.
+  Review calls are counted apart.
 - A report is never overwritten, and each run is written as soon as it ends.
 - The corpus is served by an in-memory port that refuses everything except
-  `knowledge.list`, so a run cannot read or change the Library.
+  `knowledge.list` and `knowledge.search`, so a run cannot read or change the Library.
 - Failed runs stay in the report. Unknown usage is counted on its own, never as zero.
 
 The report opens with a header holding the protocol revision, split, strategy, binding,
@@ -87,10 +110,28 @@ an uncovered date-window condition. Counting the earlier probes, same-model revi
 not yet accepted a real proposal; whether that is right or too strict is an `08.3`
 question. The rubric has not been applied to these answers.
 
+## Adaptive development run
+
+Run on 2026-11-01 under revision 3, on the same kind of temporary host, two runs per
+development case. These are development results, and the rubric was not applied.
+
+| Case | Round 1 | Round 2 | Final | Calls | Time |
+| --- | --- | --- | --- | --- | --- |
+| `dev-supported` run 1 | `conditional` | not needed | `conditional` | 1 | 26 s |
+| `dev-supported` run 2 | `needs_evidence` | Read the foreign and unresolved notes | `conflicted` | 2 | 64 s |
+| `dev-missing` run 1 | `clarify` | Read `api-v1` and the unresolved note | `clarify` | 2 | 10 s |
+| `dev-missing` run 2 | `clarify` | Read `api-v1` and the unresolved note | `clarify` | 2 | 9 s |
+
+The goal search found the three relevant documents in all four runs, with this stand-in
+search. All runs fit the 90-second limit and the token ceilings. Second retrieval helped
+none of these runs, and in `dev-supported` run 2 it moved a mostly supported proposal to
+`conflicted`. On `dev-missing` it spent a call on facts only the user can supply. Whether
+adaptive retrieval earns its cost is what the held-out comparison decides. Both reviews
+ended `needs_revision` on an uncovered date condition, as with the fixed strategy.
+
 ## Not done
 
-- The adaptive strategy does not exist, so no comparison has run.
-- Held-out cases have not been run. Run them once the adaptive strategy exists.
+- The held-out comparison has not run, for either strategy.
 - Rubric scoring is manual and independent. The sheet prepares it and nothing automates it.
 
 Implementation: [harness](../dokja_orch/cmd/knowledge-comparison/comparison.go) and
