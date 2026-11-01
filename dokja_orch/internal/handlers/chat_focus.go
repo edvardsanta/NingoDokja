@@ -42,7 +42,9 @@ marks, copying exactly what is written here, and mark each quote with its number
 for example [1]. Quote only from these excerpts: never from memory, never a paraphrase in quotation
 marks, and every quote is checked against the document, so an inexact one will be removed. If they
 hold fewer passages than asked for, give the ones there are and say how many. There are no page
-numbers here, so do not give any. Reply in the language the user wrote in.`
+numbers here, so do not give any. These are only some passages of the document: a quote from earlier
+in the conversation that is missing here may still be in it, so do not take one back for that. Reply
+in the language the user wrote in.`
 
 // asksForText recognizes a question about the text itself, in the languages Ningo is spoken to in.
 var asksForText = regexp.MustCompile(`(?i)(^|[^\p{L}])(cita[çc][ãa]o|cita[çc][õo]es|citar|cite|frases?|trechos?|passagens?|excertos?|literalmente|textualmente|quotes?|quotations?|passages?|excerpts?|sentences?|verbatim)($|[^\p{L}])`)
@@ -216,9 +218,11 @@ func (f *chatFocus) remember(turn knowledgeTurn, question string, cited []knowle
 }
 
 var (
-	straightQuote  = regexp.MustCompile(`"([^"\n]+)"`)
-	curlyQuote     = regexp.MustCompile(`“([^”]+)”`)
-	angleQuote     = regexp.MustCompile(`«([^»]+)»`)
+	// The second group is the citation right after a quote, which is the reply saying "this is in
+	// the document".
+	straightQuote  = regexp.MustCompile(`"([^"\n]+)"(\s*\[\d[^\]]*\])?`)
+	curlyQuote     = regexp.MustCompile(`“([^”]+)”(\s*\[\d[^\]]*\])?`)
+	angleQuote     = regexp.MustCompile(`«([^»]+)»(\s*\[\d[^\]]*\])?`)
 	quoteEllipsis  = regexp.MustCompile(`\[?\s*(?:…|\.\.\.)\s*\]?`)
 	brokenWord     = regexp.MustCompile(`-\s+`)
 	whitespaceRuns = regexp.MustCompile(`\s+`)
@@ -254,12 +258,13 @@ func containsPieces(text string, pieces []string) bool {
 	return true
 }
 
-// verifyQuotes takes out of a reply about the text any quote the document does not contain. The
-// model is told not to invent one, which is not the same as it not happening, and an invented
-// sentence by a real author is the worst thing a citation can carry. Short quotes are left alone:
-// they are as often the user's own words or a turn of phrase.
+// verifyQuotes takes out of a reply any quote it attributes to a document that the document does
+// not contain. The model is told not to invent one, which is not the same as it not happening, and
+// an invented sentence by a real author is the worst thing a citation can carry. In a turn about
+// the text every quote counts; otherwise only one followed by a citation does, since the rest are
+// as often the user's own words. Short quotes are left alone for the same reason.
 func (h *ChatDomainHandler) verifyQuotes(ctx context.Context, reply string, sources []knowledgeSource, turn knowledgeTurn) string {
-	if !turn.text || len(sources) == 0 {
+	if !turn.planned || len(sources) == 0 {
 		return reply
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, quoteCheckBudget)
@@ -267,8 +272,9 @@ func (h *ChatDomainHandler) verifyQuotes(ctx context.Context, reply string, sour
 	removed, checked := 0, 0
 	check := func(pattern *regexp.Regexp, open, closing string) {
 		reply = pattern.ReplaceAllStringFunc(reply, func(match string) string {
-			inner := pattern.FindStringSubmatch(match)[1]
-			if len(strings.Fields(inner)) < quoteMinWords {
+			groups := pattern.FindStringSubmatch(match)
+			inner, citation := groups[1], groups[2]
+			if len(strings.Fields(inner)) < quoteMinWords || (!turn.text && citation == "") {
 				return match
 			}
 			pieces := quotePieces(inner)
@@ -277,7 +283,7 @@ func (h *ChatDomainHandler) verifyQuotes(ctx context.Context, reply string, sour
 				return match
 			}
 			removed++
-			return open + quoteRemoved + closing
+			return open + quoteRemoved + closing + citation
 		})
 	}
 	check(curlyQuote, "“", "”")

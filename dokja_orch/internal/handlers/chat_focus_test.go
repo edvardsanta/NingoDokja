@@ -170,10 +170,25 @@ func TestEachSideOfAnEllipsisMustBeInTheText(t *testing.T) {
 	}
 }
 
-func TestQuotesAreOnlyCheckedWhenTheTurnIsAboutTheText(t *testing.T) {
+func TestOutsideATurnAboutTheTextOnlyACitedQuoteIsChecked(t *testing.T) {
 	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
-	reply := `Como você disse, “isso não faz sentido nenhum aqui” [1].`
-	if got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, knowledgeTurn{planned: true}); got != reply {
+	handler := focusHandler(&documentBase{})
+	turn := knowledgeTurn{planned: true}
+	reply := `Como você disse, “isso não faz sentido nenhum aqui”.`
+	if got := handler.verifyQuotes(context.Background(), reply, sources, turn); got != reply {
+		t.Fatalf("got %q", got)
+	}
+	// A stitched quote: both ends are the author's, the sentence is not.
+	stitched := `Ela escreve: "se não for conforme à fé, queime logo" [1].`
+	if got := handler.verifyQuotes(context.Background(), stitched, sources, turn); got != `Ela escreve: "[…]" [1].` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestASpokenTurnKeepsItsQuotes(t *testing.T) {
+	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	reply := `“uma frase qualquer de quatro palavras” [1]`
+	if got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, knowledgeTurn{}); got != reply {
 		t.Fatalf("got %q", got)
 	}
 }

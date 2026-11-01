@@ -280,9 +280,10 @@ deployment currently has an active blocking policy.
 A document a reply cites becomes the conversation's focus: follow-ups search inside it, with the
 question that brought it up, until three replies pass without it. The focus lives in the
 orchestrator's memory, so a restart only loses it until the next question about the document. A
-turn about the text itself (quotes, passages) brings more passages and a text-first brief, and
-each quote of four words or more is checked against the document; one it does not hold is
-replaced by `[…]` before the session keeps the reply.
+turn about the text itself (quotes, passages) brings more passages and a text-first brief. Quotes
+of four words or more are checked against the document, all of them in such a turn and those
+followed by a citation in any other; one it does not hold is replaced by `[…]` before the session
+keeps the reply.
 
 Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),
