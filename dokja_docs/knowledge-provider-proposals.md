@@ -154,10 +154,9 @@ orchestrator and Runtime. The held-out cases were not used.
 | `dev-missing` | 6 | 271..331 | 4397..4448 | 4..5 s | `clarify` |
 
 All 12 replies decoded and none was fenced, so the fence risk did not appear here.
-All 6 `dev-supported` runs exceed the frozen 2000-token output ceiling. Reported output
-includes thinking, and the unmeasured path has no such check. Under the frozen rule
-each would be a recorded failure, so this model cannot meet the 15-of-16 target. The
-ceiling stays unchanged until the owner decides.
+All 6 `dev-supported` runs exceed the original 2000-token output ceiling. Reported
+output includes thinking. Each would have been a recorded failure, so the owner raised
+the ceiling to 6000 in [protocol revision 2](knowledge-comparison.md).
 
 The first three `dev-supported` runs wrapped goal facts in uncited claims, because a
 goal has no source to quote. The assessor then reported `needs_evidence`, which no

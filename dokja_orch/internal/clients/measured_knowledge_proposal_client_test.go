@@ -24,7 +24,7 @@ func TestMeasuredKnowledgeUsesAcceptanceBudgetAndRetainsRejectedUsage(t *testing
 				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 					t.Error(err)
 				}
-				if request.Budget["max_input_tokens"] != 12000 || request.Budget["max_output_tokens"] != 2000 || len(request.Messages) != 2 {
+				if request.Budget["max_input_tokens"] != 12000 || request.Budget["max_output_tokens"] != knowledge.ProposalMaxOutputTokens || len(request.Messages) != 2 {
 					t.Error("budget lost")
 				}
 				input := any(100)

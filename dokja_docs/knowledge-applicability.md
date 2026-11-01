@@ -61,14 +61,15 @@ commit establishes the freeze. Contract tests may validate file structure;
 assessor regression tests use development examples and adversarial mutations,
 not held-out provider answers. This batch does not run a model comparison.
 
-Freeze the following comparison protocol before any provider run:
+Freeze the following comparison protocol before any provider run. It is at revision 2;
+see [the comparison harness](knowledge-comparison.md) for the one change and its reason:
 
 | Item | Bound or criterion |
 | --- | --- |
 | Strategies | Fixed selected-document context vs bounded adaptive retrieval |
 | Cases / repeats | All 8 cases, 2 independent runs per strategy: 32 runs |
 | Provider calls | Fixed: 1 per run; adaptive: at most 3; total ceiling 64 |
-| Per-call token ceilings | 12000 input / 2000 output; overflow is a recorded failure |
+| Per-call token ceilings | 12000 input / 6000 output (2000 in revision 1); overflow is a recorded failure |
 | Per-run elapsed ceiling | 90 seconds; no hidden retries or uncounted repair calls |
 | Corpus mutation / external effects | None |
 | Blocking integrity checks | 100% valid identities, source pins/spans, scopes, cancellation and budgets |
