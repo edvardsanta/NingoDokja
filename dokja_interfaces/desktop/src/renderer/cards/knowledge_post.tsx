@@ -473,7 +473,7 @@ function PostBlock({
         <button
           type="button"
           ref={saveRef}
-          className="quiet"
+          className={canSaveLocally ? "quiet" : "primary"}
           aria-label={t("post_add_library_named", { title })}
           aria-busy={saving}
           disabled={saving || localSaving}
