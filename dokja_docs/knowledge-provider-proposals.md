@@ -136,3 +136,8 @@ usage and rejects over-budget results after generation for supported adapters.
 This original action keeps null token metrics. The measured path does not add
 pre-generation resource/billing caps or semantic acceptance, and the frozen
 comparison remains unrun.
+
+## Subsequent semantic review
+
+[Semantic review](knowledge-semantic-review.md) adds `knowledge.application.review`
+as a separate action. Proposal results above are unchanged and stay unverified.

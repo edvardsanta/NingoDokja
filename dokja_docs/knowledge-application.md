@@ -109,8 +109,8 @@ The existing route baseline includes the new opt-in action.
 The subsequent [assessment batch](knowledge-applicability.md) defines the cited
 claim/method proposal contract and freezes an authored technical corpus, held-out
 cases, rubric and comparison budget. The [provider proposal path](knowledge-provider-proposals.md) subsequently adds
-candidate extraction. Next, integrate independent semantic review and complete
-token accounting under that protocol before claiming knowledge application. Test supported application,
+candidate extraction, and the [semantic review](knowledge-semantic-review.md) adds a
+separate model opinion. Next, complete token accounting under that protocol before claiming knowledge application. Test supported application,
 missing preconditions, contradictions, stale/foreign evidence and legitimate
 abstentions. Actual attempt/outcome recording, eligible episode reuse and durable
 restart controls remain required before step `08.3` can evaluate cognition.
