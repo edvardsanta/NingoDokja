@@ -40,7 +40,7 @@ function renderPost(transport: Transport, locale: Locale = "en", onAdded?: () =>
 
 const field = () => screen.getByLabelText(/^(Post link|Link da publicação)$/) as HTMLInputElement;
 const show = () => screen.getByRole("button", { name: /^(Show post|Mostrar publicação)$/ });
-const keep = () => screen.getByRole("button", { name: /^Save to the Library/ });
+const keep = () => screen.getByRole("button", { name: /^Add to the Library: / });
 const type = (value: string) => fireEvent.change(field(), { target: { value } });
 const reads = (calls: Array<{ type: string }>) => calls.filter((call) => call.type === "digest.link.read");
 const saves = (calls: Array<{ type: string }>) => calls.filter((call) => call.type === "knowledge.ingest");
@@ -55,6 +55,13 @@ async function open(transport: Transport, locale: Locale = "en") {
 }
 
 describe("the Post way of adding", () => {
+  it("makes saving on this computer the main action only where it is possible", async () => {
+    const { transport } = routedTransport({ "digest.link.read": posted() });
+    await open({ ...transport, savePostLocally: async () => ok({}) });
+    expect(screen.getByRole("button", { name: /^Save .*: Example Author/ }).className).toContain("primary");
+    expect(keep().className).toContain("quiet");
+  });
+
   it("is the fourth way, and shows its own field instead of the form", () => {
     render(
       <I18nProvider locale="en">
@@ -120,7 +127,7 @@ describe("the Post way of adding", () => {
     expect(screen.getByText(/Oct 2[01], 2026, Files: 2/)).toBeTruthy();
     expect(show().className).not.toContain("primary");
     expect(keep().className).toContain("primary");
-    expect(keep().getAttribute("aria-label")).toBe("Save to the Library: Example Author");
+    expect(keep().getAttribute("aria-label")).toBe("Add to the Library: Example Author");
     expect(document.activeElement).toBe(field());
 
     const picture = screen.getByAltText("Image 1 of 2") as HTMLImageElement;
@@ -233,7 +240,7 @@ describe("the Post way of adding", () => {
     fireEvent.click(show());
 
     await screen.findByRole("heading", { name: LINK });
-    expect(keep().getAttribute("aria-label")).toBe(`Save to the Library: ${LINK}`);
+    expect(keep().getAttribute("aria-label")).toBe(`Add to the Library: ${LINK}`);
   });
 
   it("says which file could not be shown", async () => {
@@ -253,7 +260,7 @@ describe("the Post way of adding", () => {
     type(`${LINK}4`);
 
     expect(screen.queryByRole("heading", { name: "Example Author" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Save to the Library/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Add to the Library: / })).toBeNull();
     expect(screen.queryByAltText("Image 1 of 2")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe("");
     expect(show().className).toContain("primary");
@@ -326,7 +333,7 @@ describe("the Post way of adding", () => {
     await screen.findByText("Saved to the Library: Example Author.");
   });
 
-  it("stays quiet when the owner cancels the shell's question, and goes back to Save", async () => {
+  it("stays quiet when the owner cancels the shell's question, and goes back to Add", async () => {
     const { transport, calls } = routedTransport({
       "digest.link.read": posted(),
       "knowledge.ingest": [failure("cancelled", "the question was declined"), ok(CREATED)],
@@ -437,9 +444,9 @@ describe("the Post way of adding", () => {
     screen.getByAltText("Imagem 1 de 2");
     screen.getByLabelText("Vídeo 2 de 2");
     screen.getByText("Alguns arquivos não puderam ser baixados (1). Ao guardar, só os outros são mantidos. Mostre a publicação de novo para tentar outra vez.");
-    expect(screen.getByRole("button", { name: "Guardar na Biblioteca: Example Author" }).textContent).toBe("Guardar na Biblioteca");
+    expect(screen.getByRole("button", { name: "Adicionar à Biblioteca: Example Author" }).textContent).toBe("Adicionar à Biblioteca");
 
-    fireEvent.click(screen.getByRole("button", { name: /^Guardar na Biblioteca/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Adicionar à Biblioteca: / }));
     await screen.findByText("Guardada na Biblioteca: Example Author.");
     screen.getByText("Arquivos copiados para este computador: 2.");
   });
