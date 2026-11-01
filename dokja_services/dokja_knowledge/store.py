@@ -70,6 +70,12 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def parts_of(source_id: str) -> str:
+    """The LIKE pattern for the parts of a document, stored as <source_id>#<key>."""
+    escaped = source_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"{escaped}#%"
+
+
 class Store:
     backend = "sqlite"
 
@@ -326,7 +332,9 @@ class Store:
             )
         self.version += 1
 
-    def embedding_matrix(self, model: str, kind: str = "") -> tuple[np.ndarray, np.ndarray]:
+    def embedding_matrix(
+        self, model: str, kind: str = "", source_id: str = ""
+    ) -> tuple[np.ndarray, np.ndarray]:
         """(chunk ids, matrix) of every chunk embedded by `model`. Rows are unit vectors."""
         rows = self.conn.execute(
             """
@@ -336,9 +344,10 @@ class Store:
             WHERE c.embedding IS NOT NULL
               AND c.embed_model = ?
               AND (? = '' OR d.kind = ?)
+              AND (? = '' OR d.source_id = ? OR d.source_id LIKE ? ESCAPE '\\')
             ORDER BY c.id
             """,
-            (model, kind, kind),
+            (model, kind, kind, source_id, source_id, parts_of(source_id)),
         ).fetchall()
         if not rows:
             return np.zeros(0, dtype=np.int64), np.zeros((0, 0), dtype=np.float32)
@@ -348,7 +357,9 @@ class Store:
 
     # ---- keyword search -------------------------------------------------------------
 
-    def keyword_search(self, fts_query: str, limit: int, kind: str = "") -> list[tuple[int, float]]:
+    def keyword_search(
+        self, fts_query: str, limit: int, kind: str = "", source_id: str = ""
+    ) -> list[tuple[int, float]]:
         """(chunk id, bm25) best first. bm25 is lower for better matches in SQLite."""
         if not fts_query:
             return []
@@ -360,10 +371,11 @@ class Store:
             JOIN documents d ON d.id = c.document_id
             WHERE chunks_fts MATCH ?
               AND (? = '' OR d.kind = ?)
+              AND (? = '' OR d.source_id = ? OR d.source_id LIKE ? ESCAPE '\\')
             ORDER BY score
             LIMIT ?
             """,
-            (fts_query, kind, kind, limit),
+            (fts_query, kind, kind, source_id, source_id, parts_of(source_id), limit),
         ).fetchall()
         return [(row["rowid"], row["score"]) for row in rows]
 

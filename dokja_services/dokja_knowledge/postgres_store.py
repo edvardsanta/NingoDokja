@@ -16,7 +16,7 @@ from chunker import Chunk
 from metadata import encode_metadata
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
-from store import _now
+from store import _now, parts_of
 
 
 class PostgresStore:
@@ -335,7 +335,7 @@ class PostgresStore:
             )
         self.version += 1
 
-    def vector_search(self, vector, model, kind, limit):
+    def vector_search(self, vector, model, kind, limit, source_id=""):
         vector = np.asarray(vector, dtype=np.float32)
         rows = self.conn.execute(
             """
@@ -343,6 +343,7 @@ class PostgresStore:
                 SELECT c.id, c.embedding FROM chunks c JOIN documents d ON d.id=c.document_id
                 WHERE c.embedding IS NOT NULL AND c.embed_model=%s
                   AND vector_dims(c.embedding)=%s AND (%s = '' OR d.kind=%s)
+                  AND (%s = '' OR d.source_id=%s OR d.source_id LIKE %s ESCAPE '\\')
             )
             SELECT id, CASE WHEN vector_norm(embedding)=0 OR %s THEN 0
                             ELSE 1 - (embedding <=> %s) END AS score FROM eligible
@@ -353,6 +354,9 @@ class PostgresStore:
                 len(vector),
                 kind,
                 kind,
+                source_id,
+                source_id,
+                parts_of(source_id),
                 bool(np.linalg.norm(vector) == 0),
                 vector,
                 limit,
@@ -360,7 +364,7 @@ class PostgresStore:
         ).fetchall()
         return {row["id"]: float(row["score"]) for row in rows}
 
-    def keyword_search(self, fts_query, limit, kind=""):
+    def keyword_search(self, fts_query, limit, kind="", source_id=""):
         # The caller supplies quoted OR terms, not arbitrary SQL/tsquery syntax.
         terms = re.findall(r'"([^"\\]+)"', fts_query)
         if not terms:
@@ -371,9 +375,10 @@ class PostgresStore:
             SELECT c.id, -ts_rank_cd(c.search_text, to_tsquery('dokja_knowledge.knowledge_search', %s)) AS score
             FROM chunks c JOIN documents d ON d.id=c.document_id
             WHERE c.search_text @@ to_tsquery('dokja_knowledge.knowledge_search', %s) AND (%s = '' OR d.kind=%s)
+              AND (%s = '' OR d.source_id=%s OR d.source_id LIKE %s ESCAPE '\\')
             ORDER BY score, c.id LIMIT %s
         """,
-            (query, query, kind, kind, limit),
+            (query, query, kind, kind, source_id, source_id, parts_of(source_id), limit),
         ).fetchall()
         return [(row["id"], row["score"]) for row in rows]
 

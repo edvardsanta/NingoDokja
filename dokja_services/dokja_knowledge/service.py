@@ -388,11 +388,17 @@ class KnowledgeService:
         kind = str(payload.get("kind") or "").strip().lower()
         if kind and not KIND.match(kind):
             raise ValueError("kind must be a short lowercase word such as note, article or book")
+        # One document and its parts, for a conversation that is about it.
+        source_id = payload.get("source_id")
+        if source_id is None:
+            source_id = ""
+        elif not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
+            raise ValueError("source_id must be valid")
 
-        semantic, degraded, reason = self._semantic_candidates(query, kind)
+        semantic, degraded, reason = self._semantic_candidates(query, kind, source_id)
         query_terms = terms(query)
         fts_query = " OR ".join(f'"{term}"' for term in query_terms)
-        keyword = dict(self.store.keyword_search(fts_query, CANDIDATES, kind))
+        keyword = dict(self.store.keyword_search(fts_query, CANDIDATES, kind, source_id))
 
         # Reciprocal rank fusion over the two rankings.
         fused: dict[int, float] = {}
@@ -428,7 +434,9 @@ class KnowledgeService:
             result["reason"] = reason
         return result
 
-    def _semantic_candidates(self, query: str, kind: str = "") -> tuple[dict[int, float], bool, str]:
+    def _semantic_candidates(
+        self, query: str, kind: str = "", source_id: str = ""
+    ) -> tuple[dict[int, float], bool, str]:
         """chunk id -> cosine for the closest chunks. Empty and degraded if embeddings are out."""
         if self.embedder is None:
             return {}, True, "no embedding server is configured; keyword search only"
@@ -438,7 +446,7 @@ class KnowledgeService:
             logger.warning("semantic search unavailable: %s", err)
             return {}, True, f"{err}; keyword search only"
         if hasattr(self.store, "vector_search"):
-            scores = self.store.vector_search(vector[0], self.model, kind, CANDIDATES)
+            scores = self.store.vector_search(vector[0], self.model, kind, CANDIDATES, source_id)
             if scores:
                 return scores, False, ""
             if kind and self.store.document_count(kind) == 0:
@@ -446,7 +454,7 @@ class KnowledgeService:
             if self.store.stats(self.model)["chunks"] > 0:
                 return {}, True, "embeddings are missing for this model (reindex pending); keyword search only"
             return {}, False, ""
-        ids, matrix = self._embeddings(kind)
+        ids, matrix = self._embeddings(kind, source_id)
         if len(ids) == 0 or matrix.shape[1] != vector.shape[1]:
             if kind and self.store.document_count(kind) == 0:
                 return {}, False, ""
@@ -459,9 +467,9 @@ class KnowledgeService:
         top = np.argsort(-scores)[:CANDIDATES]
         return {int(ids[i]): float(scores[i]) for i in top}, False, ""
 
-    def _embeddings(self, kind: str = "") -> tuple[np.ndarray, np.ndarray]:
-        if kind:
-            return self.store.embedding_matrix(self.model, kind)
+    def _embeddings(self, kind: str = "", source_id: str = "") -> tuple[np.ndarray, np.ndarray]:
+        if kind or source_id:
+            return self.store.embedding_matrix(self.model, kind, source_id)
         if self._matrix_version != self.store.version:
             self._ids, self._matrix = self.store.embedding_matrix(self.model)
             self._matrix_version = self.store.version

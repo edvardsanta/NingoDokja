@@ -142,6 +142,21 @@ def test_the_relevance_threshold_can_be_set_per_request(service):
     assert service.search({"query": "football championship", "min_score": 0.99})["relevant_count"] == 0
 
 
+def test_a_search_can_stay_inside_one_document_and_its_parts(service):
+    service.ingest({"title": "Birds", "body": "Herons wade in shallow water.", "source_id": "doc:birds"})
+    service.ingest({"title": "Birds 2", "body": "Herons nest in tall trees.", "source_id": "doc:birds#part2"})
+    service.ingest({"title": "Other", "body": "Herons appear on the coat of arms.", "source_id": "doc:birdsong"})
+
+    hits = service.search({"query": "herons", "source_id": "doc:birds", "k": 10})["hits"]
+
+    assert {hit["source_id"] for hit in hits} == {"doc:birds", "doc:birds#part2"}
+
+
+def test_a_document_search_takes_only_a_valid_id(service):
+    with pytest.raises(ValueError, match="source_id"):
+        service.search({"query": "herons", "source_id": "bad id'"})
+
+
 def test_queries_with_search_syntax_do_not_break_the_keyword_index(service):
     add(service, KANT)
     for query in ['"Kant"', "kant AND", "kant OR (reason", "reason*", "kant: reason -pure", "'; DROP TABLE chunks;--", "***"]:
