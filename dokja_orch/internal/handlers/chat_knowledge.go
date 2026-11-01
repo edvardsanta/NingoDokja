@@ -96,6 +96,17 @@ type knowledgeSource struct {
 	Reference string
 	// Register says how to talk about the document, from its classification; often empty.
 	Register string
+	// AskedForText marks a turn about the text itself, which changes the brief.
+	AskedForText bool
+}
+
+// reference is the brief for a set of sources, and the text-first one when the user asked about
+// the text itself.
+func referenceBrief(sources []knowledgeSource) string {
+	if len(sources) > 0 && sources[0].AskedForText {
+		return knowledgeTextBrief
+	}
+	return knowledgeReferenceBrief
 }
 
 func (s knowledgeSource) label() string {
@@ -170,13 +181,19 @@ func registerOf(hit map[string]any) string {
 }
 
 func relevantSources(result map[string]any) []knowledgeSource {
+	return selectSources(result, knowledgeMaxChunks, knowledgeMaxChars, true)
+}
+
+// selectSources takes hits up to a budget. onlyRelevant is false when the document was chosen, so
+// that being in it is reason enough.
+func selectSources(result map[string]any, maxChunks, maxChars int, onlyRelevant bool) []knowledgeSource {
 	hits, _ := result["hits"].([]any)
 	sources := []knowledgeSource{}
 	numbers := map[string]int{}
-	budget := knowledgeMaxChars
+	budget := maxChars
 	for _, raw := range hits {
 		hit, _ := raw.(map[string]any)
-		if relevant, _ := hit["relevant"].(bool); !relevant {
+		if relevant, _ := hit["relevant"].(bool); onlyRelevant && !relevant {
 			continue
 		}
 		text := strings.TrimSpace(firstString(hit, "text"))
@@ -200,7 +217,7 @@ func relevantSources(result map[string]any) []knowledgeSource {
 			Reference: firstString(hit, "source_ref"),
 			Register:  registerOf(hit),
 		})
-		if len(sources) == knowledgeMaxChunks {
+		if len(sources) == maxChunks {
 			break
 		}
 	}
@@ -213,7 +230,7 @@ func relevantSources(result map[string]any) []knowledgeSource {
 // document cannot close its own quote and pose as part of the instructions.
 func knowledgeReference(sources []knowledgeSource) string {
 	var out strings.Builder
-	out.WriteString(knowledgeReferenceBrief + "\n")
+	out.WriteString(referenceBrief(sources) + "\n")
 	said := map[int]bool{}
 	for _, source := range sources {
 		out.WriteString("\n" + source.label() + "\n")

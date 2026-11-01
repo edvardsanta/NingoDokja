@@ -277,6 +277,13 @@ generic dispatcher does not currently interpret a successful moderation result
 as a stop instruction. This is a workflow transition gap, not evidence that every
 deployment currently has an active blocking policy.
 
+A document a reply cites becomes the conversation's focus: follow-ups search inside it, with the
+question that brought it up, until three replies pass without it. The focus lives in the
+orchestrator's memory, so a restart only loses it until the next question about the document. A
+turn about the text itself (quotes, passages) brings more passages and a text-first brief, and
+each quote of four words or more is checked against the document; one it does not hold is
+replaced by `[…]` before the session keeps the reply.
+
 Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),
 [chat handler](../dokja_orch/internal/handlers/chat_domain_handler.go).

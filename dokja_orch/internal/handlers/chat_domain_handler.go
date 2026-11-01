@@ -39,6 +39,7 @@ type ChatDomainHandler struct {
 	recent         func(context.Context, string, int) ([]digestdomain.Reference, error)
 	sessions       *chatSessionManager
 	voicePolicy    *chat.VoicePolicy
+	focus          *chatFocus
 
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
@@ -68,6 +69,7 @@ func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
 		generator:   generator,
 		sessions:    newChatSessionManager(),
 		voicePolicy: chat.NewVoicePolicy(),
+		focus:       newChatFocus(),
 		sends:       core.NewOrderedQueue(maxWaitingSends),
 		running:     core.NewRunningSends(),
 	}
@@ -198,6 +200,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	var sources []knowledgeSource
 	var result map[string]any
 	var keptLine string
+	var turn knowledgeTurn
 	if reply, ok := h.factReply(ctx, event, content); ok {
 		return map[string]any{"action": workflow.Action, "reply": reply}, nil
 	}
@@ -210,7 +213,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		if voice {
 			lookupCtx, cancelLookup = context.WithTimeout(ctx, chat.VoiceKnowledgeLookupBudget)
 		}
-		sources = h.lookupKnowledge(lookupCtx, content, anchor)
+		turn = h.planKnowledgeTurn(event, content, voice)
+		sources = h.lookupForTurn(lookupCtx, content, anchor, turn)
 		cancelLookup()
 		result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
 	}
@@ -226,12 +230,15 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision.Detailed)
 		h.voicePolicy.CompleteReply(chatSessionBaseKey(event), voiceDecision, rawReply)
 	}
+	// Checked before the session keeps it, so a false quote is not repeated as a fact later.
+	rawReply = h.verifyQuotes(ctx, rawReply, sources, turn)
 	if err := h.sessions.CompleteTurn(ctx, event, rawReply); err != nil {
 		return nil, err
 	}
 	// The session keeps the model's own words; citations are added only to what is sent, and only
 	// for the sources the reply actually cites.
 	sources = citedSources(rawReply, sources)
+	h.focus.remember(turn, content, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
 	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
 	if presentation.failed {
