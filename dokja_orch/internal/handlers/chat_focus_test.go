@@ -63,6 +63,8 @@ func TestAFollowUpSearchesTheDocumentACitedReplyWasAbout(t *testing.T) {
 	}
 }
 
+const malthusReply = "Sem as leis dos pobres, tal conjunto de pessoas felizes seria maior."
+
 // From a real conversation about Malthus: neither the question nor the first question of the
 // conversation names the poor laws, so the search reached the book's birth tables and Ningo said
 // the book did not hold the argument. Only its own previous reply had the words. The text is in
@@ -71,12 +73,11 @@ func TestAFollowUpSearchesWithWhatWasJustSaid(t *testing.T) {
 	base := &documentBase{hits: []any{bookHit(true)}}
 	handler := focusHandler(base)
 	citedBook(handler, "Viu Ensaio sobre o Princípio da População?")
-	turn := focusedTurn(handler, "O que sao pessoas felizes na população?")
-	handler.focus.remember(turn, "O que sao pessoas felizes na população?", []knowledgeSource{{Number: 1, SourceID: "file:book", Title: "The book"}})
-	handler.focus.rememberReply(turn, "Sem as leis dos pobres, tal conjunto de pessoas felizes seria maior.")
 
 	question := "Como ele explica essa ideia do estimulo aos nascimentos?"
-	handler.lookupForTurn(context.Background(), question, "", focusedTurn(handler, question))
+	turn := focusedTurn(handler, question)
+	turn.previousReply = malthusReply
+	handler.lookupForTurn(context.Background(), question, "", turn)
 
 	if len(base.scoped) != 1 || !strings.Contains(base.scoped[0], question+"\nSem as leis dos pobres") {
 		t.Fatalf("scoped query: %v", base.scoped)
@@ -86,38 +87,79 @@ func TestAFollowUpSearchesWithWhatWasJustSaid(t *testing.T) {
 	}
 }
 
-func TestTheLastReplySurvivesATurnWithoutCitations(t *testing.T) {
-	base := &documentBase{hits: []any{bookHit(true)}}
-	handler := focusHandler(base)
-	citedBook(handler, "the book")
-	turn := focusedTurn(handler, "and that?")
-	handler.focus.remember(turn, "and that?", nil)
-	handler.focus.rememberReply(turn, "The poor laws, from memory.")
+// documentAfterRestart is a base where only the words of the previous reply find the book.
+type documentAfterRestart struct{ documentBase }
 
-	handler.lookupForTurn(context.Background(), "from the text", "", focusedTurn(handler, "from the text"))
+func (b *documentAfterRestart) Search(_ context.Context, query string, _ int, _ float64) (map[string]any, error) {
+	b.searches = append(b.searches, query)
+	if strings.Contains(query, "leis dos pobres") {
+		return map[string]any{"hits": []any{bookHit(true)}}, nil
+	}
+	return map[string]any{"hits": []any{}}, nil
+}
 
-	if len(base.scoped) != 1 || !strings.Contains(base.scoped[0], "The poor laws, from memory.") {
-		t.Fatalf("scoped query: %v", base.scoped)
+// The same conversation, four seconds after a restart: the focus was gone, and without it
+// "de fragmentos" found nothing, so the model got no passages and asked for them.
+func TestAFollowUpFindsTheDocumentAgainAfterARestart(t *testing.T) {
+	base := &documentAfterRestart{}
+	handler := NewChatDomainHandler(nil).WithKnowledge(base, nil)
+	turn := focusedTurn(handler, "de fragmentos")
+	turn.previousReply = malthusReply
+
+	sources := handler.lookupForTurn(context.Background(), "de fragmentos", "", turn)
+
+	if len(sources) != 1 || !sources[0].AskedForText {
+		t.Fatalf("sources=%v searches=%v", sources, base.searches)
+	}
+	if len(base.searches) != 3 || !strings.Contains(base.searches[2], "de fragmentos\nSem as leis dos pobres") {
+		t.Fatalf("searches=%q", base.searches)
+	}
+	if turn.focus != nil {
+		t.Fatal("the test needs a turn without a focus")
 	}
 }
 
-func TestTheRememberedReplyIsBounded(t *testing.T) {
-	handler := focusHandler(&documentBase{})
-	citedBook(handler, "the book")
-	turn := focusedTurn(handler, "more")
-	handler.focus.rememberReply(turn, strings.Repeat("é", knowledgeMaxAnchorLen+50))
-	focus, _ := handler.focus.current(turn.key)
-	if utf8.RuneCountInString(focus.lastReply) != knowledgeMaxAnchorLen {
-		t.Fatal(utf8.RuneCountInString(focus.lastReply))
+func TestANewQuestionKeepsSearchingOnItsOwnWords(t *testing.T) {
+	base := &documentAfterRestart{}
+	handler := NewChatDomainHandler(nil).WithKnowledge(base, nil)
+	question := strings.Repeat("uma pergunta nova sobre outro assunto que nada tem a ver ", 2)
+	turn := focusedTurn(handler, question)
+	turn.previousReply = malthusReply
+
+	handler.lookupForTurn(context.Background(), question, "", turn)
+
+	if len(base.searches) != 1 || strings.Contains(base.searches[0], "leis dos pobres") {
+		t.Fatalf("searches=%q", base.searches)
 	}
 }
 
-func TestAReplyWithoutAFocusLeavesNoFocus(t *testing.T) {
-	handler := focusHandler(&documentBase{})
-	turn := focusedTurn(handler, "hello")
-	handler.focus.rememberReply(turn, "Hello.")
-	if _, ok := handler.focus.current(turn.key); ok {
-		t.Fatal("a reply created a focus")
+func TestAReadingAnchorIsNotReplacedByTheReply(t *testing.T) {
+	base := &documentAfterRestart{}
+	handler := NewChatDomainHandler(nil).WithKnowledge(base, nil)
+	turn := focusedTurn(handler, "e isso?")
+	turn.previousReply = malthusReply
+
+	handler.lookupForTurn(context.Background(), "e isso?", "the reading", turn)
+
+	for _, query := range base.searches {
+		if strings.Contains(query, "leis dos pobres") {
+			t.Fatalf("searches=%q", base.searches)
+		}
+	}
+}
+
+func TestPreviousReplyComesFromTheSessionAndIsBounded(t *testing.T) {
+	history := []chatMessage{
+		{Role: "assistant", Content: "older"},
+		{Role: "user", Content: "question"},
+		{Role: "assistant", Content: " " + strings.Repeat("é", knowledgeMaxAnchorLen+50)},
+		{Role: "user", Content: "de fragmentos"},
+	}
+	if reply := previousReply(history); utf8.RuneCountInString(reply) != knowledgeMaxAnchorLen || !strings.HasPrefix(reply, "é") {
+		t.Fatal(utf8.RuneCountInString(reply))
+	}
+	if reply := previousReply([]chatMessage{{Role: "user", Content: "first"}}); reply != "" {
+		t.Fatal(reply)
 	}
 }
 

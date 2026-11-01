@@ -56,9 +56,6 @@ type knowledgeFocus struct {
 	SourceID string
 	// Subject is what the user asked when the document came up, which a follow-up leaves unsaid.
 	Subject string
-	// lastReply is the start of Ningo's previous reply. A follow-up points at what was just said
-	// ("that idea"), and only the reply names it, so it searches better than the first question.
-	lastReply string
 	// wantsText is whether the last turn was about the text: "which topic?" is answered in one word.
 	wantsText bool
 	idle      int
@@ -91,6 +88,10 @@ type knowledgeTurn struct {
 	focus   *knowledgeFocus
 	text    bool
 	planned bool
+	// previousReply is the start of Ningo's last reply, from the session, so it survives a restart
+	// that loses the focus. A follow-up points at what was just said ("that idea"), and only the
+	// reply names it. It guides the search and is never evidence.
+	previousReply string
 }
 
 func (h *ChatDomainHandler) planKnowledgeTurn(event core.Event, content string, voice bool) knowledgeTurn {
@@ -125,6 +126,9 @@ func (h *ChatDomainHandler) lookupForTurn(ctx context.Context, question, anchor 
 	if len(sources) == 0 {
 		sources = h.lookupKnowledge(ctx, question, anchor)
 	}
+	if len(sources) == 0 && anchor == "" && turn.isFollowUp(question) {
+		sources = h.lookupFollowUp(ctx, question, turn)
+	}
 	if turn.text {
 		for i := range sources {
 			sources[i].AskedForText = true
@@ -144,7 +148,7 @@ func (h *ChatDomainHandler) lookupFocused(ctx context.Context, question string, 
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
 	defer cancel()
-	recent := turn.focus.lastReply
+	recent := turn.previousReply
 	if recent == "" {
 		recent = turn.focus.Subject
 	}
@@ -159,6 +163,39 @@ func (h *ChatDomainHandler) lookupFocused(ctx context.Context, question string, 
 		return nil
 	}
 	return selectSources(result, chunks, chars, !turn.text)
+}
+
+// isFollowUp is a short message after a reply, or a request for the text. Only those fall back on
+// the reply, so a new question of any length keeps searching on its own words.
+func (t knowledgeTurn) isFollowUp(question string) bool {
+	if t.previousReply == "" {
+		return false
+	}
+	return t.text || utf8.RuneCountInString(strings.TrimSpace(question)) <= knowledgeTopicRunes
+}
+
+// lookupFollowUp searches everything with what was just said. It is what finds the document again
+// when the focus is gone, and a reply that cites it brings the focus back.
+func (h *ChatDomainHandler) lookupFollowUp(ctx context.Context, question string, turn knowledgeTurn) []knowledgeSource {
+	if turn.text {
+		return h.lookupText(ctx, question, turn.previousReply)
+	}
+	return h.lookupKnowledge(ctx, question, turn.previousReply)
+}
+
+// previousReply is the start of the last reply in a session's history.
+func previousReply(history []chatMessage) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role != "assistant" {
+			continue
+		}
+		reply := strings.TrimSpace(history[i].Content)
+		if utf8.RuneCountInString(reply) > knowledgeMaxAnchorLen {
+			reply = string([]rune(reply)[:knowledgeMaxAnchorLen])
+		}
+		return reply
+	}
+	return ""
 }
 
 // lookupText is the general search with the budget of a question about the text.
@@ -182,26 +219,6 @@ func boundQuery(query string) string {
 		return string([]rune(query)[:knowledgeMaxQueryLen])
 	}
 	return query
-}
-
-// rememberReply keeps what the reply said for the next turn's search, and only for that: it is a
-// way to find the passage, never evidence of what the document says.
-func (f *chatFocus) rememberReply(turn knowledgeTurn, reply string) {
-	if f == nil || !turn.planned || turn.key == "" {
-		return
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	focus, ok := f.items[turn.key]
-	if !ok {
-		return
-	}
-	reply = strings.TrimSpace(reply)
-	if utf8.RuneCountInString(reply) > knowledgeMaxAnchorLen {
-		reply = string([]rune(reply)[:knowledgeMaxAnchorLen])
-	}
-	focus.lastReply = reply
-	f.items[turn.key] = focus
 }
 
 // documentOf is the id of a whole document: a part is stored as <source_id>#<key>.
