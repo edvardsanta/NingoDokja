@@ -141,15 +141,21 @@ frozen held-out cases were not used.
 An earlier run in this probe, under weaker isolation, took up to 163 seconds. That
 exceeds the 90-second task limit and would be recorded as a failure.
 
+A second probe chained real proposals into real reviews on `dev-supported`, three
+times, with the same model. One reply listed the method among the claims and was
+refused, and the instructions were then corrected; that correction has not been
+rerun. The other two ended `needs_revision`, at 39 seconds, about 7300 input and 4600
+to 4900 output tokens. One flagged effective dates the candidate never mentions and
+one flagged an endpoint the goal never names. No real proposal was accepted, so
+this review is strict on these cases, and whether it is too strict is unmeasured.
+
 ## What this does not establish
 
 - That the review is reliable. Repeated runs, held-out cases and same-model
   proposals belong to `08.3`.
 - That a review improves decisions over the proposal alone.
-- That Claude Code proposals fit the frozen 2000-token output ceiling. Reviews used
-  more than that, and reported output includes thinking. Proposals were not measured.
-- That real proposals decode. Fenced proposals are still refused by the strict
-  `propose` decoder, and two early review replies were fenced.
+- That real proposals fit the frozen token ceiling. On development cases they do not;
+  see [real proposals](knowledge-provider-proposals.md#real-proposals-on-the-development-cases).
 
 Implementation: [domain contract and rule](../dokja_domain/dokja_knowledge/semantic_review.go),
 [application workflow](../dokja_orch/internal/handlers/knowledge_application.go),
