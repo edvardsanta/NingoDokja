@@ -72,7 +72,7 @@ new provider settings are required by this change.
 `knowledge.application.propose.measured` is a new orchestrator event/action. It
 uses the exact existing preparation payload (`knowledge.application.context.v1`,
 goal, constraints, selected sources and optional text pins). It is wired to the
-measured Runtime port with **12000 input / 2000 output tokens** as result acceptance
+measured Runtime port with **12000 input / 6000 output tokens** as result acceptance
 ceilings. Ordinary `knowledge.application.propose` remains unmeasured and retains
 its behavior; there is no automatic fallback between the two paths.
 
@@ -94,7 +94,7 @@ ceilings even if Runtime incorrectly labels the response `ok`.
 | Runtime messages / content | Existing 128-message / 64 KiB content bounds |
 | Private measured HTTP request | 128 KiB |
 | Runtime acceptance budget range | Input 1..1000000; output 1..65536 tokens |
-| Knowledge acceptance budget | Input 12000; output 2000 tokens |
+| Knowledge acceptance budget | Input 12000; output 6000 tokens ([protocol revision 2](knowledge-comparison.md)) |
 | Runtime deadline | 90 seconds or earlier caller deadline |
 | Knowledge provider step / whole task | Existing 60 / 90 seconds |
 | Provider attempts | At most one; unsupported adapters launch none |
