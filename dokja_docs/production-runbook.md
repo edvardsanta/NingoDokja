@@ -1372,9 +1372,11 @@ the same setting directly.
 
 Rebuild the orchestrator and WhatsApp adapter together. Run Feeds with an enabled
 `document.extract.v1` provider for the requested extension and a
-`social.resolve.v1` reader that supports both `read` and `media` actions. Old
-orchestrators cannot request document bytes or return publication media; old
-adapters ignore the new structured response fields. Existing text message event
+`social.resolve.v1` reader that supports `read` and either `media_file` or `media`.
+Old orchestrators cannot request document bytes or return publication media; old
+adapters ignore the new structured response fields, and an adapter older than
+`media_file` reports a delivery failure for a file named by token, so deploy it with
+the orchestrator. Existing text message event
 types and eligibility metadata are unchanged. This is an additive content contract,
 not a new operator-command route from WhatsApp.
 
@@ -1382,7 +1384,7 @@ The bridge accepts up to 15 MiB of JSON for bounded 10 MiB document uploads. Bai
 downloads only after Communications authorizes the metadata request. Files are not
 implicitly ingested into Knowledge. The first 80,000 extracted Unicode characters
 are summarized, and a localized message explicitly identifies partial summaries.
-Post delivery accepts up to 10 files, 16 MiB each and in total. Static messages
+Post delivery accepts up to 10 files, 100 MB each and in total. A reader with only the `media` action stays at 16 MiB. Feeds and the adapter each need about that much free temporary disk per delivery; Feeds caps its spool at 300 MB. Static messages
 and signatures use the gateway's locale catalogs; original post captions retain
 their source language.
 
