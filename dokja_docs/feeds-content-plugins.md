@@ -225,10 +225,23 @@ reports a larger one as `{"result": {"refused": "media_too_large"}}`. The caller
 pins requests to the reader selected by `read`; another reader is never allowed
 to interpret its cache references.
 
+A reader should also support `action: "media_file"`, which carries files up to
+100 MB without holding them in memory. Its input adds `destination`, an absolute
+path Feeds chose, overwriting anything the caller sent under that name. The reader
+creates that file, writes the media to it and returns
+`{"result": {"content_type": "video/mp4"}}`, or the same `media_too_large` refusal.
+Feeds checks the file and answers with `{media_token, content_type, size}`. The path
+never leaves Feeds. `feeds.media.read {token, offset}` then returns up to 1 MiB at a
+time as `{data_b64, content_type, size, done}`. Feeds removes a file after its last
+piece, after 15 minutes, or when its 300 MB spool needs the room. A reader that
+answers `media_file` with `{"handled": false}` is asked with `media` instead.
+
 This operation lets WhatsApp resend media while keeping the existing
 Interface → Event → Orchestrator → Domain → Service flow. Digest bounds and
-validates all files before returning them to the gateway. Communication adapters
-never fetch plugin-supplied URLs themselves. A metadata-only reader remains valid
+validates all files before returning them to the gateway. A file named by token
+reaches the adapter through the orchestrator's `GET /orchestrator/media/<token>`
+route, which requires the gateway credential and pulls one piece at a time.
+Communication adapters never fetch plugin-supplied URLs themselves. A metadata-only reader remains valid
 for desktop preview, but publication delivery reports a localized unavailable
 result until that reader supports media transfer.
 

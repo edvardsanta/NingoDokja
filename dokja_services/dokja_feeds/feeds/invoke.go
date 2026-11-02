@@ -12,6 +12,13 @@ import (
 // invoke is the bounded on-demand protocol for mechanism plugins. Domains keep
 // workflow policy; the host only selects a declared provider and runs it.
 func (s *Service) invoke(ctx context.Context, payload map[string]any) (map[string]any, error) {
+	if payload["capability"] == CapabilitySocialResolve && payload["action"] == ActionMediaFile {
+		return s.spoolMedia(ctx, payload)
+	}
+	return s.invokePlugin(ctx, payload)
+}
+
+func (s *Service) invokePlugin(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	capability, _ := payload["capability"].(string)
 	switch capability {
 	case CapabilityDocumentProcess, CapabilityMediaLibrary, CapabilityMediaPerceive, CapabilityAudioResolve, CapabilitySocialResolve:

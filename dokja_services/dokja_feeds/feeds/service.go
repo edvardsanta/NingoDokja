@@ -66,6 +66,7 @@ type Service struct {
 	entries []*entry
 	// extractions holds one token per on-demand reading that is running.
 	extractions chan struct{}
+	media       *mediaSpool
 }
 
 // New reads the plugins directory. Nothing runs until Run is called.
@@ -84,6 +85,7 @@ func New(config Config, options Options) *Service {
 	if s.now == nil {
 		s.now = time.Now
 	}
+	s.media = newMediaSpool(s.now)
 
 	found, builtinErr := Discover(config.BuiltinPluginsDir, config.Limits)
 	custom, err := Discover(config.PluginsDir, config.Limits)
@@ -219,6 +221,8 @@ func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[st
 		return s.itemsReply(), nil
 	case "feeds.invoke":
 		return s.invoke(ctx, payload)
+	case "feeds.media.read":
+		return s.readMedia(payload)
 	case "feeds.refresh":
 		return s.refreshSources(ctx, payload)
 	case "feeds.extract":
