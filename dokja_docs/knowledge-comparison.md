@@ -129,10 +129,18 @@ none of these runs, and in `dev-supported` run 2 it moved a mostly supported pro
 adaptive retrieval earns its cost is what the held-out comparison decides. Both reviews
 ended `needs_revision` on an uncovered date condition, as with the fixed strategy.
 
-## Not done
+## Frozen comparison results
 
-- The held-out comparison has not run, for either strategy.
-- Rubric scoring is manual and independent. The sheet prepares it and nothing automates it.
+The owner authorized the run on 2026-11-01. All 32 development/held-out runs
+are recorded and independently model-scored before model-review inspection:
+fixed 13/16, adaptive 9/16, both below the frozen 15/16 target. Late provider
+unavailability and unequal evidence selections limit interpretation. See
+[the results, scoring limits and evidence digests](knowledge-comparison-results.md).
+No broad adoption or learning is established; `08.2` and the `08.3` gate remain open.
+
+The scorer completed its rubric judgments manually; the harness does not automate
+scoring. The raw sheets remain unchanged beside the separate scores. These cases
+have now been evaluated and cannot serve as unseen held-out inputs after tuning.
 
 Implementation: [harness](../dokja_orch/cmd/knowledge-comparison/comparison.go) and
 [tests](../dokja_orch/cmd/knowledge-comparison/comparison_test.go).
