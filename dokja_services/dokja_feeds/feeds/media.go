@@ -7,8 +7,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
-	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -138,7 +136,7 @@ func (m *mediaSpool) chunk(token string, offset int64) (map[string]any, error) {
 	}
 	defer file.Close()
 	buffer := make([]byte, min(MediaChunkBytes, media.size-offset))
-	if _, err := file.ReadAt(buffer, offset); err != nil && !errors.Is(err, io.EOF) {
+	if _, err := file.ReadAt(buffer, offset); err != nil {
 		return nil, reasonError(ReasonFailed, "media could not be read")
 	}
 	done := offset+int64(len(buffer)) == media.size

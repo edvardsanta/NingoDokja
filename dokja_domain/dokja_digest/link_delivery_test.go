@@ -162,3 +162,12 @@ func TestMediaChunkPassesOnOnePiece(t *testing.T) {
 		}
 	}
 }
+
+func TestPostDeliveryKeepsTheCombinedInlineLimit(t *testing.T) {
+	reader := &deliveryReader{data: base64.StdEncoding.EncodeToString(make([]byte, MaxInlineMediaBytes/2+1)), mime: "video/mp4",
+		media: []any{map[string]any{"kind": "video", "url": "https://media.example/1"}, map[string]any{"kind": "video", "url": "https://media.example/2"}}}
+	reply, err := New(reader).Handle(context.Background(), Request{Action: ActionReadLinkDelivery, Event: Event{Payload: map[string]any{"url": "https://example.com/post"}}})
+	if err != nil || reply["refused"] != "media_too_large" {
+		t.Fatalf("inline files exceeded the adapter's combined limit: %v %+v", err, reply)
+	}
+}

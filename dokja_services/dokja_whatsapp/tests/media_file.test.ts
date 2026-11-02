@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
+import { Readable } from "node:stream";
 import { mediaContent, withMediaFile } from "../transport/media_file.ts";
 import { validatedReplyMedia } from "../messages/message_handler.ts";
 
@@ -91,4 +92,24 @@ test("media by token is limited to 100 MB per file and in total", () => {
   const inline = {filename: "x.png", content_type: "image/png", data_b64: Buffer.alloc(2).toString("base64")};
   assert.equal(validatedReplyMedia([file(10), inline]).length, 2);
   assert.throws(() => validatedReplyMedia([file(100_000_000), inline]));
+});
+
+
+test("a 100 MB file reaches the sender on disk through bounded chunks", async () => {
+  const size = 100_000_000;
+  let chunks = 0;
+  const fetchImpl = (async () => new Response(Readable.toWeb(Readable.from((function* () {
+    const chunk = Buffer.alloc(64 * 1024, 42);
+    for (let offset = 0; offset < size; offset += chunk.length) {
+      chunks++;
+      yield chunk.subarray(0, Math.min(chunk.length, size - offset));
+    }
+  })())) as ReadableStream<Uint8Array>)) as typeof fetch;
+  let seen = "";
+  await withMediaFile("http://orchestrator", {...media, size}, async (file) => {
+    seen = file;
+    assert.equal(statSync(file).size, size);
+    assert.ok(chunks > 1);
+  }, fetchImpl);
+  assert.equal(existsSync(seen), false);
 });

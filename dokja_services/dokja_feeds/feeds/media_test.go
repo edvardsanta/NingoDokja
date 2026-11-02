@@ -210,3 +210,18 @@ func TestMediaReadRefusesABadRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestMediaReadRejectsATruncatedSpoolFile(t *testing.T) {
+	runner := &mediaRunner{reply: writes([]byte("clip"), "video/mp4")}
+	service := mediaService(t, runner, nil)
+	reply, err := spool(service)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(runner.destination, 2); err != nil {
+		t.Fatal(err)
+	}
+	if piece, err := service.Dispatch(context.Background(), "feeds.media.read", map[string]any{"token": reply["media_token"], "offset": float64(0)}); err == nil {
+		t.Fatalf("truncated bytes must not be padded and delivered: %v", piece)
+	}
+}

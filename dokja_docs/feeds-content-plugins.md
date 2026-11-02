@@ -233,12 +233,14 @@ creates that file, writes the media to it and returns
 Feeds checks the file and answers with `{media_token, content_type, size}`. The path
 never leaves Feeds. `feeds.media.read {token, offset}` then returns up to 1 MiB at a
 time as `{data_b64, content_type, size, done}`. Feeds removes a file after its last
-piece, after 15 minutes, or when its 300 MB spool needs the room. A reader that
+piece, when an expired entry is swept on the next add/read after 15 minutes,
+or when its 300 MB spool needs the room. A reader that
 answers `media_file` with `{"handled": false}` is asked with `media` instead.
 
 This operation lets WhatsApp resend media while keeping the existing
 Interface → Event → Orchestrator → Domain → Service flow. Digest bounds and
-validates all files before returning them to the gateway. A file named by token
+validates all files before returning them to the gateway: at most 10 files and
+100 MB combined, with inline files also limited to 16 MiB combined. A file named by token
 reaches the adapter through the orchestrator's `GET /orchestrator/media/<token>`
 route, which requires the gateway credential and pulls one piece at a time.
 Communication adapters never fetch plugin-supplied URLs themselves. A metadata-only reader remains valid

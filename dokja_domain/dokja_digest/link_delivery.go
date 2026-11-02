@@ -55,14 +55,17 @@ func (d *Domain) readLinkDelivery(ctx context.Context, payload map[string]any) (
 		return refused(refusedTooLarge), nil
 	}
 	media := []DeliveryMedia{}
-	var total int64
+	var total, inlineTotal int64
 	for index, row := range rows {
 		item, size, refusal := d.deliveryFile(ctx, reader, row)
 		if refusal != "" {
 			return refused(refusal), nil
 		}
 		total += size
-		if total > MaxDeliveryTotalBytes {
+		if item.MediaToken == "" {
+			inlineTotal += size
+		}
+		if total > MaxDeliveryTotalBytes || inlineTotal > MaxInlineMediaBytes {
 			return refused(refusedTooLarge), nil
 		}
 		item.Filename = fmt.Sprintf("post-%d.%s", index+1, deliveryExtension(item.ContentType))
