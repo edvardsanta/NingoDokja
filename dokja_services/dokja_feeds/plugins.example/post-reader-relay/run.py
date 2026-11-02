@@ -15,8 +15,38 @@ import sys
 from urllib.parse import urlsplit
 
 MAX_MEDIA_BYTES = 16 << 20
+MAX_FILE_BYTES = 100_000_000
 ROOT = Path(__file__).resolve().parent
 MEDIA_PATH = re.compile(r"/media/[a-f0-9]{48}\.(?:jpg|png|webp|mp4)$")
+
+
+def open_media(connection, payload, config):
+    target = urlsplit(payload.get("url") or "")
+    origin = urlsplit(config["media_origin"])
+    if (target.scheme, target.netloc) != (origin.scheme, origin.netloc) or target.query or target.fragment or target.username or not MEDIA_PATH.fullmatch(target.path):
+        raise ValueError("media does not belong to this reader")
+    connection.request("GET", target.path)
+    response = connection.getresponse()
+    content_type = response.getheader("Content-Type", "").split(";", 1)[0]
+    if response.status != 200 or content_type not in ("image/jpeg", "image/png", "image/webp", "video/mp4"):
+        raise ValueError("media unavailable or unsupported")
+    return response, content_type
+
+
+def write_media(response, content_type, destination):
+    """Copy a file to the path the host chose, without holding it in memory."""
+    if not isinstance(destination, str) or not Path(destination).is_absolute():
+        raise ValueError("media needs a destination from the host")
+    total = 0
+    with open(destination, "xb") as output:
+        while chunk := response.read(1 << 16):
+            total += len(chunk)
+            if total > MAX_FILE_BYTES:
+                return {"refused": "media_too_large"}
+            output.write(chunk)
+    if not total:
+        raise ValueError("media is empty")
+    return {"content_type": content_type}
 
 
 def invoke(request, config):
@@ -38,17 +68,11 @@ def invoke(request, config):
             if response.status != 200 or len(data) > 65536:
                 raise ValueError("post reader refused the request")
             return json.loads(data)
-        if action != "media":
+        if action not in ("media", "media_file"):
             return {"handled": False}
-        target = urlsplit(payload.get("url") or "")
-        origin = urlsplit(config["media_origin"])
-        if (target.scheme, target.netloc) != (origin.scheme, origin.netloc) or target.query or target.fragment or target.username or not MEDIA_PATH.fullmatch(target.path):
-            raise ValueError("media does not belong to this reader")
-        connection.request("GET", target.path)
-        response = connection.getresponse()
-        content_type = response.getheader("Content-Type", "").split(";", 1)[0]
-        if response.status != 200 or content_type not in ("image/jpeg", "image/png", "image/webp", "video/mp4"):
-            raise ValueError("media unavailable or unsupported")
+        response, content_type = open_media(connection, payload, config)
+        if action == "media_file":
+            return write_media(response, content_type, payload.get("destination"))
         data = response.read(MAX_MEDIA_BYTES + 1)
         if not data:
             raise ValueError("media is empty")

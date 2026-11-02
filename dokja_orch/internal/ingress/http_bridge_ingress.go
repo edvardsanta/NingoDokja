@@ -22,6 +22,7 @@ import (
 const defaultHTTPBridgeEndpoint = ":8091"
 
 type HTTPBridgeIngress struct {
+	media          MediaSource
 	service        *core.Service
 	endpoint       string
 	token          string
@@ -92,6 +93,12 @@ func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIng
 	}
 }
 
+// WithMediaSource supplies where the media route reads post files from.
+func (i *HTTPBridgeIngress) WithMediaSource(source MediaSource) *HTTPBridgeIngress {
+	i.media = source
+	return i
+}
+
 // WithOwnerConfig supplies the identity loaded from the private JSON file.
 func (i *HTTPBridgeIngress) WithOwnerConfig(config ownerconfig.Config) *HTTPBridgeIngress {
 	i.discordOwnerID = config.Owner.Accounts.Discord.UserID
@@ -118,6 +125,7 @@ func (i *HTTPBridgeIngress) Start() error {
 	i.app.Post("/orchestrator", i.handle)
 	i.app.Post("/orchestrator/chat/stream", i.handleChatStream)
 	i.app.Post("/orchestrator/voice/chat/stream", i.handleVoiceChatStream)
+	i.app.Get("/orchestrator/media/:token", i.handleMedia)
 
 	go func() {
 		logger.Info(fmt.Sprintf("http bridge ingress listening endpoint=%s", i.endpoint))

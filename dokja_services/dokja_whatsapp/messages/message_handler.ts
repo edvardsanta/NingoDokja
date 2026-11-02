@@ -232,18 +232,37 @@ function ignoreReason(context: WhatsAppMessageContext, now: number): string | nu
   return null;
 }
 
+// WhatsApp's video limit. A file named by token is streamed; inline bytes crossed in a JSON reply
+// and keep the smaller limit that path was built for.
+const maxMediaBytes = 100_000_000;
+const maxInlineMediaBytes = 16 * 1024 * 1024;
+const mediaToken = /^[a-f0-9]{48}$/;
+
 export function validatedReplyMedia(rows: ReplyMedia[]): ReplyMedia[] {
   if (!Array.isArray(rows) || rows.length === 0 || rows.length > 10) throw new Error("invalid media count");
   let total = 0;
+  let inlineTotal = 0;
   for (const row of rows) {
-    if (!row || !["image/jpeg", "image/png", "image/webp", "video/mp4"].includes(row.content_type)
-      || typeof row.data_b64 !== "string" || row.data_b64.length > Math.ceil(16 * 1024 * 1024 / 3) * 4) {
+    if (!row || !["image/jpeg", "image/png", "image/webp", "video/mp4"].includes(row.content_type)) {
       throw new Error("invalid media");
     }
-    const bytes = Buffer.from(row.data_b64, "base64");
-    total += bytes.length;
-    if (!bytes.length || bytes.length > 16 * 1024 * 1024 || bytes.toString("base64") !== row.data_b64
-      || total > 16 * 1024 * 1024) throw new Error("invalid media bytes");
+    if (row.media_token !== undefined) {
+      if (typeof row.media_token !== "string" || !mediaToken.test(row.media_token)
+        || !Number.isSafeInteger(row.size) || row.size! <= 0 || row.size! > maxMediaBytes) {
+        throw new Error("invalid media reference");
+      }
+      total += row.size!;
+    } else {
+      if (typeof row.data_b64 !== "string" || row.data_b64.length > Math.ceil(maxInlineMediaBytes / 3) * 4) {
+        throw new Error("invalid media");
+      }
+      const bytes = Buffer.from(row.data_b64, "base64");
+      total += bytes.length;
+      inlineTotal += bytes.length;
+      if (!bytes.length || bytes.length > maxInlineMediaBytes || bytes.toString("base64") !== row.data_b64
+        || inlineTotal > maxInlineMediaBytes) throw new Error("invalid media bytes");
+    }
+    if (total > maxMediaBytes) throw new Error("invalid media bytes");
   }
   return rows;
 }

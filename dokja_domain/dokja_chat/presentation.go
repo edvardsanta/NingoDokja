@@ -15,10 +15,13 @@ type Presentation struct {
 	Text   string
 	Images []Formula
 }
+// Attachment carries its bytes, or a token the interface streams them with through the bridge.
 type Attachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
-	DataB64     string `json:"data_b64"`
+	DataB64     string `json:"data_b64,omitempty"`
+	MediaToken  string `json:"media_token,omitempty"`
+	Size        int64  `json:"size,omitempty"`
 }
 
 var mathBlock = regexp.MustCompile("(?ms)^```math\\r?\\n(.*?)^```[ \\t]*(?:\\r?\\n|$)")

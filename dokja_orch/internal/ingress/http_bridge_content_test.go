@@ -82,7 +82,7 @@ func (r *bridgePostReader) Dispatch(_ context.Context, event string, payload map
 	if payload["action"] == "read" {
 		return map[string]any{"handled": true, "post": map[string]any{"url": "https://example.com/post", "author": "Example Author", "caption": "Original caption", "media": []any{map[string]any{"kind": "video", "url": "http://localhost/media/opaque.mp4"}}}}, nil
 	}
-	return map[string]any{"content_type": "video/mp4", "data_b64": base64.StdEncoding.EncodeToString([]byte("video"))}, nil
+	return map[string]any{"content_type": "video/mp4", "media_token": "bridge-token", "size": float64(92_923_063)}, nil
 }
 func TestWhatsAppPublicationRoutesThroughDigestAndReturnsMediaAfterAuthorization(t *testing.T) {
 	for _, allowed := range []bool{false, true} {
@@ -112,7 +112,7 @@ func TestWhatsAppPublicationRoutesThroughDigestAndReturnsMediaAfterAuthorization
 				t.Fatal(err)
 			}
 			if allowed {
-				if len(reply.Attachments) != 1 || reply.Attachments[0].ContentType != "video/mp4" || !strings.Contains(reply.Reply, "Original caption") || posts.calls != 3 {
+				if len(reply.Attachments) != 1 || reply.Attachments[0].ContentType != "video/mp4" || reply.Attachments[0].MediaToken != "bridge-token" || reply.Attachments[0].Size != 92_923_063 || reply.Attachments[0].DataB64 != "" || !strings.Contains(reply.Reply, "Original caption") || posts.calls != 3 {
 					t.Fatalf("publication delivery failed: %+v", reply)
 				}
 			} else if reply.Reply != "" || len(reply.Attachments) != 0 || posts.calls != 0 {

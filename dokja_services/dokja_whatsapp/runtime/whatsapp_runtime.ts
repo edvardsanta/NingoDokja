@@ -7,6 +7,7 @@ import {
 } from "../messages/message_handler.js";
 import type { Recorder } from "../messages/recorder.js";
 import { RecentKeys } from "../messages/recent_keys.js";
+import { mediaContent, withMediaFile, type WhatsAppMediaContent } from "../transport/media_file.js";
 import { toMessageContext, type InboundMessage } from "./inbound.js";
 
 // The socket events this adapter listens to.
@@ -18,8 +19,7 @@ export type SocketEvents = {
 
 export type WhatsAppSendContent =
   | {text: string}
-  | {image: Buffer; caption: string; mimetype: string}
-  | {video: Buffer; caption: string; mimetype: string};
+  | WhatsAppMediaContent;
 // The part of the Baileys socket this adapter uses, so tests can stand in for it.
 export type WhatsAppSocketLike = {
   ev: { on<E extends keyof SocketEvents>(event: E, listener: (update: SocketEvents[E]) => void): unknown };
@@ -184,13 +184,10 @@ export function createWhatsAppRuntime(config: RuntimeConfig, deps: Dependencies)
         sent,
         send: (chatId, text, options) => socket.sendMessage(chatId, { text }, options),
         downloadDocument: socket.downloadDocument?.bind(socket),
-        sendMedia: (chatId, media, caption, options) => {
-          const bytes = Buffer.from(media.data_b64, "base64");
-          const content: WhatsAppSendContent = media.content_type === "video/mp4"
-            ? {video: bytes, caption, mimetype: media.content_type}
-            : {image: bytes, caption, mimetype: media.content_type};
-          return socket.sendMessage(chatId, content, options);
-        },
+        sendMedia: (chatId, media, caption, options) => media.media_token
+          ? withMediaFile(config.orchestratorEndpoint, media, (file) =>
+            socket.sendMessage(chatId, mediaContent(media.content_type, {url: file}, caption), options))
+          : socket.sendMessage(chatId, mediaContent(media.content_type, Buffer.from(media.data_b64 ?? "", "base64"), caption), options),
         presence: (chatId, active) => socket.sendPresenceUpdate(active ? "composing" : "paused", chatId),
         resolveNumber: socket.signalRepository?.lidMapping
           ? (jid) => socket.signalRepository!.lidMapping!.getPNForLID(jid)

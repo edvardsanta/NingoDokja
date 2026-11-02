@@ -59,10 +59,14 @@ These are one-off summaries; they do not ingest the source into long-term memory
 
 Send a standalone HTTP(S) publication URL to request its original caption, source
 link and image/video media. Digest selects an enabled `social.resolve.v1` reader,
-then asks that same reader for each file using `action: "media"`. Reader URLs are
-never fetched by the WhatsApp adapter. The reader must return bounded base64 bytes;
-metadata-only readers produce a localized unavailable message. Limits are 10 files,
-16 MiB per file and in total, using JPEG, PNG, WebP or MP4. Long captions continue
+then asks that same reader for each file using `action: "media_file"`. Feeds keeps
+the file briefly and the reply names it with an opaque token. The adapter streams it
+to a temporary file from the orchestrator's `GET /orchestrator/media/<token>` route
+with the gateway credential, uploads it from there, and removes it. Reader URLs are
+never fetched by the WhatsApp adapter. A reader with only `action: "media"` still
+works, with its files inline in the reply and limited to 16 MiB. Metadata-only
+readers produce a localized unavailable message. Limits are 10 files, 100 MB per
+file and in total, using JPEG, PNG, WebP or MP4. Long captions continue
 in signed text messages. The adapter quotes the original incoming message and
 remembers outgoing media IDs for echo suppression.
 

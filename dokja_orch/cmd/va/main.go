@@ -239,7 +239,7 @@ func main() {
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))
-	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT")).WithOwnerConfig(ownerConfig)
+	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT")).WithOwnerConfig(ownerConfig).WithMediaSource(digestdomain.New(feedsClient))
 
 	application := app.NewApp(
 		eventIngress,

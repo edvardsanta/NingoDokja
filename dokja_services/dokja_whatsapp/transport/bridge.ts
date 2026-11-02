@@ -4,7 +4,8 @@ export type IncomingDocument = {
   size: number;
   data_b64?: string;
 };
-export type ReplyMedia = {filename: string; content_type: string; data_b64: string};
+// A file travels inline, or as a token streamed from the orchestrator's media route.
+export type ReplyMedia = {filename: string; content_type: string; data_b64?: string; media_token?: string; size?: number};
 export type WhatsAppContentReply = {
   reply: string;
   attachments?: ReplyMedia[];

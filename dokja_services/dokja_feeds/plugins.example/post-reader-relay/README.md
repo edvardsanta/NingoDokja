@@ -15,6 +15,8 @@ enabling a second reader.
 - `media {url}` reads a reference from that worker's own cache and returns
   `{content_type, data_b64}`. It accepts JPEG, PNG, WebP and MP4, up to 16 MiB;
   a larger file returns `{"refused": "media_too_large"}`.
+- `media_file {url, destination}` streams the same reference to the new file Feeds
+  named and returns `{content_type}`, up to 100 MB.
 
 The socket path is private operator configuration. Caller-supplied media URLs cannot
 select another origin, route, filesystem path or network endpoint. The plugin never

@@ -158,6 +158,8 @@ here too.
 
 A plugin that only extracts may print up to 16 MiB; one that also collects keeps 1 MiB.
 A post reader (`social.resolve.v1`) that does not collect may print up to 23 MiB.
+Files up to 100 MB go through `media_file` and `feeds.media.read` instead of stdout
+(see [post readers](../../dokja_docs/feeds-content-plugins.md#post-readers)).
 
 When more than one enabled plugin extracts the same format, none is chosen until one is bound
 explicitly; the order of directories never decides.
