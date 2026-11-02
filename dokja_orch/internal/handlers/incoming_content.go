@@ -55,7 +55,7 @@ func (h *ChatDomainHandler) handleIncomingContent(ctx context.Context, event cor
 		media, _ := result["media"].([]digest.DeliveryMedia)
 		attachments := make([]chat.Attachment, 0, len(media))
 		for _, item := range media {
-			attachments = append(attachments, chat.Attachment{Filename: item.Filename, ContentType: item.ContentType, DataB64: item.DataB64})
+			attachments = append(attachments, chat.Attachment{Filename: item.Filename, ContentType: item.ContentType, DataB64: item.DataB64, MediaToken: item.MediaToken, Size: item.Size})
 		}
 		return map[string]any{"reply": text, "attachments": attachments}, nil
 	}

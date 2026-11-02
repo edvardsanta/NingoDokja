@@ -304,9 +304,10 @@ Large readings explicitly identify their 80,000-character excerpt limit; no sour
 is automatically ingested into the Library.
 
 A standalone publication URL uses the same workflow to ask Digest for
-`read-link-delivery`: select a `social.resolve.v1` reader, retrieve its bounded
-media bytes through that reader's `media` action, and return the original caption,
-source link and files. WhatsApp renders these with locale-catalog signatures and
+`read-link-delivery`: select a `social.resolve.v1` reader, have it write each file
+to Feeds through its `media_file` action (or return bytes through `media`), and
+return the original caption, source link and files. A file named by token is streamed
+through `GET /orchestrator/media/<token>`, up to 100 MB. WhatsApp renders these with locale-catalog signatures and
 errors; it never calls a reading service or model directly. See
 [WhatsApp content behavior](../dokja_services/dokja_whatsapp/README.md#document-summaries-and-publication-links).
 
