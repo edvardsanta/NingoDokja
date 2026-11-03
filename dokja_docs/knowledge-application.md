@@ -124,3 +124,12 @@ Implementation: [Knowledge contract](../dokja_domain/dokja_knowledge/application
 [orchestration task](../dokja_orch/internal/handlers/knowledge_application.go),
 [domain tests](../dokja_domain/dokja_knowledge/application_test.go), and
 [application-port tests](../dokja_orch/internal/handlers/knowledge_application_test.go).
+
+
+## Recording an actual outcome
+
+The [proposed outcome/episode contracts](knowledge-outcomes.md) define what a
+future application integration must record after an actual attempted procedure.
+They add no executor or persistence to this path. Prepared evidence, generated
+proposals and semantic reviews remain separate from attributed observations;
+existing `can_execute=false` behavior is unchanged.

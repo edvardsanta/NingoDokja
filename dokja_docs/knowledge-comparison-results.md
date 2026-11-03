@@ -183,9 +183,10 @@ conditions relevant to refusing a method requires adjudication in `08.3`.
   Electron, production ranking and cross-provider tests were not run for this
   documentation/evaluation batch.
 
-Keep the existing opt-in behavior and frozen failures. Next, define actual
-attempt/procedure/outcome and prediction/eligible-episode contracts before
-persistence or later reuse. In `08.3`, adjudicate semantic review, source-scope
+Keep the existing opt-in behavior and frozen failures. The next
+[proposed record contracts](knowledge-outcomes.md) separate actual attempts,
+observations, prior forecasts and episode eligibility. Implement and validate
+those domain contracts before persistence or later reuse. In `08.3`, adjudicate semantic review, source-scope
 comparability and the remaining causal controls. Any tuning informed by these
 answers requires a new frozen held-out set and separately reported evaluation;
 these cases cannot regain unseen status by rerunning them. No prompt, parser,
