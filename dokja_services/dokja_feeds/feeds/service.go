@@ -225,6 +225,8 @@ func (s *Service) Dispatch(ctx context.Context, eventType string, payload map[st
 		return s.readMedia(payload)
 	case "feeds.refresh":
 		return s.refreshSources(ctx, payload)
+	case "feeds.web.read":
+		return s.readWeb(ctx, payload)
 	case "feeds.extract":
 		return s.extract(ctx, payload)
 	case "feeds.classify":
