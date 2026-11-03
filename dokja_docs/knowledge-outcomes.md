@@ -256,3 +256,13 @@ registered capability receipt or attributed operator report, and explicitly revi
 its storage mapping and atomic settlement before persisting or reusing episodes.
 Existing Memory acceptance labels and prediction targets are unchanged; there is
 no automatic conversion from `accepted`/`replaced` into method success/failure.
+
+
+## Journal transaction port
+
+The [journal implementation and storage mapping review](knowledge-journal.md)
+now add prepared-attempt, dispatch/interruption marker and admitted-observation
+mutations behind a transaction port. Scoped operation replay, expected revision,
+attempt ownership and original result snapshots are part of that boundary.
+Concurrency and rollback are tested with a transactional fake. No production
+store, public writer, receipt producer or durable/restart guarantee is enabled.
