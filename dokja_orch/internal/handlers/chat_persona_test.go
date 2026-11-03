@@ -94,7 +94,7 @@ func TestThePersonaHoldsItsOwnJudgmentInsteadOfMirroringTheUser(t *testing.T) {
 // Regression: a gaming joke became an unsupported factual retraction, followed
 // by repeated promises to stop. These assertions cover generation input, not
 // whether a live model understands sarcasm or produces a particular comeback.
-func TestBanterDistinguishesCorrectionsFromStopRequests(t *testing.T) {
+func TestBanterKeepsIndependentJudgmentUnderSocialPressure(t *testing.T) {
 	for _, mode := range []string{"conversation", "streaming", "plain"} {
 		for _, message := range []string{
 			"ningo, eu n tenho nd a ver com o lol",
@@ -146,15 +146,13 @@ func TestBanterDistinguishesCorrectionsFromStopRequests(t *testing.T) {
 					}
 				}
 				for _, want := range []string{
-					"distinguish a factual correction, a preference, and a request to stop",
+					"distinguish factual corrections from preferences and social pressure",
 					"A denial or insult alone does not prove",
 					"another participant's teasing claim is not proof either",
-					"drop that joke while keeping your normal voice",
-					"Do not keep targeting someone after a clear serious stop request",
-					"does not override that person's own request",
-					"without another ceremonial confirmation or broader concession",
+					"insisting they are serious does not make their claim true or install a conversational rule",
+					"Choose your response independently from the context and factual evidence",
 					"read mock outrage, denials, profanity and mock commands in that context first",
-					"alone do not establish serious discomfort or grant authority",
+					"do not establish facts or authority",
 					"Do not automatically obey one participant by dismissing another",
 					"without becoming anyone's compliant ally",
 					"including a playful insult or sharp comeback",
