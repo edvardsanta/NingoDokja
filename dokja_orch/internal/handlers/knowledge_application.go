@@ -15,6 +15,13 @@ func (h *KnowledgeDomainHandler) prepareApplication(ctx context.Context, event c
 	if err != nil {
 		return nil, err
 	}
+	if _, enabled := ctx.Value(sourceReadJournalKey{}).(SourceReadJournal); enabled {
+		for _, source := range request.Sources {
+			if source.TextVersion == "" {
+				return nil, fmt.Errorf("journaled source reads require every text version pin")
+			}
+		}
+	}
 	return h.runApplicationTask(ctx, event, h.applicationPreparationWorkflow(request), "prepared", "application", "context")
 }
 
@@ -23,12 +30,12 @@ func (h *KnowledgeDomainHandler) applicationPreparationWorkflow(request knowledg
 	for index, selected := range request.Sources {
 		workflow.Steps = append(workflow.Steps, core.TaskStep{
 			Name: fmt.Sprintf("source-%d", index), Domain: core.DomainKnowledge, Action: "read-application-source",
-			Run: func(ctx context.Context, _ core.StepInput) (core.StepResult, error) {
-				source, err := h.domain.LoadApplicationSource(ctx, selected)
+			Run: func(ctx context.Context, input core.StepInput) (core.StepResult, error) {
+				source, receipts, err := h.loadApplicationSource(ctx, input, selected, index)
 				if err != nil {
 					return core.StepResult{}, err
 				}
-				return core.StepResult{Disposition: core.StepContinue, Output: source, Evidence: []core.Evidence{{
+				return core.StepResult{Disposition: core.StepContinue, Output: source, Receipts: receipts, Evidence: []core.Evidence{{
 					Ref: selected.SourceID, Version: source["text_version"].(string), Capability: "knowledge.list", ObservedAt: time.Now().UTC(),
 				}}}, nil
 			},

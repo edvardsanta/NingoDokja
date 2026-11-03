@@ -133,3 +133,8 @@ The subsequent [supervision contract](knowledge-supervision.md) selects automati
 receipts with incremental user steering, starting with an opt-in native source-read
 consumer. Attributed reports remain secondary. This selection adds no runtime
 activation to the adapter.
+
+The [native source-read consumer](knowledge-source-receipts.md) now exercises
+this port through the existing preparation route, including a disposable
+PostgreSQL integration test. It remains an explicit host binding with synthetic
+authorization in tests; startup configuration and public admission are pending.

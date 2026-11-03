@@ -57,6 +57,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 	if h == nil || h.domain == nil {
 		return nil, fmt.Errorf("knowledge domain is not configured")
 	}
+	if _, enabled := ctx.Value(sourceReadJournalKey{}).(SourceReadJournal); enabled && workflow.Action != knowledgedomain.ActionPrepareApplication {
+		return nil, fmt.Errorf("native source-read journal binding supports preparation only")
+	}
 	// The payload is the user's notes or question: log its shape, never its content.
 	logger.Info(fmt.Sprintf(
 		"knowledge handler received event_id=%s type=%s action=%s source=%s payload_keys=%d",

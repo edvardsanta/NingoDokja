@@ -96,6 +96,7 @@ type StepRecord struct {
 
 // StepInput is a copy of what a step may read.
 type StepInput struct {
+	AttemptID string
 	TaskID    string
 	Goal      string
 	Scope     TaskScope

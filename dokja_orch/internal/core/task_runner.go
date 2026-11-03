@@ -203,7 +203,7 @@ func (w *workspace) input() StepInput {
 		outputs[name] = copyMap(output)
 	}
 	return StepInput{
-		TaskID: w.result.TaskID, Goal: w.goal, Scope: w.result.Scope, Payload: copyMap(w.payload),
+		TaskID: w.result.TaskID, AttemptID: w.result.AttemptID, Goal: w.goal, Scope: w.result.Scope, Payload: copyMap(w.payload),
 		Evidence: copyEvidence(w.result.Evidence), Proposals: copyProposals(w.result.Proposals), Outputs: outputs,
 	}
 }

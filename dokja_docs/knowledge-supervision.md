@@ -5,8 +5,10 @@ consumer, with incremental supervision and an authenticated way to redirect the
 active task. Operator reports remain an attributed secondary input; they are not
 the default proof that an action succeeded.
 
-Status: application integration contract and next-slice plan. No supervisor,
-control endpoint or receipt producer is activated by this document. It builds on
+Status: application integration contract. The subsequent
+[native source-read receipt integration](knowledge-source-receipts.md) is
+implemented as an opt-in host binding. No supervisor, control endpoint or receipt
+producer is activated in application startup. It builds on
 [domain outcome policy](knowledge-outcomes.md), the [journal](knowledge-journal.md)
 and its [optional PostgreSQL adapter](knowledge-journal-postgres.md).
 
