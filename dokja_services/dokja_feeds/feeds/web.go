@@ -30,12 +30,13 @@ type webPassage struct {
 }
 
 type webReader struct {
-	lookup func(context.Context, string) ([]net.IPAddr, error)
-	dial   func(context.Context, string, string) (net.Conn, error)
+	browser webBrowserFetch
+	lookup  func(context.Context, string) ([]net.IPAddr, error)
+	dial    func(context.Context, string, string) (net.Conn, error)
 }
 
 func newWebReader() webReader {
-	return webReader{lookup: net.DefaultResolver.LookupIPAddr, dial: (&net.Dialer{Timeout: 4 * time.Second}).DialContext}
+	return webReader{browser: runWebBrowser, lookup: net.DefaultResolver.LookupIPAddr, dial: (&net.Dialer{Timeout: 4 * time.Second}).DialContext}
 }
 
 func webURL(raw string) (*url.URL, error) {
@@ -71,15 +72,9 @@ func (r webReader) safeDial(ctx context.Context, network, address string) (net.C
 	if err != nil || (port != "80" && port != "443") {
 		return nil, fmt.Errorf("blocked destination")
 	}
-	ips, err := r.lookup(ctx, host)
-	if err != nil || len(ips) == 0 {
-		return nil, fmt.Errorf("unavailable destination")
-	}
-	for _, candidate := range ips {
-		ip, ok := netip.AddrFromSlice(candidate.IP)
-		if !ok || !publicWebIP(ip) || candidate.Zone != "" {
-			return nil, fmt.Errorf("blocked destination")
-		}
+	ips, err := r.publicAddresses(ctx, host)
+	if err != nil {
+		return nil, err
 	}
 	for _, candidate := range ips {
 		conn, dialErr := r.dial(ctx, network, net.JoinHostPort(candidate.IP.String(), port))
@@ -91,6 +86,20 @@ func (r webReader) safeDial(ctx context.Context, network, address string) (net.C
 	return nil, err
 }
 
+func (r webReader) publicAddresses(ctx context.Context, host string) ([]net.IPAddr, error) {
+	ips, err := r.lookup(ctx, host)
+	if err != nil || len(ips) == 0 {
+		return nil, fmt.Errorf("unavailable destination")
+	}
+	for _, candidate := range ips {
+		ip, ok := netip.AddrFromSlice(candidate.IP)
+		if !ok || !publicWebIP(ip) || candidate.Zone != "" {
+			return nil, fmt.Errorf("blocked destination")
+		}
+	}
+	return ips, nil
+}
+
 func (s *Service) readWeb(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	raw, _ := payload["url"].(string)
 	ctx, cancel := context.WithTimeout(ctx, webTimeout)
@@ -99,7 +108,7 @@ func (s *Service) readWeb(ctx context.Context, payload map[string]any) (map[stri
 	case s.extractions <- struct{}{}:
 		defer func() { <-s.extractions }()
 	case <-ctx.Done():
-		return nil, fmt.Errorf("web reading timed out")
+		return nil, fmt.Errorf("web_timeout: reading deadline exceeded")
 	}
 	client := newWebReader().client()
 	defer client.CloseIdleConnections()
@@ -108,7 +117,7 @@ func (s *Service) readWeb(ctx context.Context, payload map[string]any) (map[stri
 
 func (r webReader) client() *http.Client {
 	transport := &http.Transport{Proxy: nil, DialContext: r.safeDial, DisableKeepAlives: true, TLSHandshakeTimeout: 4 * time.Second, ResponseHeaderTimeout: 6 * time.Second, MaxResponseHeaderBytes: 64 << 10}
-	return &http.Client{Transport: transport, Timeout: webTimeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	return &http.Client{Transport: webBrowserTransport{primary: transport, reader: r}, Timeout: webTimeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 4 {
 			return fmt.Errorf("too many redirects")
 		}
@@ -117,8 +126,8 @@ func (r webReader) client() *http.Client {
 	}}
 }
 
-// This reader never starts a browser, plugin, subprocess or page script and never
-// fetches embedded resources. Its only network operation is a bounded HTTP GET.
+// This reader never runs page scripts, plugins, a browser or embedded resources.
+// A fixed HTTP-only helper can retry signature-based refusals under the same budget.
 func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Time) (map[string]any, error) {
 	original, err := webURL(raw)
 	if err != nil {
@@ -132,9 +141,18 @@ func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Tim
 	req.Header.Set("User-Agent", "DokjaTextReader/1.0")
 	resp, err := client.Do(req)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("web_timeout: reading deadline exceeded")
+		}
+		if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+			return nil, fmt.Errorf("web_timeout: reading deadline exceeded")
+		}
 		return nil, fmt.Errorf("web reading unavailable")
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests || strings.EqualFold(resp.Header.Get("Cf-Mitigated"), "challenge") {
+		return nil, fmt.Errorf("web_blocked: automatic reading denied")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("web reading unavailable (HTTP %d)", resp.StatusCode)
 	}
@@ -244,7 +262,8 @@ func extractWeb(text, kind string, base *url.URL) (title, published string, pass
 		}
 		return b.String()
 	}
-	var main, article *html.Node
+	var main *html.Node
+	var articles, headings []*html.Node
 	var metadata func(*html.Node)
 	metadata = func(n *html.Node) {
 		if n.Type == html.ElementNode {
@@ -256,9 +275,9 @@ func extractWeb(text, kind string, base *url.URL) (title, published string, pass
 					main = n
 				}
 			case "article":
-				if article == nil {
-					article = n
-				}
+				articles = append(articles, n)
+			case "h1":
+				headings = append(headings, n)
 			case "meta":
 				name := strings.ToLower(attr(n, "property"))
 				if name == "" {
@@ -274,10 +293,66 @@ func extractWeb(text, kind string, base *url.URL) (title, published string, pass
 		}
 	}
 	metadata(root)
-	if article != nil {
-		root = article
-	} else if main != nil {
+	within := func(parent, child *html.Node) bool {
+		for n := child; n != nil; n = n.Parent {
+			if n == parent {
+				return true
+			}
+		}
+		return false
+	}
+	// A page's first article can be a related-story card. Prefer the main
+	// landmark, then an article that contains its primary heading.
+	if main != nil {
 		root = main
+	}
+	var primaryHeading *html.Node
+	for _, heading := range headings {
+		if within(root, heading) {
+			primaryHeading = heading
+			break
+		}
+	}
+	if primaryHeading != nil {
+		for _, article := range articles {
+			if within(root, article) && within(article, primaryHeading) {
+				root = article
+				break
+			}
+		}
+	}
+	if primaryHeading == nil || root.Type == html.DocumentNode || root == main {
+		// When no h1 identifies the story, prefer substantial paragraph text
+		// over short linked cards. General documents without articles stay whole.
+		best := 0
+		var paragraphLength func(*html.Node, bool) int
+		paragraphLength = func(n *html.Node, outsideArticles bool) int {
+			if outsideArticles && n.Type == html.ElementNode && n.Data == "article" {
+				return 0
+			}
+			if n.Type == html.ElementNode && n.Data == "p" {
+				return len([]rune(nodeText(n)))
+			}
+			total := 0
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				total += paragraphLength(c, outsideArticles)
+			}
+			return total
+		}
+		var chosen *html.Node
+		for _, article := range articles {
+			if within(root, article) {
+				if score := paragraphLength(article, false); score > best {
+					best, chosen = score, article
+				}
+			}
+		}
+		if chosen != nil && (primaryHeading == nil || best > paragraphLength(root, true)) {
+			// Some layouts place the story heading just outside its article.
+			// A body article must outweigh prose outside articles; small cards
+			// must not replace the main page's substantive paragraphs.
+			root = chosen
+		}
 	}
 	var buf strings.Builder
 	anchor, heading, articleLabel := "", "", ""
@@ -320,7 +395,11 @@ func extractWeb(text, kind string, base *url.URL) (title, published string, pass
 		block := false
 		if n.Type == html.ElementNode {
 			switch n.Data {
-			case "script", "style", "noscript", "iframe", "object", "embed", "svg", "nav", "footer", "header", "form", "template", "head":
+			case "script", "style", "noscript", "iframe", "object", "embed", "svg", "nav", "aside", "footer", "header", "form", "template", "head":
+				return
+			}
+			// Nested articles are separate stories, never evidence for this page's title.
+			if n.Data == "article" && n != root {
 				return
 			}
 			if hasAttr(n, "hidden") || attr(n, "aria-hidden") == "true" {

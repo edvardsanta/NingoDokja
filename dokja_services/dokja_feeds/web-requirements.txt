@@ -1,0 +1,2 @@
+# Browser-like TLS HTTP client; never evaluates page JavaScript.
+curl_cffi==0.16.3

@@ -288,24 +288,47 @@ provider status and rollback.
 
 ## Restricted web text reader
 
-`feeds.web.read` uses Go HTTP and HTML parsing directly. It never starts a browser,
-page JavaScript, a plugin or a subprocess, fetches embedded resources, installs
-anything, or stores the reading. Only HTTP(S) on ports 80/443 is accepted. The
-reader ignores proxy environment variables and sends no cookies or credentials.
-Each connection resolves the hostname once, rejects any non-public DNS answer,
-and connects to a validated literal IP while retaining hostname TLS verification.
-Redirects receive the same URL and destination checks (at most three followed).
+`feeds.web.read` uses Go HTTP and HTML parsing. A signature-based refusal (HTTP
+403/429 or a challenge header) can retry through a fixed, embedded Python helper
+using `curl_cffi==0.16.3`. The helper performs HTTP with a browser TLS fingerprint;
+it runs no page JavaScript, challenge solver, browser, plugin or embedded resource.
+The code is bundled at build time and receives only URL, validated IP and deadline
+on stdin. Its Python process uses isolated mode, a temporary working directory,
+no inherited credentials or proxy settings, and bounded stdout. Page content is
+always data. No request installs dependencies or stores its reading.
+
+Only HTTP(S) on ports 80/443 is accepted. Every connection rejects non-public DNS
+answers, including mixed public/private results. Go connects to a validated IP
+while retaining hostname TLS verification; the fallback uses curl's pinned DNS
+resolution with the same policy. The helper follows no redirects: each redirect
+returns to Go for URL and destination validation, with at most three followed.
+Cookies and authentication are not carried between requests.
 
 Each read has a 12-second deadline, shares the two-slot extraction limit, and
 accepts at most 2 MiB of decoded HTTP response bytes and 80,000 extracted Unicode
-characters. Oversized downloads fail; clipped text is marked `partial`. HTML,
-XHTML and plain text are supported; PDF, login-only and JavaScript-only pages are
-not. Encoding detection includes legacy HTML charsets. Original section anchors
-and legal article/paragraph labels are retained; a requested fragment selects
-where the bounded excerpt begins. No links from page content are followed.
+characters. The helper uses a synchronous curl content callback to enforce the
+byte limit before accepting a chunk. Oversized downloads fail; clipped text is
+marked `partial`. HTML, XHTML and plain text are supported. Login-only, paywalled,
+PDF or JavaScript-only content may remain unavailable; refusals retain a fixed
+`web_blocked:` category and deadlines use `web_timeout:` without exposing response
+bodies or transport details.
 
-This is a restricted reader inside the existing service process, not a separate
-OS sandbox. Its output, including metadata, remains untrusted evidence. The chat
-workflow must keep it separate from trusted instructions and retain its no-tools
-inference policy. HTTP and output validation limit effects; they cannot prove an
-LLM interpretation is immune to prompt injection.
+Main landmarks and the article containing the main heading take priority over
+related-story cards. Nested articles and sidebars are excluded. Original section
+anchors and legal article/paragraph labels are retained; a requested fragment
+selects where the bounded excerpt begins. No links from page content are followed.
+
+The production and development images install the core web helper in
+`/opt/feeds-web`, independently of optional plugin extras. Rebuild the Feeds image
+to acquire this dependency. A host-run binary uses the same dedicated interpreter
+when available, otherwise `python3` from PATH; a missing dependency leaves the
+original refusal intact. No new runtime configuration is required.
+
+This is a restricted reader inside the existing service process with a trusted
+HTTP helper, not a separate OS sandbox. Its output, including metadata, remains
+untrusted evidence. Chat keeps it separate from trusted instructions and retains
+its no-tools inference policy. If every supplied link fails, Chat records and
+returns one localized application notice without generating an interpretation of
+unread titles or URL slugs. Mixed-success turns discuss only retrieved passages.
+HTTP and output checks limit effects; they cannot prove an LLM interpretation is
+immune to prompt injection.
