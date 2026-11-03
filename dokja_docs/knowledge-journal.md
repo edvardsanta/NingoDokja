@@ -3,8 +3,9 @@
 Step `08.2`, following the [record and eligibility contracts](knowledge-outcomes.md).
 The [Memory-domain journal](../dokja_domain/dokja_memory/application/journal.go)
 implements bounded record mutations through a typed transaction port. There is
-no production store adapter, public writer, executor or registered receipt
-producer in this batch. This is a prerequisite for that integration, not actual
+no public writer, executor or registered receipt producer in this batch. A
+subsequent [optional PostgreSQL adapter](knowledge-journal-postgres.md) implements
+the storage port, without application activation. This is a prerequisite for that integration, not actual
 durable outcome capture or completed episode reuse.
 
 ## Domain operations
@@ -78,8 +79,10 @@ time would break replay and is explicitly avoided.
 4. On a changed snapshot, write the next revision and its attempt claim together
    with the operation result. An identical receipt under a new operation key
    records replay metadata without adding evidence or advancing the revision.
-5. On error or cancellation before commit, preserve the prior snapshot and leave
-   no operation key or attempt claim behind. Return detached results.
+5. On validation/callback error or confirmed rollback/cancellation before commit,
+   preserve the prior snapshot and leave no operation key or attempt claim behind.
+   A commit transport failure may have an unknown outcome; resolve it by replaying
+   the original command, not by repeating an external action. Return detached results.
 
 The domain callback never dispatches an external action. Clock assignment and
 validation under this transaction do not create an external exactly-once protocol.
@@ -135,3 +138,12 @@ failure/restart tests, then connect one opt-in registered receipt or attributed
 report consumer with independent admission facts. Keep execution disabled until
 its owning domain authorizes a reviewed action path. Eligible retrieval and
 prediction must still use the [purpose-specific policy](knowledge-outcomes.md#implemented-pure-policy).
+
+
+## PostgreSQL adapter follow-up
+
+The [optional PostgreSQL implementation](knowledge-journal-postgres.md) now covers
+the transaction port with real-database concurrency, rollback, deletion-fence and
+controlled restart/replay tests. It remains unregistered. Backup/restore tooling,
+application-level admission, receipt production, deletion propagation and runtime
+configuration still require the next integration review.
