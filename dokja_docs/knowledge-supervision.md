@@ -7,7 +7,9 @@ the default proof that an action succeeded.
 
 Status: application integration contract. The subsequent
 [native source-read receipt integration](knowledge-source-receipts.md) is
-implemented as an opt-in host binding. No supervisor, control endpoint or receipt
+implemented as an opt-in host binding. A subsequent
+[native source supervisor](knowledge-source-steering.md) implements revision-bound
+controls for that bounded path. No supervisor, control endpoint or receipt
 producer is activated in application startup. It builds on
 [domain outcome policy](knowledge-outcomes.md), the [journal](knowledge-journal.md)
 and its [optional PostgreSQL adapter](knowledge-journal-postgres.md).
@@ -225,6 +227,8 @@ This slice does not bring forward the general task registry in `10.6` or remove
 - Changed source pins stop obsolete evidence from entering the new context.
 - Journal failure or unknown commit cannot produce a false completion acknowledgment.
 
-These are required future tests, not implemented checks. Existing pure policy,
-journal and PostgreSQL tests remain useful but do not establish this supervisor,
-authenticated control interface or native receipt channel.
+The [native source supervisor](knowledge-source-steering.md) now exercises these
+ordering, admission and settlement behaviors through an opt-in host API and
+synthetic authentication policy. Public authenticated controls, durable control
+recovery and live runtime activation remain pending; these regressions do not
+establish those capabilities or semantic understanding.

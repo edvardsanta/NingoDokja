@@ -4,7 +4,10 @@ Status: opt-in library integration, not enabled in application startup or any
 public ingress. This is the first bounded automatic receipt consumer from the
 [supervision contract](knowledge-supervision.md). Incremental pause, redirect,
 resume and cancel endpoints, durable supervised-session state and the proposed
-global observer remain unimplemented.
+global observer remain unimplemented. The subsequent
+[native source supervisor](knowledge-source-steering.md) implements volatile
+authenticated-host controls and revision-bound progression without exposing them
+as public endpoints.
 
 ## Existing execution path
 
@@ -100,7 +103,7 @@ source deletion propagation remains pending.
 The host can supply the existing PostgreSQL port. No DSN, environment variable,
 Compose change, startup migration, operator database write or production cutover
 is introduced. Live authentication/admission, explicit TLS/connection selection,
-control ordering, revision-bound checkpoints, cumulative supervision limits,
+public control admission, durable control/checkpoint recovery,
 restart/backup recovery and rollout/rollback still require implementation and
 review before runtime activation. Step `08.2` remains in progress and `08.3`
 remains pending. The global observation spine is a separate proposed extension.

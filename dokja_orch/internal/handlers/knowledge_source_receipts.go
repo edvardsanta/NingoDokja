@@ -26,8 +26,20 @@ type SourceReadPermission struct {
 	Purpose                                                         string
 	Scope, ApplicationRef, TaskRef, WorkspaceAttemptRef, EpisodeRef string
 	StateRevision                                                   uint64
+	PlanRevision                                                    uint64
 	Capability                                                      string
 	Source                                                          knowledge.ApplicationSelection
+}
+
+// SourceReadSettlement is a native notification after an actual read returned.
+// Unconfirmed journal storage and unconfirmed reads remain explicit. This is a
+// host callback, not an event-supplied observer or a new receipt writer.
+type SourceReadSettlement struct {
+	ApplicationRef, TaskRef, WorkspaceAttemptRef, EpisodeRef, AttemptRef string
+	StateRevision, PlanRevision                                          uint64
+	Outcome                                                              string
+	Confirmed                                                            bool
+	SourceBytes                                                          int
 }
 
 // SourceReadJournal is an opt-in application dependency. Authorize must check
@@ -37,6 +49,8 @@ type SourceReadPermission struct {
 type SourceReadJournal struct {
 	Scope, ApplicationRef string
 	StateRevision         uint64
+	PlanRevision          uint64
+	Settled               func(SourceReadSettlement)
 	Store                 application.JournalStore
 	Authorize             func(context.Context, SourceReadPermission) (string, error)
 	Clock                 func() time.Time
@@ -69,7 +83,7 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		return nil, nil, fmt.Errorf("native source read needs a pinned workspace attempt")
 	}
 	key := application.JournalKey{Scope: binding.Scope, EpisodeRef: uuid.NewString(), AttemptRef: uuid.NewString(), OperationKey: uuid.NewString()}
-	permission := SourceReadPermission{Purpose: "execute", Scope: binding.Scope, ApplicationRef: binding.ApplicationRef, StateRevision: binding.StateRevision,
+	permission := SourceReadPermission{Purpose: "execute", Scope: binding.Scope, ApplicationRef: binding.ApplicationRef, StateRevision: binding.StateRevision, PlanRevision: binding.PlanRevision,
 		TaskRef: input.TaskID, WorkspaceAttemptRef: input.AttemptID, EpisodeRef: key.EpisodeRef, Capability: sourceReadCapability, Source: selected}
 	authorization, err := binding.Authorize(ctx, permission)
 	if err != nil || !sourceReadIdentity.MatchString(authorization) {
@@ -82,9 +96,10 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		Method:    application.Binding{Ref: sourceReadCapability, Version: "1"},
 		Criterion: application.Binding{Ref: "knowledge.application.source.validated", Version: "1"},
 		InputDigest: sourceReadDigest(struct {
-			Capability string
-			Source     knowledge.ApplicationSelection
-		}{sourceReadCapability, selected}),
+			Capability   string
+			Source       knowledge.ApplicationSelection
+			PlanRevision uint64 `json:"PlanRevision,omitempty"`
+		}{sourceReadCapability, selected, binding.PlanRevision}),
 		Sources:          []application.Evidence{{Ref: selected.SourceID, Hash: selected.TextVersion}},
 		AuthorizationRef: authorization, DispatchMode: "registered_capability", Phase: "prepared",
 	}
@@ -136,6 +151,12 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 	case "validation_failed":
 		outcome = "failed"
 	}
+	settlement := SourceReadSettlement{ApplicationRef: binding.ApplicationRef, TaskRef: input.TaskID,
+		WorkspaceAttemptRef: input.AttemptID, EpisodeRef: key.EpisodeRef, AttemptRef: attempt.Ref,
+		StateRevision: binding.StateRevision, PlanRevision: binding.PlanRevision, Outcome: outcome, SourceBytes: sourceSize(read.Source)}
+	if binding.Settled != nil {
+		defer func() { binding.Settled(settlement) }()
+	}
 	observation := application.Observation{
 		Stamp:          application.Stamp{Contract: application.ObservationContract, Ref: uuid.NewString(), Scope: binding.Scope},
 		ApplicationRef: binding.ApplicationRef, AttemptRef: attempt.Ref, InputDigest: attempt.InputDigest,
@@ -154,6 +175,7 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 	if _, err := journal.Observe(settleCtx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: key, ExpectedRevision: 2}, Observation: observation}); err != nil {
 		return nil, nil, fmt.Errorf("source-read receipt settlement was not confirmed")
 	}
+	settlement.Confirmed = true
 	if read.Err != nil {
 		return nil, nil, read.Err
 	}
