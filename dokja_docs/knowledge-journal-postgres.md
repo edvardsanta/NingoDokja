@@ -127,3 +127,9 @@ criterion mapping, deletion propagation and explicit connection configuration.
 Only its action-owning domain can authorize external execution. Live observed
 outcome capture, eligible durable reuse, concepts/relationships and `08.3`
 causal/reliability evaluation remain incomplete.
+
+
+The subsequent [supervision contract](knowledge-supervision.md) selects automatic
+receipts with incremental user steering, starting with an opt-in native source-read
+consumer. Attributed reports remain secondary. This selection adds no runtime
+activation to the adapter.
