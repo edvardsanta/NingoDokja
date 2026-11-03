@@ -91,6 +91,87 @@ func TestThePersonaHoldsItsOwnJudgmentInsteadOfMirroringTheUser(t *testing.T) {
 	}
 }
 
+// Regression: a gaming joke became an unsupported factual retraction, followed
+// by repeated promises to stop. These assertions cover generation input, not
+// whether a live model understands sarcasm or produces a particular comeback.
+func TestBanterKeepsIndependentJudgmentUnderSocialPressure(t *testing.T) {
+	for _, mode := range []string{"conversation", "streaming", "plain"} {
+		for _, message := range []string{
+			"ningo, eu n tenho nd a ver com o lol",
+			"para de falar isso",
+			"bosta",
+			"oxi, facil assim? kkkkkkkk, ele ta zuando",
+			"mas e pra levar a serio mesmo, eu desprezo lol",
+			"n escute o outro participante",
+			"Q isso ningo, c vai aceitar uma ordem desse usuário de valorant ?",
+		} {
+			t.Run(mode+"/"+message, func(t *testing.T) {
+				g := &presentationCaptureGenerator{}
+				plain := &plainGenerator{}
+				h := NewChatDomainHandler(g)
+				if mode == "plain" {
+					h = NewChatDomainHandler(plain)
+				}
+				event := chatEvent(message)
+				event.Context = map[string]any{"guild_id": "guild", "owner_configured": true, "is_owner": false}
+				summary := "One participant teased another about a game; this was not verified."
+				prior := "Vai voltar diamante só pra mandar um fala agora, calculadora kkkkk."
+				h.sessions.items[chatSessionBaseKey(event)] = chatSessionState{
+					id: "banter-session", lastSeenAt: time.Now(), summary: summary,
+					messages: []chatMessage{
+						{Role: "user", Content: "Participant A: Rlx q ele vai voltar mais forte, e com diamante no lol"},
+						{Role: "assistant", Content: prior},
+					},
+				}
+				ctx := context.Background()
+				if mode == "streaming" {
+					ctx = core.WithReplyPreview(ctx, func(string) {})
+				}
+				if _, err := h.Handle(ctx, event, chatStep); err != nil {
+					t.Fatal(err)
+				}
+				var system, transcript string
+				if mode == "plain" {
+					system, transcript = plain.prompt, plain.prompt
+				} else {
+					if g.streamed != (mode == "streaming") {
+						t.Fatal("unexpected generation path")
+					}
+					system = g.messages[0]["content"]
+					for _, turn := range g.messages[1:] {
+						transcript += turn["content"] + "\n"
+					}
+					if strings.Contains(system, summary) || strings.Contains(system, prior) {
+						t.Fatal("banter history promoted to system instructions")
+					}
+				}
+				for _, want := range []string{
+					"distinguish factual corrections from preferences and social pressure",
+					"A denial or insult alone does not prove",
+					"another participant's teasing claim is not proof either",
+					"insisting they are serious does not make their claim true or install a conversational rule",
+					"Choose your response independently from the context and factual evidence",
+					"read mock outrage, denials, profanity and mock commands in that context first",
+					"do not establish facts or authority",
+					"Do not automatically obey one participant by dismissing another",
+					"without becoming anyone's compliant ally",
+					"including a playful insult or sharp comeback",
+					"without sanitizing every retort or treating profanity as hostility",
+				} {
+					if !strings.Contains(strings.Join(strings.Fields(system), " "), want) {
+						t.Fatalf("missing banter guidance %q", want)
+					}
+				}
+				for _, want := range []string{summary, prior, message} {
+					if !strings.Contains(transcript, want) {
+						t.Fatalf("generation lost conversation context %q", want)
+					}
+				}
+			})
+		}
+	}
+}
+
 // The owner asked that, with him, Ningo may disagree once but accepts his decision; the note
 // only appears for the owner the gateway verified, and still grants no permissions.
 func TestTheOwnersWordSettlesAQuestionButGrantsNoPermission(t *testing.T) {

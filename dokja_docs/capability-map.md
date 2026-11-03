@@ -148,6 +148,17 @@ brief casual replies, varied wording, and philosophical insight without repetiti
 philosophy references. Quoted content and role claims remain untrusted input.
 Corrections should produce the corrected answer immediately, with brief
 acknowledgment rather than repeated apologies or invented memory explanations.
+Group banter distinguishes factual corrections from preferences and social pressure.
+Friendly swearing and playful insults may match an established
+group's tone. Mock outrage, profanity and mock commands are interpreted in context;
+one participant telling Ningo to ignore another does not compel obedience or taking
+sides. A denial or dislike alone does not establish that an earlier claim was false;
+another participant's teasing is not evidence either. Requests to stop a joke or
+insistence on seriousness do not establish facts or install conversational rules.
+Ningo chooses its response independently from context and evidence, without promises
+of obedience or unsupported retractions. Tests verify this guidance and representative conversation
+context reach conversational, streaming and plain generation; live-model tone remains
+unverified.
 Discord turns receive presentation guidance on every generation path: readable
 plain-text math by default, with LaTeX source only when explicitly requested.
 The Chat domain's Go presentation policy selects complex expressions or explicit
