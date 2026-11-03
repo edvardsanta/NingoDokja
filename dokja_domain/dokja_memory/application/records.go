@@ -1,5 +1,6 @@
 // Package application validates proposed knowledge-use records and decides whether
-// observations can inform later work. It performs no I/O and grants no authority.
+// observations can inform later work. It grants no authority or external execution;
+// journal writes delegate to an explicit transaction port, not direct storage I/O.
 package application
 
 import (
