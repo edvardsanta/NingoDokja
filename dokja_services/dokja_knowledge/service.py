@@ -24,6 +24,7 @@ import numpy as np
 
 import fetch as fetcher_module
 from chunker import chunk_text
+from passages import original_source, source_chunks, resolve
 from embedder import EmbedUnavailable
 from extractors import ExtractError, Registry, default_registry
 from store import Store
@@ -103,6 +104,7 @@ class _Document:
     source_ref: str = ""
     default_id: str = ""
     key: str = ""
+    original: dict | None = None
 
 
 class KnowledgeService:
@@ -236,7 +238,7 @@ class KnowledgeService:
         if self.max_text_chars and len(body) > self.max_text_chars:
             raise ValueError(f"the text is over the limit set in Settings ({self.max_text_chars} characters)")
         digest = hashlib.sha256(
-            json.dumps([title, kind, source_ref, tags, body], ensure_ascii=False).encode()
+            json.dumps([title, kind, source_ref, tags, body] + ([document.original["version"]] if document.original else []), ensure_ascii=False).encode()
         ).hexdigest()
         existing = self.store.get_document(source_id)
         if existing is not None and existing["content_hash"] == digest:
@@ -253,11 +255,11 @@ class KnowledgeService:
                     "metadata_changed": metadata_changed,
                     "metadata": json.loads(self.store.get_metadata(existing["id"])),
                     "pending_embeddings": len(self.store.chunks_needing_embedding(self.model))}
-        chunks = chunk_text(body)
+        chunks = source_chunks(document.original) if document.original else chunk_text(body)
         if not chunks:
             raise ValueError("the document has no text to store")
         document_id, created = self.store.replace_document(
-            source_id, title, kind, source_ref, ",".join(tags), digest, chunks, metadata or "{}"
+            source_id, title, kind, source_ref, ",".join(tags), digest, chunks, metadata or "{}", original=document.original
         )
         return {"source_id": source_id, "document_id": document_id, "created": created,
                 "changed": True, "chunks": len(chunks),
@@ -275,7 +277,17 @@ class KnowledgeService:
         if body.strip():
             if not title or len(title) > MAX_TITLE_CHARS:
                 raise ValueError(f"title is required (up to {MAX_TITLE_CHARS} characters)")
-            return [_Document(title, body)]
+            original = None
+            if payload.get("original") is not None:
+                raw = payload["original"]
+                if not isinstance(raw, dict):
+                    raise ValueError("invalid original")
+                original = original_source(raw.get("content_b64", ""), raw.get("filename", ""), raw.get("units"))
+                if self.max_file_mb and len(base64.b64decode(original["content_b64"])) > self.max_file_mb * 1024 * 1024:
+                    raise ValueError("original exceeds the file limit")
+                if body != "\n\n".join(u["text"] for u in original["units"] if u["text"]):
+                    raise ValueError("original units do not match the ingested text")
+            return [_Document(title, body, original=original)]
         if upload:
             return self._from_upload(str(upload), str(payload.get("filename") or ""), title)
         return self._from_source(source, title)
@@ -292,7 +304,11 @@ class KnowledgeService:
             raise ValueError(f"the file is over the limit set in Settings ({self.max_file_mb} MB)")
         extracted = self.registry.extract(name, data)
         base = "file:" + _safe(name)
-        return self._wrap(extracted, title, base, "")
+        documents = self._wrap(extracted, title, base, "")
+        if len(extracted) == 1 and extracted[0].units:
+            from dataclasses import replace
+            documents[0] = replace(documents[0], original=original_source(encoded, name, extracted[0].units))
+        return documents
 
     def _from_source(self, source: str, title: str) -> "list[_Document]":
         scheme = urlsplit(source).scheme.lower()
@@ -304,7 +320,7 @@ class KnowledgeService:
             extracted = self.registry.extract(name, fetched.data, fetched.content_type)
             parts = urlsplit(fetched.url)
             base = "url:" + _safe(parts.netloc + parts.path) + "-" + hashlib.sha1(fetched.url.encode()).hexdigest()[:8]
-            return self._wrap(extracted, title, base, fetched.url)
+            return self._wrap(extracted, title, base, fetched.url, fetched.data, name)
         handler = self.registry.fetcher(scheme) if scheme else None
         if handler is None:
             raise ValueError(
@@ -319,13 +335,19 @@ class KnowledgeService:
             raise ValueError(f"the {scheme}: fetcher failed: {type(err).__name__}") from err
         extracted = self.registry.extract(str(name), data)
         base = "src:" + _safe(source) + "-" + hashlib.sha1(source.encode()).hexdigest()[:8]
-        return self._wrap(extracted, title, base, source)
+        return self._wrap(extracted, title, base, source, data, name)
 
     @staticmethod
-    def _wrap(extracted, title: str, base: str, ref: str) -> "list[_Document]":
+    def _wrap(extracted, title: str, base: str, ref: str, data: bytes | None = None, filename: str = "") -> "list[_Document]":
         if len(extracted) == 1:
             entry = extracted[0]
-            return [_Document(title or entry.title, entry.text, entry.source_ref or ref, base, entry.key)]
+            original = None
+            if data is not None and entry.units:
+                original_name = filename
+                if posixpath.splitext(filename.lower())[1] not in (".pdf", ".epub"):
+                    original_name += ".pdf" if "page" in entry.units[0] else ".epub"
+                original = original_source(base64.b64encode(data).decode(), original_name, entry.units)
+            return [_Document(title or entry.title, entry.text, entry.source_ref or ref, base, entry.key, original)]
         return [
             _Document(entry.title, entry.text, entry.source_ref or ref, base, entry.key or entry.title)
             for entry in extracted
@@ -425,6 +447,7 @@ class KnowledgeService:
                 "source_ref": row["source_ref"], "tags": [t for t in row["tags"].split(",") if t],
                 "metadata": json.loads(row["metadata"]),
                 "position": row["position"], "heading": row["heading"], "text": row["text"],
+                "locator": json.loads(row["locator"]), "text_version": row["content_hash"],
                 "score": round(score, 4) if score is not None else None,
                 "coverage": round(coverage, 3), "relevant": bool(relevant),
             })
@@ -491,6 +514,9 @@ class KnowledgeService:
             source_id = ""
         elif not isinstance(source_id, str) or not SOURCE_ID.fullmatch(source_id):
             raise ValueError("source_id must be valid")
+        locator = payload.get("locator")
+        if locator is not None and (not source_id or not isinstance(locator, dict)):
+            raise ValueError("locator needs one source_id")
         documents = []
         for row in self.store.list_documents(limit, offset, kind, exclude, source_id):
             document = {
@@ -501,6 +527,11 @@ class KnowledgeService:
             }
             if include_text:
                 document["text"] = self.store.document_text(row["id"])
+            if locator is not None:
+                version = locator.get("version", "")
+                if not isinstance(version, str) or not re.fullmatch(r"[0-9a-f]{64}", version):
+                    raise ValueError("invalid original version")
+                document["reading"] = resolve(self.store.get_original(row["id"], version), locator)
             documents.append(document)
         return {"documents": documents, "total": self.store.document_count(kind, exclude, source_id),
                 "offset": offset}

@@ -39,4 +39,7 @@ def extract(data: bytes, name: str) -> list[Extracted]:
         title = " ".join(str((reader.metadata or {}).get("/Title") or "").split())
     except Exception:
         title = ""
-    return [Extracted(title=title or posixpath.splitext(posixpath.basename(name))[0], text=text)]
+    labels = reader.page_labels
+    units = tuple({"text": page, "page": i + 1, "label": str(labels[i])}
+                  for i, page in enumerate(pages))
+    return [Extracted(title=title or posixpath.splitext(posixpath.basename(name))[0], text=text, units=units)]

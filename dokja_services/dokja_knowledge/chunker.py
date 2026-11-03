@@ -17,6 +17,7 @@ class Chunk:
     position: int
     heading: str  # "Section > Subsection" the chunk sits under, or ""
     text: str
+    locator: str = "{}"
 
 
 def chunk_text(body: str, max_chars: int = MAX_CHARS, overlap: int = OVERLAP_CHARS) -> list[Chunk]:

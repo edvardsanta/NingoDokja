@@ -76,7 +76,7 @@ func (t *ReadingTask) Read(ctx context.Context, event core.Event) (map[string]an
 		}
 	}
 	filename := strings.TrimSpace(fmt.Sprint(request["filename"]))
-	run.reading = knowledgedomain.Reading{Filename: filename, Payload: request}
+	run.reading = knowledgedomain.Reading{Filename: filename, ContentB64: run.content, Payload: request}
 	taskEvent := event
 	taskEvent.Payload = request
 
@@ -286,9 +286,10 @@ func readDocuments(raw any) []knowledgedomain.ReadDocument {
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
+		units, _ := fields["units"].([]any)
 		documents = append(documents, knowledgedomain.ReadDocument{
 			Title: resultString(fields, "title"), Text: text,
-			SourceRef: resultString(fields, "source_ref"), Key: resultString(fields, "key"),
+			SourceRef: resultString(fields, "source_ref"), Key: resultString(fields, "key"), Units: units,
 		})
 	}
 	return documents

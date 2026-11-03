@@ -324,6 +324,8 @@ def test_version_one_source_import_does_not_upgrade_original(pg_store, tmp_path)
     path = tmp_path / "legacy.db"
     source = Store(str(path))
     ingest(KnowledgeService(source, FakeEmbedder(), model="fake"))
+    source.conn.execute("DROP TABLE document_originals")
+    source.conn.execute("ALTER TABLE chunks DROP COLUMN locator")
     source.conn.execute("DROP TABLE document_metadata")
     source.conn.execute("PRAGMA user_version=1")
     source.conn.commit()
@@ -365,3 +367,27 @@ def test_connection_and_storage_diagnostics_do_not_expose_private_values(
     finally:
         server.socket.close(0)
         server.context.destroy(linger=0)
+
+
+def test_original_versions_and_locators_survive_verified_round_trip(pg_store, tmp_path):
+    import base64
+    from samples import make_epub
+
+    source_path = tmp_path / "originals.db"
+    source = Store(str(source_path))
+    service = KnowledgeService(source, None)
+    data = make_epub(["<h1>Study</h1><p>Marriage evidence and resources.</p>"])
+    service.ingest({"filename": "study.epub", "content_b64": base64.b64encode(data).decode()})
+    hit = service.search({"query": "Marriage evidence resources"})["hits"][0]
+    source.close()
+    assert import_sqlite(str(source_path), pg_store)["verified"]
+    payload = {"source_id": hit["source_id"], "locator": hit["locator"]}
+    original = KnowledgeService(pg_store, None).list_documents(payload)["documents"][0]["reading"]
+    assert original["state"] == "resolved"
+    destination = tmp_path / "export.db"
+    assert export_sqlite(str(destination), pg_store)["verified"]
+    restored = Store(str(destination))
+    try:
+        assert KnowledgeService(restored, None).list_documents(payload)["documents"][0]["reading"] == original
+    finally:
+        restored.close()

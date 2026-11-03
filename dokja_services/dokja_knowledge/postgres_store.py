@@ -62,11 +62,13 @@ class PostgresStore:
             current = self.conn.execute(
                 "SELECT version FROM schema_version WHERE singleton"
             ).fetchone()
-            if current and current["version"] != 1:
+            if current and current["version"] not in (1, 2):
                 raise RuntimeError(
                     "PostgreSQL Knowledge schema is not supported by this build"
                 )
             if current:
+                if current["version"] == 1:
+                    self._migrate_originals()
                 return
             self.conn.execute("""
                 CREATE TEXT SEARCH CONFIGURATION knowledge_search (COPY = pg_catalog.simple);
@@ -98,6 +100,26 @@ class PostgresStore:
                 INSERT INTO schema_version VALUES (true, 1);
             """)
 
+            self._migrate_originals()
+
+    def _migrate_originals(self):
+        self.conn.execute("""
+            ALTER TABLE chunks ADD COLUMN locator text NOT NULL DEFAULT '{}';
+            CREATE TABLE document_originals (
+                document_id bigint NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                version text NOT NULL, original text NOT NULL,
+                PRIMARY KEY(document_id, version)
+            );
+            UPDATE schema_version SET version = 2 WHERE singleton;
+        """)
+
+    def get_original(self, document_id, version=""):
+        row = self.conn.execute(
+            "SELECT original FROM document_originals WHERE document_id = %s AND version = %s",
+            (document_id, version),
+        ).fetchone()
+        return json.loads(row["original"]) if row else None
+
     def get_document(self, source_id):
         return self.conn.execute(
             "SELECT * FROM documents WHERE source_id = %s", (source_id,)
@@ -113,6 +135,7 @@ class PostgresStore:
         content_hash,
         chunks: list[Chunk],
         metadata="{}",
+        original=None,
     ):
         stamp = _now()
         with self.conn.transaction():
@@ -157,10 +180,15 @@ class PostgresStore:
                 )
             with self.conn.cursor() as cursor:
                 cursor.executemany(
-                    "INSERT INTO chunks(document_id, position, heading, text) VALUES (%s, %s, %s, %s)",
-                    [(document_id, c.position, c.heading, c.text) for c in chunks],
+                    "INSERT INTO chunks(document_id, position, heading, text, locator) VALUES (%s, %s, %s, %s, %s)",
+                    [(document_id, c.position, c.heading, c.text, c.locator) for c in chunks],
                 )
             self._write_metadata(document_id, metadata)
+            if original is not None:
+                self.conn.execute(
+                    "INSERT INTO document_originals VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                    (document_id, original["version"], json.dumps(original, ensure_ascii=False)),
+                )
         self.version += 1
         return document_id, created
 
@@ -387,7 +415,7 @@ class PostgresStore:
             return {}
         rows = self.conn.execute(
             """
-            SELECT c.id, c.position, c.heading, c.text, d.source_id, d.title,
+            SELECT c.id, c.position, c.heading, c.text, c.locator, d.content_hash, d.source_id, d.title,
                    d.kind, d.source_ref, d.tags, COALESCE(m.metadata, '{}') AS metadata
             FROM chunks c JOIN documents d ON d.id=c.document_id
             LEFT JOIN document_metadata m ON m.document_id=d.id WHERE c.id = ANY(%s::bigint[])

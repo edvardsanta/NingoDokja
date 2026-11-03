@@ -35,10 +35,11 @@ CHUNK_FIELDS = (
     "text",
     "embedding",
     "embed_model",
+    "locator",
 )
 
 
-def _digest(documents, chunks):
+def _digest(documents, chunks, originals=()):
     digest = hashlib.sha256()
     for row in documents:
         digest.update(
@@ -53,6 +54,9 @@ def _digest(documents, chunks):
             json.dumps(values, ensure_ascii=False, separators=(",", ":")).encode()
         )
         digest.update(b"\n")
+    for row in originals:
+        digest.update(json.dumps(list(row), ensure_ascii=False, separators=(",", ":")).encode())
+        digest.update(b"\n")
     return digest.hexdigest()
 
 
@@ -63,8 +67,8 @@ def import_sqlite(source_path: str, target: PostgresStore) -> dict:
     with closing(sqlite3.connect(uri, uri=True)) as source:
         source.execute("BEGIN")
         version = source.execute("PRAGMA user_version").fetchone()[0]
-        if version not in {1, 2}:
-            raise ValueError("SQLite Knowledge schema must be version 1 or 2")
+        if version not in {1, 2, 3}:
+            raise ValueError("SQLite Knowledge schema must be version 1, 2 or 3")
         metadata = "'{}'" if version == 1 else "COALESCE(m.metadata, '{}')"
         join = (
             ""
@@ -84,12 +88,15 @@ def import_sqlite(source_path: str, target: PostgresStore) -> dict:
                         "SQLite contains an invalid embedding; import refused"
                     )
                 values[5] = vector
+            if version < 3:
+                values.append("{}")
             chunks.append(tuple(values))
-        expected = _digest(documents, chunks)
+        originals = source.execute("SELECT document_id, version, original FROM document_originals ORDER BY document_id, version").fetchall() if version >= 3 else []
+        expected = _digest(documents, chunks, originals)
         with target.conn.transaction():
             # Exclude application writes for the entire import and verification.
             target.conn.execute(
-                "LOCK TABLE documents, chunks, document_metadata IN EXCLUSIVE MODE"
+                "LOCK TABLE documents, chunks, document_metadata, document_originals IN EXCLUSIVE MODE"
             )
             if target.document_count() or target.stats("")["chunks"]:
                 raise ValueError(
@@ -110,17 +117,18 @@ def import_sqlite(source_path: str, target: PostgresStore) -> dict:
                 )
                 cursor.executemany(
                     """
-                    INSERT INTO chunks(id, document_id, position, heading, text, embedding, embed_model)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO chunks(id, document_id, position, heading, text, embedding, embed_model, locator)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                     chunks,
                 )
+                cursor.executemany("INSERT INTO document_originals VALUES (%s, %s, %s)", originals)
             actual_documents = target.conn.execute("""
                 SELECT d.*, COALESCE(m.metadata, '{}') AS metadata FROM documents d
                 LEFT JOIN document_metadata m ON m.document_id=d.id ORDER BY d.id
             """).fetchall()
             actual_chunks = target.conn.execute("""
-                SELECT id, document_id, position, heading, text, embedding, embed_model
+                SELECT id, document_id, position, heading, text, embedding, embed_model, locator
                 FROM chunks ORDER BY id
             """).fetchall()
             actual = _digest(
@@ -129,6 +137,7 @@ def import_sqlite(source_path: str, target: PostgresStore) -> dict:
                     for row in actual_documents
                 ],
                 [tuple(row[field] for field in CHUNK_FIELDS) for row in actual_chunks],
+                [tuple(row[field] for field in ("document_id", "version", "original")) for row in target.conn.execute("SELECT * FROM document_originals ORDER BY document_id, version")],
             )
             if actual != expected:
                 raise RuntimeError(
@@ -177,11 +186,12 @@ def export_sqlite(destination_path: str, source: PostgresStore) -> dict:
             chunks = [
                 tuple(row[field] for field in CHUNK_FIELDS)
                 for row in source.conn.execute("""
-                SELECT id, document_id, position, heading, text, embedding, embed_model
+                SELECT id, document_id, position, heading, text, embedding, embed_model, locator
                 FROM chunks ORDER BY id
             """).fetchall()
             ]
-            expected = _digest(documents, chunks)
+            originals = [tuple(row[field] for field in ("document_id", "version", "original")) for row in source.conn.execute("SELECT * FROM document_originals ORDER BY document_id, version")]
+            expected = _digest(documents, chunks, originals)
             with target.conn:
                 target.conn.executemany(
                     """
@@ -194,7 +204,7 @@ def export_sqlite(destination_path: str, source: PostgresStore) -> dict:
                     [(row[0], row[9]) for row in documents],
                 )
                 target.conn.executemany(
-                    "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                         (
                             *row[:5],
@@ -203,11 +213,12 @@ def export_sqlite(destination_path: str, source: PostgresStore) -> dict:
                                 if row[5] is None
                                 else np.asarray(row[5], dtype=np.float32).tobytes()
                             ),
-                            row[6],
+                            row[6], row[7],
                         )
                         for row in chunks
                     ],
                 )
+                target.conn.executemany("INSERT INTO document_originals VALUES (?, ?, ?)", originals)
                 actual_documents = target.conn.execute("""
                     SELECT d.*, COALESCE(m.metadata, '{}') AS metadata FROM documents d
                     LEFT JOIN document_metadata m ON m.document_id=d.id ORDER BY d.id
@@ -218,7 +229,7 @@ def export_sqlite(destination_path: str, source: PostgresStore) -> dict:
                     if values[5] is not None:
                         values[5] = np.frombuffer(values[5], dtype=np.float32)
                     actual_chunks.append(values)
-                if _digest(actual_documents, actual_chunks) != expected:
+                if _digest(actual_documents, actual_chunks, target.conn.execute("SELECT * FROM document_originals ORDER BY document_id, version").fetchall()) != expected:
                     raise RuntimeError("Knowledge export verification failed")
         target.close()
         target = None

@@ -121,3 +121,20 @@ func TestHandleDoesNotServeReadingByItself(t *testing.T) {
 		t.Fatalf("knowledge.read must not reach the service as an event: %v", err)
 	}
 }
+
+func TestLocatedReadingRetainsOriginalWithItsUnits(t *testing.T) {
+	service := &ingestService{}
+	units := []any{map[string]any{"text": "Marriage evidence", "page": 1, "label": "7"}}
+	input := reading(map[string]any{}, ReadDocument{Title: "Study", Text: "Marriage evidence", Units: units})
+	input.ContentB64 = "Zml4dHVyZQ=="
+	if _, err := New(service).StoreReading(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	original, ok := service.payloads[0]["original"].(map[string]any)
+	if !ok || original["content_b64"] != input.ContentB64 || !reflect.DeepEqual(original["units"], units) {
+		t.Fatalf("%#v", original)
+	}
+	if _, ok := input.Payload["content_b64"]; ok {
+		t.Fatal("original leaked into task payload")
+	}
+}
