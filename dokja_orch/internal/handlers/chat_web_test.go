@@ -10,9 +10,10 @@ import (
 )
 
 type webReadingService struct {
-	calls     []string
-	fail      bool
-	injection string
+	calls         []string
+	fail          bool
+	injection     string
+	failureReason string
 }
 
 func (s *webReadingService) Dispatch(_ context.Context, kind string, payload map[string]any) (map[string]any, error) {
@@ -22,6 +23,9 @@ func (s *webReadingService) Dispatch(_ context.Context, kind string, payload map
 	address := payload["url"].(string)
 	s.calls = append(s.calls, address)
 	if s.fail || strings.Contains(address, "unavailable") {
+		if s.failureReason != "" {
+			return nil, fmt.Errorf("%s", s.failureReason)
+		}
 		return nil, fmt.Errorf("private service error containing sensitive details")
 	}
 	return map[string]any{"url": address, "title": "Law " + s.injection, "published": "2026-01-01", "retrieved_at": "2026-11-03T12:00:00Z", "passages": []chat.WebPassage{{Text: "Art. 140. Include the financial impact estimate. " + s.injection, Label: "Art. 140", URL: address}, {Text: "§ 1º Include the calculation assumptions.", Label: "Art. 140 § 1º", URL: address}}}, nil
@@ -90,7 +94,7 @@ func TestWebFailedReadingAndLimitAreExplicitEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(service.calls) != 4 || strings.Contains(fmt.Sprint(generator.messages), "private service error") || !strings.Contains(fmt.Sprint(generator.messages), `"omitted_links":1`) {
+	if len(service.calls) != 4 || len(generator.messages) != 0 {
 		t.Fatalf("%#v %#v", service.calls, generator.messages)
 	}
 	if !strings.Contains(result["reply"].(string), "Não consegui ler 4") || !strings.Contains(result["reply"].(string), "1 links adicionais") {
@@ -165,5 +169,39 @@ func TestWebExactQuotationChecksShortQuotesAndAttribution(t *testing.T) {
 	reply := verifyWebQuotes(`"financial impact" [1] "Financial impact" [1] "calculation assumptions" [1] "calculation assumptions" [2]`, sources)
 	if strings.Count(reply, quoteRemoved) != 2 || !strings.Contains(reply, `"financial impact" [1]`) || !strings.Contains(reply, `"calculation assumptions" [2]`) {
 		t.Fatalf("%s", reply)
+	}
+}
+
+func TestWebAllBlockedSkipsReplyInferenceAndRecordsOneHonestNotice(t *testing.T) {
+	service := &webReadingService{fail: true, failureReason: "web_blocked: challenge details must remain private"}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "Speculation from the unread title [1]"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	event := chatEvent("https://example.com/unread-story")
+	result, err := h.Handle(context.Background(), event, chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply := result["reply"].(string)
+	if len(generator.messages) != 0 || strings.Contains(reply, "Speculation") || strings.Contains(reply, "challenge details") || strings.Contains(reply, "📚") || strings.Count(reply, "bloqueou") != 1 || !strings.Contains(reply, "Cole aqui") {
+		t.Fatalf("%#v", result)
+	}
+	h.sessions.mu.Lock()
+	saved := h.sessions.items[chatSessionBaseKey(event)]
+	h.sessions.mu.Unlock()
+	if len(saved.messages) != 2 || saved.messages[1].Content != reply {
+		t.Fatalf("failure not recorded: %#v", saved.messages)
+	}
+}
+
+func TestWebMixedSuccessStillDiscussesOnlyRetrievedPassages(t *testing.T) {
+	service := &webReadingService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "The estimate requires assumptions. [1]"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	result, err := h.Handle(context.Background(), chatEvent("https://example.com/law https://example.com/unavailable"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(generator.messages) == 0 || !strings.Contains(result["reply"].(string), "https://example.com/law") || strings.Contains(result["reply"].(string), "<https://example.com/unavailable>") {
+		t.Fatalf("%#v", result)
 	}
 }

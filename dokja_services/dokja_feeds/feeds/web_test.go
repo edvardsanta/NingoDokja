@@ -146,3 +146,19 @@ func TestWebReaderNeverRequestsEmbeddedResources(t *testing.T) {
 		t.Fatalf("requests=%d result=%#v err=%v", requests, result, err)
 	}
 }
+
+func TestWebMainArticleBeatsRelatedStoryCards(t *testing.T) {
+	u, _ := url.Parse("https://example.com/story")
+	for _, page := range []string{
+		`<main><h1>Main committee story</h1><section><article><h2>Unrelated tax headline</h2></article></section><div><p>The committee chair controls the meeting agenda.</p><p>The article explains the nomination procedure.</p></div><aside>Unrelated sidebar</aside></main>`,
+		`<main><article><h2>Unrelated tax headline</h2></article><article><h1>Main committee story</h1><p>The committee chair controls the meeting agenda.</p></article></main>`,
+		`<article><h2>Unrelated tax headline</h2></article><article><p>The committee chair controls the meeting agenda.</p></article>`,
+		`<main><h1>Main committee story</h1><article><h2>Unrelated tax headline</h2></article><article><p>The committee chair controls the meeting agenda.</p></article></main>`,
+	} {
+		_, _, passages := extractWeb(page, "text/html", u)
+		combined := fmt.Sprint(passages)
+		if !strings.Contains(combined, "committee chair") || strings.Contains(combined, "Unrelated") {
+			t.Fatalf("wrong article selected: %s", combined)
+		}
+	}
+}

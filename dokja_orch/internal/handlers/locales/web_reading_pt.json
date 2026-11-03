@@ -1,4 +1,7 @@
 {
   "failed": "Não consegui ler {count} dos links enviados. Eles não servem de evidência para esta resposta.",
-  "omitted": "Deixei {count} links adicionais sem leitura; consigo ler até {limit} por mensagem."
+  "omitted": "Deixei {count} links adicionais sem leitura; consigo ler até {limit} por mensagem.",
+  "blocked_one": "O site bloqueou a leitura automática de um dos links. Não li esse conteúdo.",
+  "blocked_many": "A leitura automática foi bloqueada em {count} links. Não li esses conteúdos.",
+  "recovery": "Cole aqui o texto ou um trecho para conversarmos com citações."
 }

@@ -28,6 +28,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 
+# Core web reading uses a fixed curl_cffi helper for TLS-fingerprint refusals.
+# It performs HTTP only; no browser, JavaScript interpreter or challenge solver.
+COPY dokja_services/dokja_feeds/web-requirements.txt /tmp/web-requirements.txt
+RUN python3 -m venv /opt/feeds-web \
+    && /opt/feeds-web/bin/pip install --no-cache-dir -r /tmp/web-requirements.txt
+
 # Optional dependencies are installed at image build time, never by a plugin request.
 ARG FEEDS_PLUGIN_EXTRAS=none
 # content: every compatibility adapter (documents and media). media: only the media-perception adapter,

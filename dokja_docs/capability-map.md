@@ -315,7 +315,10 @@ Eligible Discord text messages containing one or more HTTP(S) URLs use
 `link-conversation` / Chat's `converse-links` action. Authorization still precedes
 all reading. The orchestrator asks Digest's `read-web-link` action to dispatch
 `feeds.web.read`; the built-in Feeds reader fetches and parses text without
-executing plugins or page scripts. Existing social-link delivery remains separate.
+executing plugins or page scripts. Signature-based refusals may retry through the
+bundled HTTP-only `curl_cffi` helper; validated IP pinning, redirect checks, byte
+limits and the original deadline apply to both transports. Main article selection
+excludes related-story cards and sidebars. Existing social-link delivery remains separate.
 Up to four distinct links per message replace the conversation's previous web
 reading. URLs in page content or generated replies never schedule reads.
 
@@ -341,8 +344,11 @@ scopes and 30 minutes of inactivity. Guild/channel scopes are shared by members;
 DMs and commands retain their existing independent scopes. A session reset, new
 link message, expiry, capacity eviction or restart discards that reading. Follow-ups
 reuse the captured text without refetching; failed and excess links receive a
-localized application notice. Web turns require a conversation-message generator
-and disable streaming previews so output checks precede delivery. See the
+localized application notice. When every supplied link fails, the application
+records one honest failure reply and skips reply inference, preventing speculation
+from unread titles or URL slugs. Mixed-success turns retain grounded discussion
+and a single application notice for unread links. Web turns require a
+conversation-message generator and disable streaming previews so output checks precede delivery. See the
 [reader contract](../dokja_services/dokja_feeds/README.md#restricted-web-text-reader).
 
 ### WhatsApp content messages
