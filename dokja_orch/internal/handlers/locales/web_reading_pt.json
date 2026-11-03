@@ -1,0 +1,4 @@
+{
+  "failed": "Não consegui ler {count} dos links enviados. Eles não servem de evidência para esta resposta.",
+  "omitted": "Deixei {count} links adicionais sem leitura; consigo ler até {limit} por mensagem."
+}

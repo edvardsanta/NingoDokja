@@ -289,6 +289,9 @@ func (f *chatFocus) remember(turn knowledgeTurn, question string, cited []knowle
 		f.items[turn.key] = focus
 		return
 	}
+	if cited[0].Web {
+		return
+	}
 	document := documentOf(cited[0].SourceID)
 	if !had || focus.SourceID != document {
 		focus = knowledgeFocus{SourceID: document, Subject: strings.TrimSpace(question)}
@@ -413,6 +416,9 @@ func (h *ChatDomainHandler) quoteIsInDocument(ctx context.Context, quote string,
 	}
 	seen := map[string]bool{}
 	for _, source := range sources {
+		if source.Web {
+			continue
+		}
 		document := documentOf(source.SourceID)
 		if seen[document] {
 			continue

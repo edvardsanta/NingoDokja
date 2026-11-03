@@ -67,6 +67,26 @@ an updated orchestrator and Discord adapter, with no new variables, ports or vol
 It does not change archived owner conversations, index chat in pgvector, walk reply
 chains, or import channel history from before deployment.
 
+Discord web conversations require updated Feeds and orchestrator binaries. No
+new variables, ports, volumes or schema changes are needed. The existing Feeds
+service switch disables web reading, and existing Discord channel/mention policy
+still decides which messages may initiate it. Readers need outbound public HTTP(S)
+and DNS. They deliberately ignore HTTP proxy environment variables, reject private
+and special-purpose destinations (including redirect targets), and cannot read
+login-only, PDF or JavaScript-only pages. Do not enable a browser/plugin fallback
+for this path without reviewing its execution and network boundaries.
+
+Readings are volatile: new link messages replace them, session resets clear them,
+and inactivity over 30 minutes, capacity eviction or restart loses their text.
+Resend the links after a restart when exact web evidence is needed. At most four
+links and eight passages enter one turn; each reader accepts at most 2 MiB and
+80,000 extracted characters, with a 12-second per-read deadline and a 15-second
+aggregate chat budget. Failed/excess links are disclosed in the reply. Page dates
+are unverified metadata; clipped excerpts are explicitly marked partial in model
+context. Model tools remain disabled and web-turn previews are withheld until
+quotation and citation checks complete. This is a restricted reader in Feeds,
+not an additional OS sandbox; semantic prompt-injection resistance is not guaranteed.
+
 The stored summary is readable locally with a SQLite client in read-only mode:
 
 ```sql

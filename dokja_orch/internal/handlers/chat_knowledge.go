@@ -92,12 +92,16 @@ func knowledgeRegister(metadata map[string]any) string {
 // knowledgeSource is one retrieved passage put in front of the model. Every passage
 // has its own Number, including passages of the same document.
 type knowledgeSource struct {
-	Number   int
-	Locator  *conversation.PassageLocator
-	SourceID string
-	Title    string
-	Heading  string
-	Text     string
+	Web         bool
+	Published   string
+	RetrievedAt string
+	Partial     bool
+	Number      int
+	Locator     *conversation.PassageLocator
+	SourceID    string
+	Title       string
+	Heading     string
+	Text        string
 	// Reference is where the document came from, when it says.
 	Reference string
 	// Register says how to talk about the document, from its classification; often empty.
@@ -264,6 +268,13 @@ func neutralizeFence(text string) string {
 // withKnowledgeReference places the reference just before the user's latest message, so
 // it stays the most recent context without rewriting the session history.
 func withKnowledgeReference(messages []map[string]string, sources []knowledgeSource) []map[string]string {
+	library := make([]knowledgeSource, 0, len(sources))
+	for _, source := range sources {
+		if !source.Web {
+			library = append(library, source)
+		}
+	}
+	sources = library
 	if len(sources) == 0 || len(messages) == 0 {
 		return messages
 	}
@@ -311,7 +322,11 @@ func citeSources(reply string, sources []knowledgeSource) string {
 			continue
 		}
 		seen[source.Number] = true
-		lines = append(lines, fmt.Sprintf("[%d] %s", source.Number, source.Title))
+		if source.Web {
+			lines = append(lines, webSourceLabel(source))
+		} else {
+			lines = append(lines, fmt.Sprintf("[%d] %s", source.Number, source.Title))
+		}
 	}
 	citation := "📚 " + strings.Join(lines, " · ")
 	if strings.TrimSpace(reply) == "" {

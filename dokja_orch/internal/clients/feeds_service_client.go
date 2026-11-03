@@ -74,7 +74,7 @@ func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, pay
 	}
 	factory := c.requesterFactory
 	// A refresh runs collectors and an invoke runs a plugin on demand: both wait as long as a reading.
-	if eventType == "feeds.refresh" || eventType == "feeds.invoke" {
+	if eventType == "feeds.refresh" || eventType == "feeds.invoke" || eventType == "feeds.web.read" {
 		factory = c.extractFactory
 	}
 	return c.send(ctx, factory, eventType, payload)
