@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { KnowledgeDocument, Off } from "../../shared/replies.js";
+import type { PassageLocator } from "../../shared/passages.js";
+import { OriginalReader } from "./original_reader.js";
 import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTimes, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
@@ -15,8 +17,8 @@ type Opened = { document: KnowledgeDocument } | { gone: true } | Off;
 
 // A document is read by its id, whichever way it was opened (a row of the list, a hit, the menu's
 // Classify…): where it sat in a list says nothing once the list changes.
-export async function loadDocument(transport: Transport, id: string): Promise<LoadResult<Opened>> {
-  const answer = await transport.request("knowledge.list", { source_id: id, include_text: true }, { timeoutMs: 15_000 });
+export async function loadDocument(transport: Transport, id: string, locator?: PassageLocator): Promise<LoadResult<Opened>> {
+  const answer = await transport.request("knowledge.list", { source_id: id, include_text: true, ...(locator ? { locator } : {}) }, { timeoutMs: 15_000 });
   if (!answer.ok) return answer;
   const page = parseDocuments(answer.result);
   if (!page) return { ok: false, error: { code: "unexpected", message: "unexpected knowledge reply" } };
@@ -29,14 +31,15 @@ export async function loadDocument(transport: Transport, id: string): Promise<Lo
 // and its text. The text is what the service rebuilds from the passages it stored, so it says so,
 // quietly and under the text: close to the original, not a faithful copy of it. It is shown as
 // text, never as markup, in a column a text is comfortable to read in.
-export function DocumentView({ transport, id, classify = false }: { transport: Transport; id: string; classify?: boolean }) {
+export function DocumentView({ transport, id, classify = false, locator }: { transport: Transport; id: string; classify?: boolean; locator?: PassageLocator }) {
   const t = useTranslate();
   const { ago } = useTimes();
   const { fixed } = useNumbers();
   const [classificationOpen, setClassificationOpen] = useState(classify);
   // Classify… on a document already open shows its classification.
   useEffect(() => { if (classify) setClassificationOpen(true); }, [classify]);
-  const load = useCallback(() => loadDocument(transport, id), [transport, id]);
+  const [position, setPosition] = useState(locator);
+  const load = useCallback(() => loadDocument(transport, id, position), [transport, id, position]);
   const { state, reload, poll, refreshing } = useCard(load);
   // The panel's refresh reads the text again where it stands.
   useWorkspaceRefresh(poll, refreshing || state.phase === "loading");
@@ -86,7 +89,7 @@ export function DocumentView({ transport, id, classify = false }: { transport: T
             </header>
             <p className="detail document-line">{meta.join(" · ")}</p>
             {classificationOpen && <KnowledgeClassificationPanel key={document.id} transport={transport} id={document.id} />}
-            {document.text ? (
+            {locator ? <OriginalReader reading={document.reading ?? { state: "unavailable" }} cited={locator} onNavigate={setPosition} /> : document.text ? (
               <>
                 <pre className="document-text">{document.text}</pre>
                 {document.truncated && (

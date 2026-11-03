@@ -277,16 +277,16 @@ func TestChatAsksForAStricterRelevanceThreshold(t *testing.T) {
 	}
 }
 
-func TestExcerptsOfOneDocumentShareANumberAndItsLine(t *testing.T) {
+func TestExcerptsOfOneDocumentHaveDistinctReferences(t *testing.T) {
 	hit := func(id, title, text string) any {
 		return map[string]any{"relevant": true, "source_id": id, "title": title, "heading": title + " > A part", "text": text}
 	}
 	sources := relevantSources(knowledgeResult(hit("note:case", "The case", "one"), hit("note:case", "The case", "two"), hit("note:other", "Another", "three")))
-	if len(sources) != 3 || sources[0].Number != 1 || sources[1].Number != 1 || sources[2].Number != 2 {
+	if len(sources) != 3 || sources[0].Number != 1 || sources[1].Number != 2 || sources[2].Number != 3 {
 		t.Fatalf("%#v", sources)
 	}
 	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources))
-	if !strings.HasSuffix(reply, "\n\n📚 [1] The case · [2] Another") {
+	if !strings.HasSuffix(reply, "\n\n📚 [1] The case · [2] The case") {
 		t.Fatal(reply)
 	}
 	if strings.Contains(reply, "note:") || strings.Contains(reply, "A part") {
@@ -370,5 +370,43 @@ func TestTheRegisterIsSaidOncePerDocumentOutsideItsQuote(t *testing.T) {
 	plain := knowledgeReference([]knowledgeSource{{Number: 1, SourceID: "note:x", Title: "X", Text: "t"}})
 	if strings.Contains(plain, "This is ") {
 		t.Fatal(plain)
+	}
+}
+
+func TestPassageReferencesPreserveLocationsAndBudgetedUnicodeSpans(t *testing.T) {
+	result := knowledgeResult(map[string]any{
+		"source_id": "file:book.epub", "title": "Book", "text": " 🙂 precise evidence ",
+		"locator": map[string]any{"version": strings.Repeat("a", 64), "format": "epub", "unit": 0, "start": 7, "end": 100, "href": "chapter.xhtml", "label": "Chapter"},
+	})
+	sources := selectSources(result, 2, 12, false)
+	if len(sources) != 1 || sources[0].Locator == nil {
+		t.Fatalf("%#v", sources)
+	}
+	if sources[0].Locator.Start != 7 || sources[0].Locator.End != 19 || sources[0].Text != " 🙂 precise e" {
+		t.Fatalf("%#v", sources[0])
+	}
+	kept := turnSources(sources)
+	if kept[0].Locator.End != 19 || kept[0].Excerpt != sources[0].Text {
+		t.Fatal(kept)
+	}
+	listed := turnView(conversation.Turn{Sources: kept})["sources"].([]any)
+	if listed[0].(map[string]any)["locator"] == nil {
+		t.Fatal(listed)
+	}
+}
+
+func TestCitedQuoteMustExistInTheReferencedPassage(t *testing.T) {
+	handler, _ := chatWith(&fakeSearcher{}, nil)
+	sources := []knowledgeSource{
+		{Number: 1, SourceID: "book", Text: "The institution of marriage supports children."},
+		{Number: 2, SourceID: "book", Text: "The social status affects family decisions."},
+	}
+	reply := handler.verifyQuotes(context.Background(), "“The institution of marriage supports children.” [2]", sources, knowledgeTurn{planned: true, text: true})
+	if strings.Contains(reply, "institution") {
+		t.Fatal("accepted a true quote linked to the wrong passage", reply)
+	}
+	reply = handler.verifyQuotes(context.Background(), "“The institution of marriage supports children.” [1]", sources, knowledgeTurn{planned: true, text: true})
+	if !strings.Contains(reply, "institution") {
+		t.Fatal(reply)
 	}
 }

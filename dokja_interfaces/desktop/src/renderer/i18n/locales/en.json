@@ -764,5 +764,16 @@
   "dialog_fact_delete": "Delete this kept fact?",
   "dialog_fact_delete_detail": "Ningo stops remembering it. The conversation where it was said stays as it is.",
   "dialog_fact_delete_accept": "Delete",
-  "assistant_older": "Earlier messages"
+  "assistant_older": "Earlier messages",
+  "source_reader": "Original passage",
+  "source_pdf_page": "PDF page {page} · printed label {label}",
+  "source_loading": "Opening the original…",
+  "source_unavailable": "The original version or its exact passage is unavailable. Re-import the original file to create precise references.",
+  "source_highlight_unresolved": "The original is open, but its visual highlight could not be aligned reliably. The exact extracted passage and its context are shown below.",
+  "source_return": "Return to cited passage",
+  "source_version": "Original version: {version}",
+  "source_context": "Extracted text with surrounding context",
+  "source_page": "Page",
+  "source_chapter": "Chapter",
+  "source_legacy": "This older reference identifies the document and saved excerpt. Its exact original location was not retained."
 }

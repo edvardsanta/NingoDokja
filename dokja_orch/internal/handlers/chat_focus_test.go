@@ -297,7 +297,7 @@ func TestASpokenTurnHasNoFocus(t *testing.T) {
 func textTurn() knowledgeTurn { return knowledgeTurn{text: true, planned: true} }
 
 func TestATrueQuoteStandsAcrossALineBreak(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	reply := `Ela diz: “baixar-me as asas, e digo isso sem queixa” [1].`
 	if got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, textTurn()); got != reply {
 		t.Fatalf("got %q", got)
@@ -305,7 +305,7 @@ func TestATrueQuoteStandsAcrossALineBreak(t *testing.T) {
 }
 
 func TestAnInventedQuoteIsTakenOut(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	reply := `Ela diz: “vi um anjo com uma lança de ouro” [1].`
 	got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, textTurn())
 	if want := `Ela diz: “[…]” [1].`; got != want {
@@ -313,20 +313,18 @@ func TestAnInventedQuoteIsTakenOut(t *testing.T) {
 	}
 }
 
-func TestAQuoteFromAnEarlierTurnIsFoundInTheDocument(t *testing.T) {
+func TestEarlierQuoteCannotPointAtAnotherPassage(t *testing.T) {
 	base := &documentBase{hits: []any{bookHit(true)}}
-	sources := []knowledgeSource{{SourceID: "file:book#part1", Text: "Another passage entirely."}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book#part1", Text: "Another passage entirely."}}
 	reply := `Ela diz: "baixar-me as asas, e digo isso" [1].`
-	if got := focusHandler(base).verifyQuotes(context.Background(), reply, sources, textTurn()); got != reply {
-		t.Fatalf("got %q", got)
-	}
-	if len(base.scoped) != 1 || !strings.HasPrefix(base.scoped[0], "file:book|") {
-		t.Fatalf("scoped: %v", base.scoped)
+	got := focusHandler(base).verifyQuotes(context.Background(), reply, sources, textTurn())
+	if got != `Ela diz: "[…]" [1].` || len(base.scoped) != 0 {
+		t.Fatalf("%s searches=%v", got, base.scoped)
 	}
 }
 
 func TestEachSideOfAnEllipsisMustBeInTheText(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	handler := focusHandler(&documentBase{})
 	reply := `“Basta ser mulher […] sem queixa alguma” [1]`
 	if got := handler.verifyQuotes(context.Background(), reply, sources, textTurn()); got != reply {
@@ -338,7 +336,7 @@ func TestEachSideOfAnEllipsisMustBeInTheText(t *testing.T) {
 }
 
 func TestOutsideATurnAboutTheTextOnlyACitedQuoteIsChecked(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	handler := focusHandler(&documentBase{})
 	turn := knowledgeTurn{planned: true}
 	reply := `Como você disse, “isso não faz sentido nenhum aqui”.`
@@ -353,7 +351,7 @@ func TestOutsideATurnAboutTheTextOnlyACitedQuoteIsChecked(t *testing.T) {
 }
 
 func TestASpokenTurnKeepsItsQuotes(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	reply := `“uma frase qualquer de quatro palavras” [1]`
 	if got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, knowledgeTurn{}); got != reply {
 		t.Fatalf("got %q", got)
@@ -361,7 +359,7 @@ func TestASpokenTurnKeepsItsQuotes(t *testing.T) {
 }
 
 func TestShortQuotesAreLeftAlone(t *testing.T) {
-	sources := []knowledgeSource{{SourceID: "file:book", Text: bookPassage}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	reply := `Ela diz “queime logo” [1].`
 	if got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, textTurn()); got != reply {
 		t.Fatalf("got %q", got)
@@ -370,7 +368,7 @@ func TestShortQuotesAreLeftAlone(t *testing.T) {
 
 func TestAQuoteThatCannotBeCheckedIsNotShown(t *testing.T) {
 	base := &documentBase{err: errors.New("down")}
-	sources := []knowledgeSource{{SourceID: "file:book", Text: "Another passage entirely."}}
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: "Another passage entirely."}}
 	got := focusHandler(base).verifyQuotes(context.Background(), `“uma frase qualquer de quatro palavras” [1]`, sources, textTurn())
 	if got != `“[…]” [1]` {
 		t.Fatalf("got %q", got)

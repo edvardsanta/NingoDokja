@@ -3316,3 +3316,12 @@ button.cfg-toggle:focus-visible {
 .assistant-turns .reply-sources li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); overflow-wrap: normal; }
 .reply-source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reply-sources + .assistant-by { margin-top: var(--space-2); }
+
+/* Original passages retain their source geometry; chapter text follows the library typography. */
+.original-reader { min-width: 0; }
+.original-reader select { display: block; max-width: 100%; margin-block: .5rem 1rem; }
+.original-pdf { display: block; width: 100%; height: auto; background: white; }
+.original-epub { line-height: 1.7; overflow-wrap: anywhere; }
+.original-context pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
+.original-reader mark { background: var(--action-primary); color: var(--text-on-action); }
+.original-reader :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

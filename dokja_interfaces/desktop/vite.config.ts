@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from "vite";
 const POLICY = [
   "default-src 'none'",
   "script-src 'self'",
+  "worker-src 'self'",
   "style-src 'self'",
   // A post the owner opened shows its files through the shell's own scheme (see post_store.ts).
   "img-src 'self' data: ningo-post:",

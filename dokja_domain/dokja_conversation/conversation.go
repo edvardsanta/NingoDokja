@@ -117,13 +117,28 @@ type Turn struct {
 	FinishedAt time.Time
 }
 
-// TurnSource is one document a reply cites, with the passage it drew on.
+// TurnSource is one passage a reply cites, with its document and original location.
 type TurnSource struct {
-	Number    int    `json:"number"`
-	SourceID  string `json:"source_id"`
-	Title     string `json:"title"`
-	Reference string `json:"reference,omitempty"`
-	Excerpt   string `json:"excerpt,omitempty"`
+	Number    int             `json:"number"`
+	SourceID  string          `json:"source_id"`
+	Title     string          `json:"title"`
+	Reference string          `json:"reference,omitempty"`
+	Excerpt   string          `json:"excerpt,omitempty"`
+	Locator   *PassageLocator `json:"locator,omitempty"`
+}
+
+// PassageLocator binds a retrieved span to an immutable PDF or EPUB version.
+// Start and End count Unicode code points within the extracted original unit.
+type PassageLocator struct {
+	Version   string `json:"version"`
+	Format    string `json:"format"`
+	Unit      int    `json:"unit"`
+	Start     int    `json:"start"`
+	End       int    `json:"end"`
+	Page      int    `json:"page,omitempty"`
+	Href      string `json:"href,omitempty"`
+	Label     string `json:"label,omitempty"`
+	PassageID string `json:"passage_id,omitempty"`
 }
 
 // Bounds. A conversation's text is the owner's, and a reply is bounded like the chat reply itself.
@@ -135,7 +150,7 @@ const (
 	MaxTurnSources  = 8
 	maxSourceTitle  = 300
 	maxSourceRef    = 2048
-	maxSourceText   = 600
+	maxSourceText   = 6000
 	MaxReadingID    = 512
 	MaxListLimit    = 50
 	MaxTurnLimit    = 100
@@ -325,7 +340,16 @@ func boundedSources(sources []TurnSource) []TurnSource {
 		}
 		source.Title = truncate(strings.TrimSpace(source.Title), maxSourceTitle)
 		source.Reference = truncate(strings.TrimSpace(source.Reference), maxSourceRef)
-		source.Excerpt = truncate(strings.TrimSpace(source.Excerpt), maxSourceText)
+		// Keep the located span verbatim: trimming would change its character range.
+		if source.Locator != nil {
+			loc := *source.Locator
+			if len(loc.Version) != 64 || (loc.Format != "pdf" && loc.Format != "epub") || loc.Unit < 0 || loc.Start < 0 || loc.End <= loc.Start || loc.End-loc.Start != len([]rune(source.Excerpt)) || utf8.RuneCountInString(loc.Href) > 2000 || utf8.RuneCountInString(loc.Label) > 300 || len(loc.PassageID) > 64 || len([]rune(source.Excerpt)) > maxSourceText {
+				source.Locator = nil
+			} else {
+				source.Locator = &loc
+			}
+		}
+		source.Excerpt = truncate(source.Excerpt, maxSourceText)
 		kept = append(kept, source)
 	}
 	return kept

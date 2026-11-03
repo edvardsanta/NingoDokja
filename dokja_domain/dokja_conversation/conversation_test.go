@@ -292,3 +292,23 @@ func TestAReplyKeepsItsSourcesWithinBounds(t *testing.T) {
 	}
 }
 
+func TestArchivedPassagesKeepDistinctLocationsAndUnicodeText(t *testing.T) {
+	a := New(&recorder{})
+	turn, _, err := a.Send(context.Background(), OwnerScope, someID, "send-0001", "q", Provenance{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	locator := PassageLocator{Version: strings.Repeat("a", 64), Format: "epub", Unit: 0, Start: 2, End: 5, Href: "chapter.xhtml"}
+	sources := []TurnSource{
+		{Number: 1, SourceID: "book", Excerpt: " 🙂 ", Locator: &locator},
+		{Number: 2, SourceID: "book", Excerpt: "text", Locator: &PassageLocator{Version: strings.Repeat("b", 64), Format: "pdf", Unit: 1, Page: 2, Start: 0, End: 4}},
+	}
+	done, err := a.Complete(context.Background(), OwnerScope, turn, "Opinion [1, 2].", "", "", sources...)
+	if err != nil || len(done.Sources) != 2 || done.Sources[0].Excerpt != " 🙂 " || done.Sources[0].Locator == nil || done.Sources[1].Locator.Page != 2 {
+		t.Fatalf("%#v %v", done.Sources, err)
+	}
+	locator.End = 100
+	if done.Sources[0].Locator.End != 5 {
+		t.Fatal("archive locator aliases mutable caller state")
+	}
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { originalReading } from "../../shared/passages.js";
 import { isRecord, text } from "../../shared/records.js";
 import type { KnowledgeDocument, KnowledgeDocuments, KnowledgeStatus, Off } from "../../shared/replies.js";
 import type { Transport } from "../../shared/transport.js";
@@ -28,6 +29,7 @@ export function parseDocuments(value: unknown): KnowledgeDocuments | Off | undef
     id: text(item.id), title: text(item.title), kind: text(item.kind), reference: text(item.reference),
     tags: Array.isArray(item.tags) ? item.tags.map(text) : [], chunks: count(item.chunks),
     embedded: count(item.embedded), updatedAt: text(item.updatedAt),
+    ...(item.reading ? { reading: originalReading(item.reading) } : {}),
     ...(typeof item.text === "string" ? { text: item.text, truncated: item.truncated === true } : {}),
   })).filter((item) => item.id !== "");
   return { documents, total: count(value.total), offset: count(value.offset) };

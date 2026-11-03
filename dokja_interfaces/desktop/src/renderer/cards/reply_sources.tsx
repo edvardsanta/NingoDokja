@@ -22,6 +22,7 @@ function SourceCard({ id, peek, openable }: { id: string; peek: Peek; openable: 
   return createPortal(<div id={id} role="tooltip" className="source-card" style={{ left, ...place }}>
     <strong>{source.title || t("assistant_source_untitled")}</strong>
     {origin && <small>{origin}</small>}
+    {source.locator && <small>{source.locator.format === "pdf" ? t("source_pdf_page", { page: source.locator.page ?? 0, label: source.locator.label ?? "" }) : source.locator.label || source.locator.href}</small>}
     {source.excerpt && <p>{source.excerpt}</p>}
     {openable && <small className="source-card-hint">{t("assistant_source_open")}</small>}
   </div>, document.body);
@@ -71,8 +72,10 @@ export function ReplyBody({ reply, kept, onOpen }: { reply: string; kept?: reado
   return <>
     {body && <p>{citedParts(body, sources).map((part, at) => {
       if (typeof part === "string") return part;
-      const source = sourceOf(part.cite[0]);
-      return <SourcePoint key={at} {...point} source={source} className="cite" peeking={peek?.source === source}>{part.text}</SourcePoint>;
+      return <span key={at}>{part.cite.map((number) => {
+        const source = sourceOf(number);
+        return <SourcePoint key={number} {...point} source={source} className="cite" peeking={peek?.source === source}>[{number}]</SourcePoint>;
+      })}</span>;
     })}</p>}
     <ul className="reply-sources" aria-label={t("assistant_sources_label")}>
       {sources.map((source) => <li key={source.number} title={source.title || undefined}>
