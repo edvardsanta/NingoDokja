@@ -19,8 +19,10 @@ var (
 // JournalStore must execute the callback once inside one atomic transaction:
 // lock the scoped episode, scoped operation key and scoped attempt-owner claim;
 // pass detached copies; commit snapshot, attempt claim and operation together.
-// On error/cancellation nothing changes. A nil NextSnapshot means no snapshot
-// write. Replay and compare-and-swap are deliberately inside the same boundary.
+// Callback failures and confirmed rollback/cancellation before commit change
+// nothing. A commit transport error can leave the result unknown: never repeat
+// an external action; resolve by replaying the original operation. A nil
+// NextSnapshot means no snapshot write. Replay and CAS share this boundary.
 // No production adapter is provided by this batch.
 type JournalStore interface {
 	Transact(context.Context, JournalKey, func(JournalState) (JournalWrite, error)) (JournalResult, error)

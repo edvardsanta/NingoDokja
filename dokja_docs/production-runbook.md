@@ -1396,3 +1396,18 @@ plugin output budget for base64 media (the relay example uses 23 MiB), and resta
 Feeds after changing its plugin manifests. Preserve
 private settings and browser credentials on the host. No ports, services or
 volumes are added, and no production rollout is performed automatically.
+
+
+### Optional application journal adapter
+
+The [PostgreSQL application journal](knowledge-journal-postgres.md) is currently
+an unregistered library adapter. There is no production env setting or Compose
+service selecting it. Do not initialize it against operator data as a deployment
+step for this PR. Activation needs a reviewed receipt consumer, connection/TLS
+configuration, admission and deletion propagation, and rollout/rollback plan.
+
+Its isolated verification is `bash scripts/test_application_journal_postgres.sh`.
+The script manages its own disposable database and test-only
+`DOKJA_JOURNAL_TEST_DSN` / `DOKJA_JOURNAL_TEST_PHASE`; it does not read the operator
+environment files or migrate application stores. It checks controlled restart
+and replay; backup/restore and live receipt verification remain untested.

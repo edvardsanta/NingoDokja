@@ -266,3 +266,12 @@ mutations behind a transaction port. Scoped operation replay, expected revision,
 attempt ownership and original result snapshots are part of that boundary.
 Concurrency and rollback are tested with a transactional fake. No production
 store, public writer, receipt producer or durable/restart guarantee is enabled.
+
+
+## Optional durable adapter
+
+The [PostgreSQL journal adapter](knowledge-journal-postgres.md) implements the
+transaction port and logical deletion fences, tested with disposable PostgreSQL
+and a controlled restart. It is not selected or opened by the application entry
+point. Live receipt/report admission, configuration, deletion propagation and
+durable reuse are still pending; no existing Memory data was migrated.
