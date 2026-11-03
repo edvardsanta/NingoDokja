@@ -125,3 +125,33 @@ func TestApplicationAggregateBudgetAndUnassessedState(t *testing.T) {
 		t.Fatal("accepted oversized context")
 	}
 }
+
+func TestNativeApplicationReadObservations(t *testing.T) {
+	for _, tc := range []struct {
+		name, status, reason string
+		response             map[string]any
+		err                  error
+		pin                  string
+	}{
+		{name: "validated", status: "validated", reason: "source_validated", response: applicationDocument("source")},
+		{name: "transport", status: "unconfirmed", reason: "read_unconfirmed", err: fmt.Errorf("private diagnostic")},
+		{name: "empty", status: "validation_failed", reason: "unavailable_or_ambiguous", response: map[string]any{"documents": []any{}}},
+		{name: "identity", status: "validation_failed", reason: "identity_mismatch", response: map[string]any{"documents": []any{map[string]any{"source_id": "foreign", "text": "source"}}}},
+		{name: "version", status: "validation_failed", reason: "version_changed", response: applicationDocument("source"), pin: "sha256:" + strings.Repeat("a", 64)},
+		{name: "invalid", status: "validation_failed", reason: "invalid_response", response: map[string]any{"bad": make(chan int)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			service := &applicationService{response: tc.response, err: tc.err}
+			read := New(service).ObserveApplicationSource(context.Background(), ApplicationSelection{SourceID: "note:retry", TextVersion: tc.pin})
+			if service.calls != 1 || read.Observation.Status != tc.status || read.Observation.Reason != tc.reason {
+				t.Fatalf("unexpected native result: %+v calls=%d", read, service.calls)
+			}
+			if (read.Err == nil) != (tc.status == "validated") || (read.Source != nil) != (tc.status == "validated") {
+				t.Fatalf("incorrect result: %+v", read)
+			}
+			if tc.name == "version" && !strings.HasPrefix(read.Observation.ObservedVersion, "sha256:") {
+				t.Fatal("lost observed version")
+			}
+		})
+	}
+}

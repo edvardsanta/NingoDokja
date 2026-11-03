@@ -386,8 +386,11 @@ explicit caller proposal of cited claims and method prerequisites. It exposes
 missing/conflicting/contradicted support and conditional applicability, with
 semantic meaning unverified and execution disabled.
 `knowledge.application.propose` now obtains a task-bound model proposal through
-Runtime, anchors unique quotations and runs that assessor. Actual outcomes and
-learned episode reuse remain pending in `08.2`.
+Runtime, anchors unique quotations and runs that assessor. An explicit trusted
+host binding can now journal native pinned source-read receipts through the
+preparation route; see [source receipts](knowledge-source-receipts.md). This
+proves source validation only. Runtime activation, incremental supervision, actual
+method outcomes and learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
 [provider proposal bounds](knowledge-provider-proposals.md), and
 [measured inference](inference-token-budgets.md). The separate
