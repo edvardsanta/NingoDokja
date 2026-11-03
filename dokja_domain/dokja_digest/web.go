@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 const ActionReadWebLink = "read-web-link"
@@ -19,4 +20,18 @@ func (d *Domain) ReadWebLink(ctx context.Context, address string) (map[string]an
 		return nil, fmt.Errorf("web reader unavailable")
 	}
 	return d.service.Dispatch(ctx, "feeds.web.read", map[string]any{"url": address})
+}
+
+// WebFailureReason exposes only fixed reader categories, never response text,
+// transport errors, credentials, challenge tokens or operator diagnostics.
+func WebFailureReason(err error) string {
+	if err != nil {
+		switch {
+		case strings.HasPrefix(err.Error(), "web_blocked:"):
+			return "blocked"
+		case strings.HasPrefix(err.Error(), "web_timeout:"):
+			return "timeout"
+		}
+	}
+	return "unavailable"
 }

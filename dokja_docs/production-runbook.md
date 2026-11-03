@@ -68,20 +68,29 @@ It does not change archived owner conversations, index chat in pgvector, walk re
 chains, or import channel history from before deployment.
 
 Discord web conversations require updated Feeds and orchestrator binaries. No
-new variables, ports, volumes or schema changes are needed. The existing Feeds
-service switch disables web reading, and existing Discord channel/mention policy
+new variables, ports, volumes or schema changes are needed. Rebuild the Feeds
+image: both Dockerfiles now install the core browser-fingerprint HTTP dependency
+in `/opt/feeds-web`, including when optional plugin extras are disabled. Restarting
+an older image does not install it. The existing Feeds service switch disables web reading, and existing Discord channel/mention policy
 still decides which messages may initiate it. Readers need outbound public HTTP(S)
 and DNS. They deliberately ignore HTTP proxy environment variables, reject private
 and special-purpose destinations (including redirect targets), and cannot read
 login-only, PDF or JavaScript-only pages. Do not enable a browser/plugin fallback
-for this path without reviewing its execution and network boundaries.
+for this path without reviewing its execution and network boundaries. A fixed
+isolated Python helper may retry HTTP 403/429 or challenge-header responses using
+`curl_cffi==0.16.3`; it evaluates no page JavaScript, follows no redirects itself,
+and shares the Go reader's validated DNS pins, deadlines and byte limits. It is
+independent of the existing optional media plugin's dependency versions.
 
 Readings are volatile: new link messages replace them, session resets clear them,
 and inactivity over 30 minutes, capacity eviction or restart loses their text.
 Resend the links after a restart when exact web evidence is needed. At most four
 links and eight passages enter one turn; each reader accepts at most 2 MiB and
 80,000 extracted characters, with a 12-second per-read deadline and a 15-second
-aggregate chat budget. Failed/excess links are disclosed in the reply. Page dates
+aggregate chat budget. Failed/excess links are disclosed in the reply. If every
+link fails, the application emits one localized notice and skips reply inference instead of
+interpreting an unread headline. Refusals and deadlines retain fixed error
+categories, without returning challenge bodies or transport diagnostics. Page dates
 are unverified metadata; clipped excerpts are explicitly marked partial in model
 context. Model tools remain disabled and web-turn previews are withheld until
 quotation and citation checks complete. This is a restricted reader in Feeds,

@@ -449,7 +449,8 @@
         "2026-10-27: scheduled collectors may provide an optional full plain-text body (100,000 UTF-8 bytes maximum). Digest preserves it and the desktop shell saves it through knowledge.ingest with stable reading identity and source provenance, avoiding empty application homepages; link-only collectors retain URL fetching. Feeds and Digest go test -race ./... pass; desktop pnpm test (253 Node, 313 UI tests), typecheck and build pass. Full live-stack ingestion remains unverified.",
         "2026-10-27: Readings adds expandable plain-text and gated image/video previews, with lazy media loading and retry. Source/query/inclusive UTC date filters run in the Digest domain before ordering and pagination; explicit dates include older collected cache entries. Digest go test -race ./... passed; desktop pnpm test (256 Node and 320 UI tests), typecheck and build passed; focused built Electron test verifies full-text rendering, source/date/search forwarding through IPC, and filter layout. No production deployment performed.",
         "2026-11-02: PDF pages (including empty pages and printed labels) and EPUB chapter members retain exact Unicode spans and immutable original versions through Reading, Knowledge and archived passage-level citations. The desktop resolves each citation independently against retained originals, highlights it and shows surrounding extracted context. Existing document-only citations explicitly retain their legacy limitation. See dokja_docs/passage-references.md.",
-        "2026-11-03: Discord link conversations read up to four user-supplied pages through Digest and the restricted feeds.web.read HTTP parser, preserve section anchors and passage citations, and retain volatile per-conversation evidence for follow-ups. Page data stays out of system messages; private-network/redirect destinations, active resources, generated citation destinations, unsupported quotes and mention pings are covered by regressions. See dokja_docs/capability-map.md and the Feeds reader contract."
+        "2026-11-03: Discord link conversations read up to four user-supplied pages through Digest and the restricted feeds.web.read HTTP parser, preserve section anchors and passage citations, and retain volatile per-conversation evidence for follow-ups. Page data stays out of system messages; private-network/redirect destinations, active resources, generated citation destinations, unsupported quotes and mention pings are covered by regressions. See dokja_docs/capability-map.md and the Feeds reader contract.",
+        "2026-11-03: Follow-up web-reading fixes reproduce a static-client HTTP 403 challenge and unrelated-story-card extraction. A pinned browser-fingerprint HTTP helper retrieves the formerly blocked page without executing JavaScript, and main-article selection excludes the unrelated card. All-failed link turns return one recorded application notice without reply inference. Both reported live URLs passed the corrected Go reader; dedicated core curl_cffi 0.16.3 is required in rebuilt Feeds images."
       ],
       "checks": [
         {
@@ -486,6 +487,11 @@
           "name": "discord_web_conversations",
           "status": "passed",
           "detail": "Feeds and orchestrator go test -race ./...; Chat and Digest domain go test ./...; existing Runtime go test ./... -run TestChat -count=1. Bridge tests verify authorization before fetch and inference, shared-channel follow-ups, multiple URLs and anchored citations. No live Discord, external-page or deployed-stack verification was performed."
+        },
+        {
+          "name": "web_refusals_and_article_selection",
+          "status": "passed",
+          "detail": "Feeds and orchestrator go test -race ./...; Digest go test ./.... Helper tests cover IP pinning, proxy and redirect refusal, credentialled/private targets, synchronous byte limits and closed responses; article regressions cover related cards before and inside the main landmark. Go reader live diagnostics passed for both reported URLs (7 and 41 passages), with the pinned core helper dependency. No live Discord reply, image build or deployment was performed."
         }
       ],
       "blockers": [],

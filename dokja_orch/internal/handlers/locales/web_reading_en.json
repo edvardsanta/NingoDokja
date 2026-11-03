@@ -1,4 +1,7 @@
 {
   "failed": "I could not read {count} of the supplied links. They are not evidence for this reply.",
-  "omitted": "I left {count} additional links unread; I can read up to {limit} per message."
+  "omitted": "I left {count} additional links unread; I can read up to {limit} per message.",
+  "blocked_one": "The site blocked automatic reading of one link. I have not read that content.",
+  "blocked_many": "Automatic reading was blocked for {count} links. I have not read their contents.",
+  "recovery": "Paste the text or an excerpt here so we can discuss it with citations."
 }

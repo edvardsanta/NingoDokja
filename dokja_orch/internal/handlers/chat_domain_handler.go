@@ -231,7 +231,15 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 			turn.planned = true
 			turn.text = true
 		}
-		result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
+		if webData != nil && len(webSources) == 0 && len(webData.Failures) > 0 {
+			// No page was read. Return the application notice without letting
+			// the model improvise from URL slugs, titles or prior discussion.
+			webData.FailureOnly = true
+			sources = nil
+			result = map[string]any{"reply": webReadingStatus(event, webData)}
+		} else {
+			result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -262,7 +270,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	h.focus.remember(turn, content, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
 	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
-	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil {
+	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil && !data.FailureOnly {
 		if status := webReadingStatus(event, data); status != "" {
 			reply = strings.TrimSpace(reply) + "\n\n" + status
 		}
