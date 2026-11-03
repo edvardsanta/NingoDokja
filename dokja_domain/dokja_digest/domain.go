@@ -78,6 +78,9 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return d.service.Dispatch(ctx, "feeds.status", nil)
 	case ActionReadDigest:
 		return d.read(ctx, request.Event.Payload)
+	case ActionReadWebLink:
+		address, _ := request.Event.Payload["url"].(string)
+		return d.ReadWebLink(ctx, address)
 	case ActionReadLinkDelivery:
 		return d.readLinkDelivery(ctx, request.Event.Payload)
 	case ActionReadLink:

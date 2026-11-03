@@ -136,3 +136,14 @@ func TestFeedsClientDispatchesAnInvokeWithTheLongerWait(t *testing.T) {
 		t.Fatalf("cached=%q on-demand=%q", cached.request, onDemand.request)
 	}
 }
+
+func TestFeedsWebReadingUsesOnDemandTransport(t *testing.T) {
+	cached := &fakeFeedsRequester{response: `{"status":"error","message":"wrong transport"}`}
+	reading := &fakeFeedsRequester{response: `{"status":"ok","result":{"title":"Law"}}`}
+	client := NewFeedsServiceClientWithFactory(func() (repreq.RequesterReply, error) { return cached, nil })
+	client.extractFactory = func() (repreq.RequesterReply, error) { return reading, nil }
+	result, err := client.Dispatch(context.Background(), "feeds.web.read", map[string]any{"url": "https://example.com/law#art140"})
+	if err != nil || result["title"] != "Law" || cached.request != "" || !strings.Contains(reading.request, `"type":"feeds.web.read"`) {
+		t.Fatalf("%#v %v", result, err)
+	}
+}

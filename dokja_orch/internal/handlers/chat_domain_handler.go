@@ -47,6 +47,7 @@ type ChatDomainHandler struct {
 	facts            *conversation.Facts
 	ownerProfile     chat.OwnerProfile
 	incoming         *IncomingContentWorkflow
+	web              *webConversationReading
 	ningo            chat.NingoFacts
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
@@ -219,6 +220,17 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		}
 		sources = h.lookupForTurn(lookupCtx, content, anchor, turn)
 		cancelLookup()
+		webSources, webData := h.webSources(ctx, event, lifecycle.SessionID, content)
+		if webData != nil {
+			event.Context = cloneChatContext(event.Context)
+			event.Context["web_reading_turn"] = webData
+			for i := range sources {
+				sources[i].Number += len(webSources)
+			}
+			sources = append(webSources, sources...)
+			turn.planned = true
+			turn.text = true
+		}
 		result, err = h.generateReply(ctx, event, turnContent, history, sources, reference)
 	}
 	if err != nil {
@@ -233,8 +245,14 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision.Detailed)
 		h.voicePolicy.CompleteReply(chatSessionBaseKey(event), voiceDecision, rawReply)
 	}
+	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
+		rawReply = sanitizeWebReply(rawReply, sources)
+	}
 	// Checked before the session keeps it, so a false quote is not repeated as a fact later.
 	rawReply = h.verifyQuotes(ctx, rawReply, sources, turn)
+	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
+		rawReply = verifyWebQuotes(rawReply, sources)
+	}
 	if err := h.sessions.CompleteTurn(ctx, event, rawReply); err != nil {
 		return nil, err
 	}
@@ -244,6 +262,11 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	h.focus.remember(turn, content, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
 	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
+	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil {
+		if status := webReadingStatus(event, data); status != "" {
+			reply = strings.TrimSpace(reply) + "\n\n" + status
+		}
+	}
 	if presentation.failed {
 		logger.Info(fmt.Sprintf("chat formula rendering incomplete event_id=%s rendered=%d", event.EventID, len(presentation.attachments)))
 	}
@@ -297,6 +320,8 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 	voice := event.Context["voice_turns"] != nil
 	if voice && h.voiceGenerator != nil {
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
+		webData, _ := event.Context["web_reading_turn"].(*webTurnData)
+		messages = withWebEvidence(messages, sources, webData)
 		if reference != "" {
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
 		}
@@ -322,17 +347,22 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 	}
 	if generator, ok := h.generator.(ChatConversationGenerator); ok {
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
+		webData, _ := event.Context["web_reading_turn"].(*webTurnData)
+		messages = withWebEvidence(messages, sources, webData)
 		if reference != "" {
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
 		}
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
-		if preview := core.ReplyPreview(ctx); preview != nil {
+		if preview := core.ReplyPreview(ctx); preview != nil && webData == nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, preview)
 			}
 		}
 		return generator.GenerateMessages(ctx, messages)
+	}
+	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
+		return nil, fmt.Errorf("web reading requires a conversation generator")
 	}
 	if reference != "" {
 		content = reference + "\n\nUser question:\n" + content

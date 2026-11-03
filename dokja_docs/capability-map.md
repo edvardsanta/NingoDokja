@@ -309,6 +309,42 @@ Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),
 [chat handler](../dokja_orch/internal/handlers/chat_domain_handler.go).
 
+### Discord web conversations
+
+Eligible Discord text messages containing one or more HTTP(S) URLs use
+`link-conversation` / Chat's `converse-links` action. Authorization still precedes
+all reading. The orchestrator asks Digest's `read-web-link` action to dispatch
+`feeds.web.read`; the built-in Feeds reader fetches and parses text without
+executing plugins or page scripts. Existing social-link delivery remains separate.
+Up to four distinct links per message replace the conversation's previous web
+reading. URLs in page content or generated replies never schedule reads.
+
+Chat balances up to eight passages across the pages and ranks additional passages
+against the current question. Original section anchors, legal article/paragraph
+labels, page-supplied publication dates, retrieval times and partial-reading flags
+travel with the evidence. Citations identify each supplied passage independently
+and append the validated source URL. The existing Library citations continue to
+work, with distinct numbers when combined with web evidence.
+
+Web evidence, including every metadata field, enters inference as JSON in a
+user-role message following fixed application instructions. It never enters a
+system message, enables model tools, or becomes permanent Library knowledge.
+The Runtime's existing inference-only event validation remains in force. Exact
+web quotations are checked against their cited passages before session storage
+and delivery, unknown citation numbers are removed, and arbitrary generated web
+links are suppressed. Citation labels remove Markdown controls, mentions and
+embedded URLs. These controls restrict effects and attribution; they do not
+prove semantic immunity to prompt injection or correctness of every paraphrase.
+
+The orchestrator retains readings only in memory, for at most 64 conversation
+scopes and 30 minutes of inactivity. Guild/channel scopes are shared by members;
+DMs and commands retain their existing independent scopes. A session reset, new
+link message, expiry, capacity eviction or restart discards that reading. Follow-ups
+reuse the captured text without refetching; failed and excess links receive a
+localized application notice. Web turns require a conversation-message generator
+and disable streaming previews so output checks precede delivery. See the
+[reader contract](../dokja_services/dokja_feeds/README.md#restricted-web-text-reader).
+
 ### WhatsApp content messages
 
 An eligible WhatsApp document is normalized as `message.created` with optional

@@ -33,6 +33,9 @@ func (e *DefaultWorkflowEngine) Plan(_ context.Context, event Event, route Route
 		if route.Workflow == "incoming-content" && domain == DomainChat {
 			action = chat.ActionReadIncomingContent
 		}
+		if route.Workflow == "link-conversation" && domain == DomainChat {
+			action = chat.ActionConverseLinks
+		}
 		// The router puts the inbound authorization first; a later Communications step is the
 		// workflow's own (music, for one).
 		if inbound && index == 0 && domain == DomainCommunications {
@@ -200,6 +203,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "inspect-digest"
 		case "digest.items":
 			return "read-digest"
+		case "digest.web.read":
+			return "read-web-link"
 		case "digest.link.read":
 			return "read-link"
 		default:

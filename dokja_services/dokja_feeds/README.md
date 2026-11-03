@@ -24,6 +24,7 @@ them; at most 16 requests are in flight, past that a request is refused as busy.
 | --- | --- |
 | `feeds.status` | `configured`, `directory_error`, `plugins[]`, `extractors[]`, and the counts `enabled`, `ok`, `failed`, `pending`, `disabled`, `invalid`, `items` |
 | `feeds.items` | `items[]` (at most 1000), `total`, `updated` |
+| `feeds.web.read` | payload `url`; result `url`, `title`, `published`, `retrieved_at`, `partial`, `passages[]` (`text`, `label`, `url`); bounded HTTP text reader, no plugin execution |
 | `feeds.extract` | payload `filename`, `content_b64` (at most 20 MB); result `documents[]` (`title`, `text`, `source_ref`, `key`), `count`, `format`, `plugin`, `version` |
 | `feeds.classify` | payload `documents[]` (`title`, `text`, `key`) and an optional `format`; result `classifications[]` (one per document), `count`, `plugin`, `version` |
 
@@ -284,3 +285,27 @@ collectors can be refreshed through `feeds.refresh`. See the
 [content plugin contract and migration](../../dokja_docs/feeds-content-plugins.md)
 for scraper extension, media observations, bundled cache, optional dependencies,
 provider status and rollback.
+
+## Restricted web text reader
+
+`feeds.web.read` uses Go HTTP and HTML parsing directly. It never starts a browser,
+page JavaScript, a plugin or a subprocess, fetches embedded resources, installs
+anything, or stores the reading. Only HTTP(S) on ports 80/443 is accepted. The
+reader ignores proxy environment variables and sends no cookies or credentials.
+Each connection resolves the hostname once, rejects any non-public DNS answer,
+and connects to a validated literal IP while retaining hostname TLS verification.
+Redirects receive the same URL and destination checks (at most three followed).
+
+Each read has a 12-second deadline, shares the two-slot extraction limit, and
+accepts at most 2 MiB of decoded HTTP response bytes and 80,000 extracted Unicode
+characters. Oversized downloads fail; clipped text is marked `partial`. HTML,
+XHTML and plain text are supported; PDF, login-only and JavaScript-only pages are
+not. Encoding detection includes legacy HTML charsets. Original section anchors
+and legal article/paragraph labels are retained; a requested fragment selects
+where the bounded excerpt begins. No links from page content are followed.
+
+This is a restricted reader inside the existing service process, not a separate
+OS sandbox. Its output, including metadata, remains untrusted evidence. The chat
+workflow must keep it separate from trusted instructions and retain its no-tools
+inference policy. HTTP and output validation limit effects; they cannot prove an
+LLM interpretation is immune to prompt injection.
