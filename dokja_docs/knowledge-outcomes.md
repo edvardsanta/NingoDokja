@@ -1,8 +1,9 @@
 # Knowledge application: attempts, outcomes and episode eligibility
 
-Status: proposed implementation contract for step `08.2`. This document defines
-what the next application batch must validate; it adds no live action, event,
-store, model call or migration. It follows the
+Status: first pure-domain validation/eligibility batch implemented for step
+`08.2`; receipt integration and persistence remain pending. The record semantics
+below guide that integration. There is no new live action, event, store, model
+call or migration. It follows the
 [frozen comparison results](knowledge-comparison-results.md), not a successful
 acceptance of either strategy. `08.3` remains a required gate.
 
@@ -198,3 +199,60 @@ recording. `08.3` must evaluate removal of experience, stale/inapplicable episod
 restart/reuse behavior, source-scope comparability, and semantic-review reliability
 before broader adoption. The evaluated corpus cannot become unseen again; new
 held-out cases must be frozen before measuring any tuned method.
+
+
+## Implemented pure policy
+
+The [Memory application package](../dokja_domain/dokja_memory/application/records.go)
+adds bounded Go record values and structural validators for attempts, observations,
+prior predictions and episode snapshots. These are domain values, not new public
+JSON payloads or registered actions. The generic stamp reference identifies each
+record; nested attempt/observation fields retain their own bindings.
+
+[Eligibility policy](../dokja_domain/dokja_memory/application/eligibility.go) derives
+an observed outcome from the active, attributed observation journal. Repeated
+identical observation references are idempotent; different content under one
+reference conflicts. A correction must name an earlier observation of the same
+kind and observer. Competing current outcomes remain conflicted. Input records
+are not changed. Snapshot revision/acceptance time describes the supplied
+projection; no append-only store or atomic compare-and-swap is implemented here.
+
+The trusted query supplies current access/evidence versions, an independently
+verified attempt, observation provenance, applicability and context facts. The
+application must obtain these facts through the relevant domain policies; the
+orchestrator must not implement their business decisions itself. A supplied
+`MethodApplicable` flag is not this package performing semantic applicability
+review. Missing verification callbacks or evidence versions fail closed. No
+adapter supplying real identity, receipts, effective-date interpretation or
+state revisions is wired by this batch. Server-controlled ordering and hashes
+must be established by that future integration; typed fields alone do not
+prove authenticity, dispatch or clock provenance.
+
+Use-specific decisions distinguish `success_support`, `caution`, `prediction`
+and `diagnostic`. Simulations can appear only in diagnostics and never yield an
+observed success. Attributed operator reports require explicit policy permission;
+this first implementation excludes them from prediction scoring. Scoring covers
+only a prior `criterion_satisfied` estimate and a verified executor observation
+of that terminal criterion within its horizon. An absent score/baseline remains
+absent, not zero. Other targets and report-derived scoring remain unimplemented.
+
+Selection evaluates at most 32 candidate snapshots, deduplicates identical
+scope/reference identities and refuses mixed snapshots of one identity. With no
+eligible candidate it returns `insufficient_evidence`, including exclusion reasons
+when candidates exist. It never fabricates a remembered successful method.
+
+Regression tests exercise the pure decision boundary with fake verification facts:
+prepared proposals, simulations, interrupted/late attempts, receipt/input/criterion
+mismatches, duplicates/conflicts/corrections, scope and evidence invalidation,
+method/context mismatches, attributed reports, missing/retrospective estimates,
+unknown outcomes, target horizons, record/candidate bounds and input immutability.
+They do not exercise a durable journal, startup recovery, actual external effects,
+live authorization, real retrieval, or cross-document learning. In particular,
+these tests do not complete the application-level restart/settlement controls in
+`08.3` or the general lifecycle work in `10.6`.
+
+Next: connect these policies through a reviewed opt-in application path using a
+registered capability receipt or attributed operator report, and explicitly review
+its storage mapping and atomic settlement before persisting or reusing episodes.
+Existing Memory acceptance labels and prediction targets are unchanged; there is
+no automatic conversion from `accepted`/`replaced` into method success/failure.
