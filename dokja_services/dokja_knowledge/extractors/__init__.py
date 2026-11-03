@@ -28,6 +28,7 @@ class Extracted:
     text: str
     source_ref: str = ""  # where an entry came from, when the format says so
     key: str = ""  # stable id of an entry inside a multi-document file
+    units: tuple[dict, ...] = ()  # ordered PDF pages or EPUB chapter files
 
 
 Extractor = Callable[[bytes, str], "list[Extracted]"]

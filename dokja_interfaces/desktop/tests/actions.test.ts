@@ -646,7 +646,7 @@ test("a turn carries the documents its reply cites, bounded, and only those that
   const kept = { number: 1, source_id: "note:one", title: "One", reference: "https://example.com/a", excerpt: "x".repeat(900), secret: "drop" };
   const [source] = turn([kept, { number: 2, title: "names nothing" }, "junk"]).turns[0]!.sources as { id: string; excerpt: string }[];
   assert.equal(source!.id, "note:one");
-  assert.ok(source!.excerpt.length <= 601);
+  assert.ok(source!.excerpt.length <= 6001);
   assert.equal("secret" in source!, false);
   assert.equal(turn([kept, { number: 2, title: "names nothing" }]).turns[0]!.sources!.length, 1);
   assert.equal("sources" in turn(undefined).turns[0]!, false, "no sources, no field");

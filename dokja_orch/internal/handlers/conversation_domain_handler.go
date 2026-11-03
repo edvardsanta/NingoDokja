@@ -202,7 +202,7 @@ func turnView(t conversation.Turn) map[string]any {
 		for i, source := range t.Sources {
 			sources[i] = map[string]any{
 				"number": source.Number, "source_id": source.SourceID, "title": source.Title,
-				"reference": source.Reference, "excerpt": source.Excerpt,
+				"reference": source.Reference, "excerpt": source.Excerpt, "locator": source.Locator,
 			}
 		}
 		view["sources"] = sources

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/logger"
@@ -46,7 +47,10 @@ voice and at the length of a conversation: say what you think, and bring in what
 you as part of that. Use no headings, no bullet lists and no sections separating what the text says
 from your own view, and do not talk about "the material", "the excerpts" or "the text". Mark what
 came from an excerpt with its number in square brackets, for example [1], once per point at most;
-excerpts of one document share a number. A line before an excerpt may say how to talk about that
+each passage has its own number, even within the same document. Cite every source-dependent
+statement, paraphrase and interpretation with the passage numbers that support it. State your own
+interpretation as an interpretation, and make its textual basis readable through those references.
+Never attach a passage number merely because it names the same book. A line before an excerpt may say how to talk about that
 kind of document: follow it without naming the kind. These documents are in the user's library, so
 never ask them to send you a passage of one. Reply in the language the user wrote in.`
 
@@ -85,10 +89,11 @@ func knowledgeRegister(metadata map[string]any) string {
 	return fmt.Sprintf("%s It is dated %s.", register, date)
 }
 
-// knowledgeSource is one retrieved chunk that was put in front of the model. Chunks of one document
-// share a Number: the reader cites a document, not its passages.
+// knowledgeSource is one retrieved passage put in front of the model. Every passage
+// has its own Number, including passages of the same document.
 type knowledgeSource struct {
 	Number   int
+	Locator  *conversation.PassageLocator
 	SourceID string
 	Title    string
 	Heading  string
@@ -190,27 +195,33 @@ func relevantSources(result map[string]any) []knowledgeSource {
 func selectSources(result map[string]any, maxChunks, maxChars int, onlyRelevant bool) []knowledgeSource {
 	hits, _ := result["hits"].([]any)
 	sources := []knowledgeSource{}
-	numbers := map[string]int{}
 	budget := maxChars
 	for _, raw := range hits {
 		hit, _ := raw.(map[string]any)
 		if relevant, _ := hit["relevant"].(bool); onlyRelevant && !relevant {
 			continue
 		}
-		text := strings.TrimSpace(firstString(hit, "text"))
-		if text == "" || budget <= 0 {
+		text := firstString(hit, "text")
+		if strings.TrimSpace(text) == "" || budget <= 0 {
 			continue
 		}
 		if utf8.RuneCountInString(text) > budget {
-			text = string([]rune(text)[:budget]) + "…"
+			text = string([]rune(text)[:budget])
 		}
 		budget -= utf8.RuneCountInString(text)
 		id := firstString(hit, "source_id")
-		if numbers[id] == 0 {
-			numbers[id] = len(numbers) + 1
+		var locator *conversation.PassageLocator
+		if raw, ok := hit["locator"].(map[string]any); ok && raw["version"] != nil {
+			data, _ := json.Marshal(raw)
+			var loc conversation.PassageLocator
+			if json.Unmarshal(data, &loc) == nil {
+				loc.End = loc.Start + utf8.RuneCountInString(text)
+				locator = &loc
+			}
 		}
 		sources = append(sources, knowledgeSource{
-			Number:    numbers[id],
+			Number:    len(sources) + 1,
+			Locator:   locator,
 			SourceID:  id,
 			Title:     firstString(hit, "title"),
 			Heading:   firstString(hit, "heading"),
@@ -232,12 +243,12 @@ func selectSources(result map[string]any, maxChunks, maxChars int, onlyRelevant 
 func knowledgeReference(sources []knowledgeSource) string {
 	var out strings.Builder
 	out.WriteString(referenceBrief(sources) + "\n")
-	said := map[int]bool{}
+	said := map[string]bool{}
 	for _, source := range sources {
 		out.WriteString("\n" + source.label() + "\n")
 		// Said once per document, outside the quote: it comes from the system, not from the document.
-		if source.Register != "" && !said[source.Number] {
-			said[source.Number] = true
+		if source.Register != "" && !said[source.SourceID] {
+			said[source.SourceID] = true
 			out.WriteString(source.Register + "\n")
 		}
 		out.WriteString(knowledgeFence + "\n" + neutralizeFence(source.Text) + "\n" + knowledgeFenceClose + "\n")
@@ -287,9 +298,8 @@ func citedSources(reply string, sources []knowledgeSource) []knowledgeSource {
 	return out
 }
 
-// citeSources appends the documents the reply drew on, so a wrong retrieval is visible to the
-// reader: one line, each document once, by title. It has no words of its own, so it reads the same
-// in any language.
+// citeSources lists the passages cited by the reply. Numbers remain distinct even
+// when their document titles are equal. The archive carries each passage location.
 func citeSources(reply string, sources []knowledgeSource) string {
 	if len(sources) == 0 {
 		return reply
@@ -310,8 +320,7 @@ func citeSources(reply string, sources []knowledgeSource) string {
 	return strings.TrimSpace(reply) + "\n\n" + citation
 }
 
-// turnSources is what the archive keeps of the documents a reply cites: each once, with the first
-// passage cited, so the owner can see what the reply drew on and open the document.
+// turnSources keeps every cited passage with its exact location and original version.
 func turnSources(sources []knowledgeSource) []conversation.TurnSource {
 	seen := map[int]bool{}
 	kept := make([]conversation.TurnSource, 0, len(sources))
@@ -322,7 +331,7 @@ func turnSources(sources []knowledgeSource) []conversation.TurnSource {
 		seen[source.Number] = true
 		kept = append(kept, conversation.TurnSource{
 			Number: source.Number, SourceID: source.SourceID, Title: source.Title,
-			Reference: source.Reference, Excerpt: source.Text,
+			Reference: source.Reference, Excerpt: source.Text, Locator: source.Locator,
 		})
 	}
 	return kept
@@ -331,7 +340,7 @@ func turnSources(sources []knowledgeSource) []conversation.TurnSource {
 func sourcesForResult(sources []knowledgeSource) []map[string]any {
 	out := make([]map[string]any, 0, len(sources))
 	for _, source := range sources {
-		out = append(out, map[string]any{"number": source.Number, "source_id": source.SourceID, "title": source.Title, "heading": source.Heading})
+		out = append(out, map[string]any{"number": source.Number, "source_id": source.SourceID, "title": source.Title, "heading": source.Heading, "excerpt": source.Text, "locator": source.Locator})
 	}
 	return out
 }

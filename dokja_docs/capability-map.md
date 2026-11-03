@@ -287,7 +287,12 @@ previous reply, and a reply that cites the document brings the focus back. A
 turn about the text itself (quotes, passages) brings more passages and a text-first brief. Quotes
 of four words or more are checked against the document, all of them in such a turn and those
 followed by a citation in any other; one it does not hold is replaced by `[…]` before the session
-keeps the reply.
+keeps the reply. A cited quotation must occur in its referenced passage; text elsewhere
+in the same document cannot validate that link. Each supplied passage has a separate
+citation number, including multiple passages of one book. PDF pages and EPUB chapter
+files may carry versioned original locations through extraction, Knowledge and the
+conversation archive. See [exact passage references](passage-references.md) for the
+storage, reader, compatibility and verification contract.
 
 Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 [moderation adapter](../dokja_orch/internal/handlers/moderation_domain_handler.go),

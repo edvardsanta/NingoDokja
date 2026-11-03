@@ -45,6 +45,7 @@ def extract(data: bytes, name: str) -> list[Extracted]:
         raise ExtractError("the e-book has too many chapters")
 
     chapters: list[str] = []
+    units: list[dict] = []
     for item_id in order:
         href, media_type = manifest.get(item_id, ("", ""))
         if not href or media_type not in CHAPTER_TYPES:
@@ -55,6 +56,8 @@ def extract(data: bytes, name: str) -> list[Extracted]:
         _, text = html_to_text(decode_html(budget.read(archive, member)))
         if text:
             chapters.append(text)
+            heading = next((line.lstrip("# ") for line in text.splitlines() if line.startswith("#")), member)
+            units.append({"text": text, "href": member, "label": heading})
     if not title:
         title = posixpath.splitext(posixpath.basename(name))[0]
-    return [Extracted(title=title, text="\n\n".join(chapters))]
+    return [Extracted(title=title, text="\n\n".join(chapters), units=tuple(units))]

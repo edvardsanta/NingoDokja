@@ -125,7 +125,7 @@ def test_schema_one_upgrade_and_metadata_downgrade_preserve_content(tmp_path):
     old.commit()
     old.close()
     store = Store(path)
-    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 3
     assert store.list_documents(20, 0)[0]["metadata"] == "{}"
     assert store.get_document("legacy")["content_hash"] == "digest"
     original = [tuple(row) for row in store.conn.execute("SELECT * FROM chunks")]
@@ -133,8 +133,8 @@ def test_schema_one_upgrade_and_metadata_downgrade_preserve_content(tmp_path):
     assert store.chunks_by_ids([1])[1]["metadata"] == json.dumps(metadata())
     assert [tuple(row) for row in store.conn.execute("SELECT * FROM chunks")] == original
     # Documented offline downgrade discards metadata only, preserving post-upgrade text.
-    store.conn.executescript("BEGIN IMMEDIATE; DROP TABLE document_metadata; PRAGMA user_version = 1; COMMIT;")
-    assert [tuple(row) for row in store.conn.execute("SELECT * FROM chunks")] == original
+    store.conn.executescript("BEGIN IMMEDIATE; DROP TABLE document_originals; ALTER TABLE chunks DROP COLUMN locator; DROP TABLE document_metadata; PRAGMA user_version = 1; COMMIT;")
+    assert [tuple(row) for row in store.conn.execute("SELECT * FROM chunks")] == [row[:-1] for row in original]
     assert store.conn.execute("SELECT content_hash FROM documents").fetchone()[0] == "digest"
     store.close()
     # Re-upgrade after downgrade is supported, with no invented metadata.

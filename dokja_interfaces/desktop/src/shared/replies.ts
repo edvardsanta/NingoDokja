@@ -1,3 +1,4 @@
+import type { PassageLocator, OriginalReading } from "./passages.js";
 // What the main process hands to the renderer for each action: a projection of the orchestrator
 // reply with only the fields a card reads, so channel IDs, provider profiles and other detail
 // never reach the screen.
@@ -200,6 +201,7 @@ export type IngestResult = {
 
 // One document of the research base.
 export type KnowledgeDocument = {
+  reading?: OriginalReading;
   id: string;
   title: string;
   kind: string;
@@ -307,7 +309,7 @@ export type ArchivedTurn = {
   sources?: ArchivedTurnSource[];
 };
 
-export type ArchivedTurnSource = { number: number; id: string; title: string; reference: string; excerpt: string };
+export type ArchivedTurnSource = { number: number; id: string; title: string; reference: string; excerpt: string; locator?: PassageLocator };
 
 export type ArchivedConversation = {
   id: string;

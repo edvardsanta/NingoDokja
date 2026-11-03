@@ -25,11 +25,13 @@ type ReadDocument struct {
 	Text      string
 	SourceRef string
 	Key       string
+	Units     []any
 }
 
 // Reading is one file read on demand and what the request said about storing it.
 type Reading struct {
 	Filename      string
+	ContentB64    string // retained by Knowledge only for located PDF/EPUB sources
 	Format        string // the extension the reading host chose the reader by, such as ".pdf"
 	Reader        string // the plugin that read it
 	ReaderVersion string
@@ -126,6 +128,9 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 			"metadata":              metadata,
 			"metadata_if_unchanged": patch,
 		}
+		if len(document.Units) > 0 && reading.ContentB64 != "" && (reading.Format == ".pdf" || reading.Format == ".epub") {
+			payload["original"] = map[string]any{"filename": reading.Filename, "content_b64": reading.ContentB64, "units": document.Units}
+		}
 		payload["source_id"] = base
 		if len(reading.Documents) > 1 {
 			key := document.Key
@@ -133,6 +138,9 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 				key = document.Title
 			}
 			sum := sha1.Sum([]byte(key))
+			if len(document.Units) > 0 && reading.ContentB64 != "" && (reading.Format == ".pdf" || reading.Format == ".epub") {
+				payload["original"] = map[string]any{"filename": reading.Filename, "content_b64": reading.ContentB64, "units": document.Units}
+			}
 			payload["source_id"] = base + "#" + hex.EncodeToString(sum[:])[:10]
 		}
 		if kind, _ := request["kind"].(string); strings.TrimSpace(kind) != "" {

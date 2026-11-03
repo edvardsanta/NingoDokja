@@ -37,10 +37,19 @@ const (
 
 // Document is Knowledge's Extracted contract (ADR 0006): what a reading hands to Knowledge.
 type Document struct {
-	Title     string `json:"title"`
-	Text      string `json:"text"`
-	SourceRef string `json:"source_ref"`
-	Key       string `json:"key"`
+	Title     string         `json:"title"`
+	Text      string         `json:"text"`
+	SourceRef string         `json:"source_ref"`
+	Key       string         `json:"key"`
+	Units     []DocumentUnit `json:"units,omitempty"`
+}
+
+// DocumentUnit preserves an original page or chapter; text offsets use Unicode code points.
+type DocumentUnit struct {
+	Text  string `json:"text"`
+	Label string `json:"label"`
+	Page  int    `json:"page,omitempty"`
+	Href  string `json:"href,omitempty"`
 }
 
 // extractRequest is what a document.extract.v1 plugin reads on stdin.
@@ -205,11 +214,29 @@ func parseDocuments(data []byte) ([]Document, error) {
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
+		if len(raw.Units) > 5000 {
+			return nil, reasonError(ReasonFailed, "too many original units")
+		}
+		if len(raw.Units) > 0 {
+			parts := []string{}
+			for _, unit := range raw.Units {
+				if unit.Text != "" {
+					parts = append(parts, unit.Text)
+				}
+				if len(unit.Label) > 2000 || len(unit.Href) > 2000 {
+					return nil, reasonError(ReasonFailed, "original unit label or path too long")
+				}
+			}
+			if strings.Join(parts, "\n\n") != text {
+				return nil, reasonError(ReasonFailed, "original units differ from document text")
+			}
+		}
 		documents = append(documents, Document{
 			Title:     cleanText(raw.Title, maxDocumentTitle),
 			Text:      text,
 			SourceRef: cleanText(raw.SourceRef, maxDocumentRef),
 			Key:       cleanText(raw.Key, maxDocumentKey),
+			Units:     raw.Units,
 		})
 	}
 	if len(documents) == 0 {

@@ -399,3 +399,14 @@ def register(registry):
 		t.Fatalf("the owner's plugin must read its format: %#v", result)
 	}
 }
+
+func TestExtractedUnitsPreserveEmptyPagesAndRejectUnrelatedText(t *testing.T) {
+	documents, err := parseDocuments([]byte(`{"documents":[{"title":"Study","text":"Marriage evidence","units":[{"text":"","page":1,"label":"cover"},{"text":"Marriage evidence","page":2,"label":"7"}]}]}`))
+	if err != nil || len(documents) != 1 || len(documents[0].Units) != 2 || documents[0].Units[1].Page != 2 {
+		t.Fatalf("%#v %v", documents, err)
+	}
+	_, err = parseDocuments([]byte(`{"documents":[{"title":"Study","text":"Unrelated","units":[{"text":"Marriage evidence","page":1,"label":"1"}]}]}`))
+	if err == nil {
+		t.Fatal("accepted a page map for unrelated text")
+	}
+}

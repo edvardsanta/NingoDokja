@@ -57,7 +57,7 @@ def main() -> int:
         return answer({"error": str(err)})
     return answer({
         "documents": [
-            {"title": doc.title, "text": doc.text, "source_ref": doc.source_ref, "key": doc.key}
+            {"title": doc.title, "text": doc.text, "source_ref": doc.source_ref, "key": doc.key, "units": list(doc.units)}
             for doc in documents
         ]
     })

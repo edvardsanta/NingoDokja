@@ -764,5 +764,16 @@
   "dialog_fact_delete": "Apagar este fato guardado?",
   "dialog_fact_delete_detail": "O Ningo deixa de lembrar. A conversa em que foi dito continua como está.",
   "dialog_fact_delete_accept": "Apagar",
-  "assistant_older": "Mensagens anteriores"
+  "assistant_older": "Mensagens anteriores",
+  "source_reader": "Trecho original",
+  "source_pdf_page": "Página {page} do PDF · numeração impressa {label}",
+  "source_loading": "Abrindo o original…",
+  "source_unavailable": "A versão original ou seu trecho exato está indisponível. Importe novamente o arquivo original para criar referências precisas.",
+  "source_highlight_unresolved": "O original está aberto, mas não foi possível alinhar o destaque visual com segurança. O trecho exato extraído e seu contexto aparecem abaixo.",
+  "source_return": "Voltar ao trecho citado",
+  "source_version": "Versão original: {version}",
+  "source_context": "Texto extraído com contexto",
+  "source_page": "Página",
+  "source_chapter": "Capítulo",
+  "source_legacy": "Esta referência antiga identifica o documento e o trecho salvo. A localização exata no original não foi preservada."
 }

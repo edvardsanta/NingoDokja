@@ -1,3 +1,4 @@
+import { passageLocator, originalReading } from "../shared/passages.js";
 import { observerSnapshot } from "../shared/realtime.js";
 import { createHash } from "node:crypto";
 import { runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
@@ -238,7 +239,8 @@ function turnSources(value: unknown): ArchivedTurnSource[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, MAX_TURN_SOURCES).filter(isRecord).map((source) => ({
     number: count0(source.number), id: shorten(text(source.source_id), 200), title: shorten(text(source.title), 300),
-    reference: shorten(text(source.reference), 2048), excerpt: shorten(text(source.excerpt), 600),
+    reference: shorten(text(source.reference), 2048), excerpt: Array.from(text(source.excerpt)).slice(0, 6000).join(""),
+    ...(passageLocator(source.locator) ? { locator: passageLocator(source.locator) } : {}),
   })).filter((source) => source.number > 0 && source.id !== "");
 }
 
@@ -652,6 +654,7 @@ function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
       embedded: count(document.embedded),
       updatedAt: text(document.updated_at),
       ...documentText(document.text),
+      ...(document.reading ? { reading: originalReading(document.reading) } : {}),
     })),
     total: count(body.total),
     offset: count(body.offset),
@@ -947,7 +950,9 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       // One document by its id, as a search hit names it: with its text, never a page of them.
       if (raw.source_id !== undefined) {
         if (typeof raw.source_id !== "string" || !INGEST_ID.test(raw.source_id)) return undefined;
-        return { limit: 1, offset: 0, source_id: raw.source_id, ...(raw.include_text === true ? { include_text: true } : {}) };
+        const locator = raw.locator === undefined ? undefined : passageLocator(raw.locator);
+        if (raw.locator !== undefined && !locator) return undefined;
+        return { limit: 1, offset: 0, source_id: raw.source_id, ...(raw.include_text === true ? { include_text: true } : {}), ...(locator ? { locator } : {}) };
       }
       const limit = clampInt(raw.limit, 1, 100, 20);
       return {

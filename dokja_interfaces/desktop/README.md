@@ -474,3 +474,13 @@ Chat requires an explicit enabled provider and declared model. Select it in Desk
 System → Inference providers → Chat provider and model, or run
 `dokja-cli providers chat <provider> <model>`. Missing/disabled configuration
 shows a setup error. Archived profile editing no longer selects live inference.
+
+
+Book citations can open exact original PDF pages and EPUB chapter ranges, including
+references reopened from the conversation archive. Each passage has its own
+number; grouped numbers open independently. The reader displays the retained
+original version, highlights the cited passage and provides surrounding extracted
+context and page/chapter navigation. Missing originals or ambiguous visual
+alignment are reported explicitly. Existing document-only citations remain
+readable; re-import an original to enable exact locations on future replies.
+See [passage references](../../dokja_docs/passage-references.md).

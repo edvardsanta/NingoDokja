@@ -4,7 +4,9 @@
 
 // What the archive kept of a document adds its id, origin and passage; a reply kept before that has
 // only what the line says.
-export type ReplySource = { number: number; title: string; id?: string; reference?: string; excerpt?: string };
+import type { PassageLocator } from "../../shared/passages.js";
+
+export type ReplySource = { locator?: PassageLocator; number: number; title: string; id?: string; reference?: string; excerpt?: string };
 
 // A piece of a reply's text: plain, or a citation of documents that are listed under it.
 export type ReplyPart = string | { cite: readonly number[]; text: string };

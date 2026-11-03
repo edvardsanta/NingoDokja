@@ -16,13 +16,13 @@ chosen. PostgreSQL connection failure is an error; there is no fallback to
 SQLite, automatic import or dual write. `knowledge.status` adds
 `storage_backend`, so the operator can verify which store is serving requests.
 
-The PostgreSQL service-owned schema is `dokja_knowledge`, version 1. Documents,
+The PostgreSQL service-owned schema is `dokja_knowledge`, version 2. Documents,
 chunks, metadata, tags, source references and model-tagged embeddings persist
 there. The extensions `vector` and `unaccent` must be available in `public`;
 startup creates them when permitted. On a managed server, provision extensions
 with an administrator and give the application ownership of its own schema.
 Schema creation is transactional and serialized; unsupported versions are
-refused. This does not change any existing SQLite schema version.
+refused. SQLite schema 1/2 upgrades additively to version 3 when opened by this build.
 
 Vector candidates are selected by exact cosine search in PostgreSQL, filtered
 by model, dimension and the existing kind restriction before ranking. The
@@ -70,7 +70,7 @@ explicitly before selecting the backend.
    ```
 
    Use the dev base for development. For production, use the prod base and
-   `/data/dokja_knowledge.db`. The importer opens schema-1/2 SQLite read-only,
+   `/data/dokja_knowledge.db`. The importer opens schema-1/2/3 SQLite read-only,
    copies document/chunk IDs, text, metadata, hashes, timestamps, vectors and
    model tags, and checks a full logical digest before committing. Metadata for
    schema-1 sources defaults to `{}` without upgrading the source. A nonempty
@@ -100,7 +100,7 @@ docker compose -f docker-compose.lite.yml -f docker-compose.postgres.yml run --r
 ```
 
 Use `/data/dokja_knowledge.rollback.db` in production. Export reads one
-repeatable-read PostgreSQL snapshot, builds SQLite schema 2 with its keyword
+repeatable-read PostgreSQL snapshot, builds SQLite schema 3 with its keyword
 index and original vectors, verifies the full digest, and publishes a new
 owner-readable file atomically. An existing destination is never replaced.
 Failure leaves the PostgreSQL source intact and does not publish a partial
@@ -124,3 +124,10 @@ both SQLite regressions and PostgreSQL integration fixtures.
 This does not implement the cognitive graph, new ownership/scope semantics,
 Memory adoption, delivery attempts or a cross-service transaction. Those remain
 explicit subsequent batches in `steps.json`.
+
+
+Passage locations and retained PDF/EPUB originals are included in verified imports
+and exports. PostgreSQL schema 2 adds chunk locators and `document_originals`;
+SQLite schema 3 adds their equivalents. Original versions remain available after
+document replacement and are removed on document deletion. See
+[exact passage references](passage-references.md) for retention and rollback limits.

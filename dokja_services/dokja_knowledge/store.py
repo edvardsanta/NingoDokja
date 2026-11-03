@@ -63,6 +63,15 @@ MIGRATIONS = [
         metadata TEXT NOT NULL
     );
     """,
+    """
+    ALTER TABLE chunks ADD COLUMN locator TEXT NOT NULL DEFAULT '{}';
+    CREATE TABLE document_originals (
+        document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        version TEXT NOT NULL,
+        original TEXT NOT NULL,
+        PRIMARY KEY(document_id, version)
+    );
+    """,
 ]
 
 
@@ -121,7 +130,7 @@ class Store:
         return self.conn.execute("SELECT * FROM documents WHERE source_id = ?", (source_id,)).fetchone()
 
     def replace_document(self, source_id: str, title: str, kind: str, source_ref: str, tags: str,
-                         content_hash: str, chunks: list[Chunk], metadata: str = "{}") -> tuple[int, bool]:
+                         content_hash: str, chunks: list[Chunk], metadata: str = "{}", original: dict | None = None) -> tuple[int, bool]:
         """Create or fully replace a document and its chunks, atomically.
 
         Returns (document id, created). Old chunks are removed first, so an edited
@@ -146,12 +155,24 @@ class Store:
                     (title, kind, source_ref, tags, content_hash, stamp, document_id),
                 )
             self.conn.executemany(
-                "INSERT INTO chunks(document_id, position, heading, text) VALUES (?, ?, ?, ?)",
-                [(document_id, c.position, c.heading, c.text) for c in chunks],
+                "INSERT INTO chunks(document_id, position, heading, text, locator) VALUES (?, ?, ?, ?, ?)",
+                [(document_id, c.position, c.heading, c.text, c.locator) for c in chunks],
             )
             self._write_metadata(document_id, metadata)
+            if original is not None:
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO document_originals VALUES (?, ?, ?)",
+                    (document_id, original["version"], json.dumps(original, ensure_ascii=False)),
+                )
         self.version += 1
         return document_id, created
+
+    def get_original(self, document_id, version=""):
+        row = self.conn.execute(
+            "SELECT original FROM document_originals WHERE document_id = ? AND version = ?",
+            (document_id, version),
+        ).fetchone()
+        return json.loads(row["original"]) if row else None
 
     def get_metadata(self, document_id: int) -> str:
         row = self.conn.execute(
@@ -384,7 +405,7 @@ class Store:
             return {}
         marks = ",".join("?" for _ in ids)
         rows = self.conn.execute(
-            f"""SELECT c.id, c.position, c.heading, c.text,
+            f"""SELECT c.id, c.position, c.heading, c.text, c.locator, d.content_hash,
                        d.source_id, d.title, d.kind, d.source_ref, d.tags,
                        COALESCE(m.metadata, '{{}}') AS metadata
                 FROM chunks c JOIN documents d ON d.id = c.document_id
