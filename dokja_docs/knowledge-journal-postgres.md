@@ -138,3 +138,8 @@ The [native source-read consumer](knowledge-source-receipts.md) now exercises
 this port through the existing preparation route, including a disposable
 PostgreSQL integration test. It remains an explicit host binding with synthetic
 authorization in tests; startup configuration and public admission are pending.
+
+The [native source supervisor](knowledge-source-steering.md) now verifies in-flight
+redirects and retained original attempts against this adapter. Its control state
+and replay acknowledgments remain volatile; journal persistence does not imply
+durable supervisor or authenticated-ingress recovery.
