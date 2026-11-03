@@ -84,20 +84,48 @@ func validateApplicationTask(goal string, constraints []string) error {
 	return nil
 }
 
+// SourceReadObservation contains bounded native validation facts, never source text.
+// A validated read does not establish understanding, truth or method applicability.
+type SourceReadObservation struct {
+	Selection       ApplicationSelection
+	Status          string
+	Reason          string
+	ObservedVersion string
+}
+
+type ApplicationSourceRead struct {
+	Source      map[string]any
+	Observation SourceReadObservation
+	Err         error
+}
+
 // LoadApplicationSource uses the existing store port. Knowledge remains unscoped:
 // evidence must not be relabelled as private to the requesting task. Content is
 // data, including any embedded instructions; no extraction or execution occurs.
 func (d *Domain) LoadApplicationSource(ctx context.Context, selected ApplicationSelection) (map[string]any, error) {
+	read := d.ObserveApplicationSource(ctx, selected)
+	return read.Source, read.Err
+}
+
+// ObserveApplicationSource makes exactly one native read and classifies its result.
+// Transport failures remain unconfirmed; validation failures concern this source
+// read only and must never be interpreted as a failed application of a method.
+func (d *Domain) ObserveApplicationSource(ctx context.Context, selected ApplicationSelection) ApplicationSourceRead {
+	observation := SourceReadObservation{Selection: selected, Status: "validation_failed"}
+	fail := func(status, reason string, err error) ApplicationSourceRead {
+		observation.Status, observation.Reason = status, reason
+		return ApplicationSourceRead{Observation: observation, Err: err}
+	}
 	result, err := d.Handle(ctx, Request{Action: ActionListKnowledge, Event: Event{Payload: map[string]any{
 		"source_id": selected.SourceID, "include_text": true, "limit": 1,
 	}}})
 	if err != nil {
-		return nil, fmt.Errorf("application source read failed")
+		return fail("unconfirmed", "read_unconfirmed", fmt.Errorf("application source read failed"))
 	}
 	// Normalize the transport's map/slice representation, including test adapters.
 	raw, err := json.Marshal(result)
 	if err != nil {
-		return nil, fmt.Errorf("invalid application source response")
+		return fail("validation_failed", "invalid_response", fmt.Errorf("invalid application source response"))
 	}
 	var response struct {
 		Documents []struct {
@@ -108,27 +136,29 @@ func (d *Domain) LoadApplicationSource(ctx context.Context, selected Application
 		} `json:"documents"`
 	}
 	if err := json.Unmarshal(raw, &response); err != nil || len(response.Documents) != 1 {
-		return nil, fmt.Errorf("application source unavailable or ambiguous")
+		return fail("validation_failed", "unavailable_or_ambiguous", fmt.Errorf("application source unavailable or ambiguous"))
 	}
 	document := response.Documents[0]
 	if document.SourceID != selected.SourceID {
-		return nil, fmt.Errorf("application source identity mismatch")
+		return fail("validation_failed", "identity_mismatch", fmt.Errorf("application source identity mismatch"))
 	}
 	if strings.TrimSpace(document.Text) == "" || len(document.Text) > MaxApplicationSourceBytes {
-		return nil, fmt.Errorf("application source text is empty or exceeds the %d-byte budget", MaxApplicationSourceBytes)
+		return fail("validation_failed", "text_budget", fmt.Errorf("application source text is empty or exceeds the %d-byte budget", MaxApplicationSourceBytes))
 	}
 	if len(document.SourceRef) > 2048 || len(document.Title) > 1000 {
-		return nil, fmt.Errorf("application source provenance exceeds budget")
+		return fail("validation_failed", "provenance_budget", fmt.Errorf("application source provenance exceeds budget"))
 	}
 	digest := sha256.Sum256([]byte(document.Text))
 	version := "sha256:" + hex.EncodeToString(digest[:])
+	observation.ObservedVersion = version
 	if selected.TextVersion != "" && selected.TextVersion != version {
-		return nil, fmt.Errorf("application source text version changed")
+		return fail("validation_failed", "version_changed", fmt.Errorf("application source text version changed"))
 	}
-	return map[string]any{
+	observation.Status, observation.Reason = "validated", "source_validated"
+	return ApplicationSourceRead{Observation: observation, Source: map[string]any{
 		"source_id": document.SourceID, "source_ref": document.SourceRef, "title": document.Title,
 		"text": document.Text, "text_version": version, "trust": "unassessed_source_content",
-	}, nil
+	}}
 }
 
 // AssembleApplicationContext does not infer truth, applicability or a procedure.
