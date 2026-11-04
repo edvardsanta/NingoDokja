@@ -12,9 +12,21 @@ function fakeVoice(member: string | undefined, playing?: string) {
   const applied: unknown[] = [];
   const posted: Array<{ channelId: string; message: any }> = [];
   const edited: Array<{ channelId: string; messageId: string; message: any }> = [];
+  const removed: Array<{ channelId: string; messageId: string }> = [];
+  let latest = true;
+  let postFails = false;
+  let deleteFails = false;
   let hooks: { onEnded(entry: number): void; onGone(): void } | undefined;
   const voice = {
-    async postMessage(args: { channelId: string; message: unknown }) { posted.push(args as never); return `panel${posted.length}`; },
+    async postMessage(args: { channelId: string; message: unknown }) {
+      if (postFails) throw new Error("post unavailable");
+      posted.push(args as never); latest = true; return `panel${posted.length}`;
+    },
+    async panelIsLatest() { return latest; },
+    async deleteMessage(args: { channelId: string; messageId: string }) {
+      if (deleteFails) throw new Error("cleanup unavailable");
+      removed.push(args);
+    },
     async editMessage(args: { channelId: string; messageId: string; message: unknown }) { edited.push(args as never); },
     async memberVoiceChannel() { return member; },
     musicChannel() { return playing; },
@@ -23,7 +35,8 @@ function fakeVoice(member: string | undefined, playing?: string) {
       hooks = args.hooks;
     },
   };
-  return { voice: voice as never, applied, posted, edited, hooks: () => hooks! };
+  return { voice: voice as never, applied, posted, edited, removed, hooks: () => hooks!,
+    bury: () => { latest = false; }, failPost: () => { postFails = true; }, failDelete: () => { deleteFails = true; } };
 }
 
 function context(overrides: Partial<DiscordCommandContext> & { song?: string; percent?: number } = {}) {
@@ -96,7 +109,7 @@ test("the queue can be read from anywhere, and the volume is sent as typed", asy
   assert.equal(sent.at(-1)?.content, "40");
 });
 
-test("a track that ends is reported from the channel of the last command, and what comes next plays", async () => {
+test("a track that ends is reported from the shared panel channel, and what comes next plays", async () => {
   const sent: Sent[] = [];
   const fake = fakeVoice("voice1");
   const list = commands(fake.voice, {
@@ -143,7 +156,8 @@ test("the panel is posted with the first song, edited as the queue changes, and 
   const pressed: string[] = [];
   await pause.handle({ customId: PANEL.pause, userId: "u1", channelId: "text1", messageId: "panel1", guildId: "g1",
     reply: async (message: any) => { pressed.push(message.content); }, update: async () => {}, showModal: async () => {} });
-  assert.deepEqual(pressed, ["Paused."], "the button answers only the person who pressed it");
+  assert.equal(pause.defer, true, "the runtime acknowledges before applying the control");
+  assert.deepEqual(pressed, [], "successful controls do not add another message");
   assert.equal(fake.posted.length, 1, "the panel is edited, not posted again");
   assert.match(fake.edited.at(-1)!.message.embeds[0].title, /Paused/);
   assert.ok(fake.edited.at(-1)!.message.components.some((button: any) => button.customId === PANEL.resume));
@@ -332,4 +346,146 @@ test("history says so when there is nothing, or when memory cannot answer", asyn
   const second = context();
   await find(down, "history").handle(second.ctx);
   assert.equal(second.replies.at(-1), "The music memory is not available right now.");
+});
+
+
+test("a rejected panel control still explains the problem privately", async () => {
+  const music = createMusic({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fakeVoice("voice1").voice, locale: "en",
+    dispatch: async () => ({ reply: "", music: { ok: false, code: "nothing_playing" } }),
+  });
+  const replies: any[] = [];
+  await music.buttons.find(button => button.customId === PANEL.skip)!.handle({
+    customId: PANEL.skip, userId: "u1", channelId: "text1", messageId: "panel1", guildId: "g1",
+    reply: async message => { replies.push(message); }, update: async () => { assert.fail("a refusal must not replace the panel"); }, showModal: async () => {},
+  });
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].ephemeral, true);
+  assert.match(replies[0].content, /Nothing is playing/);
+});
+
+
+test("successful music commands present a shared public panel and dismiss their acknowledgements", async () => {
+  const fake = fakeVoice("voice1");
+  const options: unknown[] = [];
+  let deleted = 0;
+  const list = commands(fake.voice, { "music.play": { reply: "", music: queue(1, 1) } }, []);
+  await find(list, "play").handle(context({ song: "x", reply: async (_message, opts) => { options.push(opts); }, deleteReply: async () => { deleted++; } }).ctx);
+  assert.deepEqual(options, [undefined]);
+  assert.equal(fake.posted.length, 1);
+  assert.equal(deleted, 1);
+});
+
+function refreshableMusic(fake: ReturnType<typeof fakeVoice>) {
+  return commands(fake.voice, {
+    "music.play": { reply: "", music: queue(1, 1) },
+    "music.queue": { reply: "", music: queue(1, 1) },
+  }, []);
+}
+
+test("queue brings a buried shared panel back without replaying the song or changing its channel", async () => {
+  const fake = fakeVoice("voice1");
+  const list = refreshableMusic(fake);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  fake.bury();
+  let deleted = 0;
+  await find(list, "queue").handle(context({ channelId: "text2", userId: "u2", deleteReply: async () => { deleted++; } }).ctx);
+  assert.equal(fake.posted.length, 2);
+  assert.equal(fake.posted[1].channelId, "text1");
+  assert.deepEqual(fake.removed, [{ channelId: "text1", messageId: "panel1" }]);
+  assert.equal(fake.applied.length, 1);
+  assert.ok(fake.posted[1].message.components.some((button: any) => button.customId === PANEL.skip));
+  assert.equal(deleted, 1);
+});
+
+test("a panel already latest is edited rather than reposted", async () => {
+  const fake = fakeVoice("voice1");
+  const list = refreshableMusic(fake);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  await find(list, "queue").handle(context().ctx);
+  assert.equal(fake.posted.length, 1);
+  assert.deepEqual(fake.removed, []);
+});
+
+test("concurrent refreshes replace the old panel once", async () => {
+  const fake = fakeVoice("voice1");
+  const list = refreshableMusic(fake);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  fake.bury();
+  await Promise.all([find(list, "queue").handle(context().ctx), find(list, "queue").handle(context().ctx)]);
+  assert.equal(fake.posted.length, 2);
+  assert.equal(fake.removed.length, 1);
+});
+
+test("a failed replacement preserves old controls and retains the command result", async () => {
+  const fake = fakeVoice("voice1");
+  const list = refreshableMusic(fake);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  fake.bury(); fake.failPost();
+  let deleted = false;
+  const { ctx, replies } = context({ deleteReply: async () => { deleted = true; } });
+  await find(list, "queue").handle(ctx);
+  assert.deepEqual(fake.removed, []);
+  assert.equal(deleted, false);
+  assert.match(replies.at(-1)!, /Monalisa/);
+});
+
+test("failed cleanup disables old controls after publishing the replacement", async () => {
+  const fake = fakeVoice("voice1");
+  const list = refreshableMusic(fake);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  fake.bury(); fake.failDelete();
+  await find(list, "queue").handle(context().ctx);
+  assert.equal(fake.posted.length, 2);
+  assert.equal(fake.edited.at(-1)?.messageId, "panel1");
+  assert.deepEqual(fake.edited.at(-1)?.message.components, []);
+});
+
+test("the public panel includes queued tracks with safe localized text", async () => {
+  const fake = fakeVoice("voice1");
+  const list = commands(fake.voice, { "music.play": { reply: "", music: {
+    ...queue(1, 1), waiting: [{ entry: 2, url: "https://play.example/2", title: "@everyone", uploader: "Band" }],
+  } } }, []);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  assert.match(fake.posted[0].message.embeds[0].description, /Up next:\n1\. @\u200beveryone – Band/);
+});
+
+
+test("active playback brings a buried panel back during conversation and stops checking when idle", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const fake = fakeVoice("voice1");
+  const list = commands(fake.voice, {
+    "music.play": { reply: "", music: queue(1, 1) },
+    "music.stop": { reply: "", music: queue(2) },
+  }, []);
+  await find(list, "play").handle(context({ song: "x" }).ctx);
+  fake.bury();
+  t.mock.timers.tick(15_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fake.posted.length, 2);
+  assert.equal(fake.removed.length, 1);
+  t.mock.timers.tick(15_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fake.posted.length, 2, "no repost while the panel is still latest");
+  await find(list, "stop").handle(context().ctx);
+  fake.bury();
+  t.mock.timers.tick(60_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fake.posted.length, 2, "an ended queue has no sticky refresh");
+});
+
+test("history stays private and music errors never dismiss their explanation", async () => {
+  const fake = fakeVoice("voice1");
+  const list = commands(fake.voice, {
+    "music.play": { reply: "", music: { ok: false, code: "not_found" } },
+    "music.history": { reply: "", music: { ok: true, history: [] } },
+  }, []);
+  const options: unknown[] = [];
+  let deleted = 0;
+  const { ctx, replies } = context({ song: "x", reply: async (_message, opts) => { options.push(opts); }, deleteReply: async () => { deleted++; } });
+  await find(list, "play").handle(ctx);
+  assert.match(replies.at(-1)!, /could not find/);
+  await find(list, "history").handle(ctx);
+  assert.deepEqual(options, [undefined, { ephemeral: true }]);
+  assert.equal(deleted, 0);
 });

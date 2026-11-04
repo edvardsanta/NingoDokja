@@ -124,6 +124,8 @@ export type DiscordVoiceController = {
   // Posts or edits a message in a text channel (the music panel); the message id, when posted.
   postMessage(params: { channelId: string; message: DiscordReply }): Promise<string | undefined>;
   editMessage(params: { channelId: string; messageId: string; message: DiscordReply }): Promise<void>;
+  panelIsLatest?(params: { channelId: string; messageId: string }): Promise<boolean>;
+  deleteMessage?(params: { channelId: string; messageId: string }): Promise<void>;
   // Brings the server's playback to the queue's state, joining the person's voice channel to play.
   applyMusic(params: { guildId: string; userId: string; state: QueueState; hooks: MusicHooks }): Promise<void>;
 };
@@ -546,6 +548,23 @@ export function createDiscordVoiceController(options: {
       if (!channel || !("messages" in channel)) return;
       const found = await channel.messages.fetch(messageId);
       await found.edit({ ...toMessageReply(message), allowedMentions: { parse: [] } } as never);
+    },
+    async panelIsLatest({ channelId, messageId }) {
+      const client = await ensureVoiceClient();
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !("messages" in channel)) throw new Error("music panel channel is unavailable");
+      const latest = await channel.messages.fetch({ limit: 1, cache: false });
+      return latest.first()?.id === messageId;
+    },
+    async deleteMessage({ channelId, messageId }) {
+      const client = await ensureVoiceClient();
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !("messages" in channel)) throw new Error("music panel channel is unavailable");
+      try {
+        await channel.messages.delete(messageId);
+      } catch (error) {
+        if ((error as { code?: number }).code !== 10008) throw error;
+      }
     },
     async memberVoiceChannel({ guildId, userId }) {
       const client = await ensureVoiceClient();

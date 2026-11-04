@@ -62,6 +62,8 @@ export type DiscordCommandContext = {
   getNumber(name: string): number | undefined;
   reply(message: DiscordReply, opts?: { ephemeral?: boolean }): Promise<void>;
   updateReply(message: DiscordReply): Promise<void>;
+  // Dismiss the current command acknowledgement after its result reached the shared panel.
+  deleteReply?(): Promise<void>;
   showModal(modal: DiscordModalSpec): Promise<void>;
 };
 

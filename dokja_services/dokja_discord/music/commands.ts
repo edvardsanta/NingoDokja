@@ -9,15 +9,18 @@ import { parseComment, parseQueueState, type QueueState } from "./reconcile.js";
 
 type Dispatch = (eventType: string, request: { content: string; userId: string; channelId: string; guildId: string }) => Promise<OrchestratorReply>;
 
+type MusicResult = { text: string; state?: QueueState; presented: boolean };
+
 export type MusicFeature = { commands: DiscordSlashCommand[]; buttons: DiscordButtonAction[] };
 
 // The step the panel's volume buttons take, in percent.
 const VOLUME_STEP = 10;
+const PANEL_REFRESH_MS = 15_000;
 
 // Music in a voice channel. The orchestrator keeps the queue and its rules; each reply carries the
 // queue, which the voice controller plays. Who may control it: anyone in Ningo's voice channel
-// while music plays (owner, 2026-10-26); /play from elsewhere is refused. A panel in the channel of
-// the last command shows what plays, with buttons that work like the commands.
+// while music plays (owner, 2026-10-26); /play from elsewhere is refused. One shared panel stays
+// in the channel where the queue began; it is replaced when buried by newer messages.
 export function createMusic(params: {
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
@@ -34,8 +37,8 @@ export function createMusic(params: {
       params.orchestratorTimeoutMs,
       buildBridgePayload({ eventType, ...request, messageId: randomUUID(), entryKind: "command" }),
     ));
-  // Where a server's last music command came from: track-ended reports go back through it, so they
-  // pass the same inbound checks (the server and its allowed channels), and the panel lives there.
+  // The shared panel's channel and last controller: track-ended reports return through this
+  // authorized origin. Queue/history reads do not change it.
   const lastCommand = new Map<string, { channelId: string; userId: string }>();
   // The panel of each server: one message, edited as the queue changes.
   const panels = new Map<string, { channelId: string; messageId: string }>();
@@ -43,38 +46,87 @@ export function createMusic(params: {
   // Ningo's remark on the song each server is playing.
   const comments = new Map<string, { epoch: string; entry: number; text: string }>();
 
-  const showPanel = async (guildId: string, state: QueueState) => {
-    if (!voice) return;
-    const origin = lastCommand.get(guildId);
-    const panel = panels.get(guildId);
-    const comment = comments.get(guildId);
-    const remark = comment?.epoch === state.epoch && comment.entry === state.nowPlaying?.entry ? comment.text : "";
-    const message = panelMessage(state, locale, remark);
-    try {
-      if (panel && (!origin || panel.channelId === origin.channelId)) {
-        await voice.editMessage({ ...panel, message });
-      } else if (origin && state.nowPlaying) {
-        const messageId = await voice.postMessage({ channelId: origin.channelId, message });
-        if (messageId) panels.set(guildId, { channelId: origin.channelId, messageId });
+  // Serialize edits and replacements so concurrent replies cannot publish two active panels.
+  const panelUpdates = new Map<string, Promise<boolean>>();
+  const showPanel = (guildId: string, onlyIfBuried = false): Promise<boolean> => {
+    const previous = panelUpdates.get(guildId) ?? Promise.resolve(false);
+    const update = previous.catch(() => false).then(async () => {
+      if (!voice) return false;
+      const state = lastState.get(guildId);
+      if (!state || (onlyIfBuried && !state.nowPlaying)) return false;
+      const origin = lastCommand.get(guildId);
+      const panel = panels.get(guildId);
+      const comment = comments.get(guildId);
+      const remark = comment?.epoch === state.epoch && comment.entry === state.nowPlaying?.entry ? comment.text : "";
+      const message = panelMessage(state, locale, remark);
+      try {
+        const buried = panel && state.nowPlaying && voice.panelIsLatest && voice.deleteMessage
+          ? !(await voice.panelIsLatest(panel)) : false;
+        if (panel && !buried) {
+          if (onlyIfBuried) return true;
+          await voice.editMessage({ ...panel, message });
+        } else if (origin && state.nowPlaying) {
+          // Publish successfully before retiring the previous controls.
+          const messageId = await voice.postMessage({ channelId: origin.channelId, message });
+          if (!messageId) return false;
+          panels.set(guildId, { channelId: origin.channelId, messageId });
+          if (panel && voice.deleteMessage) {
+            try {
+              await voice.deleteMessage(panel);
+            } catch (error) {
+              console.error("[dokja-discord] previous music panel cleanup failed", error);
+              // If deletion fails, keep the current panel and disable the old controls.
+              await voice.editMessage({ ...panel, message: { content: say(locale, "panelMoved"), components: [], embeds: [] } });
+            }
+          }
+        } else {
+          return false;
+        }
+        // An ended queue leaves its last panel without controls.
+        if (!state.nowPlaying) panels.delete(guildId);
+        return true;
+      } catch (error) {
+        console.error("[dokja-discord] music panel failed", error);
+        return false;
       }
-      // An ended queue leaves its last panel without buttons; the next song posts a new one.
-      if (!state.nowPlaying) panels.delete(guildId);
-    } catch (error) {
-      console.error("[dokja-discord] music panel failed", error);
-    }
+    });
+    panelUpdates.set(guildId, update);
+    void update.finally(() => { if (panelUpdates.get(guildId) === update) panelUpdates.delete(guildId); });
+    return update;
+  };
+
+  const panelRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
+  const watchPanel = (guildId: string) => {
+    if (!voice?.panelIsLatest || !voice.deleteMessage || panelRefreshes.has(guildId)) return;
+    const timer = setTimeout(async () => {
+      panelRefreshes.delete(guildId);
+      if (!lastState.get(guildId)?.nowPlaying) return;
+      await showPanel(guildId, true);
+      if (lastState.get(guildId)?.nowPlaying) watchPanel(guildId);
+    }, PANEL_REFRESH_MS);
+    timer.unref();
+    panelRefreshes.set(guildId, timer);
   };
 
   const apply = async (guildId: string, userId: string, music: unknown) => {
     const state = parseQueueState(music);
-    if (!state || !voice) return;
+    if (!state || !voice) return false;
     const previous = lastState.get(guildId);
     // A late reply changes nothing, on the speakers or on the panel.
-    if (previous && previous.epoch === state.epoch && state.version <= previous.version) return;
+    if (previous && previous.epoch === state.epoch && state.version < previous.version) return panels.has(guildId);
+    if (previous && previous.epoch === state.epoch && state.version === previous.version) return showPanel(guildId);
     lastState.set(guildId, state);
     await voice.applyMusic({ guildId, userId, state, hooks: hooksFor(guildId) });
-    await showPanel(guildId, state);
+    const presented = await showPanel(guildId);
     const now = state.nowPlaying;
+    if (now) {
+      watchPanel(guildId);
+    } else {
+      clearTimeout(panelRefreshes.get(guildId));
+      panelRefreshes.delete(guildId);
+    }
     if (now && (previous?.epoch !== state.epoch || previous.nowPlaying?.entry !== now.entry)) askComment(guildId, state.epoch, now.entry);
+    return presented;
   };
 
   // Asks for a remark on the song that just started. It takes as long as the model does, so nothing
@@ -88,7 +140,7 @@ export function createMusic(params: {
         const state = lastState.get(guildId);
         if (!text || state?.epoch !== epoch || state.nowPlaying?.entry !== entry) return;
         comments.set(guildId, { epoch, entry, text });
-        await showPanel(guildId, state);
+        await showPanel(guildId);
       })
       .catch((error) => console.error("[dokja-discord] music comment failed", error));
   };
@@ -120,17 +172,21 @@ export function createMusic(params: {
     return undefined;
   };
 
-  const run = async (guildId: string, userId: string, channelId: string, eventType: string, content: string) => {
-    // Asking for one's own songs is no music command: the panel stays where it is.
-    if (eventType !== "music.history") lastCommand.set(guildId, { channelId, userId });
+  const run = async (guildId: string, userId: string, channelId: string, eventType: string, content: string): Promise<MusicResult> => {
+    // Reads do not relocate the panel. An active queue keeps its original channel;
+    // each request still goes through inbound checks for the channel it came from.
+    if (eventType !== "music.history" && eventType !== "music.queue") {
+      lastCommand.set(guildId, { channelId: panels.get(guildId)?.channelId ?? channelId, userId });
+    }
     const reply = await dispatch(eventType, { content, userId, channelId, guildId });
     const text = musicReplyText(locale, eventType, reply.music, reply.reply);
+    let presented = false;
     try {
-      await apply(guildId, userId, reply.music);
+      presented = await apply(guildId, userId, reply.music);
     } catch (error) {
-      return `${say(locale, "couldNotPlay")}${error instanceof Error ? ` ${error.message}` : ""}`;
+      return { text: `${say(locale, "couldNotPlay")}${error instanceof Error ? ` ${error.message}` : ""}`, presented: false };
     }
-    return text;
+    return { text, state: parseQueueState(reply.music), presented };
   };
 
   const command = (
@@ -160,7 +216,16 @@ export function createMusic(params: {
           await context.updateReply(refused);
           return;
         }
-        await context.updateReply(await run(context.guildId, context.userId, context.channelId, eventType, content(context)));
+        const result = await run(context.guildId, context.userId, context.channelId, eventType, content(context));
+        if (result.state && result.presented && context.deleteReply) {
+          try {
+            await context.deleteReply();
+            return;
+          } catch (error) {
+            console.error("[dokja-discord] music acknowledgement cleanup failed", error);
+          }
+        }
+        await context.updateReply(result.text);
       } catch (error) {
         console.error(`[dokja-discord] command ${name} failed`, error);
         await context.updateReply(error instanceof Error ? error.message : say(locale, "failed"));
@@ -168,11 +233,13 @@ export function createMusic(params: {
     },
   });
 
-  // The panel's buttons do what the commands do, answering only the person who pressed.
+  // The runtime acknowledges button presses immediately. Success edits the existing
+  // panel without another message; refusals and errors remain private.
   const button = (customId: string, label: string, eventType: string, content: (guildId: string) => string = () => "", style: DiscordButtonAction["style"] = "secondary"): DiscordButtonAction => ({
     customId,
     label,
     style,
+    defer: true,
     async handle(context: DiscordButtonContext) {
       try {
         const refused = await refusal(context.guildId, context.userId, eventType, true);
@@ -180,8 +247,12 @@ export function createMusic(params: {
           await context.reply({ content: refused ?? say(locale, "onlyServer"), ephemeral: true });
           return;
         }
-        const text = await run(context.guildId, context.userId, context.channelId, eventType, content(context.guildId));
-        await context.reply({ content: text, ephemeral: true });
+        const result = await run(context.guildId, context.userId, context.channelId, eventType, content(context.guildId));
+        if (!result.state || !result.presented) {
+          await context.reply({ content: result.text, ephemeral: true });
+          return;
+        }
+
       } catch (error) {
         console.error(`[dokja-discord] button ${customId} failed`, error);
         await context.reply({ content: error instanceof Error ? error.message : say(locale, "failed"), ephemeral: true });
@@ -239,6 +310,12 @@ export function panelMessage(state: QueueState, locale = "pt-BR", comment = ""):
     `volume ${state.volume}%`,
     state.waiting > 0 ? say(locale, "waiting", { count: state.waiting }) : say(locale, "nothingWaiting"),
   ].filter(Boolean).join(" · ");
+  const waiting = state.waitingTracks?.map((track, index) => {
+    const title = quiet(track.title.trim()) || say(locale, "untitled");
+    const artist = quiet(track.uploader.trim());
+    return `${index + 1}. ${title}${artist ? ` – ${artist}` : ""}`;
+  }) ?? [];
+  const nextUp = waiting.length ? `${say(locale, "nextUp")}\n${waiting.join("\n")}` : "";
   const components: DiscordComponentSpec[] = [
     state.paused
       ? { kind: "button", customId: PANEL.resume, label: say(locale, "resume"), style: "primary" }
@@ -253,7 +330,7 @@ export function panelMessage(state: QueueState, locale = "pt-BR", comment = ""):
     content: "",
     embeds: [{
       title: say(locale, state.paused ? "panelPaused" : "panelPlaying"),
-      description: [song, details, comment ? `💬 ${quiet(comment)}` : ""].filter(Boolean).join("\n"),
+      description: [song, details, nextUp, comment ? `💬 ${quiet(comment)}` : ""].filter(Boolean).join("\n"),
       ...(now.thumbnail ? { thumbnailUrl: now.thumbnail } : {}),
     }],
     components,
