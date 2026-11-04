@@ -255,6 +255,9 @@ async function handleChatInputCommand(
     updateReply: async (message: DiscordReply) => {
       await editCommandReply(interaction, message, buttons, selects);
     },
+    deleteReply: async () => {
+      await interaction.deleteReply();
+    },
     showModal: async (modal: DiscordModalAction["fields"] extends never ? never : any) => {
       params.log?.(
         "[dokja-discord] slash modal",

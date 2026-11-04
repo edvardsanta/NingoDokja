@@ -42,6 +42,8 @@ const MESSAGES = {
   panelPaused: { "pt-BR": "⏸ Pausado", en: "⏸ Paused" },
   askedBy: { "pt-BR": "pedido por <@{user}>", en: "asked by <@{user}>" },
   waiting: { "pt-BR": "{count} na fila", en: "{count} waiting" },
+  panelMoved: { "pt-BR": "O painel de música está nas mensagens mais recentes.", en: "The music panel is in the latest messages." },
+  nextUp: { "pt-BR": "Na fila:", en: "Up next:" },
   nothingWaiting: { "pt-BR": "nada na fila", en: "nothing waiting" },
   queueOver: { "pt-BR": "⏹ A fila acabou. `/play` começa outra.", en: "⏹ The queue is over. `/play` starts a new one." },
   pause: { "pt-BR": "⏸ Pausar", en: "⏸ Pause" },
