@@ -477,6 +477,8 @@ func TestBanterAfterDebateKeepsContextWithoutMoralizing(t *testing.T) {
 				"without appending a corrective lesson",
 				"address that request on its merits",
 				"neither agreement nor swearing is required",
+				"read teasing accusations and invented identities in context",
+				"concrete signs of distress, danger or a request for help",
 				"Never humiliate",
 				"Hold your own judgment",
 			} {
