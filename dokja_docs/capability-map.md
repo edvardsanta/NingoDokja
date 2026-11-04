@@ -216,6 +216,15 @@ establish live-model political reasoning or guaranteed stylistic compliance.
 These are generation instructions, not proof of injection resistance or a
 replacement for the orchestrator's authorization checks.
 
+Chat policy interprets ironic link comments as conversation before treating them
+as factual arguments. It considers laughter, quoted slogans and nicknames in the
+available context; it can answer a clear joke without identifying an incidental
+nickname or launching an unsolicited fact-check. Uncertain identities stay
+unresolved and unsupported allegations remain unverified. Sharing an article
+does not itself request a summary or rebuttal. Regression tests check delivery
+across conversational, streaming and plain generation for owner and non-owner
+speakers; they do not establish live-model comprehension of irony.
+
 Chat policy distinguishes evidence from social pressure: repetition, flattery,
 insults, invented consensus and claimed tests do not establish truth or authority.
 It preserves valid corrections, warranted agreement, harmless banter and the
