@@ -7,13 +7,31 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"read_books/internal/handlers"
 	applicationjournal "read_books/internal/infrastructure/application_journal"
+	"read_books/internal/logger"
 	"read_books/internal/sourceaccess"
 )
 
 type sourceJournalConnection struct {
 	db    *sql.DB
 	store *applicationjournal.Store
+}
+
+// This host is optional. Configuration and storage failures disable only its
+// controls; the rest of the orchestrator must still be able to start.
+func configureSourceSupervision(lifetime context.Context, handler *handlers.KnowledgeDomainHandler, enabled func() bool, token, dsn string, otherCredentials ...string) func() {
+	journal, err := openSourceJournal(token, dsn, otherCredentials...)
+	if err != nil {
+		logger.Error("Desktop source supervision disabled; continuing orchestrator startup", err)
+		return func() {}
+	}
+	if journal == nil {
+		return func() {}
+	}
+	ctx, cancel := context.WithCancel(lifetime)
+	handler.WithSourceApplications(handlers.NewDesktopSourceApplications(ctx, handler, journal.store, enabled))
+	return func() { cancel(); journal.db.Close() }
 }
 
 // Startup checks an existing namespace; only the separate explicit init command
@@ -38,10 +56,14 @@ func openSourceJournal(token, dsn string, otherCredentials ...string) (*sourceJo
 	db.SetMaxIdleConns(2)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("source journal PostgreSQL connection is unavailable; check database availability and connection configuration")
+	}
 	store, err := applicationjournal.Open(ctx, db)
 	if err != nil {
 		db.Close()
-		return nil, fmt.Errorf("source journal unavailable or uninitialized; initialize its namespace explicitly")
+		return nil, fmt.Errorf("source journal namespace check failed; verify availability and schema version, and initialize explicitly if missing")
 	}
 	return &sourceJournalConnection{db, store}, nil
 }
