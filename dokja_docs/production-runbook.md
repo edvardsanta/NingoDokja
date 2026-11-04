@@ -50,6 +50,16 @@ compaction notice is emitted. The complete unsummarized checkpoint remains in
 the existing session store until valid compaction replaces its older portion.
 Existing store/input byte limits still apply; this is not an unbounded archive.
 
+Summary inference must return a JSON object with `kind: "conversation_summary"`
+and a nonempty `summary` string of at most 4,096 UTF-8 bytes. Ordinary conversational
+replies or malformed task output are rejected as `invalid_summary`, preserving
+the previous checkpoint and pending raw turns. Runtime's provider wrapper defers
+to the application system task rather than always requesting a conversational
+reply. Update both the orchestrator and host Runtime controller for these changes;
+no environment, schema or Compose changes are required. Existing stored summaries
+remain readable. This checks the output format, not semantic completeness, and
+cannot reconstruct details already discarded by earlier successful compactions.
+
 After a summary failure, a one-minute per-session cooldown avoids repeating the
 failed compaction on every turn. The cooldown is volatile: restart reloads pending
 history and can attempt compaction again. Logs use `compaction_fallback` values

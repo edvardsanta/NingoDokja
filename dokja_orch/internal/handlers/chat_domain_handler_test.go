@@ -282,9 +282,7 @@ func TestChatDomainHandlerStartsSessionAndPrefixesReply(t *testing.T) {
 }
 
 func TestChatDomainHandlerCompactsIdleSession(t *testing.T) {
-	handler := NewChatDomainHandler(&fakeChatGenerator{
-		result: map[string]any{"reply": "hello"},
-	})
+	handler := NewChatDomainHandler(&compactionGenerator{summary: "A greeting exchange."})
 	currentTime := time.Unix(100, 0).UTC()
 	handler.sessions.nowFn = func() time.Time { return currentTime }
 

@@ -122,6 +122,9 @@ func (m *chatSessionManager) BeginTurn(ctx context.Context, event core.Event, co
 		if errors.Is(err, context.DeadlineExceeded) {
 			reason = "summary_timeout"
 		}
+		if errors.Is(err, chat.ErrInvalidSummary) {
+			reason = "invalid_summary"
+		}
 		if err == nil {
 			summary, err = chat.ValidateSummary(summary)
 			reason = "invalid_summary"

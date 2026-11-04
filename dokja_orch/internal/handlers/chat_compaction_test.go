@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -12,10 +13,11 @@ import (
 )
 
 type compactionGenerator struct {
-	summary  string
-	err      error
-	requests [][]map[string]string
-	replies  [][]map[string]string
+	summary    string
+	rawSummary bool
+	err        error
+	requests   [][]map[string]string
+	replies    [][]map[string]string
 }
 
 func (g *compactionGenerator) Generate(context.Context, string) (map[string]any, error) {
@@ -27,7 +29,12 @@ func (g *compactionGenerator) GenerateMessages(_ context.Context, messages []map
 		return map[string]any{"reply": "An assistant claim about the kingdom."}, nil
 	}
 	g.requests = append(g.requests, messages)
-	return map[string]any{"reply": g.summary}, g.err
+	response := g.summary
+	if !g.rawSummary {
+		encoded, _ := json.Marshal(map[string]string{"kind": "conversation_summary", "summary": g.summary})
+		response = string(encoded)
+	}
+	return map[string]any{"reply": response}, g.err
 }
 
 func TestIdleCompactionKeepsSummaryAndSessionAcrossFollowingTurns(t *testing.T) {
@@ -175,7 +182,7 @@ func TestExplicitNewSessionClearsSummaryWithoutCompactionNotice(t *testing.T) {
 }
 
 func TestPlainGenerationReceivesCompactedHistory(t *testing.T) {
-	g := &plainGenerator{}
+	g := &plainCompactionGenerator{model: compactionGenerator{summary: "A prior turn"}}
 	h := NewChatDomainHandler(g)
 	h.sessions.maxMsgs = 2
 	event := chatEvent("A prior turn")
@@ -190,6 +197,16 @@ func TestPlainGenerationReceivesCompactedHistory(t *testing.T) {
 	if result["notice"] != "chat.context_compacted" || !strings.Contains(g.prompt, "Earlier conversation summary") || !strings.HasSuffix(g.prompt, "Continue from the summary") {
 		t.Fatal("plain generation lost compacted history or current turn")
 	}
+}
+
+type plainCompactionGenerator struct {
+	model  compactionGenerator
+	prompt string
+}
+
+func (g *plainCompactionGenerator) Generate(ctx context.Context, prompt string) (map[string]any, error) {
+	g.prompt = prompt
+	return g.model.GenerateMessages(ctx, []map[string]string{{"content": prompt}})
 }
 
 func TestSessionTurnLockSupportsCancellationAndIndependentSessions(t *testing.T) {

@@ -191,7 +191,13 @@ The orchestrator requests a summary through the configured inference integration
 merges previous summary context, and retains up to eight recent turns verbatim
 within 16 KiB of recent context.
 The summary is bounded to 4,096 UTF-8 bytes and supplied as explicitly untrusted
-user-level context. Failed or invalid summaries preserve the last valid summary
+user-level context, with missing details explicitly unknown rather than evidence
+that nobody discussed them. Summary inference requires a JSON object with
+`kind: "conversation_summary"` and a nonempty `summary` string before replacing
+older turns. Runtime's shared provider wrapper respects background system tasks
+instead of forcing a conversational answer. This validates task output format,
+not factual completeness; existing checkpoints remain compatible. Failed or
+invalid summaries preserve the last valid summary
 and pending raw history, then continue with a bounded recent projection and a
 one-minute retry cooldown. They never silently discard history or claim successful
 compaction.

@@ -60,6 +60,31 @@ func TestSummaryValidationAndUntrustedContext(t *testing.T) {
 	}
 }
 
+func TestSummaryResponseRequiresBackgroundTaskOutput(t *testing.T) {
+	for _, response := range []string{
+		"Pelo nome exibido nesta conversa, você é o Draco.",
+		`{"reply":"An ordinary reply"}`,
+		`{"kind":"reply","summary":"An ordinary reply"}`,
+		`{"kind":"conversation_summary"}`,
+		`{"kind":"conversation_summary","summary":"  "}`,
+		`{"kind":"conversation_summary","summary":42}`,
+		`{"kind":"conversation_summary","summary":"facts"} trailing text`,
+		`{"kind":"conversation_summary","summary":"` + strings.Repeat("x", MaxSummaryBytes+1) + `"}`,
+		string([]byte{255}),
+	} {
+		if _, err := ParseSummaryResponse(response); err != ErrInvalidSummary {
+			t.Fatalf("accepted invalid response: %.100q, err=%v", response, err)
+		}
+	}
+	got, err := ParseSummaryResponse(`{"kind":"conversation_summary","summary":"  A participant joked about a fictional title.  "}`)
+	if err != nil || got != "A participant joked about a fictional title." {
+		t.Fatal(got, err)
+	}
+	if !strings.Contains(SummaryContext(got).Content, "not evidence that they were never discussed") {
+		t.Fatal("lossy summary treated as complete history")
+	}
+}
+
 func TestRecoveryContextIsBoundedAndDoesNotChangeHistory(t *testing.T) {
 	messages := []ContextMessage{}
 	for i := 0; i < 30; i++ {
