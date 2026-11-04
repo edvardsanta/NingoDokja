@@ -204,7 +204,7 @@ const factInMessageNote = `This message includes a request to keep something. Th
 // personaForEvent is the system message of a turn: the persona for its interface and the private
 // facts the chat handler attached, only where the owner allowed them.
 func personaForEvent(event core.Event) string {
-	persona := interfacePersona(event)
+	persona := interfacePersona(event) + "\n\n" + chat.CapabilityContext()
 	if name, ok := event.Context["ningo_named_by"].(string); ok && name != "" {
 		persona += "\n\n" + fmt.Sprintf(namedByNote, name)
 	}

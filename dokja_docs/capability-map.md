@@ -137,6 +137,17 @@ Relevant implementation contracts:
 
 `message.* -> conversation route -> moderation:screen-event -> chat action`
 
+The Chat domain's versioned [capabilities.json](../dokja_domain/dokja_chat/capabilities.json)
+provides static product self-knowledge: supported features, interface entry points
+and limits. It is embedded at build time and added to each generated turn's system
+context across text, voice, streaming and plain fallback, including after history
+compaction. Music playback, editable panel comments and listening memory are
+explicit; the catalog states that current listens do not train recommendations
+or supply song-comment context. This describes implementation, without asserting
+live availability, granting chat execution tools or confirming an operation.
+Update the catalog alongside feature changes and rebuild the orchestrator;
+private account facts remain in the separately scoped owner configuration.
+
 Discord replies carry a bounded excerpt of the referenced message through the
 bridge as optional `replyToContent`, mapped to `context.reply_to_content`. The
 chat handler includes it as quoted user context rather than a system instruction,
