@@ -96,7 +96,7 @@ test("the queue can be read from anywhere, and the volume is sent as typed", asy
   assert.equal(sent.at(-1)?.content, "40");
 });
 
-test("a track that ends is reported from the channel of the last command, and what comes next plays", async () => {
+test("a track that ends is reported from the shared panel channel, and what comes next plays", async () => {
   const sent: Sent[] = [];
   const fake = fakeVoice("voice1");
   const list = commands(fake.voice, {
@@ -143,7 +143,8 @@ test("the panel is posted with the first song, edited as the queue changes, and 
   const pressed: string[] = [];
   await pause.handle({ customId: PANEL.pause, userId: "u1", channelId: "text1", messageId: "panel1", guildId: "g1",
     reply: async (message: any) => { pressed.push(message.content); }, update: async () => {}, showModal: async () => {} });
-  assert.deepEqual(pressed, ["Paused."], "the button answers only the person who pressed it");
+  assert.equal(pause.defer, true, "the runtime acknowledges before applying the control");
+  assert.deepEqual(pressed, [], "successful controls do not add another message");
   assert.equal(fake.posted.length, 1, "the panel is edited, not posted again");
   assert.match(fake.edited.at(-1)!.message.embeds[0].title, /Paused/);
   assert.ok(fake.edited.at(-1)!.message.components.some((button: any) => button.customId === PANEL.resume));
@@ -332,4 +333,81 @@ test("history says so when there is nothing, or when memory cannot answer", asyn
   const second = context();
   await find(down, "history").handle(second.ctx);
   assert.equal(second.replies.at(-1), "The music memory is not available right now.");
+});
+
+
+test("all music command acknowledgements are private", async () => {
+  const music = createMusic({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fakeVoice("voice1").voice, locale: "en",
+    dispatch: async () => ({ reply: "", music: queue(1, 1) }),
+  });
+  for (const command of music.commands) {
+    const options: unknown[] = [];
+    const { ctx } = context({ song: "x", percent: 40, reply: async (_message, opts) => { options.push(opts); } });
+    await command.handle(ctx);
+    assert.deepEqual(options, [{ ephemeral: true }], command.name);
+  }
+});
+
+test("queue exposes private controls without moving the shared panel or its reports", async () => {
+  const fake = fakeVoice("voice1");
+  const sent: Sent[] = [];
+  const music = createMusic({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fake.voice, locale: "en",
+    dispatch: async (eventType, request) => {
+      sent.push({ eventType, ...request });
+      if (eventType === "music.comment") return { reply: "" };
+      return { reply: "", music: queue(eventType === "music.play" ? 1 : 2, 1) };
+    },
+  });
+  await music.commands.find(command => command.name === "play")!.handle(context({ song: "x" }).ctx);
+  let privateQueue: any;
+  await music.commands.find(command => command.name === "queue")!.handle(context({
+    channelId: "text2", userId: "u2", updateReply: async message => { privateQueue = message; },
+  }).ctx);
+  assert.equal(fake.posted.length, 1);
+  assert.ok(fake.edited.every(panel => panel.channelId === "text1"));
+  assert.match(privateQueue.content, /Monalisa/);
+  assert.ok(privateQueue.components.some((button: any) => button.customId === PANEL.skip));
+  fake.hooks().onEnded(1);
+  await new Promise(resolve => setImmediate(resolve));
+  const ended = sent.find(event => event.eventType === "music.ended")!;
+  assert.equal(ended.channelId, "text1");
+  assert.equal(ended.userId, "u1", "a private inspection does not replace the command origin");
+});
+
+test("private queue buttons refresh their snapshot silently and keep shared controls in place", async () => {
+  const fake = fakeVoice("voice1");
+  let version = 0;
+  const music = createMusic({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fake.voice, locale: "en",
+    dispatch: async eventType => eventType === "music.comment" ? { reply: "" }
+      : { reply: "", music: { ...queue(++version, 1), paused: eventType === "music.pause" } },
+  });
+  await music.commands.find(command => command.name === "play")!.handle(context({ song: "x" }).ctx);
+  const replies: unknown[] = [];
+  const updates: any[] = [];
+  const pause = music.buttons.find(button => button.customId === PANEL.pause)!;
+  assert.equal(pause.defer, true);
+  await pause.handle({ customId: PANEL.pause, userId: "u2", channelId: "text2", messageId: "private-queue", guildId: "g1",
+    reply: async message => { replies.push(message); }, update: async message => { updates.push(message); }, showModal: async () => {} });
+  assert.deepEqual(replies, []);
+  assert.equal(fake.posted.length, 1);
+  assert.ok(fake.edited.every(panel => panel.channelId === "text1"));
+  assert.ok(updates[0].components.some((button: any) => button.customId === PANEL.resume));
+});
+
+test("a rejected panel control still explains the problem privately", async () => {
+  const music = createMusic({
+    orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fakeVoice("voice1").voice, locale: "en",
+    dispatch: async () => ({ reply: "", music: { ok: false, code: "nothing_playing" } }),
+  });
+  const replies: any[] = [];
+  await music.buttons.find(button => button.customId === PANEL.skip)!.handle({
+    customId: PANEL.skip, userId: "u1", channelId: "text1", messageId: "panel1", guildId: "g1",
+    reply: async message => { replies.push(message); }, update: async () => { assert.fail("a refusal must not replace the panel"); }, showModal: async () => {},
+  });
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].ephemeral, true);
+  assert.match(replies[0].content, /Nothing is playing/);
 });

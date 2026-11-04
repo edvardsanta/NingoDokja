@@ -45,17 +45,22 @@ adapter plays what it says, ignoring a reply older than the last one it applied.
 - When a track ends, or cannot start, the adapter sends `music.ended` with its entry and plays
   what the reply says next. If the voice connection is gone, it sends `music.stop`.
 - `/play` needs the person in a voice channel; while music plays, the controls need them in
-  Ningo's voice channel. `/queue` works from anywhere allowed.
+  Ningo's voice channel. `/queue` works from anywhere allowed and shows a private queue
+  snapshot with the same control buttons. Using those buttons still requires the proper voice
+  channel; a private read does not move the shared panel.
+- **Quiet responses.** Music slash-command acknowledgements, results and refusals are private.
+  Successful panel-button presses are acknowledged immediately and update the existing panel
+  without another confirmation message. Failures still receive a private explanation.
 - Ningo's speech pauses the music and resumes it after, unless the queue itself was paused. The
   radio is refused while a queue plays, and `/play` stops a radio that is playing.
 - Only Discord plays the queue: a change made elsewhere (desktop, CLI) is heard at the next
   Discord command or track end.
-- **The panel.** When a song starts, Ningo posts one message in the channel of the last music
-  command: a card with the song, who asked for it, the volume, how many wait and the song's cover
-  beside it (when its source gives one), with Pause/Resume, Skip,
+- **The panel.** When a queue starts, Ningo posts one message in that command's channel:
+  a card with the song, who asked for it, the volume, how many wait and the song's cover beside it (when its source gives one), with Pause/Resume, Skip,
   Stop and volume −10/+10 buttons. It is edited as the queue changes, never posted again for the
-  same queue, and loses its buttons when the queue ends. Buttons follow the commands' rule and
-  answer only the person who pressed.
+  same queue, and loses its buttons when the queue ends. Commands from other channels keep
+  this shared panel in place. A private `/queue` snapshot refreshes when its controls are used;
+  use `/queue` again for a fresh snapshot after other people change the queue.
 - **`/history`** shows a person the last songs they asked for and how each ended, only to them.
   Each song is kept in Memory for the person who asked for it, with no time limit.
 - **A remark on the song.** On about one song in three, from the first, the adapter's

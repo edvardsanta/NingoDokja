@@ -9,6 +9,8 @@ import { parseComment, parseQueueState, type QueueState } from "./reconcile.js";
 
 type Dispatch = (eventType: string, request: { content: string; userId: string; channelId: string; guildId: string }) => Promise<OrchestratorReply>;
 
+type MusicResult = { text: string; state?: QueueState; music?: unknown };
+
 export type MusicFeature = { commands: DiscordSlashCommand[]; buttons: DiscordButtonAction[] };
 
 // The step the panel's volume buttons take, in percent.
@@ -16,8 +18,8 @@ const VOLUME_STEP = 10;
 
 // Music in a voice channel. The orchestrator keeps the queue and its rules; each reply carries the
 // queue, which the voice controller plays. Who may control it: anyone in Ningo's voice channel
-// while music plays (owner, 2026-10-26); /play from elsewhere is refused. A panel in the channel of
-// the last command shows what plays, with buttons that work like the commands.
+// while music plays (owner, 2026-10-26); /play from elsewhere is refused. One shared panel stays
+// in the channel where the queue began; /queue exposes its controls privately.
 export function createMusic(params: {
   orchestratorEndpoint: string;
   orchestratorTimeoutMs: number;
@@ -34,8 +36,8 @@ export function createMusic(params: {
       params.orchestratorTimeoutMs,
       buildBridgePayload({ eventType, ...request, messageId: randomUUID(), entryKind: "command" }),
     ));
-  // Where a server's last music command came from: track-ended reports go back through it, so they
-  // pass the same inbound checks (the server and its allowed channels), and the panel lives there.
+  // The shared panel's channel and last controller: track-ended reports return through this
+  // authorized origin. Private queue/history reads do not change it.
   const lastCommand = new Map<string, { channelId: string; userId: string }>();
   // The panel of each server: one message, edited as the queue changes.
   const panels = new Map<string, { channelId: string; messageId: string }>();
@@ -120,17 +122,28 @@ export function createMusic(params: {
     return undefined;
   };
 
-  const run = async (guildId: string, userId: string, channelId: string, eventType: string, content: string) => {
-    // Asking for one's own songs is no music command: the panel stays where it is.
-    if (eventType !== "music.history") lastCommand.set(guildId, { channelId, userId });
+  const queueControls = (music: unknown, state: QueueState): DiscordReply => {
+    const panel = panelMessage(state, locale);
+    return {
+      content: musicReplyText(locale, "music.queue", music, ""),
+      components: typeof panel === "string" ? [] : panel.components,
+    };
+  };
+
+  const run = async (guildId: string, userId: string, channelId: string, eventType: string, content: string): Promise<MusicResult> => {
+    // Reads do not relocate the panel. An active queue keeps its original channel;
+    // each request still goes through inbound checks for the channel it came from.
+    if (eventType !== "music.history" && eventType !== "music.queue") {
+      lastCommand.set(guildId, { channelId: panels.get(guildId)?.channelId ?? channelId, userId });
+    }
     const reply = await dispatch(eventType, { content, userId, channelId, guildId });
     const text = musicReplyText(locale, eventType, reply.music, reply.reply);
     try {
       await apply(guildId, userId, reply.music);
     } catch (error) {
-      return `${say(locale, "couldNotPlay")}${error instanceof Error ? ` ${error.message}` : ""}`;
+      return { text: `${say(locale, "couldNotPlay")}${error instanceof Error ? ` ${error.message}` : ""}` };
     }
-    return text;
+    return { text, state: parseQueueState(reply.music), music: reply.music };
   };
 
   const command = (
@@ -140,7 +153,7 @@ export function createMusic(params: {
     options: any[] = [],
     content: (context: DiscordCommandContext) => string = () => "",
     needsVoice = true,
-    ephemeral = false,
+    ephemeral = true,
   ): DiscordSlashCommand => ({
     name,
     description,
@@ -160,7 +173,8 @@ export function createMusic(params: {
           await context.updateReply(refused);
           return;
         }
-        await context.updateReply(await run(context.guildId, context.userId, context.channelId, eventType, content(context)));
+        const result = await run(context.guildId, context.userId, context.channelId, eventType, content(context));
+        await context.updateReply(eventType === "music.queue" && result.state ? queueControls(result.music, result.state) : result.text);
       } catch (error) {
         console.error(`[dokja-discord] command ${name} failed`, error);
         await context.updateReply(error instanceof Error ? error.message : say(locale, "failed"));
@@ -168,11 +182,13 @@ export function createMusic(params: {
     },
   });
 
-  // The panel's buttons do what the commands do, answering only the person who pressed.
+  // The runtime acknowledges button presses immediately. Success edits the existing
+  // panel without another message; refusals and errors remain private.
   const button = (customId: string, label: string, eventType: string, content: (guildId: string) => string = () => "", style: DiscordButtonAction["style"] = "secondary"): DiscordButtonAction => ({
     customId,
     label,
     style,
+    defer: true,
     async handle(context: DiscordButtonContext) {
       try {
         const refused = await refusal(context.guildId, context.userId, eventType, true);
@@ -180,8 +196,18 @@ export function createMusic(params: {
           await context.reply({ content: refused ?? say(locale, "onlyServer"), ephemeral: true });
           return;
         }
-        const text = await run(context.guildId, context.userId, context.channelId, eventType, content(context.guildId));
-        await context.reply({ content: text, ephemeral: true });
+        const shared = panels.get(context.guildId);
+        const isSharedPanel = shared?.messageId === context.messageId && shared.channelId === context.channelId;
+        const result = await run(context.guildId, context.userId, context.channelId, eventType, content(context.guildId));
+        if (!result.state) {
+          await context.reply({ content: result.text, ephemeral: true });
+          return;
+        }
+        // /queue exposes a private snapshot with the same controls. Keep that
+        // snapshot current too; the shared panel was already updated by apply().
+        if (!isSharedPanel) {
+          await context.update(queueControls(result.music, result.state));
+        }
       } catch (error) {
         console.error(`[dokja-discord] button ${customId} failed`, error);
         await context.reply({ content: error instanceof Error ? error.message : say(locale, "failed"), ephemeral: true });
