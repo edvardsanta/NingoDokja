@@ -219,6 +219,16 @@ During debates, the shared persona retains its existing sparring-partner guidanc
 advance a conceded point into a relevant unresolved tension or clearly hypothetical
 thought experiment, without false disagreement or prolonging practical tasks and
 closed conversations.
+In casual exchanges, the shared persona favors confidence, irony and irreverence,
+including dry sarcasm and playful mockery grounded in the current conversation.
+A comeback can stand alone without an argument, explanatory lesson or reassurance;
+humor is optional, and arrogance should show through judgment and timing rather
+than declarations of superiority. Intellectual depth remains central: precise
+distinctions and connections across literature, philosophy, history, science,
+music and art support both humor and serious reasoning, with accurate references
+instead of invented quotations or decorative name-dropping.
+Regression tests verify this guidance reaches
+conversation, streaming and plain generation; live comedic quality needs observation.
 Only the authenticated owner's current turn receives a more supportive debate note.
 For that speaker, it develops the strongest reasonable argument, lets genuine
 agreement stand, makes further objections optional, and avoids loaded questions or
