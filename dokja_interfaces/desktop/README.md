@@ -53,6 +53,12 @@ orchestrator holds, and a refused or timed-out change says so.
 
 ## Run
 
+From the repository root, use `make start` to start the local stack (including
+PostgreSQL) and open Desktop, or `make desktop` to open only the app. Both install
+Desktop dependencies from the lockfile if absent. Existing configuration is
+required. Use `ENV_FILE=.env.prod` to select that file for both Compose and Desktop.
+The equivalent manual Desktop commands are:
+
 ```bash
 cd dokja_interfaces/desktop
 pnpm install
