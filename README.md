@@ -97,10 +97,23 @@ orchestrator endpoints do not provide these container controls.
 From the repository root:
 
 ```sh
-cd dokja_interfaces/desktop
-pnpm install --frozen-lockfile
-pnpm start
+make start
 ```
+
+`make start` starts PostgreSQL, waits for it to accept connections, starts the
+local application services, then builds and opens Desktop. Desktop dependencies
+are installed from the lockfile if `node_modules` is absent. Existing credentials,
+provider configuration and the journal namespace must already be configured; this
+command does not initialize or migrate data. First startup may build images or
+download models. It does not wait for every application service to become ready;
+inspect readiness in System.
+
+Use `make desktop` to open only the app, `make up` for the stack, `make status`
+for container states, and `make logs` to follow service logs. These commands use
+`.env` and the lite stack by default; `make start ENV_FILE=.env.prod` selects a
+different credential file for both Compose and Desktop while retaining the lite
+stack. Desktop's module controller supports only the lite stack. Closing Desktop
+leaves the services running. Run `make help` for the available commands.
 
 The build includes the host runtime controller. Opening System starts or
 reconnects to that background daemon; it does not start all application modules.
@@ -108,7 +121,7 @@ reconnects to that background daemon; it does not start all application modules.
 1. Open **System** and inspect the module states.
 2. Use **Settings** for supported non-secret configuration, including model
    choices and messaging preferences. Credentials remain local configuration.
-3. Start the application orchestrator and the modules needed for your task.
+3. Start any additional modules needed for your task.
    Starting a module brings up its required dependencies; readiness is checked.
 4. Open Knowledge, Memory or Messages once their backing modules are ready.
 
