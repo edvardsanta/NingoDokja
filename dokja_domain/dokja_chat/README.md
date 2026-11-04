@@ -1,6 +1,7 @@
 # Chat context and presentation policy
 
-The Go package plans formula presentation for the orchestrator's chat handler.
+The Go package owns conversation context, identity and presentation policy for
+the orchestrator's chat handler.
 The existing Python files remain the separate legacy chat adapter.
 
 For a narrow set of direct Portuguese/English identity questions, the domain can
@@ -44,3 +45,22 @@ The orchestrator calls the rendering service and sends validated images through
 the interface. Unsupported expressions or unavailable rendering preserve text.
 
 Run `go test ./...` inside this module.
+
+`capabilities.json` is a versioned, public catalog of implemented product
+abilities, their interface entry points and practical limits. The Go package
+embeds it at build time and supplies a compact `CapabilityContext()` independently
+of conversational history. Update the catalog with feature changes and rebuild
+the orchestrator to apply it; it contains no private accounts, credentials or
+runtime endpoints.
+
+The orchestrator adds this context to every generated chat turn, including voice,
+streamed replies and plain-generator fallbacks, and reinjects it after history
+compaction. It explains music commands, editable song comments, listening history,
+voice, reading, saved knowledge, meme examples, explicit facts and message delivery.
+In particular, playback outcomes are automatic observations: current music
+history neither trains recommendations nor drives song comments.
+
+The catalog describes implementation, so a listed feature can still be disabled
+or unconfigured. It grants no chat tools or permissions and cannot confirm that an
+action ran. Tests validate the bundled catalog and its delivery to inference;
+model compliance still requires behavioral evaluation.
