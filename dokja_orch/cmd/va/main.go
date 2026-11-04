@@ -237,7 +237,8 @@ func main() {
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
 		}).WithArchive(archive).WithFacts(facts).WithRunningSends(runningSends),
-		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience),
+		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience).
+			WithTagEvaluation(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),

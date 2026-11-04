@@ -516,7 +516,10 @@ the same action after adding their own explicit presentation contract.
 Manual tagging writes an explicit label to Knowledge. Scheduled/manual delivery
 can append a relevant learned suggestion. Experience integration starts background
 work to obtain an acceptance prediction and record the suggestion; later explicit
-tagging resolves the corresponding experience.
+tagging resolves the corresponding experience. Desktop tag saves also evaluate
+a shadow candidate before storing the new Knowledge label, then record and
+resolve it only after the save succeeds. Missing candidates create no scored
+example; historical predictions are preserved.
 
 Memory owns the observation identity, action name, bounded context/evidence,
 copied prediction probabilities and feedback request preparation. Orchestration

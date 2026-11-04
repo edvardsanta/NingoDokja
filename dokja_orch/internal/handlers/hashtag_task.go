@@ -71,7 +71,7 @@ func (t *HashtagTask) Suggest(ctx context.Context, event core.Event, url string)
 		return HashtagAttempt{}
 	}
 	steps := []core.TaskStep{
-		{Name: "read", Domain: core.DomainMeme, Action: "read-meme-text", Run: t.read(url)},
+		{Name: "read", Domain: core.DomainMeme, Action: "read-meme-text", Run: t.read(url, resultString(event.Payload, "text"))},
 		{Name: "retrieve", Domain: core.DomainKnowledge, Action: "search-knowledge", Run: t.retrieve},
 		{Name: "select", Domain: core.DomainMeme, Action: "select-hashtag", Run: selectHashtag},
 	}
@@ -104,9 +104,9 @@ func (t *HashtagTask) Suggest(ctx context.Context, event core.Event, url string)
 	return attempt
 }
 
-func (t *HashtagTask) read(url string) core.TaskStepFunc {
+func (t *HashtagTask) read(url, explicit string) core.TaskStepFunc {
 	return func(ctx context.Context, in core.StepInput) (core.StepResult, error) {
-		text, err := t.hashtags.text(ctx, url, "")
+		text, err := t.hashtags.text(ctx, url, explicit)
 		if err != nil {
 			return core.StepResult{Disposition: core.StepFail, Reason: "media_text_unavailable"}, nil
 		}

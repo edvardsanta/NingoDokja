@@ -33,9 +33,23 @@ match types remain aliases to the domain types.
 Explicit tagging prepares an observation addressed to the same experience.
 Memory's existing resolution policy compares it with the stored detail,
 case-insensitively, to produce accepted or replaced. Feedback does not create
-a missing experience and does not edit Knowledge examples. The orchestrator
-retains the existing successful-tag and successful-task-delivery call sites;
-this extraction does not change delivery eligibility or feedback timing.
+a missing experience and does not edit Knowledge examples.
+
+Desktop tag saves now run the existing suggestion task before the new label is
+stored in Knowledge. This is a shadow evaluation: it never replaces the
+operator's chosen tag. The task uses supplied text when available; otherwise its
+OCR text is reused for the save. After a successful save, one background worker
+records the frozen candidate and then resolves it against the normalized tag.
+A failed save records nothing. Missing predictions remain unscored; an absent
+candidate only resolves a previously recorded suggestion, if one exists.
+Repeated media retain the existing immutable reference and first verdict.
+Previewing a suggestion still records nothing. Delivery keeps its existing
+successful-send recording path.
+
+This closes the gap where daily desktop tagging updated Knowledge but feedback
+found no prior experience to resolve. The scorecard still evaluates only
+`hashtag.suggest`, not music listens or all knowledge examples. Historical
+probabilities are never backfilled or recomputed after the answer is known.
 
 Compatibility review: no event envelope, route, action, provider contract,
 response field, command, SQLite schema, environment variable, Compose service,
