@@ -5,6 +5,7 @@ import { useTranslate } from "../i18n/context.js";
 import { DigestCard } from "./digest.js";
 import { DocumentView } from "./document_view.js";
 import { Drawer } from "./drawer.js";
+import { SourceApplicationView } from "./source_application.js";
 import { KnowledgeCard } from "./knowledge.js";
 import { AddToBase } from "./knowledge_add.js";
 import { LibraryContext, useLibraryState } from "./library_context.js";
@@ -58,11 +59,12 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
     closeLabel: t("view_close_named", { title: document.title }),
     onClose: () => library.close(document.id),
   }));
-  const { tabs, panels, currentLabel, currentItem, show, showItem } = useViewTabs(
+  const { tabs, panels, currentLabel, currentView, currentItem, show, showItem } = useViewTabs(
     t("nav_library"),
     [
       { id: "documents", label: t("knowledge_view_documents") },
       { id: "sources", label: t("knowledge_view_sources") },
+ {id:"application", label:t("knowledge_view_application")},
     ],
     items,
   );
@@ -118,7 +120,7 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
             </p>
           )}
           {panels(
-            (id) => (id === "documents" ? <KnowledgeCard transport={transport} /> : <DigestCard transport={transport} />),
+            (id) => (id === "documents" ? <KnowledgeCard transport={transport} /> : id==="application" ? <SourceApplicationView transport={transport} active={currentView==="application"}/> : <DigestCard transport={transport} />),
             (id) => {
               const document = library.documents.find((each) => each.id === id);
               return document && (

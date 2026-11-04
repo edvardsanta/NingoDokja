@@ -433,7 +433,9 @@ host binding can now journal native pinned source-read receipts through the
 preparation route; see [source receipts](knowledge-source-receipts.md). This
 proves source validation only. The [native source supervisor](knowledge-source-steering.md)
 adds revision-bound authenticated-host controls, late-receipt isolation and aggregate
-bounds. Public control admission, durable supervisor recovery, runtime activation,
+bounds. The [Desktop Apply view and dedicated operator RPC](desktop-source-supervision.md)
+now expose this source-only workflow through explicit journal configuration.
+Durable supervisor recovery, general public admission, production rollout,
 actual method outcomes and learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
 [provider proposal bounds](knowledge-provider-proposals.md), and

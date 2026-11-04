@@ -5,7 +5,9 @@ package applicationjournal
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -109,4 +111,86 @@ func TestPostgresSupervisedRedirectRetainsOriginalAttempt(t *testing.T) {
 	if snapshot.Settlements[0].WorkspaceAttemptRef == snapshot.Settlements[1].WorkspaceAttemptRef {
 		t.Fatal("redirect reused the old workspace attempt")
 	}
+}
+
+func TestPostgresDesktopRPCSteeringAndCredentialBoundary(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	db := database(t)
+	store, err := Initialize(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	started := make(chan struct{})
+	handler := handlers.NewKnowledgeDomainHandler(nativeSteeringFixture{started: started, release: release})
+	host := handlers.NewDesktopSourceApplications(ctx, handler, store, func() bool { return true })
+	handler.WithSourceApplications(host)
+	token := strings.Repeat("t", 40)
+	service := core.DefaultService(handler).WithSourceSupervisionToken(token)
+	request := func(kind string, payload map[string]any) map[string]any {
+		t.Helper()
+		result, err := service.ProcessWithResult(ctx, core.Event{Source: core.SourceDesktop, Type: "knowledge.application.supervision." + kind, Payload: payload, Context: map[string]any{"source_supervision_token": token, "is_owner": true}, User: core.EventUser{ID: "untrusted-identity"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, _ := json.Marshal(result)
+		if strings.Contains(string(raw), token) {
+			t.Fatal("credential leaked through RPC result")
+		}
+		return result.Result["knowledge"].(map[string]any)
+	}
+	caps := request("status", map[string]any{})
+	pin := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("Synthetic source validation fixture.")))
+	application := map[string]any{"contract": knowledge.ApplicationContract, "goal": "Validate the selected source", "constraints": []string{}, "sources": []any{map[string]any{"source_id": "source:old", "text_version": pin}}}
+	first := request("start", map[string]any{"operation_ref": "start:rpc", "host_ref": caps["host_ref"], "application": application})
+	ref := first["application_ref"].(string)
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("native read did not begin")
+	}
+	pause := map[string]any{"application_ref": ref, "operation_ref": "control:pause", "expected_revision": 1, "action": "pause", "reason": "Inspect the current approach"}
+	snapshot := request("control", pause)
+	if snapshot["state"] != "paused" {
+		t.Fatalf("pause did not reach the real supervisor: %v", snapshot)
+	}
+	replay := request("control", pause)
+	if replay["control_revision"] != snapshot["control_revision"] {
+		t.Fatal("duplicate control advanced the revision")
+	}
+	unblock()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshot = request("status", map[string]any{"application_ref": ref})
+		if snapshot["pending"].(int) == 0 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	candidate := map[string]any{"contract": knowledge.ApplicationContract, "goal": "Check a corrected source", "constraints": []string{}, "sources": []any{map[string]any{"source_id": "source:new"}}}
+	checked := request("preview", map[string]any{"application_ref": ref, "expected_revision": 2, "application": candidate})
+	if checked["status"] != "prepared" {
+		t.Fatal("paused preview did not use the real source port")
+	}
+	snapshot = request("status", map[string]any{"application_ref": ref})
+	if snapshot["read_attempts"] != 2 || snapshot["control_revision"] != uint64(2) {
+		t.Fatalf("preview escaped application budget or advanced control: %v", snapshot)
+	}
+	receipts := snapshot["receipts"].([]any)
+	if len(receipts) != 1 || receipts[0].(map[string]any)["confirmed"] != true || receipts[0].(map[string]any)["source_id"] != "source:old" {
+		t.Fatalf("Desktop projection lost actual native receipt: %v", snapshot)
+	}
+	var episode string
+	if err := db.QueryRow(`SELECT episode_ref FROM dokja_application_journal.episodes WHERE attempt_ref=$1`, receipts[0].(map[string]any)["attempt_ref"]).Scan(&episode); err != nil {
+		t.Fatal(err)
+	}
+	recorded, found, err := store.Read(ctx, "desktop:operator", episode)
+	if err != nil || !found || recorded.Attempt.AuthorizationRef != "desktop:source-read" {
+		t.Fatalf("missing private operator receipt: %+v %v", recorded, err)
+	}
+	request("control", map[string]any{"application_ref": ref, "operation_ref": "control:cancel", "expected_revision": 2, "action": "cancel"})
 }

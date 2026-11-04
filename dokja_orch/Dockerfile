@@ -14,6 +14,7 @@ COPY dokja_store /src/dokja_store
 WORKDIR /src/dokja_orch
 
 RUN GOCACHE=/tmp/go-build go build -o /tmp/va ./cmd/va
+RUN GOCACHE=/tmp/go-build go build -o /tmp/source-journal-init ./cmd/source-journal-init
 
 FROM docker.io/debian:bookworm-slim
 
@@ -25,6 +26,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY --from=builder /tmp/va /app/va
+COPY --from=builder /tmp/source-journal-init /app/source-journal-init
 
 EXPOSE 5555 5558 8091
 

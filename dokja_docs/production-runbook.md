@@ -1440,3 +1440,31 @@ The script manages its own disposable database and test-only
 `DOKJA_JOURNAL_TEST_DSN` / `DOKJA_JOURNAL_TEST_PHASE`; it does not read the operator
 environment files or migrate application stores. It checks controlled restart
 and replay; backup/restore and live receipt verification remain untested.
+
+## Optional Desktop source supervision
+
+The Library Apply view uses the source-only supervisor. Configure matching
+`DOKJA_SOURCE_SUPERVISION_TOKEN` values in the orchestrator and Desktop main;
+use a separate random operator credential of 32–512 characters. Set
+`DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` only for the orchestrator/initializer,
+including the database's explicit TLS policy. Both settings are optional and
+unset by default; partial configuration fails explicitly.
+
+The dev, lite and prod stacks project both variables into the orchestrator.
+Initialize the journal namespace with the explicit `source-journal-init` command
+before restarting the enabled orchestrator. Production images include
+`/app/source-journal-init`; dev/lite can run `go run ./cmd/source-journal-init`.
+Startup uses the existing namespace and refuses uninitialized/unsupported state.
+See [Desktop source supervision](desktop-source-supervision.md) for the exact
+Compose initialization and Desktop launch commands.
+
+This configuration does not migrate SQLite or Knowledge data. Native receipts
+persist; supervisor/control state is process-local. A new process invalidates
+old start retries, and the UI requires a new explicit preparation. Keep the
+Desktop endpoint local or use a secure local tunnel. Durable control recovery,
+unknown-write reconciliation and coordinated deletion remain pending.
+
+To disable the interface, cancel active preparations where possible and remove
+both orchestrator supervision settings on the next approved rollout. Retain the
+journal data; disabling this optional host does not drop tables or change its
+schema. Restart alone does not settle an unconfirmed old receipt.

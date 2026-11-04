@@ -1,3 +1,5 @@
+import { sourceApplication } from "../shared/source_application.js";
+import { sourceStart, sourceStatus, sourceControl, sourcePreview, sourceSnapshot } from "./source_application.js";
 import { passageLocator, originalReading } from "../shared/passages.js";
 import { observerSnapshot } from "../shared/realtime.js";
 import { createHash } from "node:crypto";
@@ -645,7 +647,7 @@ function documentText(value: unknown): { text?: string; truncated?: boolean } {
 function knowledgeDocuments(body: Record<string, unknown>): KnowledgeDocuments {
   return {
     documents: records(body.documents, (document) => ({
-      id: shorten(text(document.source_id), 200),
+      id: text(document.source_id).length<=240 ? text(document.source_id) : "",
       title: shorten(text(document.title), 300),
       kind: shorten(text(document.kind), 32),
       reference: shorten(text(document.source_ref), 300),
@@ -720,6 +722,11 @@ function reindexResult(body: Record<string, unknown>): ReindexResult {
 const INTERNAL_KINDS = ["meme_hashtag"] as const;
 
 export const ACTIONS: Record<ActionType, ActionDefinition> = {
+ "knowledge.application.supervision.preview": {payload:(raw)=>{const application=sourceApplication(raw.application,false);return application && typeof raw.application_ref==="string" && /^[A-Za-z0-9._:-]{1,240}$/.test(raw.application_ref) && Number.isSafeInteger(raw.expected_revision) && Number(raw.expected_revision)>0 ? {application_ref:raw.application_ref,expected_revision:raw.expected_revision,application} : undefined;},project:(result)=>inDomain(result,"knowledge",sourcePreview)},
+ "knowledge.application.prepare": {payload:(raw)=>sourceApplication(raw,false), project:(result)=>inDomain(result,"knowledge",sourcePreview)},
+ "knowledge.application.supervision.start": {payload:sourceStart,project:(result)=>inDomain(result,"knowledge",sourceSnapshot)},
+ "knowledge.application.supervision.status": {payload:sourceStatus,project:(result)=>inDomain(result,"knowledge",sourceSnapshot)},
+ "knowledge.application.supervision.control": {payload:sourceControl,project:(result)=>inDomain(result,"knowledge",sourceSnapshot)},
   "communications.channels": {
     payload: noPayload,
     project: (result) => inDomain(result, "communications", (body) => ({

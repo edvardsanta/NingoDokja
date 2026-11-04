@@ -477,6 +477,14 @@ export function createFakeTransport(delayMs = 400): Transport {
           entry.feedback = { code: "recorded", message: "" };
           return ok({ found: true, resolved: true, outcome: entry.outcome });
         }
+        case "knowledge.application.supervision.status":
+          return {ok:false,error:{code:"unavailable",message:"Source supervision requires the configured Desktop shell."}};
+        case "knowledge.application.prepare": {
+          const chosen=Array.isArray(payload?.sources) ? payload.sources : [];
+          const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(FAKE_TEXT));
+          const pin="sha256:"+Array.from(new Uint8Array(digest),(byte)=>byte.toString(16).padStart(2,"0")).join("");
+          return ok({status:"prepared",application:{...payload,sources:chosen.map((s)=>({source_id:String(s.source_id),text_version:pin,title:documents.find((d)=>d.id===s.source_id)?.title ?? String(s.source_id)}))}});
+        }
         case "knowledge.status":
           return ok({
             ...KNOWLEDGE_STATUS,

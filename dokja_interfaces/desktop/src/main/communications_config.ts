@@ -18,3 +18,12 @@ export function communicationsToken(env: NodeJS.ProcessEnv, root?: string, envFi
     throw new Error("Could not read the desktop communications env file.");
   }
 }
+
+export function sourceSupervisionToken(env: NodeJS.ProcessEnv, root?: string, envFile?: string): string | undefined {
+ const key = "DOKJA_SOURCE_SUPERVISION_TOKEN";
+ if (Object.hasOwn(env,key)) return env[key];
+ const path=envFile ?? (root ? join(root,".env") : undefined);
+ if (!path) return undefined;
+ try { return parseEnv(readFileSync(path,"utf8"))[key]; }
+ catch(error) { if (!envFile && (error as NodeJS.ErrnoException).code==="ENOENT") return undefined; throw new Error("Could not read the Desktop supervision env file."); }
+}

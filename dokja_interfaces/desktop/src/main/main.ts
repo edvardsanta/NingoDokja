@@ -12,7 +12,7 @@ import {
 import { RuntimeClient, runtimeRoot, runtimeStateHome } from "./runtime_client.js";
 import { DEFAULT_ENDPOINT } from "./config.js";
 import { localPostMediaOrigin, parseConfig } from "./config.js";
-import { communicationsToken } from "./communications_config.js";
+import { communicationsToken, sourceSupervisionToken } from "./communications_config.js";
 import { isTrustedSender } from "./guards.js";
 import { downloadMedia, fetchMedia } from "./media_fetch.js";
 import { POST_SCHEME } from "../shared/posts.js";
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
   const postMediaOrigin = config.postMediaOrigin ?? localPostMediaOrigin(root);
   const orchestrator = new OrchestratorClient({ endpoint: config.endpoint,
-    communicationsToken: communicationsToken(process.env, root, config.envFile) });
+    sourceSupervisionToken: sourceSupervisionToken(process.env, root, config.envFile), communicationsToken: communicationsToken(process.env, root, config.envFile) });
   const runtimeEnabled = config.endpoint === DEFAULT_ENDPOINT && root !== undefined && process.platform !== "win32";
   const runtime = new RuntimeClient({ root, enabled:runtimeEnabled, stateHome:runtimeStateHome(process.env, app.getPath("home")), legacyStateHome:app.getPath("userData"), binary:join(distDir,"runtime","dokja-runtime") });
   // A Talk turn is streamed through the orchestrator's bridge when its address and credential are set;

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -501,4 +502,51 @@ func TestSourceSupervisorBoundsEventCorrelationAndDropsCandidateContext(t *testi
 	if _, err := sourceSupervisionEvent(event); err == nil {
 		t.Fatal("unbounded event correlation metadata accepted")
 	}
+}
+
+func TestSourceSupervisorCandidateChecksShareActiveBudget(t *testing.T) {
+	release := make(chan struct{})
+	source := &steeringSources{block: release, started: make(chan struct{})}
+	s := steeringSupervisor(t, source, newSourceJournalStore(), func(o *SourceSupervisorOptions) { o.Limits.Reads = 3 })
+	steeringStartBlocked(t, source, s)
+	if _, err := s.Control(steeringOwner(), knowledge.SourceControl{Action: "pause", OperationRef: "control:pause", ExpectedRevision: 1}); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	steeringWait(t, s, func(s SourceSupervisorSnapshot) bool { return s.Pending == 0 })
+	request := mustSteeringRequest(t)
+	for i := range request.Sources {
+		request.Sources[i].TextVersion = ""
+	}
+	raw, _ := json.Marshal(request)
+	var payload map[string]any
+	_ = json.Unmarshal(raw, &payload)
+	preview, err := s.Preview(steeringOwner(), 2, payload)
+	if err != nil || preview["status"] != "prepared" {
+		t.Fatalf("candidate check failed: %v %v", preview, err)
+	}
+	state, _ := s.Status(steeringOwner())
+	if state.ReadAttempts != 3 || state.ControlRevision != 2 || state.PlanRevision != 1 || len(state.Settlements) != 1 || state.State != "paused" {
+		t.Fatalf("candidate check reset budget, accepted a plan or manufactured receipts: %+v", state)
+	}
+	if _, err := s.Control(steeringOwner(), knowledge.SourceControl{Action: "resume", OperationRef: "control:resume", ExpectedRevision: 2}); err != nil {
+		t.Fatal(err)
+	}
+	state = steeringWait(t, s, func(s SourceSupervisorSnapshot) bool { return s.State == "exhausted" })
+	if len(source.callList()) != 3 || state.Prepared != nil {
+		t.Fatal("candidate reads bypassed the active read ceiling")
+	}
+}
+func TestSourceSupervisorCandidateCheckRequiresPauseAndAuthority(t *testing.T) {
+	release := make(chan struct{})
+	source := &steeringSources{block: release, started: make(chan struct{})}
+	s := steeringSupervisor(t, source, newSourceJournalStore(), nil)
+	steeringStartBlocked(t, source, s)
+	if _, err := s.Preview(steeringOwner(), 1, steeringEvent().Payload); err == nil {
+		t.Fatal("checked a candidate while dispatch was active")
+	}
+	if _, err := s.Preview(context.Background(), 1, steeringEvent().Payload); !errors.Is(err, ErrSourceControlDenied) {
+		t.Fatal("untrusted preview admitted")
+	}
+	close(release)
 }
