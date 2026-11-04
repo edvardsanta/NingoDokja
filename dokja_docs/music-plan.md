@@ -150,7 +150,12 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
    also reports its end, so it reads as `finished` for now. `/history` shows a
    person their own last songs, only to them; the id comes from the verified
    sender, never from what was typed. Memory's own switch turns this off, and slow
-   or stopped memory never touches the music.
+   or stopped memory never touches the music. The desktop Notebook identifies
+   the requester by the stored Discord user id and labels the playback ending
+   separately. Automatic outcomes never read as the owner accepting, replacing
+   or ignoring a song; the requester is not assumed to be whoever pressed Skip.
+   Historical records need no migration. Display names are not stored in these
+   experiences.
 
 Beyond the phases, Ningo remarks on a song now and then: the Communications domain
 decides which (`CommentDue`, about one in three) and bounds the line (`CommentLine`);

@@ -102,7 +102,20 @@ const VERDICTS: Record<string, { id: MessageId; tone: string }> = {
   expired: { id: "experience_verdict_expired", tone: "off" },
 };
 
+// Music outcomes describe playback, not a verdict from the owner or the requester.
+const MUSIC_ENDINGS: Record<string, { id: MessageId; tone: string }> = {
+  finished: { id: "experience_music_finished", tone: "ok" },
+  skipped: { id: "experience_music_skipped", tone: "unchecked" },
+  stopped: { id: "experience_music_stopped", tone: "off" },
+};
+
+function musicRequester(entry: MemoryExperience): string | undefined {
+  return /^music\.listen:([0-9]{1,20})$/.exec(entry.action)?.[1];
+}
+
 function decisionOf(entry: MemoryExperience, t: ReturnType<typeof useTranslate>): string {
+  const requester = musicRequester(entry);
+  if (requester) return t("experience_decision_music", { user: requester });
   if (entry.action === "hashtag.suggest" && entry.detail) return t("experience_decision_hashtag", { tag: entry.detail });
   return entry.detail ? `${entry.action}: ${entry.detail}` : entry.action;
 }
@@ -112,7 +125,9 @@ function ExperienceRow({ entry, transport, onChanged, settled }: { entry: Memory
   const t = useTranslate();
   const { ago } = useTimes();
   const [opened, setOpened] = useState(false);
-  const verdict = entry.outcome ? VERDICTS[entry.outcome] : undefined;
+  const verdict: { id: MessageId; tone: string } | undefined = musicRequester(entry)
+    ? MUSIC_ENDINGS[entry.detail] ?? { id: "experience_music_recorded", tone: "other" }
+    : entry.outcome ? VERDICTS[entry.outcome] : undefined;
   // Two lines and the way in on the right, so a long queue of waiting verdicts stays short: what he
   // decided (and what came of it), then when and about what. What waits is the owner's to answer, so
   // its button keeps the app's own look; in the record of what is settled it is quiet.

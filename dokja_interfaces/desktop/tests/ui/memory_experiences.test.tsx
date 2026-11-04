@@ -138,3 +138,34 @@ describe("experiences read as decisions", () => {
   });
 });
 
+
+describe("music experience attribution", () => {
+  it.each([
+    { locale: "en" as const, title: "Music requested by Discord user 42", finished: "playback finished", skipped: "skipped", stopped: "stopped", ownerVerdict: /you accepted|you replaced it|you ignored it/ },
+    { locale: "pt" as const, title: "Música pedida pelo usuário do Discord 42", finished: "reprodução finalizada", skipped: "pulada", stopped: "interrompida", ownerVerdict: /você aceitou|você trocou|você ignorou/ },
+  ])("shows requester and playback status without claiming an owner's verdict in $locale", async ({locale, title, finished, skipped, stopped, ownerVerdict}) => {
+    const music = [
+      { ...entry, ref: "music:one", action: "music.listen:42", detail: "finished", outcome: "accepted" },
+      { ...entry, ref: "music:two", action: "music.listen:7", detail: "skipped", outcome: "replaced" },
+      { ...entry, ref: "music:three", action: "music.listen:42", detail: "stopped", outcome: "ignored" },
+    ];
+    const { transport } = routedTransport({ "memory.list": page(music) });
+    render(<I18nProvider locale={locale}><MemoryExperiencesPanel transport={transport}/></I18nProvider>);
+    await screen.findAllByText(title);
+    screen.getByText(finished);
+    screen.getByText(skipped);
+    screen.getByText(stopped);
+    expect(document.body.textContent).not.toMatch(ownerVerdict);
+    expect(document.body.textContent).not.toContain("music.listen:");
+    expect(screen.getByText(skipped).closest("li")?.textContent).toContain("7");
+    expect(screen.getByText(skipped).closest("li")?.textContent).not.toContain("42");
+  });
+
+  it("keeps unknown music details neutral and available for inspection", async () => {
+    const music = { ...entry, action: "music.listen:42", detail: "unknown ending", outcome: "accepted" };
+    const { transport } = routedTransport({ "memory.list": page([music]) });
+    show(transport);
+    await screen.findByText("playback recorded");
+    expect(screen.queryByText("you accepted")).toBeNull();
+  });
+});
