@@ -35,6 +35,7 @@ type SourceReadPermission struct {
 // Unconfirmed journal storage and unconfirmed reads remain explicit. This is a
 // host callback, not an event-supplied observer or a new receipt writer.
 type SourceReadSettlement struct {
+	SourceID                                                             string
 	ApplicationRef, TaskRef, WorkspaceAttemptRef, EpisodeRef, AttemptRef string
 	StateRevision, PlanRevision                                          uint64
 	Outcome                                                              string
@@ -151,7 +152,7 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 	case "validation_failed":
 		outcome = "failed"
 	}
-	settlement := SourceReadSettlement{ApplicationRef: binding.ApplicationRef, TaskRef: input.TaskID,
+	settlement := SourceReadSettlement{SourceID: selected.SourceID, ApplicationRef: binding.ApplicationRef, TaskRef: input.TaskID,
 		WorkspaceAttemptRef: input.AttemptID, EpisodeRef: key.EpisodeRef, AttemptRef: attempt.Ref,
 		StateRevision: binding.StateRevision, PlanRevision: binding.PlanRevision, Outcome: outcome, SourceBytes: sourceSize(read.Source)}
 	if binding.Settled != nil {

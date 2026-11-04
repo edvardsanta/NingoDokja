@@ -24,6 +24,7 @@ export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 
 // What the fake orchestrator says. Hand-built, never a captured reply, and seeded with what must
 // not reach the screen: a channel ID, a provider profile, a plugin name and an item address.
+export const SOURCE_SUPERVISION_TOKEN = "test-source-supervision-credential-000000";
 export const COMMUNICATIONS_TOKEN = "test-communications-token-0000000000";
 export const HOSTILE_TITLE = '<img src="x" onerror="window.__owned = 1">';
 
@@ -114,7 +115,8 @@ export async function startFakeOrchestrator(respond?: (type: string, payload: Re
     for await (const [frame] of socket) {
       const event = JSON.parse(frame?.toString() ?? "{}") as { type?: string; source?: string; payload?: Record<string, unknown>; context?: Record<string, unknown> };
       seen.push({ type: String(event.type), source: String(event.source), payload: event.payload ?? {} });
-      const answer = String(event.type).startsWith("communications.") && event.context?.communications_token !== COMMUNICATIONS_TOKEN
+      const answer = String(event.type).startsWith("knowledge.application.supervision.") && event.context?.source_supervision_token!==SOURCE_SUPERVISION_TOKEN
+ ? {status:"error",error:"source supervision access denied"} : String(event.type).startsWith("communications.") && event.context?.communications_token !== COMMUNICATIONS_TOKEN
         ? { status: "error", error: "communications access denied" } : respond?.(String(event.type), event.payload ?? {}) ?? replyFor(String(event.type), event.payload as Record<string, unknown>);
       await socket.send(JSON.stringify(answer));
     }
@@ -178,13 +180,13 @@ async function startHiddenDisplay(): Promise<{ socket: string; stop(): Promise<v
 
 // Starts the built app (run `pnpm build` first) with its own profile, against the fake
 // orchestrator, and waits for the debugging port Chromium reports.
-export async function launchApp(endpoint: string, communicationsToken = "", envFile?: string): Promise<RunningApp> {
+export async function launchApp(endpoint: string, communicationsToken = "", envFile?: string, sourceToken = ""): Promise<RunningApp> {
   const profile = await mkdtemp(join(tmpdir(), "dokja-desktop-e2e-"));
   const hidden = await startHiddenDisplay();
   const env = hidden
     ? { ...process.env, WAYLAND_DISPLAY: hidden.socket, DISPLAY: "" }
     : process.env;
-  const childEnv: NodeJS.ProcessEnv = { ...env, DOKJA_COMMUNICATIONS_TOKEN: communicationsToken };
+  const childEnv: NodeJS.ProcessEnv = { ...env, DOKJA_COMMUNICATIONS_TOKEN: communicationsToken, DOKJA_SOURCE_SUPERVISION_TOKEN: sourceToken };
   if (envFile) delete childEnv.DOKJA_COMMUNICATIONS_TOKEN;
   const child: ChildProcess = spawn(
     join(ROOT, "node_modules", ".bin", "electron"),

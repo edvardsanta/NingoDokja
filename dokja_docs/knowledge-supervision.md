@@ -9,8 +9,9 @@ Status: application integration contract. The subsequent
 [native source-read receipt integration](knowledge-source-receipts.md) is
 implemented as an opt-in host binding. A subsequent
 [native source supervisor](knowledge-source-steering.md) implements revision-bound
-controls for that bounded path. No supervisor, control endpoint or receipt
-producer is activated in application startup. It builds on
+controls for that bounded path. The [Desktop integration](desktop-source-supervision.md) now offers explicit
+operator configuration and source-only controls. No live operator rollout was
+performed. It builds on
 [domain outcome policy](knowledge-outcomes.md), the [journal](knowledge-journal.md)
 and its [optional PostgreSQL adapter](knowledge-journal-postgres.md).
 

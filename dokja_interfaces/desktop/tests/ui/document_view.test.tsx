@@ -45,7 +45,7 @@ describe("a document opened from the research base", () => {
     expect(view.container.querySelector(".document-text b")).toBeNull();
     screen.getByText("Rebuilt from the passages the Library stored: close to the original, not a faithful copy of it.");
     expect(current()).toEqual(["Title note:one"]);
-    expect(tabs()).toEqual(["Documents", "Readings", "Title note:one"]);
+    expect(tabs()).toEqual(["Documents", "Readings", "Apply", "Title note:one"]);
     expect(calls.filter((call) => call.type === "knowledge.list").map((call) => call.payload)).toEqual([
       { limit: 20, offset: 0, external: true },
       // a document is read by its id, not by where the list had it
@@ -73,7 +73,7 @@ describe("a document opened from the research base", () => {
     expect(calls.filter((call) => call.type === "knowledge.list")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Close Title note:one" }));
-    expect(tabs()).toEqual(["Documents", "Readings"]);
+    expect(tabs()).toEqual(["Documents", "Readings", "Apply"]);
     expect(current()).toEqual(["Documents"]);
     expect(screen.getByRole("button", { name: "Open Title note:one" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Library › Documents" })).toBeTruthy();

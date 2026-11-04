@@ -187,6 +187,29 @@ func main() {
 		whatsappSender = whatsappConversations
 	}
 
+	knowledgeHandler := handlers.NewKnowledgeDomainHandler(knowledgeClient).WithApplicationProposer(
+		clients.NewKnowledgeProposalClient(clients.NewChatProviderClient("")),
+	).WithMeasuredApplicationProposer(
+		clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
+	).WithApplicationReviewer(
+		clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
+	).WithReading(handlers.NewReadingTask(
+		feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
+	)).WithIntake(handlers.NewIntakeTask(
+		feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
+		func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
+	))
+	sourceLifetime, cancelSourceApplications := context.WithCancel(context.Background())
+	defer cancelSourceApplications()
+	sourceJournal, err := openSourceJournal(os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"), os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"), os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"))
+	if err != nil {
+		logger.Error("configure Desktop source supervision", err)
+		os.Exit(1)
+	}
+	if sourceJournal != nil {
+		defer func() { cancelSourceApplications(); sourceJournal.db.Close() }()
+		knowledgeHandler.WithSourceApplications(handlers.NewDesktopSourceApplications(sourceLifetime, knowledgeHandler, sourceJournal.store, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }))
+	}
 	service := core.DefaultService(
 		communicationsHandler,
 		handlers.NewSystemDomainHandler(
@@ -204,18 +227,7 @@ func main() {
 			WithManualTargets(communicationsHandler.Readable),
 		handlers.NewModerationDomainHandler(nil),
 		handlers.NewBookDomainHandler(bookClient),
-		handlers.NewKnowledgeDomainHandler(knowledgeClient).WithApplicationProposer(
-			clients.NewKnowledgeProposalClient(clients.NewChatProviderClient("")),
-		).WithMeasuredApplicationProposer(
-			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
-		).WithApplicationReviewer(
-			clients.NewMeasuredKnowledgeProposalClient(clients.NewChatProviderClient("")),
-		).WithReading(handlers.NewReadingTask(
-			feedsClient, knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
-		)).WithIntake(handlers.NewIntakeTask(
-			feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
-			func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
-		)),
+		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
@@ -235,7 +247,7 @@ func main() {
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
-	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
+	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")).WithSourceSupervisionToken(os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"))
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))

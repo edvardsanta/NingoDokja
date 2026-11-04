@@ -6,15 +6,17 @@ import (
 	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
 	"read_books/internal/logger"
+	"strings"
 )
 
 type KnowledgeDomainHandler struct {
-	domain           *knowledgedomain.Domain
-	reading          *ReadingTask
-	intake           *IntakeTask
-	proposer         knowledgedomain.ApplicationProposer
-	measuredProposer knowledgedomain.ApplicationProposer
-	reviewer         knowledgedomain.ApplicationReviewer
+	domain             *knowledgedomain.Domain
+	reading            *ReadingTask
+	intake             *IntakeTask
+	proposer           knowledgedomain.ApplicationProposer
+	measuredProposer   knowledgedomain.ApplicationProposer
+	reviewer           knowledgedomain.ApplicationReviewer
+	sourceApplications *DesktopSourceApplications
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
@@ -59,6 +61,12 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 	}
 	if _, enabled := ctx.Value(sourceReadJournalKey{}).(SourceReadJournal); enabled && workflow.Action != knowledgedomain.ActionPrepareApplication {
 		return nil, fmt.Errorf("native source-read journal binding supports preparation only")
+	}
+	if strings.HasPrefix(workflow.Action, "knowledge.application.supervision.") {
+		if h.sourceApplications == nil {
+			return nil, fmt.Errorf("source supervision is not configured")
+		}
+		return h.sourceApplications.Handle(ctx, event)
 	}
 	// The payload is the user's notes or question: log its shape, never its content.
 	logger.Info(fmt.Sprintf(
@@ -106,4 +114,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 			Context: event.Context,
 		},
 	})
+}
+
+func (h *KnowledgeDomainHandler) WithSourceApplications(host *DesktopSourceApplications) *KnowledgeDomainHandler {
+	h.sourceApplications = host
+	return h
 }

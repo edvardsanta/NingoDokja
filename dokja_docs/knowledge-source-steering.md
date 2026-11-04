@@ -2,8 +2,10 @@
 
 Status: implemented as an opt-in native host API for one bounded application.
 `handlers.SourceSupervisor` builds on the [native receipt consumer](knowledge-source-receipts.md).
-It has no startup registration, network endpoint, Discord command or Desktop UI.
-Live authentication and production activation are not demonstrated by its tests.
+The [Desktop integration](desktop-source-supervision.md) now supplies optional
+startup registration, dedicated operator admission and the Library Apply view.
+Native controls remain volatile. Live operator deployment and durable recovery
+are not demonstrated by synthetic integration tests.
 
 ## Supported behavior
 
@@ -120,11 +122,13 @@ A new supervisor is a new logical application, not recovery or an implicit budge
 grant for a lost session. There is no durable control acknowledgment or cross-node
 coordination guarantee.
 
-Before public activation, implement authenticated ingress mapping, per-actor host
-quotas, durable control/replay/checkpoint recovery and unknown-result reconciliation.
+The Desktop integration supplies dedicated operator ingress, process-bound replay
+and a 16-application admission quota. Before general public or multi-user
+activation, implement durable control/replay/checkpoint recovery and unknown-result
+reconciliation.
 Review connection/TLS selection, coordinated deletion, retention and restart/
-backup/rollout behavior. No environment, Compose, startup migration or operator
-database change is introduced here. The proposed global observer remains separate;
+backup/rollout behavior. Desktop configuration and explicit namespace initialization are documented in
+its integration guide. No operator database change or deployment was performed. The proposed global observer remains separate;
 steps `08.2` and `08.3` remain open.
 
 ## Verification
@@ -142,3 +146,7 @@ both original and revised journal attempts, alongside existing native-consumer,
 fault/replay and controlled restart tests. Source transport and authentication
 are synthetic fixtures. This does not prove live user authentication, durable
 control recovery, method execution or improved cognitive results.
+
+Paused candidate-version checks now share the supervisor’s remaining read, byte
+and time budgets. They leave the accepted plan untouched, create no execution
+receipts and are invalidated by a concurrent control.

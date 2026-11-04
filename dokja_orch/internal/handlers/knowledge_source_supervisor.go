@@ -72,14 +72,15 @@ type sourceControlReplay struct {
 // registration. The host owns its lifetime and supplies separate current control
 // and source permissions. Restart recovery is deliberately not inferred here.
 type SourceSupervisor struct {
-	mu         sync.Mutex
-	handler    *KnowledgeDomainHandler
-	options    SourceSupervisorOptions
-	lifetime   context.Context
-	snapshot   SourceSupervisorSnapshot
-	operations map[string]sourceControlReplay
-	changed    chan struct{}
-	planCancel context.CancelFunc
+	mu            sync.Mutex
+	handler       *KnowledgeDomainHandler
+	options       SourceSupervisorOptions
+	lifetime      context.Context
+	snapshot      SourceSupervisorSnapshot
+	operations    map[string]sourceControlReplay
+	changed       chan struct{}
+	planCancel    context.CancelFunc
+	previewCancel context.CancelFunc
 }
 
 func NewSourceSupervisor(lifetime context.Context, handler *KnowledgeDomainHandler, options SourceSupervisorOptions) (*SourceSupervisor, error) {
@@ -305,6 +306,9 @@ func (s *SourceSupervisor) Control(ctx context.Context, command knowledge.Source
 	if s.planCancel != nil {
 		s.planCancel()
 	}
+	if s.previewCancel != nil {
+		s.previewCancel()
+	}
 	s.signalLocked()
 	return ack, nil
 }
@@ -457,4 +461,93 @@ func (s *SourceSupervisor) prepare(ctx context.Context, event core.Event, reques
 	event.Payload = nil
 	_ = json.Unmarshal(raw, &event.Payload)
 	return s.handler.runApplicationTask(bound, event, workflow, "prepared", "application", "context")
+}
+
+// Preview checks a candidate's current versions while paused. These prospective
+// reads share the active application's budgets and deadline; they do not create
+// execution receipts or replace the accepted plan. Controls invalidate the draft.
+func (s *SourceSupervisor) Preview(ctx context.Context, expected uint64, payload map[string]any) (map[string]any, error) {
+	actor, err := s.authenticate(ctx, "preview", expected)
+	if err != nil {
+		return nil, err
+	}
+	request, err := knowledge.ParseApplicationRequest(payload)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	s.expireLocked()
+	if s.snapshot.State != "paused" || s.snapshot.ControlRevision != expected || s.snapshot.Pending != 0 || s.snapshot.Uncertain || s.previewCancel != nil {
+		s.mu.Unlock()
+		return nil, ErrSourceControlState
+	}
+	if s.snapshot.UsedBytes+sourceSize(request) > s.options.Limits.Bytes {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("candidate check exceeds the remaining byte budget")
+	}
+	s.snapshot.UsedBytes += sourceSize(request)
+	plan := s.snapshot.PlanRevision
+	previewCtx, cancel := context.WithDeadline(ctx, s.snapshot.Deadline)
+	s.previewCancel = cancel
+	stop := context.AfterFunc(s.lifetime, cancel)
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		stop()
+		s.mu.Lock()
+		s.previewCancel = nil
+		s.signalLocked()
+		s.mu.Unlock()
+	}()
+	workflow := s.handler.applicationPreparationWorkflow(request)
+	for index := range workflow.Steps {
+		if index >= len(request.Sources) {
+			break
+		}
+		step := &workflow.Steps[index]
+		original := step.Run
+		selected := request.Sources[index]
+		step.Run = func(ctx context.Context, input core.StepInput) (core.StepResult, error) {
+			if _, err := s.options.AuthorizeSource(ctx, SourceReadPermission{Purpose: "execute", Scope: s.options.Scope, ApplicationRef: s.snapshot.ApplicationRef, TaskRef: input.TaskID, WorkspaceAttemptRef: input.AttemptID, StateRevision: expected, PlanRevision: plan, Capability: sourceReadCapability, Source: selected}); err != nil {
+				return core.StepResult{}, ErrSourceControlDenied
+			}
+			s.mu.Lock()
+			s.expireLocked()
+			if ctx.Err() != nil || s.snapshot.State != "paused" || s.snapshot.ControlRevision != expected || s.snapshot.PlanRevision != plan {
+				s.mu.Unlock()
+				return core.StepResult{}, ErrSourceControlState
+			}
+			if s.snapshot.ReadAttempts >= s.options.Limits.Reads {
+				s.snapshot.State, s.snapshot.Reason = "exhausted", "read_budget_exhausted"
+				s.signalLocked()
+				s.mu.Unlock()
+				return core.StepResult{}, ErrSourceControlState
+			}
+			s.snapshot.ReadAttempts++
+			s.snapshot.Pending++
+			s.signalLocked()
+			s.mu.Unlock()
+			result, err := original(ctx, input)
+			s.mu.Lock()
+			s.snapshot.Pending--
+			s.snapshot.UsedBytes += sourceSize(result.Output)
+			if s.snapshot.UsedBytes > s.options.Limits.Bytes && !sourceTerminal(s.snapshot.State) {
+				s.snapshot.State, s.snapshot.Reason = "exhausted", "byte_budget_exhausted"
+			}
+			s.signalLocked()
+			s.mu.Unlock()
+			return result, err
+		}
+	}
+	event := core.Event{Source: core.SourceDesktop, Type: "knowledge.application.prepare", User: core.EventUser{ID: actor.Ref}, Channel: core.EventChannel{ID: s.options.Scope}, Payload: sourceClone(payload)}
+	result, err := s.handler.runApplicationTask(previewCtx, event, workflow, "prepared", "application", "context")
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if previewCtx.Err() != nil || s.snapshot.State != "paused" || s.snapshot.ControlRevision != expected || s.snapshot.PlanRevision != plan {
+		return nil, ErrSourceControlState
+	}
+	return result, nil
 }

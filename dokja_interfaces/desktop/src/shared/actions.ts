@@ -60,6 +60,11 @@ export const ACTION_TYPES = [
   "memory.get",
   "memory.resolve",
   "knowledge.status",
+ "knowledge.application.prepare",
+ "knowledge.application.supervision.preview",
+ "knowledge.application.supervision.start",
+ "knowledge.application.supervision.status",
+ "knowledge.application.supervision.control",
   "knowledge.search",
   "meme.status",
   "meme.list",
@@ -80,6 +85,9 @@ export const ACTION_TYPES = [
 export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
+ "knowledge.application.supervision.preview",
+ "knowledge.application.supervision.start",
+ "knowledge.application.supervision.control",
   "memory.resolve",
   "runtime.set",
   "runtime.providers.configure",

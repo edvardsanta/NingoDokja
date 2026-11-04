@@ -1,13 +1,9 @@
 # Native source-read receipts
 
-Status: opt-in library integration, not enabled in application startup or any
-public ingress. This is the first bounded automatic receipt consumer from the
-[supervision contract](knowledge-supervision.md). Incremental pause, redirect,
-resume and cancel endpoints, durable supervised-session state and the proposed
-global observer remain unimplemented. The subsequent
-[native source supervisor](knowledge-source-steering.md) implements volatile
-authenticated-host controls and revision-bound progression without exposing them
-as public endpoints.
+Status: implemented as a native producer and opt-in host binding. The
+[Desktop operator integration](desktop-source-supervision.md) now supplies an
+explicitly configured ingress and source-supervision UI. Controls remain volatile;
+durable supervisor recovery and the proposed global observer are still pending.
 
 ## Existing execution path
 
@@ -48,7 +44,8 @@ rights outside its transaction. The host must distinguish permission to record
 an original attempt from permission to dispatch more work after a correction.
 A planning revision change must not automatically erase permission to retain
 an actual old receipt; an actual record-access revocation still denies writing.
-No current ingress installs this policy or binding.
+The optional Desktop RPC host installs this binding only after dedicated operator
+authentication; unconfigured startup leaves it disabled.
 
 Each read gets server-generated episode, native attempt, intent, operation and
 receipt identities. The real workspace task and attempt IDs are propagated
@@ -100,9 +97,9 @@ no cross-process producer-verification or receipt-reconstruction API yet.
 Existing journal retention/deletion fences apply to these records; coordinated
 source deletion propagation remains pending.
 
-The host can supply the existing PostgreSQL port. No DSN, environment variable,
-Compose change, startup migration, operator database write or production cutover
-is introduced. Live authentication/admission, explicit TLS/connection selection,
+The host can supply the existing PostgreSQL port. The producer itself has no startup configuration. The Desktop integration adds
+explicit credential/DSN configuration and an explicit journal initializer; no
+operator database write or production cutover occurred during implementation. Live authentication/admission, explicit TLS/connection selection,
 public control admission, durable control/checkpoint recovery,
 restart/backup recovery and rollout/rollback still require implementation and
 review before runtime activation. Step `08.2` remains in progress and `08.3`
