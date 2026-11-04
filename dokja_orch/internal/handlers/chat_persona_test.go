@@ -421,6 +421,74 @@ func TestOwnerDebateHandlingDoesNotFollowTheNextChannelSpeaker(t *testing.T) {
 }
 
 // This checks the effective generation input, not a live model's interpretation of a joke.
+func TestBanterAfterDebateKeepsContextWithoutMoralizing(t *testing.T) {
+	// Check the effective generation input; a live model's tone still needs UAT.
+	const prior = "Isso não justifica piratear."
+	const message = "SOU FÃ DE PIRATAS DO CARIBE, ENT BORA PEROLA NEGRA, AVANTE"
+	for _, mode := range []string{"conversation", "streaming", "plain"} {
+		t.Run(mode, func(t *testing.T) {
+			g := &presentationCaptureGenerator{}
+			plain := &plainGenerator{}
+			h := NewChatDomainHandler(g)
+			if mode == "plain" {
+				h = NewChatDomainHandler(plain)
+			}
+			event := chatEvent(message)
+			event.Source = core.SourceDiscord
+			h.sessions.items[chatSessionBaseKey(event)] = chatSessionState{
+				id: "banter-session", lastSeenAt: time.Now(),
+				messages: []chatMessage{
+					{Role: "user", Content: "VIVA A PIRATARIA!"},
+					{Role: "assistant", Content: prior},
+				},
+			}
+			ctx := context.Background()
+			if mode == "streaming" {
+				ctx = core.WithReplyPreview(ctx, func(string) {})
+			}
+			if _, err := h.Handle(ctx, event, chatStep); err != nil {
+				t.Fatal(err)
+			}
+			var system string
+			if mode == "plain" {
+				system = plain.prompt
+				if !strings.Contains(plain.prompt, prior) || !strings.HasSuffix(plain.prompt, message) {
+					t.Fatal("plain generation lost the debate or current joke")
+				}
+			} else {
+				system = g.messages[0]["content"]
+				if g.streamed != (mode == "streaming") {
+					t.Fatal("unexpected generation path")
+				}
+				found := false
+				for _, turn := range g.messages[1:] {
+					if turn["role"] == "assistant" && turn["content"] == prior {
+						found = true
+					}
+				}
+				if !found || g.messages[len(g.messages)-1]["content"] != message {
+					t.Fatal("the debate or current joke was rewritten")
+				}
+			}
+			system = strings.Join(strings.Fields(system), " ")
+			for _, want := range []string{
+				"Follow changes in conversational intent",
+				"unsolicited moral or legal advice",
+				"without appending a corrective lesson",
+				"address that request on its merits",
+				"neither agreement nor swearing is required",
+				"Never humiliate",
+				"Hold your own judgment",
+			} {
+				if !strings.Contains(system, want) {
+					t.Fatalf("conversational guidance missing: %q", want)
+				}
+			}
+		})
+	}
+}
+
+// This checks the effective generation input, not a live model's interpretation of a joke.
 func TestIronicLinkCommentKeepsIntentWithoutInventingIdentity(t *testing.T) {
 	const message = `NINGO KKKKKKK, "PAZ MUNDIAL". Votou no Fulano, político envolvido em toda corrupção possível.`
 	for _, mode := range []string{"conversation", "streaming", "plain"} {
