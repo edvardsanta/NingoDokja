@@ -1448,13 +1448,20 @@ The Library Apply view uses the source-only supervisor. Configure matching
 use a separate random operator credential of 32–512 characters. Set
 `DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` only for the orchestrator/initializer,
 including the database's explicit TLS policy. Both settings are optional and
-unset by default; partial configuration fails explicitly.
+unset by default. Partial/invalid configuration or an unavailable journal logs a
+sanitized error and disables only Desktop source supervision; the rest of the
+orchestrator continues startup. Supervision requests remain refused without a
+journal; they never fall back to unjournaled execution.
 
 The dev, lite and prod stacks project both variables into the orchestrator.
 Initialize the journal namespace with the explicit `source-journal-init` command
 before restarting the enabled orchestrator. Production images include
 `/app/source-journal-init`; dev/lite can run `go run ./cmd/source-journal-init`.
-Startup uses the existing namespace and refuses uninitialized/unsupported state.
+Startup uses the existing namespace and disables supervision for
+uninitialized/unsupported state. A failed PostgreSQL connectivity check reports
+a connection problem rather than recommending namespace initialization. After
+restoring connectivity or fixing the configuration/schema, restart the
+orchestrator to enable supervision; startup does not retry in the background.
 See [Desktop source supervision](desktop-source-supervision.md) for the exact
 Compose initialization and Desktop launch commands.
 

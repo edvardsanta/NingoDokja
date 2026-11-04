@@ -76,7 +76,12 @@ switched off; new source reads still honor the switch.
 | `DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` | Orchestrator and explicit initializer only | Existing PostgreSQL database and its operator-selected TLS/connection policy |
 
 Both are unset by default. Enabling just one orchestrator setting is a
-configuration error. No existing SQLite or Knowledge data is migrated. The
+configuration error. Invalid configuration, an unavailable database or a failed
+namespace check disables this optional host and logs a sanitized error while the
+rest of the orchestrator starts. Supervision requests are refused without a
+journal; no unjournaled fallback is registered. Restore the database or fix the
+configuration/schema, then restart the orchestrator to enable the host (there is
+no automatic startup retry). No existing SQLite or Knowledge data is migrated. The
 PostgreSQL journal uses its existing isolated namespace; startup only opens an
 initialized version and never creates tables implicitly. Errors do not expose
 credentials or native DSN diagnostics.
