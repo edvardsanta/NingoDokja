@@ -9,9 +9,11 @@ import (
 )
 
 type MemeDomainHandler struct {
-	domain       *memedomain.Domain
-	hashtags     MemeHashtagActions
-	hashtagNotes HashtagExperienceNotes
+	domain        *memedomain.Domain
+	hashtags      MemeHashtagActions
+	hashtagNotes  HashtagExperienceNotes
+	tagTask       HashtagSuggestionTask
+	tagExperience *HashtagExperience
 }
 
 func NewMemeDomainHandler(service memedomain.Service) *MemeDomainHandler {
@@ -34,6 +36,13 @@ func (h *MemeDomainHandler) WithHashtagWorkflow(workflow MemeHashtagActions) *Me
 	return h
 }
 
+// WithTagEvaluation freezes a shadow suggestion before an operator's label enters Knowledge.
+// Successful tagging then records and judges it; optional memory never determines the label.
+func (h *MemeDomainHandler) WithTagEvaluation(task HashtagSuggestionTask, experience *HashtagExperience) *MemeDomainHandler {
+	h.tagTask, h.tagExperience = task, experience
+	return h
+}
+
 func (h *MemeDomainHandler) Domain() core.Domain {
 	return core.DomainMeme
 }
@@ -50,13 +59,30 @@ func (h *MemeDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		event.Source,
 	))
 
+	var attempt HashtagAttempt
+	evaluate := workflow.Action == memedomain.ActionTagMemeHashtag && h.tagTask != nil && h.tagExperience.active()
+	if evaluate {
+		attempt = h.tagTask.Suggest(ctx, event, resultString(event.Payload, "url"))
+	}
+
 	var response map[string]any
 	var err error
 	if isMemeHashtagAction(workflow.Action) {
 		if h.hashtags == nil {
 			return nil, fmt.Errorf("meme hashtag workflow is not configured")
 		}
-		response, err = h.hashtags.Handle(ctx, workflow.Action, event.Payload)
+		payload := event.Payload
+		// Reuse the text already read for evaluation rather than performing OCR twice.
+		if evaluate && resultString(payload, "text") == "" {
+			if text := resultString(attempt.Task.Outputs["read"], "text"); text != "" {
+				payload = make(map[string]any, len(event.Payload)+1)
+				for key, value := range event.Payload {
+					payload[key] = value
+				}
+				payload["text"] = text
+			}
+		}
+		response, err = h.hashtags.Handle(ctx, workflow.Action, payload)
 	} else {
 		response, err = h.domain.Handle(ctx, memedomain.Request{
 			Action: workflow.Action,
@@ -73,13 +99,16 @@ func (h *MemeDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		return nil, err
 	}
 
-	if h.hashtagNotes != nil && workflow.Action == memedomain.ActionTagMemeHashtag {
+	if (h.hashtagNotes != nil || evaluate) && workflow.Action == memedomain.ActionTagMemeHashtag {
 		// The service returns the hashtag normalized ("Name" becomes "#Name"), which is how a
 		// suggestion was stored.
-		h.hashtagNotes.Tagged(
-			firstNonEmptyString(resultString(response, "source_url"), resultString(event.Payload, "url")),
-			firstNonEmptyString(resultString(response, "hashtag"), resultString(event.Payload, "hashtag")),
-		)
+		url := firstNonEmptyString(resultString(response, "source_url"), resultString(event.Payload, "url"))
+		observed := firstNonEmptyString(resultString(response, "hashtag"), resultString(event.Payload, "hashtag"))
+		if evaluate {
+			h.tagExperience.TagEvaluated(url, attempt, observed)
+		} else {
+			h.hashtagNotes.Tagged(url, observed)
+		}
 	}
 
 	logger.Info(fmt.Sprintf(

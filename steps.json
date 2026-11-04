@@ -1119,7 +1119,8 @@
               ],
               "evidence": [
                 "Memory now prepares immutable hashtag observations and fresh requests using the legacy media-derived reference and existing action name. Unicode bounds, positive evidence-score clamping, optional-note behavior and generic validation remain unchanged. Task evidence uses the domain-owned experience identity.",
-                "Handler match and prediction types remain aliases. The executed path copies the record probabilities before scheduling; later snapshot edits cannot change the request. Background sequencing, switches, budgets, existing successful-operation call sites and generic accepted/replaced resolution are preserved."
+                "Handler match and prediction types remain aliases. The executed path copies the record probabilities before scheduling; later snapshot edits cannot change the request. Background sequencing, switches, budgets, existing successful-operation call sites and generic accepted/replaced resolution are preserved.",
+                "2026-11-04 follow-up: desktop tag saves run a pre-save shadow suggestion and freeze its prediction before the new Knowledge label is stored. Only successful saves schedule ordered record-then-feedback; absent candidates preserve feedback-only behavior and missing predictions remain unscored. Existing media identity and historical probabilities are unchanged. Orchestrator go test ./..., go test -race ./internal/handlers and go vet ./internal/handlers ./cmd/va passed with synthetic fixtures; no live tagging, delivery or deployment."
               ],
               "checks": [
                 {

@@ -7,6 +7,14 @@ before delivery under a 1 s budget chosen by the owner; a miss or a Memory failu
 the attempt unscored. An attempt is recorded only after its meme reached at least one
 channel. Feedback still resolves by the media-derived ref, so repeated media keeps the
 one-open-attempt limitation below.
+Desktop tagging also runs the task before storing the operator's new Knowledge
+label. A successful tag save records this shadow candidate and resolves it in
+sequence against the chosen label; a failed save records nothing. This evaluates
+pre-save agreement, without claiming the shadow candidate was delivered or
+selected by the operator. The same media-derived identity, frozen probabilities,
+missing-prediction fallback and first-verdict semantics apply. Historical rows
+are not backfilled.
+
 Related: [decision index](./README.md), [workspace](./0001-task-workspace.md),
 [state ownership](./0003-state-ownership.md).
 

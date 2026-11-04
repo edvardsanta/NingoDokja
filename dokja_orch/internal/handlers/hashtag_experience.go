@@ -92,6 +92,35 @@ func (e *HashtagExperience) Executed(url string, attempt HashtagAttempt) {
 	e.spawn(func() { e.record(request, attempt.Prediction != nil) })
 }
 
+// TagEvaluated records a pre-save shadow suggestion only after the operator's tag succeeded.
+// Record and feedback share one worker so feedback cannot race ahead of the new experience.
+// Existing media retain their original prediction and verdict through Memory's immutable ref.
+func (e *HashtagExperience) TagEvaluated(url string, attempt HashtagAttempt, observed string) {
+	if !e.active() {
+		return
+	}
+	observation, ok := memorydomain.PrepareHashtagExperience(url, attempt.QueryText, attempt.Hashtag, attempt.Match)
+	if !ok {
+		e.Tagged(url, observed)
+		return
+	}
+	feedback, ok := memorydomain.HashtagFeedbackRequest(url, observed)
+	if !ok {
+		return
+	}
+	record := observation.RecordRequest(attempt.Prediction)
+	e.spawn(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), experienceBudget)
+		defer cancel()
+		if !e.recordIn(ctx, record, attempt.Prediction != nil) {
+			return
+		}
+		if _, err := e.domain.Handle(ctx, feedback); err != nil {
+			logger.Info(fmt.Sprintf("hashtag experience could not be resolved: %v", err))
+		}
+	})
+}
+
 func (e *HashtagExperience) Tagged(url, hashtag string) {
 	if !e.active() {
 		return
@@ -109,13 +138,14 @@ func (e *HashtagExperience) record(request memorydomain.Request, scored bool) {
 	e.recordIn(ctx, request, scored)
 }
 
-func (e *HashtagExperience) recordIn(ctx context.Context, request memorydomain.Request, scored bool) {
+func (e *HashtagExperience) recordIn(ctx context.Context, request memorydomain.Request, scored bool) bool {
 	answer, err := e.domain.Handle(ctx, request)
 	if err != nil {
 		logger.Info(fmt.Sprintf("hashtag experience could not be recorded: %v", err))
-		return
+		return false
 	}
 	logger.Info(fmt.Sprintf("hashtag experience recorded created=%v scored=%t", answer["created"], scored))
+	return true
 }
 
 func (e *HashtagExperience) resolveSuggestion(request memorydomain.Request) {
