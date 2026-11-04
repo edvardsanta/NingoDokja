@@ -419,3 +419,61 @@ func TestOwnerDebateHandlingDoesNotFollowTheNextChannelSpeaker(t *testing.T) {
 		}
 	}
 }
+
+// This checks the effective generation input, not a live model's interpretation of a joke.
+func TestIronicLinkCommentKeepsIntentWithoutInventingIdentity(t *testing.T) {
+	const message = `NINGO KKKKKKK, "PAZ MUNDIAL". Votou no Fulano, político envolvido em toda corrupção possível.`
+	for _, mode := range []string{"conversation", "streaming", "plain"} {
+		for _, owner := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/owner=%t", mode, owner), func(t *testing.T) {
+				g := &presentationCaptureGenerator{}
+				plain := &plainGenerator{}
+				h := NewChatDomainHandler(g)
+				if mode == "plain" {
+					h = NewChatDomainHandler(plain)
+				}
+				event := chatEvent(message)
+				event.Context = map[string]any{"owner_configured": true, "is_owner": owner, "owner_mentioned": true}
+				ctx := context.Background()
+				if mode == "streaming" {
+					ctx = core.WithReplyPreview(ctx, func(string) {})
+				}
+				if _, err := h.Handle(ctx, event, chatStep); err != nil {
+					t.Fatal(err)
+				}
+				var system, current string
+				if mode == "plain" {
+					system, current = plain.prompt, message
+					if !strings.HasSuffix(plain.prompt, message) {
+						t.Fatal("plain generation lost the original comment")
+					}
+				} else {
+					system = g.messages[0]["content"]
+					current = g.messages[len(g.messages)-1]["content"]
+					if g.streamed != (mode == "streaming") {
+						t.Fatal("unexpected generation path")
+					}
+				}
+				if current != message {
+					t.Fatal("the user's joke was rewritten")
+				}
+				system = strings.Join(strings.Fields(system), " ")
+				for _, want := range []string{
+					"Read the speech act",
+					"never as proof by themselves",
+					"An incidental uncertain nickname need not be identified",
+					"repeat an unsupported accusation as established fact",
+					"does not automatically request a summary",
+					"keep the response conditional",
+				} {
+					if !strings.Contains(system, want) {
+						t.Fatalf("irony guidance missing: %q", want)
+					}
+				}
+				if strings.Contains(system, "prioritize a supportive, charitable discussion") != owner {
+					t.Fatal("irony handling changed verified-owner isolation")
+				}
+			})
+		}
+	}
+}
