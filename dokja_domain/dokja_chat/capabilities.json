@@ -93,7 +93,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Share a supported link or ask about a reading in chat."
+          "usage": "Share a supported link or PDF attachment, then ask about the reading in chat. PDF links may select a page using #page=N."
         },
         {
           "interface": "desktop",
@@ -101,7 +101,7 @@
         }
       ],
       "limits": [
-        "Extraction depends on configured reading integrations and source access. Do not claim to have read unavailable content or performed an unrestricted web search."
+        "Extraction depends on source access and active reading services. Discord PDFs are limited to 2 MiB each and share a four-source limit with links. Scanned or protected PDFs may be unreadable; OCR is not included. Readings support temporary follow-ups in the same conversation, not permanent memory. Do not claim to have read unavailable content or performed an unrestricted web search."
       ]
     },
     {

@@ -3,6 +3,7 @@
 package feeds
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -128,7 +129,7 @@ func (r webReader) client() *http.Client {
 
 // This reader never runs page scripts, plugins, a browser or embedded resources.
 // A fixed HTTP-only helper can retry signature-based refusals under the same budget.
-func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Time) (map[string]any, error) {
+func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Time, pdfReaders ...webPDFRead) (map[string]any, error) {
 	original, err := webURL(raw)
 	if err != nil {
 		return nil, err
@@ -137,7 +138,7 @@ func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Tim
 	if err != nil {
 		return nil, fmt.Errorf("invalid web request")
 	}
-	req.Header.Set("Accept", "text/html, application/xhtml+xml, text/plain")
+	req.Header.Set("Accept", "text/html, application/xhtml+xml, text/plain, application/pdf")
 	req.Header.Set("User-Agent", "DokjaTextReader/1.0")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -157,12 +158,27 @@ func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Tim
 		return nil, fmt.Errorf("web reading unavailable (HTTP %d)", resp.StatusCode)
 	}
 	kind, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if kind != "text/html" && kind != "application/xhtml+xml" && kind != "text/plain" {
+	isPDF := kind == "application/pdf" || kind == "application/x-pdf" || kind == "application/octet-stream"
+	if !isPDF && kind != "text/html" && kind != "application/xhtml+xml" && kind != "text/plain" {
 		return nil, fmt.Errorf("unsupported web content")
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxWebBytes+1))
 	if err != nil || len(data) > maxWebBytes {
 		return nil, fmt.Errorf("web content exceeds reading limit or is incomplete")
+	}
+	final := *resp.Request.URL
+	if final.Fragment == "" {
+		final.Fragment = original.Fragment
+	}
+	if isPDF {
+		if !bytes.HasPrefix(data, []byte("%PDF-")) {
+			return nil, fmt.Errorf("web_pdf_unreadable: invalid PDF")
+		}
+		reader := runWebPDF
+		if len(pdfReaders) > 0 {
+			reader = pdfReaders[0]
+		}
+		return readWebPDF(ctx, data, &final, now, reader)
 	}
 	decoded, err := charset.NewReader(strings.NewReader(string(data)), resp.Header.Get("Content-Type"))
 	if err != nil {
@@ -171,10 +187,6 @@ func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Tim
 	decodedData, err := io.ReadAll(io.LimitReader(decoded, 3*maxWebBytes+1))
 	if err != nil || len(decodedData) > 3*maxWebBytes {
 		return nil, fmt.Errorf("unreadable web content")
-	}
-	final := *resp.Request.URL
-	if final.Fragment == "" {
-		final.Fragment = original.Fragment
 	}
 	title, published, passages := extractWeb(string(decodedData), kind, &final)
 	if len(passages) == 0 {

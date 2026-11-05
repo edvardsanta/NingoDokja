@@ -58,7 +58,8 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 		return nil, nil
 	}
 	w := h.web
-	links := chat.WebLinks(question)
+	attachments, _ := event.Payload["document_attachments"].([]chat.WebAttachment)
+	links := chat.PlanWebReadings(question, attachments)
 	key := chatSessionBaseKey(event)
 	if key == "" {
 		return nil, nil
@@ -82,7 +83,7 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	data := &webTurnData{}
 	if w.enabled != nil && !w.enabled() {
 		for _, link := range links {
-			data.Failures = append(data.Failures, webFailure{link, "reader_disabled"})
+			data.Failures = append(data.Failures, webFailure{link.URL, "reader_disabled"})
 		}
 		return nil, data
 	}
@@ -93,14 +94,18 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 		readCtx, cancel := context.WithTimeout(ctx, webReadBudget)
 		defer cancel()
 		for _, link := range links {
-			result, err := w.domain.ReadWebLink(readCtx, link)
+			if link.Error != "" {
+				data.Failures = append(data.Failures, webFailure{link.URL, link.Error})
+				continue
+			}
+			result, err := w.domain.ReadWebLink(readCtx, link.URL)
 			if err != nil {
-				data.Failures = append(data.Failures, webFailure{link, digest.WebFailureReason(err)})
+				data.Failures = append(data.Failures, webFailure{link.URL, digest.WebFailureReason(err)})
 				continue
 			}
 			document, err := decodeWebDocument(result)
 			if err != nil {
-				data.Failures = append(data.Failures, webFailure{link, "unreadable"})
+				data.Failures = append(data.Failures, webFailure{link.URL, "unreadable"})
 				continue
 			}
 			saved.documents = append(saved.documents, document)
@@ -281,10 +286,16 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 	}
 	catalog := webReadingCatalogs[locale]
 	var lines []string
-	blocked := 0
+	blocked, pdfUnreadable, tooLarge := 0, 0, 0
 	for _, failure := range data.Failures {
 		if failure.Reason == "blocked" {
 			blocked++
+		}
+		if failure.Reason == "pdf_unreadable" {
+			pdfUnreadable++
+		}
+		if failure.Reason == "too_large" {
+			tooLarge++
 		}
 	}
 	if blocked > 0 {
@@ -294,7 +305,13 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 		}
 		lines = append(lines, catalog.say(key, "count", fmt.Sprint(blocked)))
 	}
-	if other := len(data.Failures) - blocked; other > 0 {
+	if pdfUnreadable > 0 {
+		lines = append(lines, catalog.say("pdf_unreadable", "count", fmt.Sprint(pdfUnreadable)))
+	}
+	if tooLarge > 0 {
+		lines = append(lines, catalog.say("too_large", "count", fmt.Sprint(tooLarge)))
+	}
+	if other := len(data.Failures) - blocked - pdfUnreadable - tooLarge; other > 0 {
 		lines = append(lines, catalog.say("failed", "count", fmt.Sprint(other)))
 	}
 	if data.Omitted > 0 {
@@ -304,6 +321,16 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 		lines = append(lines, catalog.say("recovery"))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func webAttachmentPrompt(event core.Event) string {
+	locale, _ := event.Payload["locale"].(string)
+	if strings.HasPrefix(locale, "en") {
+		locale = "en"
+	} else {
+		locale = "pt"
+	}
+	return webReadingCatalogs[locale].say("document_prompt")
 }
 
 // Short quotations and exact attribution receive the same check as longer ones.
