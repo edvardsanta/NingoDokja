@@ -12,8 +12,9 @@ def main():
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     from pypdf import PdfReader
 
-    data = sys.stdin.buffer.read((2 << 20) + 1)
-    if len(data) > 2 << 20 or not data.startswith(b"%PDF-"):
+    limit = int(sys.argv[2])
+    data = sys.stdin.buffer.read(limit + 1)
+    if len(data) > limit or not data.startswith(b"%PDF-"):
         raise ValueError("unreadable PDF")
     reader = PdfReader(io.BytesIO(data))
     if reader.is_encrypted:

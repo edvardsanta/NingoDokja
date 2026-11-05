@@ -5,6 +5,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -12,7 +13,16 @@ import (
 const MaxWebLinks = 4
 const MaxWebPassages = 8
 const ActionConverseLinks = "converse-links"
-const MaxWebDocumentBytes = 2 << 20
+const MaxWebDocumentBytes = 25 << 20
+
+// PDFLimitBytes resolves the configured MiB limit, falling back to the default.
+func PDFLimitBytes(value string) int64 {
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || n < 1 || n > 100 {
+		return MaxWebDocumentBytes
+	}
+	return int64(n) << 20
+}
 
 // WebAttachment is platform metadata, never file bytes, a path or instructions.
 type WebAttachment struct {
@@ -26,6 +36,10 @@ type WebReadingRequest struct{ URL, Error string }
 
 // PlanWebReadings shares the existing per-turn link budget with PDF attachments.
 func PlanWebReadings(message string, attachments []WebAttachment) []WebReadingRequest {
+	return PlanWebReadingsWithLimit(message, attachments, MaxWebDocumentBytes)
+}
+
+func PlanWebReadingsWithLimit(message string, attachments []WebAttachment, limit int64) []WebReadingRequest {
 	var requests []WebReadingRequest
 	seen := map[string]bool{}
 	for _, link := range WebLinks(message) {
@@ -43,7 +57,7 @@ func PlanWebReadings(message string, attachments []WebAttachment) []WebReadingRe
 		u, err := url.Parse(attachment.URL)
 		if err != nil || len(attachment.URL) > 2048 || u.Hostname() == "" || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
 			request.Error = "unreadable"
-		} else if attachment.Size < 0 || attachment.Size > MaxWebDocumentBytes {
+		} else if attachment.Size < 0 || attachment.Size > limit {
 			request.Error = "too_large"
 		}
 		seen[attachment.URL] = true

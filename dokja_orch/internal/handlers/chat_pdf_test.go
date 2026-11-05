@@ -32,7 +32,7 @@ func TestOversizedPDFRefusesBeforeFetchingOrGenerating(t *testing.T) {
 	event.Payload["document_attachments"] = []chat.WebAttachment{{URL: "https://example.com/large.pdf", Filename: "large.pdf", Size: chat.MaxWebDocumentBytes + 1}}
 	event.Payload["locale"] = "en"
 	result, err := h.Handle(t.Context(), event, chatStep)
-	if err != nil || len(reader.calls) != 0 || len(g.messages) != 0 || !strings.Contains(result["reply"].(string), "2 MiB") {
+	if err != nil || len(reader.calls) != 0 || len(g.messages) != 0 || !strings.Contains(result["reply"].(string), "25 MiB") {
 		t.Fatal("oversized PDF reached inference or reader", result, err)
 	}
 }
@@ -47,5 +47,19 @@ func TestPDFExtractionFailureDoesNotGenerateFromFilename(t *testing.T) {
 	result, err := h.Handle(t.Context(), event, chatStep)
 	if err != nil || len(g.messages) != 0 || !strings.Contains(result["reply"].(string), "could not extract text") || strings.Contains(result["reply"].(string), "private parser") {
 		t.Fatal("unread PDF became evidence", result, err)
+	}
+}
+
+func TestPDFConfiguredLimitIsReportedBeforeFetching(t *testing.T) {
+	t.Setenv("DOKJA_PDF_MAX_MIB", "3")
+	reader := &webReadingService{}
+	g := &presentationCaptureGenerator{}
+	h := NewChatDomainHandler(g).WithWebReading(reader, nil)
+	event := chatEvent("")
+	event.Payload["document_attachments"] = []chat.WebAttachment{{URL: "https://example.com/report.pdf", Filename: "report.pdf", Size: (3 << 20) + 1}}
+	event.Payload["locale"] = "en"
+	result, err := h.Handle(t.Context(), event, chatStep)
+	if err != nil || len(reader.calls) != 0 || len(g.messages) != 0 || !strings.Contains(result["reply"].(string), "3 MiB") {
+		t.Fatal("configured PDF limit not enforced or reported", result, err)
 	}
 }

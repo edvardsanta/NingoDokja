@@ -59,3 +59,12 @@ test("the Library's limits have their own section and read as no limit while emp
   assert.equal(FIELDS["library.max_file_mb"]?.unset, "setting_no_limit");
 });
 
+
+test("chat PDF limit appears in Library with a translated label and help", () => {
+  const setting = row("library.chat_pdf_max_mib", "", { kind: "text", default: "25", affects: ["orchestrator", "feeds"] });
+  const sections = sectionsOf([setting]);
+  assert.equal(sections[0]?.id, "library");
+  assert.equal(sections[0]?.rows[0]?.default, "25");
+  assert.equal(FIELDS[setting.id]?.label, "setting_chat_pdf_max");
+  assert.equal(FIELDS[setting.id]?.help, "settings_help_chat_pdf_max");
+});

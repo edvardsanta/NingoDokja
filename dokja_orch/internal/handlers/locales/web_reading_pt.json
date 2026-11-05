@@ -1,7 +1,7 @@
 {
   "document_prompt": "Leia o PDF anexado e vamos conversar sobre ele.",
   "pdf_unreadable": "Não consegui extrair texto de {count} PDF(s). Arquivos digitalizados, protegidos ou danificados podem não ser legíveis; não li esses conteúdos.",
-  "too_large": "Deixei {count} PDF(s) sem leitura por excederem o limite de 2 MiB por arquivo.",
+  "too_large": "Deixei {count} PDF(s) sem leitura por excederem o limite de {limit} MiB por arquivo.",
   "failed": "Não consegui ler {count} dos links enviados. Eles não servem de evidência para esta resposta.",
   "omitted": "Deixei {count} links adicionais sem leitura; consigo ler até {limit} por mensagem.",
   "blocked_one": "O site bloqueou a leitura automática de um dos links. Não li esse conteúdo.",

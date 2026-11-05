@@ -42,3 +42,22 @@ func TestPDFFollowupCanSelectAnOriginalPageBeyondTheFirstReply(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigurablePDFLimit(t *testing.T) {
+	for _, raw := range []string{"", "bad", "0", "101"} {
+		if PDFLimitBytes(raw) != 25<<20 {
+			t.Fatalf("invalid setting %q did not use default", raw)
+		}
+	}
+	attachment := []WebAttachment{{URL: "https://example.com/report.pdf", Filename: "report.pdf", Size: 3 << 20}}
+	if PlanWebReadings("", attachment)[0].Error != "" {
+		t.Fatal("3 MiB PDF rejected by new default")
+	}
+	if PlanWebReadingsWithLimit("", attachment, PDFLimitBytes("2"))[0].Error != "too_large" {
+		t.Fatal("configured limit ignored")
+	}
+	attachment[0].Size = 2 << 20
+	if PlanWebReadingsWithLimit("", attachment, PDFLimitBytes("2"))[0].Error != "" {
+		t.Fatal("exact limit rejected")
+	}
+}

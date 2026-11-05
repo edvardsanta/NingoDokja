@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -41,6 +42,7 @@ var (
 )
 
 var settingsCatalog = []Setting{
+	{ID: "library.chat_pdf_max_mib", Group: "library", Env: "DOKJA_PDF_MAX_MIB", Default: "25", Kind: "text", Affects: []string{"orchestrator", "feeds"}, parse: pdfLimit},
 	{ID: "discord.meme_channels", Group: "discord", Env: "DISCORD_SCHEDULED_MEME_CHANNEL_ID", Kind: "list", Affects: []string{"orchestrator", "communications"}, Note: "sessions", parse: listOf(channel)},
 	{ID: "discord.safe_only_channels", Group: "discord", Env: "DISCORD_SAFE_ONLY_CHANNEL_IDS", Kind: "list", Affects: []string{"orchestrator"}, Note: "sessions", parse: listOf(channel)},
 	{ID: "discord.answer_channels", Group: "discord", Env: "DISCORD_ALLOWED_CHANNELS", Kind: "list", Affects: []string{"orchestrator", "discord"}, parse: listOf(channel)},
@@ -142,6 +144,19 @@ func model(value string) (string, error) {
 		return "", fmt.Errorf("not a model name")
 	}
 	return value, nil
+}
+
+// pdfLimit accepts a bounded MiB count, or nothing for the default.
+func pdfLimit(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 1 || n > 100 {
+		return "", fmt.Errorf("PDF limit must be between 1 and 100 MiB")
+	}
+	return strconv.Itoa(n), nil
 }
 
 // wholeNumber is a limit: a positive count, or nothing for no limit at all.

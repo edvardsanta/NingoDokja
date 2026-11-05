@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	chat "read_books/dokja_domain/dokja_chat"
 	digest "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
@@ -59,7 +60,7 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	}
 	w := h.web
 	attachments, _ := event.Payload["document_attachments"].([]chat.WebAttachment)
-	links := chat.PlanWebReadings(question, attachments)
+	links := chat.PlanWebReadingsWithLimit(question, attachments, chat.PDFLimitBytes(os.Getenv("DOKJA_PDF_MAX_MIB")))
 	key := chatSessionBaseKey(event)
 	if key == "" {
 		return nil, nil
@@ -309,7 +310,7 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 		lines = append(lines, catalog.say("pdf_unreadable", "count", fmt.Sprint(pdfUnreadable)))
 	}
 	if tooLarge > 0 {
-		lines = append(lines, catalog.say("too_large", "count", fmt.Sprint(tooLarge)))
+		lines = append(lines, catalog.say("too_large", "count", fmt.Sprint(tooLarge), "limit", fmt.Sprint(chat.PDFLimitBytes(os.Getenv("DOKJA_PDF_MAX_MIB"))>>20)))
 	}
 	if other := len(data.Failures) - blocked - pdfUnreadable - tooLarge; other > 0 {
 		lines = append(lines, catalog.say("failed", "count", fmt.Sprint(other)))

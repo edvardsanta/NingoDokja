@@ -12,6 +12,7 @@ type FieldSpec = { label: MessageId; help?: MessageId; entry?: EntryKind; unset?
 
 // A setting is named by what it does for the owner, never by its variable or the shape of its value.
 export const FIELDS: Readonly<Record<string, FieldSpec>> = {
+  "library.chat_pdf_max_mib": { label: "setting_chat_pdf_max", help: "settings_help_chat_pdf_max" },
   "discord.answer_channels": { label: "setting_answer_channels", help: "settings_help_answer_channels", entry: "channel", unset: "setting_every_channel" },
   "library.max_file_mb": { label: "setting_library_max_file", help: "settings_help_library_max_file", unset: "setting_no_limit" },
   "library.max_text_chars": { label: "setting_library_max_text", help: "settings_help_library_max_text", unset: "setting_no_limit" },
@@ -41,7 +42,7 @@ const SECTIONS: readonly SectionSpec[] = [
   { id: "discord_memes", title: "settings_section_discord_memes", about: "settings_about_discord_memes", settings: ["discord.meme_channels", "discord.safe_only_channels"], unset: "empty" },
   { id: "whatsapp_access", title: "settings_section_whatsapp_access", about: "settings_about_whatsapp_access", settings: ["whatsapp.people", "whatsapp.groups", "whatsapp.own_chat"], unset: "default" },
   { id: "whatsapp_messages", title: "settings_section_whatsapp_messages", about: "settings_about_whatsapp_messages", settings: ["whatsapp.conversations"], unset: "empty" },
-  { id: "library", title: "settings_section_library", about: "settings_about_library", settings: ["library.max_file_mb", "library.max_text_chars", "library.intake_sources"], unset: "default" },
+  { id: "library", title: "settings_section_library", about: "settings_about_library", settings: ["library.chat_pdf_max_mib", "library.max_file_mb", "library.max_text_chars", "library.intake_sources"], unset: "default" },
   { id: "models", title: "settings_group_models", about: "settings_about_models", settings: ["models.embedding", "models.book_classifier", "models.book_overview", "models.speech_to_text", "models.ocr"], unset: "default", takes: "models" },
 ];
 

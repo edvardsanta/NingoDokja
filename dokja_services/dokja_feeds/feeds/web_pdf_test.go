@@ -151,3 +151,25 @@ sys.stdout.buffer.write(output.getvalue())`)
 		t.Fatal("accepted protected PDF")
 	}
 }
+
+func TestWebPDFDownloadUsesConfiguredLimit(t *testing.T) {
+	body := "%PDF-" + strings.Repeat(" ", (3<<20)-5)
+	client := &http.Client{Transport: webRoundTrip(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/pdf"}}, Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+	})}
+	for _, limit := range []string{"", "2", "3"} {
+		t.Setenv("DOKJA_PDF_MAX_MIB", limit)
+		called := false
+		_, err := fetchWeb(t.Context(), client, "https://example.com/report.pdf", time.Now(), func(context.Context, []byte, int) (pdfReading, error) {
+			called = true
+			return pdfReading{Pages: []pdfPage{{Page: 1, Text: "Report contents"}}}, nil
+		})
+		if limit == "2" {
+			if err == nil || called {
+				t.Fatal("oversized download reached parser")
+			}
+		} else if err != nil || !called {
+			t.Fatal("PDF within limit rejected", limit, err)
+		}
+	}
+}

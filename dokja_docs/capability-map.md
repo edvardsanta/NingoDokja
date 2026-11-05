@@ -145,7 +145,7 @@ orchestrator calls Digest's existing `ReadWebLink` action and Feeds client.
 `feeds.web.read` performs the validated fetch and invokes a fixed embedded PDF
 text helper. Original page numbers become citation fragments; extracted text,
 PDF metadata and filenames remain data rather than trusted instructions.
-The existing four-source, eight-passage and 2 MiB limits apply. Requested page
+The existing four-source, eight-passage and 25 MiB limits apply. Requested page
 fragments start the bounded excerpt; page-specific follow-ups can revisit cached
 passages. Readings remain temporary and scoped to the same conversation. No
 automatic Knowledge import, channel-history retrieval or OCR is added. Regression

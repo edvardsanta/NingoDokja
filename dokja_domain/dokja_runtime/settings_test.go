@@ -327,3 +327,16 @@ func TestIntakeSourcesAreFeedPluginIDsForTheOrchestrator(t *testing.T) {
 		}
 	}
 }
+
+func TestPDFLimitSettingValidation(t *testing.T) {
+	for _, value := range []string{"", "1", "25", "100"} {
+		if _, err := pdfLimit(value); err != nil {
+			t.Fatal(value, err)
+		}
+	}
+	for _, value := range []string{"0", "101", "-1", "2.5", "bad"} {
+		if _, err := pdfLimit(value); err == nil {
+			t.Fatal("accepted invalid PDF limit", value)
+		}
+	}
+}
