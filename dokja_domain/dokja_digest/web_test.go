@@ -29,7 +29,7 @@ func TestWebReadingUsesNonExecutingReader(t *testing.T) {
 }
 
 func TestWebFailureReasonsExposeOnlyFixedCategories(t *testing.T) {
-	for message, want := range map[string]string{"web_blocked: secret challenge": "blocked", "web_timeout: internal details": "timeout", "private transport diagnostic": "unavailable"} {
+	for message, want := range map[string]string{"web_blocked: secret challenge": "blocked", "web_timeout: internal details": "timeout", "web_pdf_unreadable: parser details": "pdf_unreadable", "private transport diagnostic": "unavailable"} {
 		if got := WebFailureReason(fmt.Errorf("%s", message)); got != want {
 			t.Fatalf("%s", got)
 		}

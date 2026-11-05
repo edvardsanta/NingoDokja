@@ -2,6 +2,7 @@ package chat
 
 import (
 	"net/url"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -11,8 +12,48 @@ import (
 const MaxWebLinks = 4
 const MaxWebPassages = 8
 const ActionConverseLinks = "converse-links"
+const MaxWebDocumentBytes = 2 << 20
+
+// WebAttachment is platform metadata, never file bytes, a path or instructions.
+type WebAttachment struct {
+	URL         string `json:"url"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
+}
+
+type WebReadingRequest struct{ URL, Error string }
+
+// PlanWebReadings shares the existing per-turn link budget with PDF attachments.
+func PlanWebReadings(message string, attachments []WebAttachment) []WebReadingRequest {
+	var requests []WebReadingRequest
+	seen := map[string]bool{}
+	for _, link := range WebLinks(message) {
+		requests = append(requests, WebReadingRequest{URL: link})
+		seen[link] = true
+	}
+	for _, attachment := range attachments {
+		if seen[attachment.URL] {
+			continue
+		}
+		if !strings.EqualFold(path.Ext(attachment.Filename), ".pdf") && !strings.EqualFold(attachment.ContentType, "application/pdf") {
+			continue
+		}
+		request := WebReadingRequest{URL: attachment.URL}
+		u, err := url.Parse(attachment.URL)
+		if err != nil || len(attachment.URL) > 2048 || u.Hostname() == "" || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
+			request.Error = "unreadable"
+		} else if attachment.Size < 0 || attachment.Size > MaxWebDocumentBytes {
+			request.Error = "too_large"
+		}
+		seen[attachment.URL] = true
+		requests = append(requests, request)
+	}
+	return requests
+}
 
 var webLinkPattern = regexp.MustCompile(`https?://[^\s<>]+`)
+var requestedReadingPage = regexp.MustCompile(`(?i)\b(?:pages?|p[aá]ginas?|p[aá]g\.?)\s+([1-9][0-9]{0,4})\b`)
 
 // WebLinks recognizes raw, Discord-wrapped and Markdown links without treating
 // any page-supplied address as a new request. Fragments remain part of identity.
@@ -52,6 +93,10 @@ type WebDocument struct {
 // SelectWebPassages balances the pages before ranking extra passages by the
 // current question. It can revisit text not included in the preceding reply.
 func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
+	wantedPages := map[string]bool{}
+	for _, match := range requestedReadingPage.FindAllStringSubmatch(question, -1) {
+		wantedPages["page "+match[1]] = true
+	}
 	words := strings.FieldsFunc(strings.ToLower(question), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	type candidate struct{ doc, index, score int }
 	var rest []candidate
@@ -65,6 +110,9 @@ func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
 		bestScore := -1
 		for i, p := range document.Passages {
 			score := 0
+			if wantedPages[strings.ToLower(p.Label)] {
+				score += 1000
+			}
 			hay := strings.ToLower(p.Label + " " + p.Text)
 			for _, word := range words {
 				if len([]rune(word)) >= 4 && strings.Contains(hay, word) {
@@ -100,6 +148,7 @@ func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
 			}
 		}
 		if len(document.Passages) > 0 {
+			document.Partial = document.Partial || len(document.Passages) < len(all)
 			out = append(out, document)
 		}
 	}

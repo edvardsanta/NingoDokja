@@ -26,8 +26,8 @@ jobs:
       with:
         go-version: '1.25.0'
 
-    - name: Install native ZeroMQ development headers
-      run: sudo apt-get update && sudo apt-get install -y libzmq3-dev pkg-config
+    - name: Install native headers and PDF parser
+      run: sudo apt-get update && sudo apt-get install -y libzmq3-dev pkg-config python3-pypdf
 
     - name: Test
       working-directory: ./dokja_orch

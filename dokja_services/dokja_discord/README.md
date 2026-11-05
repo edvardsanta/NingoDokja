@@ -1,5 +1,13 @@
 # Dokja Discord Interface
 
+Share a searchable PDF link or attach a PDF to discuss it in the same chat, with
+page citations and follow-up questions. File-only messages are accepted. PDFs
+share the four-source limit with links and must fit within 2 MiB per file. The
+adapter forwards only platform metadata through optional `documentAttachments`;
+the orchestrator authorizes the turn before Feeds downloads anything. The reader
+does not run PDF instructions or links, and scanned/protected documents may be
+unreadable. Readings expire after inactivity or restart and are not saved to Knowledge.
+
 Chat replies may include up to three formula PNGs. The orchestrator supplies
 validated inline image bytes through optional bridge `attachments`; the adapter
 uploads them with messages, slash replies and chat modals. A long reply attaches

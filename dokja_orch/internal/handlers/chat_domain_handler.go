@@ -111,6 +111,12 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 
 	content := chatMessageFromEvent(event)
+	if content == "" && event.Source == core.SourceDiscord {
+		attachments, _ := event.Payload["document_attachments"].([]chat.WebAttachment)
+		if len(chat.PlanWebReadings("", attachments)) > 0 {
+			content = webAttachmentPrompt(event)
+		}
+	}
 	if content == "" {
 		return nil, fmt.Errorf("chat content is required")
 	}

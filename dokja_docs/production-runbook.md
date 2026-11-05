@@ -75,17 +75,38 @@ an older image does not install it. The existing Feeds service switch disables w
 still decides which messages may initiate it. Readers need outbound public HTTP(S)
 and DNS. They deliberately ignore HTTP proxy environment variables, reject private
 and special-purpose destinations (including redirect targets), and cannot read
-login-only, PDF or JavaScript-only pages. Do not enable a browser/plugin fallback
+login-only or JavaScript-only pages. Do not enable a browser/plugin fallback
 for this path without reviewing its execution and network boundaries. A fixed
 isolated Python helper may retry HTTP 403/429 or challenge-header responses using
 `curl_cffi==0.16.3`; it evaluates no page JavaScript, follows no redirects itself,
 and shares the Go reader's validated DNS pins, deadlines and byte limits. It is
 independent of the existing optional media plugin's dependency versions.
 
-Readings are volatile: new link messages replace them, session resets clear them,
+Discord also accepts searchable PDF links and PDF message attachments, including
+messages containing only the file. Both Discord runtimes forward up to ten
+attachment metadata records through optional bridge `documentAttachments`;
+the existing channel, server, DM and mention policy runs before any file fetch.
+PDFs share the existing four-source budget with links and the 2 MiB per-file
+download limit. A `#page=N` URL starts extraction at that original PDF page;
+citations retain `#page=N`, and English or Portuguese page questions can select
+later cached pages. Page numbers refer to physical PDF pages, not printed labels.
+
+The Feeds reader checks PDF content type and signature, then runs a fixed embedded
+Python text parser using `pypdf`, already installed in both Feeds images. It uses
+isolated Python mode, no inherited credentials, a 512 MiB address-space limit,
+an eight-second CPU limit and bounded output under the existing reading deadline.
+It executes no document scripts, plugins, links, embedded files or OCR. Protected,
+damaged and image-only files can fail with an explicit localized notice; unread
+content is never sent to reply inference as evidence. Extracted text and metadata
+stay in the same untrusted-evidence frame as web text. This reduces prompt-injection
+exposure but does not guarantee model resistance. Rebuild/restart Feeds, the
+orchestrator and the Discord adapter to use this additive feature. No new ports,
+variables, volumes or database migrations are needed.
+
+Readings are volatile: new link or PDF messages replace them, session resets clear them,
 and inactivity over 30 minutes, capacity eviction or restart loses their text.
 Resend the links after a restart when exact web evidence is needed. At most four
-links and eight passages enter one turn; each reader accepts at most 2 MiB and
+sources (links or PDFs) and eight passages enter one turn; each reader accepts at most 2 MiB and
 80,000 extracted characters, with a 12-second per-read deadline and a 15-second
 aggregate chat budget. Failed/excess links are disclosed in the reply. If every
 link fails, the application emits one localized notice and skips reply inference instead of

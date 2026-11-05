@@ -40,34 +40,35 @@ type BridgeRequest struct {
 }
 
 type BridgePayload struct {
-	Document         *chat.IncomingDocument `json:"document,omitempty"`
-	Locale           string                 `json:"locale,omitempty"`
-	VoiceSessionID   string                 `json:"voiceSessionId"`
-	VoiceStartedBy   string                 `json:"voiceStartedBy"`
-	Realtime         map[string]any         `json:"realtime"`
-	Voice            map[string]any         `json:"voice"`
-	VoiceTurns       []chat.VoiceTurn       `json:"voiceTurns"`
-	VoiceChannelID   string                 `json:"voiceChannelId"`
-	Content          string                 `json:"content"`
-	ReplyToContent   string                 `json:"replyToContent"`
-	MentionedUserIDs []string               `json:"mentionedUserIds"`
-	Limit            *int                   `json:"limit"`
-	MaxItems         *int                   `json:"maxItemsPerScraper"`
-	UserID           string                 `json:"userId"`
-	UserName         string                 `json:"userName"`
-	ChannelID        string                 `json:"channelId"`
-	MessageID        string                 `json:"messageId"`
-	GuildID          string                 `json:"guildId"`
-	SessionKey       string                 `json:"sessionKey"`
-	StartChat        bool                   `json:"startSession"`
-	AccountID        string                 `json:"accountId"`
-	EntryKind        string                 `json:"entryKind"`
-	Direct           *bool                  `json:"isDirectMessage"`
-	Mentioned        *bool                  `json:"mentionsBot"`
-	ChatKind         string                 `json:"chatKind"`
-	OwnAccount       *bool                  `json:"isOwnAccount"`
-	SelfChat         *bool                  `json:"isSelfChat"`
-	Numbers          []string               `json:"senderNumbers"`
+	DocumentAttachments []chat.WebAttachment   `json:"documentAttachments,omitempty"`
+	Document            *chat.IncomingDocument `json:"document,omitempty"`
+	Locale              string                 `json:"locale,omitempty"`
+	VoiceSessionID      string                 `json:"voiceSessionId"`
+	VoiceStartedBy      string                 `json:"voiceStartedBy"`
+	Realtime            map[string]any         `json:"realtime"`
+	Voice               map[string]any         `json:"voice"`
+	VoiceTurns          []chat.VoiceTurn       `json:"voiceTurns"`
+	VoiceChannelID      string                 `json:"voiceChannelId"`
+	Content             string                 `json:"content"`
+	ReplyToContent      string                 `json:"replyToContent"`
+	MentionedUserIDs    []string               `json:"mentionedUserIds"`
+	Limit               *int                   `json:"limit"`
+	MaxItems            *int                   `json:"maxItemsPerScraper"`
+	UserID              string                 `json:"userId"`
+	UserName            string                 `json:"userName"`
+	ChannelID           string                 `json:"channelId"`
+	MessageID           string                 `json:"messageId"`
+	GuildID             string                 `json:"guildId"`
+	SessionKey          string                 `json:"sessionKey"`
+	StartChat           bool                   `json:"startSession"`
+	AccountID           string                 `json:"accountId"`
+	EntryKind           string                 `json:"entryKind"`
+	Direct              *bool                  `json:"isDirectMessage"`
+	Mentioned           *bool                  `json:"mentionsBot"`
+	ChatKind            string                 `json:"chatKind"`
+	OwnAccount          *bool                  `json:"isOwnAccount"`
+	SelfChat            *bool                  `json:"isSelfChat"`
+	Numbers             []string               `json:"senderNumbers"`
 }
 
 type BridgeResponse struct {
@@ -558,6 +559,10 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 		context["sender_numbers"] = request.Payload.Numbers
 	}
 	if eventType == "message.created" {
+		if source == core.SourceDiscord {
+			payload["locale"] = request.Payload.Locale
+			payload["document_attachments"] = request.Payload.DocumentAttachments[:min(len(request.Payload.DocumentAttachments), 10)]
+		}
 		context["content"] = content
 		if source == core.SourceDiscord && request.Payload.ReplyToContent != "" {
 			quoted := []rune(request.Payload.ReplyToContent)

@@ -31,6 +31,8 @@ func WebFailureReason(err error) string {
 			return "blocked"
 		case strings.HasPrefix(err.Error(), "web_timeout:"):
 			return "timeout"
+		case strings.HasPrefix(err.Error(), "web_pdf_unreadable:"):
+			return "pdf_unreadable"
 		}
 	}
 	return "unavailable"

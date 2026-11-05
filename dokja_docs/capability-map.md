@@ -137,6 +137,22 @@ Relevant implementation contracts:
 
 `message.* -> conversation route -> moderation:screen-event -> chat action`
 
+Discord PDF attachments and HTTP(S) PDF links use the same link-conversation
+route and `converse-links` action as web readings. The adapter forwards attachment
+metadata as optional `documentAttachments`; the bridge maps it to
+`payload.document_attachments`. Chat plans the bounded source list, and the
+orchestrator calls Digest's existing `ReadWebLink` action and Feeds client.
+`feeds.web.read` performs the validated fetch and invokes a fixed embedded PDF
+text helper. Original page numbers become citation fragments; extracted text,
+PDF metadata and filenames remain data rather than trusted instructions.
+The existing four-source, eight-passage and 2 MiB limits apply. Requested page
+fragments start the bounded excerpt; page-specific follow-ups can revisit cached
+passages. Readings remain temporary and scoped to the same conversation. No
+automatic Knowledge import, channel-history retrieval or OCR is added. Regression
+coverage includes attachment-only messages, admission before fetch, malicious
+document evidence, citation sanitation, follow-ups, channel isolation and real
+PDF parser fixtures. An opt-in Feeds test can exercise a public PDF URL.
+
 The Chat domain's versioned [capabilities.json](../dokja_domain/dokja_chat/capabilities.json)
 provides static product self-knowledge: supported features, interface entry points
 and limits. It is embedded at build time and added to each generated turn's system

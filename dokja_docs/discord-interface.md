@@ -19,6 +19,7 @@ Primary flow:
 Current capabilities:
 
 - plain text message forwarding
+- PDF attachment forwarding, including file-only messages, into cited reading conversations
 - slash commands
 - buttons
 - select menus

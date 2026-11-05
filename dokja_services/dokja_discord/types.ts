@@ -68,6 +68,7 @@ export type DiscordCommandContext = {
 };
 
 export type DiscordMessageContext = {
+  documentAttachments?: DiscordDocumentAttachment[];
   userId: string;
   userName?: string;
   channelId: string;
@@ -80,6 +81,13 @@ export type DiscordMessageContext = {
   isDirectMessage: boolean;
   mentionsBot: boolean;
   reply(message: DiscordReply): Promise<void>;
+};
+
+export type DiscordDocumentAttachment = {
+  url: string;
+  filename: string;
+  content_type: string;
+  size: number;
 };
 
 export type DiscordSlashCommand = {

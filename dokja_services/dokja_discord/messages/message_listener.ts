@@ -14,7 +14,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
       console.log("[dokja-discord] message ignored", JSON.stringify({ reason: "bot", messageId: context.messageId }));
       return;
     }
-    if (!context.content) {
+    if (!context.content && !context.documentAttachments?.length) {
       console.log("[dokja-discord] message ignored", JSON.stringify({ reason: "empty", messageId: context.messageId }));
       return;
     }
@@ -37,6 +37,8 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
         buildBridgePayload({
           eventType: "message.created",
           content: context.content,
+          documentAttachments: context.documentAttachments,
+          locale: config.locale,
           replyToContent: context.replyToContent,
           mentionedUserIds: context.mentionedUserIds,
           userId: context.userId,

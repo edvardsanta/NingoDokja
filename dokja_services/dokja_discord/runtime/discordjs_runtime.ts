@@ -23,6 +23,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 
+import { pdfAttachments } from "../messages/documents.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -411,6 +412,7 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     messageId: message.id,
     guildId: message.guildId ?? undefined,
     content: message.content?.trim() ?? "",
+    documentAttachments: pdfAttachments(message.attachments?.values() ?? []),
     replyToContent,
     mentionedUserIds: Array.from(message.mentions.users.values(), user => user.id).slice(0, 20),
     isBot: Boolean(message.author.bot),
