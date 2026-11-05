@@ -308,8 +308,8 @@ Each read has a 12-second deadline, shares the two-slot extraction limit, and
 accepts at most 2 MiB of decoded HTTP response bytes and 80,000 extracted Unicode
 characters. The helper uses a synchronous curl content callback to enforce the
 byte limit before accepting a chunk. Oversized downloads fail; clipped text is
-marked `partial`. HTML, XHTML and plain text are supported. Login-only, paywalled,
-PDF or JavaScript-only content may remain unavailable; refusals retain a fixed
+marked `partial`. HTML, XHTML, plain text and searchable PDFs are supported. Login-only, paywalled
+or JavaScript-only content may remain unavailable; refusals retain a fixed
 `web_blocked:` category and deadlines use `web_timeout:` without exposing response
 bodies or transport details.
 
@@ -317,6 +317,31 @@ Main landmarks and the article containing the main heading take priority over
 related-story cards. Nested articles and sidebars are excluded. Original section
 anchors and legal article/paragraph labels are retained; a requested fragment
 selects where the bounded excerpt begins. No links from page content are followed.
+
+PDF responses must have a PDF signature and PDF or binary content type. A fixed
+embedded Python helper extracts text with the image's existing `pypdf` dependency,
+without plugins, OCR or document actions. Its isolated process has a 512 MiB
+address-space limit, eight CPU seconds and bounded output, under the HTTP reader's
+existing deadline and concurrency gate. `#page=N` starts at the original physical
+page; page passages keep that number and citation fragment. At most 500 pages
+and 80,000 text characters are considered per reading, with clipping marked
+partial. Empty, encrypted, damaged or missing-page readings fail with the fixed
+`web_pdf_unreadable:` category. PDF-owned titles and text are untrusted data.
+
+Run the real-parser regression with `python3` plus `pypdf` available:
+
+```sh
+go test ./feeds -run TestWebPDFRealHelper -v
+```
+
+The optional network probe accepts its URL at runtime:
+
+```sh
+go test ./feeds -run '^TestLiveWebPDF$' -v -count=1 -args -pdf-url 'https://example.com/reading.pdf#page=9'
+```
+
+Without that flag the live test is skipped. It uses the same validated fetch and
+PDF parser, and neither stores the document nor invokes a language model.
 
 The production and development images install the core web helper in
 `/opt/feeds-web`, independently of optional plugin extras. Rebuild the Feeds image
