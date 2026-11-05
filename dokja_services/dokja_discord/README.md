@@ -2,7 +2,7 @@
 
 Share a searchable PDF link or attach a PDF to discuss it in the same chat, with
 page citations and follow-up questions. File-only messages are accepted. PDFs
-share the four-source limit with links and must fit within 2 MiB per file. The
+share the four-source limit with links and must fit within 25 MiB per file. The
 adapter forwards only platform metadata through optional `documentAttachments`;
 the orchestrator authorizes the turn before Feeds downloads anything. The reader
 does not run PDF instructions or links, and scanned/protected documents may be

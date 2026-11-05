@@ -41,7 +41,7 @@ func runWebPDF(ctx context.Context, data []byte, page int) (pdfReading, error) {
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	output := &capped{limit: 1 << 20, onFull: cancel}
-	cmd := exec.CommandContext(childCtx, python, "-I", "-c", webPDFScript, strconv.Itoa(page))
+	cmd := exec.CommandContext(childCtx, python, "-I", "-c", webPDFScript, strconv.Itoa(page), strconv.FormatInt(pdfLimitBytes(), 10))
 	cmd.Dir = os.TempDir()
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "LANG=C.UTF-8"}
 	cmd.Stdin = bytes.NewReader(data)

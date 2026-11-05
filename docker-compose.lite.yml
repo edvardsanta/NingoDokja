@@ -18,6 +18,7 @@ services:
       DOKJA_INFERENCE_SOCKET: /run/dokja-inference/chat.sock
       MEMORY_SERVICE_ENDPOINT: tcp://dokja-memory:5562
       MEME_HASHTAG_MIN_SCORE: ${MEME_HASHTAG_MIN_SCORE:-0.6}
+      DOKJA_PDF_MAX_MIB: ${DOKJA_PDF_MAX_MIB:-25}
       FEEDS_SERVICE_ENDPOINT: tcp://dokja-feeds:5563
       DOKJA_CONTENT_BACKEND: ${DOKJA_CONTENT_BACKEND:-feeds}
       DOKJA_KNOWLEDGE_INTAKE_SOURCES: ${DOKJA_KNOWLEDGE_INTAKE_SOURCES:-}
@@ -189,6 +190,7 @@ services:
     working_dir: /workspace/dokja_services/dokja_feeds
     command: ["/usr/local/go/bin/go", "run", "./cmd/dokja-feeds"]
     environment:
+      DOKJA_PDF_MAX_MIB: ${DOKJA_PDF_MAX_MIB:-25}
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
       FEEDS_PLUGINS_DIR: /plugins
       FEEDS_BUILTIN_PLUGINS_DIR: /workspace/dokja_services/dokja_feeds/plugins.builtin

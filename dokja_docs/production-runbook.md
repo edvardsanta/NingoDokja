@@ -105,7 +105,7 @@ Discord also accepts searchable PDF links and PDF message attachments, including
 messages containing only the file. Both Discord runtimes forward up to ten
 attachment metadata records through optional bridge `documentAttachments`;
 the existing channel, server, DM and mention policy runs before any file fetch.
-PDFs share the existing four-source budget with links and the 2 MiB per-file
+PDFs share the existing four-source budget with links and the 25 MiB per-file
 download limit. A `#page=N` URL starts extraction at that original PDF page;
 citations retain `#page=N`, and English or Portuguese page questions can select
 later cached pages. Page numbers refer to physical PDF pages, not printed labels.
@@ -125,7 +125,7 @@ variables, volumes or database migrations are needed.
 Readings are volatile: new link or PDF messages replace them, session resets clear them,
 and inactivity over 30 minutes, capacity eviction or restart loses their text.
 Resend the links after a restart when exact web evidence is needed. At most four
-sources (links or PDFs) and eight passages enter one turn; each reader accepts at most 2 MiB and
+sources (links or PDFs) and eight passages enter one turn; each HTML/text reader accepts at most 2 MiB and
 80,000 extracted characters, with a 12-second per-read deadline and a 15-second
 aggregate chat budget. Failed/excess links are disclosed in the reply. If every
 link fails, the application emits one localized notice and skips reply inference instead of
@@ -1515,3 +1515,9 @@ To disable the interface, cancel active preparations where possible and remove
 both orchestrator supervision settings on the next approved rollout. Retain the
 journal data; disabling this optional host does not drop tables or change its
 schema. Restart alone does not settle an unconfirmed old receipt.
+
+Discord chat PDF size is configured with `DOKJA_PDF_MAX_MIB` (1–100 MiB,
+default 25). Desktop exposes it under Settings → Library → Chat PDF limit.
+Saving recreates orchestrator and feeds together. Blank or invalid environment
+values use 25 MiB. HTML/text reading retains its 2 MiB limit; extracted text,
+page, source and time budgets remain unchanged.

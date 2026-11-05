@@ -1,4 +1,6 @@
 {
+  "setting_chat_pdf_max": "Limite de PDF no chat (MiB)",
+  "settings_help_chat_pdf_max": "Tamanho máximo por PDF lido no chat do Discord: 1–100 MiB. Padrão: 25 MiB. Salvar reinicia o orquestrador e o serviço de feeds.",
   "refresh": "Atualizar",
   "retry": "Tentar de novo",
   "loading": "Carregando…",

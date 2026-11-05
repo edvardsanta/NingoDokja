@@ -162,8 +162,12 @@ func fetchWeb(ctx context.Context, client *http.Client, raw string, now time.Tim
 	if !isPDF && kind != "text/html" && kind != "application/xhtml+xml" && kind != "text/plain" {
 		return nil, fmt.Errorf("unsupported web content")
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxWebBytes+1))
-	if err != nil || len(data) > maxWebBytes {
+	limit := int64(maxWebBytes)
+	if isPDF {
+		limit = pdfLimitBytes()
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil || int64(len(data)) > limit {
 		return nil, fmt.Errorf("web content exceeds reading limit or is incomplete")
 	}
 	final := *resp.Request.URL

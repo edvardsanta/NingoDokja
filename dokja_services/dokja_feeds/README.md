@@ -305,7 +305,7 @@ returns to Go for URL and destination validation, with at most three followed.
 Cookies and authentication are not carried between requests.
 
 Each read has a 12-second deadline, shares the two-slot extraction limit, and
-accepts at most 2 MiB of decoded HTTP response bytes and 80,000 extracted Unicode
+accepts at most 2 MiB of decoded HTML/text response bytes and 80,000 extracted Unicode
 characters. The helper uses a synchronous curl content callback to enforce the
 byte limit before accepting a chunk. Oversized downloads fail; clipped text is
 marked `partial`. HTML, XHTML, plain text and searchable PDFs are supported. Login-only, paywalled
@@ -317,6 +317,11 @@ Main landmarks and the article containing the main heading take priority over
 related-story cards. Nested articles and sidebars are excluded. Original section
 anchors and legal article/paragraph labels are retained; a requested fragment
 selects where the bounded excerpt begins. No links from page content are followed.
+
+PDF downloads accept up to 25 MiB by default, configurable from 1–100 MiB with
+`DOKJA_PDF_MAX_MIB` (also available in Desktop Settings → Library). Invalid or
+blank environment values fall back to 25 MiB. The download and isolated parser
+enforce the same configured bound.
 
 PDF responses must have a PDF signature and PDF or binary content type. A fixed
 embedded Python helper extracts text with the image's existing `pypdf` dependency,
