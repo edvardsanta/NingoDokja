@@ -7,6 +7,7 @@ export type DiscordMessageConfig = {
 import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordMessageContext, DiscordMessageHandler } from "../types.js";
 import { localizeNotice } from "./notices.js";
+import { formatCitations } from "./citations.js";
 
 export function createDiscordMessageHandler(config: DiscordMessageConfig): DiscordMessageHandler {
   return async (context: DiscordMessageContext) => {
@@ -51,7 +52,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           mentionsBot: context.mentionsBot,
         }),
       );
-      const reply = localizeNotice(response.notice, response.reply, config.locale);
+      const reply = localizeNotice(response.notice, formatCitations(response.reply), config.locale);
       if (!reply.trim()) {
         console.log(
           "[dokja-discord] message dispatch completed",

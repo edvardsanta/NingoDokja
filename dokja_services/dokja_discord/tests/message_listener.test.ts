@@ -6,13 +6,13 @@ import { createDiscordMessageHandler } from "../messages/message_listener.js";
 test("message handler delivers formula attachments with readable text", async () => {
   const originalFetch = globalThis.fetch;
   const attachment = { filename: "formula-1.png", content_type: "image/png", data_b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6JXAAAAAASUVORK5CYII=" };
-  globalThis.fetch = (async () => new Response(JSON.stringify({ status: "ok", reply: "x / 2", attachments: [attachment] }))) as typeof fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ status: "ok", reply: "x / 2 [1]\n\n📚 [1] Formula · Formula <https://example.com/formula>", attachments: [attachment] }))) as typeof fetch;
   try {
     let delivered: unknown;
     const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 });
     await handler({ userId: "u", channelId: "c", messageId: "m", content: "show a formula", isBot: false,
       isDirectMessage: true, mentionsBot: false, reply: async message => { delivered = message; } });
-    assert.deepEqual(delivered, { content: "x / 2", attachments: [attachment] });
+    assert.deepEqual(delivered, { content: "x / 2 [1]\n\n📚\n[1] [Formula](<https://example.com/formula>)", attachments: [attachment] });
   } finally { globalThis.fetch = originalFetch; }
 });
 
