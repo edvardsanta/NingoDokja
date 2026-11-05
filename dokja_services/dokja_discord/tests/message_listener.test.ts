@@ -12,7 +12,7 @@ test("message handler delivers formula attachments with readable text", async ()
     const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 });
     await handler({ userId: "u", channelId: "c", messageId: "m", content: "show a formula", isBot: false,
       isDirectMessage: true, mentionsBot: false, reply: async message => { delivered = message; } });
-    assert.deepEqual(delivered, { content: "x / 2 [1]\n\n📚\n[1] [Formula](<https://example.com/formula>)", attachments: [attachment] });
+    assert.deepEqual(delivered, { content: "x / 2 [1]\n\n📚\n[1] [Formula](https://example.com/formula)", attachments: [attachment] });
   } finally { globalThis.fetch = originalFetch; }
 });
 

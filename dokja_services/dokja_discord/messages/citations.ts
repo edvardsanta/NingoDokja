@@ -19,8 +19,11 @@ export function formatCitations(reply: string): string {
       if (!existing.numbers.includes(number)) existing.numbers.push(number);
       continue;
     }
-    // The backend label includes title and heading, often the same product name.
-    const title = [...new Set(label.split(" · ").map(part => part.trim()).filter(Boolean))].join(" · ");
+    // Prefer the page title over the often-redundant product heading. Keep the
+    // complete destination and citation numbers even when shortening the label.
+    const pageTitle = label.split(" · ").map(part => part.trim()).find(Boolean) ?? label;
+    const characters = Array.from(pageTitle);
+    const title = characters.length > 100 ? characters.slice(0, 99).join("").trimEnd() + "…" : pageTitle;
     const group = { numbers: [number], title, url: address };
     groups.set(address, group);
     lines.push(group);
@@ -28,9 +31,9 @@ export function formatCitations(reply: string): string {
   if (!groups.size) return reply;
   const rendered = lines.map(line => {
     if (typeof line === "string") return line;
-    const title = line.title.replace(/[\\\[\]*_`~|]/g, "\\$&").replace(/@/g, "＠");
-    const url = line.url.replace(/\(/g, "%28").replace(/\)/g, "%29");
-    return `[${line.numbers.join(", ")}] [${title}](<${url}>)`;
+    const title = line.title.replace(/[\\\[\]*_`~]/g, "\\$&").replace(/\|/g, "│").replace(/@/g, "＠");
+    const url = line.url.replace(/\(/g, "%28").replace(/\)/g, "%29").replace(/\\/g, "%5C");
+    return `[${line.numbers.join(", ")}] [${title}](${url})`;
   });
   return reply.slice(0, footer.index) + footer[1] + "📚\n" + rendered.join("\n");
 }
