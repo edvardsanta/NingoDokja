@@ -191,7 +191,13 @@ The orchestrator requests a summary through the configured inference integration
 merges previous summary context, and retains up to eight recent turns verbatim
 within 16 KiB of recent context.
 The summary is bounded to 4,096 UTF-8 bytes and supplied as explicitly untrusted
-user-level context. Failed or invalid summaries preserve the last valid summary
+user-level context, with missing details explicitly unknown rather than evidence
+that nobody discussed them. Summary inference requires a JSON object with
+`kind: "conversation_summary"` and a nonempty `summary` string before replacing
+older turns. Runtime's shared provider wrapper respects background system tasks
+instead of forcing a conversational answer. This validates task output format,
+not factual completeness; existing checkpoints remain compatible. Failed or
+invalid summaries preserve the last valid summary
 and pending raw history, then continue with a bounded recent projection and a
 one-minute retry cooldown. They never silently discard history or claim successful
 compaction.
@@ -213,6 +219,16 @@ During debates, the shared persona retains its existing sparring-partner guidanc
 advance a conceded point into a relevant unresolved tension or clearly hypothetical
 thought experiment, without false disagreement or prolonging practical tasks and
 closed conversations.
+In casual exchanges, the shared persona favors confidence, irony and irreverence,
+including dry sarcasm and playful mockery grounded in the current conversation.
+A comeback can stand alone without an argument, explanatory lesson or reassurance;
+humor is optional, and arrogance should show through judgment and timing rather
+than declarations of superiority. Intellectual depth remains central: precise
+distinctions and connections across literature, philosophy, history, science,
+music and art support both humor and serious reasoning, with accurate references
+instead of invented quotations or decorative name-dropping.
+Regression tests verify this guidance reaches
+conversation, streaming and plain generation; live comedic quality needs observation.
 Only the authenticated owner's current turn receives a more supportive debate note.
 For that speaker, it develops the strongest reasonable argument, lets genuine
 agreement stand, makes further objections optional, and avoids loaded questions or

@@ -429,7 +429,7 @@ func (h *ChatDomainHandler) summarizeContext(ctx context.Context, plan chat.Cont
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return chatReplyFromResult(result), nil
+	return chat.ParseSummaryResponse(chatReplyFromResult(result))
 }
 
 func firstString(values map[string]any, keys ...string) string {

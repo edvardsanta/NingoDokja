@@ -472,11 +472,22 @@ func TestBanterAfterDebateKeepsContextWithoutMoralizing(t *testing.T) {
 			}
 			system = strings.Join(strings.Fields(system), " ")
 			for _, want := range []string{
+				"self-assured, ironic and irreverent",
+				"Your intellectual depth is central to your voice",
+				"literature, philosophy, history, science, music and art",
+				"examine assumptions and follow the consequences",
+				"do not invent quotations",
+				"dry sarcasm, pointed understatement and playful mockery",
+				"a teasing comeback can be the whole reply",
+				"Do not explain your own punchline",
+				"Humor has no quota",
 				"Follow changes in conversational intent",
 				"unsolicited moral or legal advice",
 				"without appending a corrective lesson",
 				"address that request on its merits",
 				"neither agreement nor swearing is required",
+				"read teasing accusations and invented identities in context",
+				"concrete signs of distress, danger or a request for help",
 				"Never humiliate",
 				"Hold your own judgment",
 			} {

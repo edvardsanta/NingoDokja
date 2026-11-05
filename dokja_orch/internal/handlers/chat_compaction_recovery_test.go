@@ -59,6 +59,57 @@ func TestCompactionRecoveryPreservesDurableTurnsAcrossRestart(t *testing.T) {
 		t.Fatal("restart lost pending raw history before a valid summary")
 	}
 }
+
+func TestConversationalReplyCannotReplaceDurableSummary(t *testing.T) {
+	for _, mode := range []string{"conversation", "plain"} {
+		t.Run(mode, func(t *testing.T) {
+			event := channelEvent("member", "Member", "Continue the joke")
+			before := chat.SessionSnapshot{
+				ID: "existing-session", LastSeenAt: time.Now(), Summary: "An earlier group discussion.",
+				Messages: []chatMessage{
+					{Role: "user", Content: "A detail that must survive an invalid summary."},
+					{Role: "assistant", Content: "An earlier reply."},
+				},
+			}
+			store := &failingSessionStore{data: before, found: true}
+			model := &compactionGenerator{summary: "Pelo nome exibido nesta conversa, você é o Draco.", rawSummary: true}
+			h := NewChatDomainHandler(model)
+			if mode == "plain" {
+				plain := &plainCompactionGenerator{model: *model}
+				h = NewChatDomainHandler(plain)
+				model = &plain.model
+			}
+			h.WithSessionStore(store)
+			h.sessions.maxMsgs = 2
+			result, err := h.Handle(t.Context(), event, chatStep)
+			if err != nil {
+				t.Fatal("invalid summary blocked the real reply", err)
+			}
+			after := store.data
+			if after.ID != before.ID || after.Summary != before.Summary || len(after.Messages) != len(before.Messages)+2 || !reflect.DeepEqual(after.Messages[:len(before.Messages)], before.Messages) {
+				t.Fatal("a conversational reply replaced durable context")
+			}
+			state := h.sessions.items[chatSessionBaseKey(event)]
+			if result["notice"] != nil || state.compactionRetryAt.IsZero() {
+				t.Fatal("invalid task output claimed compaction or missed cooldown")
+			}
+			if len(model.requests) != 1 || len(model.replies) != 1 {
+				t.Fatal("summary failure lost the real reply")
+			}
+			// Restart must retry with the original raw detail still present.
+			recovered := &compactionGenerator{summary: "The group's earlier detail and joke."}
+			h2 := NewChatDomainHandler(recovered).WithSessionStore(store)
+			h2.sessions.maxMsgs = 2
+			if _, err = h2.Handle(t.Context(), event, chatStep); err != nil {
+				t.Fatal(err)
+			}
+			if len(recovered.requests) != 1 || !strings.Contains(recovered.requests[0][1]["content"], before.Messages[0].Content) || store.data.Summary != recovered.summary {
+				t.Fatal("restart lost pending history or could not adopt a valid summary")
+			}
+		})
+	}
+}
+
 func TestCompactionRecoveryKeepsCurrentInputAndPreviousSummary(t *testing.T) {
 	manager := newChatSessionManager()
 	manager.maxMsgs = 4

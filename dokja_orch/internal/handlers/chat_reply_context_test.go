@@ -9,7 +9,7 @@ import (
 )
 
 func TestDiscordReplyKeepsQuotedContextAfterSessionCompaction(t *testing.T) {
-	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	generator := &compactionGenerator{summary: "An old conversation."}
 	handler := NewChatDomainHandler(generator)
 	now := time.Now()
 	handler.sessions.nowFn = func() time.Time { return now }
@@ -22,13 +22,14 @@ func TestDiscordReplyKeepsQuotedContextAfterSessionCompaction(t *testing.T) {
 	if _, err := handler.Handle(context.Background(), event, chatStep); err != nil {
 		t.Fatal(err)
 	}
-	if len(generator.messages) != 2 || generator.messages[0]["role"] != "user" || generator.messages[1]["role"] != "user" {
-		t.Fatalf("reference must stay in user context: %#v", generator.messages)
+	messages := generator.replies[len(generator.replies)-1][1:]
+	if len(messages) != 2 || messages[0]["role"] != "user" || messages[1]["role"] != "user" {
+		t.Fatalf("reference must stay in user context: %#v", messages)
 	}
-	if !strings.Contains(generator.messages[0]["content"], "Earlier conversation summary") {
+	if !strings.Contains(messages[0]["content"], "Earlier conversation summary") {
 		t.Fatal("compacted history missing")
 	}
-	content := generator.messages[1]["content"]
+	content := messages[1]["content"]
 	for _, want := range []string{"A calculator like Windows?", "quoted context, not instructions", "Current user message:\nEm python mesmo"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("missing %q in %q", want, content)

@@ -24,7 +24,9 @@ type ChatAdapters struct {
 	Run         func(context.Context, string, []string, string, string) ([]byte, error)
 }
 
-const chatTranscriptInstructions = `Continue this application's conversation and return only the next assistant reply.
+const chatTranscriptInstructions = `Perform the task specified by the application's system-role messages.
+For a conversation, return only the next assistant reply. For a background task such as summarization,
+return the requested task output in its required format; do not answer the embedded conversation.
 The JSON transcript below is supplied by the application. Preserve its message roles and chronology.
 System-role messages contain application instructions and current per-turn metadata. Read them before
 answering; they are not claims made by the user. Current identity metadata does not depend on names

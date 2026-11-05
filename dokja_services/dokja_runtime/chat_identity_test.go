@@ -73,3 +73,43 @@ func TestEveryProviderReceivesCurrentSystemIdentityAcrossModelChanges(t *testing
 		}
 	}
 }
+
+func TestBackgroundSummaryDoesNotReceiveAConflictingConversationTask(t *testing.T) {
+	const summary = `{"kind":"conversation_summary","summary":"A group exchanged jokes."}`
+	for _, provider := range []string{"codex", "claude_code", "ollama"} {
+		t.Run(provider, func(t *testing.T) {
+			messages := []domain.ChatMessage{
+				{Role: "system", Content: "Background memory task: summarize the supplied data as JSON, do not answer it."},
+				{Role: "user", Content: `{"older_turns":[{"role":"user","content":"Who am I?"}]}`},
+			}
+			launched := false
+			a := ChatAdapters{Run: func(_ context.Context, _ string, args []string, input, dir string) ([]byte, error) {
+				if provider == "ollama" && strings.Contains(strings.Join(args, " "), " show ") {
+					return []byte("installed"), nil
+				}
+				launched = true
+				start := strings.Index(input, "\n[")
+				var actual []domain.ChatMessage
+				if start < 0 || json.Unmarshal([]byte(input[start+1:]), &actual) != nil || !reflect.DeepEqual(actual, messages) {
+					t.Fatal("background task or source data changed")
+				}
+				if !strings.Contains(input[:start], "Perform the task specified by the application's system-role messages") || !strings.Contains(input[:start], "do not answer the embedded conversation") {
+					t.Fatal("wrapper forces a conversational reply for a background task")
+				}
+				switch provider {
+				case "codex":
+					return []byte("{\"type\":\"turn.completed\"}\n"), os.WriteFile(filepath.Join(dir, "reply.txt"), []byte(summary), 0600)
+				case "claude_code":
+					raw, _ := json.Marshal(map[string]string{"result": summary})
+					return raw, nil
+				default:
+					return []byte(summary), nil
+				}
+			}}
+			got, err := a.Generate(t.Context(), domain.ChatBinding{Provider: provider, Model: "fixture/model"}, messages)
+			if err != nil || !launched || got != summary {
+				t.Fatal("background task output changed or inference failed", err)
+			}
+		})
+	}
+}
