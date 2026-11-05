@@ -11,7 +11,7 @@ COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-c
 .PHONY: help start desktop desktop-install up status logs
 
 help:
-	@echo "make start           Start the local stack, then open Desktop"
+	@echo "make start           Start/restart local services, then open Desktop"
 	@echo "make desktop         Build and open Desktop only"
 	@echo "make desktop-install Install Desktop dependencies"
 	@echo "make up              Start local services, including PostgreSQL"
@@ -20,6 +20,7 @@ help:
 
 # Keep startup ordered even when make is invoked with -j.
 start: up
+	$(COMPOSE_CMD) restart $(SERVICES)
 	$(MAKE) desktop
 
 desktop:
