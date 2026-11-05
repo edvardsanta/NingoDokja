@@ -29,3 +29,19 @@ test("ordinary messages, unsupported links and already formatted citations are u
 test("source punctuation cannot break masked links or introduce mentions", () => {
   assert.equal(formatCitations("📚 [1] A [title] @everyone <https://example.com/a(b)>"), "📚\n[1] [A \\[title\\] ＠everyone](https://example.com/a%28b%29)");
 });
+
+test("PDF citations show the linked page and group only the same page", () => {
+  const reply = "Answer [1][5][8].\n\n📚 [1] Report.pdf · Page 1 <https://example.com/report.pdf#page=1> · [5] Report.pdf · Page 5 <https://example.com/report.pdf#page=5> · [8] Report.pdf · Page 5 <https://example.com/report.pdf#page=5>";
+  assert.equal(formatCitations(reply), "Answer [1][5][8].\n\n📚\n[1] [Report.pdf · p. 1](https://example.com/report.pdf#page=1)\n[5, 8] [Report.pdf · p. 5](https://example.com/report.pdf#page=5)");
+});
+
+test("PDF page remains visible when the filename is shortened", () => {
+  const suffix = " · p. 123";
+  assert.equal(formatCitations(`📚 [1] ${"a".repeat(120)} · Page 123 <https://example.com/report.pdf#page=123>`), `📚\n[1] [${"a".repeat(99 - suffix.length)}…${suffix}](https://example.com/report.pdf#page=123)`);
+});
+
+test("invalid page fragments do not produce a visible page locator", () => {
+  for (const fragment of ["page=0", "page=-1", "page=abc"]) {
+    assert.equal(formatCitations(`📚 [1] Report.pdf <https://example.com/report.pdf#${fragment}>`), `📚\n[1] [Report.pdf](https://example.com/report.pdf#${fragment})`);
+  }
+});
