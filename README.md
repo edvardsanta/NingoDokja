@@ -100,9 +100,11 @@ From the repository root:
 make start
 ```
 
-`make start` starts PostgreSQL, waits for it to accept connections, starts the
-local application services, then builds and opens Desktop. Desktop dependencies
-are installed from the lockfile if `node_modules` is absent. Existing credentials,
+`make start` starts PostgreSQL, waits for it to accept connections, starts and
+restarts the selected application services to load current code, then builds and
+opens Desktop. PostgreSQL and unselected dependencies are not restarted by this
+reload step. A failed restart stops startup before Desktop opens. Desktop
+dependencies are installed from the lockfile if `node_modules` is absent. Existing credentials,
 provider configuration and the journal namespace must already be configured; this
 command does not initialize or migrate data. First startup may build images or
 download models. It does not wait for every application service to become ready;

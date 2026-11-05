@@ -21,6 +21,15 @@ Production stack:
 
 ## Orchestrator development startup
 
+`make start` brings up the local stack, then explicitly restarts the selected
+application services before opening Desktop. This reloads bind-mounted source
+in services that compile or load code only when their process starts, including
+Feeds. The explicit restart uses `SERVICES`; it does not restart PostgreSQL or
+other dependencies unless they are selected there. A restart failure prevents
+Desktop startup. `make up` starts missing services without the explicit reload.
+Restarting applications clears their volatile state, including active voice
+sessions and cached readings. Image/dependency changes still require a rebuild.
+
 Development and lite orchestrator images download and verify Go dependencies
 during the image build. Their module cache lives under `/go/pkg/mod`, outside the
 `/workspace` source mount, so a recreated container can compile the mounted code
