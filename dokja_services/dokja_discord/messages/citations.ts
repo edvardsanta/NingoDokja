@@ -19,11 +19,14 @@ export function formatCitations(reply: string): string {
       if (!existing.numbers.includes(number)) existing.numbers.push(number);
       continue;
     }
-    // Prefer the page title over the often-redundant product heading. Keep the
-    // complete destination and citation numbers even when shortening the label.
+    // Prefer the title over redundant headings, but keep the PDF page visible.
+    // Reserve space for its suffix so long filenames cannot hide the locator.
     const pageTitle = label.split(" · ").map(part => part.trim()).find(Boolean) ?? label;
+    const page = /^#page=([1-9][0-9]{0,4})$/.exec(new URL(address).hash)?.[1];
+    const suffix = page ? ` · p. ${page}` : "";
+    const titleLimit = 100 - suffix.length;
     const characters = Array.from(pageTitle);
-    const title = characters.length > 100 ? characters.slice(0, 99).join("").trimEnd() + "…" : pageTitle;
+    const title = (characters.length > titleLimit ? characters.slice(0, titleLimit - 1).join("").trimEnd() + "…" : pageTitle) + suffix;
     const group = { numbers: [number], title, url: address };
     groups.set(address, group);
     lines.push(group);
