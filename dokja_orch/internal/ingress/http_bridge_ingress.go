@@ -307,11 +307,12 @@ func (i *HTTPBridgeIngress) authorize(c *fiber.Ctx) int {
 // chatStreamTimeout covers a whole chat turn: the runtime gives a provider 90 seconds.
 const chatStreamTimeout = 120 * time.Second
 
-// handleChatStream takes a desktop chat turn, the same envelope the request socket takes, and answers
+// handleChatStream takes a chat turn from the owner's desktop or terminal (the CLI and the TUI both
+// say "cli"), the same envelope the request socket takes, and answers
 // it as newline-delimited JSON: {"progress": "queued"} and {"progress": "dispatched"} when the send
 // waits behind earlier turns, {"preview": text so far} while Ningo writes, then the response the
 // request socket would give. Only the requester sees the previews; they are never the reply. Anything
-// but a desktop message.created is refused.
+// but a desktop or cli message.created is refused.
 func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
 	if status := i.authorize(c); status != fiber.StatusOK {
 		return c.SendStatus(status)
@@ -320,8 +321,8 @@ func (i *HTTPBridgeIngress) handleChatStream(c *fiber.Ctx) error {
 	if err := json.Unmarshal(c.Body(), &event); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(RequestResponse{Status: "error", Error: "decode request"})
 	}
-	if event.Type != "message.created" || event.Source != core.SourceDesktop {
-		return c.Status(fiber.StatusBadRequest).JSON(RequestResponse{Status: "error", Error: "only desktop chat turns are streamed"})
+	if event.Type != "message.created" || (event.Source != core.SourceDesktop && event.Source != core.SourceCLI) {
+		return c.Status(fiber.StatusBadRequest).JSON(RequestResponse{Status: "error", Error: "only desktop and cli chat turns are streamed"})
 	}
 	logger.Info(fmt.Sprintf("http bridge chat stream received event_id=%s user=%s channel=%s", event.EventID, event.User.ID, event.Channel.ID))
 	c.Set("Content-Type", "application/x-ndjson")

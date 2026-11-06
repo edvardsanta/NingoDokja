@@ -8,6 +8,13 @@ It uses two orchestrator channels:
   Default: `tcp://127.0.0.1:5555`
 - `DOKJA_ORCH_REQUEST_ENDPOINT`
   Default: `tcp://127.0.0.1:5558`
+- `DOKJA_BRIDGE_ENDPOINT` and `DOKJA_GATEWAY_INGRESS_TOKEN` (optional, both or neither)
+  The orchestrator's HTTP bridge on this machine (for example `http://localhost:8091`; any other
+  host is ignored) and its credential, the same pair the desktop uses. With both, a send to an
+  archived conversation goes over the bridge's chat stream and prints
+  `(waiting behind an earlier reply)` and `(being answered)` on stderr while it waits; the reply
+  still goes to stdout. Without them, or when the bridge is not listening, it uses the request
+  socket. See the production runbook for who should hold this credential.
 - `DOKJA_ORCH_TOPIC`
   Default: `events`
 

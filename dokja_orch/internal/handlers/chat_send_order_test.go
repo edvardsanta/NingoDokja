@@ -349,3 +349,61 @@ func TestASendThatWaitsSaysSoAndThenThatItWasDispatched(t *testing.T) {
 		t.Fatal("dispatched must come last", reports)
 	}
 }
+
+// The CLI and the TUI send as "cli", through moderation and then chat. Run through the whole service, a
+// send of theirs that waits behind an earlier one must still say it is queued and then dispatched.
+func TestACLISendThatWaitsReportsItsProgressThroughTheService(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	archive := archiveFor(t)
+	model := newGatedModel("First", "Second")
+	service := core.DefaultService(NewModerationDomainHandler(nil), NewChatDomainHandler(model).WithArchive(archive))
+	held, _ := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	send := func(ctx context.Context, sendID, content string) <-chan error {
+		done := make(chan error, 1)
+		go func() {
+			_, err := service.ProcessWithResult(ctx, core.Event{EventID: sendID, Source: core.SourceCLI, Type: "message.created",
+				User: core.EventUser{ID: "owner"}, Channel: core.EventChannel{ID: "cli"},
+				Payload: map[string]any{"content": content, "conversation_id": held.ID, "send_id": sendID}, Context: map[string]any{}})
+			done <- err
+		}()
+		return done
+	}
+
+	var mu sync.Mutex
+	var reports []core.SendState
+	first := send(ctx, "send-0001", "First")
+	awaitSignal(t, ctx, model.started["First"], "the first send was not asked")
+	second := send(core.WithSendProgress(ctx, func(state core.SendState) {
+		mu.Lock()
+		defer mu.Unlock()
+		reports = append(reports, state)
+	}), "send-0002", "Second")
+	for {
+		mu.Lock()
+		queued := len(reports) > 0 && reports[0] == core.SendQueued
+		mu.Unlock()
+		if queued {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("the waiting cli send never said it was queued", ctx.Err())
+		case <-time.After(time.Millisecond):
+		}
+	}
+	close(model.release["First"])
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	awaitSignal(t, ctx, model.started["Second"], "the second send was not asked")
+	close(model.release["Second"])
+	if err := <-second; err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if reports[len(reports)-1] != core.SendDispatched {
+		t.Fatal("dispatched must come last", reports)
+	}
+}

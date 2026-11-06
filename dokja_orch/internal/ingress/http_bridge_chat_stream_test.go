@@ -58,10 +58,12 @@ func TestChatStreamNeedsTheGatewayCredential(t *testing.T) {
 	}
 }
 
-func TestChatStreamTakesDesktopChatTurnsOnly(t *testing.T) {
+func TestChatStreamTakesDesktopAndCLIChatTurnsOnly(t *testing.T) {
 	app := chatStreamApp(core.DefaultService(previewingChat{}))
 	for _, body := range []string{
 		strings.Replace(desktopTurn, `"source":"desktop"`, `"source":"discord"`, 1),
+		strings.Replace(desktopTurn, `"source":"desktop"`, `"source":"whatsapp"`, 1),
+		strings.Replace(desktopTurn, `"source":"desktop"`, `"source":"api"`, 1),
 		strings.Replace(desktopTurn, `"type":"message.created"`, `"type":"knowledge.delete"`, 1),
 		`not json`,
 	} {
@@ -129,5 +131,32 @@ func TestChatStreamSaysWhereTheSendStandsBeforeTheReply(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
 	if len(lines) != 3 || lines[0] != `{"progress":"queued"}` || lines[1] != `{"progress":"dispatched"}` || !strings.Contains(lines[2], `"status":"ok"`) {
 		t.Fatalf("unexpected stream: %q", lines)
+	}
+}
+
+// moderationPass stands in for the moderation step the CLI's conversation workflow runs before chat.
+type moderationPass struct{}
+
+func (moderationPass) Domain() core.Domain { return core.DomainModeration }
+func (moderationPass) Handle(context.Context, core.Event, core.WorkflowStep) (map[string]any, error) {
+	return map[string]any{"allowed": true}, nil
+}
+
+// The CLI and the TUI send as "cli", which goes through moderation before chat; the send's progress
+// must still reach the chat step and come back on the stream.
+func TestChatStreamSaysWhereACLISendStandsThroughItsWorkflow(t *testing.T) {
+	app := chatStreamApp(core.DefaultService(moderationPass{}, queuedChat{}))
+	cliTurn := strings.Replace(desktopTurn, `"source":"desktop"`, `"source":"cli"`, 1)
+	response, err := app.Test(streamRequest(cliTurn, "Bearer fixture-gateway-secret"), 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+	if response.StatusCode != fiber.StatusOK || len(lines) != 3 || lines[0] != `{"progress":"queued"}` || lines[1] != `{"progress":"dispatched"}` || !strings.Contains(lines[2], `"status":"ok"`) {
+		t.Fatalf("unexpected stream: %d %q", response.StatusCode, lines)
 	}
 }

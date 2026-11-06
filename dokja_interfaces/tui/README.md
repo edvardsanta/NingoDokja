@@ -18,6 +18,12 @@ cd dokja_interfaces/tui && go run ./cmd/dokja-tui
 Flags: `--request-endpoint` (default `DOKJA_ORCH_REQUEST_ENDPOINT` or `tcp://127.0.0.1:5558`),
 `--refresh` (panel poll, default `5s`), `--timeout` (one orchestrator answer, default `2m`).
 
+With `DOKJA_BRIDGE_ENDPOINT` (the orchestrator's HTTP bridge on this machine, for example
+`http://localhost:8091`; any other host is ignored) and `DOKJA_GATEWAY_INGRESS_TOKEN` both set, a
+send in the Conversations tab goes over the bridge's chat stream, and the waiting label says when it
+waits behind an earlier reply and when it is being answered. Without them, or when the bridge is
+not listening, it uses the request socket as before.
+
 ## Language
 
 The interface is available in English (the default) and Portuguese. It is chosen with

@@ -362,6 +362,8 @@
   "turn_failed": "Failed: %s",
   "no_reason_recorded": "no reason recorded",
   "turn_interrupted": "Interrupted before an answer.",
+  "send_queued": "Waiting behind an earlier reply",
+  "send_dispatched": "Being answered",
   "turn_being_answered": "Still being answered.",
   "turn_state_unknown": "In a state this TUI does not know.",
   "nothing_said_yet": "Nothing said yet."
