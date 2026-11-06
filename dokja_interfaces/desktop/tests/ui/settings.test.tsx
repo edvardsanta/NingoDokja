@@ -85,6 +85,19 @@ describe("the settings card", () => {
     expect(saves(calls)).toEqual([]);
   });
 
+  it("keeps the markup of its controls on the shared Button", async () => {
+    const { transport } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules });
+    show(transport);
+    const toggle = await screen.findByRole("button", { name: REPLIES });
+    expect([toggle.getAttribute("type"), toggle.className]).toEqual(["button", "cfg-toggle"]);
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("radio", { name: "Closed" }));
+    const discard = screen.getByRole("button", { name: "Discard" });
+    const review = screen.getByRole("button", { name: "Review" });
+    expect([discard.getAttribute("type"), discard.className]).toEqual(["button", "quiet compact"]);
+    expect([review.getAttribute("type"), review.className]).toEqual(["button", "primary compact"]);
+  });
+
   it("adds and removes list entries, and a removal can be undone before reviewing", async () => {
     const { transport, calls } = routedTransport({ "runtime.settings": settings(), "runtime.modules": modules, "runtime.settings.set": settings() });
     show(transport);

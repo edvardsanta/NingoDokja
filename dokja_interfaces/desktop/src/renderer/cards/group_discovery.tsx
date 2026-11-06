@@ -4,6 +4,7 @@ import type { CommunicationChannel } from "../../shared/replies.js";
 import { useTranslate } from "../i18n/context.js";
 import { KnownPicker } from "./known_picker.js";
 import type { Groups, Lookup } from "./settings_lookups.js";
+import { Button, Notice } from "./ui.js";
 
 // The alias a named conversation goes by, made from the group's name: lowercase letters, digits, "-"
 // and "_", up to 32, and different from the aliases already taken.
@@ -28,9 +29,9 @@ export function GroupDiscovery({ groups, chosen, disabled, onAdd }: {
   const loading = groups.phase === "loading";
   const failed = groups.asked && groups.phase === "unavailable";
   return <div className="cfg-discovery">
-    <button type="button" className="compact" disabled={disabled || loading} onClick={() => { setShown(true); void groups.discover(); }}>{t("groups_discover")}</button>
-    {shown && loading && <p role="status" className="detail">{t("groups_discovering")}</p>}
-    {shown && failed && <p role="alert">{t("groups_not_connected")}</p>}
+    <Button size="compact" disabled={disabled || loading} onClick={() => { setShown(true); void groups.discover(); }}>{t("groups_discover")}</Button>
+    {shown && loading && <Notice announce="polite" extra="detail">{t("groups_discovering")}</Notice>}
+    {shown && failed && <Notice announce="assertive">{t("groups_not_connected")}</Notice>}
     {shown && groups.phase === "ready" && groups.items.length === 0 && <p className="detail">{t("groups_none")}</p>}
     {shown && groups.phase === "ready" && groups.items.length > 0 && <KnownPicker label={t("groups_found")} chosen={chosen} disabled={disabled}
       items={groups.items.map((group) => ({ key: group.id, title: group.name || t("groups_unnamed"), detail: [t("groups_members", { count: String(group.members) })] }))}
@@ -50,7 +51,7 @@ export function ChannelPicker({ channels, chosen, disabled, onAdd }: {
   const named = channels.items.filter((channel) => channel.name && channel.name !== channel.id);
   if (channels.phase !== "ready" || named.length === 0) return null;
   return <div className="cfg-discovery">
-    <button type="button" className="compact" aria-expanded={shown} disabled={disabled} onClick={() => setShown(!shown)}>{t("channels_choose")}</button>
+    <Button size="compact" aria-expanded={shown} disabled={disabled} onClick={() => setShown(!shown)}>{t("channels_choose")}</Button>
     {shown && <KnownPicker label={t("channels_found")} chosen={chosen} disabled={disabled}
       items={named.map((channel) => ({ key: channel.id, title: `#${channel.name}`, detail: [...(channel.guildName ? [channel.guildName] : []), channel.id] }))}
       onAdd={onAdd} />}

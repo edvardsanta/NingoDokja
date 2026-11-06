@@ -35,7 +35,8 @@ changes, and never streaming text.
 | --- | --- |
 | Talk (`assistant`, `assistant_conversation`, `conversation_list`, `talk_model`) and `card_frame` | Migrated |
 | Messages (`communications`, `memes`) | Migrated; feedback with an unboxed `data-tone` or an `aria-label` stays plain, because `Notice` does not draw it |
-| Settings, Library, Notebook, System, Realtime | Not migrated; move each in its own batch, with its own tests |
+| Settings (`settings`, `settings_fields`, `group_discovery`, `known_picker`) | Migrated; an error line with its own `id`, `ref` or `tabIndex` stays plain, because `Notice` does not take them |
+| Library, Notebook, System, Realtime | Not migrated; move each in its own batch, with its own tests |
 
 `button.primary`, `.quiet`, `.compact` and `.note` remain the styling contract, so
 migrated and unmigrated screens look the same while this happens. To roll a vertical
