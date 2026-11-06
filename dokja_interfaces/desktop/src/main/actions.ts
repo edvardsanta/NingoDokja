@@ -16,6 +16,8 @@ import type {
   ArchivedChatReply,
   ArchivedConversation,
   ArchivedTurn,
+  ConversationCapabilities,
+  ConversationOperation,
   ArchivedTurnSource,
   ArchivedTurnState,
   ConversationList,
@@ -331,6 +333,22 @@ function conversationRenamePayload(raw: Record<string, unknown>): Record<string,
 }
 
 // A send is stopped by the conversation and send id the screen knows it by, even before it has a turn.
+// The report's own version: an operation may be added to a view, a changed meaning needs a new one.
+const CONVERSATION_CAPABILITIES_VIEW = 1;
+const CONVERSATION_OPERATIONS: readonly ConversationOperation[] = ["send", "retry", "stop", "steer"];
+
+// Only the operations and answers the desktop knows pass; anything else is left out, so it stays unknown.
+function conversationCapabilities(body: Record<string, unknown>): ConversationCapabilities {
+  if (body.view !== CONVERSATION_CAPABILITIES_VIEW || !isRecord(body.operations)) throw new Error("unexpected capability report");
+  const reported = body.operations;
+  const operations: ConversationCapabilities["operations"] = {};
+  for (const operation of CONVERSATION_OPERATIONS) {
+    const state = reported[operation];
+    if (state === "supported" || state === "unsupported") operations[operation] = state;
+  }
+  return { operations };
+}
+
 function conversationStopPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
   const id = text(raw.conversation_id);
   const sendId = text(raw.send_id);
@@ -853,6 +871,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "message.created": { payload: chatPayload, project: chatReply },
   "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
+  "conversation.capabilities": { payload: noPayload, project: (result) => inDomain(result, "conversation", conversationCapabilities) },
   "conversation.stop": { payload: conversationStopPayload, project: (result) => inDomain(result, "conversation", (body) => ({ stopping: body.stopping === true })) },
   "conversation.rename": { payload: conversationRenamePayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },

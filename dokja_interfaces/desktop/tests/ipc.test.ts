@@ -756,6 +756,16 @@ test("reading media enters the preview gate without authorizing its article addr
   assert.deepEqual(remembered, [["https://images.example/reading.jpg"]]);
 });
 
+test("the capability report passes only the operations and answers the desktop knows, and only in its view", async () => {
+  const reply = (body: Record<string, unknown>) => ({ async request() { return { status: "ok", result: { domain: "conversation", result: body } }; } });
+  const limits = { defaultTimeoutMs: 1000, maxTimeoutMs: 1000 };
+  const read = await handleRequest({ type: "conversation.capabilities", payload: { anything: "ignored" } },
+    reply({ view: 1, operations: { send: "supported", stop: "unsupported", steer: "unsupported", retry: "maybe", launch: "supported" } }) as never, limits);
+  assert.deepEqual(read, { ok: true, result: { operations: { send: "supported", stop: "unsupported", steer: "unsupported" } } });
+  const newer = await handleRequest({ type: "conversation.capabilities", payload: {} }, reply({ view: 2, operations: { stop: "supported" } }) as never, limits);
+  assert.equal(newer.ok, false, "a report in a view the desktop does not know is not read as this one");
+});
+
 test("stopping a send needs a press and names only the conversation and the send", async () => {
   const id = "c".repeat(32);
   const calls: unknown[] = [];

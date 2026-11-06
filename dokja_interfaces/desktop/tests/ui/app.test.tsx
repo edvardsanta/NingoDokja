@@ -94,8 +94,8 @@ describe("the screen", () => {
     render(<App transport={transport} locale="en" />);
 
     await waitFor(() => expect(wordmark().dataset.pulse).toBe("calm"));
-    // Talk, the front door, looks for a conversation to continue; nothing else is asked.
-    expect(calls.map((call) => call.type).sort()).toEqual(["conversation.list", "ningo.status"]);
+    // Talk, the front door, looks for a conversation to continue and what it may offer; nothing else is asked.
+    expect(calls.map((call) => call.type).sort()).toEqual(["conversation.capabilities", "conversation.list", "ningo.status"]);
     expect(screen.queryByRole("heading", { name: "Experience memory" })).toBeNull();
   });
 
@@ -206,7 +206,7 @@ describe("the screen", () => {
     await screen.findByRole("heading", { name: "Readings" });
 
     await waitFor(() =>
-      expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list")).toEqual([
+      expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list" && type !== "conversation.capabilities")).toEqual([
         "ningo.status",
         "conversation.facts",
         "memory.status",

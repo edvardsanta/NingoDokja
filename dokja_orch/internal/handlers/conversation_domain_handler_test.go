@@ -3,10 +3,13 @@ package handlers
 import (
 	"context"
 	"errors"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
+	"read_books/internal/infrastructure/conversations"
 )
 
 func ask(t *testing.T, h *ConversationDomainHandler, source core.EventSource, kind string, payload map[string]any) (map[string]any, error) {
@@ -95,5 +98,57 @@ func TestConversationRequestsAreRoutedToTheArchiveByTheService(t *testing.T) {
 	items, _ := archived["conversations"].([]map[string]any)
 	if len(items) != 1 || items[0]["title"] != "Routed" {
 		t.Fatal(listed)
+	}
+}
+
+// onlyStore hides the optional capabilities of a store, as a custom store without them would.
+type onlyStore struct{ conversation.Store }
+
+func capabilitiesOf(t *testing.T, handler *ConversationDomainHandler, source core.EventSource) (map[string]any, error) {
+	t.Helper()
+	return handler.Handle(context.Background(), core.Event{Source: source, Type: "conversation.capabilities", Payload: map[string]any{}}, core.WorkflowStep{})
+}
+
+func TestTheCapabilityReportFollowsTheOrchestratorsWiring(t *testing.T) {
+	archive := archiveFor(t)
+	wired, err := capabilitiesOf(t, NewConversationDomainHandler(archive).WithRunningSends(core.NewRunningSends()), core.SourceCLI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported"}
+	if wired["view"] != 1 || !reflect.DeepEqual(wired["operations"], want) {
+		t.Fatal(wired)
+	}
+
+	unwired, err := capabilitiesOf(t, NewConversationDomainHandler(archive), core.SourceDesktop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operations := unwired["operations"].(map[string]string); operations["stop"] != "unsupported" || operations["steer"] != "unsupported" {
+		t.Fatal("without running sends nothing can be stopped", unwired)
+	}
+}
+
+func TestTheCapabilityReportSaysRetryIsUnsupportedOnAStoreWithoutIt(t *testing.T) {
+	store, err := conversations.Open(filepath.Join(t.TempDir(), conversations.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { store.Close() })
+	report, err := capabilitiesOf(t, NewConversationDomainHandler(conversation.New(onlyStore{store})), core.SourceDesktop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report["operations"].(map[string]string)["retry"] != "unsupported" {
+		t.Fatal(report)
+	}
+}
+
+func TestOnlyTheOwnersInterfacesAreToldTheCapabilities(t *testing.T) {
+	handler := NewConversationDomainHandler(archiveFor(t)).WithRunningSends(core.NewRunningSends())
+	for _, source := range []core.EventSource{core.SourceDiscord, core.SourceWhatsApp} {
+		if report, err := capabilitiesOf(t, handler, source); err == nil {
+			t.Fatalf("%s was told %v", source, report)
+		}
 	}
 }

@@ -555,3 +555,19 @@ func TestASendGoesByTheSocketWhenTheStreamWasNeverReached(t *testing.T) {
 		t.Fatal("the turn goes over the request socket", fake.count("message.created"))
 	}
 }
+
+func TestStoppingAsksNothingOfAnOrchestratorThatCannotStop(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.capabilities"] = map[string]any{"view": 1, "operations": map[string]any{"stop": "unsupported"}}
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{pendingFixture("t1", "send-elsewhere", "Agora")},
+	}
+	press(m, "5", "enter", "s")
+	if fake.count("conversation.stop") != 0 || !strings.Contains(m.notice, "não consegue parar") {
+		t.Fatal(fake.count("conversation.stop"), m.notice)
+	}
+	if m.conversations.stopping {
+		t.Fatal("a stop that was never asked is not left pending")
+	}
+}

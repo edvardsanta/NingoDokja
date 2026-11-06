@@ -20,7 +20,8 @@ async function renderTalk(transport: Transport, locale: Locale = "en") {
 }
 
 // What Talk asked beyond looking for a conversation to continue.
-const asked = (calls: { type: string }[]) => calls.filter((call) => call.type !== "conversation.list");
+// What Talk asked beyond the reads it makes on opening: the list and what the orchestrator supports.
+const asked = (calls: { type: string }[]) => calls.filter((call) => call.type !== "conversation.list" && call.type !== "conversation.capabilities");
 
 const field = () => screen.getByRole("textbox", { name: "Your message" }) as HTMLTextAreaElement;
 const sent = (calls: { type: string; payload: Record<string, unknown> | undefined }[]) =>
@@ -643,6 +644,20 @@ describe("a send waiting for its turn", () => {
     // The stream's error is not said on top of the turn's own outcome, and only one send was made.
     expect(screen.getAllByText(/you stopped this reply/)).toHaveLength(1);
     expect(sent(calls)).toHaveLength(1);
+  });
+
+  it("offers Stop only to an orchestrator that does not say it cannot stop", async () => {
+    const pending = ok({ conversation: {}, turns: [archivedTurn({ content: "why?", state: "pending", sendId: "send-elsewhere" })] });
+    const list = ok({ conversations: [{ id: archiveId(1), kind: "general", reading_id: "", title: "Elsewhere", updated_at: "2026-01-01T00:00:00Z", revision: 1, turns: 1 }], next: "" });
+    const unsupported = routedTransport({ "conversation.list": list, "conversation.read": pending, "conversation.capabilities": ok({ operations: { stop: "unsupported" } }) });
+    const view = render(<I18nProvider locale="en"><AssistantCard transport={unsupported.transport} /></I18nProvider>);
+    await screen.findByText("This message is still on its way.");
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Stop the reply" })).toBeNull());
+    view.unmount();
+
+    const supported = routedTransport({ "conversation.list": list, "conversation.read": pending, "conversation.capabilities": ok({ operations: { stop: "supported" } }) });
+    render(<I18nProvider locale="en"><AssistantCard transport={supported.transport} /></I18nProvider>);
+    await screen.findByRole("button", { name: "Stop the reply" });
   });
 
   it("stops a send another interface left on its way, and reads how it ended", async () => {

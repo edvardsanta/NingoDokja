@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -349,6 +350,21 @@ func retryable(turns []archivedTurn) (archivedTurn, bool) {
 	return archivedTurn{}, false
 }
 
+// ErrStopUnsupported is the orchestrator saying it cannot stop a send at all.
+var ErrStopUnsupported = errors.New("this orchestrator cannot stop a reply")
+
+// StopUnsupported asks the orchestrator what it does with conversations and answers true only when it
+// says it cannot stop a send. An older orchestrator, which has no report, or a report that cannot be
+// read leaves it unknown, and the stop is asked as before: its own answer then says what happened.
+func StopUnsupported(ask func(eventType string, payload map[string]any) (map[string]any, error)) bool {
+	report, err := ask("conversation.capabilities", map[string]any{})
+	if err != nil {
+		return false
+	}
+	operations, _ := report["operations"].(map[string]any)
+	return reportView(report["view"]) == 1 && operations["stop"] == "unsupported"
+}
+
 // stopLatest asks the orchestrator to stop the conversation's latest turn, if it is on its way. It only
 // asks: reading the conversation shows how the send ended.
 func stopLatest(ask archiveRequest, out io.Writer, reference string) error {
@@ -364,6 +380,9 @@ func stopLatest(ask archiveRequest, out io.Writer, reference string) error {
 		return fmt.Errorf("nothing in this conversation is on its way")
 	}
 	latest := held.Turns[len(held.Turns)-1]
+	if StopUnsupported(ask) {
+		return ErrStopUnsupported
+	}
 	if _, err := ask("conversation.stop", map[string]any{"conversation_id": id, "send_id": latest.SendID}); err != nil {
 		return fmt.Errorf("the reply could not be stopped, and it may still arrive: %w", err)
 	}
@@ -485,4 +504,15 @@ func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
 
 	command.AddCommand(list, read, rename, remove, retry, stop)
 	return command
+}
+
+// reportView reads a report's view, a JSON number or a Go integer from an in-process client.
+func reportView(value any) int {
+	switch view := value.(type) {
+	case float64:
+		return int(view)
+	case int:
+		return view
+	}
+	return 0
 }
