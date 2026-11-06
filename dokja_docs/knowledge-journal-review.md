@@ -127,14 +127,41 @@ If supervised application reading is not something the owner wants to keep, remo
 the path, the journal and the adapter together. This is the smallest result, but it
 gives up the supervision feature and the receipts work in `08.2`.
 
-## Recommendation
+## Recommendation (before the owner's decision)
 
 Option C. It keeps every safety rule that matters, removes a second lifecycle model,
 drops the separate PostgreSQL requirement for this path and makes the source read
 look like the rest of the system. If a smaller first step is preferred, B is a safe
 stage on the way to C: removing the unused scoring first loses nothing.
 
-## Decisions for the owner
+## Owner decision (2026-11-06)
+
+- Keep supervised source reading as a feature, integrated in the existing workflow:
+  it already runs inside the task runner, and no new flow or record type is created.
+  Option C is rejected.
+- Option B, shrinking the journal in place.
+- Keep PostgreSQL: the journal is the macro-learning store (episodes consolidated for
+  later learning, apart from the conversation archive), so it stays separate from
+  SQLite. Eligibility, selection and scoring stay, because they are that learning.
+
+### Revised B
+
+Checking B against the code changed one item. The journal refuses a prediction that
+is not strictly earlier than dispatch (`MarkDispatched` and `ValidatePrediction`):
+prediction before action is the signal later scoring compares against. Merging
+`Begin` and `MarkDispatched` would remove the moment a prediction is recorded before
+acting, so that merge is dropped. B is now:
+
+1. Keep prepared, dispatched and receipt as separate steps, and keep scoring.
+2. Derive each operation key from the attempt and the step instead of a fresh UUID
+   per call, so repeating a step replays it instead of becoming a new operation.
+3. Close the `08.2` gap in the existing workflow: at orchestrator start, mark
+   attempts left dispatched without a receipt as interrupted, as chat recovery does,
+   never replaying them.
+4. Route the three writes in `knowledge_source_receipts.go` through one small helper
+   instead of repeating keys, revisions and admission at each call.
+
+## Decisions asked of the owner (answered above)
 
 1. Keep supervised source reading as a feature (A, B or C), or drop it (D)?
 2. If kept: fold into a turn-style record (C), or shrink the journal (B)?
@@ -142,5 +169,4 @@ stage on the way to C: removing the unused scoring first loses nothing.
    same SQLite store as conversations?
 4. Should eligibility and scoring be deleted, or parked in `dokja_lab` as a sketch?
 
-Until these are answered, nothing in the journal changes. `08.2` and `10.6-c` keep
-the journal as their open consumer, and this note is the reason for not extending it.
+The revised B above is the plan; it is implemented in its own batches.
