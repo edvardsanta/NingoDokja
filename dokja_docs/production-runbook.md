@@ -984,7 +984,7 @@ and recreate the orchestrator and enabled gateways together.
 The bridge also answers `POST /orchestrator/chat/stream` with the same bearer credential. It takes
 a desktop `message.created` envelope, exactly what the request socket takes, and answers
 newline-delimited JSON: `{"preview": ...}` lines with the reply written so far, then the response
-the request socket would give. Anything but a desktop chat turn is refused. Previews reach only the
+the request socket would give. Anything but a desktop or `cli` chat turn is refused. Previews reach only the
 caller and are never stored; the reply is the record. The route is additive and nothing changes
 until an interface uses it.
 
@@ -995,6 +995,15 @@ socket and shows the reply whole, as before. Giving the desktop this credential 
 it is the gateways' credential, and with it a process can also post to `/orchestrator` as the Discord
 or WhatsApp gateway. Give it only to a desktop on a machine you would trust with the gateways. If the
 bridge is not listening, or is too old to stream, the desktop sends the turn over the request socket.
+
+The CLI and the TUI read the same two variables, and the same rule applies to them: only a bridge
+on this machine is used, and the credential they get widens who holds it in the same way. With both
+set, a send to an archived conversation goes over the stream, and the terminal says when it waits
+behind an earlier reply and when it is being answered; the TUI shows it as its waiting label. Only
+a bridge the send never reached (not listening, or no stream) makes them use the request socket
+instead; a refused credential or a failure after sending is reported and never sent again. A plain
+session chat, and the `dokja-cli` and `dokja-tui` compose services, which set neither variable,
+keep using the request socket.
 
 The orchestrator now reads `DISCORD_GUILD_ID`, `DISCORD_ALLOWED_CHANNELS`,
 `DISCORD_DM_POLICY`, `DOKJA_WHATSAPP_SELF_CHAT`,
