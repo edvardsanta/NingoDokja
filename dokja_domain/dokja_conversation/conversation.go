@@ -303,6 +303,13 @@ func (a *Archive) Retry(ctx context.Context, scope Scope, turnID string) (Turn, 
 	return a.store.RetryTurn(ctx, scope, turnID, a.now())
 }
 
+// RetriesInConversation says whether the store can retry a turn bound to its conversation, the only
+// retry the archive offers; without it a retry is refused as unavailable.
+func (a *Archive) RetriesInConversation() bool {
+	_, ok := a.store.(ConversationRetryStore)
+	return ok
+}
+
 // RetryInConversation validates the complete request identity before storage
 // changes a turn. Never fall back to Retry: a post-write conversation check is
 // too late to reject a mismatched request safely.

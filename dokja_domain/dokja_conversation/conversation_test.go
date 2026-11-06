@@ -312,3 +312,12 @@ func TestArchivedPassagesKeepDistinctLocationsAndUnicodeText(t *testing.T) {
 		t.Fatal("archive locator aliases mutable caller state")
 	}
 }
+
+func TestTheArchiveSaysWhetherItsStoreRetriesInAConversation(t *testing.T) {
+	if New(&recorder{}).RetriesInConversation() {
+		t.Fatal("a store without the atomic capability cannot retry in a conversation")
+	}
+	if !New(&conversationRetryRecorder{}).RetriesInConversation() {
+		t.Fatal("a store with it can")
+	}
+}

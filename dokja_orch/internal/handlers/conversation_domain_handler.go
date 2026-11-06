@@ -103,6 +103,8 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 			return nil, archiveError(err)
 		}
 		return map[string]any{"conversation_id": id, "deleted": true}, nil
+	case "conversation.capabilities":
+		return map[string]any{"view": conversationCapabilitiesView, "operations": h.operations()}, nil
 	case "conversation.stop":
 		if h.running == nil {
 			return nil, conversation.ErrUnavailable
@@ -144,6 +146,30 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 		return map[string]any{"fact_id": id, "deleted": true}, nil
 	default:
 		return nil, fmt.Errorf("unsupported conversation action %q", event.Type)
+	}
+}
+
+// conversationCapabilitiesView is the version of the capability report. A new operation may be added
+// to a view; changing what an existing one means needs a new view.
+const conversationCapabilitiesView = 1
+
+// operations reports what this orchestrator, as it is wired, does with the owner's conversations, so
+// an interface offers only what will work instead of finding out by trying. It is read from the
+// wiring, never from the request, and an operation it does not name is unsupported. It describes
+// support, not that a given send can be stopped now: that is still the action's own answer.
+func (h *ConversationDomainHandler) operations() map[string]string {
+	state := func(supported bool) string {
+		if supported {
+			return "supported"
+		}
+		return "unsupported"
+	}
+	return map[string]string{
+		"send":  "supported",
+		"retry": state(h.archive.RetriesInConversation()),
+		"stop":  state(h.running != nil),
+		// Changing a reply while it is written is a separate capability that nothing offers.
+		"steer": "unsupported",
 	}
 }
 
