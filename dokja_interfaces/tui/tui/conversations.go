@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -310,19 +311,26 @@ func (m *Model) cmdConversationTurn(id, title, sendID string, payload map[string
 	if id != "" && sendID != "" {
 		m.conversations.sending = &runningTurn{id, sendID}
 	}
-	return func() tea.Msg {
+	// The turn reports where it stands on updates while it waits, then ends with what the archive holds.
+	updates := make(chan tea.Msg, 4)
+	go func() {
+		defer close(updates)
 		if id == "" {
 			res, err := m.request("conversation.start", map[string]any{"title": title})
 			if err != nil {
-				return conversationOpenMsg{notice: err.Error()}
+				updates <- conversationOpenMsg{notice: err.Error()}
+				return
 			}
 			fields, _ := res["conversation"].(map[string]any)
 			if id = str(fields, "id"); id == "" {
-				return conversationOpenMsg{notice: tr("the_archive_named_no_conversation")}
+				updates <- conversationOpenMsg{notice: tr("the_archive_named_no_conversation")}
+				return
 			}
 		}
 		payload["conversation_id"] = id
-		_, failure := m.requestWithin(conversationChatWait, "message.created", payload)
+		failure := m.sendTurn(payload, func(state string) {
+			updates <- conversationProgressMsg{conversationID: id, sendID: sendID, state: state, updates: updates}
+		})
 		open, err := m.readConversation(id)
 		notice := ""
 		switch {
@@ -331,8 +339,58 @@ func (m *Model) cmdConversationTurn(id, title, sendID string, payload map[string
 		case err != nil:
 			notice = err.Error()
 		}
-		return conversationOpenMsg{open: open, notice: notice}
+		updates <- conversationOpenMsg{open: open, notice: notice}
+	}()
+	return listenTurn(updates)
+}
+
+// conversationProgressMsg says where a send stands while it waits: queued behind an earlier turn, or
+// dispatched to be answered. It carries the channel the rest of the turn arrives on.
+type conversationProgressMsg struct {
+	conversationID, sendID, state string
+	updates                       <-chan tea.Msg
+}
+
+func listenTurn(updates <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-updates
+		if !ok {
+			return nil
+		}
+		return msg
 	}
+}
+
+// sendStateLabel is the waiting label for a state the orchestrator reports, or "" for another.
+func sendStateLabel(state string) string {
+	switch state {
+	case "queued":
+		return tr("send_queued")
+	case "dispatched":
+		return tr("send_dispatched")
+	}
+	return ""
+}
+
+// sendTurn sends the turn over the bridge's stream when there is one, so the screen can say where it
+// stands, and otherwise over the request socket. A stream the turn reached is never sent again.
+func (m *Model) sendTurn(payload map[string]any, progress func(string)) error {
+	if streamer, ok := m.client.(ChatStreamer); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), conversationChatWait)
+		defer cancel()
+		res, streamed, err := streamer.StreamChat(ctx, payload, progress)
+		if streamed {
+			if err != nil {
+				return err
+			}
+			if skipped, _ := res["skipped"].(bool); skipped {
+				return &skippedError{reason: str(res, "reason")}
+			}
+			return nil
+		}
+	}
+	_, err := m.requestWithin(conversationChatWait, "message.created", payload)
+	return err
 }
 
 func (m *Model) cmdConversationSend(text string) tea.Cmd {

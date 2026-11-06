@@ -609,6 +609,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.conversations.applyList(msg)
 		return m, nil
 
+	case conversationProgressMsg:
+		// A report for a send this screen no longer waits on changes nothing, but the rest still comes.
+		if sending := m.conversations.sending; sending != nil && sending.conversationID == msg.conversationID && sending.sendID == msg.sendID {
+			if label := sendStateLabel(msg.state); label != "" {
+				m.busyLabel = label
+			}
+		}
+		return m, listenTurn(msg.updates)
+
 	case conversationOpenMsg:
 		m.busy = false
 		m.conversations.sending = nil

@@ -4,6 +4,7 @@ package tui
 // Portuguese catalog text.
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -474,5 +475,83 @@ func TestEarlierTurnsThatCannotBeReadChangeNothing(t *testing.T) {
 	press(m, "m")
 	if len(m.conversations.open.turns) != 10 || !strings.Contains(m.View(), "o arquivo não respondeu") {
 		t.Fatal(m.View())
+	}
+}
+
+// streamingFake is a client whose chat turns go over the bridge's stream: it reports states, then
+// answers, or says the stream was never reached.
+type streamingFake struct {
+	*fakeClient
+	states   []string
+	missing  bool
+	streamed []map[string]any
+}
+
+func (f *streamingFake) StreamChat(_ context.Context, payload map[string]any, progress func(string)) (map[string]any, bool, error) {
+	if f.missing {
+		return nil, false, nil
+	}
+	f.streamed = append(f.streamed, payload)
+	for _, state := range f.states {
+		progress(state)
+	}
+	return map[string]any{"reply": "ok"}, true, nil
+}
+
+func streamingTUI(t *testing.T, states ...string) (*Model, *streamingFake) {
+	t.Helper()
+	plain, _ := conversationsTUI(t)
+	fake := &streamingFake{fakeClient: plain.client.(*fakeClient), states: states}
+	plain.client = fake
+	return plain, fake
+}
+
+func TestAWaitingSendSaysWhereItStandsThenShowsTheArchive(t *testing.T) {
+	m, fake := streamingTUI(t, "queued", "dispatched")
+	press(m, "5", "enter")
+	cmd := m.cmdConversationSend("Por quê?")
+	for _, want := range []string{"Na fila atrás de uma resposta anterior", "Sendo respondido"} {
+		msg := cmd()
+		if _, ok := msg.(conversationProgressMsg); !ok {
+			t.Fatalf("expected a progress report, got %T", msg)
+		}
+		_, cmd = m.Update(msg)
+		if m.busyLabel != want || !strings.Contains(m.View(), want) {
+			t.Fatalf("label %q, want %q", m.busyLabel, want)
+		}
+	}
+	pump(m, cmd)
+	if m.busy || m.conversations.sending != nil {
+		t.Fatal("the turn ended")
+	}
+	if len(fake.streamed) != 1 || fake.count("message.created") != 0 {
+		t.Fatal("a streamed turn is not sent again over the socket", fake.streamed, fake.count("message.created"))
+	}
+}
+
+func TestAReportForAnotherSendChangesNothingButTheTurnStillEnds(t *testing.T) {
+	m, _ := streamingTUI(t)
+	press(m, "5", "enter")
+	m.busy, m.busyLabel, m.conversations.sending = true, "waiting", &runningTurn{firstConversation, "send-0002"}
+	updates := make(chan tea.Msg, 1)
+	updates <- conversationOpenMsg{}
+	close(updates)
+	_, cmd := m.Update(conversationProgressMsg{conversationID: firstConversation, sendID: "send-0001", state: "queued", updates: updates})
+	if m.busyLabel != "waiting" {
+		t.Fatal("a late report for another send must not relabel this one", m.busyLabel)
+	}
+	pump(m, cmd)
+	if m.busy {
+		t.Fatal("the rest of the turn still arrives")
+	}
+}
+
+func TestASendGoesByTheSocketWhenTheStreamWasNeverReached(t *testing.T) {
+	m, fake := streamingTUI(t)
+	fake.missing = true
+	press(m, "5", "enter")
+	pump(m, m.cmdConversationSend("Por quê?"))
+	if fake.count("message.created") != 1 {
+		t.Fatal("the turn goes over the request socket", fake.count("message.created"))
 	}
 }

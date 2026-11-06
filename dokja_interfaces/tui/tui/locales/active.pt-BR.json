@@ -362,6 +362,8 @@
   "turn_failed": "Falhou: %s",
   "no_reason_recorded": "sem motivo registrado",
   "turn_interrupted": "Interrompido antes da resposta.",
+  "send_queued": "Na fila atrás de uma resposta anterior",
+  "send_dispatched": "Sendo respondido",
   "turn_being_answered": "Ainda sendo respondido.",
   "turn_state_unknown": "Num estado que esta TUI não conhece.",
   "nothing_said_yet": "Nada dito ainda."

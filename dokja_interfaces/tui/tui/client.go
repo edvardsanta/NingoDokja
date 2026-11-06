@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -13,14 +14,35 @@ type Client interface {
 	Request(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error)
 }
 
+// ChatStreamer is a client that can send an archived chat turn and say where it stands while it
+// waits. streamed is false when it could not: then nothing was sent, and the turn goes by Request.
+type ChatStreamer interface {
+	StreamChat(ctx context.Context, payload map[string]any, progress func(state string)) (result map[string]any, streamed bool, err error)
+}
+
 // OrchestratorClient opens a fresh REQ socket per request: ZeroMQ REQ is strict
 // send/recv lockstep, so sockets are never shared or reused after a timeout.
 type OrchestratorClient struct {
 	Endpoint string
+	// Bridge is the orchestrator's chat stream on this machine, when it is configured.
+	Bridge *cli.BridgeStream
 }
 
 func NewOrchestratorClient(endpoint string) *OrchestratorClient {
-	return &OrchestratorClient{Endpoint: endpoint}
+	bridge, _ := cli.BridgeFromEnv()
+	return &OrchestratorClient{Endpoint: endpoint, Bridge: bridge}
+}
+
+func tuiEvent(eventType string, payload map[string]any) cli.Event {
+	return cli.BuildEvent(cli.EmitOptions{
+		Type:      eventType,
+		UserID:    "tui-user",
+		UserName:  "tui",
+		ChannelID: "tui",
+		Payload:   payload,
+		Context:   cli.CommunicationsContext(eventType, map[string]any{"interface": "tui"}, os.Getenv),
+		Source:    "cli",
+	})
 }
 
 func (c *OrchestratorClient) Request(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error) {
@@ -30,20 +52,28 @@ func (c *OrchestratorClient) Request(ctx context.Context, eventType string, payl
 	}
 	defer requester.Close()
 
-	event := cli.BuildEvent(cli.EmitOptions{
-		Type:      eventType,
-		UserID:    "tui-user",
-		UserName:  "tui",
-		ChannelID: "tui",
-		Payload:   payload,
-		Context:   cli.CommunicationsContext(eventType, map[string]any{"interface": "tui"}, os.Getenv),
-		Source:    "cli",
-	})
-	response, err := requester.Request(ctx, event)
+	response, err := requester.Request(ctx, tuiEvent(eventType, payload))
 	if err != nil {
 		return nil, err
 	}
 	return unwrapResult(response.Result)
+}
+
+// StreamChat sends a chat turn over the bridge's stream. Only a bridge the turn never reached gives
+// streamed false; any other failure is the turn's, and it is not sent again.
+func (c *OrchestratorClient) StreamChat(ctx context.Context, payload map[string]any, progress func(string)) (map[string]any, bool, error) {
+	if c.Bridge == nil {
+		return nil, false, nil
+	}
+	response, err := c.Bridge.Chat(ctx, tuiEvent("message.created", payload), progress)
+	if errors.Is(err, cli.ErrBridgeMissing) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, true, err
+	}
+	result, err := unwrapResult(response.Result)
+	return result, true, err
 }
 
 // unwrapResult turns {"event_id":..,"workflow":..,"result":{"<domain>":{...}}} into {...}.
