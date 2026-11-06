@@ -136,3 +136,29 @@ repairing a model's answer. Claude quota and unavailable Ollama remain the earli
 live-evaluation limits; neither was claimed to pass in this follow-up. No new
 PostgreSQL run or scalable graph benchmark was performed. Production integration,
 durable execution, calibration and general learning claims remain out of scope.
+
+## Live round, 2026-11-06 (Codex and Claude)
+
+Same harness and cases; Codex requested `gpt-6-luna`, Claude Code requested `sonnet`;
+neither reported its actual model. One run per case: an exploratory sample, not a rate.
+
+| Case | Codex | Claude |
+| --- | --- | --- |
+| Pair | fast failed, then clarification requested | fast failed, then normalize succeeded |
+| Pair without memory | fast failed, then invalid proposal (rejected) | fast failed, then provider unavailable |
+| Pair without diagnostic | invalid proposal in the first task (rejected) | provider unavailable |
+| Pair with nonnumeric input | fast failed, then normalize failed | provider unavailable |
+| Contrary sample | abstained, no action | provider unavailable |
+| Unauthorized | stopped at authorization_required | provider unavailable |
+| Single retrieval, depth 3 | abstained at depth limit, no model call | same |
+| Bounded retrieval, depth 3 | invalid proposal (rejected) | provider unavailable |
+
+Claude answered the first two cases fully, then every later call failed in about 1.6 s
+with `provider_unavailable` and no tokens, which looks like a quota or rate refusal rather
+than a model failure; those cells are not evidence about Claude's decisions. Claude's one
+complete pair reproduced the causal cycle (failure observed, then a different action that
+succeeded). Codex again preferred clarification after a failure, and three of its proposals
+were rejected by the contract instead of being repaired. Every rejection and stop held.
+
+Still open: a Claude round without the quota limit, Ollama, repeated runs for rates, and
+the offline items (when to ask versus simulate, invalid field combinations).
