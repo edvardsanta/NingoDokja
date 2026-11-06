@@ -2460,7 +2460,7 @@ button.icon-button[aria-expanded="true"] {
 .assistant-turns li > strong { display: block; margin-bottom: .2rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--turn-label-text); }
 .assistant-turns p { margin: 0; white-space: pre-wrap; }
 .assistant-turns li[data-role="user"] { box-sizing: border-box; justify-self: end; max-width: min(100%, var(--turn-owner-width)); padding: .5rem .85rem .6rem; border: 1px solid var(--turn-owner-border); background: var(--turn-owner-surface); color: var(--turn-owner-text); font-size: .875rem; line-height: 1.55; }
-.assistant-turns li[data-role="assistant"] { padding-left: var(--space-4); border-left: 2px solid var(--turn-reply-rule); color: var(--turn-reply-text); line-height: 1.7; }
+.assistant-turns li[data-role="assistant"] { padding: var(--space-3) var(--space-4); border-left: 3px solid var(--turn-reply-rule); background: var(--turn-reply-surface); color: var(--turn-reply-text); line-height: 1.7; }
 .assistant-turns li[data-role="assistant"] > strong { color: var(--turn-reply-text); }
 /* A send that has no reply: said quietly, in the dim of "off", not as a reply. */
 .assistant-turns li.detail[data-role="assistant"] { border-left-color: var(--status-off); color: var(--ink-dim); font-size: .875rem; line-height: 1.5; }

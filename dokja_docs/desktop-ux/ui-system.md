@@ -72,7 +72,8 @@ without a shape of its own. The mockup still shows the rejected proposals; the a
 ## 2. Principles applied
 
 1. **Neon only means a state.** Cyan = on, selected, open. Magenta = a problem. Amber = not checked or
-   waiting. Nothing else is neon. Focus is ink, not a colour of state.
+   waiting. Nothing else is neon, except two marks of the machine the owner kept (2026-11-06): the
+   focus ring is cyan, and Ningo's reply in Talk carries a cyan rule and wash.
 2. **One meaning, one component.** A switch, a button, a segmented control and a tab never look alike
    (section 5).
 3. **Quiet when well.** A healthy screen has no neon beyond one selected entry and small shapes. Problems
@@ -90,7 +91,7 @@ without a shape of its own. The mockup still shows the rejected proposals; the a
 | `--static` | `#101b25` | The page, and input wells |
 | `--panel` | `#0a1119` | Panel and sidebar surface (opaque) |
 | `--edge` | `#456a80` | Panel edge, control borders, rules at full strength |
-| `--ink` | `#d6e6f3` | Text, focus ring, primary button fill |
+| `--ink` | `#d6e6f3` | Text, primary button fill |
 | `--ink-dim` | `#8ea3b5` | Secondary text, placeholders |
 | `--cyan` | `#3be8f5` | On, selected, open |
 | `--magenta` / `--magenta-text` | `#ff3d8b` / `#ff6aa5` | Problem (fills, bars / text) |
@@ -108,7 +109,7 @@ without a shape of its own. The mockup still shows the rejected proposals; the a
 | `--rule` | `color-mix(--edge 45%, transparent)` | Hairline between header, toolbar, body and dock; same hue, quieter |
 | `--wash` | `color-mix(--ink 6%, transparent)` | Hover on rows and entries (no new hue) |
 | `--wash-strong` | `color-mix(--ink 12%, transparent)` | Active press, icon button hover, menu hover |
-| `--focus` | `var(--ink)` | One focus ring for everything: 2 px solid, 2 px offset (inset on rows and the sidebar) |
+| `--focus` | `var(--cyan)` (owner, 2026-11-06) | One focus ring for everything: 2 px solid, 2 px offset (inset on rows and the sidebar) |
 | `--fs-xs` `--fs-sm` `--fs-base` `--fs-md` `--fs-lg` `--fs-voice` | 0.75 / 0.8125 / 0.9375 / 1.0625 / 1.375 / 1.25 rem | Type scale (section 3.3). `--fs-sm` and `--fs-base` match the sizes `styles.css` already uses ad hoc |
 | `--measure` | `68ch` | Reading width for transcripts, documents, summaries |
 | `--s-1`..`--s-7` | 0.25, 0.5, 0.75, 1, 1.5, 2, 3 rem | Spacing, a 4 px grid (section 3.4) |

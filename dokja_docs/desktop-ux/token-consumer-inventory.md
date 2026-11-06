@@ -11,8 +11,8 @@ state or a completed accessibility audit. It supplements the
 | --- | --- | --- |
 | Page/body | Page surface, body text and bundled font; 15 px / 24 px at default zoom | Native default-style assertions and Talk/System samples |
 | Shared state tones | Separate working, problem, pending, off and progress roles | Existing tone/UI fixtures; native working-state independence |
-| Base buttons | Component text/border/hover roles, primary-ink focus with 2 px width and 3 px offset | Native default and independent-override fixtures |
-| Inner view tabs | Primary-ink focus via `--tab-focus-ring`, preserving 3 px offset | Source migration; full native tab/focus traversal remains pending |
+| Base buttons | Component text/border/hover roles, cyan focus (`--focus-ring`) with 2 px width and 3 px offset | Native default and independent-override fixtures |
+| Inner view tabs | Cyan focus via `--tab-focus-ring`, preserving 3 px offset | Source migration; full native tab/focus traversal remains pending |
 | Search, settings, add forms and model input | Cyan accent focus; 2 px width and 2 px offset | Source migration; native composer probe exercises the shared accent role |
 | Composer, message input, classification and workspace selects | Same accent role and tight offset | Native composer default/override and forced-color samples; other consumers require their own interaction checks |
 | Source/advanced summaries, reading preview, media picker and menu rows | Accent focus, preserving each existing 2 px/3 px offset | Source migration; keyboard/focus-obscuring checks remain pending |
