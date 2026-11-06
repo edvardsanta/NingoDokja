@@ -70,6 +70,16 @@ it("offers documented Codex models and preserves old declarations for removal", 
  expect(screen.queryByRole("textbox", { name: "Declared models (unverified)" })).toBeNull();
 });
 
+it("offers documented Claude Code models including haiku", async () => {
+ const { transport } = routedTransport({ "runtime.chat": ok({ configurationRevision: 1, provider: "", model: "" }), "runtime.providers": ok({ configurationRevision: 2, providers: [
+  { id: "claude_code", name: "Claude Code", state: "installed", reason: "", enabled: true, declaredModels: [], modelDiscovery: "unsupported", models: [], inferenceStatus: "not_tested" },
+ ] }) });
+ render(<I18nProvider locale="en"><WorkspacePanel trail={["System"]}><ProvidersCard transport={transport} /></WorkspacePanel></I18nProvider>);
+ fireEvent.click(await screen.findByRole("button", { name: "Edit Claude Code registration" }));
+ const select = screen.getByRole("combobox", { name: "Declared models (unverified)" }) as HTMLSelectElement;
+ expect(Array.from(select.options).map((option) => option.value)).toEqual(["", "sonnet", "opus", "haiku"]);
+});
+
 it("offers only observed Ollama models in its registration picker", async () => {
  const { transport } = routedTransport({ "runtime.chat": ok({ configurationRevision: 1, provider: "", model: "" }), "runtime.providers": ok({ configurationRevision: 2, providers: [
   { id: "ollama", name: "Ollama", state: "reachable", reason: "", enabled: true, declaredModels: [], modelDiscovery: "listed", models: ["local-chat:latest"], inferenceStatus: "not_tested" },
