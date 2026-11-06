@@ -89,6 +89,25 @@ validation under this transaction do not create an external exactly-once protoco
 A timeout after possible dispatch remains uncertain. Recovery must not reset it
 to preparation and resend merely because a receipt is absent.
 
+## Restart recovery
+
+`Journal.RecoverUnsettled` is the journal's restart rule, the same one archived chat uses.
+At start, under one owner, every attempt begun before that instant and still prepared or
+dispatched is marked interrupted through `MarkInterrupted`, at the revision it was read at,
+with the operation key `<attempt>:interrupt`. An attempt settled meanwhile conflicts and is
+left alone; one the admission does not cover is skipped. Nothing is redone: an interrupted
+attempt's outcome stays unknown, and only its own late receipt can settle it.
+
+It needs the optional store capability `UnsettledReader`, a read-only listing across scopes
+that also counts records it could not read. Recovery reports what it interrupted and what was
+unreadable; an unreadable record is left untouched for the operator.
+
+The source-read path names each operation by its attempt and step (`<attempt>:begin`,
+`:dispatch`, `:interrupt`, `:observe`), so asking for a step again replays it. Its writes go
+through one record per read, which fixes the order and the revision each step expects.
+Preparation and dispatch stay separate writes: a prediction must be recorded before dispatch,
+and that ordering is what later scoring compares against.
+
 ## Proposed persistence mapping for review
 
 No table or schema migration is created here. A backend implementation needs

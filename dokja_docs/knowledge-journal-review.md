@@ -169,4 +169,5 @@ acting, so that merge is dropped. B is now:
    same SQLite store as conversations?
 4. Should eligibility and scoring be deleted, or parked in `dokja_lab` as a sketch?
 
-The revised B above is the plan; it is implemented in its own batches.
+The revised B above is implemented: the write helper, operation keys named by attempt and
+step, and startup recovery (see [restart recovery](knowledge-journal.md#restart-recovery)).
