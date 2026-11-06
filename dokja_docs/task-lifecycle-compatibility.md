@@ -283,11 +283,46 @@ capability and refused non-owner sources; the desktop projection keeps only know
 and answers and refuses another view; Talk hides Stop only on `unsupported`; the CLI and TUI
 ask nothing to stop when the report says so. No live orchestrator was exercised.
 
+## Settlement and recovery matrix (`10.6-c`, archived chat)
+
+Archived chat is the one consumer this matrix covers. Each row names the regression that
+holds it; rows marked new were added with this batch, the rest already existed.
+
+| Situation | Outcome | Evidence |
+| --- | --- | --- |
+| Old attempt completes or fails after a retry (with or without recovery) | Conflict; the current attempt is untouched | `TestOldAttemptCannotSettleARetriedTurn`, `TestLateArchivedReplyCannotCompleteTheCurrentRetry` |
+| A late result after recovery interrupted the turn | Conflict; the turn stays interrupted, attempt 1, no reply | `TestALateResultCannotSettleATurnRecoveryInterrupted` (new) |
+| The same attempt reported twice (same answer, another answer, a failure) | First accepted; the rest conflict | `TestTheSameAttemptIsSettledOnce` (new) |
+| A report for another conversation or scope | Refused before any change | `TestArchivedRetryCannotChangeAnotherConversation`, `TestAnotherScopeSeesNothingAndChangesNothing` |
+| The same send asked again | Answered from the archive; the model is never asked twice | `TestTheSameSendIsAnsweredFromTheArchiveNeverByTheModelAgain`, `TestARetriedSendReturnsItsTurnAndNeverMakesAnother` |
+| The requester leaves after the model answered | Delivery is lost, the answer is not: the turn is completed and a read shows it | `TestAnAnswerIsKeptWhenItsRequesterLeftAfterTheModelReplied` (new) |
+| The requester leaves, or its deadline passes, before the answer | The turn fails once, in plain words; nothing sends it again | `TestACancelledTurnIsRecordedInPlainWords`, `TestASendWhoseDeadlinePassesFailsOnceAndIsNotSentAgain` (new) |
+| The owner stops it, queued or being answered | Fails with the owner's reason; a queued one never reaches the model | the stop regressions above |
+| Restart while pending | Recovery at startup marks it interrupted; nothing is replayed; the same send finds it interrupted | `TestATurnLeftPendingByAStopIsInterruptedAndNotSentAgain` |
+| Owner retry of a failed or interrupted turn | Same turn, next attempt | `TestAnInterruptedTurnCanBeRetriedOnRequest`, `TestAFailedTurnStaysFailedAndARetryAnswersTheSameTurn` |
+
+Execution end, delivery and accepted result are distinct. Execution ends when the model
+returns. The result is accepted when the archive's conditional update completes the pending
+attempt; the archive's completion runs on a context the requester cannot cancel. Delivery
+is the requester receiving it, and losing it changes nothing: every interface reads the turn
+back.
+
+**Persistence decision.** For archived chat no schema change is justified. The existing turn
+state, `attempts` column, conditional settlement update and startup recovery already hold every
+row above. Recovery has one owner, the orchestrator at start, and it acts only on turns begun
+before it. An interrupted turn's effect is unknown, so it is never replayed; only the owner's
+explicit retry sends it again.
+
+**Budgets.** Archived chat has no cumulative budget: each send's budget is its request deadline,
+and retries happen only when the owner asks. A cumulative attempt or cost budget becomes
+necessary with automatic retries or delegated work (`10.5`), and belongs to that consumer.
+
 ## Remaining architecture work
 
 `10.6-a` remains open for the general logical-task mapping, state-revision and
 attempt relationships, authority and aggregate-budget contract, and compatibility
 at an actual workflow consumer. `10.6-b` still owns ordering beyond archived chat, once a
-workflow other than chat needs it; the conversation capability report above is done. `10.6-c` owns broader result/report settlement and justified
-durable recovery. Scope/unknown-effect checks and the existing cognitive evaluation
+workflow other than chat needs it; the conversation capability report above is done. `10.6-c` is verified for archived chat (matrix above); other consumers,
+such as the knowledge application journal, keep their own settlement and still need the same
+review. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.

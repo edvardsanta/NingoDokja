@@ -114,3 +114,71 @@ func TestConversationBoundRetryPreservesExistingConflictAndScopeRules(t *testing
 		t.Fatal("a second retry must not be admitted", err)
 	}
 }
+
+// An executor that outlived recovery still holds the attempt it started. Its late result must not
+// turn an interrupted turn into an answer nobody can trust, nor make the turn pending again.
+func TestALateResultCannotSettleATurnRecoveryInterrupted(t *testing.T) {
+	for _, outcome := range []string{"complete", "fail"} {
+		t.Run(outcome, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), FileName)
+			_, original := open(t, path)
+			held, _ := original.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+			first, _, err := original.Send(ctx, conversation.OwnerScope, held.ID, "send-0001", "Question", conversation.Provenance{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, recovered := open(t, path)
+			if n, err := recovered.Recover(ctx, time.Now().UTC()); err != nil || n != 1 {
+				t.Fatal(n, err)
+			}
+			if outcome == "complete" {
+				_, err = original.Complete(ctx, conversation.OwnerScope, first, "Late answer", "ollama", "fixture/late")
+			} else {
+				_, err = original.Fail(ctx, conversation.OwnerScope, first, "Late failure")
+			}
+			if !errors.Is(err, conversation.ErrConflict) {
+				t.Fatalf("a late %s after recovery must conflict: %v", outcome, err)
+			}
+			turns, _ := recovered.Turns(ctx, conversation.OwnerScope, held.ID, 0, 10)
+			if got := turns[0]; got.State != conversation.TurnInterrupted || got.Reply != "" || got.Attempts != 1 {
+				t.Fatalf("the interrupted turn changed: %+v", got)
+			}
+		})
+	}
+}
+
+// A result reported twice for the same attempt is accepted once; the second report changes nothing,
+// whether it repeats the answer, brings another one or says the attempt failed.
+func TestTheSameAttemptIsSettledOnce(t *testing.T) {
+	_, archive := open(t, filepath.Join(t.TempDir(), FileName))
+	held, _ := archive.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	turn, _, err := archive.Send(ctx, conversation.OwnerScope, held.ID, "send-0001", "Question", conversation.Provenance{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.Complete(ctx, conversation.OwnerScope, turn, "First answer", "ollama", "fixture/first"); err != nil {
+		t.Fatal(err)
+	}
+	for name, report := range map[string]func() error{
+		"the same answer": func() error {
+			_, err := archive.Complete(ctx, conversation.OwnerScope, turn, "First answer", "ollama", "fixture/first")
+			return err
+		},
+		"another answer": func() error {
+			_, err := archive.Complete(ctx, conversation.OwnerScope, turn, "Second answer", "ollama", "fixture/second")
+			return err
+		},
+		"a failure": func() error {
+			_, err := archive.Fail(ctx, conversation.OwnerScope, turn, "Failed after all")
+			return err
+		},
+	} {
+		if err := report(); !errors.Is(err, conversation.ErrConflict) {
+			t.Fatalf("%s must conflict: %v", name, err)
+		}
+	}
+	turns, _ := archive.Turns(ctx, conversation.OwnerScope, held.ID, 0, 10)
+	if got := turns[0]; got.State != conversation.TurnCompleted || got.Reply != "First answer" || got.Provenance.ObservedModel != "fixture/first" {
+		t.Fatalf("the accepted answer changed: %+v", got)
+	}
+}
