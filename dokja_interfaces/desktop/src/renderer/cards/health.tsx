@@ -27,6 +27,7 @@ import {
 } from "./health_model.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 // Longer than the few seconds the orchestrator takes to give up on a stopped service.
 const TIMEOUT_MS = 15_000;
@@ -124,7 +125,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
       </> : null;
     }} renderActivity={(runtimeAvailable) => <>
       {failure && <Problem error={failure} />}
-      {state.phase === "error" && <p className="note">{t("runtime_activity_unavailable")}</p>}
+      {state.phase === "error" && <Notice boxed>{t("runtime_activity_unavailable")}</Notice>}
       {health && <HealthBody health={health} busy={change.state.phase === "loading"}
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
     </>} /></>;
@@ -207,10 +208,10 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
               />
             ))}
           </ul>
-          <p className="note">{t("interfaces_hint")}</p>
+          <Notice boxed>{t("interfaces_hint")}</Notice>
         </>
       )}
-      {switchableScheduler && <p className="note">{t("scheduler_hint")}</p>}
+      {switchableScheduler && <Notice boxed>{t("scheduler_hint")}</Notice>}
       {health.jobs.length > 0 && (
         <>
           <h3>{t("jobs_title")}</h3>
@@ -249,8 +250,8 @@ const LINK_STATES = new Set(["waiting_for_link", "refused", "logged_out", "repla
 // container is not running (Link would find nobody to ask), and otherwise the link itself.
 function WhatsAppLinkRow({ row, link }: { row: ServiceRow; link: Parameters<typeof LinkControl>[0]["link"] }) {
   const t = useTranslate();
-  if (row.configured === false) return <p className="note">{t("whatsapp_setup_missing")}</p>;
-  if (row.state === "not_running") return <p className="note">{t("whatsapp_not_running")}</p>;
+  if (row.configured === false) return <Notice boxed>{t("whatsapp_setup_missing")}</Notice>;
+  if (row.state === "not_running") return <Notice boxed>{t("whatsapp_not_running")}</Notice>;
   if (needsLink(row)) return <p className="detail">{t("link_see_attention")}</p>;
   return <LinkControl link={link} />;
 }
@@ -386,9 +387,9 @@ function LinkControl({ link }: { link: Link }) {
   const t = useTranslate();
   return (
     <>
-      <button type="button" className="link-open" aria-expanded={link.open} onClick={link.toggle}>
+      <Button extra="link-open" aria-expanded={link.open} onClick={link.toggle}>
         {link.open ? t("link_close") : t("link_open_whatsapp")}
-      </button>
+      </Button>
       {link.open && <LinkPanel link={link} />}
     </>
   );
@@ -403,29 +404,29 @@ function LinkPanel({ link }: { link: Link }) {
     <div className="link-panel" aria-busy={busy}>
       <h4>{t("link_title")}</h4>
       {failure && (notSetUp(failure.message)
-        ? <div className="note" data-tone="unchecked"><p>{t("link_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></div>
+        ? <Notice as="div" boxed tone="unchecked"><p>{t("link_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></Notice>
         : <Problem error={failure} />)}
       {state === "connected" ? (
-        <p className="note" data-tone="ok">
+        <Notice boxed tone="ok">
           {t("link_done")}
-        </p>
+        </Notice>
       ) : view?.image ? (
         <>
           <p>{t("link_steps")}</p>
           <img className="link-code" src={view.image} alt={t("link_code_alt")} width={232} height={232} />
         </>
       ) : (
-        <p role="status">{busy ? t("link_working") : t("link_waiting")}</p>
+        <Notice announce="polite">{busy ? t("link_working") : t("link_waiting")}</Notice>
       )}
       <div className="link-actions">
         {canAskForCode && (
-          <button type="button" disabled={busy} onClick={() => void run("communications.link.start")}>
+          <Button disabled={busy} onClick={() => void run("communications.link.start")}>
             {t("link_new")}
-          </button>
+          </Button>
         )}
-        <button type="button" disabled={busy} onClick={() => void run("communications.link.reset")}>
+        <Button disabled={busy} onClick={() => void run("communications.link.reset")}>
           {t("link_unlink")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -434,9 +435,9 @@ function LinkPanel({ link }: { link: Link }) {
 function Switch({ label, on, busy, onToggle }: { label: string; on: boolean; busy: boolean; onToggle: () => void }) {
   const t = useTranslate();
   return (
-    <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} disabled={busy} onClick={onToggle}>
+    <Button role="switch" extra="switch" aria-checked={on} aria-label={label} disabled={busy} onClick={onToggle}>
       {on ? t("switch_on") : t("switch_off")}
-    </button>
+    </Button>
   );
 }
 
@@ -487,17 +488,15 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
           <option value="m">{t("unit_minutes")}</option>
           <option value="h">{t("unit_hours")}</option>
         </select>
-        <button type="submit" disabled={busy || !interval}>
+        <Button type="submit" disabled={busy || !interval}>
           {t("job_apply")}
-        </button>
+        </Button>
         {job.intervalOverride && (
-          <button
-            type="button"
+          <Button
             disabled={busy}
-            onClick={() => onChange({ type: "scheduler.jobs.set", payload: { name: job.name, interval: "default" } })}
-          >
+            onClick={() => onChange({ type: "scheduler.jobs.set", payload: { name: job.name, interval: "default" } })}>
             {t("job_reset")}
-          </button>
+          </Button>
         )}
       </form>
     </li>

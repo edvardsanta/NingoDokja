@@ -8,6 +8,7 @@ import { LocalModels, useRemoveModel } from "./local_models.js";
 import { availableProviderModels } from "./provider_model_catalog.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Button } from "./ui.js";
 
 // What inference the machine could offer, asked when the view opens (never before): discovery only,
 // nothing is selected or started.
@@ -81,12 +82,12 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
             {row.modelSizes?.[model] && <span className="detail">{row.modelSizes[model]}</span>}
             {embedding ? <span className="detail">{t("models_embedding")}</span>
               : inUse ? <span className="provider-in-use">{t("provider_in_use")}</span>
-              : <button type="button" disabled={busy}
+              : <Button disabled={busy}
                 aria-label={t("provider_use_named", { model, name: row.name })}
-                onClick={() => using.start({ row, model, revision: data.configurationRevision ?? 0 })}>{t("provider_use")}</button>}
-            {row.id === "ollama" && !embedding && !inUse && <button type="button" disabled={busy}
+                onClick={() => using.start({ row, model, revision: data.configurationRevision ?? 0 })}>{t("provider_use")}</Button>}
+            {row.id === "ollama" && !embedding && !inUse && <Button disabled={busy}
               aria-label={t("models_remove_named", { model })}
-              onClick={() => removing.start(model)}>{t("models_remove")}</button>}
+              onClick={() => removing.start(model)}>{t("models_remove")}</Button>}
           </li>;
         })}</ul> : null}
         {/* A controller old enough to have no revision has no model actions either. */}
@@ -115,30 +116,30 @@ function ProviderPreferences({ row, revision, busy, onSave }: { row: ProviderRow
   const available = availableProviderModels(row).filter((model) => !draft?.models.includes(model));
   if (!revision) return null;
   const close = () => { setDraft(undefined); setReviewing(false); };
-  if (!draft) return <button type="button" disabled={busy} onClick={() => setDraft({ revision, enabled: row.enabled !== false, models: row.declaredModels ?? [] })} aria-label={t("provider_edit_named", { name: row.name })}>{t("setting_edit")}</button>;
+  if (!draft) return <Button disabled={busy} onClick={() => setDraft({ revision, enabled: row.enabled !== false, models: row.declaredModels ?? [] })} aria-label={t("provider_edit_named", { name: row.name })}>{t("setting_edit")}</Button>;
   return <form className="setting-edit" onSubmit={(event) => { event.preventDefault(); setReviewing(true); }}>
     <label htmlFor={`${id}-enabled`}><input id={`${id}-enabled`} type="checkbox" checked={draft.enabled} disabled={busy} onChange={(event) => { setDraft({ ...draft, enabled: event.target.checked }); setReviewing(false); }} /> {t("provider_discovery_enabled")}</label>
     <div className="list-editor">
       <label htmlFor={`${id}-model`}>{t("provider_declared_models")}</label>
       {draft.models.length ? <ul className="list-editor-items">{draft.models.map((model) => <li key={model}>
         <span>{model}</span>
-        <button type="button" disabled={busy} aria-label={t("list_remove_named", { name: model })} onClick={() => { setDraft({ ...draft, models: draft.models.filter((item) => item !== model) }); setReviewing(false); }}>{t("list_remove")}</button>
+        <Button disabled={busy} aria-label={t("list_remove_named", { name: model })} onClick={() => { setDraft({ ...draft, models: draft.models.filter((item) => item !== model) }); setReviewing(false); }}>{t("list_remove")}</Button>
       </li>)}</ul> : <p className="detail list-editor-empty">{t("setting_none")}</p>}
       <div className="list-editor-add">
         <select id={`${id}-model`} value={candidate} disabled={busy || available.length === 0 || draft.models.length >= 16} onChange={(event) => setCandidate(event.target.value)}>
           <option value="">{t("provider_choose_model")}</option>
           {available.map((model) => <option key={model} value={model}>{model}</option>)}
         </select>
-        <button type="button" disabled={busy || !candidate || !available.includes(candidate) || draft.models.length >= 16} onClick={() => { setDraft({ ...draft, models: [...draft.models, candidate] }); setCandidate(""); setReviewing(false); }}>{t("list_add")}</button>
+        <Button disabled={busy || !candidate || !available.includes(candidate) || draft.models.length >= 16} onClick={() => { setDraft({ ...draft, models: [...draft.models, candidate] }); setCandidate(""); setReviewing(false); }}>{t("list_add")}</Button>
       </div>
     </div>
     <p className="detail">{t(row.id === "ollama" ? "provider_models_ollama_hint" : "provider_models_cli_hint")}</p>
-    {!reviewing ? <><button type="submit" disabled={busy}>{t("setting_review")}</button><button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button></>
+    {!reviewing ? <><Button type="submit" disabled={busy}>{t("setting_review")}</Button><Button disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</Button></>
       : <div className="module-confirm" role="alertdialog" aria-label={t("provider_save_named", { name: row.name })}>
         <p>{t("provider_registration_notice")}</p>
         <p>{t(draft.enabled ? "provider_discovery_enabled" : "provider_disabled")}: {draft.models.join(", ") || t("provider_no_declarations")}</p>
-        <button type="button" disabled={busy} onClick={() => onSave({ provider: row.id, configurationRevision: draft.revision, enabled: draft.enabled, models: draft.models })}>{t("provider_save_registration")}</button>
-        <button type="button" disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</button>
+        <Button disabled={busy} onClick={() => onSave({ provider: row.id, configurationRevision: draft.revision, enabled: draft.enabled, models: draft.models })}>{t("provider_save_registration")}</Button>
+        <Button disabled={busy} onClick={close}>{t("runtime_confirm_cancel")}</Button>
       </div>}
   </form>;
 }
@@ -162,14 +163,14 @@ function ChatSelection({transport,providers,onCurrent}:{transport:Transport;prov
  {save.state.phase==="error"&&<Problem error={save.state.error}/>}
  {state.phase==="ready"&&<>
  <p>{state.data.provider ? `${state.data.provider} / ${state.data.model}`:t("chat_provider_missing")}</p>
- {!draft?<button type="button" onClick={()=>setDraft({revision:state.data.configurationRevision,provider:state.data.provider,model:state.data.model})}>{t("setting_edit")}</button>:
+ {!draft?<Button onClick={()=>setDraft({revision:state.data.configurationRevision,provider:state.data.provider,model:state.data.model})}>{t("setting_edit")}</Button>:
  <form onSubmit={e=>{e.preventDefault();save.start(draft);}}>
  <label>{t("chat_provider_title")}<select value={draft.provider+"|"+draft.model} disabled={save.state.phase==="loading"} onChange={e=>{const [provider,model]=e.target.value.split("|");setDraft({...draft,provider:provider??"",model:model??""});}}>
  <option value="|">{t("chat_provider_missing")}</option>
  {providers.filter(p=>p.enabled!==false).flatMap(p=>(p.declaredModels??[]).map(model=><option key={p.id+"|"+model} value={p.id+"|"+model}>{p.name} / {model}</option>))}
  </select></label>
- <button type="submit" disabled={!draft.provider||!draft.model||save.state.phase==="loading"}>{t("chat_provider_save")}</button>
- <button type="button" disabled={save.state.phase==="loading"} onClick={()=>setDraft(undefined)}>{t("runtime_confirm_cancel")}</button>
+ <Button type="submit" disabled={!draft.provider||!draft.model||save.state.phase==="loading"}>{t("chat_provider_save")}</Button>
+ <Button disabled={save.state.phase==="loading"} onClick={()=>setDraft(undefined)}>{t("runtime_confirm_cancel")}</Button>
  </form>}
  </>}
  </section>;
