@@ -106,7 +106,7 @@ describe("design token compatibility", { skip: hasDisplay ? false : "no display"
       offset: style.outlineOffset, style: style.outlineStyle };
   })()`);
 
-  it("retains distinct keyboard focus defaults for fields and base buttons", async () => {
+  it("keeps visible keyboard focus on fields and base buttons, in the owner's cyan", async () => {
     await page.press("Tab");
     const field = await focus('.composer textarea');
     assert.equal(field.visible, true);
@@ -114,9 +114,10 @@ describe("design token compatibility", { skip: hasDisplay ? false : "no display"
     assert.equal(field.width, '2px');
     assert.equal(field.offset, '2px');
     assert.equal(field.style, 'solid');
+    // Every ring follows --focus-ring, cyan by the owner's decision; the button keeps its own offset.
     const button = await focus('#token-test-button');
     assert.equal(button.visible, true);
-    assert.equal(button.color, 'rgb(214, 230, 243)');
+    assert.equal(button.color, 'rgb(59, 232, 245)');
     assert.equal(button.width, '2px');
     assert.equal(button.offset, '3px');
   });
@@ -127,7 +128,7 @@ describe("design token compatibility", { skip: hasDisplay ? false : "no display"
       const field = await focus('.composer textarea');
       assert.equal(field.color, 'rgb(255, 178, 46)');
       const button = await focus('#token-test-button');
-      assert.equal(button.color, 'rgb(214, 230, 243)');
+      assert.equal(button.color, 'rgb(59, 232, 245)');
       const current = await colors();
       assert.equal(current.text, 'rgb(59, 232, 245)');
       assert.equal(current.status, 'rgb(59, 232, 245)');

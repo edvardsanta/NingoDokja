@@ -1433,18 +1433,19 @@
               ],
               "evidence": [
                 "09.6-c supplies a source-level consumer inventory and sampled native focus/motion/forced-color checks. All-workspace interaction, visual and zoom acceptance remains pending; no full-step completion is claimed.",
-                "2026-10-30, owner asked to proceed: native acceptance suite covers all six workspaces for overflow, dock visibility, 200% text, real Tab focus rings, reduced motion and forced colors. It found and fixed a System row overflow. Stale e2e suites were repaired (position-based tabs, the preload list, Readings navigation)."
+                "2026-10-30, owner asked to proceed: native acceptance suite covers all six workspaces for overflow, dock visibility, 200% text, real Tab focus rings, reduced motion and forced colors. It found and fixed a System row overflow. Stale e2e suites were repaired (position-based tabs, the preload list, Readings navigation).",
+                "2026-11-06: after the 09.7 batches the native suite runs 52/52 under weston's headless backend; two design-token tests had expected the old ink focus ring on base buttons after the owner's cyan decision (26fb7b6) and now expect cyan. Native screenshots work under an isolated Xvfb display when Electron is started with --ozone-platform=x11: a session exporting ELECTRON_OZONE_PLATFORM_HINT/OZONE_PLATFORM=wayland makes the app exit under xvfb-run, and weston's pixman backend still never answers Page.captureScreenshot. Six workspaces were captured at 1536x860, 1100x800 and 800x700 against the e2e fake orchestrator: no sideways overflow, dock visible, Notebook list scrolls inside its panel. The fake orchestrator does not answer knowledge.status, so Library shows only its error state. Seen: CardFrame's Try again button is default size beside the compact Open System."
               ],
               "checks": [
                 {
                   "name": "native_acceptance",
                   "status": "passed",
-                  "detail": "Under xvfb with a synthetic orchestrator: acceptance 7, smoke 24, design_tokens 8, communications 4, feedback 3, communications_env 1, readings 1, post_video 1 all passed."
+                  "detail": "2026-11-06 under weston headless with a synthetic orchestrator: all 52 e2e tests passed (acceptance, smoke, design_tokens, communications, feedback, communications_env, readings, post_video, passage_references, source_application)."
                 },
                 {
                   "name": "native_screenshots",
-                  "status": "blocked",
-                  "detail": "Page.captureScreenshot timed out again in the headless compositor; no native visual acceptance is claimed."
+                  "status": "passed",
+                  "detail": "18 captures (6 workspaces x 3 sizes) under Xvfb with --ozone-platform=x11; Library content not covered by the fake orchestrator. Owner visual review of the captures is still pending."
                 },
                 {
                   "name": "assistive_technology",
@@ -1479,7 +1480,8 @@
           ],
           "evidence": [
             "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch adds Button (variant/size/type) and Notice (announce/boxed/tone) in cards/ui.tsx with unchanged HTML, rebuilds the card_frame states on them and migrates the Talk vertical. dokja_docs/desktop-ux/component-catalog.md holds the inventory, state catalog, migration map and rollback.",
-            "2026-11-06, owner chose to continue 09.7: the Messages vertical (communications.tsx, memes.tsx) moves every button to Button and the boxed notes and status/alert lines Notice can draw to it, with unchanged HTML. Lines with an unboxed data-tone or an aria-label stay plain. component-catalog.md records it."
+            "2026-11-06, owner chose to continue 09.7: the Messages vertical (communications.tsx, memes.tsx) moves every button to Button and the boxed notes and status/alert lines Notice can draw to it, with unchanged HTML. Lines with an unboxed data-tone or an aria-label stay plain. component-catalog.md records it.",
+            "2026-11-06: Settings, Notebook, System and Library moved to Button and Notice in one batch each, stacked on Messages; Realtime already used only the primitives. A script converted only elements whose rendered HTML stays the same and listed the rest; buttons with a computed class or reordered variant and notes with a computed tone or extra attributes stay plain, as component-catalog.md records. Remaining raw buttons live inside the primitives themselves (drawer, menu, tabs, panel) plus those exceptions."
           ],
           "checks": [
             {
@@ -1491,6 +1493,11 @@
               "name": "primitives_messages_vertical",
               "status": "passed",
               "detail": "Communications and meme suites unchanged and passing; new markup regressions for the send, meme, older and channel buttons and the not-set-up note fail when the variant or the boxed note is dropped. Desktop pnpm test and typecheck recorded in the PR. Not run in the real app."
+            },
+            {
+              "name": "primitives_remaining_verticals",
+              "status": "passed",
+              "detail": "Per-vertical suites passed after each batch (Settings 21, Notebook 40, System 72, Library 201 tests), each with a new markup regression; desktop pnpm test passed twice in full (node and vitest 531/531), typecheck and build passed. Not run in the real app; multi-field linked errors outside Settings not done."
             }
           ],
           "blockers": [],
@@ -1499,7 +1506,7 @@
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/desktop-ux/component-catalog.md"
           ],
-          "next_action": "Migrate Settings, Library, Notebook, System and Realtime in their own batches; real-app narrow and long-content checks belong with 09.6-b."
+          "next_action": "All verticals are on the primitives. Remaining: linked inline errors with a focusable summary for multi-field submits outside Settings, and the real-app narrow/long-content checks with 09.6-b."
         },
         {
           "id": "09.8",

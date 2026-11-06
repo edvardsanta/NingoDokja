@@ -6,6 +6,7 @@ import { useTranslate } from "../i18n/context.js";
 import type { MessageId, Translate } from "../i18n/i18n.js";
 import { ChannelPicker, GroupDiscovery, conversationAlias } from "./group_discovery.js";
 import type { Groups, Lookup } from "./settings_lookups.js";
+import { Button, Notice } from "./ui.js";
 import {
   FIELDS, MAX_VALUE, checkAlias, checkChannel, checkGroup, checkPhone, checkTarget, effective,
   isChanged, isChoice, isList, joinConversation, parseList, splitConversation, type Checked,
@@ -124,7 +125,7 @@ function ListField({ row }: { row: RuntimeSetting }) {
   return <div role="group" className="cfg-field" data-changed={changed || undefined} aria-labelledby={`${id}-label`}
     aria-describedby={joinIds(FIELDS[row.id]?.help && `${id}-help`, problem && `${id}-problem`, refused && env.refusalId)}>
     <Head row={row} labelId={`${id}-label`} helpId={`${id}-help`} changed={changed} />
-    {kind === "conversation" && <p className="note">{t("setting_conversations_recording")}</p>}
+    {kind === "conversation" && <Notice boxed>{t("setting_conversations_recording")}</Notice>}
     {entries.length === 0
       ? <p className="detail cfg-empty">{t(FIELDS[row.id]?.unset ?? "setting_none")}</p>
       : <ul className="cfg-entries">{entries.map((entry) => {
@@ -137,8 +138,8 @@ function ListField({ row }: { row: RuntimeSetting }) {
             {state !== "kept" && <span className="cfg-entry-state">{t(state === "added" ? "settings_entry_new" : "settings_entry_removed")}</span>}
           </span>
           {state === "removed"
-            ? <button type="button" className="quiet compact" disabled={env.disabled} aria-label={t("settings_undo_named", { name: title })} onClick={() => add(entry)}>{t("settings_undo")}</button>
-            : <button type="button" className="quiet compact" disabled={env.disabled} aria-label={t("list_remove_named", { name: title })} onClick={() => commit(final.filter((item) => item !== entry))}>{t("list_remove")}</button>}
+            ? <Button variant="quiet" size="compact" disabled={env.disabled} aria-label={t("settings_undo_named", { name: title })} onClick={() => add(entry)}>{t("settings_undo")}</Button>
+            : <Button variant="quiet" size="compact" disabled={env.disabled} aria-label={t("list_remove_named", { name: title })} onClick={() => commit(final.filter((item) => item !== entry))}>{t("list_remove")}</Button>}
         </li>;
       })}</ul>}
     <Problem id={`${id}-problem`} reason={problem} />
@@ -198,7 +199,7 @@ function AddEntry({ label, check, current, disabled, onAdd, inputMode }: {
       <input id={id} value={text} inputMode={inputMode} maxLength={128} autoComplete="off" disabled={disabled}
         aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined}
         onChange={(event) => { setText(event.target.value); setError(undefined); }} />
-      <button type="submit" className="compact" disabled={disabled || text.trim() === ""}>{t("list_add")}</button>
+      <Button type="submit" size="compact" disabled={disabled || text.trim() === ""}>{t("list_add")}</Button>
     </div>
     {error && <p id={`${id}-error`} role="alert" className="cfg-error">{t(error)}</p>}
   </form>;
@@ -240,7 +241,7 @@ function AddConversation({ entries, disabled, onAdd }: { entries: readonly strin
         <input id={`${id}-target`} value={target} maxLength={128} autoComplete="off" disabled={disabled} aria-invalid={invalid("target") ? true : undefined} aria-describedby={invalid("target") ? `${id}-error` : undefined}
           onChange={(event) => { setTarget(event.target.value); setError(undefined); }} />
       </div>
-      <button type="submit" className="compact" disabled={disabled || alias.trim() === "" || target.trim() === ""}>{t("list_add")}</button>
+      <Button type="submit" size="compact" disabled={disabled || alias.trim() === "" || target.trim() === ""}>{t("list_add")}</Button>
     </div>
     {error && <p id={`${id}-error`} role="alert" className="cfg-error">{t(error.reason)}</p>}
   </form>;

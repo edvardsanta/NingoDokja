@@ -35,7 +35,11 @@ changes, and never streaming text.
 | --- | --- |
 | Talk (`assistant`, `assistant_conversation`, `conversation_list`, `talk_model`) and `card_frame` | Migrated |
 | Messages (`communications`, `memes`) | Migrated; feedback with an unboxed `data-tone` or an `aria-label` stays plain, because `Notice` does not draw it |
-| Settings, Library, Notebook, System, Realtime | Not migrated; move each in its own batch, with its own tests |
+| Settings (`settings`, `settings_fields`, `group_discovery`, `known_picker`) | Migrated; an error line with its own `id`, `ref` or `tabIndex` stays plain, because `Notice` does not take them |
+| Notebook (`memory`, `memory_experiences`, `experience_feedback`; `kept_facts` had nothing to move) | Migrated; two notes whose tone is computed stay plain |
+| System (`health`, `runtime`, `providers`, `local_models`) | Migrated |
+| Realtime | Already on the primitives; nothing to move |
+| Library (`knowledge_*`, `digest`, `document_view`, `original_reader`, `source_application`) | Migrated; buttons with a computed class or the variant after another class, and notes with a computed tone or extra attributes, stay plain |
 
 `button.primary`, `.quiet`, `.compact` and `.note` remain the styling contract, so
 migrated and unmigrated screens look the same while this happens. To roll a vertical
@@ -43,7 +47,8 @@ back, restore its class strings; nothing else depends on the primitives.
 
 ## Still open in `09.7`
 
-Other verticals; linked inline errors with a focusable summary for multi-field
-submits outside Settings; long-content and narrow-panel checks in the real app, which
+The controls each batch left plain (listed above), and Talk's `reply_sources`
+source button, which has a computed class; linked inline errors with a focusable
+summary for multi-field submits outside Settings; long-content and narrow-panel checks in the real app, which
 belong with `09.6-b`. CLI and TUI keep their own presentation and share only the
 state vocabulary.

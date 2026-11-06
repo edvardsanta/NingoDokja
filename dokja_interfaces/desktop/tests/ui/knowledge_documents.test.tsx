@@ -32,6 +32,16 @@ describe("document management", () => {
     expect(calls.map((call) => call.payload?.offset)).toEqual([0, 20, 0]);
   });
 
+  it("keeps the markup of the document pager on the shared Button", async () => {
+    const { transport } = routedTransport({ "knowledge.list": ok(page()) });
+    render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={() => {}} />));
+    await screen.findByText("Title note:0");
+    for (const name of ["Previous documents", "Next documents"]) {
+      const pager = screen.getByRole("button", { name });
+      expect([pager.getAttribute("type"), pager.className]).toEqual(["button", "quiet compact"]);
+    }
+  });
+
   it("sends the selected id once, keeps a cancelled document, and refreshes after success", async () => {
     const onChanged = vi.fn();
     const { transport, calls } = routedTransport({

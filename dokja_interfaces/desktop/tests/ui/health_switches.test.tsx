@@ -46,6 +46,14 @@ describe("the switches on the health card", () => {
     expect(switchOf("Memes").textContent).toBe("On");
   });
 
+  it("keeps the markup of a switch on the shared Button", async () => {
+    const { transport } = routedTransport({ "ningo.status": status(UP) });
+    renderCard(transport);
+    await screen.findByText("Memes");
+    const memes = switchOf("Memes");
+    expect([memes.tagName, memes.getAttribute("type"), memes.className, memes.getAttribute("role")]).toEqual(["BUTTON", "button", "switch", "switch"]);
+  });
+
   it("shows a switched-off service as off", async () => {
     const { transport } = routedTransport({ "ningo.status": status(MEME_OFF) });
     renderCard(transport);

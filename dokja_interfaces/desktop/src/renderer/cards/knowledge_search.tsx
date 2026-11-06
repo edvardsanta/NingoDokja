@@ -5,7 +5,7 @@ import type { Transport } from "../../shared/transport.js";
 import { useNumbers, useTranslate } from "../i18n/context.js";
 import { OffNotice, OpenSystem, Problem } from "./card_frame.js";
 import { parseKnowledgeSearch } from "./knowledge_model.js";
-import { Button, VoiceBlock } from "./ui.js";
+import { Button, Notice, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 
@@ -100,9 +100,9 @@ export function SearchForm({ search }: { search: KnowledgeSearchState }) {
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      <button type="submit" disabled={searching || question === ""}>
+      <Button type="submit" disabled={searching || question === ""}>
         {t("knowledge_search")}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -116,7 +116,7 @@ export function SearchState({ search }: { search: KnowledgeSearchState }) {
   return (
     <div className="results-head" data-active={searching || active ? "" : undefined}>
       <div aria-live="polite">
-        {searching && <p role="status">{t("knowledge_searching")}</p>}
+        {searching && <Notice announce="polite">{t("knowledge_searching")}</Notice>}
         {!searching && found > 0 && <p>{t("knowledge_results", { count: found, query: asked })}</p>}
       </div>
       {active && <Button variant="quiet" size="compact" onClick={clear}>{t("knowledge_clear")}</Button>}
@@ -150,15 +150,15 @@ function Hits({ search, onOpen }: { search: KnowledgeSearch; onOpen: (hit: Knowl
   return (
     <>
       {search.degraded && (
-        <p className="note" data-tone="unchecked">
+        <Notice boxed tone="unchecked">
           {t("knowledge_degraded")}
           {search.reason && <span className="detail"> {search.reason}</span>}
-        </p>
+        </Notice>
       )}
       {search.relevantCount === 0 && (
-        <p className="note" data-tone="unchecked">
+        <Notice boxed tone="unchecked">
           {t("knowledge_none_relevant")}
-        </p>
+        </Notice>
       )}
       <ol className="hits">
         {search.hits.map((hit) => (
@@ -166,9 +166,9 @@ function Hits({ search, onOpen }: { search: KnowledgeSearch; onOpen: (hit: Knowl
             <p>
               {/* the title opens the document the passage is from; a hit that names none is only read */}
               {hit.sourceId ? (
-                <button type="button" className="row-title" aria-label={t("documents_open_named", { title: hit.title || hit.sourceId })} onClick={() => onOpen(hit)}>
+                <Button extra="row-title" aria-label={t("documents_open_named", { title: hit.title || hit.sourceId })} onClick={() => onOpen(hit)}>
                   <strong>{hit.title}</strong>
-                </button>
+                </Button>
               ) : (
                 <strong>{hit.title}</strong>
               )}

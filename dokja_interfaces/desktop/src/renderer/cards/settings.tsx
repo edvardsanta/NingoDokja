@@ -15,6 +15,7 @@ import {
 } from "./settings_model.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 export { impactOf } from "./settings_model.js";
 
@@ -163,7 +164,7 @@ export function SettingsCard({ transport }: { transport: Transport }) {
   return <CardFrame title={t("settings_title")} state={state} onReload={reload}>
     {(data) => <SettingsEnv.Provider value={env}>
       <p className="detail cfg-intro">{t("settings_intro")}</p>
-      {data.error && <p role="alert">{t("settings_last_change", { message: data.error })}</p>}
+      {data.error && <Notice announce="assertive">{t("settings_last_change", { message: data.error })}</Notice>}
       {sections.length === 0 && !data.error && <p className="detail">{t("setting_none")}</p>}
       <div className="cfg-sections">{sections.map((section) =>
         <SectionView key={section.id} section={section} env={env} changes={changes} open={open.has(section.id)} onToggle={() => toggle(section.id)}
@@ -174,17 +175,17 @@ export function SettingsCard({ transport }: { transport: Transport }) {
         {failure && <p ref={failureText} tabIndex={-1} role="alert" id={refusalId} className="cfg-error">
           <span>{describeError(failure, t)}</span> <span>{t("settings_not_saved")}</span>
         </p>}
-        {busy && <p className="note" data-tone="progress">{saving ? t("settings_saving") : t("settings_busy")}</p>}
-        {saved && !busy && !data.error && changes.length === 0 && <p className="note" data-tone="ok">
+        {busy && <Notice boxed tone="progress">{saving ? t("settings_saving") : t("settings_busy")}</Notice>}
+        {saved && !busy && !data.error && changes.length === 0 && <Notice boxed tone="ok">
           <span>{t("settings_saved")}</span>
-          <button type="button" className="quiet compact" onClick={() => setSaved(false)}>{t("settings_dismiss")}</button>
-        </p>}
+          <Button variant="quiet" size="compact" onClick={() => setSaved(false)}>{t("settings_dismiss")}</Button>
+        </Notice>}
         {changes.length > 0 && !reviewing && <div className="cfg-bar">
           <p className="cfg-count">{t("settings_pending", { count: changes.length })}</p>
           {blocked && <p id={`${refusalId}-blocked`} className="cfg-error">{t("settings_blocked")}</p>}
           <div className="cfg-actions">
-            <button type="button" className="quiet compact" disabled={saving} onClick={discard}>{t("settings_discard")}</button>
-            <button type="button" className="primary compact" ref={reviewButton} disabled={busy || blocked} aria-describedby={blocked ? `${refusalId}-blocked` : undefined} onClick={() => setReviewing(true)}>{t("setting_review")}</button>
+            <Button variant="quiet" size="compact" disabled={saving} onClick={discard}>{t("settings_discard")}</Button>
+            <Button variant="primary" size="compact" ref={reviewButton} disabled={busy || blocked} aria-describedby={blocked ? `${refusalId}-blocked` : undefined} onClick={() => setReviewing(true)}>{t("setting_review")}</Button>
           </div>
         </div>}
         {changes.length > 0 && reviewing && <Review changes={changes} view={data} env={env} headingRef={reviewHeading} busy={busy} onSave={submit} onBack={() => setReviewing(false)} />}
@@ -221,20 +222,20 @@ function SectionView({ section, env, changes, open, onToggle, webhooks, register
   const holdsGroups = holds("group") || section.rows.some((row) => FIELDS[row.id]?.entry === "conversation" && parseList(env.value(row)).some((entry) => splitConversation(entry).target.endsWith("@g.us")));
   return <section className="cfg-section" data-tone={STATE_TONES[state]} data-open={open || undefined}>
     <h3 className="cfg-heading">
-      <button type="button" ref={register} className="cfg-toggle" aria-expanded={open} aria-controls={`${id}-body`} aria-labelledby={`${id}-title ${id}-state`} aria-describedby={`${id}-summary`} onClick={onToggle}>
+      <Button ref={register} extra="cfg-toggle" aria-expanded={open} aria-controls={`${id}-body`} aria-labelledby={`${id}-title ${id}-state`} aria-describedby={`${id}-summary`} onClick={onToggle}>
         <span id={`${id}-title`} className="cfg-title">{title}</span>
         <span id={`${id}-state`} className="cfg-state">{t(STATE_WORDS[state])}</span>
         <span className="cfg-chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
         <span id={`${id}-summary`} className="cfg-summary">{summaryOf(section, env, t, join).map((part, at) =>
           <span key={at} className="cfg-sum">{part.label && <span className="cfg-sum-label">{part.label}</span>}<span>{part.value}</span></span>)}</span>
-      </button>
+      </Button>
     </h3>
     {open && <div id={`${id}-body`} className="cfg-body">
       {section.about && <p className="detail cfg-about">{t(section.about)}</p>}
       {affects.length > 0 && <p className="detail cfg-about">{t("settings_affects", { names: join(affects) })}</p>}
       {env.channels.phase === "unavailable" && holds("channel") && <p className="detail cfg-about">{t("settings_channel_names_unavailable")}</p>}
       {env.groups.phase === "unavailable" && holdsGroups && !env.groups.asked && <p className="detail cfg-about">{t("settings_group_names_unavailable")}</p>}
-      {webhooks && section.rows.some((row) => row.id === "discord.meme_channels") && <p className="note cfg-about">{t("settings_webhooks_by_hand")}</p>}
+      {webhooks && section.rows.some((row) => row.id === "discord.meme_channels") && <Notice boxed extra="cfg-about">{t("settings_webhooks_by_hand")}</Notice>}
       {section.rows.map((row) => <FieldFor key={row.id} row={row} />)}
     </div>}
   </section>;
@@ -280,7 +281,7 @@ function Review({ changes, view, env, headingRef, busy, onSave, onBack }: {
         </>
         : <span>{t("settings_review_change", { from: wording(change.row, change.before), to: wording(change.row, change.after) })}</span>}</span>
     </li>)}</ul>
-    {recorded && <p className="note">{t("setting_conversations_recording")}</p>}
+    {recorded && <Notice boxed>{t("setting_conversations_recording")}</Notice>}
     <ul className="cfg-impact">
       {impact.now.length > 0 && <li>{t("setting_recreated_now", { names: names(impact.now) })}</li>}
       {impact.later.length > 0 && <li>{t("setting_recreated_later", { names: names(impact.later) })}</li>}
@@ -288,8 +289,8 @@ function Review({ changes, view, env, headingRef, busy, onSave, onBack }: {
       {impact.reindex && <li>{t("setting_reindex")}</li>}
     </ul>
     <div className="cfg-actions">
-      <button type="button" className="primary compact" disabled={busy} onClick={onSave}>{t("setting_save")}</button>
-      <button type="button" className="compact" onClick={onBack}>{t("settings_back")}</button>
+      <Button variant="primary" size="compact" disabled={busy} onClick={onSave}>{t("setting_save")}</Button>
+      <Button size="compact" onClick={onBack}>{t("settings_back")}</Button>
     </div>
   </section>;
 }

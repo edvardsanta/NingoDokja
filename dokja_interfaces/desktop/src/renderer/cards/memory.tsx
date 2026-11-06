@@ -15,6 +15,7 @@ import {
 import { MemoryExperiencesPanel, WaitingVerdictsPanel } from "./memory_experiences.js";
 import { KeptFactsPanel } from "./kept_facts.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Notice } from "./ui.js";
 
 // A stopped memory service takes about five seconds to fail, so wait longer than that.
 const TIMEOUT_MS = 15_000;
@@ -99,9 +100,9 @@ function MemoryBody({ view }: { view: Extract<MemoryView, { off: false }> }) {
         {similarity === "down" && t("memory_similarity_down")}
       </p>
       {status.needsReindex > 0 && (
-        <p className="note" data-tone="unchecked">
+        <Notice boxed tone="unchecked">
           {t("memory_needs_reindex", { count: status.needsReindex })}
-        </p>
+        </Notice>
       )}
     </details>
   );
@@ -115,15 +116,15 @@ function ScoreBody({ score }: { score: ScoreView }) {
       return <OffNotice reason={score.reason} />;
     case "error":
       return (
-        <p className="note" data-tone="problem">
+        <Notice boxed tone="problem">
           {t("memory_score_failed", { message: score.message })}
-        </p>
+        </Notice>
       );
     case "nothing":
       return (
-        <p className="note" data-tone="off">
+        <Notice boxed tone="off">
           {t("memory_nothing_scored")}
-        </p>
+        </Notice>
       );
     case "too-few":
     case "judged": {
@@ -132,9 +133,9 @@ function ScoreBody({ score }: { score: ScoreView }) {
       return (
         <>
           {score.kind === "too-few" && (
-            <p className="note" data-tone="unchecked">
+            <Notice boxed tone="unchecked">
               {t("memory_too_few", { scored, needed: minScored })}
-            </p>
+            </Notice>
           )}
           <p>{t("memory_scored_counts", { scored, unscored })}</p>
           <p>

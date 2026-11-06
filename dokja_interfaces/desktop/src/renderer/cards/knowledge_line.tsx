@@ -6,7 +6,7 @@ import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { OffNotice, Problem } from "./card_frame.js";
 import { similarityOf } from "./knowledge_model.js";
-import { Button } from "./ui.js";
+import { Button, Notice } from "./ui.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 
@@ -43,9 +43,9 @@ export function KnowledgeLine({ transport, status, facts, internal, onInternal, 
                 {t("knowledge_similarity_chip")}
               </span>
             ) : (
-              <span className="note" data-tone="unchecked">
+              <Notice as="span" boxed tone="unchecked">
                 {similarity === "off" ? t("knowledge_similarity_off") : t("knowledge_similarity_down")}
-              </span>
+              </Notice>
             )}
             {status.pendingEmbeddings > 0 && (
               <span className="chip" data-tone="unchecked">
@@ -56,10 +56,10 @@ export function KnowledgeLine({ transport, status, facts, internal, onInternal, 
           </>
         )}
         {onInternal && (
-          <button type="button" className="chip-toggle" aria-pressed={internal} onClick={() => onInternal(!internal)}>
+          <Button extra="chip-toggle" aria-pressed={internal} onClick={() => onInternal(!internal)}>
             {internal && <span aria-hidden="true">✓ </span>}
             {t("documents_show_internal")}
-          </button>
+          </Button>
         )}
       </div>
       {hidden > 0 && <p className="detail library-hidden">{t("documents_hidden", { count: hidden })}</p>}
@@ -94,12 +94,12 @@ export function IndexPending({ transport, pending, onChanged }: {
     {/* the name stays what it says it does; the words on it are the short ones */}
     {pending > 0 && <Button size="compact" aria-label={t("index_title")} disabled={state.phase === "loading"} onClick={() => start(undefined)}>{t("index_now")}</Button>}
     <div className="line-feedback" aria-live="polite">
-      {state.phase === "loading" && <p role="status">{t("index_running")}</p>}
+      {state.phase === "loading" && <Notice announce="polite">{t("index_running")}</Notice>}
       {state.phase === "error" && (state.error.code === "timeout"
-        ? <p role="alert">{t("index_timeout")}</p> : <Problem error={state.error} />)}
+        ? <Notice announce="assertive">{t("index_timeout")}</Notice> : <Problem error={state.error} />)}
       {state.phase === "ready" && (state.data.off ? <OffNotice reason={state.data.reason} /> : <>
         <p>{t("index_result", { count: state.data.embedded, remaining: state.data.remaining })}</p>
-        {state.data.degraded && <p className="note" data-tone="unchecked">{t("index_degraded")} {state.data.reason}</p>}
+        {state.data.degraded && <Notice boxed tone="unchecked">{t("index_degraded")} {state.data.reason}</Notice>}
       </>)}
     </div>
   </>;

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { useTranslate } from "../i18n/context.js";
+import { Button } from "./ui.js";
 
 export type KnownItem = { key: string; title: string; detail?: readonly string[] };
 
@@ -35,7 +36,7 @@ export function KnownPicker({ label, items, chosen, disabled, onAdd }: {
             <strong className="cfg-entry-title">{item.title}</strong>
             {(item.detail ?? []).map((part, at) => <span key={at} className="detail cfg-entry-detail">{part}</span>)}
           </span>
-          <button type="button" className="compact" disabled={disabled || added} aria-label={t("known_add_named", { name: item.title })} onClick={() => onAdd(item.key)}>{added ? t("known_added") : t("list_add")}</button>
+          <Button size="compact" disabled={disabled || added} aria-label={t("known_add_named", { name: item.title })} onClick={() => onAdd(item.key)}>{added ? t("known_added") : t("list_add")}</Button>
         </li>;
       })}</ul>
       : <p className="detail">{t("known_none")}</p>}

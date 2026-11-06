@@ -6,6 +6,7 @@ import { useTranslate } from "../i18n/context.js";
 import { Problem } from "./card_frame.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
@@ -62,25 +63,25 @@ export function LocalModels({ transport, row, onChanged }: { transport: Transpor
     {status.engine === "failed" && <p className="detail">{t("models_engine_failed")}{status.engineError ? `: ${status.engineError}` : ""}</p>}
     {stopped && status.engine !== "starting" && <p className="detail">
       {t("models_engine_stopped")}{" "}
-      <button type="button" disabled={busy} onClick={() => action.start({ type: "runtime.models.engine.start" })}>{t("models_engine_start")}</button>
+      <Button disabled={busy} onClick={() => action.start({ type: "runtime.models.engine.start" })}>{t("models_engine_start")}</Button>
     </p>}
-    {status.engine === "starting" && <p role="status">{t("models_engine_starting")}</p>}
-    {pull?.state === "pulling" && <p role="status" className="model-pull">
+    {status.engine === "starting" && <Notice announce="polite">{t("models_engine_starting")}</Notice>}
+    {pull?.state === "pulling" && <Notice announce="polite" extra="model-pull">
       <span>{t("models_pull_progress", { model: pull.model, phase: t(pull.phase === "downloading" ? "models_phase_downloading" : pull.phase === "verifying" ? "models_phase_verifying" : pull.phase === "writing" ? "models_phase_writing" : "models_phase_starting") })}</span>
       {pull.percent !== undefined && <progress max={100} value={pull.percent} aria-label={t("models_pull_share", { model: pull.model })} />}
       {pull.percent !== undefined && <span>{pull.percent}%</span>}
-      <button type="button" disabled={busy} onClick={() => action.start({ type: "runtime.models.cancel" })}>{t("models_pull_cancel")}</button>
-    </p>}
-    {pull?.state === "done" && <p role="status">{t("models_pull_done", { model: pull.model })}</p>}
-    {pull?.state === "cancelled" && <p role="status">{t("models_pull_cancelled", { model: pull.model })}</p>}
-    {pull?.state === "failed" && !isInstalled(row, pull.model) && <p role="alert">{t("models_pull_failed", { model: pull.model })}{pull.error ? `: ${pull.error}` : ""}</p>}
+      <Button disabled={busy} onClick={() => action.start({ type: "runtime.models.cancel" })}>{t("models_pull_cancel")}</Button>
+    </Notice>}
+    {pull?.state === "done" && <Notice announce="polite">{t("models_pull_done", { model: pull.model })}</Notice>}
+    {pull?.state === "cancelled" && <Notice announce="polite">{t("models_pull_cancelled", { model: pull.model })}</Notice>}
+    {pull?.state === "failed" && !isInstalled(row, pull.model) && <Notice announce="assertive">{t("models_pull_failed", { model: pull.model })}{pull.error ? `: ${pull.error}` : ""}</Notice>}
     {!stopped && pull?.state !== "pulling" && <form className="model-download" onSubmit={(event) => {
       event.preventDefault();
       if (valid) action.start({ type: "runtime.models.pull", model: name.trim() });
     }}>
       <label htmlFor={`${id}-model`}>{t("models_download_label")}</label>
       <input id={`${id}-model`} value={name} maxLength={128} spellCheck={false} autoComplete="off" placeholder={t("models_download_placeholder")} disabled={busy} onChange={(event) => setName(event.target.value)} />
-      <button type="submit" disabled={busy || !valid}>{t("models_download")}</button>
+      <Button type="submit" disabled={busy || !valid}>{t("models_download")}</Button>
       <p className="detail">{t("models_download_hint")}</p>
     </form>}
   </div>;

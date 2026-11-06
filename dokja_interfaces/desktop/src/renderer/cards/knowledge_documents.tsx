@@ -9,7 +9,7 @@ import { OffNotice, OpenSystem, Problem } from "./card_frame.js";
 import { MenuRow, useRowMenu, type MenuItem } from "./context_menu.js";
 import { KnowledgeLine } from "./knowledge_line.js";
 import { similarityOf } from "./knowledge_model.js";
-import { Button, VoiceBlock } from "./ui.js";
+import { Button, Notice, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
@@ -135,7 +135,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   return (
     <section className="library-documents" aria-label={t("documents_title")} aria-busy={listing.state.phase === "loading"}>
       <h3 className="sr-only">{t("documents_title")}</h3>
-      {firstRead && <p role="status">{t("loading")}</p>}
+      {firstRead && <Notice announce="polite">{t("loading")}</Notice>}
       {listing.state.phase === "error" && <>
         <Problem error={listing.state.error} />
         <div className="problem-actions">
@@ -151,9 +151,9 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
           onInternal={searching ? undefined : (next) => { setInternal(next); setOffset(0); }} hidden={searching ? 0 : hidden} onChanged={onChanged} />
         {searching ? results : <>
         <div className="line-feedback" aria-live="polite">
-          {removing && <p role="status">{t("documents_removing")}</p>}
+          {removing && <Notice announce="polite">{t("documents_removing")}</Notice>}
           {deletion.state.phase === "error" && (deletion.state.error.code === "timeout"
-            ? <p role="alert">{t("documents_delete_timeout")}</p> : <Problem error={deletion.state.error} />)}
+            ? <Notice announce="assertive">{t("documents_delete_timeout")}</Notice> : <Problem error={deletion.state.error} />)}
           {deletion.state.phase === "ready" && ("off" in deletion.state.data
             ? <OffNotice reason={deletion.state.data.reason} />
             : <p>{deletion.state.data.deleted ? t("documents_deleted") : t("documents_absent")}</p>)}
@@ -197,7 +197,7 @@ function DocumentRow({ document, removing, similar, tabIndex, onFocus, onOpen, o
   return <MenuRow menu={menu} tabIndex={tabIndex} onFocus={onFocus} onActivate={onOpen ? () => onOpen(false) : undefined}>
     <p className="document-title">{onOpen
       // the row is the stop of the tab key; the title is still a button to click
-      ? <button type="button" className="row-title" tabIndex={-1} aria-label={t("documents_open_named", { title })} onClick={() => onOpen(false)}><strong>{title}</strong></button>
+      ? <Button extra="row-title" tabIndex={-1} aria-label={t("documents_open_named", { title })} onClick={() => onOpen(false)}><strong>{title}</strong></Button>
       : <strong>{title}</strong>}</p>
     <p className="detail document-meta">
       <span>
@@ -205,7 +205,7 @@ function DocumentRow({ document, removing, similar, tabIndex, onFocus, onOpen, o
         {document.kind && <span title={document.id}>{document.kind}</span>}
         {rest.map((part, index) => <span key={index}>{document.kind || index > 0 ? " · " : ""}{part}</span>)}
         {similar && document.embedded < document.chunks && (
-          <span className="note" data-tone="unchecked">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</span>
+          <Notice as="span" boxed tone="unchecked">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</Notice>
         )}
       </span>
       {when && <span className="document-time">{t("documents_updated", { ago: when })}</span>}

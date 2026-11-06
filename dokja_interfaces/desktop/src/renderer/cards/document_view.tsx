@@ -8,7 +8,7 @@ import { useNumbers, useTimes, useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { parseDocuments } from "./knowledge_documents.js";
 import { KnowledgeClassificationPanel } from "./knowledge_classification.js";
-import { Button } from "./ui.js";
+import { Button, Notice } from "./ui.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
 
@@ -58,9 +58,9 @@ export function DocumentView({ transport, id, classify = false, locator }: { tra
       )}
       {state.phase === "ready" && "off" in state.data && state.data.off && <OffNotice reason={state.data.reason} />}
       {state.phase === "ready" && "gone" in state.data && (
-        <p className="note" data-tone="off">
+        <Notice boxed tone="off">
           {t("document_gone")}
-        </p>
+        </Notice>
       )}
       {state.phase === "ready" && "document" in state.data && (() => {
         const document = state.data.document;
@@ -77,15 +77,12 @@ export function DocumentView({ transport, id, classify = false, locator }: { tra
           <>
             <header className="document-head">
               <h3 title={document.id}>{document.title || document.id}</h3>
-              <button
-                type="button"
-                className="disclosure"
+              <Button extra="disclosure"
                 aria-expanded={classificationOpen}
-                onClick={() => setClassificationOpen((open) => !open)}
-              >
+                onClick={() => setClassificationOpen((open) => !open)}>
                 {t("classification_title")}
                 <span aria-hidden="true"> {classificationOpen ? "▾" : "▸"}</span>
-              </button>
+              </Button>
             </header>
             <p className="detail document-line">{meta.join(" · ")}</p>
             {classificationOpen && <KnowledgeClassificationPanel key={document.id} transport={transport} id={document.id} />}
@@ -93,13 +90,13 @@ export function DocumentView({ transport, id, classify = false, locator }: { tra
               <>
                 <pre className="document-text">{document.text}</pre>
                 {document.truncated && (
-                  <p className="note" data-tone="off">
+                  <Notice boxed tone="off">
                     {t("document_truncated", { count: fixed(document.text.length, 0) })}
-                  </p>
+                  </Notice>
                 )}
-                <p className="note" data-tone="off">
+                <Notice boxed tone="off">
                   {t("document_rebuilt")}
-                </p>
+                </Notice>
               </>
             ) : (
               <p>{t("document_no_text")}</p>
