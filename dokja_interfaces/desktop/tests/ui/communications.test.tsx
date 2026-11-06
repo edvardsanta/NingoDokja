@@ -196,6 +196,27 @@ describe("communications", () => {
     screen.getByText(/DOKJA_COMMUNICATIONS_TOKEN/);
     expect(screen.queryByRole("alert")).toBeNull();
   });
+  it("keeps the markup of its controls on the shared Button and Notice", async () => {
+    const { transport } = routedTransport({ "communications.channels": ok(channels), "communications.history": ok(history("123", "9")) });
+    render(view(transport));
+    await screen.findByText("<script>text</script>");
+    const send = screen.getByRole("button", { name: "Send as Ningo" });
+    expect([send.getAttribute("type"), send.className]).toEqual(["submit", "primary"]);
+    const memes = screen.getByRole("button", { name: "Attach a meme" });
+    expect([memes.getAttribute("type"), memes.className]).toEqual(["button", "icon-button"]);
+    const older = screen.getByRole("button", { name: "Load earlier messages" });
+    expect([older.getAttribute("type"), older.className]).toEqual(["button", "quiet"]);
+    const channel = screen.getByRole("button", { name: "#reading · 123" });
+    expect([channel.getAttribute("type"), channel.hasAttribute("class")]).toEqual(["button", false]);
+  });
+
+  it("draws the not-set-up notice as the same boxed note", async () => {
+    const { transport } = routedTransport({ "communications.channels": failure("orchestrator", "Communications access is not configured.") });
+    render(view(transport));
+    const note = (await screen.findByText("Messages are not set up yet.")).parentElement!;
+    expect([note.tagName, note.className, note.dataset.tone, note.hasAttribute("role")]).toEqual(["DIV", "note", "unchecked", false]);
+  });
+
   it("opens the memes from the composer, marks the attached one, shows one large apart, and closes", async () => {
     const memePage = { total: 1, offset: 0, memes: [{ url: "https://images.example/a.png", title: "First", tags: "", source: "", createdAt: "", sentAt: "" }] };
     const { preview } = previewer();

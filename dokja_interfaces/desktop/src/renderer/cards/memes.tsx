@@ -9,6 +9,7 @@ import { describeError, needsWrittenText } from "./card_frame.js";
 import { usePreview } from "./use_preview.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 // The memes waiting in the queue, as a grid to attach one from when writing a message. A meme is
 // not a workspace of its own: it is something Ningo sends, so it is picked where messages are
@@ -140,9 +141,9 @@ export function MemePicker({
 
   if (attachable.length === 0) {
     return (
-      <p className="note" data-tone="off">
+      <Notice boxed tone="off">
         {t("memes_empty")}
-      </p>
+      </Notice>
     );
   }
 
@@ -158,14 +159,14 @@ export function MemePicker({
       <div className="meme-picker-head">
         <span>{t("memes_range", { from, to, total: Math.max(page.total, to) })}</span>
         <div className="meme-picker-pager">
-          <button type="button" className="quiet" aria-label={t("memes_previous")} title={t("memes_previous")}
+          <Button variant="quiet" aria-label={t("memes_previous")} title={t("memes_previous")}
             disabled={disabled || page.offset === 0} onClick={() => onPage(Math.max(0, page.offset - memes.length))}>
             <span aria-hidden="true">‹</span>
-          </button>
-          <button type="button" className="quiet" aria-label={t("memes_next")} title={t("memes_next")}
+          </Button>
+          <Button variant="quiet" aria-label={t("memes_next")} title={t("memes_next")}
             disabled={disabled || page.offset + memes.length >= page.total || memes.length === 0} onClick={() => onPage(page.offset + memes.length)}>
             <span aria-hidden="true">›</span>
-          </button>
+          </Button>
         </div>
       </div>
       <ul className="memes" aria-label={t("communications_meme")}>
@@ -193,10 +194,10 @@ export function MemePicker({
               if (!value.trim()) onClearPreparedTag();
             }} placeholder="#tag" />
         </label>
-        <button type="button" disabled={busy || !hashtag.trim()} onClick={() => tag.start(undefined)}>
+        <Button disabled={busy || !hashtag.trim()} onClick={() => tag.start(undefined)}>
           {t("memes_create_tag")}
-        </button>
-        {busy && <span className="meme-tag-status" role="status">{t("memes_creating_tag")}</span>}
+        </Button>
+        {busy && <Notice as="span" announce="polite" extra="meme-tag-status">{t("memes_creating_tag")}</Notice>}
         {tag.state.phase === "ready" && ("off" in tag.state.data
           ? <span className="meme-tag-status" data-tone="off">{tag.state.data.reason}</span>
           : <span className="meme-tag-status" data-tone="ok">{t("memes_tagged_ready", { tag: tag.state.data.hashtag })}</span>)}
@@ -210,15 +211,15 @@ export function MemePicker({
         <div className="meme-tag-suggestions" role="status" aria-label={t("memes_tag_suggestion")}>
           <span>{t("memes_tag_suggestion")}</span>
           {advice.kind === "found"
-            ? <button type="button" className="meme-tag-advice" disabled={busy}
-                onClick={() => { setHashtag(advice.hashtag); onPrepareTagged(advice.hashtag); }}>{advice.hashtag}</button>
+            ? <Button extra="meme-tag-advice" disabled={busy}
+                onClick={() => { setHashtag(advice.hashtag); onPrepareTagged(advice.hashtag); }}>{advice.hashtag}</Button>
             : <span className="detail">{t(ADVICE_TEXT[advice.kind])}</span>}
         </div>
         {createdTags.length > 0 && <div className="meme-tag-suggestions" aria-label={t("memes_tags_known")}>
           <span>{t("memes_tags_known")}</span>
-          {createdTags.map((known) => <button key={known} type="button" className="quiet"
+          {createdTags.map((known) => <Button key={known} variant="quiet"
             onClick={() => { setHashtag(known); onPrepareTagged(known); }}
-            disabled={busy}>{known}</button>)}
+            disabled={busy}>{known}</Button>)}
         </div>}
       </div>}
       <datalist id="meme-tag-suggestions">
@@ -229,7 +230,7 @@ export function MemePicker({
         if (event.target === event.currentTarget) setViewer(undefined);
       }}>
         <section className="media-viewer" role="dialog" aria-modal="true" aria-label={viewer.title}>
-          <button type="button" className="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</button>
+          <Button extra="media-viewer-close" onClick={() => setViewer(undefined)}>{t("memes_close_preview")}</Button>
           <Media dataUrl={viewer.dataUrl} label={viewer.title} expanded />
         </section>
       </div>, document.body)}
@@ -267,10 +268,10 @@ export function AttachedMeme({
       <input type="checkbox" checked={force} disabled={disabled} onChange={(event) => onForce(event.target.checked)} />
       {t("communications_force_send")}
     </label>
-    <button type="button" className="quiet attached-remove" aria-label={t("memes_detach", { title })} title={t("memes_detach", { title })}
+    <Button variant="quiet" extra="attached-remove" aria-label={t("memes_detach", { title })} title={t("memes_detach", { title })}
       disabled={disabled} onClick={onRemove}>
       <span aria-hidden="true">×</span>
-    </button>
+    </Button>
   </div>;
 }
 
@@ -306,15 +307,15 @@ function MemeTile({
   const preview = usePreview(transport, meme.url, true);
   const title = meme.title || t("memes_untitled");
   return <div className="meme-tile" data-attached={attached ? "" : undefined}>
-    <button type="button" className="preview meme-pick" aria-label={t("memes_attach", { title })}
+    <Button extra="preview meme-pick" aria-label={t("memes_attach", { title })}
       aria-pressed={attached} aria-busy={preview.phase === "loading"} disabled={disabled} onClick={onToggle}>
       {preview.phase === "ready" && <Media dataUrl={preview.dataUrl} label={title} />}
       {preview.phase === "failed" && <span>{t("memes_no_preview")}</span>}
-    </button>
+    </Button>
     {attached && <span className="meme-badge" aria-hidden="true">{t("memes_attached")}</span>}
-    {preview.phase === "ready" && <button type="button" className="meme-zoom" aria-label={t("memes_view_named", { title })}
+    {preview.phase === "ready" && <Button extra="meme-zoom" aria-label={t("memes_view_named", { title })}
       title={t("memes_view_named", { title })} disabled={disabled} onClick={() => onOpen(preview.dataUrl)}>
       <span aria-hidden="true">⤢</span>
-    </button>}
+    </Button>}
   </div>;
 }
