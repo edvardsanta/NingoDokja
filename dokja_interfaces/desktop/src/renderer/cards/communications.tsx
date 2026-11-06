@@ -10,6 +10,7 @@ import { AttachedMeme, MemePicker } from "./memes.js";
 import { parseMemePage } from "./memes_model.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 const unexpected = (): LoadResult<never> => ({ ok: false, error: { code: "unexpected", message: "unexpected communications reply" } });
 
@@ -36,9 +37,9 @@ export function CommunicationsCard({ transport, active = true }: { transport: Tr
   return <WorkspacePanel trail={[t("nav_messages")]} fill>
     <CardFrame title={t("communications_title")} state={state} onReload={poll}>
       {(listing) => listing === NOT_SET_UP
-        ? <div className="note" data-tone="unchecked"><p>{t("communications_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></div>
+        ? <Notice as="div" boxed tone="unchecked"><p>{t("communications_not_set_up")}</p><p className="detail">{t("communications_not_set_up_how")}</p></Notice>
         : <>
-          {listing.unavailable > 0 && <p className="note" data-tone="unchecked">{t("communications_servers_unavailable", { count: listing.unavailable })}</p>}
+          {listing.unavailable > 0 && <Notice boxed tone="unchecked">{t("communications_servers_unavailable", { count: listing.unavailable })}</Notice>}
           {listing.channels.length === 0 ? <p>{t("communications_no_channels")}</p> : <ChannelList channels={listing.channels} transport={transport} active={active} />}
         </>}
     </CardFrame>
@@ -82,9 +83,9 @@ function ChannelList({ channels, transport, active }: { channels: CommunicationC
   const groups = groupChannels(channels, t);
   const headed = groups.length > 1 || groups.some(group => group.key !== "other");
   const entry = (channel: CommunicationChannel) => <li key={channel.id}>
-    <button type="button" aria-label={channelLabel(channel, t)} aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
+    <Button aria-label={channelLabel(channel, t)} aria-current={channel.id === selected ? "true" : undefined} disabled={sending} onClick={() => setSelected(channel.id)}>
       <ChannelName channel={channel} />
-    </button>
+    </Button>
   </li>;
   return <div className="messenger" data-single={channels.length === 1 ? "" : undefined}>
     <nav className="channels" aria-label={t("communications_channel")}>
@@ -112,13 +113,13 @@ function ChannelGroupSection({ group, children }: { group: ChannelGroup; childre
 
   return <section className="channel-group" aria-label={group.name}>
     <h3 className="channel-group-name">
-      <button type="button" className="channel-group-toggle" aria-label={label} title={label}
+      <Button extra="channel-group-toggle" aria-label={label} title={label}
         aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(open => !open)}>
         <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
           <path d="m5 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" />
         </svg>
         <span>{group.name}</span>
-      </button>
+      </Button>
     </h3>
     <ul id={listId} hidden={!expanded}>{children}</ul>
   </section>;
@@ -211,8 +212,8 @@ function Conversation({ channel, transport, active, onSending }: { channel: stri
       atEnd.current = box.scrollHeight - box.scrollTop - box.clientHeight < 48;
     }}>
       <div className="history-top">
-        <button type="button" className="quiet" onClick={older} disabled={!page?.before || state.phase === "loading"}>{t("communications_older")}</button>
-        {state.phase === "loading" && !page && <p role="status">{t("loading")}</p>}
+        <Button variant="quiet" onClick={older} disabled={!page?.before || state.phase === "loading"}>{t("communications_older")}</Button>
+        {state.phase === "loading" && !page && <Notice announce="polite">{t("loading")}</Notice>}
       </div>
       {state.phase === "error" && <Problem error={state.error} />}
       {page && <>
@@ -313,9 +314,9 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
   }}>
     {!textOnly && picking && <div className="meme-tray" id={trayId}>
       <RefreshMemes transport={transport} disabled={sending || memes.state.phase === "loading"} onRefreshed={() => { setMemeOffset(0); memes.start(0); }} />
-      {memes.state.phase === "loading" && <p className="meme-tray-note" role="status">{t("loading")}</p>}
-      {memes.state.phase === "error" && <div className="meme-tray-note"><Problem error={memes.state.error} /></div>}
-      {memes.state.phase === "ready" && memes.state.data.off && <div className="meme-tray-note"><OffNotice reason={memes.state.data.reason} /></div>}
+      {memes.state.phase === "loading" && <Notice announce="polite" extra="meme-tray-note">{t("loading")}</Notice>}
+      {memes.state.phase === "error" && <Notice as="div" extra="meme-tray-note"><Problem error={memes.state.error} /></Notice>}
+      {memes.state.phase === "ready" && memes.state.data.off && <Notice as="div" extra="meme-tray-note"><OffNotice reason={memes.state.data.reason} /></Notice>}
       {memes.state.phase === "ready" && !memes.state.data.off && <MemePicker transport={transport} memes={memes.state.data.memes} page={memes.state.data} selected={attachment} disabled={sending}
         onSelect={setAttached} onPage={(offset) => { setMemeOffset(offset); memes.start(offset); }}
         onPrepareTagged={setContent} onClearPreparedTag={() => setContent("")} onClose={closePicker} />}
@@ -325,13 +326,13 @@ function Composer({ channel, transport, onSent, onSending }: { channel: string; 
     <div className="compose-row">
       <label className="sr-only" htmlFor={id}>{t("communications_message")}</label>
       <textarea id={id} value={content} maxLength={2000} rows={2} disabled={sending} placeholder={t("communications_message")} onChange={(event) => setContent(event.target.value)} />
-      {!textOnly && <button type="button" ref={toggle} className="icon-button" aria-label={t("communications_memes")} title={t("communications_memes")}
-        aria-expanded={picking} aria-controls={picking ? trayId : undefined} disabled={sending || memes.state.phase === "loading"} onClick={togglePicker}><PictureIcon /></button>}
-      <button type="submit" className="primary" disabled={!canSend}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</button>
+      {!textOnly && <Button ref={toggle} extra="icon-button" aria-label={t("communications_memes")} title={t("communications_memes")}
+        aria-expanded={picking} aria-controls={picking ? trayId : undefined} disabled={sending || memes.state.phase === "loading"} onClick={togglePicker}><PictureIcon /></Button>}
+      <Button type="submit" variant="primary" disabled={!canSend}>{textOnly ? t("communications_send_whatsapp") : t("communications_send")}</Button>
     </div>
     <div className="compose-status" aria-live="polite">
-      {sending && <p role="status">{t("communications_sending")}</p>}
-      {send.state.phase === "error" && (send.state.error.code === "timeout" ? <p role="alert">{t("communications_uncertain")}</p> : <Problem error={send.state.error} />)}
+      {sending && <Notice announce="polite">{t("communications_sending")}</Notice>}
+      {send.state.phase === "error" && (send.state.error.code === "timeout" ? <Notice announce="assertive">{t("communications_uncertain")}</Notice> : <Problem error={send.state.error} />)}
       {/* "sent" is about the last message: once the next one is being written it is no longer news */}
       {send.state.phase === "ready" && (send.state.data.off ? <OffNotice reason={send.state.data.reason} /> : !(send.state.data.sent && (content !== "" || attached)) && <p data-tone={send.state.data.sent ? "ok" : "problem"}>{send.state.data.sent ? t("communications_sent") : t("communications_not_sent")}</p>)}
     </div>
@@ -359,9 +360,9 @@ function RefreshMemes({ transport, disabled, onRefreshed }: { transport: Transpo
   useEffect(() => { if (refresh.state.phase === "ready") refreshed.current(); }, [refresh.state]);
   const busy = refresh.state.phase === "loading";
   return <div className="meme-refresh">
-    <button type="button" className="quiet" disabled={disabled || busy} onClick={() => refresh.start(undefined)}>{t("memes_refresh")}</button>
+    <Button variant="quiet" disabled={disabled || busy} onClick={() => refresh.start(undefined)}>{t("memes_refresh")}</Button>
     <span aria-live="polite">
-      {busy && <span role="status">{t("memes_refreshing")}</span>}
+      {busy && <Notice as="span" announce="polite">{t("memes_refreshing")}</Notice>}
       {refresh.state.phase === "ready" && ("off" in refresh.state.data
         ? <span data-tone="off">{refresh.state.data.reason || t("service_off")}</span>
         : <span>{t(refresh.state.data.added === 0 ? "memes_refreshed_none" : "memes_refreshed", { count: refresh.state.data.added })}</span>)}
