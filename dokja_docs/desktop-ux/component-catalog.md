@@ -47,7 +47,8 @@ back, restore its class strings; nothing else depends on the primitives.
 
 ## Still open in `09.7`
 
-The controls each batch left plain (listed above), and Talk's `reply_sources` source buttons, which have a computed class; linked inline errors with a focusable summary for multi-field
-submits outside Settings; long-content and narrow-panel checks in the real app, which
+The controls each batch left plain (listed above), and Talk's `reply_sources`
+source button, which has a computed class; linked inline errors with a focusable
+summary for multi-field submits outside Settings; long-content and narrow-panel checks in the real app, which
 belong with `09.6-b`. CLI and TUI keep their own presentation and share only the
 state vocabulary.

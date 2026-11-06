@@ -1479,7 +1479,8 @@
           ],
           "evidence": [
             "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch adds Button (variant/size/type) and Notice (announce/boxed/tone) in cards/ui.tsx with unchanged HTML, rebuilds the card_frame states on them and migrates the Talk vertical. dokja_docs/desktop-ux/component-catalog.md holds the inventory, state catalog, migration map and rollback.",
-            "2026-11-06, owner chose to continue 09.7: the Messages vertical (communications.tsx, memes.tsx) moves every button to Button and the boxed notes and status/alert lines Notice can draw to it, with unchanged HTML. Lines with an unboxed data-tone or an aria-label stay plain. component-catalog.md records it."
+            "2026-11-06, owner chose to continue 09.7: the Messages vertical (communications.tsx, memes.tsx) moves every button to Button and the boxed notes and status/alert lines Notice can draw to it, with unchanged HTML. Lines with an unboxed data-tone or an aria-label stay plain. component-catalog.md records it.",
+            "2026-11-06: Settings, Notebook, System and Library moved to Button and Notice in one batch each, stacked on Messages; Realtime already used only the primitives. A script converted only elements whose rendered HTML stays the same and listed the rest; buttons with a computed class or reordered variant and notes with a computed tone or extra attributes stay plain, as component-catalog.md records. Remaining raw buttons live inside the primitives themselves (drawer, menu, tabs, panel) plus those exceptions."
           ],
           "checks": [
             {
@@ -1491,6 +1492,11 @@
               "name": "primitives_messages_vertical",
               "status": "passed",
               "detail": "Communications and meme suites unchanged and passing; new markup regressions for the send, meme, older and channel buttons and the not-set-up note fail when the variant or the boxed note is dropped. Desktop pnpm test and typecheck recorded in the PR. Not run in the real app."
+            },
+            {
+              "name": "primitives_remaining_verticals",
+              "status": "passed",
+              "detail": "Per-vertical suites passed after each batch (Settings 21, Notebook 40, System 72, Library 201 tests), each with a new markup regression; desktop pnpm test passed twice in full (node and vitest 531/531), typecheck and build passed. Not run in the real app; multi-field linked errors outside Settings not done."
             }
           ],
           "blockers": [],
@@ -1499,7 +1505,7 @@
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/desktop-ux/component-catalog.md"
           ],
-          "next_action": "Migrate Settings, Library, Notebook, System and Realtime in their own batches; real-app narrow and long-content checks belong with 09.6-b."
+          "next_action": "All verticals are on the primitives. Remaining: linked inline errors with a focusable summary for multi-field submits outside Settings, and the real-app narrow/long-content checks with 09.6-b."
         },
         {
           "id": "09.8",
