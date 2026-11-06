@@ -107,7 +107,9 @@ type conversationOlderMsg struct {
 }
 
 type conversationStopMsg struct {
-	err error
+	// unsupported is the orchestrator saying it cannot stop a send; nothing was asked to stop.
+	unsupported bool
+	err         error
 	// waited says this screen is waiting on the send, whose answer will show how it ended.
 	waited         bool
 	conversationID string
@@ -237,6 +239,9 @@ func (m *Model) cmdConversationStop() tea.Cmd {
 	view.stopping = true
 	waited := view.sending != nil
 	return func() tea.Msg {
+		if cli.StopUnsupported(m.request) {
+			return conversationStopMsg{unsupported: true, waited: waited, conversationID: target.conversationID}
+		}
 		_, err := m.request("conversation.stop", map[string]any{"conversation_id": target.conversationID, "send_id": target.sendID})
 		return conversationStopMsg{err: err, waited: waited, conversationID: target.conversationID}
 	}

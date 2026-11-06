@@ -637,6 +637,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case conversationStopMsg:
 		m.conversations.stopping = false
+		if msg.unsupported {
+			m.setNotice(tr("stop_unsupported"), true)
+			return m, nil
+		}
 		if msg.err != nil {
 			m.setNotice(tr("reply_could_not_be_stopped"), true)
 		} else {

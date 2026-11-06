@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -313,5 +314,30 @@ func TestARetryNamesTheTurnAndCarriesNoNewMessage(t *testing.T) {
 	}
 	if payload["send_id"] != nil || payload["content"] != nil {
 		t.Fatal("a retry records no new turn", payload)
+	}
+}
+
+func TestStopAsksNothingOfAnOrchestratorThatCannotStop(t *testing.T) {
+	held := conversationID("a")
+	pending := fmt.Sprintf(`{"conversation":{"id":"%s"},"turns":[{"send_id":"send-0001","state":"pending"}]}`, held)
+	for report, wantStop := range map[string]bool{
+		`{"view":1,"operations":{"stop":"unsupported"}}`: false,
+		`{"view":1,"operations":{"stop":"supported"}}`:   true,
+		// A view this CLI does not know says nothing it can trust, so the stop is asked as before.
+		`{"view":2,"operations":{"stop":"unsupported"}}`: true,
+	} {
+		archive := &scriptedArchive{answers: map[string]string{
+			"conversation.read":         pending,
+			"conversation.capabilities": report,
+			"conversation.stop":         fmt.Sprintf(`{"conversation_id":"%s","send_id":"send-0001","stopping":true}`, held),
+		}}
+		err := stopLatest(archive.ask, &bytes.Buffer{}, held)
+		asked := strings.Contains(strings.Join(archive.asked, " "), "conversation.stop")
+		if asked != wantStop {
+			t.Fatalf("%s: asked to stop %v", report, asked)
+		}
+		if !wantStop && !errors.Is(err, ErrStopUnsupported) {
+			t.Fatal(report, err)
+		}
 	}
 }

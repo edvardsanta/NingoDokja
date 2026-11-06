@@ -71,6 +71,10 @@ Conversations are the archive the desktop and the phone share: `--continue` take
 general conversation, as the phone does, and without a message opens the REPL there. A plain
 `chat` is a session of its own and is not archived.
 
+`conversations stop` first reads `conversation.capabilities`. When the orchestrator says it
+cannot stop a reply, the command says so and asks nothing; an older orchestrator without the
+report is asked to stop as before.
+
 Administrative commands:
 
 - `meme pool` (alias of `meme status`) shows unsent and sent counts.
