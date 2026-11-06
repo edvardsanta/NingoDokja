@@ -29,6 +29,16 @@ func configureSourceSupervision(lifetime context.Context, handler *handlers.Know
 	if journal == nil {
 		return func() {}
 	}
+	// Before serving: reads a stopped orchestrator left unsettled are interrupted, never redone.
+	recoverCtx, recovered := context.WithTimeout(lifetime, 10*time.Second)
+	report, err := handlers.RecoverSourceReads(recoverCtx, journal.store, time.Now().UTC())
+	recovered()
+	switch {
+	case err != nil:
+		logger.Error("Source-read recovery did not finish; unsettled reads stay as they were", err)
+	case report.Interrupted > 0 || report.Unreadable > 0:
+		logger.Info(fmt.Sprintf("Source-read recovery interrupted=%d unreadable=%d", report.Interrupted, report.Unreadable))
+	}
 	ctx, cancel := context.WithCancel(lifetime)
 	handler.WithSourceApplications(handlers.NewDesktopSourceApplications(ctx, handler, journal.store, enabled))
 	return func() { cancel(); journal.db.Close() }

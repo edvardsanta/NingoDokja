@@ -440,3 +440,97 @@ func TestJournalUnknownObservationResolvesThroughExplicitCorrection(t *testing.T
 		t.Fatal("replay was relabelled as the latest state", replay, err)
 	}
 }
+
+// recoverableFake lists the unsettled attempts of journalFake, as a store with recovery would.
+type recoverableFake struct{ *journalFake }
+
+func (s recoverableFake) Unsettled(_ context.Context, before time.Time, limit int) ([]Episode, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []Episode
+	for _, e := range s.snapshots {
+		if (e.Attempt.Phase == "prepared" || e.Attempt.Phase == "dispatched") && e.Attempt.AcceptedAt.Before(before) && len(out) < limit {
+			out = append(out, clone(e))
+		}
+	}
+	return out, 0, nil
+}
+
+func anotherAttempt(r BeginRecord, n string) BeginRecord {
+	r.Key.EpisodeRef, r.Key.AttemptRef, r.Key.OperationKey = "episode:"+n, "attempt:"+n, "operation:begin:"+n
+	r.Attempt.Ref = r.Key.AttemptRef
+	return r
+}
+
+func TestRecoveryInterruptsOnlyWhatAStoppedProcessLeftUnsettled(t *testing.T) {
+	j, fake, r := journalFixture()
+	j.Store = recoverableFake{fake}
+	ctx := context.Background()
+	prepared := anotherAttempt(r, "prepared")
+	if _, err := j.Begin(ctx, prepared); err != nil {
+		t.Fatal(err)
+	}
+	dispatched := beginAndDispatch(t, j, r)
+	settled := anotherAttempt(r, "settled")
+	if _, err := j.Begin(ctx, settled); err != nil {
+		t.Fatal(err)
+	}
+	settledChange := ChangeRecord{Key: settled.Key, ExpectedRevision: 1}
+	settledChange.Key.OperationKey = "operation:dispatch:settled"
+	if _, err := j.MarkDispatched(ctx, settledChange); err != nil {
+		t.Fatal(err)
+	}
+	settledChange.ExpectedRevision = 2
+	settledReceipt := receipt(settledChange)
+	settledReceipt.Key.OperationKey = "operation:observe:settled"
+	settledReceipt.Observation.AttemptRef = settled.Key.AttemptRef
+	if _, err := j.Observe(ctx, settledReceipt); err != nil {
+		t.Fatal(err)
+	}
+	cutoff := j.Clock() // everything above was accepted before this instant
+	after := anotherAttempt(r, "after")
+	if _, err := j.Begin(ctx, after); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := j.RecoverUnsettled(ctx, cutoff, 100)
+	if err != nil || report.Interrupted != 2 {
+		t.Fatal("the prepared and the dispatched attempts are interrupted", report, err)
+	}
+	for _, want := range []struct {
+		key   JournalKey
+		phase string
+	}{{prepared.Key, "interrupted"}, {dispatched.Key, "interrupted"}, {settled.Key, "settled"}, {after.Key, "prepared"}} {
+		if got := fake.get(want.key).Attempt.Phase; got != want.phase {
+			t.Fatalf("%s is %s, want %s", want.key.EpisodeRef, got, want.phase)
+		}
+	}
+	if report, err := j.RecoverUnsettled(ctx, cutoff, 100); err != nil || report.Interrupted != 0 {
+		t.Fatal("recovering again finds nothing left", report, err)
+	}
+	// Recovery decides nothing about the outcome: the attempt's own late receipt still settles it.
+	late := receipt(ChangeRecord{Key: dispatched.Key, ExpectedRevision: 3})
+	if _, err := j.Observe(ctx, late); err != nil {
+		t.Fatal("an interrupted attempt's own receipt must still settle it:", err)
+	}
+}
+
+func TestRecoveryNeedsAStoreThatCanListUnsettledAttempts(t *testing.T) {
+	j, _, _ := journalFixture()
+	if _, err := j.RecoverUnsettled(context.Background(), time.Now(), 100); !errors.Is(err, ErrRecoveryUnsupported) {
+		t.Fatal(err)
+	}
+}
+
+func TestRecoverySkipsAttemptsItsAdmissionDoesNotCover(t *testing.T) {
+	j, fake, r := journalFixture()
+	j.Store = recoverableFake{fake}
+	beginAndDispatch(t, j, r)
+	j.Admission.VerifyAttempt = func(Attempt) bool { return false }
+	if report, err := j.RecoverUnsettled(context.Background(), j.Clock(), 100); err != nil || report.Interrupted != 0 {
+		t.Fatal(report, err)
+	}
+	if got := fake.get(r.Key).Attempt.Phase; got != "dispatched" {
+		t.Fatal("an attempt recovery does not admit is left as it is", got)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"io"
 	"math"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -32,6 +33,7 @@ const schemaVersion = 1
 type Store struct{ db *sql.DB }
 
 var _ application.JournalStore = (*Store)(nil)
+var _ application.UnsettledReader = (*Store)(nil)
 
 func safeError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
@@ -406,4 +408,60 @@ func (s *Store) Forget(ctx context.Context, scope, episode string) error {
 		return ErrCommitUnknown
 	}
 	return nil
+}
+
+// unsettledPage is how many current revisions recovery reads at a time.
+const unsettledPage = 200
+
+// Unsettled lists the current snapshot of every attempt still prepared or dispatched and accepted
+// before the instant, across scopes, for startup recovery, at most limit of them. It only reads,
+// without scope locks: the journal then changes each one by compare-and-swap at the revision read
+// here, so one settled meanwhile is left alone. Forgotten episodes are never listed. The phase is
+// read from each decoded snapshot, never by casting stored bytes in SQL, so a snapshot that cannot
+// be read is counted in unreadable and skipped instead of stopping recovery of the others.
+func (s *Store) Unsettled(ctx context.Context, before time.Time, limit int) ([]application.Episode, int, error) {
+	var out []application.Episode
+	unreadable := 0
+	afterScope, afterEpisode := "", ""
+	for len(out) < limit {
+		rows, err := s.db.QueryContext(ctx, `SELECT r.scope_ref, r.episode_ref, r.revision, r.snapshot
+ FROM dokja_application_journal.episodes e
+ JOIN dokja_application_journal.revisions r
+  ON r.scope_ref=e.scope_ref AND r.episode_ref=e.episode_ref AND r.revision=e.revision
+ WHERE NOT e.forgotten AND (e.scope_ref, e.episode_ref) > ($1, $2)
+ ORDER BY e.scope_ref, e.episode_ref
+ LIMIT $3`, afterScope, afterEpisode, unsettledPage)
+		if err != nil {
+			return nil, unreadable, safeError(ctx, err)
+		}
+		read := 0
+		for rows.Next() {
+			var scope, episode string
+			var revision int64
+			var raw []byte
+			if err := rows.Scan(&scope, &episode, &revision, &raw); err != nil {
+				rows.Close()
+				return nil, unreadable, safeError(ctx, err)
+			}
+			read++
+			afterScope, afterEpisode = scope, episode
+			e, err := decode(raw)
+			if err != nil || e.Scope != scope || e.Ref != episode || e.Revision != uint64(revision) {
+				unreadable++
+				continue
+			}
+			if (e.Attempt.Phase == "prepared" || e.Attempt.Phase == "dispatched") && e.Attempt.AcceptedAt.Before(before) && len(out) < limit {
+				out = append(out, e)
+			}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, unreadable, safeError(ctx, err)
+		}
+		if read < unsettledPage {
+			break
+		}
+	}
+	return out, unreadable, nil
 }

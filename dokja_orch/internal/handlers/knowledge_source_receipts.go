@@ -216,3 +216,19 @@ func (r sourceReadRecord) observed(ctx context.Context, observation application.
 	_, err := r.journal.Observe(ctx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: r.step("observe"), ExpectedRevision: 2}, Observation: observation})
 	return err
 }
+
+// sourceReadRecoveryLimit bounds how many unsettled source reads one start recovers.
+const sourceReadRecoveryLimit = 1000
+
+// RecoverSourceReads marks the source reads a stopped orchestrator left prepared or dispatched as
+// interrupted, as chat recovery does for pending turns. The host calls it once at start, before it
+// serves, with the instant it started: only attempts begun before it are touched, nothing is read
+// again, and each attempt's outcome stays unknown until its own receipt. The orchestrator is the
+// one owner here, so admission covers every scope, but only attempts of this capability.
+func RecoverSourceReads(ctx context.Context, store application.JournalStore, startedAt time.Time) (application.Recovery, error) {
+	journal := application.Journal{Store: store, Clock: time.Now, Admission: application.Admission{
+		Access:        func(context.Context, string, string) error { return nil },
+		VerifyAttempt: func(a application.Attempt) bool { return a.Method.Ref == sourceReadCapability },
+	}}
+	return journal.RecoverUnsettled(ctx, startedAt, sourceReadRecoveryLimit)
+}

@@ -335,3 +335,59 @@ func TestSourceJournalStepsAreNamedByTheirAttemptAndReplay(t *testing.T) {
 		t.Fatal("two reads, three steps each", len(store.operations))
 	}
 }
+
+// Unsettled lists, as a store with recovery would, the attempts still prepared or dispatched.
+func (s *sourceJournalStore) Unsettled(_ context.Context, before time.Time, limit int) ([]application.Episode, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []application.Episode
+	for _, e := range s.episodes {
+		if (e.Attempt.Phase == "prepared" || e.Attempt.Phase == "dispatched") && e.Attempt.AcceptedAt.Before(before) && len(out) < limit {
+			out = append(out, detached(e))
+		}
+	}
+	return out, 0, nil
+}
+
+// A read cut off between dispatch and its receipt is interrupted at the next start, never read
+// again, and an attempt of another capability in the same journal is left alone.
+func TestSourceReadsLeftUnsettledAreInterruptedAtStart(t *testing.T) {
+	store := newSourceJournalStore()
+	source := &applicationStore{documents: map[string]string{"guide": "bounded guide", "api": "bounded api"}}
+	ctx := sourceJournalContext(t, context.Background(), store, func(context.Context, SourceReadPermission) (string, error) { return "decision:fixture", nil })
+	if _, err := prepareThroughOrchestrator(ctx, source, pinnedSourceEvent(source)); err != nil {
+		t.Fatal(err)
+	}
+	// Turn the settled reads back into what a crash after dispatch leaves, and add another capability's.
+	for ref, e := range store.episodes {
+		e.Revision, e.Observations = 2, nil
+		e.Attempt.Phase = "dispatched"
+		store.episodes[ref] = e
+	}
+	foreign := application.Episode{}
+	for _, e := range store.episodes {
+		foreign = detached(e)
+		break
+	}
+	foreign.Ref, foreign.Attempt.Ref = "episode:foreign", "attempt:foreign"
+	foreign.Attempt.Method.Ref = "another.capability"
+	store.episodes[foreign.Ref] = foreign
+	reads := len(source.calls)
+
+	report, err := RecoverSourceReads(context.Background(), store, time.Now().Add(time.Second))
+	if err != nil || report.Interrupted != 2 {
+		t.Fatal(report, err)
+	}
+	for ref, e := range store.episodes {
+		want := "interrupted"
+		if ref == foreign.Ref {
+			want = "dispatched"
+		}
+		if e.Attempt.Phase != want {
+			t.Fatalf("%s is %s, want %s", ref, e.Attempt.Phase, want)
+		}
+	}
+	if len(source.calls) != reads {
+		t.Fatal("recovery must not read a source again")
+	}
+}

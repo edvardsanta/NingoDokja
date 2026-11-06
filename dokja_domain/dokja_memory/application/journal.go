@@ -297,3 +297,51 @@ func (j Journal) Observe(ctx context.Context, r ObserveRecord) (JournalResult, e
 		return e, true, nil
 	})
 }
+
+// UnsettledReader is the optional store capability recovery needs: the current snapshot of
+// every attempt, in any scope, still prepared or dispatched and accepted before the instant, at
+// most limit of them, and how many stored records could not be read at all. It only reads;
+// recovery changes the attempts through the journal.
+type UnsettledReader interface {
+	Unsettled(ctx context.Context, before time.Time, limit int) (episodes []Episode, unreadable int, err error)
+}
+
+// ErrRecoveryUnsupported is a store that cannot list unsettled attempts.
+var ErrRecoveryUnsupported = errors.New("the journal store cannot list unsettled attempts")
+
+// Recovery says what startup recovery did: attempts it interrupted, and stored records it could
+// not read, which it left untouched for the operator.
+type Recovery struct{ Interrupted, Unreadable int }
+
+// RecoverUnsettled marks the attempts a stopped process left prepared or dispatched as
+// interrupted. It runs once at start, for attempts begun before it, under one owner. Nothing is
+// redone: an interrupted attempt's outcome stays unknown, and only its own receipt can settle it.
+// Each one goes through MarkInterrupted with the revision it was read at, so an attempt settled
+// meanwhile is left alone. Admission still applies: an attempt it does not admit is skipped.
+func (j Journal) RecoverUnsettled(ctx context.Context, before time.Time, limit int) (Recovery, error) {
+	reader, ok := j.Store.(UnsettledReader)
+	if !ok {
+		return Recovery{}, ErrRecoveryUnsupported
+	}
+	episodes, unreadable, err := reader.Unsettled(ctx, before, limit)
+	report := Recovery{Unreadable: unreadable}
+	if err != nil {
+		return report, err
+	}
+	for _, e := range episodes {
+		if e.Attempt.Phase != "prepared" && e.Attempt.Phase != "dispatched" || !e.Attempt.AcceptedAt.Before(before) {
+			continue
+		}
+		key := JournalKey{Scope: e.Scope, EpisodeRef: e.Ref, AttemptRef: e.Attempt.Ref, OperationKey: e.Attempt.Ref + ":interrupt"}
+		result, err := j.MarkInterrupted(ctx, ChangeRecord{Key: key, ExpectedRevision: e.Revision})
+		switch {
+		case err == nil && !result.Replayed:
+			report.Interrupted++
+		case err == nil, errors.Is(err, ErrJournalConflict), errors.Is(err, ErrJournalDenied):
+			// Replayed, settled meanwhile, or not this journal's to recover: left as it is.
+		default:
+			return report, err
+		}
+	}
+	return report, nil
+}
