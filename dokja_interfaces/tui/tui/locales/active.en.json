@@ -363,5 +363,6 @@
   "no_reason_recorded": "no reason recorded",
   "turn_interrupted": "Interrupted before an answer.",
   "turn_being_answered": "Still being answered.",
+  "turn_state_unknown": "In a state this TUI does not know.",
   "nothing_said_yet": "Nothing said yet."
 }

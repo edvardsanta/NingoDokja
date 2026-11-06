@@ -93,6 +93,19 @@ func TestAShortIDFindsItsConversationAndOnlyThatOne(t *testing.T) {
 	}
 }
 
+func TestATurnInAStateThisCLIDoesNotKnowIsNotShownAsOnItsWay(t *testing.T) {
+	var out bytes.Buffer
+	printTurns(&out, conversationReading{Conversation: archivedConversation{ID: conversationID("a"), Title: "Newer"}, Turns: []archivedTurn{
+		{View: 1, Content: "From a newer orchestrator", State: "cancelled"},
+	}})
+	if !strings.Contains(out.String(), "you: From a newer orchestrator") || !strings.Contains(out.String(), "(in a state this CLI does not know)") {
+		t.Fatal(out.String())
+	}
+	if strings.Contains(out.String(), "still being answered") {
+		t.Fatal("an unknown state is not a reply on its way", out.String())
+	}
+}
+
 func TestContinueTakesTheLatestGeneralConversationNotAReading(t *testing.T) {
 	archive := &scriptedArchive{answers: map[string]string{"conversation.list": fmt.Sprintf(
 		`{"conversations":[{"id":"%s","kind":"reading"},{"id":"%s","kind":"general"},{"id":"%s","kind":"general"}]}`,

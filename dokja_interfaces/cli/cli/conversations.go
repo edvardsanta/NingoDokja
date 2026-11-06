@@ -300,8 +300,11 @@ func printTurns(out io.Writer, reading conversationReading) {
 			fmt.Fprintf(out, "(failed: %s)\n", firstNonEmpty(turn.Reason, "no reason recorded"))
 		case "interrupted":
 			fmt.Fprintln(out, "(interrupted before an answer)")
-		default:
+		case "pending":
 			fmt.Fprintln(out, "(still being answered)")
+		default:
+			// A state from a newer orchestrator: not claimed to be on its way.
+			fmt.Fprintln(out, "(in a state this CLI does not know)")
 		}
 	}
 }

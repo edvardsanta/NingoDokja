@@ -82,6 +82,16 @@ func TestOpeningShowsTheTurnsAndWhoAnswered(t *testing.T) {
 	}
 }
 
+func TestATurnInAStateThisTUIDoesNotKnowIsNotShownAsOnItsWay(t *testing.T) {
+	lines := strings.Join(turnLines(conversationTurn{Content: "De um orquestrador mais novo", State: "cancelled"}), "\n")
+	if !strings.Contains(lines, "De um orquestrador mais novo") || !strings.Contains(lines, "Num estado que esta TUI não conhece.") {
+		t.Fatal(lines)
+	}
+	if strings.Contains(lines, "Ainda sendo respondido.") {
+		t.Fatal("an unknown state is not a reply on its way", lines)
+	}
+}
+
 func TestEveryTurnStateIsShownAsItIs(t *testing.T) {
 	raw, err := os.ReadFile("../../../dokja_orch/internal/handlers/testdata/turn_view_v1.json")
 	if err != nil {

@@ -248,8 +248,8 @@ function turnSources(value: unknown): ArchivedTurnSource[] {
 
 function archivedTurn(value: unknown): ArchivedTurn | undefined {
   if (!isRecord(value) || !ARCHIVE_ID.test(text(value.id))) return undefined;
-  const state = text(value.state) as ArchivedTurnState;
-  if (!TURN_STATES.has(state)) return undefined;
+  const named = text(value.state) as ArchivedTurnState;
+  const state: ArchivedTurnState = TURN_STATES.has(named) ? named : "unknown";
   const sources = turnSources(value.sources);
   return {
     id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64),

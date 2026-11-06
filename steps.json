@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-11-03",
+  "updated_on": "2026-11-06",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "08",
   "status_values": [
@@ -1523,13 +1523,19 @@
             "2026-10-30, owner asked to proceed ahead of gate 08.3: first batch pins a versioned turn projection (view 1) in dokja_orch/internal/handlers/testdata/turn_view_v1.json, read by the orchestrator and desktop tests; Talk shows the provider and model the runtime reported, separate from the selection, and the queued state from 10.6-b; following the end of the conversation stops while the owner reads further up and resumes when they return or send. Cancellation and steering stay absent because no backend capability exists, so nothing is simulated.",
             "2026-10-31 long history: Talk reads earlier turns a page at a time, and reading the latest page again keeps them in order. Measured in Electron under xvfb with synthetic turns of about 600 characters, using forced layout because animation frames stall there: at 100, 500 and 2000 turns a page rendered in up to 155 ms, and typing cost 1.3, 2.2 and 5.4 ms (p90) with 656, 3056 and 12056 nodes. Windowing is not justified at these sizes. Not measured: painting, scrolling on a real display, memory.",
             "2026-10-31 TUI: the Conversas tab reads earlier turns a page at a time with m, keeps the lines on screen where they were, and reading the latest page again keeps what was read. A page that arrives after leaving the conversation is dropped. Tests only; not run against a live orchestrator.",
-            "2026-10-31 stop: Talk, the CLI and the TUI can stop the latest send through conversation.stop (10.6-b), for a send of their own or one another interface left on its way, and report the turn's outcome. Steering stays absent."
+            "2026-10-31 stop: Talk, the CLI and the TUI can stop the latest send through conversation.stop (10.6-b), for a send of their own or one another interface left on its way, and report the turn's outcome. Steering stays absent.",
+            "2026-11-06, owner chose to continue 09.8: a turn whose state an interface does not know (a newer orchestrator) is now shown as unknown in Talk, the CLI and the TUI: the message is kept, no reply is shown and it is never presented as on its way or stoppable. The desktop projection used to drop such a turn, which hid the owner's message and moved latest-turn retry onto an earlier turn. Running-work, pending-interaction and CLI/TUI queued/dispatched observation still need backend evidence (10.6-b)."
           ],
           "checks": [
             {
               "name": "desktop_turn_projection",
               "status": "passed",
               "detail": "Orchestrator go vet and go test -race passed; desktop pnpm test, typecheck and build passed except the 14 tests/ui/knowledge_post.test.tsx failures already on main. Skipped: CLI/TUI presentation (09.5-H4 pending), long-history measurement and real-app checks."
+            },
+            {
+              "name": "unknown_turn_state",
+              "status": "passed",
+              "detail": "Desktop pnpm test (node 47/47 IPC and vitest 526/526, twice) and typecheck passed; CLI and TUI gofmt, go vet and go test passed. Regressions: IPC projection keeps an unrecognized state as unknown (previously asserted dropped), Talk shows the message without the still-pending notice or Stop, CLI and TUI print the unknown line instead of 'still being answered'. Not run in the real app or against a live orchestrator."
             }
           ],
           "blockers": [],
@@ -1538,7 +1544,7 @@
             "dokja_docs/cindy-architecture-research.md",
             "dokja_docs/session-task-architecture-review.md"
           ],
-          "next_action": "Running-work and pending-interaction states need backend evidence first."
+          "next_action": "Running-work, pending-interaction and CLI/TUI queued/dispatched states need backend evidence first (10.6-b: progress on request paths other than the desktop stream)."
         },
         {
           "id": "09.9",

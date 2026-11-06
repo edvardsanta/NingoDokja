@@ -593,8 +593,11 @@ func turnLines(turn conversationTurn) []string {
 		lines = append(lines, styleBad.Render(tr("turn_failed", plainText(firstOf(turn.Reason, tr("no_reason_recorded"))))))
 	case "interrupted":
 		lines = append(lines, styleWarn.Render(tr("turn_interrupted")))
-	default:
+	case "pending":
 		lines = append(lines, styleDim.Render(tr("turn_being_answered")))
+	default:
+		// A state from a newer orchestrator: not claimed to be on its way.
+		lines = append(lines, styleDim.Render(tr("turn_state_unknown")))
 	}
 	return lines
 }
