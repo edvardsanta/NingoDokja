@@ -4,7 +4,7 @@ import type { ProviderRow } from "../../shared/runtime.js";
 // aliases, not proof that the operator's account can run them.
 const CLI_MODELS: Record<string, readonly string[]> = {
   codex: ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"],
-  claude_code: ["sonnet", "opus"],
+  claude_code: ["sonnet", "opus", "haiku"],
 };
 
 // The models a provider could chat with. Ollama's embedding model is listed with the others but is no
