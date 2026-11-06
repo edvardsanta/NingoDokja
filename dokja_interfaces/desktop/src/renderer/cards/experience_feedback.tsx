@@ -6,6 +6,7 @@ import { useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { useAction } from "./use_action.js";
 import type { LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 export function ExperienceFeedback({ entry, transport, onChanged }: {
   entry: MemoryExperience; transport: Transport; onChanged: () => void;
@@ -29,20 +30,20 @@ export function ExperienceFeedback({ entry, transport, onChanged }: {
   const settled = result && !result.off ? result : undefined;
   return <div>
     {settled ? <>
-      <p role="status">{t(!settled.found ? "experience_missing" : settled.resolved ? "experience_feedback_saved" : "experience_feedback_conflict", { outcome: settled.outcome })}</p>
-      <button type="button" onClick={onChanged}>{t("experience_feedback_refresh")}</button>
+      <Notice announce="polite">{t(!settled.found ? "experience_missing" : settled.resolved ? "experience_feedback_saved" : "experience_feedback_conflict", { outcome: settled.outcome })}</Notice>
+      <Button onClick={onChanged}>{t("experience_feedback_refresh")}</Button>
     </> : <fieldset disabled={pending}>
       <legend>{t("experience_feedback_record")}</legend>
       <p>{t("experience_feedback_confirm_scope")}</p>
-      <button type="button" onClick={() => start({ outcome: "accepted" })}>{t("experience_feedback_accept")}</button>{" "}
-      <button type="button" onClick={() => start({ outcome: "ignored" })}>{t("experience_feedback_ignore")}</button>
+      <Button onClick={() => start({ outcome: "accepted" })}>{t("experience_feedback_accept")}</Button>{" "}
+      <Button onClick={() => start({ outcome: "ignored" })}>{t("experience_feedback_ignore")}</Button>
       {entry.detail && <form onSubmit={(event) => { event.preventDefault(); if (observed.trim()) start({ observed: observed.trim() }); }}>
         <label>{t("experience_feedback_observed")} <input value={observed} maxLength={200} onChange={(event) => setObserved(event.target.value)} /></label>{" "}
-        <button type="submit" disabled={!observed.trim()}>{t("experience_feedback_correct")}</button>
+        <Button type="submit" disabled={!observed.trim()}>{t("experience_feedback_correct")}</Button>
       </form>}
     </fieldset>}
     {pending && <Pending />}
-    {state.phase === "error" && <><Problem error={state.error} /><p>{t("experience_feedback_check")}</p><button type="button" onClick={onChanged}>{t("experience_feedback_refresh")}</button></>}
+    {state.phase === "error" && <><Problem error={state.error} /><p>{t("experience_feedback_check")}</p><Button onClick={onChanged}>{t("experience_feedback_refresh")}</Button></>}
     {result?.off && <OffNotice reason={result.reason} />}
   </div>;
 }

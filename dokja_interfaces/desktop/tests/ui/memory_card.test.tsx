@@ -65,6 +65,16 @@ describe("the memory card", () => {
     screen.getByText("5 experiences need embedding for this model.");
   });
 
+  it("draws its notes as the same boxed notes on the shared Notice", async () => {
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
+      "memory.status": ok({ ...MEMORY_STATUS, needsReindex: 5 }),
+      "memory.stats": ok(MEMORY_SCORE),
+    });
+    renderCard(transport);
+    const note = await screen.findByText("5 experiences need embedding for this model.");
+    expect([note.tagName, note.className, note.dataset.tone, note.hasAttribute("role")]).toEqual(["P", "note", "unchecked", false]);
+  });
+
   it("gives no verdict while too few predictions are scored", async () => {
     const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES,
       "memory.status": ok(MEMORY_STATUS),

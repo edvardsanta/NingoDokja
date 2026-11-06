@@ -44,7 +44,7 @@ export function MemoryExperiencesPanel({ transport, onChanged, revision, initial
     {/* a filter is a mode of the list, so it is a set of pressed buttons, never a switch */}
     <div className="seg" role="group" aria-label={t("experiences_filter")}>
       {FILTERS.map(({ id, labelId }) => (
-        <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{t(labelId)}</button>
+        <Button key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>{t(labelId)}</Button>
       ))}
     </div>
     <ExperienceList key={filter} transport={transport} onChanged={onChanged} revision={revision} filter={filter} emptyId="experiences_empty" counted />
@@ -164,7 +164,7 @@ function ExperienceDetail({ transport, entry, onChanged }: { transport: Transpor
   const t = useTranslate();
   return <section className="experience-detail" aria-label={t("experience_details")}>
     {state.phase === "loading" && <Pending />}
-    {state.phase === "error" && <><Problem error={state.error} /><button type="button" onClick={reload}>{t("retry")}</button></>}
+    {state.phase === "error" && <><Problem error={state.error} /><Button onClick={reload}>{t("retry")}</Button></>}
     {state.phase === "ready" && (state.data.off ? <OffNotice reason={state.data.reason} /> : !state.data.found ? <p>{t("experience_missing")}</p> : <><ExperienceBody entry={state.data.experience} fallback={entry.contextSnippet} /><ExperienceFeedback entry={state.data.experience} transport={transport} onChanged={onChanged} /></>)}
   </section>;
 }
