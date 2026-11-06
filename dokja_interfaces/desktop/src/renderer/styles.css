@@ -2460,7 +2460,7 @@ button.icon-button[aria-expanded="true"] {
 .assistant-turns li > strong { display: block; margin-bottom: .2rem; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--turn-label-text); }
 .assistant-turns p { margin: 0; white-space: pre-wrap; }
 .assistant-turns li[data-role="user"] { box-sizing: border-box; justify-self: end; max-width: min(100%, var(--turn-owner-width)); padding: .5rem .85rem .6rem; border: 1px solid var(--turn-owner-border); background: var(--turn-owner-surface); color: var(--turn-owner-text); font-size: .875rem; line-height: 1.55; }
-.assistant-turns li[data-role="assistant"] { padding-left: var(--space-4); border-left: 2px solid var(--turn-reply-rule); color: var(--turn-reply-text); line-height: 1.7; }
+.assistant-turns li[data-role="assistant"] { padding: var(--space-3) var(--space-4); border-left: 3px solid var(--turn-reply-rule); background: var(--turn-reply-surface); color: var(--turn-reply-text); line-height: 1.7; }
 .assistant-turns li[data-role="assistant"] > strong { color: var(--turn-reply-text); }
 /* A send that has no reply: said quietly, in the dim of "off", not as a reply. */
 .assistant-turns li.detail[data-role="assistant"] { border-left-color: var(--status-off); color: var(--ink-dim); font-size: .875rem; line-height: 1.5; }
@@ -3344,3 +3344,66 @@ button.cfg-toggle:focus-visible {
 .source-receipts li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-2); padding:var(--space-3) 0; border-bottom:1px solid var(--border-subtle); overflow-wrap:anywhere; }
 .source-receipts span, .source-session-note { color:var(--text-secondary); }
 .source-application details { overflow-wrap:anywhere; }
+
+/*
+ * Live observer. Ningo's line first, then the observer's state as a tone row, the limits as small
+ * tags in the panel's edge colour, and the transcript printed in, one speaker per row.
+ */
+.realtime { display: grid; gap: var(--space-3); max-width: 72ch; }
+.realtime .voice-block { margin-bottom: 0; }
+.realtime > .note { margin: 0; }
+.realtime-status { padding-block: var(--space-1); background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%); }
+.realtime-limits { margin: 0; color: var(--ink-dim); font-size: 0.8125rem; letter-spacing: 0.04em; }
+.realtime-select { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--ink-dim); }
+.realtime-select select { padding: 0.3rem var(--space-2); border: 1px solid var(--edge); background: var(--static); color: var(--ink); font: inherit; }
+.realtime-select select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
+.realtime h3 { margin: var(--space-3) 0 0; }
+.realtime-transcript { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.realtime-transcript li {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--cyan);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 60%);
+  animation: print var(--row-enter-duration) steps(24) both;
+  animation-delay: calc(var(--i, 0) * var(--row-stagger-delay));
+}
+.realtime-transcript strong { color: var(--cyan); }
+.realtime-transcript time { margin-left: var(--space-2); color: var(--ink-dim); font-size: 0.8125rem; }
+.realtime-transcript p { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .realtime-transcript li { animation: none; } }
+
+/*
+ * Notebook rows in the panel's own idiom: a lit rule on the left and a wash that fades out, printed
+ * in one after another. What waits for the owner's verdict is amber (not yet checked); a settled
+ * decision takes the tone of its verdict; what Ningo keeps is held, so it is cyan.
+ */
+.verdicts-waiting .decision,
+.wp-section .decision,
+.kept-facts li {
+  --row-tone: var(--edge);
+  margin-bottom: 2px;
+  padding-inline: var(--space-3);
+  border-bottom: 0;
+  border-left: 3px solid var(--row-tone);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--row-tone) 10%, transparent), transparent 65%);
+  animation: print var(--row-enter-duration) steps(24) both;
+}
+.verdicts-waiting .decision { --row-tone: var(--status-pending); }
+.kept-facts li { --row-tone: var(--status-ok); }
+.wp-section .decision:has(.decision-verdict[data-tone="ok"]) { --row-tone: var(--status-ok); }
+.wp-section .decision:has(.decision-verdict[data-tone="problem"]) { --row-tone: var(--status-problem); }
+.wp-section .decision:has(.decision-verdict[data-tone="unchecked"]) { --row-tone: var(--status-pending); }
+.wp-section .decision:has(.decision-verdict[data-tone="off"]),
+.wp-section .decision:has(.decision-verdict[data-tone="other"]) { --row-tone: var(--status-off); }
+.verdicts-waiting .decision strong,
+.kept-fact { color: var(--ink); }
+.wp .verdicts-waiting h3,
+.wp .kept-person h3 {
+  font-size: 0.8125rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .verdicts-waiting .decision,
+  .wp-section .decision,
+  .kept-facts li { animation: none; }
+}

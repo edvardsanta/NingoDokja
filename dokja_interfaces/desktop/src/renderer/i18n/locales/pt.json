@@ -686,6 +686,8 @@
   "realtime_connected": "Observador conectado",
   "realtime_disconnected": "Observador indisponível",
   "realtime_select": "Selecione uma sessão de voz",
+  "realtime_voice_quiet": "Escuto em silêncio. Por ora, ninguém disse nada.",
+  "realtime_voice_deaf": "Daqui não ouço nada. O observador se calou.",
   "post_entry_title": "Publicação",
   "post_entry_title_by": "Publicação de {author}",
   "post_entry_author": "Autor: {author}",

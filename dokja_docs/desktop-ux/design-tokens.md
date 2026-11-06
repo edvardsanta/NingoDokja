@@ -78,7 +78,8 @@ smoke test assumes five workspaces while the current registry has six.
 
 The additional solid-outline consumers now share `--focus-width` and the existing
 2 px/3 px offsets. Accent fields/disclosures/list rows use `--focus-accent-ring`
-(initially cyan); view tabs use `--tab-focus-ring` (initially primary ink).
+(initially cyan); view tabs use `--tab-focus-ring`, which follows `--focus-ring`. On 2026-11-06
+the owner moved `--focus-ring` from primary ink back to cyan, so every focus ring is cyan.
 Base-button focus remains independently configurable. This retains the approved
 visual distinction instead of recoloring every focused control alike.
 

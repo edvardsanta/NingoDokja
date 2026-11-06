@@ -686,6 +686,8 @@
   "realtime_connected": "Observer connected",
   "realtime_disconnected": "Observer unavailable",
   "realtime_select": "Select a voice session",
+  "realtime_voice_quiet": "I listen in silence. No one has spoken yet.",
+  "realtime_voice_deaf": "I hear nothing from here. The observer has gone quiet.",
   "post_entry_title": "Post",
   "post_entry_title_by": "Post by {author}",
   "post_entry_author": "Author: {author}",

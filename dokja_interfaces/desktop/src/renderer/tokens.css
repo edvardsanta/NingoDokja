@@ -46,7 +46,7 @@
   --status-off: var(--color-slate-500);
   --status-off-text: var(--text-secondary);
   --status-progress: var(--text-primary);
-  --focus-ring: var(--text-primary);
+  --focus-ring: var(--color-cyan-400);
   --focus-accent-ring: var(--color-cyan-400);
   --focus-width: 2px;
   --focus-offset: 3px;
@@ -86,9 +86,8 @@
   /*
    * Conversation. One column serves the transcript and the composer, so they share an edge and a
    * reading measure (about 68 characters of text beside the reply's rule). Ningo's reply is set apart
-   * by a rule on its left; the owner's turn by a plate with a border, pushed to the end of the column.
-   * Neither is a state, so neither takes a neon: the reply's rule is the panel edge, and only
-   * --turn-reply-rule needs to change to light it.
+   * by a lit cyan rule and a faint cyan wash, the voice of the machine; the owner's turn by a plate
+   * with a plain border, pushed to the end of the column.
    */
   --conversation-column: 43rem;
   --turn-gap: var(--space-3);
@@ -97,7 +96,8 @@
   --turn-owner-surface: color-mix(in srgb, var(--text-primary) 4%, transparent);
   --turn-owner-border: var(--border-default);
   --turn-owner-text: var(--text-primary);
-  --turn-reply-rule: var(--border-default);
+  --turn-reply-rule: var(--color-cyan-400);
+  --turn-reply-surface: color-mix(in srgb, var(--color-cyan-400) 6%, transparent);
   --turn-reply-text: var(--text-primary);
   --turn-label-text: var(--text-secondary);
   --composer-field-surface: var(--surface-page);
