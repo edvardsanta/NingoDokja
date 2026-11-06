@@ -248,11 +248,46 @@ untouched, and a stop through `core.Service` while the send's request is open. M
 `Stop` a no-op fails the running, retry and queued regressions. No live provider process
 or real Electron run was exercised; the process kill is the existing cancellation.
 
+## Capability report (`10.6-b`, fourth batch)
+
+`conversation.capabilities` is a read-only, additive action for the owner's interfaces. It
+answers what this orchestrator, as it is wired, does with their conversations:
+
+```json
+{ "view": 1, "operations": { "send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported" } }
+```
+
+| Operation | Supported when |
+| --- | --- |
+| `send` | Always: the conversation handler and its archive are wired |
+| `retry` | The archive's store has the atomic conversation-bound retry (`ConversationRetryStore`) |
+| `stop` | The handler shares `core.RunningSends` with chat |
+| `steer` | Never: a separate capability that nothing offers |
+
+The report is read from the wiring, never from the request, and an operation it does not
+name is unsupported. It says what can work, not that a given send can be stopped now; that is
+still the action's own answer. A new operation may be added to view 1; changing what one means
+needs a new view. Only the owner's interfaces are told; other sources are refused like any
+`conversation.*` action.
+
+It is separate from the chat capability catalog (`dokja_domain/dokja_chat/capabilities.json`),
+which describes product features to the model and grants nothing.
+
+Interfaces offer Stop unless the report says `unsupported`. An older orchestrator has no
+report, so the read fails and Stop is offered as before; a view an interface does not know is
+treated the same way. Talk reads the report once per conversation panel; the CLI and the TUI
+read it just before asking to stop, and say the orchestrator cannot stop instead of asking.
+
+Verification: handler tests cover full wiring, no running sends, a store without the retry
+capability and refused non-owner sources; the desktop projection keeps only known operations
+and answers and refuses another view; Talk hides Stop only on `unsupported`; the CLI and TUI
+ask nothing to stop when the report says so. No live orchestrator was exercised.
+
 ## Remaining architecture work
 
 `10.6-a` remains open for the general logical-task mapping, state-revision and
 attempt relationships, authority and aggregate-budget contract, and compatibility
-at an actual workflow consumer. `10.6-b` still owns a general capability report and
-ordering beyond archived chat. `10.6-c` owns broader result/report settlement and justified
+at an actual workflow consumer. `10.6-b` still owns ordering beyond archived chat, once a
+workflow other than chat needs it; the conversation capability report above is done. `10.6-c` owns broader result/report settlement and justified
 durable recovery. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.
