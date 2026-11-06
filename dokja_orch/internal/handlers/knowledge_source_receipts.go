@@ -125,20 +125,18 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		},
 		VerifyAttempt: matchesAttempt,
 	}}
-	if _, err := journal.Begin(ctx, application.BeginRecord{Key: key, Attempt: attempt}); err != nil {
+	record := sourceReadRecord{journal: &journal, key: key}
+	if err := record.begin(ctx, attempt); err != nil {
 		return nil, nil, fmt.Errorf("source-read journal preparation was not confirmed")
 	}
-	key.OperationKey = uuid.NewString()
-	if _, err := journal.MarkDispatched(ctx, application.ChangeRecord{Key: key, ExpectedRevision: 1}); err != nil {
+	if err := record.dispatched(ctx); err != nil {
 		return nil, nil, fmt.Errorf("source-read journal dispatch was not confirmed")
 	}
 	if err := ctx.Err(); err != nil {
 		// No read was started. The marker only records possible dispatch.
 		settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
-		key.OperationKey = uuid.NewString()
-		_, settleErr := journal.MarkInterrupted(settleCtx, application.ChangeRecord{Key: key, ExpectedRevision: 2})
-		if settleErr != nil {
+		if settleErr := record.interrupted(settleCtx); settleErr != nil {
 			return nil, nil, fmt.Errorf("source-read journal interruption was not confirmed")
 		}
 		return nil, nil, err
@@ -172,8 +170,7 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 	// but the actual native receipt still belongs to the original immutable attempt.
 	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	key.OperationKey = uuid.NewString()
-	if _, err := journal.Observe(settleCtx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: key, ExpectedRevision: 2}, Observation: observation}); err != nil {
+	if err := record.observed(settleCtx, observation); err != nil {
 		return nil, nil, fmt.Errorf("source-read receipt settlement was not confirmed")
 	}
 	settlement.Confirmed = true
@@ -181,4 +178,39 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		return nil, nil, read.Err
 	}
 	return read.Source, []core.Receipt{{ActionID: attempt.Ref, Step: fmt.Sprintf("source-%d", index), Status: "source_validated", At: occurred}}, nil
+}
+
+// sourceReadRecord writes one source read to the journal in its fixed steps: prepared (revision 1),
+// possibly dispatched (2), then either a receipt or an interruption (3). Each step names its own
+// operation and the revision it expects, so callers cannot get them out of order.
+type sourceReadRecord struct {
+	journal *application.Journal
+	key     application.JournalKey
+}
+
+// step is the journal key of one step of this attempt.
+func (r sourceReadRecord) step(string) application.JournalKey {
+	key := r.key
+	key.OperationKey = uuid.NewString()
+	return key
+}
+
+func (r sourceReadRecord) begin(ctx context.Context, attempt application.Attempt) error {
+	_, err := r.journal.Begin(ctx, application.BeginRecord{Key: r.step("begin"), Attempt: attempt})
+	return err
+}
+
+func (r sourceReadRecord) dispatched(ctx context.Context) error {
+	_, err := r.journal.MarkDispatched(ctx, application.ChangeRecord{Key: r.step("dispatch"), ExpectedRevision: 1})
+	return err
+}
+
+func (r sourceReadRecord) interrupted(ctx context.Context) error {
+	_, err := r.journal.MarkInterrupted(ctx, application.ChangeRecord{Key: r.step("interrupt"), ExpectedRevision: 2})
+	return err
+}
+
+func (r sourceReadRecord) observed(ctx context.Context, observation application.Observation) error {
+	_, err := r.journal.Observe(ctx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: r.step("observe"), ExpectedRevision: 2}, Observation: observation})
+	return err
 }
