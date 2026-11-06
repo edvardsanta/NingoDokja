@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -174,5 +175,58 @@ func TestArchivedRetryCannotChangeAnotherConversation(t *testing.T) {
 				t.Fatal("valid matching retry must remain available", result, err, len(model.asked))
 			}
 		})
+	}
+}
+
+// answeredThenLeft answers, but the requester has gone by the time the answer is back.
+type answeredThenLeft struct{ cancel context.CancelFunc }
+
+func (m answeredThenLeft) Generate(ctx context.Context, _ string) (map[string]any, error) {
+	return m.GenerateMessages(ctx, nil)
+}
+func (m answeredThenLeft) GenerateMessages(context.Context, []map[string]string) (map[string]any, error) {
+	m.cancel()
+	return map[string]any{"reply": "An answer nobody waited for.", "provider": "ollama", "requested_model": "fixture/model"}, nil
+}
+
+// Delivering a reply and accepting it are different things: a requester that went away after the
+// model answered loses the delivery, never the answer. The turn is completed and a read shows it.
+func TestAnAnswerIsKeptWhenItsRequesterLeftAfterTheModelReplied(t *testing.T) {
+	archive := archiveFor(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	handler := NewChatDomainHandler(answeredThenLeft{cancel}).WithArchive(archive)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	handler.Handle(ctx, ownerTurn(map[string]any{"content": "q", "conversation_id": held.ID, "send_id": "send-0001"}), archiveStep)
+	turns, _ := archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	if len(turns) != 1 || turns[0].State != conversation.TurnCompleted || !strings.Contains(turns[0].Reply, "An answer nobody waited for.") {
+		t.Fatalf("the accepted answer was lost with its delivery: %+v", turns)
+	}
+}
+
+// waitsPastTheDeadline answers only after the request's time is up.
+type waitsPastTheDeadline struct{}
+
+func (waitsPastTheDeadline) Generate(ctx context.Context, _ string) (map[string]any, error) {
+	return waitsPastTheDeadline{}.GenerateMessages(ctx, nil)
+}
+func (waitsPastTheDeadline) GenerateMessages(ctx context.Context, _ []map[string]string) (map[string]any, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A send's budget is its request deadline. Spent during generation, the turn fails once, in plain
+// words, and nothing sends it again; the owner may retry it.
+func TestASendWhoseDeadlinePassesFailsOnceAndIsNotSentAgain(t *testing.T) {
+	archive := archiveFor(t)
+	handler := NewChatDomainHandler(waitsPastTheDeadline{}).WithArchive(archive)
+	held, _ := archive.Start(context.Background(), conversation.OwnerScope, conversation.KindGeneral, "", "")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := handler.Handle(ctx, ownerTurn(map[string]any{"content": "q", "conversation_id": held.ID, "send_id": "send-0001"}), archiveStep); err == nil {
+		t.Fatal("a send past its deadline has no reply")
+	}
+	turns, _ := archive.Turns(context.Background(), conversation.OwnerScope, held.ID, 0, 10)
+	if len(turns) != 1 || turns[0].State != conversation.TurnFailed || turns[0].Reason != "the request stopped before the reply" || turns[0].Attempts != 1 {
+		t.Fatalf("%+v", turns)
 	}
 }
