@@ -456,6 +456,23 @@ describe("a conversation continued elsewhere", () => {
   });
 });
 
+describe("a turn in a state this desktop does not know", () => {
+  it("keeps the message, shows no reply and never offers to stop it as if it were on its way", async () => {
+    const { transport, calls } = routedTransport({
+      "conversation.list": listed(kept(3, 2)),
+      "conversation.read": readOf(3,
+        archivedTurn({ seq: 1, content: "Earlier", reply: "Earlier answer.", sendId: "send-old1" }),
+        archivedTurn({ seq: 2, content: "From a newer orchestrator", state: "unknown", sendId: "send-new2" }),
+      ),
+    });
+    await renderTalk(transport);
+    screen.getByText("From a newer orchestrator");
+    expect(screen.queryByText("This message is still on its way.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop the reply" })).toBeNull();
+    expect(calls.some((call) => call.type === "conversation.stop")).toBe(false);
+  });
+});
+
 describe("a turn without a reply, in Portuguese", () => {
   it("says the archive's own reasons in the screen's language and keeps any other as recorded", async () => {
     const { transport } = routedTransport({

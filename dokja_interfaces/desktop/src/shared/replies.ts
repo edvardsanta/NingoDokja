@@ -292,7 +292,9 @@ export type ChatReply = { off?: false; reply: string; sessionNotice: string };
 
 // One send of an archived conversation and how it ended, as the archive keeps it. A pending turn is
 // not proof a reply is coming; an interrupted one was cut by a restart and nobody knows its outcome.
-export type ArchivedTurnState = "pending" | "completed" | "failed" | "interrupted";
+// unknown is a state this desktop does not know, from a newer orchestrator: the turn is kept, with no
+// reply, and never shown as on its way.
+export type ArchivedTurnState = "pending" | "completed" | "failed" | "interrupted" | "unknown";
 export type ArchivedTurn = {
   id: string;
   seq: number;

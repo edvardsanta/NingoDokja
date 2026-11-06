@@ -713,7 +713,7 @@ test("a conversation is started with only its reading, and read by its archive i
   assert.deepEqual(started,{ok:true,result:{conversation:{id:"c".repeat(32),kind:"reading",readingId:"entry-1",title:"",updatedAt:"t",revision:1,turns:0}}});
   const read = await handleRequest({type:"conversation.read",payload:{conversation_id:"c".repeat(32),limit:5000}},client,limits);
   assert.equal(read.ok,true);
-  assert.deepEqual((read as {result:{turns:unknown[]}}).result.turns,[],"a turn in an unknown state is dropped");
+  assert.deepEqual((read as {result:{turns:{state:string}[]}}).result.turns.map((turn) => turn.state),["unknown"],"a turn in a state the desktop does not know is kept as unknown");
   assert.equal((await handleRequest({type:"conversation.read",payload:{conversation_id:"../x"}},client,limits)).ok,false);
   assert.equal((await handleRequest({type:"conversation.start",payload:{title:"t".repeat(121)}},client,limits,undefined,{recent:()=>true})).ok,false,"a title past the archive's bound is refused");
   assert.deepEqual(calls,[
@@ -839,6 +839,17 @@ test("the shared turn projection is read as the orchestrator pins it, version 1"
   assert.deepEqual([turns[0]!.provider,turns[0]!.model,turns[0]!.reply],["ollama","example/model:latest","One who judges."]);
   assert.equal(turns[1]!.sendId,"wa-0123456789abcdef");
   assert.deepEqual([turns[2]!.attempts,turns[2]!.reason],[2,"the model returned no reply"]);
+});
+
+test("a turn in a state this desktop does not know is kept as unknown, never dropped or shown as on its way", async () => {
+  const id = "e".repeat(32);
+  const turn = (seq: number, state: string) => ({view:1,id:String(seq).repeat(32),seq,send_id:`send-000${seq}`,content:`message ${seq}`,reply:"",state,reason:"",attempts:1,provider:"",model:""});
+  const conversation = {id,kind:"general",reading_id:"",title:"",updated_at:"u",revision:1,turns:2};
+  const client = { async request() { return {status:"ok",result:{domain:"conversation",result:{conversation,turns:[turn(1,"failed"),turn(2,"cancelled")]}}}; } };
+  const read = await handleRequest({type:"conversation.read",payload:{conversation_id:id}},client,{defaultTimeoutMs:15000,maxTimeoutMs:120000});
+  assert.equal(read.ok,true);
+  const turns = (read as {result:{turns:Record<string,unknown>[]}}).result.turns;
+  assert.deepEqual(turns.map((each) => [each.content,each.state]),[["message 1","failed"],["message 2","unknown"]]);
 });
 
 test("reading earlier turns names a position and nothing else", async () => {
