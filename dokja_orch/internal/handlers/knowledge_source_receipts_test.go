@@ -303,3 +303,35 @@ func TestSourceJournalBindingRejectsIncompleteHost(t *testing.T) {
 		}
 	}
 }
+
+// Each step of a read is one operation named by its attempt, and asking for a step again replays it.
+func TestSourceJournalStepsAreNamedByTheirAttemptAndReplay(t *testing.T) {
+	source := &applicationStore{documents: map[string]string{"guide": "bounded guide", "api": "bounded api"}}
+	store := newSourceJournalStore()
+	ctx := sourceJournalContext(t, context.Background(), store, func(context.Context, SourceReadPermission) (string, error) { return "decision:fixture", nil })
+	if _, err := prepareThroughOrchestrator(ctx, source, pinnedSourceEvent(source)); err != nil {
+		t.Fatal(err)
+	}
+	for _, episode := range store.episodes {
+		attempt := episode.Attempt.Ref
+		for _, step := range []string{"begin", "dispatch", "observe"} {
+			if _, ok := store.operations[attempt+":"+step]; !ok {
+				t.Fatalf("missing operation %s:%s in %v", attempt, step, len(store.operations))
+			}
+		}
+		journal := application.Journal{Store: store, Clock: time.Now, Admission: application.Admission{
+			Access:        func(context.Context, string, string) error { return nil },
+			VerifyAttempt: func(application.Attempt) bool { return true },
+		}}
+		record := sourceReadRecord{journal: &journal, key: application.JournalKey{Scope: episode.Scope, EpisodeRef: episode.Ref, AttemptRef: attempt}}
+		if err := record.dispatched(context.Background()); err != nil {
+			t.Fatal("asking for a recorded step again must replay it, not conflict:", err)
+		}
+		if current := store.episodes[episode.Ref]; current.Revision != 3 || current.Attempt.Phase != "settled" {
+			t.Fatalf("a replayed step changed the episode: %+v", current)
+		}
+	}
+	if len(store.operations) != 6 {
+		t.Fatal("two reads, three steps each", len(store.operations))
+	}
+}

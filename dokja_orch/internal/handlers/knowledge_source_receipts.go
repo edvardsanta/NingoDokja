@@ -188,10 +188,12 @@ type sourceReadRecord struct {
 	key     application.JournalKey
 }
 
-// step is the journal key of one step of this attempt.
-func (r sourceReadRecord) step(string) application.JournalKey {
+// step is the journal key of one step of this attempt. The operation is named by the attempt and the
+// step, so asking for a step again replays what was recorded instead of becoming a new operation
+// against a revision that has moved on.
+func (r sourceReadRecord) step(name string) application.JournalKey {
 	key := r.key
-	key.OperationKey = uuid.NewString()
+	key.OperationKey = r.key.AttemptRef + ":" + name
 	return key
 }
 
