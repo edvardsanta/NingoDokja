@@ -6,6 +6,7 @@ import type { Transport, TransportError } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { OffNotice, Pending, Problem } from "./card_frame.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 function snapshot(value: unknown, id: string): KnowledgeClassification | Off | undefined {
   if (!isRecord(value)) return undefined;
@@ -27,7 +28,7 @@ export function KnowledgeClassificationPanel({ transport, id }: { transport: Tra
     <section className="classification-panel" aria-label={t("classification_title")}>
       <h4>{t("classification_title")}</h4>
       {state.phase === "loading" && <Pending />}
-      {state.phase === "error" && <><Problem error={state.error} /><button type="button" onClick={reload}>{t("retry")}</button></>}
+      {state.phase === "error" && <><Problem error={state.error} /><Button onClick={reload}>{t("retry")}</Button></>}
       {state.phase === "ready" && (state.data.off ? <OffNotice reason={state.data.reason} /> :
         <ClassificationEditor key={state.data.revision} transport={transport} initial={state.data} reload={reload} />)}
     </section>
@@ -90,7 +91,7 @@ function ClassificationEditor({ transport, initial, reload }: { transport: Trans
           </div>
         ))}
       </dl>
-      {saved && <p role="status">{t("classification_saved")}</p>}
+      {saved && <Notice announce="polite">{t("classification_saved")}</Notice>}
       {!current.needsUserInput && <p>{t("classification_complete")}</p>}
       {current.needsUserInput && <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
         <p>{t("classification_explain")}</p>
@@ -103,11 +104,11 @@ function ClassificationEditor({ transport, initial, reload }: { transport: Trans
               {question.allowedValues.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </div>)}
-          <button type="submit" disabled={sending || !!error || !Object.values(answers).some(Boolean)}>{t(sending ? "classification_saving" : "classification_save")}</button>
+          <Button type="submit" disabled={sending || !!error || !Object.values(answers).some(Boolean)}>{t(sending ? "classification_saving" : "classification_save")}</Button>
         </fieldset>
       </form>}
       {error && <><Problem error={error} /><p>{t("classification_reload_explain")}</p></>}
-      <button type="button" disabled={sending} onClick={reload}>{t("classification_reload")}</button>
+      <Button disabled={sending} onClick={reload}>{t("classification_reload")}</Button>
     </>
   );
 }

@@ -39,7 +39,7 @@ changes, and never streaming text.
 | Notebook (`memory`, `memory_experiences`, `experience_feedback`; `kept_facts` had nothing to move) | Migrated; two notes whose tone is computed stay plain |
 | System (`health`, `runtime`, `providers`, `local_models`) | Migrated |
 | Realtime | Already on the primitives; nothing to move |
-| Library | Not migrated; its own batch, with its own tests |
+| Library (`knowledge_*`, `digest`, `document_view`, `original_reader`, `source_application`) | Migrated; buttons with a computed class or the variant after another class, and notes with a computed tone or extra attributes, stay plain |
 
 `button.primary`, `.quiet`, `.compact` and `.note` remain the styling contract, so
 migrated and unmigrated screens look the same while this happens. To roll a vertical
@@ -47,7 +47,7 @@ back, restore its class strings; nothing else depends on the primitives.
 
 ## Still open in `09.7`
 
-Other verticals; linked inline errors with a focusable summary for multi-field
+The controls each batch left plain (listed above), and Talk's `reply_sources` source buttons, which have a computed class; linked inline errors with a focusable summary for multi-field
 submits outside Settings; long-content and narrow-panel checks in the real app, which
 belong with `09.6-b`. CLI and TUI keep their own presentation and share only the
 state vocabulary.

@@ -20,7 +20,7 @@ import {
   type Problem,
 } from "./knowledge_add_model.js";
 import { PostPane } from "./knowledge_post.js";
-import { Button } from "./ui.js";
+import { Button, Notice } from "./ui.js";
 import { useAction } from "./use_action.js";
 
 const MODE_IDS: Record<AddMode, MessageId> = {
@@ -165,9 +165,9 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
       {titled && <h3 id={field("title")}>{t("add_title")}</h3>}
       <div className="scope" role="group" aria-label={t("add_title")}>
         {ADD_MODES.map((each) => (
-          <button key={each} type="button" aria-pressed={mode === each} disabled={busy} onClick={() => pick(each)}>
+          <Button key={each} aria-pressed={mode === each} disabled={busy} onClick={() => pick(each)}>
             {t(MODE_IDS[each])}
-          </button>
+          </Button>
         ))}
       </div>
       {mode === "post" && <PostPane transport={transport} onAdded={onAdded} onBusy={setReading} onUseAddress={carryToAddress} />}
@@ -245,7 +245,7 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
           )}
 
           <div>
-            <button type="submit">{t("add_submit")}</button>
+            <Button type="submit">{t("add_submit")}</Button>
           </div>
 
           <details className="more" open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
@@ -300,11 +300,11 @@ export function AddToBase({ transport, onAdded, dropped, titled = true, startMod
         </fieldset>
       </form>}
       {mode !== "post" && <div aria-live="polite">
-        {sending && <p role="status">{t("add_sending")}</p>}
-        {problem && <p role="alert">{t(problem.id, problem.params)}</p>}
+        {sending && <Notice announce="polite">{t("add_sending")}</Notice>}
+        {problem && <Notice announce="assertive">{t(problem.id, problem.params)}</Notice>}
         {state.phase === "error" &&
           (state.error.code === "timeout" ? (
-            <p role="alert">{t("add_timeout")}</p>
+            <Notice announce="assertive">{t("add_timeout")}</Notice>
           ) : (
             <ErrorLine error={state.error} />
           ))}
@@ -320,17 +320,17 @@ export function Outcome({ result }: { result: IngestResult | Off }) {
   const outcome = outcomeOf(result);
   return (
     <>
-      <p className="note" data-tone="ok">
+      <Notice boxed tone="ok">
         {t(outcome.id, outcome.params)}
-      </p>
+      </Notice>
       {(result.pendingEmbeddings ?? 0) > 0 && !result.degraded && (
         <p className="detail">{t("add_indexing", { count: result.pendingEmbeddings ?? 0 })}</p>
       )}
       {result.degraded && (
-        <p className="note" data-tone="unchecked">
+        <Notice boxed tone="unchecked">
           {t("add_degraded")}
           {result.reason && <span className="detail"> {result.reason}</span>}
-        </p>
+        </Notice>
       )}
     </>
   );

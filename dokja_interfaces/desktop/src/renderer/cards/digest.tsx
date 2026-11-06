@@ -20,7 +20,7 @@ import type { Tone } from "./health_model.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { Outcome } from "./knowledge_add.js";
 import { addToBase } from "./knowledge_add_model.js";
-import { Button, VoiceBlock } from "./ui.js";
+import { Button, Notice, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";
@@ -184,14 +184,14 @@ function Reading({ transport, sources, strip }: { transport: Transport; sources:
           <label>{t("reading_to")}<input type="date" value={draft.to} min={draft.from || undefined} onChange={event => setDraft({ ...draft, to: event.target.value })} /></label>
         </details>
         <div className="reading-filter-actions">
-          <button type="submit" disabled={invalidDates}>{t("reading_apply")}</button>
+          <Button type="submit" disabled={invalidDates}>{t("reading_apply")}</Button>
           {anyFilter && <Button variant="quiet" onClick={reset}>{t("reading_clear")}</Button>}
         </div>
-        {invalidDates && <p role="alert">{t("reading_invalid_dates")}</p>}
+        {invalidDates && <Notice announce="assertive">{t("reading_invalid_dates")}</Notice>}
       </form>
       {strip}
       {page && !page.off && <>
-        {(filters.source || filters.query || filters.from || filters.to) && <p role="status">{t("reading_matches", { count: page.total })}</p>}
+        {(filters.source || filters.query || filters.from || filters.to) && <Notice announce="polite">{t("reading_matches", { count: page.total })}</Notice>}
         <DigestList page={page} transport={transport} filtered={!!(filters.source || filters.query || filters.from || filters.to)} />
       </>}
       {loading && <Pending />}
@@ -206,9 +206,9 @@ function Reading({ transport, sources, strip }: { transport: Transport; sources:
       )}
       {page && !page.off && page.more > 0 &&
         (shown < MAX_SHOWN ? (
-          <button type="button" disabled={loading} onClick={() => setShown((count) => Math.min(count + SHOW_STEP, MAX_SHOWN))}>
+          <Button disabled={loading} onClick={() => setShown((count) => Math.min(count + SHOW_STEP, MAX_SHOWN))}>
             {t("digest_more", { count: nextStep(page) })}
-          </button>
+          </Button>
         ) : (
           <p className="detail">{t("digest_at_limit", { count: MAX_SHOWN })}</p>
         ))}
@@ -251,9 +251,9 @@ function ReadingItem({ item, meta, transport, onDiscuss }: { item: DigestItem; m
       {meta !== "" && <p className="detail">{meta}</p>}
       {item.summary !== "" && <p className="digest-summary">{item.summary}</p>}
       <div className="digest-actions">
-        <button type="button" disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title} onClick={onDiscuss}>
+        <Button disabled={!item.id} aria-label={t("assistant_continue") + ": " + item.title} onClick={onDiscuss}>
           {t("assistant_continue")}
-        </button>
+        </Button>
         {item.id && save.button}
         <ReadingPreview item={item} transport={transport} />
       </div>
@@ -282,7 +282,7 @@ function ReadingMedia({ transport, url, title, onRetry }: { transport: Transport
   const t = useTranslate();
   const preview = usePreview(transport, url, true);
   if (preview.phase === "loading") return <Pending />;
-  if (preview.phase === "failed") return <><Problem error={preview.error} /><button type="button" onClick={onRetry}>{t("retry")}</button></>;
+  if (preview.phase === "failed") return <><Problem error={preview.error} /><Button onClick={onRetry}>{t("retry")}</Button></>;
   return preview.dataUrl.startsWith("data:video/")
     ? <video src={preview.dataUrl} aria-label={title} controls playsInline preload="metadata" />
     : <img src={preview.dataUrl} alt={title} loading="lazy" />;
@@ -302,7 +302,7 @@ function useSaveReading(transport: Transport, id: string, title: string) {
     ),
     feedback: (
       <div className="reading-save" aria-live="polite">
-        {state.phase === "loading" && <p role="status">{t("reading_saving")}</p>}
+        {state.phase === "loading" && <Notice announce="polite">{t("reading_saving")}</Notice>}
         {state.phase === "error" && <Problem error={state.error} />}
         {state.phase === "ready" && <Outcome result={state.data} />}
       </div>

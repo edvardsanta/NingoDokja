@@ -3,7 +3,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import type { OriginalReading, PassageLocator } from "../../shared/passages.js";
 import { passageText } from "../../shared/passages.js";
 import { useTranslate } from "../i18n/context.js";
-import { Button } from "./ui.js";
+import { Button, Notice } from "./ui.js";
 
 // Strip extraction's Markdown block markers and normalize wrapping/ligatures for display matching.
 // The persisted locator itself always addresses the unchanged extracted text.
@@ -89,8 +89,8 @@ function PDFPage({ reading, cited }: { reading: OriginalReading; cited?: Passage
     return () => { gone = true; destroy?.(); };
   }, [reading, cited]);
   return <>
-    {status === "loading" && <p role="status">{t("source_loading")}</p>}
-    {(status === "error" || status === "unresolved") && <p role="status">{t(status === "error" ? "source_unavailable" : "source_highlight_unresolved")}</p>}
+    {status === "loading" && <Notice announce="polite">{t("source_loading")}</Notice>}
+    {(status === "error" || status === "unresolved") && <Notice announce="polite">{t(status === "error" ? "source_unavailable" : "source_highlight_unresolved")}</Notice>}
     <canvas ref={canvas} data-state={status} className="original-pdf" role="img" aria-label={t("source_pdf_page", { page: reading.locator!.page!, label: reading.unit!.label })} />
   </>;
 }
@@ -152,9 +152,9 @@ function EPUBChapter({ reading, cited }: { reading: OriginalReading; cited?: Pas
   }, [reading, cited]);
   useEffect(() => { body.current?.querySelector("mark")?.scrollIntoView?.({ block: "center" }); }, [rendered]);
   return <>
-    {!rendered && !failed && <p role="status">{t("source_loading")}</p>}
-    {failed && <p role="status">{t("source_unavailable")}</p>}
-    {rendered && cited?.unit === reading.locator!.unit && !rendered.highlighted && <p role="status">{t("source_highlight_unresolved")}</p>}
+    {!rendered && !failed && <Notice announce="polite">{t("source_loading")}</Notice>}
+    {failed && <Notice announce="polite">{t("source_unavailable")}</Notice>}
+    {rendered && cited?.unit === reading.locator!.unit && !rendered.highlighted && <Notice announce="polite">{t("source_highlight_unresolved")}</Notice>}
     <div ref={body} className="original-epub">{rendered?.content}</div>
   </>;
 }
@@ -163,7 +163,7 @@ export function OriginalReader({ reading, cited, onNavigate }: { reading: Origin
   const t = useTranslate();
   const text = useRef<HTMLPreElement>(null);
   useEffect(() => { text.current?.querySelector("mark")?.scrollIntoView?.({ block: "center" }); }, [reading]);
-  if (reading.state !== "resolved" || !reading.unit || !reading.locator) return <p role="status">{t("source_unavailable")}</p>;
+  if (reading.state !== "resolved" || !reading.unit || !reading.locator) return <Notice announce="polite">{t("source_unavailable")}</Notice>;
   const loc = reading.locator;
   const [before, selected, after] = passageText(reading.unit.text, cited.unit === loc.unit ? cited.start : 0, cited.unit === loc.unit ? cited.end : 0);
   return <section className="original-reader" aria-label={t("source_reader")}>

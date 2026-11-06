@@ -147,7 +147,7 @@ export function SourceApplicationView({ transport, active=true }: {transport: Tr
      <div className="source-toolbar"><Button disabled={offset===0} onClick={()=>void loadDocuments(Math.max(0,offset-20))}>{t("source_previous")}</Button><Button disabled={offset+documents.length>=total} onClick={()=>void loadDocuments(offset+20)}>{t("source_next")}</Button></div>
      {selected.some((id)=>!documents.some((d)=>d.id===id)) && <p className="detail">{t("source_selected_elsewhere")}</p>}
     </fieldset>
-    {!candidate&&goal.trim()&&selected.length>0&&<p role="status" className="detail">{t("source_invalid")}</p>}
+    {!candidate&&goal.trim()&&selected.length>0&&<Notice announce="polite" extra="detail">{t("source_invalid")}</Notice>}
     <Button type="submit" disabled={!candidate || !!snapshot&&!reason.trim()}>{t(busy?"source_checking":"source_check")}</Button>
    </fieldset>
    {rejected && <Notice boxed tone="problem" announce="polite">{t("source_rejected")}</Notice>}

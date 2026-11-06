@@ -10,6 +10,7 @@ import type { MessageId } from "../i18n/i18n.js";
 import { OffNotice, Problem as ErrorLine } from "./card_frame.js";
 import { addToBase, checkPostLink, parsePostReply, postOutcome, postTitle } from "./knowledge_add_model.js";
 import type { LoadResult } from "./use_card.js";
+import { Button, Notice } from "./ui.js";
 
 // The orchestrator asks a reader, and the shell then downloads every file before it answers.
 const READ_TIMEOUT_MS = 120_000;
@@ -283,9 +284,9 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
               {t("post_show")}
             </button>
             {note?.kind === "refused" && note.refused === "unsupported" && (
-              <button type="button" className="quiet" onClick={() => onUseAddress?.(link.trim())}>
+              <Button variant="quiet" onClick={() => onUseAddress?.(link.trim())}>
                 {t("post_use_address")}
-              </button>
+              </Button>
             )}
           </div>
         </fieldset>
@@ -304,48 +305,48 @@ export function PostPane({ transport, onAdded, onBusy, onUseAddress }: Props) {
         )}
         {view.phase === "saved" && (
           <>
-            <p className="note" data-tone="ok">
+            <Notice boxed tone="ok">
               {t(view.id, { title: view.title })}
-            </p>
+            </Notice>
             {view.id === "post_saved" && view.files > 0 && (
-              <p className="note" data-tone="ok">
+              <Notice boxed tone="ok">
                 {t("post_files_copied", { count: view.files })}
-              </p>
+              </Notice>
             )}
           </>
         )}
       </div>
       {view.phase === "saved" && view.files > 0 && transport.openSavedPost && (
         <div className="add-post-actions">
-          <button type="button" className="quiet" onClick={() => openFolder(view.documentId)}>
+          <Button variant="quiet" onClick={() => openFolder(view.documentId)}>
             {t("post_open_folder")}
-          </button>
+          </Button>
         </div>
       )}
       {view.phase === "saved" && view.folderFailed && (
-        <p role="alert" className="note" data-tone="problem">
+        <Notice announce="assertive" boxed tone="problem">
           {t("post_open_folder_failed")}
-        </p>
+        </Notice>
       )}
       {view.phase === "shown" && view.localFiles !== undefined && (
         <>
-          <p className="note" data-tone="ok">
+          <Notice boxed tone="ok">
             {t("post_local_saved", { count: view.localFiles })}
-          </p>
+          </Notice>
           {transport.openSavedPost && (
             <div className="add-post-actions">
-              <button type="button" className="quiet" disabled={busy} onClick={() => openFolder(view.post.documentId)}>
+              <Button variant="quiet" disabled={busy} onClick={() => openFolder(view.post.documentId)}>
                 {t("post_open_folder")}
-              </button>
+              </Button>
             </div>
           )}
           {view.folderFailed && (
-            <p role="alert" className="note" data-tone="problem">{t("post_open_folder_failed")}</p>
+            <Notice announce="assertive" boxed tone="problem">{t("post_open_folder_failed")}</Notice>
           )}
         </>
       )}
       {view.phase === "shown" && view.localFailed && (
-        <p role="alert" className="note" data-tone="problem">{t("post_local_save_failed")}</p>
+        <Notice announce="assertive" boxed tone="problem">{t("post_local_save_failed")}</Notice>
       )}
       {view.phase === "shown" && (
         <PostBlock
@@ -370,9 +371,9 @@ function FieldNote({ note }: { note: Note }) {
   switch (note.kind) {
     case "link":
       return (
-        <p role="alert" className="note" data-tone="problem">
+        <Notice announce="assertive" boxed tone="problem">
           {t(note.id)}
-        </p>
+        </Notice>
       );
     case "refused":
       return (
@@ -394,16 +395,16 @@ function SaveTrouble({ trouble }: { trouble: Trouble }) {
       return <OffNotice reason={trouble.reason} />;
     case "timeout":
       return (
-        <p role="alert" className="note" data-tone="unchecked">
+        <Notice announce="assertive" boxed tone="unchecked">
           {t("add_timeout")}
-        </p>
+        </Notice>
       );
     case "error":
       return (
         <>
-          <p role="alert" className="note" data-tone="problem">
+          <Notice announce="assertive" boxed tone="problem">
             {t("post_save_failed")}
-          </p>
+          </Notice>
           <ErrorLine error={trouble.error} />
         </>
       );
@@ -452,23 +453,20 @@ function PostBlock({
         </div>
       )}
       {post.missing > 0 && (
-        <p className="note" data-tone="unchecked">
+        <Notice boxed tone="unchecked">
           {t("post_media_missing", { count: post.missing })}
-        </p>
+        </Notice>
       )}
       <div className="add-post-actions" aria-busy={saving || localSaving}>
         {canSaveLocally && (
-          <button
-            type="button"
-            ref={localSaveRef}
-            className="primary"
+          <Button
+            ref={localSaveRef} variant="primary"
             aria-label={t("post_save_local_named", { title })}
             aria-busy={localSaving}
             disabled={saving || localSaving}
-            onClick={onSaveLocal}
-          >
+            onClick={onSaveLocal}>
             {localSaving ? t("post_saving_local") : t("post_save_local")}
-          </button>
+          </Button>
         )}
         <button
           type="button"
@@ -502,9 +500,9 @@ function PostFile({ item, index, total }: { item: PostMedia; index: number; tota
   const label = item.kind === "video" ? t("post_video_n", { n: index + 1, total }) : t("post_image_n", { n: index + 1, total });
   if (failed) {
     return (
-      <p className="note" data-tone="off">
+      <Notice boxed tone="off">
         {label}. {t("post_media_error")}
-      </p>
+      </Notice>
     );
   }
   return item.kind === "video" ? (
