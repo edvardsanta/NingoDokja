@@ -112,6 +112,16 @@ A controlled restart is not a power-loss, failover, performance or cross-engine
 evaluation. Admission facts in these tests are fakes, not live authentication or
 registered receipt verification. No comparison corpus was rerun or tuned.
 
+## Recovery listing
+
+`Unsettled` lists, for startup recovery, the current snapshot of each non-forgotten episode
+whose attempt is still prepared or dispatched and was accepted before the given instant,
+across scopes, up to a limit. It reads current revisions in key order, 200 at a time, without
+scope locks, and decodes each snapshot in Go: it never casts stored bytes in SQL, so an
+unreadable snapshot is counted and skipped instead of failing the listing. The journal then
+changes each attempt by compare-and-swap, which is what makes the unlocked read safe. No
+schema change; the listing costs one pass over current revisions at start.
+
 ## Rollback and next integration
 
 The adapter is opt-in library code with no application entry-point wiring, so

@@ -490,3 +490,93 @@ func TestPostgresInvalidWriteAndParameterizedScope(t *testing.T) {
 		t.Fatal("invalid callback wrote a head", err)
 	}
 }
+
+// Startup recovery reads what a stopped process left prepared or dispatched, across scopes, and the
+// journal interrupts only what its admission covers. Settled and forgotten episodes are not listed.
+func TestPostgresRecoveryInterruptsWhatAStoppedProcessLeft(t *testing.T) {
+	_, s, j, r := fixture(t)
+	ctx := context.Background()
+	other := func(n string) application.BeginRecord {
+		c := r
+		c.Key.EpisodeRef, c.Key.AttemptRef, c.Key.OperationKey = "episode:"+n, "attempt:"+n, "operation:begin:"+n
+		c.Attempt.Ref = c.Key.AttemptRef
+		return c
+	}
+	dispatched := dispatch(t, j, r)
+	prepared := other("prepared")
+	if _, err := j.Begin(ctx, prepared); err != nil {
+		t.Fatal(err)
+	}
+	settled := other("settled")
+	if _, err := j.Begin(ctx, settled); err != nil {
+		t.Fatal(err)
+	}
+	settledChange := application.ChangeRecord{Key: settled.Key, ExpectedRevision: 1}
+	settledChange.Key.OperationKey = "operation:dispatch:settled"
+	if _, err := j.MarkDispatched(ctx, settledChange); err != nil {
+		t.Fatal(err)
+	}
+	settledChange.ExpectedRevision = 2
+	receipt := observation(settled, settledChange)
+	receipt.Key.OperationKey = "operation:observe:settled"
+	if _, err := j.Observe(ctx, receipt); err != nil {
+		t.Fatal(err)
+	}
+	forgotten := other("forgotten")
+	if _, err := j.Begin(ctx, forgotten); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Forget(ctx, forgotten.Key.Scope, forgotten.Key.EpisodeRef); err != nil {
+		t.Fatal(err)
+	}
+	cutoff := time.Now().Add(time.Second)
+
+	listed, _, err := s.Unsettled(ctx, cutoff, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine := map[string]string{}
+	for _, e := range listed {
+		if e.Scope == r.Key.Scope {
+			mine[e.Ref] = e.Attempt.Phase
+		}
+	}
+	if len(mine) != 2 || mine[dispatched.Key.EpisodeRef] != "dispatched" || mine[prepared.Key.EpisodeRef] != "prepared" {
+		t.Fatalf("listed %v", mine)
+	}
+	if report, err := j.RecoverUnsettled(ctx, cutoff, 1000); err != nil || report.Interrupted != 2 {
+		t.Fatal("this scope's two unsettled attempts are interrupted", report, err)
+	}
+	for _, key := range []application.JournalKey{dispatched.Key, prepared.Key} {
+		e, ok, err := s.Read(ctx, key.Scope, key.EpisodeRef)
+		if err != nil || !ok || e.Attempt.Phase != "interrupted" {
+			t.Fatal(key.EpisodeRef, e.Attempt.Phase, ok, err)
+		}
+	}
+	if report, err := j.RecoverUnsettled(ctx, cutoff, 1000); err != nil || report.Interrupted != 0 {
+		t.Fatal("a second recovery finds nothing of this scope", report, err)
+	}
+}
+
+// One unreadable snapshot must not stop recovery of the others: it is counted and left alone.
+func TestPostgresRecoveryCountsAnUnreadableSnapshotAndRecoversTheRest(t *testing.T) {
+	db, s, j, r := fixture(t)
+	ctx := context.Background()
+	dispatched := dispatch(t, j, r)
+	broken := r
+	broken.Key.EpisodeRef, broken.Key.AttemptRef, broken.Key.OperationKey = "episode:broken", "attempt:broken", "operation:begin:broken"
+	broken.Attempt.Ref = broken.Key.AttemptRef
+	if _, err := j.Begin(ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE dokja_application_journal.revisions SET snapshot=$1 WHERE scope_ref=$2 AND episode_ref=$3`, []byte(`private fixture invalid JSON`), broken.Key.Scope, broken.Key.EpisodeRef); err != nil {
+		t.Fatal(err)
+	}
+	report, err := j.RecoverUnsettled(ctx, time.Now().Add(time.Second), 1000)
+	if err != nil || report.Interrupted != 1 || report.Unreadable < 1 {
+		t.Fatal(report, err)
+	}
+	if e, ok, err := s.Read(ctx, dispatched.Key.Scope, dispatched.Key.EpisodeRef); err != nil || !ok || e.Attempt.Phase != "interrupted" {
+		t.Fatal(e.Attempt.Phase, ok, err)
+	}
+}

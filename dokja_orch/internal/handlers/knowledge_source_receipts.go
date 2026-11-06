@@ -125,20 +125,18 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		},
 		VerifyAttempt: matchesAttempt,
 	}}
-	if _, err := journal.Begin(ctx, application.BeginRecord{Key: key, Attempt: attempt}); err != nil {
+	record := sourceReadRecord{journal: &journal, key: key}
+	if err := record.begin(ctx, attempt); err != nil {
 		return nil, nil, fmt.Errorf("source-read journal preparation was not confirmed")
 	}
-	key.OperationKey = uuid.NewString()
-	if _, err := journal.MarkDispatched(ctx, application.ChangeRecord{Key: key, ExpectedRevision: 1}); err != nil {
+	if err := record.dispatched(ctx); err != nil {
 		return nil, nil, fmt.Errorf("source-read journal dispatch was not confirmed")
 	}
 	if err := ctx.Err(); err != nil {
 		// No read was started. The marker only records possible dispatch.
 		settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
-		key.OperationKey = uuid.NewString()
-		_, settleErr := journal.MarkInterrupted(settleCtx, application.ChangeRecord{Key: key, ExpectedRevision: 2})
-		if settleErr != nil {
+		if settleErr := record.interrupted(settleCtx); settleErr != nil {
 			return nil, nil, fmt.Errorf("source-read journal interruption was not confirmed")
 		}
 		return nil, nil, err
@@ -172,8 +170,7 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 	// but the actual native receipt still belongs to the original immutable attempt.
 	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	key.OperationKey = uuid.NewString()
-	if _, err := journal.Observe(settleCtx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: key, ExpectedRevision: 2}, Observation: observation}); err != nil {
+	if err := record.observed(settleCtx, observation); err != nil {
 		return nil, nil, fmt.Errorf("source-read receipt settlement was not confirmed")
 	}
 	settlement.Confirmed = true
@@ -181,4 +178,57 @@ func (h *KnowledgeDomainHandler) loadApplicationSource(ctx context.Context, inpu
 		return nil, nil, read.Err
 	}
 	return read.Source, []core.Receipt{{ActionID: attempt.Ref, Step: fmt.Sprintf("source-%d", index), Status: "source_validated", At: occurred}}, nil
+}
+
+// sourceReadRecord writes one source read to the journal in its fixed steps: prepared (revision 1),
+// possibly dispatched (2), then either a receipt or an interruption (3). Each step names its own
+// operation and the revision it expects, so callers cannot get them out of order.
+type sourceReadRecord struct {
+	journal *application.Journal
+	key     application.JournalKey
+}
+
+// step is the journal key of one step of this attempt. The operation is named by the attempt and the
+// step, so asking for a step again replays what was recorded instead of becoming a new operation
+// against a revision that has moved on.
+func (r sourceReadRecord) step(name string) application.JournalKey {
+	key := r.key
+	key.OperationKey = r.key.AttemptRef + ":" + name
+	return key
+}
+
+func (r sourceReadRecord) begin(ctx context.Context, attempt application.Attempt) error {
+	_, err := r.journal.Begin(ctx, application.BeginRecord{Key: r.step("begin"), Attempt: attempt})
+	return err
+}
+
+func (r sourceReadRecord) dispatched(ctx context.Context) error {
+	_, err := r.journal.MarkDispatched(ctx, application.ChangeRecord{Key: r.step("dispatch"), ExpectedRevision: 1})
+	return err
+}
+
+func (r sourceReadRecord) interrupted(ctx context.Context) error {
+	_, err := r.journal.MarkInterrupted(ctx, application.ChangeRecord{Key: r.step("interrupt"), ExpectedRevision: 2})
+	return err
+}
+
+func (r sourceReadRecord) observed(ctx context.Context, observation application.Observation) error {
+	_, err := r.journal.Observe(ctx, application.ObserveRecord{ChangeRecord: application.ChangeRecord{Key: r.step("observe"), ExpectedRevision: 2}, Observation: observation})
+	return err
+}
+
+// sourceReadRecoveryLimit bounds how many unsettled source reads one start recovers.
+const sourceReadRecoveryLimit = 1000
+
+// RecoverSourceReads marks the source reads a stopped orchestrator left prepared or dispatched as
+// interrupted, as chat recovery does for pending turns. The host calls it once at start, before it
+// serves, with the instant it started: only attempts begun before it are touched, nothing is read
+// again, and each attempt's outcome stays unknown until its own receipt. The orchestrator is the
+// one owner here, so admission covers every scope, but only attempts of this capability.
+func RecoverSourceReads(ctx context.Context, store application.JournalStore, startedAt time.Time) (application.Recovery, error) {
+	journal := application.Journal{Store: store, Clock: time.Now, Admission: application.Admission{
+		Access:        func(context.Context, string, string) error { return nil },
+		VerifyAttempt: func(a application.Attempt) bool { return a.Method.Ref == sourceReadCapability },
+	}}
+	return journal.RecoverUnsettled(ctx, startedAt, sourceReadRecoveryLimit)
 }
