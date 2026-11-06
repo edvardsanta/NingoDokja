@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +24,9 @@ type App struct {
 	runtimeRoot  string
 	// stdin answers the confirmations the CLI asks.
 	stdin io.Reader
+	// bridge is the orchestrator's chat stream, when this machine has one; status lines go to stderr.
+	bridge func() (*BridgeStream, bool)
+	stderr io.Writer
 }
 
 type emitCommandOptions struct {
@@ -42,6 +46,8 @@ func NewApp() *App {
 	return &App{
 		newPublisher: NewPublisher,
 		newRequester: NewRequester,
+		bridge:       BridgeFromEnv,
+		stderr:       os.Stderr,
 		emitOpts: emitCommandOptions{
 			eventEndpoint:   envOrDefault("DOKJA_ORCH_ENDPOINT", DefaultEndpoint),
 			requestEndpoint: envOrDefault("DOKJA_ORCH_REQUEST_ENDPOINT", DefaultRequestEndpoint),
@@ -540,18 +546,11 @@ type chatSessionOptions struct {
 }
 
 func (a *App) chatOnce(ctx context.Context, message string, session chatSessionOptions) error {
-	requester, err := a.newRequester(a.emitOpts.requestEndpoint)
-	if err != nil {
-		return fmt.Errorf("create requester: %w", err)
-	}
-	defer requester.Close()
-
 	payload, chatContext, err := a.chatFields(ctx, message, session)
 	if err != nil {
 		return err
 	}
-
-	response, err := requester.Request(ctx, BuildEvent(EmitOptions{
+	event := BuildEvent(EmitOptions{
 		Type:      "message.created",
 		UserID:    a.emitOpts.userID,
 		UserName:  a.emitOpts.userName,
@@ -559,9 +558,21 @@ func (a *App) chatOnce(ctx context.Context, message string, session chatSessionO
 		Payload:   payload,
 		Context:   chatContext,
 		Source:    "cli",
-	}))
+	})
+
+	response, streamed, err := a.streamChat(ctx, event, session.target.archived())
 	if err != nil {
 		return fmt.Errorf("request chat event: %w", err)
+	}
+	if !streamed {
+		requester, err := a.newRequester(a.emitOpts.requestEndpoint)
+		if err != nil {
+			return fmt.Errorf("create requester: %w", err)
+		}
+		defer requester.Close()
+		if response, err = requester.Request(ctx, event); err != nil {
+			return fmt.Errorf("request chat event: %w", err)
+		}
 	}
 
 	reply, err := extractChatReply(response.Result)
@@ -729,4 +740,33 @@ func buildBookFilePayload(path, title, goal, language string, includeBytes bool)
 		payload["content"] = string(fileBytes)
 	}
 	return payload, nil
+}
+
+// sendStateLines are what the terminal says while an archived send waits; the orchestrator reports
+// them only when the send is behind an earlier turn of the conversation.
+var sendStateLines = map[string]string{
+	"queued":     "(waiting behind an earlier reply)",
+	"dispatched": "(being answered)",
+}
+
+// streamChat sends an archived turn over the bridge's chat stream, which says where the send stands.
+// streamed is false when there is no stream to use: a session chat, no bridge configured, or a bridge
+// the send never reached. Only then does the caller send it over the request socket.
+func (a *App) streamChat(ctx context.Context, event Event, archived bool) (RequestResponse, bool, error) {
+	if !archived || a.bridge == nil {
+		return RequestResponse{}, false, nil
+	}
+	stream, ok := a.bridge()
+	if !ok {
+		return RequestResponse{}, false, nil
+	}
+	response, err := stream.Chat(ctx, event, func(state string) {
+		if line, known := sendStateLines[state]; known && a.stderr != nil {
+			fmt.Fprintln(a.stderr, line)
+		}
+	})
+	if errors.Is(err, ErrBridgeMissing) {
+		return RequestResponse{}, false, nil
+	}
+	return response, err == nil, err
 }
