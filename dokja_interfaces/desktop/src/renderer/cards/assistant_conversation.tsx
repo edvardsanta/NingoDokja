@@ -143,6 +143,16 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [queued, setQueued] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopFailed, setStopFailed] = useState(false);
+  // Whether this orchestrator can stop a send at all. Unknown (an older one, or no answer) keeps Stop
+  // offered as before; only an explicit "unsupported" takes it away.
+  const [stopSupport, setStopSupport] = useState<"supported" | "unsupported">();
+  useEffect(() => {
+    void transport.request("conversation.capabilities", {}).then((answer) => {
+      const operations = answer.ok && isRecord(answer.result) && isRecord(answer.result.operations) ? answer.result.operations : undefined;
+      const stop = operations?.stop;
+      if (live.current && (stop === "supported" || stop === "unsupported")) setStopSupport(stop);
+    }).catch(() => undefined);
+  }, [transport]);
   // A send this panel is waiting on ends in an error once stopped; the turn says what happened.
   const stopped = useRef(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -294,7 +304,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
   const older = firstSeq !== undefined && firstSeq > 1;
-  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry, stoppable: turns.at(-1)?.state === "pending", stopping, stopFailed, stop };
+  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry, stoppable: turns.at(-1)?.state === "pending" && stopSupport !== "unsupported", stopping, stopFailed, stop };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the

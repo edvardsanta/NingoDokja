@@ -19,6 +19,8 @@ export const ACTION_TYPES = [
   "conversation.start",
   "conversation.list",
   "conversation.read",
+  // What this orchestrator does with conversations (stop, retry...), so Talk offers only what works.
+  "conversation.capabilities",
   // Stopping a reply on its way is a change on a real press, like renaming.
   "conversation.stop",
   // Renaming is a change on a real press; deleting also asks in the shell's own window.

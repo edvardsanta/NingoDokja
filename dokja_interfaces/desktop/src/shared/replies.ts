@@ -290,6 +290,11 @@ export type MemoryResolution = { off?: false; found: boolean; resolved: boolean;
 
 export type ChatReply = { off?: false; reply: string; sessionNotice: string };
 
+// What the orchestrator says it does with the owner's conversations, as it is wired. An operation it
+// does not name, or a report the desktop cannot read, is not known: Talk then behaves as before.
+export type ConversationOperation = "send" | "retry" | "stop" | "steer";
+export type ConversationCapabilities = { operations: Partial<Record<ConversationOperation, "supported" | "unsupported">> };
+
 // One send of an archived conversation and how it ended, as the archive keeps it. A pending turn is
 // not proof a reply is coming; an interrupted one was cut by a restart and nobody knows its outcome.
 // unknown is a state this desktop does not know, from a newer orchestrator: the turn is kept, with no
