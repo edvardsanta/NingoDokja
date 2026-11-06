@@ -2119,7 +2119,17 @@
                 "Define required persistence, schema compatibility and restart ownership before storage changes.",
                 "Exercise crash/unknown-effect recovery without automatic replay, plus budget exhaustion and cancellation."
               ],
-              "evidence": []
+              "evidence": [
+                "2026-11-06: settlement and recovery matrix for archived chat in task-lifecycle-compatibility.md, each row tied to a regression. New: a late result after recovery interrupted the turn conflicts; the same attempt is settled once whatever the second report says; an answer is kept when its requester left after the model replied (delivery is not acceptance); a send whose deadline passes fails once and is not resent. Persistence decision: no schema change; turn state, attempts, the conditional settlement update and startup recovery (one owner, turns begun before it, never replayed) suffice. Budgets: per-send deadline only; a cumulative budget belongs to automatic retries or delegation (10.5). Other consumers (knowledge application journal) still need the same review."
+              ],
+              "checks": [
+                {
+                  "name": "archived_chat_settlement_matrix",
+                  "status": "passed",
+                  "detail": "dokja_orch gofmt, go vet and go test -race ./... passed; new handler regressions passed 3x under -race. No live orchestrator restart or provider process was exercised."
+                }
+              ],
+              "next_action": "Archived chat is verified. Apply the same review to the next consumer with its own settlement (knowledge application journal), and define cumulative budgets with 10.5 delegation."
             }
           ],
           "next_action": "10.6-a.1/a.2 fence stale settlement and bind retries; 10.6-b orders archived sends and reports queued/dispatched. Next: explicit capability admission and ordering beyond archived chat, then logical-task/revision/budget mapping at a workflow consumer. 09.8 can consume the queued/dispatched observation. Preserve existing RunTask IDs; 08.2 remains the active cognitive work."
