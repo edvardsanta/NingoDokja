@@ -3344,3 +3344,29 @@ button.cfg-toggle:focus-visible {
 .source-receipts li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-2); padding:var(--space-3) 0; border-bottom:1px solid var(--border-subtle); overflow-wrap:anywhere; }
 .source-receipts span, .source-session-note { color:var(--text-secondary); }
 .source-application details { overflow-wrap:anywhere; }
+
+/*
+ * Live observer. Ningo's line first, then the observer's state as a tone row, the limits as small
+ * tags in the panel's edge colour, and the transcript printed in, one speaker per row.
+ */
+.realtime { display: grid; gap: var(--space-3); max-width: 72ch; }
+.realtime .voice-block { margin-bottom: 0; }
+.realtime > .note { margin: 0; }
+.realtime-status { padding-block: var(--space-1); background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%); }
+.realtime-limits { margin: 0; color: var(--ink-dim); font-size: 0.8125rem; letter-spacing: 0.04em; }
+.realtime-select { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--ink-dim); }
+.realtime-select select { padding: 0.3rem var(--space-2); border: 1px solid var(--edge); background: var(--static); color: var(--ink); font: inherit; }
+.realtime-select select:focus-visible { outline: var(--focus-width) solid var(--focus-accent-ring); outline-offset: var(--focus-offset-tight); }
+.realtime h3 { margin: var(--space-3) 0 0; }
+.realtime-transcript { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.realtime-transcript li {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--cyan);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 60%);
+  animation: print var(--row-enter-duration) steps(24) both;
+  animation-delay: calc(var(--i, 0) * var(--row-stagger-delay));
+}
+.realtime-transcript strong { color: var(--cyan); }
+.realtime-transcript time { margin-left: var(--space-2); color: var(--ink-dim); font-size: 0.8125rem; }
+.realtime-transcript p { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .realtime-transcript li { animation: none; } }

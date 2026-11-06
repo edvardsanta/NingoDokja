@@ -44,3 +44,16 @@ for (const locale of ["en", "pt"] as const) {
   expect(screen.queryByText(locale === "en" ? "Participant 1" : "Participante 1")).toBeNull();
  });
 }
+
+test("observer speaks in Ningo's voice and marks its state when no session is open",async()=>{
+ const up:Transport={preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:true,result:{sessions:[]}})};
+ const view=render(<I18nProvider locale="en"><RealtimeCard transport={up}/></I18nProvider>);
+ expect((await screen.findByText("I listen in silence. No one has spoken yet.")).className).toBe("voice");
+ expect(screen.getByText("Observer connected").getAttribute("data-tone")).toBe("ok");
+ expect(screen.getByText(/Use \/conversation_start/)).toBeTruthy();
+ view.unmount();
+ const down:Transport={preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:false,error:{code:"unavailable",message:"down"}})};
+ render(<I18nProvider locale="pt"><RealtimeCard transport={down}/></I18nProvider>);
+ await screen.findByText("Daqui não ouço nada. O observador se calou.");
+ expect(screen.getByText("Observador indisponível").getAttribute("data-tone")).toBe("problem");
+});

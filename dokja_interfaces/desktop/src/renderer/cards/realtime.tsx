@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { Transport } from "../../shared/transport.js";
 import { observerSnapshot, type ObserverSnapshot } from "../../shared/realtime.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import { WorkspacePanel } from "./workspace_panel.js";
+import { VoiceBlock } from "./ui.js";
 
 // One bounded request at a time. No provider keys, audio, direct database access,
 // provider invocation, or semantic inference belongs in this renderer.
@@ -25,20 +26,24 @@ export function RealtimeCard({transport,active=true}:{transport:Transport;active
   void poll();return()=>{stopped=true;clearTimeout(timer);};
  },[transport,active]);
  const session=snapshot.sessions.find(s=>s.session_id===selected)??snapshot.sessions[0];
+ const empty=snapshot.sessions.length===0;
  return <WorkspacePanel trail={[t("nav_realtime"),t("realtime_intro")]}>
-  <p aria-live="polite">{t(connected?"realtime_connected":"realtime_disconnected")}</p>
-  <p>{t("realtime_hint")}</p><p className="muted">{t("realtime_limits")}</p>
-  {snapshot.sessions.length===0?<p>{t("realtime_empty")}</p>:<>
-   <label>{t("realtime_select")} <select value={session?.session_id??""} onChange={e=>setSelected(e.target.value)}>
-    {snapshot.sessions.map((s,i)=><option key={s.session_id} value={s.session_id}>{t("realtime_session",{number:i+1})}</option>)}
-   </select></label>
-   <h2>{t("realtime_messages")}</h2><p>{t("realtime_pending")}</p>
-   {session?.messages.length===0&&<p>{t("realtime_no_messages")}</p>}
-   <ol>{session?.messages.map(m=><li key={m.message_id}>
-    <strong>{m.speaker_name || t("realtime_speaker",{number:session.consenting_participants.indexOf(m.speaker_id)+1})}</strong>{" "}
-    <time dateTime={m.timestamp_start}>{times.clock(m.timestamp_start)}</time>
-    <p>{m.text}</p>
-   </li>)}</ol>
-  </>}
+  <div className="realtime">
+   {empty?<VoiceBlock voice={t(connected?"realtime_voice_quiet":"realtime_voice_deaf")} next={t("realtime_hint")}/>:<p className="detail">{t("realtime_hint")}</p>}
+   <p aria-live="polite" className="note realtime-status" data-tone={connected?"ok":"problem"}>{t(connected?"realtime_connected":"realtime_disconnected")}</p>
+   <p className="realtime-limits">{t("realtime_limits")}</p>
+   {empty?<p className="detail">{t("realtime_empty")}</p>:<>
+    <label className="realtime-select">{t("realtime_select")} <select value={session?.session_id??""} onChange={e=>setSelected(e.target.value)}>
+     {snapshot.sessions.map((s,i)=><option key={s.session_id} value={s.session_id}>{t("realtime_session",{number:i+1})}</option>)}
+    </select></label>
+    <h3>{t("realtime_messages")}</h3><p className="note" data-tone="unchecked">{t("realtime_pending")}</p>
+    {session?.messages.length===0&&<p className="detail">{t("realtime_no_messages")}</p>}
+    <ol className="realtime-transcript">{session?.messages.map((m,i)=><li key={m.message_id} style={{"--i":Math.min(i,12)} as CSSProperties}>
+     <strong>{m.speaker_name || t("realtime_speaker",{number:session.consenting_participants.indexOf(m.speaker_id)+1})}</strong>{" "}
+     <time dateTime={m.timestamp_start}>{times.clock(m.timestamp_start)}</time>
+     <p>{m.text}</p>
+    </li>)}</ol>
+   </>}
+  </div>
  </WorkspacePanel>;
 }
