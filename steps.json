@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-11-06",
+  "updated_on": "2026-11-07",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "08",
   "status_values": [
@@ -1771,11 +1771,19 @@
           "evidence": [
             "Owner accepted ADR 0011 responsibility boundaries. Existing agent-kinds classifier demonstrates provider adapters and domain proposal validation, not general cognitive-loop integration.",
             "Experimental domain contract, three infrastructure adapters and bounded cognitive driver implemented. Live Codex requested dependent evidence and produced an observed simulation outcome; paired memory reuse remained unreliable and did not establish improved decisions. Claude quota and unavailable Ollama blocked their live evaluation.",
-            "Follow-up: final grounded schema and observed diagnostics produced one successful justified memory-reuse cycle in three real Codex pairs; two requested clarification. No-memory repeated failure; diagnostic ablation succeeded with weak justification. Live contrary and authorization controls stopped correctly. Reliability and cross-provider evaluation remain open."
+            "Follow-up: final grounded schema and observed diagnostics produced one successful justified memory-reuse cycle in three real Codex pairs; two requested clarification. No-memory repeated failure; diagnostic ablation succeeded with weak justification. Live contrary and authorization controls stopped correctly. Reliability and cross-provider evaluation remain open.",
+            "2026-11-06 live round (owner approved quota): Codex gpt-6-luna and Claude sonnet, 8 cases each, results in model-assisted-cognition-follow-up.md. Claude's one complete pair reproduced the causal cycle; its later calls failed fast with provider_unavailable (likely quota), so they are not decision evidence. Codex: clarification after failure, three contract rejections, contrary and authorization stops held. Ollama down. Reliability and cross-provider claims remain open.",
+            "2026-11-06 offline: owner chose retrieve-before-asking. The contract refuses clarify while evidence is still retrievable, except for contradicting supplied facts; abstain always open; the prompt states the rule. A target outside propose is refused, never trimmed. Domain and spike go vet/test -race passed. Remaining: an unthrottled Claude round, Ollama, repeated runs for rates.",
+            "2026-11-07 repeated live rounds, 3x8 cases on Claude sonnet and Codex gpt-6-luna (48 runs, no provider failure), under the new rules; table in model-assisted-cognition-follow-up.md. Memory changed the decision on both (Claude 3/3, Codex 2/3; without memory both repeated the failure). Claude consistent; Codex asked for clarification in 2/12 pair runs (allowed: nothing left to retrieve) and gave 3 invalid proposals, all refused. Safety stops held on every run. Small non-seeded sample for one fixture."
           ],
           "checks": [
             "Domain and spike: go test -race ./...; go vet ./... passed.",
-            "Live paired and counterfactual observations documented; acceptance remains incomplete."
+            "Live paired and counterfactual observations documented; acceptance remains incomplete.",
+            {
+              "name": "repeated_live_rounds",
+              "status": "passed",
+              "detail": "48 live runs, 3 per case per provider; outcomes recorded per cell. Not a general reliability rate: one synthetic fixture, no seed. Ollama not run (no chat model installed)."
+            }
           ],
           "references": [
             "dokja_docs/decisions/0011-inference-provider-boundaries.md",
@@ -1787,7 +1795,7 @@
           "status_before_review": "in_progress",
           "rescheduled_on": "2026-10-26",
           "resume_gate": "08.3",
-          "next_action": "Reuse tested inference contracts/adapters where appropriate in 08.2; general production adoption awaits 08.3 controls and reliability evidence."
+          "next_action": "Ollama (needs a chat model) and a second, independent task fixture; production adoption still awaits 08.3."
         },
         {
           "id": "10.4",
