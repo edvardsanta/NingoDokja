@@ -160,5 +160,17 @@ complete pair reproduced the causal cycle (failure observed, then a different ac
 succeeded). Codex again preferred clarification after a failure, and three of its proposals
 were rejected by the contract instead of being repaired. Every rejection and stop held.
 
-Still open: a Claude round without the quota limit, Ollama, repeated runs for rates, and
-the offline items (when to ask versus simulate, invalid field combinations).
+Still open: a Claude round without the quota limit, Ollama, and repeated runs for rates.
+
+## Ask versus act, and fields of another status (2026-11-06)
+
+Owner decision: **retrieve before asking**. The contract refuses a `clarify` while the
+evidence still names a record that can be retrieved (`Retrievable` is not empty), so the
+model must request it first. The exception is supplied facts that contradict each other:
+reading more cannot undo a contradiction, so asking is allowed at once. `abstain` stays
+open in every case. The provider prompt states the rule.
+
+A field that belongs to another status is refused as it came, never trimmed: a `target`
+is only valid on `propose`, so an evidence request, abstention or clarification carrying
+one is rejected. The live round's raw outputs were not kept, so whether either rule would
+have changed one of its results is not known; the next live round runs under both.
