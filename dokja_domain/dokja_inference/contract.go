@@ -208,6 +208,13 @@ func Validate(r Request, p Proposal) error {
 		if p.Action != "" || p.Missing != "" || p.Target != "" {
 			return errors.New("terminal inference cannot request effects")
 		}
+		// Retrieve before asking: while the evidence still names something that can be read, a question
+		// to the person is premature; the model asks for that evidence instead. Supplied facts that
+		// contradict each other are the exception, since reading more does not undo a contradiction.
+		// Abstaining stays open.
+		if p.Status == "clarify" && len(Retrievable(r)) > 0 && !conflicting(r) {
+			return errors.New("clarification while evidence can still be retrieved")
+		}
 	default:
 		return errors.New("unsupported inference status")
 	}
@@ -303,4 +310,18 @@ func SchemaFor(r Request) map[string]any {
 		}
 	}
 	return schema
+}
+
+// conflicting reports whether two supplied evidence records assert opposite values for one fact.
+func conflicting(r Request) bool {
+	seen := map[string]bool{}
+	for _, e := range r.Evidence {
+		for fact, value := range e.Facts {
+			if earlier, ok := seen[fact]; ok && earlier != value {
+				return true
+			}
+			seen[fact] = value
+		}
+	}
+	return false
 }
