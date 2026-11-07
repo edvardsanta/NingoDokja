@@ -104,3 +104,31 @@ func TestSchemaRequiresGroundedCitation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Fields that belong to another status are an inconsistent answer: it is refused as it came, never
+// repaired by dropping the field the validator does not expect.
+func TestFieldsOfAnotherStatusAreRefusedNotRepaired(t *testing.T) {
+	r := request()
+	for _, status := range []string{"need_evidence", "abstain", "clarify"} {
+		p := proposal()
+		p.Status = status
+		if status != "need_evidence" {
+			p.Missing = ""
+		}
+		if err := Validate(r, p); err != nil {
+			t.Fatalf("%s without stray fields is valid: %v", status, err)
+		}
+		p.Target = "simulated_sum_success"
+		if err := Validate(r, p); err == nil {
+			t.Fatalf("%s carrying a success target was accepted", status)
+		}
+		if p.Target != "simulated_sum_success" {
+			t.Fatal("validation must not change the proposal")
+		}
+	}
+	p := proposal()
+	p.Status, p.Missing, p.Action = "clarify", "", "fast"
+	if err := Validate(r, p); err == nil {
+		t.Fatal("a clarification naming an action was accepted")
+	}
+}

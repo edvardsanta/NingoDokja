@@ -189,7 +189,7 @@ func Validate(r Request, p Proposal) error {
 	}
 	switch p.Status {
 	case "need_evidence":
-		if p.Action != "" || !missing[p.Missing] || known[p.Missing] || len(p.Evidence) == 0 {
+		if p.Action != "" || p.Target != "" || !missing[p.Missing] || known[p.Missing] || len(p.Evidence) == 0 {
 			return errors.New("unjustified evidence request")
 		}
 	case "propose":
@@ -203,7 +203,9 @@ func Validate(r Request, p Proposal) error {
 			return errors.New("invalid action proposal")
 		}
 	case "abstain", "clarify":
-		if p.Action != "" || p.Missing != "" {
+		// A target is what a proposed action is predicted to reach; with no action it means nothing,
+		// so a terminal answer carrying one contradicts itself and is refused, never trimmed.
+		if p.Action != "" || p.Missing != "" || p.Target != "" {
 			return errors.New("terminal inference cannot request effects")
 		}
 	default:
