@@ -38,7 +38,8 @@ export GOROOT=$GO_HOME/go GOPATH=$GO_HOME/packages
 
 ```bash
 cd "$SP"
-VA_STATE_FILE="$SP/state.json" \
+DOKJA_GATEWAY_INGRESS_TOKEN=$(openssl rand -hex 32) \
+  VA_STATE_FILE="$SP/state.json" \
   VA_ZMQ_ENDPOINT=tcp://127.0.0.1:35557 \
   VA_ZMQ_REQUEST_ENDPOINT=tcp://127.0.0.1:35558 \
   VA_HTTP_ENDPOINT=127.0.0.1:38091 \
@@ -46,6 +47,9 @@ VA_STATE_FILE="$SP/state.json" \
 echo $! > va.pid
 ```
 
+- The HTTP bridge refuses to start without `DOKJA_GATEWAY_INGRESS_TOKEN`, and the orchestrator
+  exits with it. Any random value of 32 characters or more works for a local run; give it to nothing
+  else.
 - Loopback ports away from the defaults (5555, 5558, 8091), so a stack the person already runs is
   not hit. Check with `ss -ltn` first.
 - To make the interfaces appear in the health tab, give the orchestrator
@@ -81,6 +85,9 @@ nohup ./node_modules/.bin/electron . --ozone-platform=wayland \
 - The language follows the locale; `--lang=en` or `--lang=pt` forces one.
 - The first `ningo.status` takes about five seconds: the orchestrator waits for each service that is
   not running to time out. The card shows "Loading" until then; this is not a hang.
+- A worktree's `node_modules` linked to another checkout's is shared: removing that worktree with
+  `git worktree remove --force` can take the other checkout's dependencies with it. Prefer
+  `pnpm install --frozen-lockfile --prefer-offline` in the worktree and link only Electron's `dist`.
 - `pnpm run build` overwrites `dist/`. Restart the window afterwards (see 4) to show the new build.
 
 ## 3. Drive it
@@ -102,6 +109,12 @@ page.close();
   no click.
 - The window can open on a tab other than health: press `1` first. The switch labels follow the
   language (`chave de meme` in Portuguese), so match on the label of the locale you forced.
+- While the window is covered or not drawn, every `page.click` stalls for about five seconds (the
+  input waits for a frame), which is longer than the shell's three-second window for a real press:
+  a write action then arrives late and is refused, or a short-lived button is gone. Call
+  `Page.bringToFront` and `Emulation.setFocusEmulationEnabled` (`{ enabled: true }`) on the page's
+  debugging session first; `send` is private in `Page`, so cast it to `any` in a throwaway script.
+- Measure a click when something does not happen: a click that takes ~5000 ms is this, not the app.
 - The entrance animations do not advance while the window is not being drawn, and a clipped row takes
   no click. Run `document.getAnimations().forEach((a) => { try { a.finish(); } catch {} })` before
   clicking a row (the cursor's animation never ends, so finishing it throws).
