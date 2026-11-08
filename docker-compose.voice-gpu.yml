@@ -1,0 +1,39 @@
+# Optional overlay for the dev/lite stacks. Provision the model file first.
+# The GPU provider can reach only the voice service, never the app network.
+services:
+  dokja-whisper-gpu:
+    image: ghcr.io/ggml-org/whisper.cpp@sha256:1090badf58652c073ca8963b7718dbc3a8dd1dddfb0965d5c5efd2b0c0b83ea4
+    command: ["whisper-server", "--host", "0.0.0.0", "--port", "8085", "--model", "/models/model.bin", "--language", "auto", "--threads", "4", "--no-fallback"]
+    devices:
+      - ${DOKJA_VOICE_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
+    volumes:
+      - ${DOKJA_VOICE_CPP_MODEL_FILE:?set DOKJA_VOICE_CPP_MODEL_FILE to a cached multilingual GGML model}:/models/model.bin:ro
+    networks:
+      - dokja-stt-net
+    # Upstream provider output is not a transcript archive.
+    logging:
+      driver: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      MESA_SHADER_CACHE_DISABLE: "true"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8085/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 12
+      start_period: 30s
+  dokja-voice:
+    environment:
+      DOKJA_VOICE_STT_PROVIDER: whisper_cpp
+      DOKJA_VOICE_CPP_ENDPOINT: http://dokja-whisper-gpu:8085/inference
+    networks:
+      - dokja-net
+      - dokja-stt-net
+    depends_on:
+      dokja-whisper-gpu:
+        condition: service_healthy
+networks:
+  dokja-stt-net:
+    internal: true

@@ -216,3 +216,43 @@ the collected next turn. Voice requests pass through the orchestrator.
 
 Run provider regressions in an environment with the service dependencies:
 `python -m unittest discover -s dokja_services/dokja_voice -p 'test_*.py' -v`.
+
+## Audio conversion and optional GPU recognition
+
+Recognition and VAD receive mono PCM16 at 16 kHz. Rate conversion now uses a
+polyphase low-pass FIR resampler before decimation, including the Discord
+48 kHz stereo path. It preserves amplitude instead of boosting quiet noise;
+regression tests cover speech-band gain, out-of-band alias rejection, fractional
+rates, digital silence and integer overflow. This is signal preservation, not
+an echo canceller or a claim that inaccurate speech is now understood correctly.
+Per-transcription logs include normalized RMS/peak dBFS and clipped percentage,
+never audio samples or transcript text.
+
+The default Transformers image installs CPU PyTorch. Its adapter now selects an
+accelerator only when the installed runtime reports one, otherwise CPU. GPU
+hardware on the host alone does not accelerate that image; a compatible inference
+build and explicitly exposed device are both required.
+
+For an AMD GPU with a working Vulkan render node, the optional dev/lite overlay
+`docker-compose.voice-gpu.yml` adds a pinned Whisper server image. The server
+keeps the explicitly selected GGML model loaded; `whisper_cpp` forwards only
+normalized, speech-gated WAV segments over a private provider network. It has
+no published port and no connection to the application network. Provider logs
+are disabled, the model mount is read-only, and uploaded WAV data is handled in
+memory (the optional upstream ffmpeg file converter is not enabled).
+
+Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
+if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects
+`DOKJA_VOICE_STT_PROVIDER=whisper_cpp` and the internal
+`DOKJA_VOICE_CPP_ENDPOINT`. Apply it with the dev or lite base and rebuild voice
+for its pinned resampling dependency. Base stacks retain their existing defaults;
+production voice deployments must provision/review their own provider topology.
+Do not apply this optional overlay directly to a production base that has no
+voice service definition.
+
+The HTTP adapter accepts pt, en and auto, sends no accumulated participant
+history, bounds segments at 30 seconds and responses at 64 KiB, refuses redirects
+and uses a ten-second request timeout. Backend failures are explicit, with no
+silent switch to stub recognition. This provider remains segment-final, not
+native streaming partial transcription. Check live health `stt_provider` before
+comparing results; old development settings can still select tiny on CPU.

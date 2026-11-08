@@ -1530,3 +1530,44 @@ default 25). Desktop exposes it under Settings → Library → Chat PDF limit.
 Saving recreates orchestrator and feeds together. Blank or invalid environment
 values use 25 MiB. HTML/text reading retains its 2 MiB limit; extracted text,
 page, source and time budgets remain unchanged.
+
+## Optional development GPU speech recognition
+
+`docker-compose.voice-gpu.yml` extends the dev/lite voice service with an
+explicitly selected Vulkan speech backend. Provision a multilingual GGML model
+before selecting this path; no download or automatic model replacement happens
+at startup. `DOKJA_VOICE_CPP_MODEL_FILE` names the existing host model file and
+`DOKJA_VOICE_RENDER_DEVICE` defaults to `/dev/dri/renderD128`. The overlay passes
+`DOKJA_VOICE_STT_PROVIDER=whisper_cpp` and an internal
+`DOKJA_VOICE_CPP_ENDPOINT` to voice. Dev and lite also expose the optional endpoint
+setting for separately provisioned providers. A blank endpoint is invalid when
+this provider is selected, rather than a reason to run a stub.
+
+For a prepared local model and compatible GPU:
+
+```sh
+docker compose -f docker-compose.lite.yml -f docker-compose.voice-gpu.yml up -d --build dokja-voice
+```
+
+The GPU process can reach only its dedicated internal network shared with voice;
+it has no published port, app-network access, writable model mount or persistent
+provider logs. Its internal health port is 8085. The voice API keeps port 8081
+and its existing STT response shape. GPU device exposure requires a compatible
+host driver/runtime and is not inferred from the presence of a graphics card.
+The stock Transformers image is CPU-only even on such a host. No host driver
+changes, privileged container, HSA override or undocumented GPU compatibility
+claim is introduced here.
+
+The overlay is opt-in and is not a production deployment. The production base
+currently does not define a voice service; deployers must review their actual
+voice topology rather than assuming this overlay provisions it. After switching,
+check voice `/health` for the selected provider and perform a known-sentence
+transcription test. Compose may restart dependent Discord containers; start a
+fresh listener afterward. Rollback selects the previous provider and recreates
+voice with the base configuration. Preserve cached models and transcript data;
+there is no database migration or destructive cleanup in either direction.
+
+Keep the overlay in subsequent Compose commands. The current Desktop Runtime
+module controller uses the lite base file alone; its recreate operations do not
+preserve this optional overlay. After such an operation, reapply the full Compose
+file selection and verify the provider again before comparing GPU measurements.

@@ -5,6 +5,7 @@ import threading
 import time
 
 import numpy as np
+import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 from audio_utils import wav_bytes_to_mono_16k
@@ -28,12 +29,13 @@ class TransformersSTTService:
         self.model_name = model_name
         self.processor = AutoProcessor.from_pretrained(model_name, cache_dir=cache_dir)
         self.model = AutoModelForSpeechSeq2Seq.from_pretrained(model_name, cache_dir=cache_dir)
+        self.device = 0 if torch.cuda.is_available() else -1
         self.pipeline = pipeline(
             "automatic-speech-recognition",
             model=self.model,
             tokenizer=self.processor.tokenizer,
             feature_extractor=self.processor.feature_extractor,
-            device=-1,
+            device=self.device,
         )
 
     def transcribe(self, audio_bytes: bytes, audio_format: str, language: str) -> str:
@@ -72,13 +74,20 @@ class TransformersSTTService:
                     "condition_on_prev_tokens": False,
                 },
             )
+        rms = float(np.sqrt(np.mean(samples * samples)))
+        peak = float(np.max(np.abs(samples)))
+        clipped_pct = float(np.mean(np.abs(pcm.astype(np.int32)) >= 32767) * 100)
         text = str(result.get("text", "")) if isinstance(result, dict) else str(result)
         logging.getLogger("dokja_voice.stt").info(
-            "stt completed audio_seconds=%.3f elapsed_ms=%d text_chars=%d token_limit=%d",
+            "stt completed audio_seconds=%.3f elapsed_ms=%d text_chars=%d token_limit=%d rms_dbfs=%.1f peak_dbfs=%.1f clipped_pct=%.2f device=%s",
             duration,
             round((time.monotonic() - started) * 1000),
             len(text),
             token_limit,
+            20 * math.log10(max(rms, 1e-6)),
+            20 * math.log10(max(peak, 1e-6)),
+            clipped_pct,
+            getattr(self, "device", -1),
         )
         return text.strip()
 
