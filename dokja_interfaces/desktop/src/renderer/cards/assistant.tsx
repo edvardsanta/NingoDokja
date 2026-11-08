@@ -9,6 +9,7 @@ import { useStatus } from "../status_context.js";
 import { Composer, READING_PROMPTS, Transcript, useConversation } from "./assistant_conversation.js";
 import { ConversationsDrawer } from "./conversation_list.js";
 import { TalkModel } from "./talk_model.js";
+import { TalkVoice } from "./desktop_voice.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 import { Button, Notice } from "./ui.js";
 
@@ -67,7 +68,10 @@ function Talk({ transport, reading, opened, restore, onRestart, onList }: { tran
     conversation.field.current?.focus();
   };
   const dock = <Composer conversation={conversation} placeholder={t("assistant_placeholder")} hint={t("talk_hint")} keyshortcuts="Control+K"
-    footer={<TalkModel transport={transport} busy={conversation.busy} />} />;
+    footer={<>
+      <TalkModel transport={transport} busy={conversation.busy} />
+      <TalkVoice transport={transport} converse={conversation.send} disabled={conversation.loading || conversation.loadError !== undefined} />
+    </>} />;
   return <WorkspacePanel trail={[t("nav_assistant")]} actions={restart} dock={dock}>
     <section className="talk" aria-label={t("assistant_title")}>
       {pulse === "lost" && <Notice as="div" boxed tone="problem">

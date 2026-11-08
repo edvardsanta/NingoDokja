@@ -57,7 +57,8 @@ export type Conversation = {
   loadError: TransportError | undefined;
   reload: () => void;
   field: RefObject<HTMLTextAreaElement | null>;
-  send: (content: string) => Promise<void>;
+  // resolves to the kept reply when this send was answered, so a spoken message can be read back
+  send: (content: string) => Promise<string | undefined>;
   retry: () => void;
   // The latest send is still on its way, here or from another interface, and can be asked to stop.
   stoppable: boolean;
@@ -242,7 +243,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     return () => clearTimeout(timer);
   }, [latestPending, turns]);
 
-  const dispatch = async (sendId: string, payload: Record<string, unknown>) => {
+  const dispatch = async (sendId: string, payload: Record<string, unknown>): Promise<string | undefined> => {
     setBusy(true); setError(undefined); setStopFailed(false);
     try {
       const answer = await transport.request("message.created", { conversation_id: id.current, ...payload }, { timeoutMs: 120_000 });
@@ -251,13 +252,15 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
         settle(sendId, () => fromArchive(turn));
         // Another interface (the phone) may have added turns meanwhile; the archive's order is kept.
         await readBack();
-        return;
+        return turn.state === "completed" && turn.reply ? turn.reply : undefined;
       }
       if (answer.ok || !stopped.current) setError(answer.ok ? { code: "unexpected", message: "The assistant returned no reply." } : answer.error);
       await readBack(sendId);
+      return undefined;
     } catch {
       setError({ code: "unavailable", message: "The assistant could not be reached." });
       await readBack(sendId).catch(() => settle(sendId, (turn) => ({ ...turn, state: "unknown" })));
+      return undefined;
     } finally { stopped.current = false; setBusy(false); setPreview(""); setQueued(false); field.current?.focus(); }
   };
 
@@ -279,9 +282,9 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     }
   };
 
-  const send = async (content: string) => {
+  const send = async (content: string): Promise<string | undefined> => {
     const message = content.trim();
-    if (!message || busy || loading || loadError) return;
+    if (!message || busy || loading || loadError) return undefined;
     setDraft(""); setError(undefined); setUnkept(false);
     if (!id.current) {
       setBusy(true);
@@ -290,14 +293,14 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
       if (!conversation || typeof conversation.id !== "string") {
         // Nothing is answered unless it is kept, so the message goes back to the owner unsent.
         setBusy(false); setDraft(message); setUnkept(true);
-        return;
+        return undefined;
       }
       id.current = conversation.id;
       setConversationId(conversation.id);
     }
     const sendId = newSendId();
     setTurns((previous) => [...previous, { sendId, id: "", content: message, reply: "", state: "pending", reason: "" }]);
-    await dispatch(sendId, { content: message, send_id: sendId });
+    return dispatch(sendId, { content: message, send_id: sendId });
   };
 
   // Only the latest send is retried, and never by sending its text as a new message.

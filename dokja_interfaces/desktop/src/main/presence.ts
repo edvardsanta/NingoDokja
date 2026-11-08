@@ -9,7 +9,8 @@ const PRESENCE = new Set(["mouseDown", "keyDown", "rawKeyDown", "char", "touchSt
 
 export type Presence = {
   note(inputType: string): void;
-  recent(): boolean;
+  // The action asking, when there is one, so a narrower proof can stand in for a press.
+  recent(action?: string): boolean;
 };
 
 export function createPresence(now: () => number = Date.now, windowMs: number = WINDOW_MS): Presence {

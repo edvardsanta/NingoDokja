@@ -797,5 +797,17 @@
   "answer_verdict_denied": "Aperte o botão você mesmo para dar um veredito.",
   "experience_decision_answer_cited": "Respondeu na Conversa, citando seus documentos",
   "experience_decision_answer_uncited": "Respondeu na Conversa, sem seus documentos",
-  "memory_score_answers": "Respostas que você julgou na Conversa"
+  "memory_score_answers": "Respostas que você julgou na Conversa",
+  "voice_start": "Falar por voz",
+  "voice_stop": "Parar voz",
+  "voice_language": "pt-BR",
+  "voice_state_idle": "Microfone desligado",
+  "voice_state_preparing": "Preparando o microfone…",
+  "voice_state_listening": "Ouvindo — fale e faça uma pausa",
+  "voice_state_thinking": "O Ningo está ouvindo…",
+  "voice_state_speaking": "O Ningo está falando…",
+  "voice_permission_denied": "O acesso ao microfone foi negado. Autorize o microfone e tente novamente.",
+  "voice_capture_failed": "Não consegui abrir o microfone. Confira se há um conectado e autorizado.",
+  "voice_request_failed": "Não consegui enviar o que você disse. Confira Voz e Chat em Sistema e tente de novo.",
+  "voice_speech_failed": "A resposta está na conversa, mas não consegui lê-la em voz alta. Confira Voz em Sistema."
 }
