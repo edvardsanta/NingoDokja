@@ -112,3 +112,22 @@ func TestLinkActionsNeedTheCommunicationsCredentialAndGetTheirOwnAction(t *testi
 		}
 	}
 }
+
+// The retired Desktop source supervision credential is dropped from every event, so an older
+// Desktop build that still attaches it cannot leak it into context building or a reply.
+func TestRetiredSourceSupervisionCredentialIsDropped(t *testing.T) {
+	token := strings.Repeat("x", 32)
+	h := &communicationsHandler{}
+	s := DefaultService(h).WithCommunicationsToken(token)
+	result, err := s.ProcessWithResult(context.Background(), Event{Source: SourceDesktop, Type: "communications.channels",
+		Context: map[string]any{"communications_token": token, "source_supervision_token": "retired-credential-value"}})
+	if err != nil || !h.called {
+		t.Fatalf("ordinary request failed: %v", err)
+	}
+	if _, present := h.context["source_supervision_token"]; present {
+		t.Fatal("the retired credential reached the domain handler")
+	}
+	if raw, _ := json.Marshal(result); strings.Contains(string(raw), "retired-credential-value") {
+		t.Fatal("the retired credential reached the reply")
+	}
+}

@@ -16,13 +16,12 @@ type ProcessResult struct {
 }
 
 type Service struct {
-	router                 EventRouter
-	contextBuilder         ContextBuilder
-	workflowEngine         WorkflowEngine
-	dispatcher             DomainDispatcher
-	controls               *Controls
-	communicationsToken    string
-	sourceSupervisionToken string
+	router              EventRouter
+	contextBuilder      ContextBuilder
+	workflowEngine      WorkflowEngine
+	dispatcher          DomainDispatcher
+	controls            *Controls
+	communicationsToken string
 }
 
 // WithControls makes the service honour the operator's service and job switches.
@@ -49,7 +48,7 @@ func (s *Service) skipped(event Event, route Route) (ProcessResult, bool) {
 	silent := false
 	if name := InterfaceForSource(event.Source); name != "" && !s.controls.ServiceEnabled(name) {
 		reason, silent = fmt.Sprintf("interface %s is switched off", name), true
-	} else if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) && event.Type != "knowledge.application.supervision.status" && event.Type != "knowledge.application.supervision.control" {
+	} else if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) {
 		reason = fmt.Sprintf("service %s is disabled", service)
 	} else if schedule != "" && !s.controls.ServiceEnabled("scheduler") {
 		reason = "scheduler is paused"
@@ -130,10 +129,9 @@ func (s *Service) ProcessWithResult(ctx context.Context, event Event) (ProcessRe
 		return ProcessResult{}, err
 	}
 
-	ctx, err := s.authorizeSourceSupervision(ctx, &event)
-	if err != nil {
-		return ProcessResult{}, err
-	}
+	// An older Desktop build may still attach the retired source supervision credential. It grants
+	// nothing and must never reach context building, dispatch or a verbose reply.
+	delete(event.Context, "source_supervision_token")
 	if err := s.authorizeCommunications(&event); err != nil {
 		return ProcessResult{}, err
 	}

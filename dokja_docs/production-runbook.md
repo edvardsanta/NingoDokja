@@ -1490,40 +1490,30 @@ The script manages its own disposable database and test-only
 environment files or migrate application stores. It checks controlled restart
 and replay; backup/restore and live receipt verification remain untested.
 
-## Optional Desktop source supervision
+## Optional source-read journal
 
-The Library Apply view uses the source-only supervisor. Configure matching
-`DOKJA_SOURCE_SUPERVISION_TOKEN` values in the orchestrator and Desktop main;
-use a separate random operator credential of 32–512 characters. Set
-`DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` only for the orchestrator/initializer,
-including the database's explicit TLS policy. Both settings are optional and
-unset by default. Partial/invalid configuration or an unavailable journal logs a
-sanitized error and disables only Desktop source supervision; the rest of the
-orchestrator continues startup. Supervision requests remain refused without a
-journal; they never fall back to unjournaled execution.
+`DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` names the PostgreSQL database that keeps
+source-read receipts (the application journal), including the database's
+explicit TLS policy. It is optional and unset by default; only the orchestrator
+and the `source-journal-init` command read it. The name is historical: Desktop
+source supervision was removed (see
+[the Apply review](knowledge-apply-review.md)), and the journal now serves
+preparation inside workflows.
 
-The dev, lite and prod stacks project both variables into the orchestrator.
-Initialize the journal namespace with the explicit `source-journal-init` command
-before restarting the enabled orchestrator. Production images include
-`/app/source-journal-init`; dev/lite can run `go run ./cmd/source-journal-init`.
-Startup uses the existing namespace and disables supervision for
-uninitialized/unsupported state. A failed PostgreSQL connectivity check reports
-a connection problem rather than recommending namespace initialization. After
-restoring connectivity or fixing the configuration/schema, restart the
-orchestrator to enable supervision; startup does not retry in the background.
-See [Desktop source supervision](desktop-source-supervision.md) for the exact
-Compose initialization and Desktop launch commands.
+The dev, lite and prod stacks project the DSN into the orchestrator. Initialize
+the namespace once with the explicit `source-journal-init` command before
+restarting the orchestrator; production images include
+`/app/source-journal-init`, and dev/lite can run `go run ./cmd/source-journal-init`.
+Startup only opens an initialized namespace and never creates tables. An invalid
+DSN, an unavailable database or an unsupported schema logs a sanitized error and
+disables only the journal; the rest of the orchestrator starts. At startup, reads
+an earlier process left unsettled are marked interrupted, never redone.
 
-This configuration does not migrate SQLite or Knowledge data. Native receipts
-persist; supervisor/control state is process-local. A new process invalidates
-old start retries, and the UI requires a new explicit preparation. Keep the
-Desktop endpoint local or use a secure local tunnel. Durable control recovery,
-unknown-write reconciliation and coordinated deletion remain pending.
-
-To disable the interface, cancel active preparations where possible and remove
-both orchestrator supervision settings on the next approved rollout. Retain the
-journal data; disabling this optional host does not drop tables or change its
-schema. Restart alone does not settle an unconfirmed old receipt.
+**Upgrade note.** `DOKJA_SOURCE_SUPERVISION_TOKEN` is retired. The compose files
+no longer pass it; an orchestrator still started with it logs that it is ignored.
+Remove it from `.env` and `.env.prod` on the next approved rollout. The
+`knowledge.application.supervision.*` request types are refused. Journal data
+and schema are unchanged.
 
 Discord chat PDF size is configured with `DOKJA_PDF_MAX_MIB` (1–100 MiB,
 default 25). Desktop exposes it under Settings → Library → Chat PDF limit.

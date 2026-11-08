@@ -1,5 +1,10 @@
 # Desktop source preparation and steering
 
+> **Removed on 2026-11-08.** Desktop source supervision (the Library Apply view, the
+> source supervisor, the `knowledge.application.supervision.*` requests and
+> `DOKJA_SOURCE_SUPERVISION_TOKEN`) was removed because no flow consumed it. This page
+> is kept as history. See the [Apply review](knowledge-apply-review.md).
+
 The Library's **Apply** view connects to the bounded source supervisor through
 normal orchestrator requests. This release provides an explicitly configured
 owner-local interface. It validates sources for a goal; it does not execute a

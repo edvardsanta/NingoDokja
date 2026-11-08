@@ -10,7 +10,6 @@ import (
 	"read_books/internal/handlers"
 	applicationjournal "read_books/internal/infrastructure/application_journal"
 	"read_books/internal/logger"
-	"read_books/internal/sourceaccess"
 )
 
 type sourceJournalConnection struct {
@@ -18,16 +17,21 @@ type sourceJournalConnection struct {
 	store *applicationjournal.Store
 }
 
-// This host is optional. Configuration and storage failures disable only its
-// controls; the rest of the orchestrator must still be able to start.
-func configureSourceSupervision(lifetime context.Context, handler *handlers.KnowledgeDomainHandler, enabled func() bool, token, dsn string, otherCredentials ...string) func() {
-	journal, err := openSourceJournal(token, dsn, otherCredentials...)
+// configureSourceJournal opens the PostgreSQL application journal named by dsn and settles what
+// a stopped orchestrator left in it. The journal is optional: an unset DSN leaves it off, and a
+// configuration or storage failure disables only the journal, never the orchestrator's start.
+// retiredToken is the former Desktop operator credential, which no longer grants anything.
+func configureSourceJournal(lifetime context.Context, dsn, retiredToken string) (*applicationjournal.Store, func()) {
+	if retiredToken != "" {
+		logger.Info("DOKJA_SOURCE_SUPERVISION_TOKEN is ignored: Desktop source supervision was removed")
+	}
+	journal, err := openSourceJournal(dsn)
 	if err != nil {
-		logger.Error("Desktop source supervision disabled; continuing orchestrator startup", err)
-		return func() {}
+		logger.Error("Source journal disabled; continuing orchestrator startup", err)
+		return nil, func() {}
 	}
 	if journal == nil {
-		return func() {}
+		return nil, func() {}
 	}
 	// Before serving: reads a stopped orchestrator left unsettled are interrupted, never redone.
 	recoverCtx, recovered := context.WithTimeout(lifetime, 10*time.Second)
@@ -39,24 +43,14 @@ func configureSourceSupervision(lifetime context.Context, handler *handlers.Know
 	case report.Interrupted > 0 || report.Unreadable > 0:
 		logger.Info(fmt.Sprintf("Source-read recovery interrupted=%d unreadable=%d", report.Interrupted, report.Unreadable))
 	}
-	ctx, cancel := context.WithCancel(lifetime)
-	handler.WithSourceApplications(handlers.NewDesktopSourceApplications(ctx, handler, journal.store, enabled))
-	return func() { cancel(); journal.db.Close() }
+	return journal.store, func() { journal.db.Close() }
 }
 
 // Startup checks an existing namespace; only the separate explicit init command
 // creates journal tables. Connection failures never expose DSNs or native errors.
-func openSourceJournal(token, dsn string, otherCredentials ...string) (*sourceJournalConnection, error) {
-	if token == "" && dsn == "" {
+func openSourceJournal(dsn string) (*sourceJournalConnection, error) {
+	if dsn == "" {
 		return nil, nil
-	}
-	for _, other := range otherCredentials {
-		if token != "" && token == other {
-			return nil, fmt.Errorf("source supervision requires a dedicated operator credential")
-		}
-	}
-	if !sourceaccess.ValidToken(token) || dsn == "" {
-		return nil, fmt.Errorf("Desktop source supervision requires a valid dedicated credential and PostgreSQL DSN")
 	}
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
