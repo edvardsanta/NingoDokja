@@ -149,7 +149,6 @@ this port through the existing preparation route, including a disposable
 PostgreSQL integration test. It remains an explicit host binding with synthetic
 authorization in tests; startup configuration and public admission are pending.
 
-The [native source supervisor](knowledge-source-steering.md) now verifies in-flight
-redirects and retained original attempts against this adapter. Its control state
-and replay acknowledgments remain volatile; journal persistence does not imply
-durable supervisor or authenticated-ingress recovery.
+The native source supervisor that verified in-flight redirects against this adapter
+was removed on 2026-11-08 (see the [Apply review](knowledge-apply-review.md)), along
+with its integration tests. The adapter, its schema and startup recovery are unchanged.

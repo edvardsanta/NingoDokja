@@ -1,9 +1,9 @@
 # Native source-read receipts
 
-Status: implemented as a native producer and opt-in host binding. The
-[Desktop operator integration](desktop-source-supervision.md) now supplies an
-explicitly configured ingress and source-supervision UI. Controls remain volatile;
-durable supervisor recovery and the proposed global observer are still pending.
+Status: implemented as a native producer and opt-in host binding. The Desktop
+operator integration that drove it was removed on 2026-11-08; its next consumer is
+preparation inside the Talk workflow (see the [Apply review](knowledge-apply-review.md)).
+Startup recovery of unsettled reads stays; the proposed global observer is pending.
 
 ## Existing execution path
 
