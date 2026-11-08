@@ -1,5 +1,10 @@
 # Automatic receipts with incremental application supervision
 
+> **Removed on 2026-11-08.** Desktop source supervision (the Library Apply view, the
+> source supervisor, the `knowledge.application.supervision.*` requests and
+> `DOKJA_SOURCE_SUPERVISION_TOKEN`) was removed because no flow consumed it. This page
+> is kept as history. See the [Apply review](knowledge-apply-review.md).
+
 Owner decision, 2026-11-03: use automatic execution receipts as the first outcome
 consumer, with incremental supervision and an authenticated way to redirect the
 active task. Operator reports remain an attributed secondary input; they are not
