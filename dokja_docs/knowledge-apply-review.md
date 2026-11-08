@@ -108,10 +108,14 @@ Interface → message.created → Orchestrator
 | Configuration | `DOKJA_SOURCE_SUPERVISION_TOKEN` in compose files, `production-runbook.md` and docs |
 | Docs | `desktop-source-supervision.md`, `knowledge-source-steering.md` and `knowledge-supervision.md` become history notes pointing here |
 
-**Kept:** the preparation workflow and its limits, `knowledge.application.prepare`
-as an internal step (its external route is removed in the same change unless a
-consumer appears), the journal and its PostgreSQL adapter, and startup recovery
-(`RecoverSourceReads`).
+**Kept:** the preparation workflow and its limits, the `knowledge.application.prepare`
+route (read-only; step 3's Talk workflow dispatches it as a Knowledge step, so it
+is no longer offered to the Desktop shell), the journal and its PostgreSQL
+adapter, and startup recovery (`RecoverSourceReads`).
+
+The removed `knowledge.application.supervision.*` request types are refused with
+an explicit error before reaching the Knowledge service, and the retired
+credential is still dropped from every event an older Desktop build might send.
 
 **Configuration after the change:** the journal is enabled by
 `DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN` alone. The name is kept on purpose: a
