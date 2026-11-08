@@ -625,6 +625,7 @@
             "2026-11-06, owner kept supervised source reading in the existing workflow and PostgreSQL as the macro-learning store, and chose to shrink the journal (knowledge-journal-review.md). Merging preparation and dispatch was dropped: a prediction must precede dispatch. Done: one write helper per read; operation keys named <attempt>:<step>, so a repeated step replays; Journal.RecoverUnsettled marks attempts begun before start and still prepared or dispatched as interrupted at the revision read, never redoing them, through a read-only UnsettledReader that counts unreadable snapshots; the supervision host runs it once before serving, for source reads only. No schema change."
           ],
           "remaining": [
+            "Redesign per dokja_docs/knowledge-apply-review.md: Apply is a step of the Talk workflow, not a Desktop surface. Remove the Desktop Apply view, source supervisor, operator routes and DOKJA_SOURCE_SUPERVISION_TOKEN (journal configured by the DSN alone, startup recovery kept); then prepare focused sources inside chat turns with version-pinned citations; then answer feedback as the outcome 08.3 needs.",
             "The frozen comparison has run and provisional independent scores are recorded in dokja_docs/knowledge-comparison-results.md. Neither strategy met the answer target; provider availability, unequal source scope and review/citation-entailment disagreements limit interpretation. Retain the existing opt-in baseline and the 08.3 causal/reliability gate. Any tuning now requires a new frozen held-out set; do not relabel reruns of these cases as unseen.",
             "Define the scoped operational observation contract and orchestrator/native producer coverage before global collection. The native source-read producer is implemented as an opt-in host binding. Native host controls, ordering, revision-bound dispatch/checkpoints and cumulative limits are implemented; the owner-local Desktop ingress is implemented. Complete final Desktop rollout verification, durable control/replay/checkpoint and receipt recovery, unknown-result reconciliation and broader admission before general activation. Review explicit connection/TLS, deletion and rollout/rollback before exposure. Later register a concrete method executor and observable criterion; live capture, concepts/relationships, eligible durable reuse and 08.3 reliability controls remain incomplete."
           ],
@@ -664,6 +665,11 @@
               "name": "journal_recovery_and_keys",
               "status": "passed",
               "detail": "dokja_memory/application and dokja_orch go vet and go test -race passed; PostgreSQL integration suite (-tags integration, disposable journal_test database in a local container) passed 15/15, including recovery and an unreadable snapshot. Mutation check: fresh operation keys fail the replay regression. Not run: a real orchestrator restart against an operator database."
+            },
+            {
+              "name": "desktop_apply_live_isolated",
+              "status": "failed",
+              "detail": "Isolated loopback stack (scratch Knowledge with the corpus_v1 fixtures, disposable PostgreSQL journal, built Electron app; no owner data, env or database). Start, real reads, journal episodes and Cancel passed; a real orchestrator restart ran startup recovery (interrupted=2 unreadable=0) and the view offered only a new preparation. A pause during a slow read aborted the orchestrator (libzmq close-while-receiving), fixed for all service clients and the CLI/TUI in PR 302. After the fix, a pause during a read cancels it, the read settles unknown and the run stays blocked; synthetic tests missed it because their fake source ignores its context. No flow consumes knowledge.application.prepare; see dokja_docs/knowledge-apply-review.md."
             }
           ]
         },
@@ -684,7 +690,7 @@
           "evidence": []
         }
       ],
-      "next_action": "08.2: validate and roll out the explicit owner-local Desktop Apply surface, then implement durable supervisor/control/replay/checkpoint recovery and unknown-write reconciliation. Desktop UI, dedicated operator admission, process-bound starts and quota-limited source-only hosting are implemented; candidate checks share the active task budget. Control state remains volatile, production rollout is not performed, and general public/multi-user admission remains gated. The global observation spine, method execution, durable reuse and 08.3 remain incomplete."
+      "next_action": "08.2: redesign Apply as a Talk workflow step (dokja_docs/knowledge-apply-review.md): first remove the Desktop Apply surface, supervisor, operator routes and token, keeping the DSN-configured journal and recovery; then prepare focused sources in chat turns; then answer feedback as the outcome."
     },
     {
       "id": "09",
@@ -2451,5 +2457,5 @@
     }
   ],
   "next_step": null,
-  "next_action": "08.2: validate and roll out the explicit owner-local Desktop Apply surface, then implement durable supervisor/control/replay/checkpoint recovery and unknown-write reconciliation. Desktop UI, dedicated operator admission, process-bound starts and quota-limited source-only hosting are implemented; candidate checks share the active task budget. Control state remains volatile, production rollout is not performed, and general public/multi-user admission remains gated. The global observation spine, method execution, durable reuse and 08.3 remain incomplete."
+  "next_action": "08.2: redesign Apply as a Talk workflow step (dokja_docs/knowledge-apply-review.md): first remove the Desktop Apply surface, supervisor, operator routes and token, keeping the DSN-configured journal and recovery; then prepare focused sources in chat turns; then answer feedback as the outcome."
 }
