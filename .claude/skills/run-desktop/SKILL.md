@@ -85,9 +85,9 @@ nohup ./node_modules/.bin/electron . --ozone-platform=wayland \
 - The language follows the locale; `--lang=en` or `--lang=pt` forces one.
 - The first `ningo.status` takes about five seconds: the orchestrator waits for each service that is
   not running to time out. The card shows "Loading" until then; this is not a hang.
-- A worktree's `node_modules` linked to another checkout's is shared: removing that worktree with
-  `git worktree remove --force` can take the other checkout's dependencies with it. Prefer
-  `pnpm install --frozen-lockfile --prefer-offline` in the worktree and link only Electron's `dist`.
+- A worktree's `node_modules` linked to another checkout's is shared: anything that changes it
+  changes both. Prefer `pnpm install --frozen-lockfile --prefer-offline` in the worktree and link
+  only Electron's `dist`. (`git worktree remove --force` unlinks such a link without following it.)
 - `pnpm run build` overwrites `dist/`. Restart the window afterwards (see 4) to show the new build.
 
 ## 3. Drive it
