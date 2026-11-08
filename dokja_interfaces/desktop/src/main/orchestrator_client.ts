@@ -26,7 +26,6 @@ type ClientOptions = {
   // How long to wait for the orchestrator to accept a request before calling it unavailable.
   connectTimeoutMs?: number;
   communicationsToken?: string;
- sourceSupervisionToken?: string;
   // How many requests may be out at once; the rest wait their turn here.
   maxInFlight?: number;
 };
@@ -40,7 +39,6 @@ const DEFAULT_MAX_IN_FLIGHT = 8;
 export class OrchestratorClient {
   private readonly endpoint: string;
   private readonly communicationsToken: string;
- private readonly sourceSupervisionToken: string;
   private readonly connectTimeoutMs: number;
   private readonly maxInFlight: number;
   private inFlight = 0;
@@ -49,7 +47,6 @@ export class OrchestratorClient {
   constructor(options: ClientOptions) {
     this.endpoint = options.endpoint;
     this.communicationsToken = options.communicationsToken ?? "";
- this.sourceSupervisionToken = options.sourceSupervisionToken ?? "";
     this.connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     this.maxInFlight = Math.max(1, options.maxInFlight ?? DEFAULT_MAX_IN_FLIGHT);
   }
@@ -74,11 +71,7 @@ export class OrchestratorClient {
     payload: Record<string, unknown>,
     timeoutMs: number,
   ): Promise<OrchestratorReply> {
-    if (type.startsWith("knowledge.application.supervision.")) {
- if (this.sourceSupervisionToken.length<32 || this.sourceSupervisionToken.length>512 || this.sourceSupervisionToken.trim()!==this.sourceSupervisionToken || this.sourceSupervisionToken.startsWith("CHANGE_ME")) return Promise.reject(new OrchestratorError("unavailable","Desktop source supervision is not configured."));
- if (!localEndpoint(this.endpoint)) return Promise.reject(new OrchestratorError("denied","source supervision requires a local endpoint or tunnel"));
- }
- if (type.startsWith("communications.")) {
+    if (type.startsWith("communications.")) {
       if (this.communicationsToken.length < 32 || this.communicationsToken.startsWith("CHANGE_ME")) {
         return Promise.reject(new OrchestratorError("orchestrator", "Communications access is not configured."));
       }
@@ -136,7 +129,7 @@ export class OrchestratorClient {
     try {
       socket.connect(this.endpoint);
       try {
-        await socket.send(JSON.stringify(buildEnvelope(type, payload, this.communicationsToken, this.sourceSupervisionToken)));
+        await socket.send(JSON.stringify(buildEnvelope(type, payload, this.communicationsToken)));
       } catch (error) {
         throw new OrchestratorError("unavailable", describe("the orchestrator did not accept the request", error));
       }
@@ -159,7 +152,7 @@ export class OrchestratorClient {
   }
 }
 
-export function buildEnvelope(type: string, payload: Record<string, unknown>, token: string, sourceToken = "") {
+export function buildEnvelope(type: string, payload: Record<string, unknown>, token: string) {
   return {
     event_id: randomUUID(),
     timestamp: new Date().toISOString(),
@@ -168,7 +161,7 @@ export function buildEnvelope(type: string, payload: Record<string, unknown>, to
     user: { id: SOURCE, name: SOURCE },
     channel: { id: SOURCE },
     payload,
-    context: { interface: SOURCE, ...(type.startsWith("knowledge.application.supervision.") ? { source_supervision_token: sourceToken } : {}), ...(type.startsWith("communications.") ? { communications_token: token } : {}) },
+    context: { interface: SOURCE, ...(type.startsWith("communications.") ? { communications_token: token } : {}) },
   };
 }
 
