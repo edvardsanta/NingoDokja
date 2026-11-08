@@ -60,8 +60,9 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
   });
 
   it("asks the orchestrator as the desktop, and only for the workspace that is open", async () => {
-    // Talk, the front door, looks for a conversation to continue; nothing else is asked.
-    assert.deepEqual(orchestrator.seen.map((event) => event.type).sort(), ["conversation.list", "ningo.status"]);
+    // Talk, the front door, looks for a conversation to continue and asks what a send can report
+    // (stop support); nothing else is asked.
+    assert.deepEqual(orchestrator.seen.map((event) => event.type).sort(), ["conversation.capabilities", "conversation.list", "ningo.status"]);
     assert.ok(orchestrator.seen.every((event) => event.source === "desktop"));
   });
 
