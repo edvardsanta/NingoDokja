@@ -3326,25 +3326,6 @@ button.cfg-toggle:focus-visible {
 .original-reader mark { background: var(--action-primary); color: var(--text-on-action); }
 .original-reader :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 
-/* Source preparation keeps the Library's single panel and existing field rhythm. */
-.source-application { display:grid; gap:var(--space-5); max-width:64rem; margin:0 auto; min-width:0; }
-.source-application h2, .source-application h3 { margin:0 0 var(--space-3); }
-.source-application p { overflow-wrap:anywhere; }
-.source-form, .source-progress { display:grid; gap:var(--space-4); min-width:0; }
-.source-form fieldset { border:0; padding:0; margin:0; min-width:0; display:grid; gap:var(--space-4); }
-.source-form label { display:grid; gap:var(--space-2); }
-.source-form textarea { width:100%; box-sizing:border-box; resize:vertical; min-height:3rem; }
-.source-picker > label { display:flex; align-items:center; gap:var(--space-3); min-height:2.75rem; padding:var(--space-2); border-bottom:1px solid var(--border-subtle); overflow-wrap:anywhere; }
-.source-picker small { display:block; }
-.source-picker input { flex:0 0 auto; width:1.2rem; height:1.2rem; }
-.source-toolbar { display:flex; flex-wrap:wrap; gap:var(--space-2); }
-.source-toolbar button, .source-form button { min-height:2.75rem; }
-.source-progress progress { width:100%; accent-color:var(--action-primary); }
-.source-receipts { list-style:none; padding:0; margin:0; }
-.source-receipts li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-2); padding:var(--space-3) 0; border-bottom:1px solid var(--border-subtle); overflow-wrap:anywhere; }
-.source-receipts span, .source-session-note { color:var(--text-secondary); }
-.source-application details { overflow-wrap:anywhere; }
-
 /*
  * Live observer. Ningo's line first, then the observer's state as a tone row, the limits as small
  * tags in the panel's edge colour, and the transcript printed in, one speaker per row.
