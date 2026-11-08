@@ -14,6 +14,7 @@ import type {
   ArchivedChatReply,
   ArchivedConversation,
   ArchivedTurn,
+  AnswerFeedback,
   ConversationCapabilities,
   ConversationOperation,
   ArchivedTurnSource,
@@ -153,7 +154,9 @@ const MAX_DOCUMENT_CHARS = 200_000;
 const SOURCE_STATES = new Set(["ok", "failed", "pending", "disabled", "invalid"]);
 const MAX_SOURCES = 50;
 
-// The action the TUI scores the experience memory by: the hashtag suggestion.
+// The actions the experience memory is scored by: the hashtag suggestion (also the TUI's) by
+// default, and the answers the owner judged in Talk. Nothing else is asked for.
+const SCORED_ACTIONS = new Set(["hashtag.suggest", "chat.answer"]);
 const SCORED_ACTION = "hashtag.suggest";
 
 function shorten(value: string, limit = MAX_DETAIL_CHARS): string {
@@ -333,7 +336,7 @@ function conversationRenamePayload(raw: Record<string, unknown>): Record<string,
 // A send is stopped by the conversation and send id the screen knows it by, even before it has a turn.
 // The report's own version: an operation may be added to a view, a changed meaning needs a new one.
 const CONVERSATION_CAPABILITIES_VIEW = 1;
-const CONVERSATION_OPERATIONS: readonly ConversationOperation[] = ["send", "retry", "stop", "steer"];
+const CONVERSATION_OPERATIONS: readonly ConversationOperation[] = ["send", "retry", "stop", "steer", "feedback"];
 
 // Only the operations and answers the desktop knows pass; anything else is left out, so it stays unknown.
 function conversationCapabilities(body: Record<string, unknown>): ConversationCapabilities {
@@ -351,6 +354,23 @@ function conversationStopPayload(raw: Record<string, unknown>): Record<string, u
   const id = text(raw.conversation_id);
   const sendId = text(raw.send_id);
   return ARCHIVE_ID.test(id) && SEND_ID.test(sendId) ? { conversation_id: id, send_id: sendId } : undefined;
+}
+
+// A verdict names the answer by the conversation, its turn and that turn's number; the orchestrator
+// reads the turn back, so these only point at it.
+function conversationFeedbackPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.conversation_id);
+  const turnId = text(raw.turn_id);
+  const seq = raw.seq;
+  const verdict = raw.verdict;
+  if (!ARCHIVE_ID.test(id) || !ARCHIVE_ID.test(turnId) || !Number.isSafeInteger(seq) || Number(seq) < 1 || Number(seq) > 1e9) return undefined;
+  return verdict === "useful" || verdict === "wrong" ? { conversation_id: id, turn_id: turnId, seq, verdict } : undefined;
+}
+
+function answerFeedback(body: Record<string, unknown>): AnswerFeedback {
+  if (typeof body.found !== "boolean" || typeof body.resolved !== "boolean" || (body.resolved && !body.found)) throw new Error("invalid answer feedback reply");
+  const verdict = body.verdict === "useful" || body.verdict === "wrong" ? body.verdict : undefined;
+  return { found: body.found, resolved: body.resolved, ...(verdict ? { verdict } : {}) };
 }
 
 function conversationDeletePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -865,6 +885,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "conversation.start": { payload: conversationStartPayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.list": { payload: conversationListPayload, project: (result) => inDomain(result, "conversation", conversationList) },
   "conversation.capabilities": { payload: noPayload, project: (result) => inDomain(result, "conversation", conversationCapabilities) },
+  "conversation.feedback": { payload: conversationFeedbackPayload, project: (result) => inDomain(result, "conversation", answerFeedback) },
   "conversation.stop": { payload: conversationStopPayload, project: (result) => inDomain(result, "conversation", (body) => ({ stopping: body.stopping === true })) },
   "conversation.rename": { payload: conversationRenamePayload, project: (result) => inDomain(result, "conversation", (body): ConversationStarted => ({ conversation: archivedConversation(body.conversation) })) },
   "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
@@ -888,7 +909,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     project: (result) => inDomain(result, "memory", memoryStatus),
   },
   "memory.stats": {
-    payload: () => ({ action: SCORED_ACTION }),
+    payload: (raw) => ({ action: SCORED_ACTIONS.has(String(raw.action)) ? String(raw.action) : SCORED_ACTION }),
     project: (result) => inDomain(result, "memory", memoryScore),
   },
   "memory.list": { payload: memoryListPayload, project: (result) => inDomain(result, "memory", memoryPage) },

@@ -298,6 +298,8 @@ export function createFakeTransport(delayMs = 400): Transport {
     sizes: { "demo/embed:latest": "1.2 GB", "demo/small:latest": "2.0 GB" },
     chat: { configurationRevision: 1, provider: "", model: "" },
   };
+  // The owner's verdicts on the demo's answers; the first one stands, as in the orchestrator.
+  const verdicts = new Map<string, "useful" | "wrong">();
   // The demo's conversation archive, kept as the orchestrator keeps it: by its own opaque ids.
   const archive = new Map<string, { readingId: string; turns: ArchivedTurn[] }>();
   let keptFacts = [{ id: "f".repeat(32), owner: true, person: "", content: "Prefers tea to coffee.", place: "private", createdAt: "2026-10-30T12:00:00Z" }];
@@ -316,6 +318,17 @@ export function createFakeTransport(delayMs = 400): Transport {
           const id = archiveId(archive.size + 1);
           archive.set(id, { readingId: String(payload?.reading_id ?? ""), turns: [] });
           return ok({ conversation: { id, kind: payload?.reading_id ? "reading" : "general", readingId: String(payload?.reading_id ?? ""), title: "", updatedAt: new Date().toISOString(), revision: 1, turns: 0 } });
+        }
+        // Only feedback is named, so Stop keeps behaving as it did before the report existed.
+        case "conversation.capabilities":
+          return ok({ operations: { feedback: "supported" } });
+        case "conversation.feedback": {
+          const turn = String(payload?.turn_id ?? "");
+          const earlier = verdicts.get(turn);
+          if (earlier) return ok({ found: true, resolved: false, verdict: earlier });
+          const verdict = payload?.verdict === "wrong" ? "wrong" : "useful";
+          verdicts.set(turn, verdict);
+          return ok({ found: true, resolved: true, verdict });
         }
         case "conversation.facts":
           return ok({ facts: keptFacts });

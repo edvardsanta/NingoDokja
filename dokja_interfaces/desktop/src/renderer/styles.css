@@ -3388,3 +3388,6 @@ button.cfg-toggle:focus-visible {
   .wp-section .decision,
   .kept-facts li { animation: none; }
 }
+
+/* The owner's verdict on an answer sits under it, quiet until asked. */
+.answer-verdict { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-top:var(--space-2); color:var(--text-secondary); }

@@ -117,6 +117,7 @@ function decisionOf(entry: MemoryExperience, t: ReturnType<typeof useTranslate>)
   const requester = musicRequester(entry);
   if (requester) return t("experience_decision_music", { user: requester });
   if (entry.action === "hashtag.suggest" && entry.detail) return t("experience_decision_hashtag", { tag: entry.detail });
+  if (entry.action === "chat.answer") return t(entry.detail === "cited" ? "experience_decision_answer_cited" : "experience_decision_answer_uncited");
   return entry.detail ? `${entry.action}: ${entry.detail}` : entry.action;
 }
 

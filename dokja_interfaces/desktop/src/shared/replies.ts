@@ -292,7 +292,13 @@ export type ChatReply = { off?: false; reply: string; sessionNotice: string };
 
 // What the orchestrator says it does with the owner's conversations, as it is wired. An operation it
 // does not name, or a report the desktop cannot read, is not known: Talk then behaves as before.
-export type ConversationOperation = "send" | "retry" | "stop" | "steer";
+export type ConversationOperation = "send" | "retry" | "stop" | "steer" | "feedback";
+
+// The owner's verdict on one answer, as the orchestrator kept it. found is false for an answer from
+// before verdicts were kept; resolved is false when an earlier verdict already stands, and verdict
+// then says which.
+export type AnswerVerdict = "useful" | "wrong";
+export type AnswerFeedback = { found: boolean; resolved: boolean; verdict?: AnswerVerdict };
 export type ConversationCapabilities = { operations: Partial<Record<ConversationOperation, "supported" | "unsupported">> };
 
 // One send of an archived conversation and how it ended, as the archive keeps it. A pending turn is
