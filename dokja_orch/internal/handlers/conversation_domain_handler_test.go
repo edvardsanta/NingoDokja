@@ -115,7 +115,7 @@ func TestTheCapabilityReportFollowsTheOrchestratorsWiring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported"}
+	want := map[string]string{"send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported", "feedback": "unsupported"}
 	if wired["view"] != 1 || !reflect.DeepEqual(wired["operations"], want) {
 		t.Fatal(wired)
 	}
@@ -126,6 +126,10 @@ func TestTheCapabilityReportFollowsTheOrchestratorsWiring(t *testing.T) {
 	}
 	if operations := unwired["operations"].(map[string]string); operations["stop"] != "unsupported" || operations["steer"] != "unsupported" {
 		t.Fatal("without running sends nothing can be stopped", unwired)
+	}
+	judged, _ := capabilitiesOf(t, NewConversationDomainHandler(archive).WithAnswerFeedback(newAnswerMemory()), core.SourceDesktop)
+	if judged["operations"].(map[string]string)["feedback"] != "supported" {
+		t.Fatal("feedback wired to memory is not reported", judged)
 	}
 }
 
