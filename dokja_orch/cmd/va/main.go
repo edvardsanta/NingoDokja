@@ -199,11 +199,12 @@ func main() {
 		feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
 		func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	))
-	closeSourceSupervision := configureSourceSupervision(context.Background(), knowledgeHandler,
-		func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
-		os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"), os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"),
-		os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"), os.Getenv("DOKJA_GATEWAY_INGRESS_TOKEN"))
-	defer closeSourceSupervision()
+	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
+	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an
+	// earlier process left unsettled.
+	_, closeSourceJournal := configureSourceJournal(context.Background(),
+		os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"), os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"))
+	defer closeSourceJournal()
 	service := core.DefaultService(
 		communicationsHandler,
 		handlers.NewSystemDomainHandler(
@@ -242,7 +243,7 @@ func main() {
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
-	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")).WithSourceSupervisionToken(os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"))
+	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))

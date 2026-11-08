@@ -483,12 +483,12 @@ semantic meaning unverified and execution disabled.
 Runtime, anchors unique quotations and runs that assessor. An explicit trusted
 host binding can now journal native pinned source-read receipts through the
 preparation route; see [source receipts](knowledge-source-receipts.md). This
-proves source validation only. The [native source supervisor](knowledge-source-steering.md)
-adds revision-bound authenticated-host controls, late-receipt isolation and aggregate
-bounds. The [Desktop Apply view and dedicated operator RPC](desktop-source-supervision.md)
-now expose this source-only workflow through explicit journal configuration.
-Durable supervisor recovery, general public admission, production rollout,
-actual method outcomes and learned episode reuse remain pending in `08.2`.
+proves source validation only. The Desktop Apply view, its native source supervisor
+and operator routes were removed on 2026-11-08 because no flow consumed them; the
+[Apply review](knowledge-apply-review.md) moves preparation into the Talk workflow.
+The PostgreSQL journal stays, configured by its DSN alone, and startup recovery still
+interrupts reads an earlier process left unsettled. Preparation inside Talk, actual
+method outcomes and learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
 [provider proposal bounds](knowledge-provider-proposals.md), and
 [measured inference](inference-token-budgets.md). The separate

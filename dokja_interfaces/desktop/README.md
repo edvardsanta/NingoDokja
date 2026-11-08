@@ -67,7 +67,7 @@ pnpm start     # builds, then opens the window
 
 The Desktop reads `DOKJA_COMMUNICATIONS_TOKEN` from the checkout's ignored `.env`
 when it is absent from the process environment. An exported value takes precedence,
-including an explicitly blank value. Only the communications and optional source-supervision credentials are read; other entries
+including an explicitly blank value. Only the communications credential is read; other entries
 are not imported and shell expressions are never executed. The value stays in the
 main process. Restart Desktop after changing the file.
 
@@ -490,22 +490,3 @@ context and page/chapter navigation. Missing originals or ambiguous visual
 alignment are reported explicitly. Existing document-only citations remain
 readable; re-import an original to enable exact locations on future replies.
 See [passage references](../../dokja_docs/passage-references.md).
-
-## Supervised source preparation
-
-Open **Library → Apply** to choose a goal, constraints and one to eight documents.
-Check their versions, then start the supervised preparation. The view exposes
-pause, reasoned correction, resume, cancel and retained native source receipts.
-Pause before checking a correction; those checks share the active task's limits.
-Source validation does not prove understanding or successful method application.
-
-This optional feature requires `DOKJA_SOURCE_SUPERVISION_TOKEN` in the main process
-and matching orchestrator configuration with an initialized PostgreSQL journal.
-The token is separate from other service credentials and stays out of the page.
-Use the same `--env-file` selection as the stack. Setup, explicit initialization,
-request contracts and restart behavior are documented in
-[Desktop source supervision](../../dokja_docs/desktop-source-supervision.md).
-
-Control state lasts for the current orchestrator process. A lost reply can be
-retried with the original command; a process restart is shown as lost control,
-without automatically starting another run. Closing the view does not cancel work.

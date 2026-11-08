@@ -39,7 +39,7 @@ changes, and never streaming text.
 | Notebook (`memory`, `memory_experiences`, `experience_feedback`; `kept_facts` had nothing to move) | Migrated; two notes whose tone is computed stay plain |
 | System (`health`, `runtime`, `providers`, `local_models`) | Migrated |
 | Realtime | Already on the primitives; nothing to move |
-| Library (`knowledge_*`, `digest`, `document_view`, `original_reader`, `source_application`) | Migrated; buttons with a computed class or the variant after another class, and notes with a computed tone or extra attributes, stay plain |
+| Library (`knowledge_*`, `digest`, `document_view`, `original_reader`) | Migrated; buttons with a computed class or the variant after another class, and notes with a computed tone or extra attributes, stay plain |
 
 `button.primary`, `.quiet`, `.compact` and `.note` remain the styling contract, so
 migrated and unmigrated screens look the same while this happens. To roll a vertical
