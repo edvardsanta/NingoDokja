@@ -86,11 +86,14 @@ func (c *KnowledgeServiceClient) Dispatch(ctx context.Context, eventType string,
 	if err != nil {
 		return nil, fmt.Errorf("create knowledge requester: %w", err)
 	}
-	defer requester.Close()
 
 	responseCh := make(chan knowledgeServiceResponse, 1)
 	errCh := make(chan error, 1)
 	go func() {
+		// The goroutine is the socket's only user, so it alone closes it. Closing from the caller
+		// after a cancel would close a ZeroMQ socket another thread is still receiving on, which
+		// aborts the whole process; the receive timeout bounds how long the goroutine outlives it.
+		defer requester.Close()
 		raw, reqErr := requester.Request(string(body))
 		if reqErr != nil {
 			errCh <- reqErr
