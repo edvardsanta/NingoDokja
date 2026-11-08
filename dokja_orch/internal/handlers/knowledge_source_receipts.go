@@ -232,3 +232,6 @@ func RecoverSourceReads(ctx context.Context, store application.JournalStore, sta
 	}}
 	return journal.RecoverUnsettled(ctx, startedAt, sourceReadRecoveryLimit)
 }
+
+// sourceSize is the encoded size of a read source, charged against byte budgets.
+func sourceSize(value any) int { raw, _ := json.Marshal(value); return len(raw) }

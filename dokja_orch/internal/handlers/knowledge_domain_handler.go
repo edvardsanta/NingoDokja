@@ -10,13 +10,12 @@ import (
 )
 
 type KnowledgeDomainHandler struct {
-	domain             *knowledgedomain.Domain
-	reading            *ReadingTask
-	intake             *IntakeTask
-	proposer           knowledgedomain.ApplicationProposer
-	measuredProposer   knowledgedomain.ApplicationProposer
-	reviewer           knowledgedomain.ApplicationReviewer
-	sourceApplications *DesktopSourceApplications
+	domain           *knowledgedomain.Domain
+	reading          *ReadingTask
+	intake           *IntakeTask
+	proposer         knowledgedomain.ApplicationProposer
+	measuredProposer knowledgedomain.ApplicationProposer
+	reviewer         knowledgedomain.ApplicationReviewer
 }
 
 func NewKnowledgeDomainHandler(service knowledgedomain.Service) *KnowledgeDomainHandler {
@@ -62,11 +61,10 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 	if _, enabled := ctx.Value(sourceReadJournalKey{}).(SourceReadJournal); enabled && workflow.Action != knowledgedomain.ActionPrepareApplication {
 		return nil, fmt.Errorf("native source-read journal binding supports preparation only")
 	}
-	if strings.HasPrefix(workflow.Action, "knowledge.application.supervision.") {
-		if h.sourceApplications == nil {
-			return nil, fmt.Errorf("source supervision is not configured")
-		}
-		return h.sourceApplications.Handle(ctx, event)
+	// Desktop source supervision was removed (dokja_docs/knowledge-apply-review.md). Its request
+	// types are refused here, so they never reach the service as unknown events.
+	if strings.HasPrefix(event.Type, "knowledge.application.supervision.") {
+		return nil, fmt.Errorf("Desktop source supervision was removed; preparation runs inside workflows")
 	}
 	// The payload is the user's notes or question: log its shape, never its content.
 	logger.Info(fmt.Sprintf(
@@ -114,9 +112,4 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 			Context: event.Context,
 		},
 	})
-}
-
-func (h *KnowledgeDomainHandler) WithSourceApplications(host *DesktopSourceApplications) *KnowledgeDomainHandler {
-	h.sourceApplications = host
-	return h
 }

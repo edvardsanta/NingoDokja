@@ -172,8 +172,6 @@ func actionFor(domain Domain, eventType string) string {
 			return "propose-knowledge-application"
 		case "knowledge.application.assess":
 			return "assess-knowledge-application"
-		case "knowledge.application.supervision.preview", "knowledge.application.supervision.start", "knowledge.application.supervision.status", "knowledge.application.supervision.control":
-			return eventType
 		case "knowledge.application.prepare":
 			return "prepare-knowledge-application"
 		case "knowledge.ingest":
