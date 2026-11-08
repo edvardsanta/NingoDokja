@@ -588,3 +588,41 @@ and uninterrupted answers. Six targeted Discord test files and three offline
 report tests pass. Hot reload restarts the Discord listener after source changes;
 restart the listener command before comparing live behavior. Post-change live
 latency has not yet been measured.
+
+### Audio quality and GPU provider trial — 2026-10-29
+
+The current live base stack was inspected and still selected tiny with CPU-only
+PyTorch. The earlier ignored base-model override was not active in that stack.
+Host GPU access was confirmed separately from the restricted shell: a discrete
+RX 6600 with Vulkan render support is available, but it was not exposed to voice.
+A pinned upstream Vulkan server image loaded the multilingual small model on
+its GPU backend in an isolated, network-disabled benchmark container.
+
+Two passes over four synthesized Portuguese phrases (41 reference words) produced
+three normalized word edits per pass, concentrated in the greeting and assistant
+name. Warm end-to-end requests, including local container invocation, ranged
+from 428 to 566 ms; the first request took 796 ms. This is not an accuracy score
+for real microphones or a direct controlled speedup comparison against a different
+framework/decoder. It establishes that GPU model execution works on this host.
+No human audio was recorded for this benchmark.
+
+Through the complete voice adapter, including canonical 16 kHz conversion,
+warm small-model requests took 417–499 ms and the first took 806 ms. This path
+produced six normalized word edits across the same 41 reference words: the short
+greeting became worse, so the signal conversion is not evidence of an ASR
+accuracy improvement. A medium-model trial took about 1.44–1.81 seconds with six
+word edits and was not selected. The live development stack now explicitly uses
+the small-model Vulkan provider; its health check confirms the selected adapter.
+
+One subsequent live log sample showed mostly 349–565 ms recognition processing,
+with a 2,180 ms outlier. The outlier returned 661 characters from 1.96 seconds of
+audio, an indication that hallucination remains unresolved. These observations
+are neither end-of-speech response latency nor percentile benchmarks. No live
+transcript content or participant identity is included in these diagnostics.
+
+The audio conversion patch replaces linear interpolation with a band-limited
+polyphase FIR. Tone fixtures demonstrate out-of-band alias rejection while
+preserving speech-band amplitude and duration. GPU integration is an explicit
+provider/isolated-network overlay; absent health, compatible hardware or model
+assets must not be reported as accelerated inference. Display-name propagation
+is a separate change and does not alter verified speaker identity.

@@ -2,7 +2,7 @@ import io
 import threading
 import unittest
 import wave
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -31,6 +31,16 @@ class TranscriptionTests(unittest.TestCase):
         self.service.speech_detector = Mock()
         self.service.speech_detector.detect.return_value = {"speech": True}
         self.service.pipeline = Mock(return_value={"text": "  recognized speech  "})
+
+    def test_model_uses_accelerator_only_when_the_runtime_reports_one(self):
+        for available, expected in [(False, -1), (True, 0)]:
+            with self.subTest(available=available), patch(
+                "transformers_stt_service.torch.cuda.is_available", return_value=available
+            ), patch("transformers_stt_service.AutoProcessor.from_pretrained"), patch(
+                "transformers_stt_service.AutoModelForSpeechSeq2Seq.from_pretrained"
+            ), patch("transformers_stt_service.pipeline") as factory:
+                TransformersSTTService("fixture-model")
+                self.assertEqual(factory.call_args.kwargs["device"], expected)
 
     def test_short_audio_and_digital_silence_never_reach_decoder(self):
         for audio in [b"", wav_bytes(0.14), wav_bytes(2, amplitude=0)]:

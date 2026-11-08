@@ -34,6 +34,7 @@ from streaming import (
 from stub_stt_service import StubSTTService
 from stub_wakeword_service import StubWakewordService
 from stub_tts_service import StubTTSService
+from whisper_cpp_stt_service import WhisperCppSTTService
 from transformers_stt_service import TransformersSTTService, decode_audio_b64
 
 logger = logging.getLogger("dokja_voice.http")
@@ -174,7 +175,12 @@ def create_app() -> FastAPI:
         )
 
     stt_provider = os.getenv("DOKJA_VOICE_STT_PROVIDER", "stub").strip().lower()
-    if stt_provider == "transformers":
+    if stt_provider == "whisper_cpp":
+        stt_service = WhisperCppSTTService(
+            endpoint=os.getenv("DOKJA_VOICE_CPP_ENDPOINT", ""),
+            default_language=os.getenv("DOKJA_VOICE_DEFAULT_LANGUAGE", "pt-BR"),
+        )
+    elif stt_provider == "transformers":
         stt_service = TransformersSTTService(
             model_name=os.getenv("DOKJA_VOICE_STT_MODEL", "openai/whisper-tiny"),
             default_language=os.getenv("DOKJA_VOICE_DEFAULT_LANGUAGE", "pt-BR"),
