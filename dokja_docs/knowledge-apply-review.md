@@ -144,19 +144,17 @@ readable, and recovery keeps settling them.
    the token. The journal is configured by the DSN alone, and recovery keeps
    running at startup. Compose files, the runbook and the docs change in the
    same PR. The journal is reachable and recovered at every commit.
-3. **Prepare in Talk.** The workflow step above, with version-pinned citations,
+3. **Answer feedback as the outcome**, so 08.3 has a signal: the owner judges an
+   answer in Talk as useful or wrong, through the existing experience memory. See
+   [answer feedback](answer-feedback.md).
+4. **Prepare in Talk.** The workflow step above, with version-pinned citations,
    Stop settling as `interrupted`, and tests for: no focus (unchanged turn),
    focus with an unchanged version (no re-read), a changed version, a source
    over budget, and a Stop during a read.
-4. **Answer feedback as the outcome**, so 08.3 has a signal. A separate step,
-   proposed after 3 is in use.
 
-Step 2 does not depend on the open question below. Step 3 does.
+## Owner decision (2026-11-08)
 
-## Open question for the owner
-
-Step 3's gain to a person is modest on its own: answers name the exact document
-version they used, and reads are bounded and recorded. The learning the journal
-was built for needs step 4. If that gain is not worth a change to the chat
-path today, step 2 still stands, and `prepare` stays an internal capability
-with no consumer until step 4 is planned.
+Preparation in Talk alone would only name document versions and bound reads; the
+learning the journal was built for needs an outcome. The owner chose answer
+feedback first (step 3), since it is the only step that gives 08.3 something to
+learn from. Preparation in Talk (step 4) follows.
