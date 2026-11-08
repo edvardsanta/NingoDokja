@@ -1,0 +1,401 @@
+package price
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+var today = time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+
+func day(offset int) string { return today.AddDate(0, 0, offset).Format(dateLayout) }
+
+// body builds a price.observation.v1 body; edit changes the decoded map before encoding.
+func body(t *testing.T, points []map[string]any, edit func(map[string]any)) string {
+	t.Helper()
+	raw := map[string]any{
+		"contract": ContractVersion, "product": "ssd-example-1tb", "title": "SSD Example 1TB",
+		"merchant": "store-a", "merchant_name": "Store A", "series": "merchant",
+		"price_kind": "pix", "currency": "BRL", "points": points,
+	}
+	if edit != nil {
+		edit(raw)
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
+}
+
+func point(on string, price string) map[string]any {
+	return map[string]any{"on": on, "price": json.Number(price)}
+}
+
+func TestParseObservationReadsTheContract(t *testing.T) {
+	text := body(t, []map[string]any{
+		{"on": day(-1), "price": json.Number("499.9"), "list_price": json.Number("899.00")},
+		{"on": day(0), "price": json.Number("459"), "seller": "Store B"},
+	}, nil)
+	got, err := ParseObservation(text, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Observation{
+		Product: "ssd-example-1tb", Title: "SSD Example 1TB", Merchant: "store-a", MerchantName: "Store A",
+		Series: SeriesMerchant, Kind: KindPix,
+		Points: []Point{{On: day(-1), Cents: 49990, ListCents: 89900}, {On: day(0), Cents: 45900, Seller: "Store B"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestParseObservationTellsOtherBodiesApart(t *testing.T) {
+	for _, text := range []string{"Plain article text", `{"title": "other json"}`} {
+		if _, err := ParseObservation(text, today); !errors.Is(err, ErrNotObservation) {
+			t.Errorf("%q: got %v, want ErrNotObservation", text, err)
+		}
+	}
+}
+
+func TestParseObservationRefusesBrokenContracts(t *testing.T) {
+	cases := map[string]string{
+		"unknown field":   body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["extra"] = 1 }),
+		"bad product":     body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["product"] = "Has Space" }),
+		"bad series":      body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["series"] = "average" }),
+		"bad kind":        body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["price_kind"] = "boleto" }),
+		"other currency":  body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["currency"] = "USD" }),
+		"no title":        body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) { m["title"] = " " }),
+		"no points":       body(t, []map[string]any{}, nil),
+		"future date":     body(t, []map[string]any{point(day(2), "10")}, nil),
+		"bad date":        body(t, []map[string]any{point("2026-02-30", "10")}, nil),
+		"repeated date":   body(t, []map[string]any{point(day(0), "10"), point(day(0), "11")}, nil),
+		"zero price":      body(t, []map[string]any{point(day(0), "0")}, nil),
+		"many decimals":   body(t, []map[string]any{point(day(0), "10.0000000000000001")}, nil),
+		"rounds to zero":  body(t, []map[string]any{point(day(0), "0.004")}, nil),
+		"exponent":        body(t, []map[string]any{point(day(0), "1e3")}, nil),
+		"negative":        body(t, []map[string]any{point(day(0), "-5")}, nil),
+		"absurd price":    body(t, []map[string]any{point(day(0), "99999999999")}, nil),
+		"trailing object": body(t, []map[string]any{point(day(0), "10")}, nil) + `{}`,
+	}
+	for name, text := range cases {
+		_, err := ParseObservation(text, today)
+		if err == nil || errors.Is(err, ErrNotObservation) {
+			t.Errorf("%s: got %v, want a contract error", name, err)
+		}
+	}
+}
+
+func TestParseObservationRoundsFloatingPointNoiseToCents(t *testing.T) {
+	// Regression: aggregator histories print prices such as 1665.6100000000001, and the
+	// first strict parser refused a whole year of points because of one of them.
+	text := body(t, []map[string]any{
+		point(day(-2), "1665.6100000000001"), point(day(-1), "1909.2399999"), point(day(0), "10.005"),
+	}, nil)
+	got, err := ParseObservation(text, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cents := []int64{got.Points[0].Cents, got.Points[1].Cents, got.Points[2].Cents}
+	if !reflect.DeepEqual(cents, []int64{166561, 190924, 1001}) {
+		t.Fatalf("cents %v", cents)
+	}
+}
+
+func TestParseObservationAcceptsTomorrowForTimeZones(t *testing.T) {
+	if _, err := ParseObservation(body(t, []map[string]any{point(day(1), "10")}, nil), today); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestParseObservationCleansText(t *testing.T) {
+	text := body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) {
+		m["title"] = "  SSD\n‮Example\t1TB  "
+	})
+	got, err := ParseObservation(text, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "SSD Example 1TB" {
+		t.Fatalf("title %q", got.Title)
+	}
+}
+
+func TestMemoryRepositoryUpsertIsIdempotentAndLatestWins(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	first := Observation{Product: "p", Title: "P", Merchant: "m", Series: SeriesMerchant, Kind: KindPix,
+		Points: []Point{{On: day(-1), Cents: 100}, {On: day(0), Cents: 90}}}
+	if written, _ := repo.Upsert(ctx, first); written != 2 {
+		t.Fatalf("first write %d", written)
+	}
+	if written, _ := repo.Upsert(ctx, first); written != 0 {
+		t.Fatalf("repeated write %d", written)
+	}
+	later := first
+	later.Points = []Point{{On: day(0), Cents: 80}}
+	if written, _ := repo.Upsert(ctx, later); written != 1 {
+		t.Fatalf("later write %d", written)
+	}
+	history, _ := repo.History(ctx, first.Key(), "", "")
+	if len(history) != 2 || history[0].On != day(-1) || history[1].Cents != 80 {
+		t.Fatalf("history %+v", history)
+	}
+	card := first
+	card.Kind = KindCard
+	repo.Upsert(ctx, card)
+	keys, _ := repo.Keys(ctx, "p")
+	if len(keys) != 2 || keys[0].Kind != KindCard || keys[1].Kind != KindPix {
+		t.Fatalf("keys %+v", keys)
+	}
+	if bounded, _ := repo.History(ctx, first.Key(), day(0), day(0)); len(bounded) != 1 {
+		t.Fatalf("bounded %+v", bounded)
+	}
+}
+
+// series builds daily points ending today. prices[i] is in reais, oldest first.
+func series(prices ...int64) []Point {
+	points := make([]Point, len(prices))
+	for i, reais := range prices {
+		points[i] = Point{On: day(i - len(prices) + 1), Cents: reais * 100}
+	}
+	return points
+}
+
+func flat(days int, reais int64) []int64 {
+	values := make([]int64, days)
+	for i := range values {
+		values[i] = reais
+	}
+	return values
+}
+
+func assess(points []Point) Assessment {
+	return Assess(Key{Product: "p", Merchant: "m", Series: SeriesMerchant, Kind: KindPix}, points, today)
+}
+
+func TestAssessNeedsHistory(t *testing.T) {
+	if got := assess(series(append(flat(5, 500), 400)...)); got.Verdict != VerdictInsufficientHistory {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+	if got := assess(nil); got.Verdict != VerdictInsufficientHistory {
+		t.Fatalf("empty verdict %s", got.Verdict)
+	}
+}
+
+func TestAssessFindsARealDiscount(t *testing.T) {
+	got := assess(series(append(flat(90, 500), 440)...))
+	if got.Verdict != VerdictRealDiscount {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+	if got.Median30Cents != 50000 || got.DiscountVs30Bps != 1200 || got.HistoryDays != 90 {
+		t.Fatalf("assessment %+v", got)
+	}
+	if !reflect.DeepEqual(got.Signals, []Signal{SignalAllTimeLow}) {
+		t.Fatalf("signals %v", got.Signals)
+	}
+}
+
+func TestAssessIgnoresASmallDip(t *testing.T) {
+	if got := assess(series(append(flat(60, 500), 490)...)); got.Verdict != VerdictNoDiscount {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+}
+
+func TestAssessDoesNotCallItRealWhenTheLongerRunWasCheaper(t *testing.T) {
+	// Cheap for months, expensive for the last month, back to the old price today.
+	prices := append(flat(60, 400), flat(30, 500)...)
+	if got := assess(series(append(prices, 470)...)); got.Verdict == VerdictRealDiscount {
+		t.Fatalf("verdict %s, median90 %d", got.Verdict, got.Median90Cents)
+	}
+}
+
+func TestAssessCatchesAMarkupBeforeTheSale(t *testing.T) {
+	// Usual price 500, raised to 650 in the last ten days, "sale" back to 495.
+	prices := append(flat(80, 500), flat(10, 650)...)
+	got := assess(series(append(prices, 495)...))
+	if got.Verdict != VerdictInflatedBeforeSale {
+		t.Fatalf("verdict %s (%+v)", got.Verdict, got)
+	}
+	if !contains(got.Signals, SignalRaisedBeforeDrop) {
+		t.Fatalf("signals %v", got.Signals)
+	}
+}
+
+func TestAssessKeepsARealDropAfterAMarkup(t *testing.T) {
+	prices := append(flat(80, 500), flat(10, 650)...)
+	if got := assess(series(append(prices, 400)...)); got.Verdict != VerdictRealDiscount {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+}
+
+func TestAssessCallsOutAnAdvertisedDiscountTheHistoryDoesNotShow(t *testing.T) {
+	points := series(append(flat(60, 500), 495)...)
+	points[len(points)-1].ListCents = 90000
+	got := assess(points)
+	if got.Verdict != VerdictFakeDiscount {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+	if got.AdvertisedDiscountBps != 4500 || !contains(got.Signals, SignalListAboveObservedMax) {
+		t.Fatalf("assessment %+v", got)
+	}
+}
+
+func TestAssessReportsAStaleHistory(t *testing.T) {
+	points := series(append(flat(60, 500), 400)...)
+	for i := range points {
+		on, _ := time.Parse(dateLayout, points[i].On)
+		points[i].On = on.AddDate(0, 0, -5).Format(dateLayout)
+	}
+	if got := assess(points); got.Verdict != VerdictStale {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+}
+
+func contains(signals []Signal, want Signal) bool {
+	for _, signal := range signals {
+		if signal == want {
+			return true
+		}
+	}
+	return false
+}
+
+func feedItem(id, text string) map[string]any {
+	return map[string]any{"id": id, "plugin": "price-collector", "title": "x", "body": text}
+}
+
+func TestDomainRecordsObservationsAndSkipsOtherItems(t *testing.T) {
+	domain := New(NewMemoryRepository()).WithClock(func() time.Time { return today })
+	pix := make([]map[string]any, 0, 31)
+	for i := -30; i <= 0; i++ {
+		price := "500"
+		if i == 0 {
+			price = "430"
+		}
+		pix = append(pix, point(day(i), price))
+	}
+	items := []any{
+		feedItem("a", body(t, pix, nil)),
+		feedItem("b", body(t, []map[string]any{point(day(0), "520")}, func(m map[string]any) { m["price_kind"] = "card" })),
+		feedItem("c", "An article body"),
+		map[string]any{"id": "d", "title": "no body"},
+		feedItem("e", body(t, []map[string]any{point(day(0), "0")}, nil)),
+		"not even an object",
+	}
+	result, err := domain.Handle(context.Background(), Request{
+		Action: ActionRecordObservations, Event: Event{Payload: map[string]any{"items": items}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["observations"] != 2 || result["points"] != 32 || result["written"] != 32 || result["items"] != 6 {
+		t.Fatalf("result %v", result)
+	}
+	skipped := result["skipped"].(map[string]any)
+	if skipped[SkipOther] != 1 || skipped[SkipNoBody] != 2 || skipped[SkipInvalid] != 1 {
+		t.Fatalf("skipped %v", skipped)
+	}
+	invalid := result["invalid"].([]any)
+	if len(invalid) != 1 || invalid[0].(map[string]any)["id"] != "e" {
+		t.Fatalf("invalid %v", invalid)
+	}
+
+	again, _ := domain.Record(context.Background(), items[:2])
+	if again.Written != 0 {
+		t.Fatalf("replay wrote %d", again.Written)
+	}
+
+	assessed, err := domain.Handle(context.Background(), Request{
+		Action: ActionAssessPrice, Event: Event{Payload: map[string]any{"product": "ssd-example-1tb"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := assessed["assessments"].([]any)
+	if len(rows) != 2 {
+		t.Fatalf("rows %v", rows)
+	}
+	verdicts := map[string]any{}
+	for _, row := range rows {
+		values := row.(map[string]any)
+		verdicts[values["price_kind"].(string)] = values["verdict"]
+	}
+	want := map[string]any{"card": string(VerdictInsufficientHistory), "pix": string(VerdictRealDiscount)}
+	if !reflect.DeepEqual(verdicts, want) {
+		t.Fatalf("verdicts %v", verdicts)
+	}
+
+	all, _ := domain.AssessProduct(context.Background(), "")
+	if len(all) != 2 {
+		t.Fatalf("all products %d", len(all))
+	}
+}
+
+func TestDomainAcceptsItemsBuiltInGo(t *testing.T) {
+	// Regression: a []map[string]any payload used to read as an empty batch with no error.
+	domain := New(NewMemoryRepository()).WithClock(func() time.Time { return today })
+	items := []map[string]any{feedItem("a", body(t, []map[string]any{point(day(0), "10")}, nil))}
+	result, err := domain.Handle(context.Background(), Request{
+		Action: ActionRecordObservations, Event: Event{Payload: map[string]any{"items": items}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["observations"] != 1 {
+		t.Fatalf("result %v", result)
+	}
+}
+
+func TestDomainRefusesBadRequests(t *testing.T) {
+	domain := New(NewMemoryRepository())
+	if _, err := domain.Handle(context.Background(), Request{Action: "nope"}); err == nil {
+		t.Fatal("unknown action accepted")
+	}
+	if _, err := domain.AssessProduct(context.Background(), "Bad Key"); err == nil {
+		t.Fatal("bad product accepted")
+	}
+	for name, payload := range map[string]map[string]any{
+		"items as text":     {"items": "a,b"},
+		"items as one item": {"items": map[string]any{"body": "x"}},
+	} {
+		if _, err := domain.Handle(context.Background(), Request{
+			Action: ActionRecordObservations, Event: Event{Payload: payload},
+		}); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	if _, err := domain.Handle(context.Background(), Request{
+		Action: ActionAssessPrice, Event: Event{Payload: map[string]any{"product": 42}},
+	}); err == nil {
+		t.Error("numeric product accepted as every product")
+	}
+	many := make([]any, maxItemsPerRecord+1)
+	if _, err := domain.Record(context.Background(), many); err == nil {
+		t.Fatal("oversized batch accepted")
+	}
+	if _, err := New(nil).Handle(context.Background(), Request{Action: ActionAssessPrice}); err == nil {
+		t.Fatal("missing repository accepted")
+	}
+}
+
+// failingRepository proves a storage failure stops the batch and is reported.
+type failingRepository struct{ *MemoryRepository }
+
+func (failingRepository) Upsert(context.Context, Observation) (int, error) {
+	return 0, fmt.Errorf("disk full")
+}
+
+func TestDomainReportsStorageFailures(t *testing.T) {
+	domain := New(failingRepository{NewMemoryRepository()}).WithClock(func() time.Time { return today })
+	_, err := domain.Record(context.Background(), []any{feedItem("a", body(t, []map[string]any{point(day(0), "1")}, nil))})
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("err %v", err)
+	}
+}
