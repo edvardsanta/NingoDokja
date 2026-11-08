@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/pebbe/zmq4"
 )
 
 const DefaultRequestEndpoint = "tcp://127.0.0.1:5558"
+
+// pollInterval is how often a pending request notices that its caller gave up.
+const pollInterval = 100 * time.Millisecond
 
 type Requester struct {
 	socket *zmq4.Socket
@@ -50,41 +54,39 @@ func (r *Requester) Request(ctx context.Context, event Event) (RequestResponse, 
 		return RequestResponse{}, fmt.Errorf("marshal event: %w", err)
 	}
 
-	errCh := make(chan error, 1)
-	responseCh := make(chan RequestResponse, 1)
-
-	go func() {
-		if _, sendErr := r.socket.Send(string(body), 0); sendErr != nil {
-			errCh <- sendErr
-			return
-		}
-
-		raw, recvErr := r.socket.Recv(0)
-		if recvErr != nil {
-			errCh <- recvErr
-			return
-		}
-
-		var response RequestResponse
-		if unmarshalErr := json.Unmarshal([]byte(raw), &response); unmarshalErr != nil {
-			errCh <- fmt.Errorf("unmarshal response: %w", unmarshalErr)
-			return
-		}
-		responseCh <- response
-	}()
-
-	select {
-	case <-ctx.Done():
-		return RequestResponse{}, ctx.Err()
-	case err := <-errCh:
+	// One goroutine uses the socket from send to receive, and the caller closes it afterwards. A
+	// receive on another goroutine that outlives a cancelled caller would race its Close, and libzmq
+	// aborts the process when a socket is closed while another thread is still receiving on it.
+	if _, err := r.socket.Send(string(body), 0); err != nil {
 		return RequestResponse{}, err
-	case response := <-responseCh:
-		if response.Status != "ok" {
-			if response.Error == "" {
-				response.Error = "orchestrator request failed"
-			}
-			return RequestResponse{}, errors.New(response.Error)
-		}
-		return response, nil
 	}
+	poller := zmq4.NewPoller()
+	poller.Add(r.socket, zmq4.POLLIN)
+	for {
+		if err := ctx.Err(); err != nil {
+			return RequestResponse{}, err
+		}
+		ready, err := poller.Poll(pollInterval)
+		if err != nil {
+			return RequestResponse{}, err
+		}
+		if len(ready) > 0 {
+			break
+		}
+	}
+	raw, err := r.socket.Recv(0)
+	if err != nil {
+		return RequestResponse{}, err
+	}
+	var response RequestResponse
+	if err := json.Unmarshal([]byte(raw), &response); err != nil {
+		return RequestResponse{}, fmt.Errorf("unmarshal response: %w", err)
+	}
+	if response.Status != "ok" {
+		if response.Error == "" {
+			response.Error = "orchestrator request failed"
+		}
+		return RequestResponse{}, errors.New(response.Error)
+	}
+	return response, nil
 }
