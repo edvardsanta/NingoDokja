@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	chat "read_books/dokja_domain/dokja_chat"
+	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
@@ -35,6 +36,8 @@ type VoiceChatStreamingGenerator interface {
 type ChatDomainHandler struct {
 	generator      ChatGenerator
 	voiceGenerator VoiceChatStreamingGenerator
+	speech         communications.Voice
+	speechEnabled  func() bool
 	reading        func(context.Context, string) (digestdomain.Reference, error)
 	recent         func(context.Context, string, int) ([]digestdomain.Reference, error)
 	sessions       *chatSessionManager
@@ -95,6 +98,9 @@ func (h *ChatDomainHandler) WithSessionStore(store chat.SessionStore) *ChatDomai
 func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
 	if h == nil || h.generator == nil {
 		return nil, fmt.Errorf("chat generator is not configured")
+	}
+	if workflow.Action == chat.ActionSpeakReply {
+		return h.speakReply(ctx, event)
 	}
 	if workflow.Action == chat.ActionReadIncomingContent {
 		return h.handleIncomingContent(ctx, event)

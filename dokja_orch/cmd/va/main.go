@@ -224,7 +224,7 @@ func main() {
 		handlers.NewBookDomainHandler(bookClient),
 		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

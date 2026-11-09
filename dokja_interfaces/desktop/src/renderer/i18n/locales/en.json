@@ -797,5 +797,17 @@
   "answer_verdict_denied": "Press the button yourself to give a verdict.",
   "experience_decision_answer_cited": "Answered in Talk, citing your documents",
   "experience_decision_answer_uncited": "Answered in Talk, without your documents",
-  "memory_score_answers": "Answers you judged in Talk"
+  "memory_score_answers": "Answers you judged in Talk",
+  "voice_start": "Talk by voice",
+  "voice_stop": "Stop voice",
+  "voice_language": "en",
+  "voice_state_idle": "Microphone off",
+  "voice_state_preparing": "Preparing microphone…",
+  "voice_state_listening": "Listening — speak, then pause",
+  "voice_state_thinking": "Ningo is hearing you…",
+  "voice_state_speaking": "Ningo is speaking…",
+  "voice_permission_denied": "Microphone permission was denied. Allow microphone access and start again.",
+  "voice_capture_failed": "Could not open the microphone. Check that one is connected and allowed.",
+  "voice_request_failed": "What you said could not be sent. Check Voice and Chat in System, then try again.",
+  "voice_speech_failed": "The reply is in the conversation, but it could not be read aloud. Check Voice in System."
 }

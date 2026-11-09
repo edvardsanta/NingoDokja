@@ -1,5 +1,6 @@
 import { passageLocator, originalReading } from "../shared/passages.js";
 import { observerSnapshot } from "../shared/realtime.js";
+import { speakInput, speech, transcribeInput, transcript, MAX_SPEAK_TEXT, MAX_UTTERANCE_BASE64, VOICE_SESSION } from "../shared/desktop_voice.js";
 import { createHash } from "node:crypto";
 import { runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
@@ -916,6 +917,13 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "memory.resolve": { payload: memoryResolvePayload, project: (result) => inDomain(result, "memory", memoryResolution) },
   "memory.get": { payload: memoryGetPayload, project: (result) => inDomain(result, "memory", memoryDetail) },
   "realtime.snapshot": {payload:noPayload,project:result=>inDomain(result,"conversation",observerSnapshot)},
+  "voice.desktop.start": {payload:noPayload,project:result=>inDomain(result,"chat",body=>{
+    if (typeof body.voice_session_id !== "string" || !VOICE_SESSION.test(body.voice_session_id)) throw new Error("Invalid microphone session");
+    return {voice_session_id:body.voice_session_id};
+  })},
+  "voice.desktop.stop": {payload:raw=>typeof raw.voice_session_id === "string" && VOICE_SESSION.test(raw.voice_session_id) ? {voice_session_id:raw.voice_session_id}:undefined,project:()=>({stopped:true})},
+  "voice.transcribe": {maxPayloadChars:MAX_UTTERANCE_BASE64+1024,payload:transcribeInput,project:result=>inDomain(result,"communications",body=>transcript(isRecord(body.voice)?body.voice:{}))},
+  "voice.reply.speak": {maxPayloadChars:MAX_SPEAK_TEXT+1024,payload:speakInput,project:result=>inDomain(result,"chat",speech)},
   "knowledge.status": {
     payload: noPayload,
     project: (result) => inDomain(result, "knowledge", knowledgeStatus),
