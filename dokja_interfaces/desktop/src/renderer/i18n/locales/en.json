@@ -784,5 +784,18 @@
   "source_context": "Extracted text with surrounding context",
   "source_page": "Page",
   "source_chapter": "Chapter",
-  "source_legacy": "This older reference identifies the document and saved excerpt. Its exact original location was not retained."
+  "source_legacy": "This older reference identifies the document and saved excerpt. Its exact original location was not retained.",
+  "answer_verdict_label": "Was this answer useful?",
+  "answer_verdict_useful": "Useful",
+  "answer_verdict_wrong": "Wrong",
+  "answer_verdict_kept_useful": "Marked useful. Ningo learns from it.",
+  "answer_verdict_kept_wrong": "Marked wrong. Ningo learns from it.",
+  "answer_verdict_earlier_useful": "Already marked useful; the first verdict stands.",
+  "answer_verdict_earlier_wrong": "Already marked wrong; the first verdict stands.",
+  "answer_verdict_unrecorded": "This answer is older than verdicts, so there is nothing to mark.",
+  "answer_verdict_failed": "The verdict was not kept. Try again.",
+  "answer_verdict_denied": "Press the button yourself to give a verdict.",
+  "experience_decision_answer_cited": "Answered in Talk, citing your documents",
+  "experience_decision_answer_uncited": "Answered in Talk, without your documents",
+  "memory_score_answers": "Answers you judged in Talk"
 }

@@ -10,6 +10,7 @@ import { Problem } from "./card_frame.js";
 import { latestConversation } from "./conversation_list.js";
 import { DocumentView } from "./document_view.js";
 import { Drawer } from "./drawer.js";
+import { AnswerVerdictBar } from "./answer_verdict.js";
 import { ReplyBody } from "./reply_sources.js";
 import type { ReplySource } from "./reply_sources_model.js";
 import { Button, Notice } from "./ui.js";
@@ -60,6 +61,9 @@ export type Conversation = {
   retry: () => void;
   // The latest send is still on its way, here or from another interface, and can be asked to stop.
   stoppable: boolean;
+  // The orchestrator keeps the owner's verdict on an answer. Only an explicit "supported" offers it:
+  // an older orchestrator would refuse it.
+  judgeable: boolean;
   stopping: boolean;
   stopFailed: boolean;
   stop: () => Promise<void>;
@@ -146,11 +150,13 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   // Whether this orchestrator can stop a send at all. Unknown (an older one, or no answer) keeps Stop
   // offered as before; only an explicit "unsupported" takes it away.
   const [stopSupport, setStopSupport] = useState<"supported" | "unsupported">();
+  const [judgeable, setJudgeable] = useState(false);
   useEffect(() => {
     void transport.request("conversation.capabilities", {}).then((answer) => {
       const operations = answer.ok && isRecord(answer.result) && isRecord(answer.result.operations) ? answer.result.operations : undefined;
       const stop = operations?.stop;
       if (live.current && (stop === "supported" || stop === "unsupported")) setStopSupport(stop);
+      if (live.current) setJudgeable(operations?.feedback === "supported");
     }).catch(() => undefined);
   }, [transport]);
   // A send this panel is waiting on ends in an error once stopped; the turn says what happened.
@@ -304,7 +310,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     else void dispatch(latest.sendId, { content: latest.content, send_id: latest.sendId });
   };
   const older = firstSeq !== undefined && firstSeq > 1;
-  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry, stoppable: turns.at(-1)?.state === "pending" && stopSupport !== "unsupported", stopping, stopFailed, stop };
+  return { id: conversationId, turns, preview, queued, older, loadingOlder, olderError, readOlder, draft, setDraft, busy, error, unkept, loading, loadError, opened: held, reload: () => void load(), field, send, retry, stoppable: turns.at(-1)?.state === "pending" && stopSupport !== "unsupported", judgeable, stopping, stopFailed, stop };
 }
 
 // What was said, newest at the bottom, and what is happening now. The end is kept in view as the
@@ -350,7 +356,7 @@ export function Transcript({ conversation, transport }: { conversation: Conversa
     {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}</li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}{conversation.judgeable && conversation.id && turn.id && turn.seq !== undefined && <AnswerVerdictBar transport={transport} conversationId={conversation.id} turnId={turn.id} seq={turn.seq}/>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {reading?.id && <Drawer title={reading.title || t("assistant_source_untitled")} onClose={() => setReading(undefined)}>

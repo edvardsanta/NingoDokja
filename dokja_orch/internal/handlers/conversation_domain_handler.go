@@ -8,6 +8,7 @@ import (
 	"time"
 
 	conversation "read_books/dokja_domain/dokja_conversation"
+	memorydomain "read_books/dokja_domain/dokja_memory"
 	"read_books/internal/core"
 )
 
@@ -20,6 +21,7 @@ type ConversationDomainHandler struct {
 	realtime *conversation.ConversationContextEngine
 	facts    *conversation.Facts
 	running  *core.RunningSends
+	verdicts *memorydomain.Domain
 }
 
 func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDomainHandler {
@@ -29,6 +31,13 @@ func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDo
 // WithFacts lets the owner's interfaces see and delete what known people asked to keep.
 func (h *ConversationDomainHandler) WithFacts(facts *conversation.Facts) *ConversationDomainHandler {
 	h.facts = facts
+	return h
+}
+
+// WithAnswerFeedback lets the owner judge an answer as useful or wrong. The verdict resolves the
+// memory experience ChatAnswerExperience recorded for that turn.
+func (h *ConversationDomainHandler) WithAnswerFeedback(service memorydomain.Service) *ConversationDomainHandler {
+	h.verdicts = memorydomain.New(service)
 	return h
 }
 
@@ -122,6 +131,8 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 			return nil, conversation.ErrConflict
 		}
 		return map[string]any{"conversation_id": held.ID, "send_id": sendID, "stopping": true}, nil
+	case "conversation.feedback":
+		return h.feedback(ctx, scope, payload)
 	case "conversation.facts":
 		if h.facts == nil {
 			return nil, conversation.ErrUnavailable
@@ -168,6 +179,8 @@ func (h *ConversationDomainHandler) operations() map[string]string {
 		"send":  "supported",
 		"retry": state(h.archive.RetriesInConversation()),
 		"stop":  state(h.running != nil),
+		// Judging an answer as useful or wrong, the outcome step 08.3 learns from.
+		"feedback": state(h.verdicts != nil),
 		// Changing a reply while it is written is a separate capability that nothing offers.
 		"steer": "unsupported",
 	}
@@ -257,4 +270,51 @@ func payloadRevision(payload map[string]any) uint64 {
 		return 0
 	}
 	return uint64(value)
+}
+
+// answerVerdicts maps what the owner says about an answer to the outcomes every experience shares.
+// No verdict is not "wrong": an answer nobody judged expires unscored.
+var answerVerdicts = map[string]string{"useful": memorydomain.OutcomeAccepted, "wrong": memorydomain.OutcomeReplaced}
+
+// feedback resolves the experience of one completed answer in the caller's conversation. The turn
+// is read back from the archive, so a verdict can only judge an answer the owner was shown, and the
+// experience it resolves is derived from that turn, never taken from the request. The first verdict
+// stands: a second one reports the first.
+func (h *ConversationDomainHandler) feedback(ctx context.Context, scope conversation.Scope, payload map[string]any) (map[string]any, error) {
+	if h.verdicts == nil {
+		return nil, conversation.ErrUnavailable
+	}
+	verdict := payloadString(payload, "verdict")
+	outcome, known := answerVerdicts[verdict]
+	turnID, seq := payloadString(payload, "turn_id"), payloadInt(payload, "seq")
+	if !known || turnID == "" || seq < 1 {
+		return nil, conversation.ErrInvalid
+	}
+	turns, err := h.archive.Turns(ctx, scope, payloadString(payload, "conversation_id"), seq+1, 1)
+	if err != nil {
+		return nil, archiveError(err)
+	}
+	if len(turns) != 1 || turns[0].ID != turnID || turns[0].Seq != seq {
+		return nil, conversation.ErrNotFound
+	}
+	ref := feedbackRef(turns[0])
+	if ref == "" {
+		// Only a completed answer can be judged.
+		return nil, conversation.ErrConflict
+	}
+	answer, err := h.verdicts.Handle(ctx, memorydomain.Request{Action: memorydomain.ActionResolveExperience,
+		Event: memorydomain.Event{Source: "orchestrator", Payload: map[string]any{"ref": ref, "outcome": outcome}}})
+	if err != nil {
+		return nil, fmt.Errorf("the verdict could not be kept: memory is unavailable")
+	}
+	found, _ := answer["found"].(bool)
+	resolved, _ := answer["resolved"].(bool)
+	current, _ := answer["outcome"].(string)
+	view := map[string]any{"turn_id": turnID, "found": found, "resolved": resolved}
+	for word, mapped := range answerVerdicts {
+		if mapped == current {
+			view["verdict"] = word
+		}
+	}
+	return view, nil
 }

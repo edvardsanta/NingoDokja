@@ -675,6 +675,11 @@
               "name": "apply_surface_removed",
               "status": "passed",
               "detail": "Desktop Apply view, source supervisor, Desktop host, knowledge.application.supervision.* routes and DOKJA_SOURCE_SUPERVISION_TOKEN removed; journal configured by DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN alone with startup recovery kept. dokja_orch go vet and go test -race ./... passed; scripts/test_application_journal_postgres.sh passed 13 tests plus server restart replay; desktop pnpm typecheck, pnpm test (320 Node, 527 UI), pnpm build and the full Electron e2e suite (51) passed. Removed request types are refused before reaching Knowledge; the retired credential is dropped from every event (mutation-checked). No owner env or database changed."
+            },
+            {
+              "name": "answer_feedback_outcome",
+              "status": "passed",
+              "detail": "Owner decision 2026-11-08: answer feedback before preparation in Talk. Completed archived answers record chat.answer memory experiences with frozen predicted_p/baseline_p; conversation.feedback resolves useful=accepted, wrong=replaced, first verdict stands, no verdict expires unscored. dokja_memory and dokja_orch go vet and go test -race passed; desktop pnpm typecheck, pnpm test (321 Node, 530 UI after rebasing onto the removal; 2 known flaky UI tests failed once in an earlier full run and passed in isolation and on rerun), pnpm build, full Electron e2e 51 passed. Live: real dokja-memory with a scratch DB and a stubbed model (3 experiences across replays, verdicts kept, first verdict stands, chat.answer scored 2). No real chat provider run. See dokja_docs/answer-feedback.md."
             }
           ]
         },
@@ -695,7 +700,7 @@
           "evidence": []
         }
       ],
-      "next_action": "08.2: prepare focused sources inside Talk turns (dokja_docs/knowledge-apply-review.md step 3), then answer feedback as the outcome (step 4). The Desktop Apply surface is removed."
+      "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: CLI/TUI verdicts, then prepare focused sources inside Talk (knowledge-apply-review.md step 3); 08.3 reads the chat.answer scorecard once enough verdicts exist."
     },
     {
       "id": "09",
@@ -2462,5 +2467,5 @@
     }
   ],
   "next_step": null,
-  "next_action": "08.2: prepare focused sources inside Talk turns (dokja_docs/knowledge-apply-review.md step 3), then answer feedback as the outcome (step 4). The Desktop Apply surface is removed."
+  "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: CLI/TUI verdicts, then prepare focused sources inside Talk (knowledge-apply-review.md step 3); 08.3 reads the chat.answer scorecard once enough verdicts exist."
 }

@@ -44,6 +44,7 @@ type ChatDomainHandler struct {
 	knowledge        KnowledgeSearcher
 	knowledgeEnabled func() bool
 	archive          *conversation.Archive
+	answers          *ChatAnswerExperience
 	facts            *conversation.Facts
 	ownerProfile     chat.OwnerProfile
 	incoming         *IncomingContentWorkflow
