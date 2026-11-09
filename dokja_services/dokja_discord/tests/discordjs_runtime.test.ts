@@ -195,3 +195,35 @@ test("command replies and their edits carry embeds, and a long reply keeps them 
   assert.deepEqual((parts[0] as { embeds?: unknown }).embeds, [{ title: "card" }]);
   assert.equal((parts[1] as { embeds?: unknown }).embeds, undefined);
 });
+
+test("an optional string option left empty reads as empty text instead of failing the command", async () => {
+  // Regression: /preco with only "produto" failed because "marca" was read as required.
+  const { handleChatInputCommand } = await import("../runtime/discordjs_runtime.js");
+  const given: Record<string, string> = { produto: "hd" };
+  const seen: string[] = [];
+  const interaction = {
+    user: { id: "u" }, channelId: "c", id: "i", guildId: "g", deferred: false, replied: false,
+    options: {
+      getString(name: string, required?: boolean) {
+        if (!(name in given) && required) throw new Error(`Required option "${name}" not found.`);
+        return given[name] ?? null;
+      },
+      getNumber: () => null,
+    },
+    deferReply: async () => { interaction.deferred = true; },
+    editReply: async () => {},
+    reply: async () => {},
+    followUp: async () => {},
+  };
+  await handleChatInputCommand(
+    {
+      name: "preco",
+      description: "d",
+      handle: async (context: any) => { seen.push(context.getString("produto"), context.getString("marca")); },
+    },
+    interaction as any,
+    [], [], [],
+    {} as any,
+  );
+  assert.deepEqual(seen, ["hd", ""]);
+});
