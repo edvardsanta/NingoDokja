@@ -39,6 +39,11 @@ type competitorQueryCache interface {
 	Put(context.Context, string, []string) error
 }
 
+type competitorEquivalenceCache interface {
+	GetEquivalences(context.Context, string) ([]map[string]any, bool, error)
+	PutEquivalences(context.Context, string, []map[string]any) error
+}
+
 // WithCommenter lets Ningo comment on comparisons.
 func (h *PriceDomainHandler) WithCommenter(commenter priceCommenter) *PriceDomainHandler {
 	h.commenter = commenter
@@ -48,6 +53,12 @@ func (h *PriceDomainHandler) WithCommenter(commenter priceCommenter) *PriceDomai
 // WithCompetitorQueryCache avoids repeating provider planning for identical product facts.
 func (h *PriceDomainHandler) WithCompetitorQueryCache(cache competitorQueryCache) *PriceDomainHandler {
 	h.competitorCache = cache
+	return h
+}
+
+// WithCompetitorEquivalenceCache stores technically comparable candidates separately from prices.
+func (h *PriceDomainHandler) WithCompetitorEquivalenceCache(cache competitorEquivalenceCache) *PriceDomainHandler {
+	h.equivalenceCache = cache
 	return h
 }
 
@@ -100,13 +111,15 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
-		if discovered := h.discoverCompetitors(ctx, result, payload); discovered {
+		if discovered := h.discoverCompetitors(ctx, result); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
+				h.persistEquivalences(ctx, result)
 				result["competitors_discovered"] = true
 			}
 		}
 	}
+
 	if link != nil {
 		result["link"] = link
 	}
@@ -126,11 +139,58 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	return result, nil
 }
 
-func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, original map[string]any) bool {
+func (h *PriceDomainHandler) persistEquivalences(ctx context.Context, result map[string]any) {
+	if h.equivalenceCache == nil {
+		return
+	}
+	product, _ := result["product"].(map[string]any)
+	key, err := cacheKey(map[string]any{
+		"plan_version": competitorPlanVersion,
+		"product":      product,
+		"profile":      result["profile"],
+	})
+	if err != nil {
+		return
+	}
+	rawAlternatives, _ := result["alternatives"].([]any)
+	items := make([]map[string]any, 0, len(rawAlternatives))
+	for _, raw := range rawAlternatives {
+		alternative, _ := raw.(map[string]any)
+		classification, _ := alternative["classification"].(string)
+		if classification != "technically_comparable" && classification != "technically_superior" {
+			continue
+		}
+		confidence, _ := alternative["confidence"].(string)
+		if confidence == "" || confidence == "low" {
+			continue
+		}
+		item := map[string]any{
+			"product_key":       alternative["product"],
+			"title":             alternative["title"],
+			"category":          alternative["category"],
+			"brand":             alternative["brand"],
+			"part_number":       alternative["part_number"],
+			"classification":    classification,
+			"confidence":        confidence,
+			"shared_attributes": alternative["shared_attributes"],
+		}
+		if query, _ := alternative["part_number"].(string); strings.TrimSpace(query) != "" {
+			item["query"] = query
+		} else {
+			item["query"] = alternative["title"]
+		}
+		items = append(items, item)
+	}
+	if len(items) > 0 {
+		_ = h.equivalenceCache.PutEquivalences(ctx, key, items)
+	}
+}
+
+func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any) bool {
 	product, _ := result["product"].(map[string]any)
 	title, _ := product["title"].(string)
 	category, _ := product["category"].(string)
-	queries := h.competitorQueries(ctx, product, result["profile"], original)
+	queries := h.competitorQueries(ctx, product, result["profile"])
 	changed := false
 	for _, query := range queries {
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"query": query, "limit": competitorLookupLimit})
@@ -149,12 +209,36 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, or
 	return changed
 }
 
-func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any, original map[string]any) []string {
+func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any) []string {
 	input := map[string]any{
 		"plan_version": competitorPlanVersion,
 		"product":      product,
 		"profile":      profile,
-		"budget_cents": original["budget_cents"],
+	}
+	if h.equivalenceCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			if items, hit, getErr := h.equivalenceCache.GetEquivalences(ctx, key); getErr == nil && hit {
+				queries := make([]string, 0, len(items))
+				seen := map[string]bool{}
+				for _, item := range items {
+					query, _ := item["query"].(string)
+					if strings.TrimSpace(query) == "" {
+						query, _ = item["part_number"].(string)
+					}
+					if strings.TrimSpace(query) == "" {
+						query, _ = item["title"].(string)
+					}
+					query = strings.TrimSpace(query)
+					if query != "" && len(query) <= 100 && !seen[strings.ToLower(query)] {
+						seen[strings.ToLower(query)] = true
+						queries = append(queries, query)
+					}
+				}
+				if len(queries) > 0 {
+					return queries
+				}
+			}
+		}
 	}
 	if h.competitorCache != nil {
 		if key, keyErr := cacheKey(input); keyErr == nil {

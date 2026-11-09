@@ -166,7 +166,7 @@ func TestCompetitorQueriesComeFromStructuredProviderOutput(t *testing.T) {
 	queries := handler.competitorQueries(context.Background(), map[string]any{
 		"title": "Processador 8 cores 16 threads", "category": "cpu",
 		"specifications": map[string]any{"cores": float64(8), "threads": float64(16), "socket": "am5"},
-	}, map[string]any{"id": "cpu"}, map[string]any{"budget_cents": int64(190000)})
+	}, map[string]any{"id": "cpu"})
 	assert := strings.Join(queries, "|")
 	if !strings.Contains(assert, "8 cores 16 threads") || strings.Contains(assert, "ryzen") || strings.Contains(assert, "intel") {
 		t.Fatalf("queries %v", queries)
@@ -177,7 +177,7 @@ func TestCompetitorQueriesUseCacheBeforeProvider(t *testing.T) {
 	cache := &fakeQueryCache{queries: []string{"processador 8 cores 16 threads am5"}}
 	handler, _ := compareHandler(&compareResolver{}, &fakeCommenter{reply: `{"queries":["provider query"]}`})
 	handler.WithCompetitorQueryCache(cache)
-	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"}, nil)
+	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"})
 	if len(queries) != 1 || queries[0] != cache.queries[0] || cache.hits != 1 || cache.puts != 0 {
 		t.Fatalf("cache was not used: queries=%v hits=%d puts=%d", queries, cache.hits, cache.puts)
 	}

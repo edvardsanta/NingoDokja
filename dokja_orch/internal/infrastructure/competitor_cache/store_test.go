@@ -29,3 +29,28 @@ func TestStoreRoundTripsQueries(t *testing.T) {
 		t.Fatalf("queries %v", got)
 	}
 }
+
+func TestStoreRoundTripsEquivalences(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "cache.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	items := []map[string]any{{
+		"product_key":    "pn:equivalent",
+		"title":          "Processador 8 cores 16 threads am5",
+		"query":          "ABC123",
+		"classification": "technically_comparable",
+	}}
+	if err := store.PutEquivalences(context.Background(), "source", items); err != nil {
+		t.Fatal(err)
+	}
+	got, hit, err := store.GetEquivalences(context.Background(), "source")
+	if err != nil || !hit {
+		t.Fatalf("get: %v hit=%v", err, hit)
+	}
+	if len(got) != 1 || got[0]["product_key"] != "pn:equivalent" || got[0]["query"] != "ABC123" {
+		t.Fatalf("equivalences %v", got)
+	}
+}

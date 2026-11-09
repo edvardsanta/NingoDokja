@@ -236,7 +236,9 @@ func main() {
 		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	)).WithCommenter(clients.NewChatProviderClient(""))
 	if competitorCache != nil {
-		priceHandler.WithCompetitorQueryCache(competitorCache)
+		priceHandler.
+			WithCompetitorQueryCache(competitorCache).
+			WithCompetitorEquivalenceCache(competitorCache)
 	}
 	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
 	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an

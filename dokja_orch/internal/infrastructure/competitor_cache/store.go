@@ -51,6 +51,12 @@ func (s *Store) migrate() error {
 CREATE TABLE IF NOT EXISTS competitor_queries (
 	cache_key TEXT PRIMARY KEY,
 	queries_json TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS product_equivalences (
+	source_key TEXT NOT NULL,
+	candidate_key TEXT NOT NULL,
+	equivalence_json TEXT NOT NULL,
+	PRIMARY KEY (source_key, candidate_key)
 );`)
 	return err
 }
@@ -104,12 +110,75 @@ ON CONFLICT(cache_key) DO UPDATE SET queries_json=excluded.queries_json`,
 
 // Delete removes one plan after a profile or policy change.
 func (s *Store) Delete(ctx context.Context, key string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries WHERE cache_key = ?`, key)
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries WHERE cache_key = ?`, key); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM product_equivalences WHERE source_key = ?`, key)
 	return err
 }
 
 // Clear removes all durable plans. It is intended for explicit operator invalidation.
 func (s *Store) Clear(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries`)
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries`); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM product_equivalences`)
+	return err
+}
+
+func (s *Store) GetEquivalences(ctx context.Context, key string) ([]map[string]any, bool, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT equivalence_json FROM product_equivalences
+WHERE source_key = ? ORDER BY candidate_key`, key)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	var result []map[string]any
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, false, err
+		}
+		var item map[string]any
+		if err := json.Unmarshal([]byte(raw), &item); err != nil {
+			return nil, false, err
+		}
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	return result, len(result) > 0, nil
+}
+
+func (s *Store) PutEquivalences(ctx context.Context, key string, items []map[string]any) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, item := range items {
+		raw, err := json.Marshal(item)
+		if err != nil || len(raw) > maxJSON {
+			return fmt.Errorf("competitor equivalence exceeds storage bounds")
+		}
+		candidateKey, _ := item["product_key"].(string)
+		if candidateKey == "" {
+			return fmt.Errorf("competitor equivalence product key is empty")
+		}
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO product_equivalences(source_key, candidate_key, equivalence_json)
+VALUES(?, ?, ?)
+ON CONFLICT(source_key, candidate_key) DO UPDATE SET equivalence_json=excluded.equivalence_json`,
+			key, candidateKey, string(raw)); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) DeleteEquivalences(ctx context.Context, key string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM product_equivalences WHERE source_key = ?`, key)
 	return err
 }
