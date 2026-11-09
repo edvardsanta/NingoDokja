@@ -86,6 +86,7 @@ func TestJobEventMapsEveryJobToItsEvent(t *testing.T) {
 		"meme.refresh":     "meme.pool.refresh",
 		"meme.dispatch":    "meme.dispatch.scheduled",
 		"knowledge.intake": "knowledge.intake.run",
+		"price.intake":     "price.intake.run",
 	}
 	for _, name := range JobNames {
 		eventType, payload, err := JobEvent(name, 2)

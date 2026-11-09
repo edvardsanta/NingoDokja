@@ -27,9 +27,14 @@ type item struct {
 	prompts []string
 }
 
+// hiddenKinds are item kinds that are data for another domain, not reading. Price
+// observations (kind "price") belong to the Price domain: a row of prices is neither worth
+// showing in the digest nor worth citing in a conversation.
+var hiddenKinds = map[string]bool{"price": true}
+
 // itemsFrom reads the items of a feeds.items reply. An entry that is not an object with a title
 // is skipped: the service already cleans what plugins print, and one bad entry must not hide
-// the rest.
+// the rest. Items of a hidden kind are skipped too.
 func itemsFrom(reply map[string]any) ([]item, error) {
 	value, present := reply["items"]
 	if !present {
@@ -49,7 +54,7 @@ func itemsFrom(reply map[string]any) ([]item, error) {
 			continue
 		}
 		title := text(fields, "title")
-		if title == "" {
+		if title == "" || hiddenKinds[text(fields, "kind")] {
 			continue
 		}
 		published, _ := time.Parse(time.RFC3339, text(fields, "published"))

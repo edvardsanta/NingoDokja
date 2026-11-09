@@ -19,6 +19,7 @@ const NAMES: Readonly<Record<string, MessageId>> = {
   "meme.refresh": "name_meme_refresh",
   "meme.dispatch": "name_meme_dispatch",
   "knowledge.intake": "name_knowledge_intake",
+  "price.intake": "name_price_intake",
 };
 
 // A name the screen does not know is shown as it came, rather than hidden.

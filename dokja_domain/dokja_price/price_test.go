@@ -258,6 +258,21 @@ func TestAssessReportsAStaleHistory(t *testing.T) {
 	}
 }
 
+func TestAssessAcceptsAnAggregatorThatStopsAtYesterday(t *testing.T) {
+	// Regression: a history ending yesterday in Brazil, judged late in the evening when the
+	// UTC date is already tomorrow, was called stale.
+	points := series(append(flat(60, 500), 400)...)
+	for i := range points {
+		on, _ := time.Parse(dateLayout, points[i].On)
+		points[i].On = on.AddDate(0, 0, -1).Format(dateLayout)
+	}
+	lateEvening := today.Add(13 * time.Hour) // 01:00 UTC of the next day
+	got := Assess(Key{Product: "p", Merchant: "m", Series: SeriesMarketMin, Kind: KindUnknown}, points, lateEvening)
+	if got.Verdict != VerdictRealDiscount {
+		t.Fatalf("verdict %s", got.Verdict)
+	}
+}
+
 func contains(signals []Signal, want Signal) bool {
 	for _, signal := range signals {
 		if signal == want {

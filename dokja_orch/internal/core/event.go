@@ -35,6 +35,8 @@ const (
 	DomainModeration     Domain = "moderation"
 	// The owner's archive of conversations with Ningo: list, read, rename and delete.
 	DomainConversation Domain = "conversation"
+	// Price history of the products the owner watches, and whether a price is a real promotion.
+	DomainPrice Domain = "price"
 )
 
 type Event struct {
