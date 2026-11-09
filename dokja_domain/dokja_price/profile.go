@@ -39,8 +39,8 @@ var categoryProfiles = map[string]CategoryProfile{
 		ID: "storage",
 		Attributes: []AttributeSpec{
 			{Key: "capacity_gb", HigherIsBetter: true},
-			{Key: "read_mbs", HigherIsBetter: true},
-			{Key: "write_mbs", HigherIsBetter: true},
+			{Key: "read_mbps", HigherIsBetter: true},
+			{Key: "write_mbps", HigherIsBetter: true},
 			{Key: "interface", Required: true},
 		},
 	},

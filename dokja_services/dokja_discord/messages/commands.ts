@@ -70,6 +70,7 @@ export const COMMAND_TRANSLATIONS: Record<string, Record<string, CommandText>> =
       options: {
         product: { name: "produto", description: "Nome ou código do produto, como ssd 1tb" },
         link: { name: "link", description: "Link do produto numa loja; ele é lido, nunca aberto" },
+        budget: { name: "orçamento", description: "Orçamento máximo em reais" },
       },
     },
     political_test: {

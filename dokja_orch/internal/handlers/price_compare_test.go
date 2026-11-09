@@ -91,7 +91,7 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 	if got["found"] != true || got["looked_up"] != true || got["comment"] != "Compre na store-b, plebeu." {
 		t.Fatalf("result %v", got)
 	}
-	if strings.Join(resolver.actions, ",") != "identify,lookup" || resolver.inputs[1]["part_number"] != "XY650SS-240GT-R" {
+	if strings.Join(resolver.actions, ",") != "identify,lookup,lookup,lookup,lookup" || resolver.inputs[1]["part_number"] != "XY650SS-240GT-R" {
 		t.Fatalf("actions %v inputs %v", resolver.actions, resolver.inputs)
 	}
 	offers := got["offers"].([]any)
@@ -131,5 +131,35 @@ func TestCompareAnswersAnUnknownLinkWithoutGuessing(t *testing.T) {
 	got := runCompare(t, handler, true, map[string]any{"link": "https://unknown.example/x"})
 	if got["found"] != false || got["link"].(map[string]any)["known"] != false {
 		t.Fatalf("unknown link %v", got)
+	}
+
+}
+
+func TestCompetitorQueriesCoverOtherCPUFamilies(t *testing.T) {
+	queries := competitorQueries("processador", "AMD Ryzen 7 9700X")
+	joined := strings.Join(queries, "|")
+	for _, want := range []string{"processador ryzen 5", "processador ryzen 9", "processador intel core i7"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("queries %v do not include %q", queries, want)
+		}
+	}
+	if strings.Contains(joined, "processador ryzen 7") {
+		t.Fatalf("original family should not be queried again: %v", queries)
+	}
+}
+
+func TestObservationItemsWithCategoryFillsOnlyMissingCategory(t *testing.T) {
+	raw := []any{
+		map[string]any{"product": "one", "category": "", "title": "Ryzen"},
+		map[string]any{"product": "two", "category": "gpu", "title": "RTX"},
+	}
+	items := observationItemsWithCategory(raw, "cpu")
+	first := items[0].(map[string]any)["body"].(string)
+	second := items[1].(map[string]any)["body"].(string)
+	if !strings.Contains(first, `"category":"cpu"`) {
+		t.Fatalf("missing category was not filled: %s", first)
+	}
+	if !strings.Contains(second, `"category":"gpu"`) {
+		t.Fatalf("existing category was overwritten: %s", second)
 	}
 }

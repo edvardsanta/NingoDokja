@@ -15,6 +15,10 @@ import (
 const (
 	// compareLookupLimit bounds the products a one-off lookup may bring in.
 	compareLookupLimit = 3
+	// competitorLookupLimit bounds the candidates returned by each family query.
+	competitorLookupLimit = 5
+	// maxCompetitorQueries prevents one comparison from turning into an unbounded crawl.
+	maxCompetitorQueries = 4
 	// compareStepTimeout bounds each call the comparison makes (identify, lookup, comment).
 	compareStepTimeout = 40 * time.Second
 	// maxCompareComment bounds Ningo's comment.
@@ -71,13 +75,21 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	if growable, _ := result["growable"].(bool); growable && h.feeds != nil {
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"part_number": payload["part_number"], "query": payload["query"], "limit": compareLookupLimit})
 		if err == nil {
-			items := observationItems(looked["observations"])
+			items := observationItemsWithCategory(looked["observations"], categoryForProduct("", originalString(payload, "query")))
 			if outcome, err := h.domain.Record(ctx, items); err == nil {
 				logger.Info(fmt.Sprintf("price compare lookup event_id=%s observations=%d invalid=%d", event.EventID, outcome.Observations, len(outcome.Invalid)))
 				if result, err = ask(); err != nil {
 					return nil, err
 				}
 				result["looked_up"] = true
+			}
+		}
+	}
+	if found, _ := result["found"].(bool); found && h.feeds != nil {
+		if discovered := h.discoverCompetitors(ctx, result, payload); discovered {
+			if refreshed, refreshErr := ask(); refreshErr == nil {
+				result = refreshed
+				result["competitors_discovered"] = true
 			}
 		}
 	}
@@ -98,6 +110,114 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	return result, nil
+}
+
+func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, original map[string]any) bool {
+	product, _ := result["product"].(map[string]any)
+	title, _ := product["title"].(string)
+	category, _ := product["category"].(string)
+	originalKey, _ := product["product"].(string)
+	queries := competitorQueries(category, title)
+	if len(queries) == 0 {
+		queries = competitorQueries("", originalString(original, "query"))
+	}
+	changed := false
+	for _, query := range queries {
+		looked, err := h.invoke(ctx, "lookup", map[string]any{"query": query, "limit": competitorLookupLimit})
+		if err != nil {
+			continue
+		}
+		items := competitorObservationItems(looked["observations"], categoryForProduct(category, title), originalKey)
+		if len(items) == 0 {
+			continue
+		}
+		outcome, err := h.domain.Record(ctx, items)
+		if err == nil && outcome.Observations > 0 {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func originalString(values map[string]any, key string) string {
+	value, _ := values[key].(string)
+	return value
+}
+
+func competitorQueries(category, title string) []string {
+	family := categoryForProduct(category, title)
+	lower := strings.ToLower(title)
+	switch family {
+	case "cpu":
+		queries := []string{"processador ryzen 7", "processador ryzen 5", "processador ryzen 9", "processador intel core i7"}
+		if strings.Contains(lower, "intel") {
+			queries = []string{"processador intel core i5", "processador intel core i7", "processador intel core i9", "processador ryzen 7"}
+		}
+		return uniqueQueries(queries, lower)
+	case "gpu":
+		return uniqueQueries([]string{"placa de video radeon", "placa de video geforce", "placa de video intel arc", "placa de video"}, lower)
+	case "storage":
+		return uniqueQueries([]string{"ssd sata", "ssd nvme", "hd sata iii", "ssd"}, lower)
+	case "mobile":
+		return uniqueQueries([]string{"smartphone samsung", "smartphone motorola", "smartphone xiaomi", "smartphone apple"}, lower)
+	case "display":
+		return uniqueQueries([]string{"monitor gamer", "monitor 144hz", "monitor 165hz", "monitor ips"}, lower)
+	default:
+		return nil
+	}
+}
+
+func uniqueQueries(queries []string, original string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, maxCompetitorQueries)
+	for _, query := range queries {
+		query = strings.TrimSpace(query)
+		normalizedQuery := strings.ReplaceAll(strings.ToLower(query), "processador ", "")
+		if query == "" || strings.Contains(original, normalizedQuery) || seen[query] {
+			continue
+		}
+
+		seen[query] = true
+		out = append(out, query)
+		if len(out) == maxCompetitorQueries {
+			break
+		}
+	}
+	return out
+}
+
+func competitorObservationItems(raw any, category, originalKey string) []any {
+	observations, _ := raw.([]any)
+	filtered := make([]any, 0, len(observations))
+	for _, observation := range observations {
+		values, ok := observation.(map[string]any)
+		if !ok {
+			continue
+		}
+		if key, _ := values["product"].(string); key == originalKey {
+			continue
+		}
+		filtered = append(filtered, observation)
+	}
+	return observationItemsWithCategory(filtered, category)
+}
+
+func categoryForProduct(category, title string) string {
+	value := strings.ToLower(strings.TrimSpace(category + " " + title))
+	switch {
+	case strings.Contains(value, "processador"), strings.Contains(value, "ryzen"), strings.Contains(value, "intel core"):
+		return "cpu"
+	case strings.Contains(value, "placa de video"), strings.Contains(value, "geforce"), strings.Contains(value, "radeon"), strings.Contains(value, "arc "):
+		return "gpu"
+	case strings.Contains(value, "ssd"), strings.Contains(value, "hard disk"), strings.Contains(value, "hd sata"), strings.Contains(value, "nvme"):
+		return "storage"
+	case strings.Contains(value, "smartphone"), strings.Contains(value, "celular"), strings.Contains(value, "iphone"), strings.Contains(value, "galaxy"):
+		return "mobile"
+	case strings.Contains(value, "monitor"), strings.Contains(value, "televisor"), strings.Contains(value, "televisao"):
+		return "display"
+	default:
+		return strings.TrimSpace(category)
+	}
 }
 
 func productKey(result map[string]any) string {
@@ -167,9 +287,20 @@ func (h *PriceDomainHandler) invoke(ctx context.Context, action string, input ma
 
 // observationItems wraps resolver observations as item bodies, the one shape the domain checks.
 func observationItems(raw any) []any {
+	return observationItemsWithCategory(raw, "")
+}
+
+func observationItemsWithCategory(raw any, category string) []any {
 	observations, _ := raw.([]any)
 	items := make([]any, 0, len(observations))
 	for index, observation := range observations {
+		if category != "" {
+			if values, ok := observation.(map[string]any); ok {
+				if current, _ := values["category"].(string); strings.TrimSpace(current) == "" {
+					values["category"] = category
+				}
+			}
+		}
 		body, err := json.Marshal(observation)
 		if err != nil {
 			continue
