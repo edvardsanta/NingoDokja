@@ -92,6 +92,7 @@ type jobRuntime struct {
 	lastAt      time.Time
 	lastOutcome string
 	lastError   string
+	lastReason  string
 }
 
 // ServiceInfo and JobInfo are the read model shown by status commands and the TUI.
@@ -109,6 +110,7 @@ type JobInfo struct {
 	LastAt           time.Time
 	LastOutcome      string
 	LastError        string
+	LastReason       string // why the last run was skipped, a Skip* code; empty otherwise
 	AnnouncedAt      time.Time
 }
 
@@ -279,13 +281,29 @@ func (c *Controls) runtimeLocked(name string) *jobRuntime {
 
 // RecordRun notes how the last scheduled run of a job ended (ran, skipped or error).
 func (c *Controls) RecordRun(schedule, outcome string, cause error, at time.Time) {
+	c.recordRun(schedule, outcome, "", cause, at)
+}
+
+// Why a scheduled run was skipped, for the interfaces to translate.
+const (
+	SkipSchedulerOff = "scheduler_off"
+	SkipJobOff       = "job_off"
+	SkipServiceOff   = "service_off"
+)
+
+// RecordSkip records a scheduled run that did not happen, with the code of its reason.
+func (c *Controls) RecordSkip(schedule, reason string, cause error, at time.Time) {
+	c.recordRun(schedule, "skipped", reason, cause, at)
+}
+
+func (c *Controls) recordRun(schedule, outcome, reason string, cause error, at time.Time) {
 	if !contains(KnownJobs, schedule) {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry := c.runtimeLocked(schedule)
-	entry.lastAt, entry.lastOutcome, entry.lastError = at, outcome, ""
+	entry.lastAt, entry.lastOutcome, entry.lastError, entry.lastReason = at, outcome, "", reason
 	if cause != nil {
 		entry.lastError = cause.Error()
 	}
@@ -346,7 +364,7 @@ func (c *Controls) Jobs() []JobInfo {
 				info.Interval = entry.announce.Interval
 			}
 			info.NextAt, info.AnnouncedAt = entry.announce.NextFire, entry.announcedAt
-			info.LastAt, info.LastOutcome, info.LastError = entry.lastAt, entry.lastOutcome, entry.lastError
+			info.LastAt, info.LastOutcome, info.LastError, info.LastReason = entry.lastAt, entry.lastOutcome, entry.lastError, entry.lastReason
 			if info.LastAt.IsZero() {
 				info.LastAt = entry.announce.LastFire
 			}
