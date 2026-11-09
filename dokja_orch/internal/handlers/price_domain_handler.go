@@ -23,16 +23,22 @@ const (
 	// priceMarketRefresh bounds how many known market pages a run hands back to the collector to
 	// refresh the stores' offers and the market history from, the stalest first.
 	priceMarketRefresh = 40
+	// priceWatchWait bounds how long a Discord search that started a watched search waits for
+	// that search's first collection, so the reply carries its products. Discord waits for a
+	// slash command's answer up to the adapter's request timeout (180 s by default).
+	priceWatchWait = 150 * time.Second
 )
 
 // PriceDomainHandler serves price.* events: the scheduled intake and assessments.
 type PriceDomainHandler struct {
 	domain *pricedomain.Domain
 	intake *PriceIntakeTask
+	// watchWait bounds the wait for a new watched search's first collection; 0 answers at once.
+	watchWait time.Duration
 }
 
 func NewPriceDomainHandler(domain *pricedomain.Domain, intake *PriceIntakeTask) *PriceDomainHandler {
-	return &PriceDomainHandler{domain: domain, intake: intake}
+	return &PriceDomainHandler{domain: domain, intake: intake, watchWait: priceWatchWait}
 }
 
 func (h *PriceDomainHandler) Domain() core.Domain {
@@ -49,19 +55,43 @@ func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workf
 		}
 		return h.intake.Start(event)
 	}
-	result, err := h.domain.Handle(ctx, pricedomain.Request{
-		Action: workflow.Action,
-		Event: pricedomain.Event{
-			ID: event.EventID, Source: string(event.Source), Type: event.Type,
-			Payload: event.Payload, Context: event.Context,
-		},
-	})
+	ask := func(payload map[string]any) (map[string]any, error) {
+		return h.domain.Handle(ctx, pricedomain.Request{
+			Action: workflow.Action,
+			Event: pricedomain.Event{
+				ID: event.EventID, Source: string(event.Source), Type: event.Type,
+				Payload: payload, Context: event.Context,
+			},
+		})
+	}
+	result, err := ask(event.Payload)
 	// A search the owner just started to watch is collected now, not at the next scheduled run.
 	if err == nil && h.intake != nil {
 		if watch, ok := result["watch"].(map[string]any); ok && watch["status"] == "added" {
 			category, _ := watch["category"].(string)
 			brand, _ := watch["brand"].(string)
-			h.intake.StartFor(event, pricedomain.Watch{Category: category, Brand: brand})
+			collected := h.intake.StartFor(event, pricedomain.Watch{Category: category, Brand: brand})
+			// Discord waits for the answer, so its reply carries what that first collection
+			// found. The Desktop answers at once (its requests are short) and asks again later.
+			if collected != nil && event.Source == core.SourceDiscord && h.watchWait > 0 {
+				timer := time.NewTimer(h.watchWait)
+				defer timer.Stop()
+				select {
+				case <-collected:
+					again := make(map[string]any, len(event.Payload))
+					for key, value := range event.Payload {
+						again[key] = value
+					}
+					delete(again, "watch") // asked once; the search is watched now
+					if found, againErr := ask(again); againErr == nil {
+						watch["collected"] = true
+						found["watch"] = watch
+						result = found
+					}
+				case <-timer.C:
+				case <-ctx.Done():
+				}
+			}
 		}
 	}
 	return result, err
@@ -115,29 +145,33 @@ func (t *PriceIntakeTask) Start(event core.Event) (map[string]any, error) {
 	if t.enabled != nil && !t.enabled() {
 		return map[string]any{"skipped": true, "reason": "feeds_switched_off"}, nil
 	}
-	return t.ask(event, func() { t.full = true }), nil
+	reply, _ := t.ask(event, func() { t.full = true })
+	return reply, nil
 }
 
-// StartFor collects one watched search, the one the owner just asked for.
-func (t *PriceIntakeTask) StartFor(event core.Event, watch pricedomain.Watch) {
+// StartFor collects one watched search, the one the owner just asked for. The channel closes
+// once the intake has nothing left to do, so that search has been collected; nil means no
+// collection was started.
+func (t *PriceIntakeTask) StartFor(event core.Event, watch pricedomain.Watch) <-chan struct{} {
 	if t == nil || t.domain == nil || (t.enabled != nil && !t.enabled()) {
-		return
+		return nil
 	}
-	t.ask(event, func() { t.pending[watch] = true })
+	_, idle := t.ask(event, func() { t.pending[watch] = true })
+	return idle
 }
 
-func (t *PriceIntakeTask) ask(event core.Event, mark func()) map[string]any {
+func (t *PriceIntakeTask) ask(event core.Event, mark func()) (map[string]any, <-chan struct{}) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	mark()
 	t.event = event
 	if t.running {
-		return map[string]any{"queued": true}
+		return map[string]any{"queued": true}, t.idle
 	}
 	t.running = true
 	t.idle = make(chan struct{})
 	go t.drain()
-	return map[string]any{"started": true}
+	return map[string]any{"started": true}, t.idle
 }
 
 // drain runs what was asked until nothing is left.
