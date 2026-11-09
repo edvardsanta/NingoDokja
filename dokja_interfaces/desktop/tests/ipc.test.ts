@@ -671,6 +671,20 @@ test("Knowledge's inner write timeout is an unknown outcome, never a definite in
 });
 
 
+test("a message said in Talk by voice is forwarded as spoken, and only a true flag is", async () => {
+  const conversation = "a".repeat(32);
+  const calls: Record<string, unknown>[] = [];
+  const turn = {id:"b".repeat(32),seq:1,send_id:"send-0001",content:"teste de som",reply:"Ouvi.",state:"completed",reason:"",attempts:1};
+  const client = { async request(_type: string, payload: Record<string, unknown>) { calls.push(payload); return {status:"ok",result:{domain:"chat",result:{reply:"Ouvi.",turn}}}; } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const present = {recent:()=>true};
+  const message = {content:"teste de som",conversation_id:conversation,send_id:"send-0001"};
+  for (const spoken of [true, "true", 1, false]) {
+    assert.equal((await handleRequest({type:"message.created",payload:{...message,spoken}},client,limits,undefined,present)).ok,true);
+  }
+  assert.deepEqual(calls,[{...message,spoken:true},message,message,message]);
+});
+
 test("an archived message forwards only its conversation, send id and text, or a bare retry", async () => {
   const conversation = "a".repeat(32);
   const turnId = "b".repeat(32);

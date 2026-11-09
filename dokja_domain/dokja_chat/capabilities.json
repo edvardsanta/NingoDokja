@@ -76,15 +76,20 @@
     },
     {
       "id": "conversation.voice",
-      "description": "Transcribe speech and generate spoken replies in a Discord voice conversation.",
+      "description": "Transcribe speech and generate spoken replies in a Discord voice conversation or in a Desktop assistant conversation.",
       "entry_points": [
         {
           "interface": "discord",
           "usage": "Use /voice_chat_start, /wake_chat, /voice_chat_stop or /speak."
+        },
+        {
+          "interface": "desktop",
+          "usage": "In Talk, turn on Talk by voice: what the owner says is transcribed into the conversation and the kept reply is read aloud."
         }
       ],
       "limits": [
-        "Requires configured voice and inference providers and an eligible voice session. Passive capture does not mean every utterance receives a reply."
+        "Requires configured voice and inference providers and an eligible voice session. Passive capture does not mean every utterance receives a reply.",
+        "Desktop voice listens only while the owner keeps Talk by voice on; the microphone audio is not saved."
       ]
     },
     {

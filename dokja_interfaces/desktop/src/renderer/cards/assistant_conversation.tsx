@@ -58,7 +58,8 @@ export type Conversation = {
   reload: () => void;
   field: RefObject<HTMLTextAreaElement | null>;
   // resolves to the kept reply when this send was answered, so a spoken message can be read back
-  send: (content: string) => Promise<string | undefined>;
+  // spoken marks a message said in Talk by voice, so Ningo knows it was heard, not typed
+  send: (content: string, options?: { spoken?: boolean }) => Promise<string | undefined>;
   retry: () => void;
   // The latest send is still on its way, here or from another interface, and can be asked to stop.
   stoppable: boolean;
@@ -282,7 +283,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     }
   };
 
-  const send = async (content: string): Promise<string | undefined> => {
+  const send = async (content: string, options: { spoken?: boolean } = {}): Promise<string | undefined> => {
     const message = content.trim();
     if (!message || busy || loading || loadError) return undefined;
     setDraft(""); setError(undefined); setUnkept(false);
@@ -300,7 +301,7 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
     }
     const sendId = newSendId();
     setTurns((previous) => [...previous, { sendId, id: "", content: message, reply: "", state: "pending", reason: "" }]);
-    return dispatch(sendId, { content: message, send_id: sendId });
+    return dispatch(sendId, { content: message, send_id: sendId, ...(options.spoken ? { spoken: true } : {}) });
   };
 
   // Only the latest send is retried, and never by sending its text as a new message.

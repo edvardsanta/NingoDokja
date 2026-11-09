@@ -22,7 +22,7 @@ func TestTheDesktopKnowsTheOwnerByTheConfiguredProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	system := model.system[0]
-	for _, want := range []string{"the current speaker is Ningo's owner", "local interface", `"name":"Alex"`, "engineer"} {
+	for _, want := range []string{"the current speaker is Ningo's owner", "the Desktop app on their own computer", `"name":"Alex"`, "engineer"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("the desktop's prompt must know the owner (%q):\n%s", want, system)
 		}

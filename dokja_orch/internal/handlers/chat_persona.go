@@ -267,7 +267,17 @@ func interfacePersona(event core.Event) string {
 		}
 		return persona
 	}
+	if spokenDesktopTurn(event) {
+		return chatPersona + "\n\n" + chat.DesktopVoicePresentation
+	}
 	return chatPersona
+}
+
+// spokenDesktopTurn is a Desktop message the owner said in Talk by voice. The flag only changes
+// how Ningo is told the message arrived; it grants nothing.
+func spokenDesktopTurn(event core.Event) bool {
+	spoken, _ := event.Payload["spoken"].(bool)
+	return spoken && event.Source == core.SourceDesktop
 }
 
 // withPersona puts the persona and interface presentation ahead of the turn's other content.
@@ -299,6 +309,12 @@ This changes conversational stance, not factual standards: do not agree merely b
 func ownerInterfaceNote(event core.Event) string {
 	channel, _ := event.Context["owner_interface"].(string)
 	where := "their own local interface (desktop, CLI or TUI), which only the owner uses"
+	switch event.Source {
+	case core.SourceDesktop:
+		where = "the Desktop app on their own computer, which only the owner uses. This is not a terminal"
+	case core.SourceCLI:
+		where = "their own terminal interface (CLI or TUI), which only the owner uses"
+	}
 	switch channel {
 	case string(chat.OwnerByWhatsApp):
 		where = "the linked WhatsApp account's own \"message yourself\" chat, which only that account can write in"
