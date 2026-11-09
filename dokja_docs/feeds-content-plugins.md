@@ -23,6 +23,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
 | `audio.resolve.v1` | `feeds.invoke`, `read {url}` or `search {query, limit}` | `handled`, and `refused` or `tracks` (see Music sources) |
 | `social.resolve.v1` | `feeds.invoke`, `read {url}` | `handled`, and `refused` or `post` (see Post readers) |
+| `price.resolve.v1` | `feeds.invoke`, `search {searches, limit, market}` | `observations` (`price.observation.v1` objects, validated by the Price domain) and an optional `skipped` map |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`
 selects an explicitly named provider. The subprocess receives

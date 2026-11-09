@@ -97,14 +97,25 @@ Thresholds are constants in `assess.go`, in basis points:
 
 ## Orchestrator intake (implemented)
 
-- **Scheduler.** The `price.intake` job emits `price.intake.run` every 15
-  minutes by default, matching a Feeds collector's default interval. Feeds
-  keeps only a collector's last run, so reading less often would lose the
-  chunks of a multi-run backfill. Like every job, it can be paused or given
-  another interval through the controls; no variable was added.
-- **Intake task.** A typed task reads `feeds.items` without refreshing and
-  hands every item to `record-price-observations`. It skips the run while
-  Feeds is switched off or another run is going.
+- **Scheduler.** The `price.intake` job emits `price.intake.run` every 6 hours
+  by default: each run queries the stores for every watched search. Like every
+  job, it can be switched off or given another interval through the controls;
+  no variable was added.
+- **Intake task (collection by watched search).** A typed task in three steps:
+  - plan: the domain's watched searches, or the one the owner just added, and
+    up to 5 products that lack a market history;
+  - collect: `feeds.invoke` with `price.resolve.v1`, action `search`, input
+    `{searches: [{category, brand}], limit: 30, market: [{product, title,
+    part_number}]}`; the plugin answers `{observations: [...]}`;
+  - record: each observation goes to `record-price-observations` as an item
+    body, the one shape the domain validates.
+
+  A scheduled run collects every watched search; a search the owner just added
+  is collected at once, on its own. Asked while a run is going, both wait and
+  run next. The run is skipped while Feeds is switched off, and fails with
+  `no_watches` when nothing is watched. This replaces reading `feeds.items`:
+  the scheduled collector (`source.collect.v1`) is retired for prices, so only
+  one path writes them.
 - **Route.** `price.assess` routes to `assess-price`. It works while Feeds is
   off, because it reads only the history.
 - **Digest.** It drops items of kind `price` in the one place it reads Feeds
@@ -181,10 +192,8 @@ The owner watches categories and brands, not single products: "ssd sata" from
 
 ## Pending work (stacked follow-ups)
 
-- **Collection by watched search.** A `price.resolve.v1` Feeds capability
-  invoked by the orchestrator with the watched searches (and with a known
-  store's product link for a comparison), replacing the scheduled collector.
-  Links are parsed against known stores and never fetched as given.
+- **A product link for a comparison** (`price.resolve.v1` action `read`):
+  links are parsed against known stores and never fetched as given.
 - **`/preco` with store, links and opportunity order, then the Desktop.**
 - **`/comparar_produto`**: offers across stores for one product, with a short
   comment from Ningo written from the domain's facts.

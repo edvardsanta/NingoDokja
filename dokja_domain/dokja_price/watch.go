@@ -95,3 +95,35 @@ func (d *Domain) watchList(ctx context.Context) (map[string]any, error) {
 	}
 	return map[string]any{"watches": rows, "count": len(rows), "limit": maxWatches}, nil
 }
+
+// Watches returns the watched searches, for the orchestrator to hand to a collector.
+func (d *Domain) Watches(ctx context.Context) ([]Watch, error) {
+	return d.repository.Watches(ctx)
+}
+
+// MissingMarket lists up to limit products that have no market-low history yet, oldest key
+// first, so a collector can look each up once instead of on every run.
+func (d *Domain) MissingMarket(ctx context.Context, limit int) ([]Product, error) {
+	products, err := d.repository.Products(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var missing []Product
+	for _, product := range products {
+		if len(missing) == limit {
+			break
+		}
+		keys, err := d.repository.Keys(ctx, product.Key)
+		if err != nil {
+			return nil, err
+		}
+		market := false
+		for _, key := range keys {
+			market = market || key.Series == SeriesMarketMin
+		}
+		if !market {
+			missing = append(missing, product)
+		}
+	}
+	return missing, nil
+}

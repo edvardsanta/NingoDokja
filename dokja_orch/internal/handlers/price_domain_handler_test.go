@@ -4,89 +4,188 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
+	"reflect"
+	"sort"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-func priceObservationItem(t *testing.T, id, on, price string) map[string]any {
-	t.Helper()
-	body, err := json.Marshal(map[string]any{
-		"contract": pricedomain.ContractVersion, "product": "ssd-example-1tb", "title": "SSD Example 1TB",
-		"merchant": "store-a", "series": "merchant", "price_kind": "pix", "currency": "BRL",
-		"points": []map[string]any{{"on": on, "price": json.Number(price)}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return map[string]any{"plugin": "example-prices", "id": id, "title": "SSD Example 1TB", "kind": "price", "body": string(body)}
+// fakeResolver stands in for the Feeds price resolver: it records each invoke and answers with
+// observations for the categories it was asked, or with an error.
+type fakeResolver struct {
+	mu      sync.Mutex
+	inputs  []map[string]any
+	err     error
+	started chan struct{}
+	release chan struct{}
+	extra   []any
 }
 
-func TestPriceIntakeRecordsObservationsAndLeavesOtherItems(t *testing.T) {
-	today := time.Now().UTC().Format("2006-01-02")
-	feeds := &fakeFeeds{items: []any{
-		priceObservationItem(t, "p1", today, "459.90"),
-		intakeFeedItem("an-article"),
-	}}
-	domain := pricedomain.New(pricedomain.NewMemoryRepository())
-	task := NewPriceIntakeTask(feeds, domain, nil)
+func (f *fakeResolver) Dispatch(_ context.Context, eventType string, payload map[string]any) (map[string]any, error) {
+	if f.started != nil {
+		f.started <- struct{}{}
+		<-f.release
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if eventType != "feeds.invoke" || payload["capability"] != "price.resolve.v1" || payload["action"] != "search" {
+		return nil, fmt.Errorf("unexpected %s %v", eventType, payload)
+	}
+	input, _ := payload["input"].(map[string]any)
+	f.inputs = append(f.inputs, input)
+	if f.err != nil {
+		return nil, f.err
+	}
+	observations := append([]any(nil), f.extra...)
+	for _, raw := range input["searches"].([]any) {
+		search := raw.(map[string]any)
+		observations = append(observations, map[string]any{
+			"contract": pricedomain.ContractVersion, "product": "found-" + strings.ReplaceAll(search["category"].(string), " ", "-"),
+			"title": "Found " + search["category"].(string), "merchant": "store-a", "series": "merchant", "price_kind": "pix",
+			"currency": "BRL", "category": search["category"], "brand": search["brand"], "url": "https://store.example/p",
+			"points": []any{map[string]any{"on": time.Now().UTC().Format("2006-01-02"), "price": json.Number("459.90")}},
+		})
+	}
+	return map[string]any{"observations": observations}, nil
+}
 
-	result, run, err := task.run(context.Background(), core.Event{EventID: "event-1", Type: "price.intake.run"})
+func (f *fakeResolver) categories() [][]string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out [][]string
+	for _, input := range f.inputs {
+		var asked []string
+		for _, raw := range input["searches"].([]any) {
+			asked = append(asked, raw.(map[string]any)["category"].(string))
+		}
+		sort.Strings(asked)
+		out = append(out, asked)
+	}
+	return out
+}
+
+func watchedDomain(t *testing.T, watches ...pricedomain.Watch) *pricedomain.Domain {
+	t.Helper()
+	repo := pricedomain.NewMemoryRepository()
+	for _, watch := range watches {
+		if _, err := repo.AddWatch(context.Background(), watch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return pricedomain.New(repo)
+}
+
+func TestPriceIntakeCollectsEveryWatchedSearchAndRecordsWhatIsValid(t *testing.T) {
+	resolver := &fakeResolver{extra: []any{map[string]any{"contract": pricedomain.ContractVersion, "product": "Bad Key"}}}
+	domain := watchedDomain(t, pricedomain.Watch{Category: "ssd sata", Brand: "samsung"}, pricedomain.Watch{Category: "hd"})
+	task := NewPriceIntakeTask(resolver, domain, nil)
+
+	result, run, err := task.run(context.Background(), core.Event{EventID: "event-1", Type: "price.intake.run"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Status != core.TaskCompleted {
 		t.Fatalf("status %s reason %s", result.Status, result.Reason)
 	}
-	if len(feeds.calls) != 1 || feeds.calls[0] != "feeds.items" {
-		t.Fatalf("feeds calls: %v", feeds.calls)
+	if got := resolver.categories(); !reflect.DeepEqual(got, [][]string{{"hd", "ssd sata"}}) {
+		t.Fatalf("asked %v", got)
 	}
-	if run.outcome.Items != 2 || run.outcome.Observations != 1 || run.outcome.Written != 1 {
+	if resolver.inputs[0]["limit"] != priceSearchLimit {
+		t.Fatalf("input %v", resolver.inputs[0])
+	}
+	if run.outcome.Observations != 2 || len(run.outcome.Invalid) != 1 {
 		t.Fatalf("outcome %+v", run.outcome)
 	}
+	found, _ := domain.SearchProducts(context.Background(), pricedomain.Search{Query: "ssd sata", Brand: "samsung"})
+	if found.Matched != 1 || found.Products[0].Product.Brand != "samsung" {
+		t.Fatalf("found %+v", found)
+	}
 
-	// A second run over the same Feeds page writes nothing.
-	_, again, _ := task.run(context.Background(), core.Event{EventID: "event-2", Type: "price.intake.run"})
-	if again.outcome.Written != 0 {
-		t.Fatalf("replay wrote %d", again.outcome.Written)
+	// the next run is told which products still lack a market history
+	task.run(context.Background(), core.Event{EventID: "event-2"}, nil)
+	market, _ := resolver.inputs[1]["market"].([]any)
+	if len(market) != 2 {
+		t.Fatalf("market lookups %v", resolver.inputs[1]["market"])
 	}
 }
 
-func TestPriceIntakeReportsFeedsBeingDown(t *testing.T) {
-	task := NewPriceIntakeTask(&fakeFeeds{err: errors.New("down")}, pricedomain.New(pricedomain.NewMemoryRepository()), nil)
-	result, _, err := task.run(context.Background(), core.Event{EventID: "event-1", Type: "price.intake.run"})
-	if err != nil {
-		t.Fatal(err)
+func TestPriceIntakeSaysWhenNothingIsWatchedOrTheResolverIsDown(t *testing.T) {
+	result, _, _ := NewPriceIntakeTask(&fakeResolver{}, watchedDomain(t), nil).run(context.Background(), core.Event{EventID: "e"}, nil)
+	if result.Status == core.TaskCompleted || result.Reason != "no_watches" {
+		t.Fatalf("status %s reason %s", result.Status, result.Reason)
 	}
-	if result.Status == core.TaskCompleted || result.Reason != "feeds_unavailable" {
+	down := &fakeResolver{err: errors.New("down")}
+	result, _, _ = NewPriceIntakeTask(down, watchedDomain(t, pricedomain.Watch{Category: "hd"}), nil).run(context.Background(), core.Event{EventID: "e"}, nil)
+	if result.Status == core.TaskCompleted || result.Reason != "price_resolver_unavailable" {
 		t.Fatalf("status %s reason %s", result.Status, result.Reason)
 	}
 }
 
-func TestPriceIntakeSkipsWhenFeedsIsSwitchedOffOrAlreadyRunning(t *testing.T) {
-	domain := pricedomain.New(pricedomain.NewMemoryRepository())
-	off := NewPriceIntakeTask(&fakeFeeds{}, domain, func() bool { return false })
+func TestPriceIntakeSkipsWhenFeedsIsSwitchedOffAndQueuesWhatIsAskedMeanwhile(t *testing.T) {
+	off := NewPriceIntakeTask(&fakeResolver{}, watchedDomain(t, pricedomain.Watch{Category: "hd"}), func() bool { return false })
 	if got, _ := off.Start(core.Event{}); got["reason"] != "feeds_switched_off" {
 		t.Fatalf("switched off: %v", got)
 	}
 
-	feeds := &fakeFeeds{started: make(chan struct{}), release: make(chan struct{})}
-	busy := NewPriceIntakeTask(feeds, domain, nil)
-	if got, _ := busy.Start(core.Event{}); got["started"] != true {
+	resolver := &fakeResolver{started: make(chan struct{}), release: make(chan struct{})}
+	task := NewPriceIntakeTask(resolver, watchedDomain(t, pricedomain.Watch{Category: "hd"}, pricedomain.Watch{Category: "ssd"}), nil)
+	if got, _ := task.Start(core.Event{}); got["started"] != true {
 		t.Fatalf("first start: %v", got)
 	}
-	<-feeds.started
-	if got, _ := busy.Start(core.Event{}); got["reason"] != "already_running" {
+	<-resolver.started
+	// asked while the first run is going: queued, then run on its own
+	task.StartFor(core.Event{}, pricedomain.Watch{Category: "nvme"})
+	if got, _ := task.Start(core.Event{}); got["queued"] != true {
 		t.Fatalf("second start: %v", got)
 	}
-	close(feeds.release)
+	resolver.release <- struct{}{}
+	<-resolver.started
+	resolver.release <- struct{}{}
+	task.wait()
+	got := resolver.categories()
+	// the queued full run covers the new search too, since every watched search is collected
+	if len(got) != 2 || !reflect.DeepEqual(got[0], []string{"hd", "ssd"}) {
+		t.Fatalf("asked %v", got)
+	}
+}
+
+func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
+	resolver := &fakeResolver{}
+	domain := watchedDomain(t)
+	intake := NewPriceIntakeTask(resolver, domain, nil)
+	handler := NewPriceDomainHandler(domain, intake)
+	got, err := handler.Handle(context.Background(), core.Event{
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"query": "SSD Sata", "brand": "Samsung"},
+		Context: map[string]any{"is_owner": true},
+	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
+	if err != nil || got["watch"].(map[string]any)["status"] != "added" {
+		t.Fatalf("search %v %v", got, err)
+	}
+	intake.wait()
+	if asked := resolver.categories(); !reflect.DeepEqual(asked, [][]string{{"ssd sata"}}) {
+		t.Fatalf("asked %v", asked)
+	}
+	again, _ := handler.Handle(context.Background(), core.Event{
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"query": "ssd sata", "brand": "samsung"},
+		Context: map[string]any{"is_owner": true},
+	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
+	intake.wait()
+	if again["matched"] != 1 || len(resolver.categories()) != 1 {
+		t.Fatalf("a watched search is answered from what is known, not collected again: %v %v", again["matched"], resolver.categories())
+	}
 }
 
 func TestPriceHandlerRoutesIntakeAndAssessment(t *testing.T) {
-	today := time.Now().UTC().Format("2006-01-02")
 	domain := pricedomain.New(pricedomain.NewMemoryRepository())
-	if _, err := domain.Record(context.Background(), []any{priceObservationItem(t, "p1", today, "100")}); err != nil {
+	body, _ := json.Marshal(map[string]any{"contract": pricedomain.ContractVersion, "product": "ssd-example-1tb", "title": "SSD Example 1TB",
+		"merchant": "store-a", "series": "merchant", "price_kind": "pix", "currency": "BRL",
+		"points": []any{map[string]any{"on": time.Now().UTC().Format("2006-01-02"), "price": json.Number("100")}}})
+	if _, err := domain.Record(context.Background(), []any{map[string]any{"id": "p1", "body": string(body)}}); err != nil {
 		t.Fatal(err)
 	}
 	handler := NewPriceDomainHandler(domain, nil)
