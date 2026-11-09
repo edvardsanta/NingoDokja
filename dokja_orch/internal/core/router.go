@@ -82,6 +82,8 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 		return Route{Workflow: "realtime-observer", Domains: []Domain{DomainConversation}}, nil
 	case strings.HasPrefix(eventType, "conversation."):
 		return Route{Workflow: "conversation-archive", Domains: []Domain{DomainConversation}}, nil
+	case strings.HasPrefix(eventType, "price."):
+		return Route{Workflow: "price", Domains: []Domain{DomainPrice}}, nil
 	case strings.HasPrefix(eventType, "digest."):
 		return Route{
 			Workflow: "digest",

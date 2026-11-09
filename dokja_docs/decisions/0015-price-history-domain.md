@@ -1,8 +1,8 @@
 # ADR 0015: a price domain that owns watched-product price history
 
 Date: 2026-11-08. Status: proposed by the owner's request; the domain contract,
-rules and reference repository are implemented. Orchestrator wiring and the
-durable adapter are pending.
+rules, reference repository, orchestrator intake and PostgreSQL adapter are
+implemented. Commands and alerts are pending.
 Related: [ADR 0002](./0002-plugin-lifecycle.md), [ADR 0003](./0003-state-ownership.md),
 [ADR 0014](./0014-application-postgres-adoption.md).
 
@@ -29,9 +29,11 @@ Three facts shape the design:
 1. **A new domain, `dokja_domain/dokja_price`, owns price history and its
    interpretation.** It knows no store, site or URL. It reads one contract and
    decides what a price means.
-2. **Collectors speak `price.observation.v1`, carried in a Feeds item `body`.**
-   The domain refuses any other shape it is handed and leaves non-price items
-   alone:
+2. **Collectors speak `price.observation.v1`, carried in a Feeds item `body`,
+   and mark the item with `kind: "price"`.** The domain refuses any other shape
+   it is handed and leaves non-price items alone. The kind keeps observations
+   out of the digest and out of conversation references; the contract itself is
+   the opt-in, so no list of sources is configured:
 
    ```json
    {"contract": "price.observation.v1", "product": "ssd-example-1tb",
@@ -89,24 +91,46 @@ Thresholds are constants in `assess.go`, in basis points:
   than that peak but within 5% of the usual price.
 - `fake_discount`: the merchant advertises at least 10% off its list price, and
   the history shows no real discount.
-- `stale`: the latest point is more than a day older than the day being judged.
+- `stale`: the latest point is more than two days older than the UTC day being
+  judged. Aggregators publish only closed days, so their latest point is
+  yesterday in Brazil, two UTC days back late in the evening.
+
+## Orchestrator intake (implemented)
+
+- **Scheduler.** The `price.intake` job emits `price.intake.run` every 15
+  minutes by default, matching a Feeds collector's default interval. Feeds
+  keeps only a collector's last run, so reading less often would lose the
+  chunks of a multi-run backfill. Like every job, it can be paused or given
+  another interval through the controls; no variable was added.
+- **Intake task.** A typed task reads `feeds.items` without refreshing and
+  hands every item to `record-price-observations`. It skips the run while
+  Feeds is switched off or another run is going.
+- **Route.** `price.assess` routes to `assess-price`. It works while Feeds is
+  off, because it reads only the history.
+- **Digest.** It drops items of kind `price` in the one place it reads Feeds
+  items, so observations appear neither in the digest nor in chat references.
+
+## PostgreSQL adapter (implemented)
+
+- `dokja_orch/internal/infrastructure/price_history` implements the port in a
+  `dokja_price` schema: `schema_version`, `products` and `points`, keyed by
+  product, merchant, series, price kind and day. An upsert rewrites a point only
+  when it changed, so it counts writes the way the memory repository does.
+- `DOKJA_PRICE_POSTGRES_DSN` selects it explicitly. The explicit
+  `price-history-init` command creates the namespace; startup only opens it.
+  Unset, or when the database cannot be used, history stays in memory and a
+  sanitized message says so. The DSN is never logged.
+- An integration test, built with the `integration` tag against a disposable
+  `price_test` database, runs the same writes against both repositories and
+  compares their answers.
+- Backup, rollback and configuration are in the production runbook.
 
 ## Pending work (stacked follow-ups)
 
-- **Orchestrator wiring**, mirroring the Knowledge intake task:
-  - a scheduler event and a typed task that reads `feeds.items` for the plugin
-    ids in a `price.intake_sources` setting and calls
-    `record-price-observations`;
-  - one request route for `assess-price`.
-- **Keep price items out of the digest.** The Digest currently reads every
-  plugin, so this follow-up has to exclude price sources. Raw observations are
-  not reading material.
 - **Collection runs with the stack.** Observations are recorded only while the
   owner's stack is up (`make start`); there is no separate host capture, so days
   the stack is down have no merchant points. The aggregator's rolling history
   can backfill the market minimum for those days.
-- **The PostgreSQL adapter.** It needs a schema, a migration, backup and rollback
-  steps, and the Compose and runbook changes, all in the same PR.
 - **Commands and alerts** in Desktop, CLI or Discord. These need the owner's
   approval of the command surface before they are added.
 

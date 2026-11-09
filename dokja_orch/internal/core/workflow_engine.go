@@ -200,6 +200,15 @@ func actionFor(domain Domain, eventType string) string {
 		default:
 			return "handle-knowledge-event"
 		}
+	case DomainPrice:
+		switch eventType {
+		case "price.intake.run":
+			return "intake-price"
+		case "price.assess":
+			return "assess-price"
+		default:
+			return "handle-price-event"
+		}
 	case DomainDigest:
 		switch eventType {
 		case "digest.status":

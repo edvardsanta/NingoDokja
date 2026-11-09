@@ -182,6 +182,23 @@ func (s *Service) runKnowledgeIntake(ctx context.Context) error {
 	return s.emit(ctx, event)
 }
 
+// priceIntakeInterval matches the default interval of a Feeds collector. Feeds keeps only a
+// collector's last run, so reading less often than collectors run would miss the chunks of a
+// backfill spread over several runs. The operator can still change it per job.
+const priceIntakeInterval = 15 * time.Minute
+
+// runPriceIntake asks the orchestrator to record the prices the collectors observed. Which
+// items are observations is the Price domain's to decide.
+func (s *Service) runPriceIntake(ctx context.Context) error {
+	event := newEvent("price.intake.run", map[string]any{}, map[string]any{
+		"interface": "scheduler",
+		"schedule":  "price.intake",
+	})
+
+	s.logger.Printf("emit type=%s", event.Type)
+	return s.emit(ctx, event)
+}
+
 func (s *Service) publish(ctx context.Context, event Event) error {
 	socket, err := s.publisherFactory()
 	if err != nil {

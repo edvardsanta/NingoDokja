@@ -28,7 +28,7 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0014](./0014-application-postgres-adoption.md) | Adopt PostgreSQL and pgvector in application stores, Knowledge then Memory, with verified migration and rollback | Owner-approved direction; Knowledge adapter implemented; cutover and Memory pending |
 
-| [0015](./0015-price-history-domain.md) | A store-agnostic Price domain owns watched-product price history; owner collectors speak `price.observation.v1` through Feeds | Proposed; PostgreSQL confirmed by the owner; domain implemented, orchestrator wiring and adapter pending |
+| [0015](./0015-price-history-domain.md) | A store-agnostic Price domain owns watched-product price history; owner collectors speak `price.observation.v1` through Feeds | Proposed; PostgreSQL confirmed by the owner; domain, orchestrator intake and PostgreSQL adapter implemented |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):

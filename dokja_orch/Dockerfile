@@ -15,6 +15,7 @@ WORKDIR /src/dokja_orch
 
 RUN GOCACHE=/tmp/go-build go build -o /tmp/va ./cmd/va
 RUN GOCACHE=/tmp/go-build go build -o /tmp/source-journal-init ./cmd/source-journal-init
+RUN GOCACHE=/tmp/go-build go build -o /tmp/price-history-init ./cmd/price-history-init
 
 FROM docker.io/debian:bookworm-slim
 
@@ -27,6 +28,7 @@ WORKDIR /app
 
 COPY --from=builder /tmp/va /app/va
 COPY --from=builder /tmp/source-journal-init /app/source-journal-init
+COPY --from=builder /tmp/price-history-init /app/price-history-init
 
 EXPOSE 5555 5558 8091
 

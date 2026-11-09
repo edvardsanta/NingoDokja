@@ -38,6 +38,7 @@ var KnownJobs = []string{
 	"meme.refresh",
 	"meme.dispatch",
 	"knowledge.intake",
+	"price.intake",
 }
 
 const (

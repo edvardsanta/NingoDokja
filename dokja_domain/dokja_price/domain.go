@@ -13,6 +13,9 @@ const (
 	// ActionAssessPrice judges the latest price of every history of a product, or of
 	// every watched product.
 	ActionAssessPrice = "assess-price"
+	// ActionIntakePrice names the scheduled run that reads Feeds and records what it
+	// holds. The orchestrator sequences it; the domain only records.
+	ActionIntakePrice = "intake-price"
 )
 
 const (

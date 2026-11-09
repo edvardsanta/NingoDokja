@@ -631,6 +631,7 @@
   "name_meme": "Memes",
   "name_book": "Livros",
   "name_knowledge_intake": "Guardar fontes escolhidas",
+  "name_price_intake": "Registrar preços observados",
   "name_meme_refresh": "Atualizar memes",
   "name_meme_dispatch": "Postar memes",
   "models_embedding": "Modelo de embeddings, da memória e do conhecimento",
