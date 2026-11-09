@@ -48,6 +48,8 @@ type BridgeResponse = {
   music?: unknown;
   // a price search's result, after price.search
   price?: unknown;
+  // a questionnaire run's result or refusal code, after quiz.take
+  quiz?: unknown;
   realtime?: { accepted?: boolean };
 };
 
@@ -56,6 +58,8 @@ export type OrchestratorReply = {
   notice?: string;
   // a price search's result (price.search), rendered by the interface in its own language
   price?: unknown;
+  // a questionnaire run (quiz.take): result link, label and comment, or a refusal code
+  quiz?: unknown;
   attachments?: DiscordAttachment[];
   music?: unknown;
   realtime?: { accepted?: boolean };
@@ -135,6 +139,7 @@ export async function dispatchToOrchestratorResponse(
       ...(attachments.length ? { attachments } : {}),
       ...(payload.music !== undefined ? { music: payload.music } : {}),
       ...(payload.price !== undefined ? { price: payload.price } : {}),
+      ...(payload.quiz !== undefined ? { quiz: payload.quiz } : {}),
       ...(payload.realtime?.accepted === true ? { realtime: {accepted: true} } : {}),
     };
   } catch (error) {

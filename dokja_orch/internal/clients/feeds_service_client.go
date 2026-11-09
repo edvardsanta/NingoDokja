@@ -23,6 +23,9 @@ const feedsExtractTimeout = 2*time.Minute + 10*time.Second
 // feedsClassifyTimeout is a little over the service's 3-minute limit for a classification.
 const feedsClassifyTimeout = 3*time.Minute + 10*time.Second
 
+// feedsQuizTimeout is a little over the service's 5-minute limit for a quiz run.
+const feedsQuizTimeout = 5*time.Minute + 10*time.Second
+
 type FeedsServiceRequesterFactory func() (repreq.RequesterReply, error)
 
 // FeedsServiceClient talks to the feeds service over ZeroMQ. Requests are logged by type only.
@@ -31,6 +34,7 @@ type FeedsServiceClient struct {
 	requesterFactory FeedsServiceRequesterFactory
 	extractFactory   FeedsServiceRequesterFactory
 	classifyFactory  FeedsServiceRequesterFactory
+	quizFactory      FeedsServiceRequesterFactory
 }
 
 type feedsServiceResponse struct {
@@ -60,11 +64,17 @@ func NewFeedsServiceClient(endpoint string) *FeedsServiceClient {
 			}
 			return zeromq.NewRequesterWithTimeout(resolved, feedsClassifyTimeout)
 		},
+		quizFactory: func() (repreq.RequesterReply, error) {
+			if err := validateFeedsServiceEndpoint(resolved); err != nil {
+				return nil, err
+			}
+			return zeromq.NewRequesterWithTimeout(resolved, feedsQuizTimeout)
+		},
 	}
 }
 
 func NewFeedsServiceClientWithFactory(factory FeedsServiceRequesterFactory) *FeedsServiceClient {
-	return &FeedsServiceClient{requesterFactory: factory, extractFactory: factory, classifyFactory: factory}
+	return &FeedsServiceClient{requesterFactory: factory, extractFactory: factory, classifyFactory: factory, quizFactory: factory}
 }
 
 // Dispatch sends one feeds.* event and returns the service's result.
@@ -76,6 +86,10 @@ func (c *FeedsServiceClient) Dispatch(ctx context.Context, eventType string, pay
 	// A refresh runs collectors and an invoke runs a plugin on demand: both wait as long as a reading.
 	if eventType == "feeds.refresh" || eventType == "feeds.invoke" || eventType == "feeds.web.read" {
 		factory = c.extractFactory
+	}
+	// A quiz runner may click through a whole questionnaire.
+	if eventType == "feeds.invoke" && payload["capability"] == "quiz.run.v1" && c.quizFactory != nil {
+		factory = c.quizFactory
 	}
 	return c.send(ctx, factory, eventType, payload)
 }

@@ -21,7 +21,7 @@ func (s *Service) invoke(ctx context.Context, payload map[string]any) (map[strin
 func (s *Service) invokePlugin(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	capability, _ := payload["capability"].(string)
 	switch capability {
-	case CapabilityDocumentProcess, CapabilityMediaLibrary, CapabilityMediaPerceive, CapabilityAudioResolve, CapabilitySocialResolve, CapabilityPriceResolve:
+	case CapabilityDocumentProcess, CapabilityMediaLibrary, CapabilityMediaPerceive, CapabilityAudioResolve, CapabilitySocialResolve, CapabilityPriceResolve, CapabilityQuizRun:
 	default:
 		return nil, reasonError(ReasonUnsupported, "capability cannot be invoked")
 	}

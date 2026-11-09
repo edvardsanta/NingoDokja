@@ -17,6 +17,8 @@ const (
 
 	// maxPostOutput bounds what a post reader may print: one 16 MiB media file in base64.
 	maxPostOutput = 23 << 20
+	// maxQuizOutput bounds what a quiz runner may print: a few hundred questions as text.
+	maxQuizOutput = 2 << 20
 
 	// MaxExtractInput bounds the file of one on-demand reading, as Knowledge bounds uploads.
 	MaxExtractInput = 20_000_000

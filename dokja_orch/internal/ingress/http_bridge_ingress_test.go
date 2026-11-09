@@ -188,6 +188,23 @@ func TestTheBridgeHandsTheQueueBackOnlyForMusicCommands(t *testing.T) {
 	}
 }
 
+func TestBridgeMapsAQuizRunAndHandsItsResultBack(t *testing.T) {
+	eventType, payload := mapBridgeRequestToEvent(BridgeRequest{
+		EventType: "quiz.take",
+		Payload:   BridgePayload{Locale: " en-US "},
+	}, "https://quiz.example.com/start")
+	if eventType != "quiz.take" || payload["url"] != "https://quiz.example.com/start" || payload["locale"] != "en-US" || len(payload) != 2 {
+		t.Fatalf("mapped %s %v", eventType, payload)
+	}
+	result := map[string]any{string(core.DomainQuiz): map[string]any{"status": "ok", "url": "https://quiz.example.com/r"}}
+	if got := extractBridgeQuiz(core.ProcessResult{Event: core.Event{Type: "quiz.take"}, Result: result}); got["url"] != "https://quiz.example.com/r" {
+		t.Fatalf("quiz result %v", got)
+	}
+	if got := extractBridgeQuiz(core.ProcessResult{Event: core.Event{Type: "price.search"}, Result: result}); got != nil {
+		t.Fatalf("another event carried a quiz result: %v", got)
+	}
+}
+
 func TestBridgeMapsAPriceSearchAndHandsItsResultBack(t *testing.T) {
 	eventType, payload := mapBridgeRequestToEvent(BridgeRequest{
 		EventType: "price.search",

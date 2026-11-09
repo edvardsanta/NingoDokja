@@ -137,6 +137,24 @@ func TestFeedsClientDispatchesAnInvokeWithTheLongerWait(t *testing.T) {
 	}
 }
 
+func TestFeedsClientWaitsLongestForAQuizRun(t *testing.T) {
+	onDemand := &fakeFeedsRequester{response: `{"status":"ok","result":{}}`}
+	quizRun := &fakeFeedsRequester{response: `{"status":"ok","result":{"handled":true}}`}
+	client := &FeedsServiceClient{
+		extractFactory: func() (repreq.RequesterReply, error) { return onDemand, nil },
+		quizFactory:    func() (repreq.RequesterReply, error) { return quizRun, nil },
+	}
+	if _, err := client.Dispatch(context.Background(), "feeds.invoke", map[string]any{"capability": "quiz.run.v1", "action": "submit"}); err != nil {
+		t.Fatal(err)
+	}
+	if onDemand.request != "" || !strings.Contains(quizRun.request, `"quiz.run.v1"`) {
+		t.Fatalf("on-demand=%q quiz=%q", onDemand.request, quizRun.request)
+	}
+	if feedsQuizTimeout <= feedsExtractTimeout {
+		t.Fatal("a quiz run must wait longer than a reading")
+	}
+}
+
 func TestFeedsWebReadingUsesOnDemandTransport(t *testing.T) {
 	cached := &fakeFeedsRequester{response: `{"status":"error","message":"wrong transport"}`}
 	reading := &fakeFeedsRequester{response: `{"status":"ok","result":{"title":"Law"}}`}

@@ -44,7 +44,10 @@ const (
 	// the watched searches (or a known store's product link) and validates nothing here; the
 	// domain checks every observation the plugin returns.
 	CapabilityPriceResolve = "price.resolve.v1"
-	maxFormats             = 20
+	// CapabilityQuizRun reads an online questionnaire's questions and submits answers for its
+	// result link. The repository ships no runner: runners reach third-party sites.
+	CapabilityQuizRun = "quiz.run.v1"
+	maxFormats        = 20
 )
 
 // ErrIncompatible marks a manifest that names a lifecycle version, runtime or capability
@@ -56,7 +59,7 @@ var (
 	envPattern     = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 	versionPattern = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$`)
 	formatPattern  = regexp.MustCompile(`^\.[a-z0-9]{1,10}$`)
-	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true, CapabilityDocumentProcess: true, CapabilityMediaLibrary: true, CapabilityMediaPerceive: true, CapabilityAudioResolve: true, CapabilitySocialResolve: true, CapabilityPriceResolve: true}
+	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true, CapabilityDocumentProcess: true, CapabilityMediaLibrary: true, CapabilityMediaPerceive: true, CapabilityAudioResolve: true, CapabilitySocialResolve: true, CapabilityPriceResolve: true, CapabilityQuizRun: true}
 )
 
 // manifest is plugin.json. It is read without running the plugin, so a plugin that is
@@ -364,6 +367,9 @@ func loadV1(dir, name string, raw []byte, limits Limits) (*Plugin, error) {
 	}
 	if seen[CapabilitySocialResolve] && !seen[CapabilitySourceCollect] {
 		outputCeiling = maxPostOutput
+	}
+	if seen[CapabilityQuizRun] && !seen[CapabilitySourceCollect] {
+		outputCeiling = maxQuizOutput
 	}
 	if m.Limits.OutputBytes <= 0 || m.Limits.OutputBytes > outputCeiling {
 		return nil, fmt.Errorf("limits.output_bytes must be between 1 and %d", outputCeiling)

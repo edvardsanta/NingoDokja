@@ -1254,8 +1254,11 @@ processors' dependencies; `media` installs only the media-perception adapter's
 default. `FEEDS_PLUGIN_REQUIREMENTS` names a requirements file of the owner's, by a
 path inside the build context (for example `feeds_plugins/requirements.txt`, which
 git ignores), whose libraries are installed for the owner's own plugins; the
-default is an empty list in the repository. Both are build arguments of the
-`dokja-feeds` image in every stack: rebuild Feeds after changing either.
+default is an empty list in the repository. `FEEDS_PLUGIN_BROWSER=chromium`
+installs Playwright for Python and Chromium for the owner's plugins that must run a
+page's scripts, such as a quiz runner (`quiz.run.v1`); `none`, the default, keeps
+the image small. All three are build arguments of the `dokja-feeds` image in every
+stack: rebuild Feeds after changing any of them.
 
 All stacks configure `FEEDS_BUILTIN_PLUGINS_DIR`, the existing `dokja-data` volume
 for plugin state/model cache, and an optional models mount. Processing settings

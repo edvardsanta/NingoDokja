@@ -210,10 +210,20 @@ func TestServeAnswersStatusWhileAReadingIsStillRunning(t *testing.T) {
 }
 
 func TestExtractRequestsGetALongerTimeout(t *testing.T) {
-	if timeoutFor("feeds.extract") <= timeoutFor("feeds.status") || timeoutFor("feeds.items") != requestTimeout {
+	if timeoutFor("feeds.extract", nil) <= timeoutFor("feeds.status", nil) || timeoutFor("feeds.items", nil) != requestTimeout {
 		t.Fatal("only an on-demand reading may wait longer than the cached requests")
 	}
-	if timeoutFor("feeds.classify") <= requestTimeout {
+	if timeoutFor("feeds.classify", nil) <= requestTimeout {
 		t.Fatal("a classification waits longer than a cached request")
+	}
+}
+
+// A quiz runner may click through a whole questionnaire; other invokes keep the reading limit.
+func TestAQuizRunGetsThePluginCeilingAndOtherInvokesDoNot(t *testing.T) {
+	if got := timeoutFor("feeds.invoke", map[string]any{"capability": "quiz.run.v1"}); got != quizTimeout {
+		t.Fatalf("quiz run timeout = %v", got)
+	}
+	if got := timeoutFor("feeds.invoke", map[string]any{"capability": "social.resolve.v1"}); got != extractTimeout {
+		t.Fatalf("other invokes must keep the reading timeout, got %v", got)
 	}
 }

@@ -89,6 +89,8 @@ type BridgeResponse struct {
 	Music map[string]any `json:"music,omitempty"`
 	// Price is a price search's result, for the interface to render in its own language.
 	Price map[string]any `json:"price,omitempty"`
+	// Quiz is a questionnaire run's result or refusal code, for the interface to word.
+	Quiz map[string]any `json:"quiz,omitempty"`
 }
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
@@ -241,6 +243,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Attachments:      extractChatAttachments(result),
 		Music:            extractBridgeMusic(result),
 		Price:            extractBridgePrice(result),
+		Quiz:             extractBridgeQuiz(result),
 		Voice:            extractBridgeVoice(result),
 		Realtime:         extractBridgeRealtime(result),
 	})
@@ -301,6 +304,16 @@ func extractBridgePrice(result core.ProcessResult) map[string]any {
 	}
 	price, _ := result.Result[string(core.DomainPrice)].(map[string]any)
 	return price
+}
+
+// extractBridgeQuiz hands a questionnaire run back to the interface: the result link, label and
+// comment, or a refusal code the interface words itself.
+func extractBridgeQuiz(result core.ProcessResult) map[string]any {
+	if strings.TrimSpace(result.Event.Type) != "quiz.take" {
+		return nil
+	}
+	quiz, _ := result.Result[string(core.DomainQuiz)].(map[string]any)
+	return quiz
 }
 
 // authorize checks the bearer token every bridge route requires; it answers the status to send when
@@ -639,6 +652,8 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		}
 	case "price.merchants":
 		return "price.merchants", map[string]any{}
+	case "quiz.take":
+		return "quiz.take", map[string]any{"url": content, "locale": strings.TrimSpace(request.Payload.Locale)}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":

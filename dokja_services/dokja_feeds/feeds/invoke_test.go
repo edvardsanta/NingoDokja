@@ -147,6 +147,27 @@ func TestRefreshWaitingForAnActiveCollectorHonorsCancellation(t *testing.T) {
 	}
 }
 
+func TestInvokeReachesAQuizRunnerWithItsAction(t *testing.T) {
+	root := t.TempDir()
+	newPlugin(t, root, "quiz-runner", v1(map[string]any{"id": "quiz-runner", "enabled": true, "formats": nil, "provides": []string{CapabilityQuizRun}}))
+	runner := &inputRunner{reply: func(p Plugin) ([]byte, error) {
+		return []byte(`{"result":{"handled":true,"quiz":{"questions":[]}}}`), nil
+	}}
+	s := extractService(root, runner)
+	payload := map[string]any{"capability": CapabilityQuizRun, "action": "questions", "plugin": "quiz-runner", "input": map[string]any{"url": "https://example.com/quiz"}}
+	result, err := s.Dispatch(context.Background(), "feeds.invoke", payload)
+	if err != nil || result["handled"] != true {
+		t.Fatal(result, err)
+	}
+	var request map[string]any
+	if err := json.Unmarshal(runner.inputs["quiz-runner"], &request); err != nil {
+		t.Fatal(err)
+	}
+	if request["operation"] != CapabilityQuizRun || request["action"] != "questions" {
+		t.Fatal(request)
+	}
+}
+
 func TestInvokeReachesASocialProviderNamedByTheCaller(t *testing.T) {
 	root := t.TempDir()
 	for _, id := range []string{"post-reader", "post-reader-alt"} {

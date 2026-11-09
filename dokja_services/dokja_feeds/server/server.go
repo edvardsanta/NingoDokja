@@ -23,12 +23,18 @@ const (
 	// classifyTimeout bounds a classification of documents already read (ADR 0008). A
 	// plugin may try several agent CLIs in turn, each taking seconds to answer.
 	classifyTimeout = 3 * time.Minute
+	// quizTimeout bounds a quiz runner, which may click through a whole questionnaire in a
+	// browser. It matches the longest timeout a plugin manifest may declare.
+	quizTimeout = 5 * time.Minute
 	// maxInFlight bounds the requests being answered at once; past it a request is refused.
 	maxInFlight = 16
 )
 
 // timeoutFor is how long one request may take.
-func timeoutFor(eventType string) time.Duration {
+func timeoutFor(eventType string, payload map[string]any) time.Duration {
+	if eventType == "feeds.invoke" && payload["capability"] == "quiz.run.v1" {
+		return quizTimeout
+	}
 	switch eventType {
 	case "feeds.extract", "feeds.invoke", "feeds.refresh":
 		return extractTimeout
@@ -81,7 +87,7 @@ func HandleRequest(ctx context.Context, raw string, handler Handler, logger *log
 	}
 	logger.Printf("handling type=%s payload_keys=%d", parsed.Type, len(parsed.Payload))
 
-	ctx, cancel := context.WithTimeout(ctx, timeoutFor(parsed.Type))
+	ctx, cancel := context.WithTimeout(ctx, timeoutFor(parsed.Type, parsed.Payload))
 	defer cancel()
 	result, err := handler.Dispatch(ctx, parsed.Type, parsed.Payload)
 	if err != nil {
