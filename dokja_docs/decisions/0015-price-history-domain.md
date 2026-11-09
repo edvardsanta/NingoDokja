@@ -138,6 +138,17 @@ as a structured `price` field, so the interface renders it in its own language;
 the bridge writes no prices into reply text. Brands and kinds of product are
 found because collectors put them in titles; the contract gained no field.
 
+## Desktop view (implemented)
+
+Library › Prices shows the same search as `/preco`: product and brand fields,
+a filter by leading verdict, and one card per product with its sources, its
+lowest price now and a chart of the market low over the last year. The chart
+needs points a chat reply does not, so `price.search` returns each product's
+market-low history (`market`, the last year, oldest first) only when the request
+sets `history: true`; the Desktop shell always sets it and keeps only codes,
+whole cents and days from the reply. Verdicts and signals are translated in the
+Desktop catalogs.
+
 ## Pending work (stacked follow-ups)
 
 - **Collection runs with the stack.** Observations are recorded only while the
