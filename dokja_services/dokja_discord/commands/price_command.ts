@@ -48,6 +48,11 @@ const messages: Record<string, Catalog> = {
     compare_unknown: "Ainda não acompanho esse produto.",
     compare_not_found: "Procurei e não achei esse produto nas lojas que consigo ler.",
     compare_unreadable: "Não consigo ler a página da {store}; comparei o mesmo produto nas outras lojas.",
+    compare_over_budget: "A oferta encontrada ultrapassa o orçamento informado; procurei uma alternativa, mas esta comparação não encontrou uma opção compatível.",
+    compare_alternatives: "Candidatos encontrados com os dados atuais:",
+    alternative_lower_price: "mais barato",
+    alternative_within_budget: "dentro do orçamento",
+    alternative_same_category_candidate: "mesma categoria; equivalência técnica não confirmada",
     compare_bad_link: "Não reconheço a loja desse link.",
     compare_need: "Mande o nome, o código ou o link do produto.",
     compare_failed: "Não consegui comparar agora.",
@@ -86,6 +91,11 @@ const messages: Record<string, Catalog> = {
     compare_unknown: "I do not follow that product yet.",
     compare_not_found: "I looked and did not find that product at the stores I can read.",
     compare_unreadable: "I cannot read {store}'s page; I compared the same product at the other stores.",
+    compare_over_budget: "The offer found exceeds the stated budget; an alternative is needed, but this comparison found no compatible option.",
+    compare_alternatives: "Candidates found with the current data:",
+    alternative_lower_price: "lower price",
+    alternative_within_budget: "within budget",
+    alternative_same_category_candidate: "same category; technical equivalence unconfirmed",
     compare_bad_link: "I do not know that link's store.",
     compare_need: "Send the product's name, part number or link.",
     compare_failed: "I could not compare right now.",
@@ -300,6 +310,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const words = catalog(locale);
   const result = (compare ?? {}) as {
     found?: boolean; product?: Record<string, unknown>; offers?: Assessment[]; candidates?: Array<Record<string, unknown>>;
+    alternatives?: Array<Record<string, unknown>>;
     comment?: string; looked_up?: boolean; link?: { known?: boolean; store?: string; store_name?: string };
   };
   if (result.link && result.link.known === false) return text(words, "compare_bad_link");
@@ -315,6 +326,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const lead = [...offers].sort((a, b) => looksOf(a.verdict).rank - looksOf(b.verdict).rank)[0];
   const cheapest = offers.find((offer) => offer.series !== "market_min" && safeUrl(offer.url));
   const part = String(product.part_number ?? "");
+  const decision = (result as { decision?: { action?: string } }).decision;
   const store = result.link?.store;
   const notes = store && !offers.some((offer) => offer.merchant === store)
     ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
@@ -326,8 +338,20 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     fields: offers.map((offer) => field(offer, words, locale)),
     ...(part ? { footer: text(words, "compare_part", { part }) } : {}),
   };
+  const decisionNote = decision?.action === "seek_alternative" ? text(words, "compare_over_budget") : "";
   const header = text(words, "compare_header", { title: String(product.title ?? product.product ?? "") });
-  return { content: [header, ...notes].join("\n"), embeds: [embed] };
+  const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 5) : [];
+  const alternativeLines = alternatives.length > 0
+    ? [
+      text(words, "compare_alternatives"),
+      ...alternatives.map((alternative) => {
+        const classification = text(words, `alternative_${String(alternative.classification ?? "")}`);
+        const price = typeof alternative.price_cents === "number" ? ` · ${money(alternative.price_cents, locale)}` : "";
+        return `• ${String(alternative.title ?? alternative.product)} — ${classification}${price}`;
+      }),
+    ]
+    : [];
+  return { content: [header, ...notes, decisionNote, ...alternativeLines].filter(Boolean).join("\n"), embeds: [embed] };
 }
 
 export function createCompareCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
@@ -337,11 +361,13 @@ export function createCompareCommand(orchestratorEndpoint: string, orchestratorT
     options: [
       { name: "product", description: "Name or part number, such as ssd 1tb", type: ApplicationCommandOptionType.String, required: false },
       { name: "link", description: "A product link from a store; it is read, never opened", type: ApplicationCommandOptionType.String, required: false },
+      { name: "budget", description: "Maximum budget in BRL", type: ApplicationCommandOptionType.Number, required: false, min_value: 0 },
     ],
     handle: async (context: DiscordCommandContext) => {
       const words = catalog(locale);
       const query = context.getString("product").trim();
       const link = context.getString("link").trim();
+      const budget = context.getNumber("budget");
       if (!query && !link) {
         await context.reply(text(words, "compare_need"), { ephemeral: true });
         return;
@@ -349,6 +375,7 @@ export function createCompareCommand(orchestratorEndpoint: string, orchestratorT
       try {
         const response = await dispatchToOrchestratorResponse(orchestratorEndpoint, orchestratorTimeoutMs, buildBridgePayload({
           eventType: "price.compare", query, link,
+          ...(typeof budget === "number" && Number.isFinite(budget) && budget > 0 ? { budget_cents: Math.round(budget * 100) } : {}),
           userId: context.userId, channelId: context.channelId, messageId: context.messageId, guildId: context.guildId,
         }));
         const reply = response.price === undefined && response.reply.trim() ? response.reply : buildCompareReply(response.price, locale);

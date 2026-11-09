@@ -13,7 +13,7 @@ func compareRepo(t *testing.T) *Domain {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 	add := func(product, title, part, merchant string, series Series, kind Kind, cents int64, url string) {
-		repo.Upsert(ctx, Observation{Product: product, Title: title, PartNumber: part, Merchant: merchant, Series: series, Kind: kind,
+		repo.Upsert(ctx, Observation{Product: product, Title: title, Category: "ssd", PartNumber: part, Merchant: merchant, Series: series, Kind: kind,
 			URL: url, Points: []Point{{On: day(0), Cents: cents}}})
 	}
 	add("pn:ab-1000x1", "SSD Example 1TB", "AB-1000X1", "store-a", SeriesMerchant, KindPix, 1685_25, "https://a.example/1")
@@ -86,6 +86,27 @@ func TestCompareActionSaysWhetherTheOwnerMayLookAMissingProductUp(t *testing.T) 
 	}
 	if _, err := domain.Handle(context.Background(), Request{Action: ActionCompareProduct, Event: Event{Payload: map[string]any{"query": 3}}}); err == nil {
 		t.Fatal("a numeric query was accepted")
+	}
+}
+
+func TestCompareReturnsAuditableSameCategoryAlternatives(t *testing.T) {
+	domain := compareRepo(t)
+	got, err := domain.CompareProduct(context.Background(), Compare{PartNumber: "AB-1000X1", BudgetCents: 2_000})
+	if err != nil || !got.Found {
+		t.Fatalf("got %+v %v", got, err)
+	}
+	if got.Profile.ID != "storage" || got.Profile.Generic {
+		t.Fatalf("profile = %+v", got.Profile)
+	}
+	if len(got.Alternatives) != 1 {
+		t.Fatalf("alternatives = %+v", got.Alternatives)
+	}
+	alternative := got.Alternatives[0]
+	if alternative.Product.Key != "pn:ab-2000x1" || alternative.Classification != "same_category_candidate" {
+		t.Fatalf("alternative = %+v", alternative)
+	}
+	if alternative.Confidence != "low" {
+		t.Fatalf("confidence = %q", alternative.Confidence)
 	}
 }
 

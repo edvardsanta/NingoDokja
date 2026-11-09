@@ -5,6 +5,7 @@ package pricehistory
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	pricedomain "read_books/dokja_domain/dokja_price"
@@ -15,8 +16,8 @@ var (
 	ErrSchema  = errors.New("price history schema is unsupported or uninitialized")
 )
 
-// schemaVersion 2 added product descriptions, offer pages and the watched searches.
-const schemaVersion = 2
+// schemaVersion 4 added explicit product specifications.
+const schemaVersion = 4
 
 // schemaLockKey serializes concurrent initializations of this namespace.
 const schemaLockKey = int64(0x0d0c_1a00_0015_0001)
@@ -127,6 +128,42 @@ CREATE TABLE dokja_price.watches (
 UPDATE dokja_price.schema_version SET version = 2 WHERE id = 1;`); err != nil {
 			return nil, safeError(ctx)
 		}
+		version = 2
+	}
+	if version == 2 {
+		if _, err := tx.ExecContext(ctx, `
+CREATE TABLE dokja_price.purchase_decisions (
+		decision_id   TEXT PRIMARY KEY,
+		user_id       TEXT NOT NULL,
+		product_key   TEXT NOT NULL,
+		product_title TEXT NOT NULL,
+		category      TEXT NOT NULL DEFAULT '',
+		brand         TEXT NOT NULL DEFAULT '',
+		part_number   TEXT NOT NULL DEFAULT '',
+		budget_cents  BIGINT NOT NULL DEFAULT 0 CHECK (budget_cents >= 0),
+		action        TEXT NOT NULL,
+		selected_merchant TEXT NOT NULL DEFAULT '',
+		selected_cents BIGINT NOT NULL DEFAULT 0 CHECK (selected_cents >= 0),
+		confidence    TEXT NOT NULL,
+		reason_codes  JSONB NOT NULL,
+		evidence      JSONB NOT NULL,
+		created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX purchase_decisions_user_product_created
+		ON dokja_price.purchase_decisions (user_id, product_key, created_at DESC);
+UPDATE dokja_price.schema_version SET version = 3 WHERE id = 1;`); err != nil {
+			return nil, safeError(ctx)
+		}
+		version = 3
+	}
+	if version == 3 {
+		if _, err := tx.ExecContext(ctx, `
+ALTER TABLE dokja_price.products
+		ADD COLUMN specifications JSONB NOT NULL DEFAULT '{}'::jsonb;
+UPDATE dokja_price.schema_version SET version = 4 WHERE id = 1;`); err != nil {
+			return nil, safeError(ctx)
+		}
+		version = 4
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, safeError(ctx)
@@ -144,19 +181,20 @@ func (s *Store) Upsert(ctx context.Context, observation pricedomain.Observation)
 	defer tx.Rollback()
 	// A description is replaced only by a non-empty value, as the memory repository does.
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO dokja_price.products (product_key, title, category, brand, part_number) VALUES ($1, $2, $3, $4, $5)
+INSERT INTO dokja_price.products (product_key, title, category, brand, part_number, specifications) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
 ON CONFLICT (product_key) DO UPDATE SET
 	title       = EXCLUDED.title,
 	category    = COALESCE(NULLIF(EXCLUDED.category, ''), dokja_price.products.category),
 	brand       = COALESCE(NULLIF(EXCLUDED.brand, ''), dokja_price.products.brand),
 	part_number = COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number),
+	specifications = CASE WHEN EXCLUDED.specifications <> '{}'::jsonb THEN EXCLUDED.specifications ELSE dokja_price.products.specifications END,
 	updated_at  = now()
 WHERE (dokja_price.products.title, dokja_price.products.category, dokja_price.products.brand, dokja_price.products.part_number)
 	IS DISTINCT FROM (EXCLUDED.title,
 		COALESCE(NULLIF(EXCLUDED.category, ''), dokja_price.products.category),
 		COALESCE(NULLIF(EXCLUDED.brand, ''), dokja_price.products.brand),
 		COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number))`,
-		observation.Product, observation.Title, observation.Category, observation.Brand, observation.PartNumber); err != nil {
+		specificationsJSON(observation.Specifications)); err != nil {
 		return 0, safeError(ctx)
 	}
 	if observation.URL != "" {
@@ -254,7 +292,7 @@ ORDER BY merchant, series, price_kind`, product)
 // Products returns the watched products in key order.
 func (s *Store) Products(ctx context.Context) ([]pricedomain.Product, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT product_key, title, category, brand, part_number FROM dokja_price.products ORDER BY product_key`)
+SELECT product_key, title, category, brand, part_number, specifications FROM dokja_price.products ORDER BY product_key`)
 	if err != nil {
 		return nil, safeError(ctx)
 	}
@@ -262,15 +300,33 @@ SELECT product_key, title, category, brand, part_number FROM dokja_price.product
 	products := []pricedomain.Product{}
 	for rows.Next() {
 		var product pricedomain.Product
-		if err := rows.Scan(&product.Key, &product.Title, &product.Category, &product.Brand, &product.PartNumber); err != nil {
+		var specifications []byte
+		if err := rows.Scan(&product.Key, &product.Title, &product.Category, &product.Brand, &product.PartNumber, &specifications); err != nil {
 			return nil, safeError(ctx)
+		}
+		if len(specifications) > 0 && string(specifications) != "{}" {
+			if err := json.Unmarshal(specifications, &product.Specifications); err != nil {
+				return nil, safeError(ctx)
+			}
 		}
 		products = append(products, product)
 	}
+
 	if rows.Err() != nil {
 		return nil, safeError(ctx)
 	}
 	return products, nil
+}
+
+func specificationsJSON(specifications map[string]any) string {
+	if len(specifications) == 0 {
+		return "{}"
+	}
+	encoded, err := json.Marshal(specifications)
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
 }
 
 // OfferURLs returns the known page of each history of a product that has one.
@@ -345,6 +401,72 @@ func (s *Store) RemoveWatch(ctx context.Context, watch pricedomain.Watch) (bool,
 		return false, safeError(ctx)
 	}
 	return affected == 1, nil
+}
+
+func (s *Store) SaveDecision(ctx context.Context, memory pricedomain.DecisionMemory) error {
+	reasons, err := json.Marshal(memory.Decision.ReasonCodes)
+	if err != nil {
+		return safeError(ctx)
+	}
+	evidence, err := json.Marshal(memory.Evidence)
+	if err != nil {
+		return safeError(ctx)
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO dokja_price.purchase_decisions
+	(decision_id, user_id, product_key, product_title, category, brand, part_number,
+	 budget_cents, action, selected_merchant, selected_cents, confidence, reason_codes, evidence)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)
+ON CONFLICT (decision_id) DO NOTHING`,
+		memory.ID, memory.UserID, memory.Product.Key, memory.Product.Title, memory.Product.Category,
+		memory.Product.Brand, memory.Product.PartNumber, memory.BudgetCents, memory.Decision.Action,
+		memory.Decision.SelectedOffer, memory.Decision.SelectedCents, memory.Decision.Confidence,
+		string(reasons), string(evidence))
+	if err != nil {
+		return safeError(ctx)
+	}
+	return nil
+}
+
+func (s *Store) RecentDecisions(ctx context.Context, userID, product string, limit int) ([]pricedomain.DecisionMemory, error) {
+	if limit <= 0 {
+		return []pricedomain.DecisionMemory{}, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT decision_id, user_id, product_key, product_title, category, brand, part_number,
+       budget_cents, action, selected_merchant, selected_cents, confidence,
+       reason_codes, evidence, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+FROM dokja_price.purchase_decisions
+WHERE user_id = $1 AND ($2 = '' OR product_key = $2)
+ORDER BY created_at DESC
+LIMIT $3`, userID, product, limit)
+	if err != nil {
+		return nil, safeError(ctx)
+	}
+	defer rows.Close()
+	var result []pricedomain.DecisionMemory
+	for rows.Next() {
+		var item pricedomain.DecisionMemory
+		var reasons, evidence []byte
+		if err := rows.Scan(&item.ID, &item.UserID, &item.Product.Key, &item.Product.Title,
+			&item.Product.Category, &item.Product.Brand, &item.Product.PartNumber,
+			&item.BudgetCents, &item.Decision.Action, &item.Decision.SelectedOffer,
+			&item.Decision.SelectedCents, &item.Decision.Confidence, &reasons, &evidence, &item.CreatedAt); err != nil {
+			return nil, safeError(ctx)
+		}
+		if err := json.Unmarshal(reasons, &item.Decision.ReasonCodes); err != nil {
+			return nil, safeError(ctx)
+		}
+		if err := json.Unmarshal(evidence, &item.Evidence); err != nil {
+			return nil, safeError(ctx)
+		}
+		item.Decision.RequiredBudget = item.BudgetCents
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, safeError(ctx)
+	}
+	return result, nil
 }
 
 // Merchants returns every merchant key with a history, sorted.

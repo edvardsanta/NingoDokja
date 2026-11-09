@@ -16,8 +16,9 @@ const maxCandidates = 5
 
 // Compare asks for one product: by its manufacturer's part number when known, else by words.
 type Compare struct {
-	PartNumber string
-	Query      string
+	PartNumber  string
+	Query       string
+	BudgetCents int64
 }
 
 // Offer is one history of the compared product, as a person reads it.
@@ -29,10 +30,13 @@ type Offer struct {
 // Comparison is the result of a Compare. Found is false when nothing matched; Candidates holds
 // the products to pick from when several matched and none stood out.
 type Comparison struct {
-	Found      bool
-	Product    Product
-	Offers     []Offer
-	Candidates []Product
+	Found        bool
+	Product      Product
+	Offers       []Offer
+	Decision     Decision
+	Profile      CategoryProfile
+	Alternatives []Alternative
+	Candidates   []Product
 	// Growable reports that the person may have the product looked up when it was not found.
 	Growable bool
 }
@@ -126,7 +130,95 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 		}
 		return a.Latest.Cents < b.Latest.Cents
 	})
-	return Comparison{Found: true, Product: *chosen, Offers: offers}, nil
+	allProducts := make([]Product, 0, len(products))
+	allProducts = append(allProducts, products...)
+	alternatives := d.alternatives(ctx, *chosen, offers, products, compare.BudgetCents)
+	return Comparison{
+		Found: true, Product: *chosen, Offers: offers,
+		Profile: CategoryProfileFor(chosen.Category), Alternatives: alternatives,
+		Decision: Decide(DecisionInput{
+			Product: *chosen, Offers: offers, BudgetCents: compare.BudgetCents, Products: allProducts,
+		}),
+	}, nil
+}
+
+func (d *Domain) alternatives(ctx context.Context, original Product, originalOffers []Offer, products []Product, budget int64) []Alternative {
+	originalPrice := cheapestMerchant(originalOffers)
+	result := make([]Alternative, 0, maxCandidates)
+	for _, product := range products {
+		if product.Key == original.Key || !sameCategory(product, original) {
+			continue
+		}
+		assessments, err := d.AssessProduct(ctx, product.Key)
+		if err != nil {
+			continue
+		}
+		urls, err := d.repository.OfferURLs(ctx, product.Key)
+		if err != nil {
+			continue
+		}
+		var cheapest *Offer
+		for _, assessment := range assessments {
+			if assessment.Key.Series == SeriesMarketMin || assessment.Latest.Cents <= 0 {
+				continue
+			}
+			offer := Offer{Assessment: assessment, URL: urls[assessment.Key]}
+			if cheapest == nil || offer.Assessment.Latest.Cents < cheapest.Assessment.Latest.Cents {
+				copy := offer
+				cheapest = &copy
+			}
+		}
+		if cheapest == nil {
+			continue
+		}
+		classification := "same_category_candidate"
+		reasons := []string{"same_category"}
+		profile := CategoryProfileFor(original.Category)
+		shared, better, compatible := comparableScore(profile, original, product)
+		confidence := CandidateConfidence(product)
+		if !profile.Generic && compatible && shared > 0 {
+			confidence = "medium"
+			if shared >= 2 && better == shared {
+				classification = "technically_superior"
+				reasons = append(reasons, "shared_attributes_superior")
+			} else if shared >= 2 && better*2 >= shared {
+				classification = "technically_comparable"
+				reasons = append(reasons, "shared_attributes_comparable")
+			}
+		}
+		if originalPrice > 0 && cheapest.Assessment.Latest.Cents < originalPrice {
+			classification = "lower_price"
+			reasons = append(reasons, "lower_current_price")
+		}
+		if budget > 0 && cheapest.Assessment.Latest.Cents <= budget {
+			classification = "within_budget"
+			reasons = append(reasons, "within_budget")
+		}
+		result = append(result, Alternative{
+			Product: product, Offer: *cheapest, Classification: classification,
+			ReasonCodes: reasons, Confidence: confidence, SharedAttributes: shared,
+		})
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Offer.Assessment.Latest.Cents < result[j].Offer.Assessment.Latest.Cents
+	})
+	if len(result) > maxCandidates {
+		result = result[:maxCandidates]
+	}
+	return result
+}
+
+func cheapestMerchant(offers []Offer) int64 {
+	var cheapest int64
+	for _, offer := range offers {
+		if offer.Assessment.Key.Series == SeriesMarketMin || offer.Assessment.Latest.Cents <= 0 {
+			continue
+		}
+		if cheapest == 0 || offer.Assessment.Latest.Cents < cheapest {
+			cheapest = offer.Assessment.Latest.Cents
+		}
+	}
+	return cheapest
 }
 
 func (c Comparison) Map() map[string]any {
@@ -138,11 +230,21 @@ func (c Comparison) Map() map[string]any {
 			row["url"] = offer.URL
 			offers = append(offers, row)
 		}
+
 		out["product"] = map[string]any{
 			"product": c.Product.Key, "title": c.Product.Title, "category": c.Product.Category,
 			"brand": c.Product.Brand, "part_number": c.Product.PartNumber,
 		}
 		out["offers"] = offers
+		out["decision"] = c.Decision.Map()
+		out["profile"] = map[string]any{
+			"id": c.Profile.ID, "generic": c.Profile.Generic,
+		}
+		alternatives := make([]any, 0, len(c.Alternatives))
+		for _, alternative := range c.Alternatives {
+			alternatives = append(alternatives, alternative.Map())
+		}
+		out["alternatives"] = alternatives
 	}
 	candidates := make([]any, 0, len(c.Candidates))
 	for _, candidate := range c.Candidates {
@@ -165,6 +267,21 @@ func compareFromPayload(payload map[string]any) (Compare, error) {
 			return Compare{}, fmt.Errorf("%s must be a string", name)
 		}
 		*target = value
+	}
+	if raw, present := payload["budget_cents"]; present && raw != nil {
+		value, ok := raw.(int64)
+		if !ok {
+			if number, numberOK := raw.(int); numberOK {
+				value, ok = int64(number), true
+			}
+		}
+		if number, numberOK := raw.(float64); numberOK && number >= 0 && number == float64(int64(number)) {
+			value, ok = int64(number), true
+		}
+		if !ok || value < 0 {
+			return Compare{}, fmt.Errorf("budget_cents must be a non-negative integer")
+		}
+		compare.BudgetCents = value
 	}
 	return compare, nil
 }

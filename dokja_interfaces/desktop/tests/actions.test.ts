@@ -837,3 +837,12 @@ test("price.watches lists the watched searches and price.unwatch needs a categor
   assert.deepEqual(ACTIONS["price.unwatch"].project(compactOf("price", { removed: true })), { removed: true });
   assert.ok(WRITE_ACTION_TYPES.includes("price.unwatch"));
 });
+
+test("price.watches preserves long categories so removal uses the stored value", () => {
+  const category = "processador amd ryzen 7 9700x 3 8ghz 5 5ghz turbo 8 cores 16 threads am5 sem cooler 100 10000";
+  assert.deepEqual(
+    ACTIONS["price.watches"].project(compactOf("price", { watches: [{ category, brand: "" }], limit: 50 })),
+    { watches: [{ category, brand: "" }], limit: 50 },
+  );
+  assert.deepEqual(ACTIONS["price.unwatch"].payload({ category }), { category, brand: "" });
+});

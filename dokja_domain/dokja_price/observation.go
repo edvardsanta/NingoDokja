@@ -96,6 +96,8 @@ type Observation struct {
 	// PartNumber is the manufacturer's code when the store shows one: the same product at two
 	// stores shares it.
 	PartNumber string
+	// Specifications are explicit values extracted by a collector. Missing values are unknown.
+	Specifications map[string]any
 	// URL is this merchant's page for the offer, for a person to open. The domain never fetches it.
 	URL string
 }
@@ -128,19 +130,20 @@ type wirePoint struct {
 }
 
 type wireObservation struct {
-	Contract     string      `json:"contract"`
-	Product      string      `json:"product"`
-	Title        string      `json:"title"`
-	Merchant     string      `json:"merchant"`
-	MerchantName string      `json:"merchant_name,omitempty"`
-	Series       Series      `json:"series"`
-	PriceKind    Kind        `json:"price_kind"`
-	Currency     string      `json:"currency"`
-	Points       []wirePoint `json:"points"`
-	Category     string      `json:"category,omitempty"`
-	Brand        string      `json:"brand,omitempty"`
-	PartNumber   string      `json:"part_number,omitempty"`
-	URL          string      `json:"url,omitempty"`
+	Contract       string         `json:"contract"`
+	Product        string         `json:"product"`
+	Title          string         `json:"title"`
+	Merchant       string         `json:"merchant"`
+	MerchantName   string         `json:"merchant_name,omitempty"`
+	Series         Series         `json:"series"`
+	PriceKind      Kind           `json:"price_kind"`
+	Currency       string         `json:"currency"`
+	Points         []wirePoint    `json:"points"`
+	Category       string         `json:"category,omitempty"`
+	Brand          string         `json:"brand,omitempty"`
+	PartNumber     string         `json:"part_number,omitempty"`
+	Specifications map[string]any `json:"specifications,omitempty"`
+	URL            string         `json:"url,omitempty"`
 }
 
 // ParseObservation reads one price.observation.v1 body. today bounds the dates: a point
@@ -201,6 +204,10 @@ func (w wireObservation) validate(today time.Time) (Observation, error) {
 		}
 		described[field] = clean
 	}
+	specifications, err := cleanSpecifications(w.Specifications)
+	if err != nil {
+		return Observation{}, err
+	}
 	address, err := offerURL(w.URL)
 	if err != nil {
 		return Observation{}, err
@@ -226,7 +233,40 @@ func (w wireObservation) validate(today time.Time) (Observation, error) {
 		Product: w.Product, Title: title, Merchant: w.Merchant, MerchantName: name,
 		Series: w.Series, Kind: w.PriceKind, Points: points,
 		Category: described["category"], Brand: described["brand"], PartNumber: described["part_number"], URL: address,
+		Specifications: specifications,
 	}, nil
+}
+
+func cleanSpecifications(raw map[string]any) (map[string]any, error) {
+	if len(raw) > 32 {
+		return nil, fmt.Errorf("specifications may contain at most 32 fields")
+	}
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	clean := make(map[string]any, len(raw))
+	for key, value := range raw {
+		if !regexp.MustCompile(`^[a-z0-9_]{1,40}$`).MatchString(key) {
+			return nil, fmt.Errorf("specification key must contain lowercase letters, digits and underscores")
+		}
+		switch typed := value.(type) {
+		case string:
+			if len(typed) > 80 {
+				return nil, fmt.Errorf("specification %s is too long", key)
+			}
+			clean[key] = typed
+		case float64:
+			if typed < 0 || typed > 1_000_000 {
+				return nil, fmt.Errorf("specification %s is out of range", key)
+			}
+			clean[key] = typed
+		case bool:
+			clean[key] = typed
+		default:
+			return nil, fmt.Errorf("specification %s has an unsupported value", key)
+		}
+	}
+	return clean, nil
 }
 
 func (w wirePoint) validate(latest string) (Point, error) {
