@@ -183,6 +183,37 @@ export type DigestPage = {
   updated: string;
 };
 
+// A price search: the watched products that match, each with its histories judged by the Price
+// domain, and the market-low points of the last year for a chart. Verdicts and signals are the
+// domain's codes; the screen translates them.
+export type PriceRow = {
+  merchant: string;
+  series: "merchant" | "market_min";
+  kind: "pix" | "card" | "unknown";
+  verdict: string;
+  signals: string[];
+  latestOn: string;
+  latestCents: number;
+  median30Cents: number;
+  lowestCents: number;
+};
+
+export type PricePoint = { on: string; cents: number };
+
+export type PriceProduct = {
+  key: string;
+  title: string;
+  rows: PriceRow[];
+  market: PricePoint[];
+};
+
+export type PriceSearch = {
+  off?: false;
+  products: PriceProduct[];
+  // every product that matched, including those past the answer's limit
+  matched: number;
+};
+
 // What adding to the research base did. One document or many (a feed file is many): how many were
 // new, how many replaced an earlier version of the same document, and how many were already there.
 export type IngestResult = {

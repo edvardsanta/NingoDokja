@@ -27,6 +27,10 @@ import type {
   ConversationStarted,
   DeleteResult,
   DigestPage,
+  PricePoint,
+  PriceProduct,
+  PriceRow,
+  PriceSearch,
   DigestStatus,
   IngestResult,
   InterfaceLink,
@@ -629,6 +633,39 @@ function readingPrompts(value: unknown): { prompts?: string[] } {
   return prompts.length > 0 ? { prompts } : {};
 }
 
+const MAX_PRICE_SEARCH_CHARS = 100;
+const MAX_PRICE_PRODUCTS = 10;
+const MAX_PRICE_ROWS = 12;
+const MAX_PRICE_POINTS = 400;
+const PRICE_CODE = /^[a-z_]{1,40}$/;
+const PRICE_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+// The Price domain's search, reduced to what the screen draws: codes it translates, whole cents,
+// days, and nothing that is not one of those.
+function priceSearch(body: Record<string, unknown>): PriceSearch {
+  const cents = (value: unknown) => clampInt(value, 0, 1_000_000_000, 0);
+  const day = (value: unknown) => (PRICE_DAY.test(text(value)) ? text(value) : "");
+  const code = (value: unknown) => (PRICE_CODE.test(text(value)) ? text(value) : "");
+  const products = records(body.products, (product): PriceProduct => ({
+    key: shorten(text(product.product), 80),
+    title: shorten(text(product.title) || text(product.product), 300),
+    rows: records(product.assessments, (row): PriceRow => ({
+      merchant: shorten(text(row.merchant), 80),
+      series: row.series === "market_min" ? "market_min" : "merchant",
+      kind: row.price_kind === "pix" || row.price_kind === "card" ? row.price_kind : "unknown",
+      verdict: code(row.verdict),
+      signals: words(row.signals).filter((signal) => PRICE_CODE.test(signal)).slice(0, 5),
+      latestOn: day(row.latest_on),
+      latestCents: cents(row.latest_cents),
+      median30Cents: cents(row.median_30_cents),
+      lowestCents: cents(row.lowest_cents),
+    })).filter((row) => row.merchant !== "" && row.latestCents > 0).slice(0, MAX_PRICE_ROWS),
+    market: records(product.market, (point): PricePoint => ({ on: day(point.on), cents: cents(point.cents) }))
+      .filter((point) => point.on !== "" && point.cents > 0).slice(-MAX_PRICE_POINTS),
+  })).filter((product) => product.key !== "").slice(0, MAX_PRICE_PRODUCTS);
+  return { products, matched: Math.max(clampInt(body.matched, 0, 100_000, 0), products.length) };
+}
+
 function digestPage(body: Record<string, unknown>): DigestPage {
   return {
     items: records(body.items, (item) => {
@@ -979,6 +1016,15 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: postLink,
     project: (result) => inDomain(result, "digest", postReply),
     settle: async (projected) => (posts ? posts.hold(projected) : { status: "refused", refused: "failed" }),
+  },
+  "price.search": {
+    // The words of the search, and always the history: the screen draws it.
+    payload: (raw) => ({
+      ...Object.fromEntries(["query", "brand"].filter((key) => typeof raw[key] === "string" && (raw[key] as string).trim())
+        .map((key) => [key, (raw[key] as string).trim().slice(0, MAX_PRICE_SEARCH_CHARS)])),
+      history: true,
+    }),
+    project: (result) => inDomain(result, "price", priceSearch),
   },
   "knowledge.ingest": {
     // A book travels whole as base64 text, however large it is.

@@ -4,6 +4,7 @@ import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
 import { DigestCard } from "./digest.js";
 import { DocumentView } from "./document_view.js";
+import { PricesCard } from "./prices.js";
 import { Drawer } from "./drawer.js";
 import { KnowledgeCard } from "./knowledge.js";
 import { AddToBase } from "./knowledge_add.js";
@@ -63,6 +64,7 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
     [
       { id: "documents", label: t("knowledge_view_documents") },
       { id: "sources", label: t("knowledge_view_sources") },
+      { id: "prices", label: t("knowledge_view_prices") },
     ],
     items,
   );
@@ -118,7 +120,10 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
             </p>
           )}
           {panels(
-            (id) => (id === "documents" ? <KnowledgeCard transport={transport} /> : <DigestCard transport={transport} />),
+            (id) =>
+              id === "documents" ? <KnowledgeCard transport={transport} />
+                : id === "prices" ? <PricesCard transport={transport} />
+                : <DigestCard transport={transport} />,
             (id) => {
               const document = library.documents.find((each) => each.id === id);
               return document && (
