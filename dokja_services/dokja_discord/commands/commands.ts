@@ -1,4 +1,4 @@
-import { observerCommands } from "./observer_commands.js";
+import { observerCommands, startVoiceChatMirror } from "./observer_commands.js";
 import { conversationReply } from "../voice/conversation_reply.js";
 import { ApplicationCommandOptionType } from "discord-api-types/v10";
 import { randomUUID } from "node:crypto";
@@ -193,12 +193,16 @@ export function createCommands(
 
         const voiceSessionId = randomUUID();
 
+        // What is said is also shown live in the owner's Desktop realtime view.
+        const mirror = await startVoiceChatMirror(orchestratorEndpoint, orchestratorTimeoutMs, context, voice);
         void voice
           .startConversation({
             guildId: context.guildId,
             userId: context.userId,
             activationMode: "always",
             originChannelId: context.channelId,
+            onHeard: mirror?.heard,
+            onStopped: mirror?.stop,
             onTurn: async (_transcript, turn) => {
               if (!turn) throw new Error("Voice speaker metadata is required");
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
@@ -228,6 +232,7 @@ export function createCommands(
           })
           .then((reply) => context.updateReply(reply))
           .catch((error) => {
+            mirror?.stop();
             console.error("[dokja-discord] command voice_chat_start failed", error);
             return context.updateReply(
               error instanceof Error ? error.message : "Could not start voice conversation.",
@@ -249,12 +254,16 @@ export function createCommands(
 
         const voiceSessionId = randomUUID();
 
+        // What is said is also shown live in the owner's Desktop realtime view.
+        const mirror = await startVoiceChatMirror(orchestratorEndpoint, orchestratorTimeoutMs, context, voice);
         void voice
           .startConversation({
             guildId: context.guildId,
             userId: context.userId,
             activationMode: "wakeword",
             originChannelId: context.channelId,
+            onHeard: mirror?.heard,
+            onStopped: mirror?.stop,
             onTurn: async (_transcript, turn) => {
               if (!turn) throw new Error("Voice speaker metadata is required");
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
@@ -284,6 +293,7 @@ export function createCommands(
           })
           .then((reply) => context.updateReply(reply))
           .catch((error) => {
+            mirror?.stop();
             console.error("[dokja-discord] command wake_chat failed", error);
             return context.updateReply(
               error instanceof Error ? error.message : "Could not start wake-word voice conversation.",

@@ -148,6 +148,12 @@ replies default to one short sentence. Ask for detail to get a longer explanatio
 which plays sentence by sentence with the next sentence prepared ahead.
 `/voice_chat_stop` cancels playback and outstanding work.
 
+What participants say is also shown live in the owner's Desktop **Realtime**
+view. `/voice_chat_start` and `/wake_chat` open the same ephemeral journal that
+`/conversation_start` keeps, marked `voice_chat`, and add each transcribed
+segment to it. The journal is deleted when the voice chat stops. If the
+orchestrator refuses the journal, the voice chat still works without it.
+
 WebRTC VAD checks short activity probes and gates Whisper transcription; acoustic
 guards reject quiet packets and isolated impulses. Bots are ignored. Rebuild the
 Voice image and restart Voice, the orchestrator and Discord together for this

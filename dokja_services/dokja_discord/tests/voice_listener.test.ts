@@ -63,3 +63,18 @@ test("observer publishes a final attributed segment without entering reply gener
   assert.ok(Date.parse(observed[0].endedAt)>=Date.parse(observed[0].startedAt));assert.equal(replies,0);
  }finally{listener.stop();globalThis.fetch=previous;}
 });
+
+test("a voice chat copies each transcribed segment to its mirror and still answers it",async()=>{
+ const previous=globalThis.fetch;const speaking=new EventEmitter();let stream!:PassThrough;
+ const heard:any[]=[];const replies:VoiceTurnContext[]=[];
+ globalThis.fetch=async()=>new Response('{"status":"ok","voice":{"text":"teste de som"}}');
+ const session:any={channelId:"room",player:{stop(){},pause(){},unpause(){}},stream:{stop(){}},connection:{receiver:{speaking,subscribe(){return stream=new PassThrough();}}}};
+ const listener=createListeningSession({session,guildId:"g",userId:"a",originChannelId:"text",orchestratorEndpoint:"http://orch",
+  participant(id){return{userId:id,userName:"Scholar"};},decoderFactory:()=>new PassThrough(),activationMode:"always",logTranscripts:false,
+  async onTurn(_,turn){replies.push(turn!);},onHeard(value){heard.push(value);throw new Error("a broken mirror must not cost the reply");}});
+ try{
+  speaking.emit("start","a");stream.end(pcm(57600));await delay(120);
+  assert.equal(heard.length,1);assert.equal(heard[0].userId,"a");assert.equal(heard[0].userName,"Scholar");assert.equal(heard[0].text,"teste de som");
+  assert.equal(replies.length,1,"the segment still reaches Ningo");assert.equal(replies[0].turns[0].text,"teste de som");
+ }finally{listener.stop();globalThis.fetch=previous;}
+});

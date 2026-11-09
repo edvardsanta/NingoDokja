@@ -36,6 +36,7 @@ export function RealtimeCard({transport,active=true}:{transport:Transport;active
     <label className="realtime-select">{t("realtime_select")} <select value={session?.session_id??""} onChange={e=>setSelected(e.target.value)}>
      {snapshot.sessions.map((s,i)=><option key={s.session_id} value={s.session_id}>{t("realtime_session",{number:i+1})}</option>)}
     </select></label>
+    {session&&<p className="detail realtime-mode">{t(session.mode==="voice_chat"?"realtime_mode_voice_chat":"realtime_mode_observer")}</p>}
     <h3>{t("realtime_messages")}</h3><p className="note" data-tone="unchecked">{t("realtime_pending")}</p>
     {session?.messages.length===0&&<p className="detail">{t("realtime_no_messages")}</p>}
     <ol className="realtime-transcript">{session?.messages.map((m,i)=><li key={m.message_id} style={{"--i":Math.min(i,12)} as CSSProperties}>

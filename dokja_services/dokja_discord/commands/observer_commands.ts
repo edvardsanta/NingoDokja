@@ -1,10 +1,60 @@
 import { observerMessage } from "../messages/observer.js";
 import { randomUUID } from "node:crypto";
 import type { DiscordCommandContext, DiscordSlashCommand } from "../types.js";
-import type { DiscordVoiceController } from "../voice/voice.js";
+import type { DiscordVoiceController, VoiceObservation } from "../voice/voice.js";
 import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 
 type Observer = { id: string; channel: string; origin: string; active: boolean };
+type Speaker = { userId: string; userName?: string; guildId?: string };
+
+// Whether the orchestrator accepted it; a transport failure still throws.
+async function realtimeRequest(endpoint: string, timeout: number, speaker: Speaker, room: Observer, type: string, extra = {}): Promise<boolean> {
+  const body = buildBridgePayload({eventType:type,userId:speaker.userId,userName:speaker.userName,guildId:speaker.guildId,
+    channelId:room.origin,messageId:randomUUID()});
+  body.payload.realtime={session_id:room.id,voice_channel_id:room.channel,...extra};
+  const result=await dispatchToOrchestratorResponse(endpoint, Math.min(timeout,5000), body);
+  return result.realtime?.accepted === true;
+}
+async function accepted(request: Promise<boolean>): Promise<void> {
+  if (!await request) throw new Error("Realtime request was not accepted");
+}
+
+const observed = (room: Observer, observation: VoiceObservation) => ({
+  capture_sequence:observation.sequence,message_id:`${room.id}:${observation.sequence}`,text:observation.text,
+  timestamp_start:observation.startedAt,timestamp_end:observation.endedAt,
+  transcription_status:"final",revision:1,
+});
+
+export type VoiceChatMirror = { heard(observation: VoiceObservation): void; stop(): void };
+
+// Mirrors a voice chat Ningo answers into the owner's Desktop realtime view: the same ephemeral,
+// channel-wide journal an observer keeps, marked voice_chat. Segments are sent one at a time, in
+// order. A failure only ends the mirror; the voice chat itself goes on.
+export async function startVoiceChatMirror(endpoint: string, timeout: number, starter: Speaker & { channelId: string },
+  voice: Pick<DiscordVoiceController, "getVoiceChannelId">, error: (...args: unknown[]) => void = console.error): Promise<VoiceChatMirror | undefined> {
+  if (!voice.getVoiceChannelId || !starter.guildId) return undefined;
+  let room: Observer;
+  try {
+    room = {id:randomUUID(),channel:await voice.getVoiceChannelId(starter.guildId, starter.userId),origin:starter.channelId,active:true};
+    await accepted(realtimeRequest(endpoint, timeout, starter, room, "realtime.start", {mode:"voice_chat"}));
+  } catch (failure) { error("[dokja-discord] voice chat transcript mirror unavailable", failure); return undefined; }
+  let queue = Promise.resolve();
+  const stop = () => {
+    if (!room.active) return;
+    room.active = false;
+    queue = queue.then(() => realtimeRequest(endpoint, timeout, starter, room, "realtime.stop")).catch(() => {});
+  };
+  return {
+    heard(observation) {
+      if (!room.active) return;
+      queue = queue.then(async () => {
+        if (!room.active) return;
+        await accepted(realtimeRequest(endpoint, timeout, {...starter,userId:observation.userId,userName:observation.userName}, room, "realtime.observe", observed(room, observation)));
+      }).catch((failure) => { error("[dokja-discord] voice chat transcript mirror stopped", failure); stop(); });
+    },
+    stop,
+  };
+}
 
 // Sessions are bound to a guild voice channel and stop when the listener stops.
 export function observerCommands(endpoint: string, timeout: number, voice?: DiscordVoiceController, locale = "pt-BR"): DiscordSlashCommand[] {
@@ -12,11 +62,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
   const rooms = new Map<string, Observer>();
   const operations = new Set<string>();
   async function send(context: DiscordCommandContext, room: Observer, type: string, extra = {}) {
-    const body = buildBridgePayload({eventType:type,userId:context.userId,userName:context.userName,guildId:context.guildId,
-      channelId:room.origin,messageId:randomUUID()});
-    body.payload.realtime={session_id:room.id,voice_channel_id:room.channel,...extra};
-    const result=await dispatchToOrchestratorResponse(endpoint, Math.min(timeout,5000), body);
-    if (result.realtime?.accepted !== true) throw new Error(message("notAccepted"));
+    if (!await realtimeRequest(endpoint, timeout, context, room, type, extra)) throw new Error(message("notAccepted"));
   }
   async function perform(context: DiscordCommandContext, name: string) {
     if (!voice?.getVoiceChannelId || !context.guildId) throw new Error(message("requiresVoice"));
@@ -49,11 +95,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
           async onObservation(observation) {
             if (rooms.get(guild)!==selected || !selected.active) return;
             try {
-              await send({...context,userId:observation.userId,userName:observation.userName},selected,"realtime.observe",{
-                capture_sequence:observation.sequence,message_id:`${selected.id}:${observation.sequence}`,text:observation.text,
-                timestamp_start:observation.startedAt,timestamp_end:observation.endedAt,
-                transcription_status:"final",revision:1,
-              });
+              await send({...context,userId:observation.userId,userName:observation.userName},selected,"realtime.observe",observed(selected,observation));
             } catch(error) {
               selected.active=false;rooms.delete(guild);
               await voice.stopConversation({guildId:guild});

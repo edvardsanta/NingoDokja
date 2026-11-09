@@ -34,3 +34,24 @@ func TestRealtimeObservationIsSeparateFromOwnerArchiveAndAuthenticated(t *testin
 		t.Fatal("observer bypassed archive availability or scope")
 	}
 }
+
+func TestVoiceChatStartOpensAVoiceChatJournalTheDesktopCanRead(t *testing.T) {
+	h := NewConversationDomainHandler(nil).WithRealtime(conversation.NewConversationContextEngine())
+	start := core.Event{Type: "realtime.start", Source: core.SourceDiscord, User: core.EventUser{ID: "a"}, Channel: core.EventChannel{ID: "text"},
+		Payload: map[string]any{"session_id": "s", "voice_channel_id": "voice", "mode": "voice_chat"}, Context: map[string]any{"guild_id": "guild", "gateway_inbound": true}}
+	if _, err := h.Handle(t.Context(), start, core.WorkflowStep{}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := core.Event{Type: "realtime.snapshot", Source: core.SourceDesktop}
+	result, err := h.Handle(t.Context(), snapshot, core.WorkflowStep{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sessions := result["sessions"].([]conversation.RealtimeSession); len(sessions) != 1 || sessions[0].Mode != "voice_chat" {
+		t.Fatalf("snapshot = %#v", sessions)
+	}
+	start.Payload = map[string]any{"session_id": "t", "voice_channel_id": "voice", "mode": "broadcast"}
+	if _, err := h.Handle(t.Context(), start, core.WorkflowStep{}); err == nil {
+		t.Fatal("an unknown realtime mode was accepted")
+	}
+}

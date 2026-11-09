@@ -1,11 +1,14 @@
 import { isRecord } from "./records.js";
 export type Observation = {message_id:string;session_id:string;speaker_id:string;speaker_name?:string;text:string;timestamp_start:string;timestamp_end:string;revision:number;transcription_status:"final"};
-export type ObserverSession = {session_id:string;guild_id:string;channel_id:string;origin_channel_id:string;consenting_participants:string[];messages:Observation[]};
+// observer: a silent transcription (/conversation_start); voice_chat: a voice chat Ningo answers (/voice_chat_start).
+export type ObserverMode = "observer"|"voice_chat";
+export type ObserverSession = {mode:ObserverMode;session_id:string;guild_id:string;channel_id:string;origin_channel_id:string;consenting_participants:string[];messages:Observation[]};
 export type ObserverSnapshot = {sessions:ObserverSession[]};
 function short(value: unknown,max=128): string { return typeof value==="string"?value.slice(0,max):""; }
 export function observerSnapshot(raw: unknown): ObserverSnapshot {
  if (!isRecord(raw)||!Array.isArray(raw.sessions)) throw new Error("Invalid observer snapshot");
  return {sessions:raw.sessions.slice(0,32).filter(isRecord).map(s=>({
+  mode:s.mode==="voice_chat"?"voice_chat" as const:"observer" as const,
   session_id:short(s.session_id),guild_id:short(s.guild_id),channel_id:short(s.channel_id),origin_channel_id:short(s.origin_channel_id),
   consenting_participants:Array.isArray(s.consenting_participants)?s.consenting_participants.slice(0,16).map(v=>short(v)):[],
   messages:Array.isArray(s.messages)?s.messages.slice(-512).filter(isRecord).filter(m=>m.transcription_status==="final").map(m=>({

@@ -73,3 +73,38 @@ for (const locale of [undefined, "pt-BR", "en", "en-US", "fr"]) {
     }
   });
 }
+
+test("voice_chat_start mirrors what is said into a voice_chat realtime journal and ends it on stop",async()=>{
+ const previous=globalThis.fetch;const events:any[]=[];let params:any;
+ globalThis.fetch=async(_,init)=>{const body=JSON.parse(String(init?.body));events.push(body);return new Response('{"status":"ok","realtime":{"accepted":true}}');};
+ const voice={getVoiceChannelId:async()=>"voice",startConversation:async(p:any)=>{params=p;return "started";},stopConversation:async()=>"stopped"} as unknown as DiscordVoiceController;
+ const commands=createCommands("http://orch",1000,voice,{locale:"en"});
+ const context:DiscordCommandContext={userId:"a",userName:"Starter",guildId:"g",channelId:"text",messageId:"request",getString:()=>"",getNumber:()=>undefined,reply:async()=>{},updateReply:async()=>{},showModal:async()=>{}};
+ const settle=async()=>{for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));};
+ try{
+  await commands.find(c=>c.name==="voice_chat_start")!.handle(context);await settle();
+  assert.equal(events[0].event_type,"realtime.start");assert.equal(events[0].payload.realtime.mode,"voice_chat");assert.equal(events[0].payload.realtime.voice_channel_id,"voice");
+  assert.equal(params.activationMode,"always");assert.equal(params.onObservation,undefined,"Ningo still answers a voice chat");
+  params.onHeard({userId:"b",userName:"Scholar",sequence:3,text:"what did Malthus fear?",startedAt:new Date().toISOString(),endedAt:new Date().toISOString()});await settle();
+  const observe=events.find(e=>e.event_type==="realtime.observe");
+  assert.equal(observe.payload.userId,"b");assert.equal(observe.payload.realtime.text,"what did Malthus fear?");assert.equal(observe.payload.realtime.session_id,events[0].payload.realtime.session_id);
+  params.onStopped();await settle();
+  assert.equal(events.at(-1).event_type,"realtime.stop");
+  const count=events.length;params.onHeard({userId:"b",sequence:4,text:"late",startedAt:"",endedAt:""});await settle();
+  assert.equal(events.length,count,"nothing is mirrored after the voice chat stopped");
+ }finally{globalThis.fetch=previous;}
+});
+
+test("voice_chat_start still starts when the realtime mirror is refused",async()=>{
+ const previous=globalThis.fetch;let params:any;
+ globalThis.fetch=async()=>new Response('{"status":"ok","realtime":{"accepted":false}}');
+ const voice={getVoiceChannelId:async()=>"voice",startConversation:async(p:any)=>{params=p;return "started";},stopConversation:async()=>"stopped"} as unknown as DiscordVoiceController;
+ const commands=createCommands("http://orch",1000,voice,{locale:"en"});
+ const context:DiscordCommandContext={userId:"a",guildId:"g",channelId:"text",messageId:"request",getString:()=>"",getNumber:()=>undefined,reply:async()=>{},updateReply:async()=>{},showModal:async()=>{}};
+ const errors=console.error;console.error=()=>{};
+ try{
+  await commands.find(c=>c.name==="voice_chat_start")!.handle(context);
+  for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(params,"the voice chat started");assert.equal(params.onHeard,undefined);
+ }finally{globalThis.fetch=previous;console.error=errors;}
+});

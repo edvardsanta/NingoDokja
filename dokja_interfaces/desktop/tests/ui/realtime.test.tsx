@@ -16,7 +16,10 @@ test("observer displays actual final evidence and makes semantic limitations vis
  const stamp = document.querySelector("time")!;
  expect(stamp.getAttribute("datetime")).toBe("2026-10-29T10:00:00Z");
  expect(stamp.textContent).toBe(new Intl.DateTimeFormat("en", {hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).format(new Date("2026-10-29T10:00:00Z")));
- expect(screen.getByText(/Use \/conversation_start/).textContent).toContain("/conversation_stop");
+ const hint=screen.getByText(/\/voice_chat_start talks with Ningo/).textContent;
+ expect(hint).toContain("/conversation_start");expect(hint).toContain("/conversation_stop");
+ // A session without a mode is an older observer: silent transcription.
+ expect(screen.getByText("Transcription only: Ningo stays silent.")).toBeTruthy();
  expect(document.body.textContent).not.toContain("/conversation_join");
  expect(screen.getByText(/Semantic associations are unresolved/)).toBeTruthy();
  expect(screen.getByText(/Segment-final transcription/)).toBeTruthy();
@@ -50,10 +53,20 @@ test("observer speaks in Ningo's voice and marks its state when no session is op
  const view=render(<I18nProvider locale="en"><RealtimeCard transport={up}/></I18nProvider>);
  expect((await screen.findByText("I listen in silence. No one has spoken yet.")).className).toBe("voice");
  expect(screen.getByText("Observer connected").getAttribute("data-tone")).toBe("ok");
- expect(screen.getByText(/Use \/conversation_start/)).toBeTruthy();
+ expect(screen.getByText(/\/voice_chat_start talks with Ningo/)).toBeTruthy();
  view.unmount();
  const down:Transport={preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:false,error:{code:"unavailable",message:"down"}})};
  render(<I18nProvider locale="pt"><RealtimeCard transport={down}/></I18nProvider>);
  await screen.findByText("Daqui não ouço nada. O observador se calou.");
  expect(screen.getByText("Observador indisponível").getAttribute("data-tone")).toBe("problem");
+});
+
+test("a voice chat from /voice_chat_start is transcribed here and shown as a conversation Ningo answers",async()=>{
+ const transport:Transport={preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:true,result:{sessions:[{
+  mode:"voice_chat",session_id:"s",consenting_participants:["a"],messages:[{message_id:"m",speaker_id:"a",speaker_name:"Eduardo",text:"Teste de som",transcription_status:"final"}],
+ }]}})};
+ render(<I18nProvider locale="pt"><RealtimeCard transport={transport}/></I18nProvider>);
+ await screen.findByText("Teste de som");
+ expect(screen.getByText("Conversa por voz: Ningo escuta e responde.")).toBeTruthy();
+ expect(screen.queryByText("Só transcrição: Ningo permanece em silêncio.")).toBeNull();
 });

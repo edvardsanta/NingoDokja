@@ -46,7 +46,10 @@ observations. No event-envelope field, route, or storage schema changes.
 | `realtime.stop` | Same gateway, same voice channel/origin | `session_id` | Delete ephemeral journal |
 | `realtime.snapshot` | Local Desktop source only | None | Bounded session/transcript projection |
 
-The Discord interface exposes only `/conversation_start` and `/conversation_stop`.
+The Discord interface exposes `/conversation_start` and `/conversation_stop` for a silent
+observer. `realtime.start` takes an optional `mode`, either `observer` (the default) or `voice_chat`.
+`/voice_chat_start` and `/wake_chat` open a `voice_chat` journal and mirror what their listener
+transcribes into it, without changing reply generation. The snapshot carries each session's `mode`.
 The orchestrator starts channel-wide admission in the domain. The legacy domain
 `Start`/`Consent` API and join/leave routes remain for compatibility with older
 callers; they do not manage channel-wide sessions. The snapshot's existing
