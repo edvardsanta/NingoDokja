@@ -163,7 +163,9 @@ func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
 		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "SSD Sata", "brand": "Brandx"},
 		Context: map[string]any{"is_owner": true},
 	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
-	if err != nil || got["watch"].(map[string]any)["status"] != "added" {
+	// Discord waits for the first collection: the reply already carries what it found.
+	watch := got["watch"].(map[string]any)
+	if err != nil || watch["status"] != "added" || watch["collected"] != true || got["matched"] != 1 {
 		t.Fatalf("search %v %v", got, err)
 	}
 	intake.wait()
@@ -278,5 +280,45 @@ func TestPriceIntakeHandsTheKnownMarketPagesBack(t *testing.T) {
 	}
 	if !reflect.DeepEqual(pages, []string{"https://market.example/found-hd"}) {
 		t.Fatalf("pages %v in %v", pages, market)
+	}
+}
+
+func TestTheDesktopAnswersAtOnceWhileANewWatchIsCollected(t *testing.T) {
+	resolver := &fakeResolver{started: make(chan struct{}, 1), release: make(chan struct{})}
+	domain := watchedDomain(t)
+	intake := NewPriceIntakeTask(resolver, domain, nil)
+	handler := NewPriceDomainHandler(domain, intake)
+	got, err := handler.Handle(context.Background(), core.Event{
+		Type: "price.search", Source: core.SourceDesktop, Payload: map[string]any{"watch": true, "query": "hd"},
+		Context: map[string]any{"is_owner": true},
+	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
+	watch, _ := got["watch"].(map[string]any)
+	if err != nil || watch["status"] != "added" || watch["collected"] != nil || got["matched"] != 0 {
+		t.Fatalf("desktop %v %v", got, err)
+	}
+	<-resolver.started // the collection still began at once
+	close(resolver.release)
+	intake.wait()
+}
+
+func TestADiscordSearchStopsWaitingForASlowCollection(t *testing.T) {
+	resolver := &fakeResolver{started: make(chan struct{}, 1), release: make(chan struct{})}
+	domain := watchedDomain(t)
+	intake := NewPriceIntakeTask(resolver, domain, nil)
+	handler := NewPriceDomainHandler(domain, intake)
+	handler.watchWait = 20 * time.Millisecond
+	got, err := handler.Handle(context.Background(), core.Event{
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "hd"},
+		Context: map[string]any{"is_owner": true},
+	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
+	watch, _ := got["watch"].(map[string]any)
+	if err != nil || watch["status"] != "added" || watch["collected"] != nil {
+		t.Fatalf("slow %v %v", got, err)
+	}
+	<-resolver.started
+	close(resolver.release)
+	intake.wait()
+	if found, _ := domain.SearchProducts(context.Background(), pricedomain.Search{Query: "hd"}); found.Matched != 1 {
+		t.Fatalf("the collection still finished and recorded: %+v", found)
 	}
 }

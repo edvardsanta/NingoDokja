@@ -118,7 +118,12 @@ Thresholds are constants in `assess.go`, in basis points:
 
   A scheduled run collects every watched search; a search the owner just added
   is collected at once, on its own. Asked while a run is going, both wait and
-  run next. The run is skipped while Feeds is switched off, and fails with
+  run next. A Discord search that added the watch waits for that first
+  collection, at most 150 seconds (Discord allows up to the adapter's request
+  timeout, 180 by default), and answers with what it found, marking the watch
+  `collected: true`; past the limit it answers as before and the collection
+  finishes on its own. The Desktop answers at once, since its requests are
+  short. The run is skipped while Feeds is switched off, and fails with
   `no_watches` when nothing is watched. This replaces reading `feeds.items`:
   the scheduled collector (`source.collect.v1`) is retired for prices, so only
   one path writes them.

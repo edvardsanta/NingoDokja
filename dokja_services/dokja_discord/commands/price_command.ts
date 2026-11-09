@@ -38,6 +38,8 @@ const messages: Record<string, Catalog> = {
     raised_before_drop: "subiu antes de cair",
     open: "abrir na loja",
     watch_added: "👁️ Passei a vigiar **{search}**. Os produtos chegam em instantes: pergunte de novo daqui a pouco.",
+    watch_collected: "👁️ Passei a vigiar **{search}** e já busquei agora.",
+    watch_collected_none: "👁️ Passei a vigiar **{search}** e já busquei agora, mas as lojas que consigo ler não trouxeram nada.",
     watch_full: "A lista de buscas vigiadas está cheia; remova uma para vigiar **{search}**.",
     compare_header: "⚖️ Comparação de **{title}**",
     compare_part: "Código {part}",
@@ -73,6 +75,8 @@ const messages: Record<string, Catalog> = {
     raised_before_drop: "rose before dropping",
     open: "open at the store",
     watch_added: "👁️ Now watching **{search}**. Its products arrive in a moment: ask again shortly.",
+    watch_collected: "👁️ Now watching **{search}**, and I searched just now.",
+    watch_collected_none: "👁️ Now watching **{search}**. I searched just now, but the stores I can read brought nothing.",
     watch_full: "The watched searches are full; remove one to watch **{search}**.",
     compare_header: "⚖️ Comparing **{title}**",
     compare_part: "Part {part}",
@@ -178,12 +182,21 @@ function embedLength(embed: DiscordEmbedSpec): number {
 // buildPriceReply renders the bridge's price result as one card per product; exported for tests.
 export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): DiscordReply {
   const words = catalog(locale);
-  const result = (price ?? {}) as { products?: Array<Record<string, unknown>>; matched?: number; watch?: { category?: string; brand?: string; status?: string } };
+  const result = (price ?? {}) as {
+    products?: Array<Record<string, unknown>>; matched?: number;
+    watch?: { category?: string; brand?: string; status?: string; collected?: boolean };
+  };
   const products = Array.isArray(result.products) ? result.products : [];
   // What the search did to the watched searches: only a new watch or a full list is worth saying.
+  // A new watch is collected at once; when the reply waited for that, it says so.
   const watched = [result.watch?.category, result.watch?.brand].filter((part) => part?.trim()).join(" · ");
-  const notice = result.watch?.status === "added" ? text(words, "watch_added", { search: watched })
+  const added = result.watch?.collected === true
+    ? (products.length > 0 ? "watch_collected" : "watch_collected_none") : "watch_added";
+  const notice = result.watch?.status === "added" ? text(words, added, { search: watched })
     : result.watch?.status === "full" ? text(words, "watch_full", { search: watched }) : "";
+  if (products.length === 0 && result.watch?.collected === true && result.watch?.status === "added") {
+    return notice;
+  }
   if (products.length === 0) {
     return notice ? `${notice}\n${text(words, "none")}` : text(words, "none");
   }
