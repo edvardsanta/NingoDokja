@@ -232,8 +232,8 @@ func (a *App) newJobsCommand(ctx context.Context) *cobra.Command {
 	run.Flags().IntVar(&runLimit, "limit", 1, "For meme.dispatch: how many memes to send (at least 1)")
 
 	command.AddCommand(list,
-		toggle("enable", "Resume a paused job (scheduler.jobs.set)", true),
-		toggle("disable", "Pause a job (scheduler.jobs.set)", false),
+		toggle("enable", "Switch a job on; every job starts off (scheduler.jobs.set)", true),
+		toggle("disable", "Switch a job off (scheduler.jobs.set)", false),
 		interval, run)
 	return command
 }

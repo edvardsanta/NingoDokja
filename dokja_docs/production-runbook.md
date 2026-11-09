@@ -271,6 +271,15 @@ Normal cadence:
 - refresh every `45m`
 - dispatch every `6h`
 
+**Every job starts switched off.** The scheduler still emits on its cadence, but the
+orchestrator runs a scheduled job only when an operator switched that job on (Desktop, TUI,
+or `dokja-cli jobs enable <job>`), and only while the `scheduler` switch is on. A manual run
+(`dokja-cli jobs run <job>`, the TUI or Desktop "run now") needs no switch.
+
+**Upgrade note.** Before this change a job ran unless it had been paused. After upgrading,
+every job is off, including ones that used to run; switch on the ones you want. Rolling back
+to an older orchestrator turns on every job without a saved `"enabled": false`.
+
 ## Scheduled Meme Delivery Path
 
 Expected production path:
@@ -286,8 +295,9 @@ The orchestrator owns the delivery workflow.
 The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`:
 
 - `/data/dokja_state.json` (`VA_STATE_FILE` in the orchestrator, `DOKJA_STATE_FILE` in the scheduler):
-  which services and scheduler jobs an operator switched off and any job interval overrides. The
-  orchestrator writes it; the scheduler only reads the intervals. A corrupt file starts every job paused.
+  which services an operator switched off, which scheduler jobs an operator switched on (a job
+  without `"enabled": true` is off), and any job interval overrides. The orchestrator writes it;
+  the scheduler only reads the intervals. A corrupt file starts every job off.
 - `/data/dokja.db` (`DOKJA_DB_FILE`): SQLite database with the chat provider profiles (base URL, model
   and token). Keep the volume private: the token is stored in plain text.
 - `/data/dokja_chat_sessions.db`: durable non-archived session snapshots, created
