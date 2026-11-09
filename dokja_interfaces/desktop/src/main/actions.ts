@@ -234,7 +234,7 @@ function chatPayload(raw: Record<string, unknown>): Record<string, unknown> | un
   const content = text(raw.content);
   const sendId = text(raw.send_id);
   if (!content || content.length > MAX_TURN_CONTENT_CHARS || !SEND_ID.test(sendId)) return undefined;
-  return { content, conversation_id: conversationId, send_id: sendId };
+  return { content, conversation_id: conversationId, send_id: sendId, ...(raw.spoken === true ? { spoken: true } : {}) };
 }
 
 function count0(value: unknown): number {

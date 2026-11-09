@@ -84,3 +84,58 @@ func TestCompactionDoesNotReplaceOrForgetStaticCapabilities(t *testing.T) {
 		}
 	}
 }
+
+func TestSpokenDesktopTurnKnowsItIsHeardInTalk(t *testing.T) {
+	model := &presentationCaptureGenerator{}
+	event := chatEvent("Esse é um teste de som.")
+	event.Source = core.SourceDesktop
+	event.Payload["spoken"] = true
+	if _, err := NewChatDomainHandler(model).Handle(t.Context(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	system := model.messages[0]["content"]
+	if !strings.Contains(system, chat.DesktopVoicePresentation) || !strings.Contains(system, "In Talk, turn on Talk by voice") {
+		t.Fatal("a spoken Desktop turn must say it is heard and read aloud in Talk")
+	}
+	if !strings.Contains(system, "the Desktop app on their own computer") || strings.Contains(system, "desktop, CLI or TUI") {
+		t.Fatal("the owner on Desktop must not be told they may be in a terminal")
+	}
+}
+
+func TestOnlyASpokenDesktopTurnGetsDesktopVoicePresentation(t *testing.T) {
+	for name, event := range map[string]func() core.Event{
+		"typed desktop": func() core.Event { e := chatEvent("oi"); e.Source = core.SourceDesktop; return e },
+		"spoken cli": func() core.Event {
+			e := chatEvent("oi")
+			e.Source = core.SourceCLI
+			e.Payload["spoken"] = true
+			return e
+		},
+		"spoken string": func() core.Event {
+			e := chatEvent("oi")
+			e.Source = core.SourceDesktop
+			e.Payload["spoken"] = "true"
+			return e
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if strings.Contains(personaForEvent(event()), chat.DesktopVoicePresentation) {
+				t.Fatal("voice presentation applied to a turn that was not spoken in Desktop")
+			}
+		})
+	}
+}
+
+func TestOwnerNoteNamesTheLocalInterface(t *testing.T) {
+	for source, want := range map[core.EventSource]string{
+		core.SourceDesktop: "the Desktop app on their own computer",
+		core.SourceCLI:     "their own terminal interface (CLI or TUI)",
+	} {
+		event := chatEvent("oi")
+		event.Source = source
+		event.Context = map[string]any{"owner_interface": string(chat.OwnerByLocal)}
+		if note := ownerInterfaceNote(event); !strings.Contains(note, want) {
+			t.Fatalf("%s owner note = %q", source, note)
+		}
+	}
+}

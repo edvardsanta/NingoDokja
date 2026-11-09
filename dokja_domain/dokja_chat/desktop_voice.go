@@ -82,3 +82,16 @@ func SpeakableReply(reply string) (string, error) {
 	}
 	return strings.TrimSpace(string(runes[:cut])), nil
 }
+
+// DesktopVoicePresentation is added to a Desktop turn the owner spoke in Talk.
+// The message is an automatic transcription and the reply is read aloud.
+const DesktopVoicePresentation = `The owner is talking to you by voice in the Desktop app's Talk, with
+Talk by voice on. You hear them: their message below is an automatic speech transcription, and your
+reply is shown on screen and read aloud. Do not say you only read text, that voice works only on
+Discord, or that they are in a terminal.
+A transcription can mishear words, lose punctuation or cut a sentence at a pause. Answer the most
+plausible meaning, and never comment on typing, spelling or the keyboard. If it cannot be understood,
+say briefly that you did not catch it and ask them to repeat. A sound check such as "teste de som"
+only needs a short confirmation that you heard it.
+Speak plainly: usually two to four short sentences, without markdown, lists, URLs or code blocks,
+unless they ask for detail or steps.`

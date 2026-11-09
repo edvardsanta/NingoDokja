@@ -145,7 +145,9 @@ Talk has a **Talk by voice** toggle beside the model. A press opens the micropho
 session that the shell holds; the window may use the microphone only while that session listens,
 and never the camera. Speech is cut into utterances on pauses (at most 8 s each, 16 kHz mono) and
 each one goes to the orchestrator as `voice.transcribe`. The text is sent as an ordinary message
-of the open conversation, so it is archived, focused, stopped and retried like a typed one. The
+of the open conversation, so it is archived, focused, stopped and retried like a typed one. It
+carries `spoken: true`, so Ningo is told the owner is speaking in Desktop Talk: the text is a
+transcription that may mishear words, and the reply should be short and plain enough to hear. The
 kept reply is then read aloud through `voice.reply.speak`: the Chat domain removes markup, links
 and citation markers and reads up to about 600 characters, ending at a sentence; the whole reply
 stays on screen. Capture pauses while an utterance is heard, answered and spoken.

@@ -61,6 +61,8 @@ describe("talking by voice in the conversation", () => {
     const sent = calls.filter((call) => call.type === "message.created");
     expect(sent).toHaveLength(1);
     expect(sent[0]?.payload?.content).toBe("What did Malthus fear?");
+    // Ningo is told it was said aloud, not typed.
+    expect(sent[0]?.payload?.spoken).toBe(true);
     const transcribed = calls.find((call) => call.type === "voice.transcribe");
     expect(transcribed?.payload).toMatchObject({ voice_session_id: SESSION, language: "en" });
     expect(calls.find((call) => call.type === "voice.reply.speak")?.payload).toEqual({ text: "That food would not keep up.", language: "en" });

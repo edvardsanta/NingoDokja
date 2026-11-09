@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Transport } from "../../shared/transport.js";
-import { LiveDesktopVoice, type Converse, type VoiceIssue, type VoiceState } from "../audio/live_voice.js";
+import { LiveDesktopVoice, type VoiceIssue, type VoiceState } from "../audio/live_voice.js";
 import type { VoiceAudioFactory } from "../audio/microphone.js";
 import { useTranslate } from "../i18n/context.js";
 import { Button } from "./ui.js";
@@ -14,9 +14,12 @@ const STATE_MESSAGE = {
   speaking: "voice_state_speaking",
 } as const satisfies Record<VoiceState, string>;
 
+// Talk's send; a spoken message says so, so Ningo knows it was heard rather than typed.
+export type TalkSend = (text: string, options: { spoken: boolean }) => Promise<string | undefined>;
+
 // Talk by voice, beside the composer. What is said is sent as an ordinary message of this
 // conversation, so it is kept, focused and retried like a typed one; the reply is read aloud.
-export function TalkVoice({ transport, converse, disabled = false, audioFactory }: { transport: Transport; converse: Converse; disabled?: boolean; audioFactory?: VoiceAudioFactory }) {
+export function TalkVoice({ transport, converse, disabled = false, audioFactory }: { transport: Transport; converse: TalkSend; disabled?: boolean; audioFactory?: VoiceAudioFactory }) {
   const t = useTranslate();
   const [state, setState] = useState<VoiceState>("idle");
   const [issue, setIssue] = useState<VoiceIssue>();
@@ -25,7 +28,7 @@ export function TalkVoice({ transport, converse, disabled = false, audioFactory 
   send.current = converse;
   const controller = useRef<LiveDesktopVoice | undefined>(undefined);
   useEffect(() => {
-    const voice = new LiveDesktopVoice(transport, { state: setState, issue: setIssue }, (text) => send.current(text), audioFactory);
+    const voice = new LiveDesktopVoice(transport, { state: setState, issue: setIssue }, (text) => send.current(text, { spoken: true }), audioFactory);
     controller.current = voice;
     return () => { voice.stop(); if (controller.current === voice) controller.current = undefined; };
   }, [transport, audioFactory]);
