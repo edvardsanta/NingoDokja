@@ -23,7 +23,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
 | `audio.resolve.v1` | `feeds.invoke`, `read {url}` or `search {query, limit}` | `handled`, and `refused` or `tracks` (see Music sources) |
 | `social.resolve.v1` | `feeds.invoke`, `read {url}` | `handled`, and `refused` or `post` (see Post readers) |
-| `price.resolve.v1` | `feeds.invoke`, `search {searches, limit, market}` | `observations` (`price.observation.v1` objects, validated by the Price domain) and an optional `skipped` map |
+| `price.resolve.v1` | `feeds.invoke`, `search {searches, limit, market}`, `identify {link}` (read from the address text, never fetched) or `lookup {part_number, query, limit}` | `observations` (`price.observation.v1` objects, validated by the Price domain) and an optional `skipped` map |
 | `quiz.run.v1` | `feeds.invoke`, `questions {url}` or `submit {url, answers}` | `handled`, and `refused`, `quiz` or `result` (see Quiz runners) |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`

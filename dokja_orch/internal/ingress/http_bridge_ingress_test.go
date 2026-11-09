@@ -237,3 +237,15 @@ func TestBridgePassesAStoreAndListsTheMerchants(t *testing.T) {
 		t.Fatal("the merchants list was not handed back")
 	}
 }
+
+func TestBridgeHandsAComparisonOnWithItsLinkUntouched(t *testing.T) {
+	eventType, payload := mapBridgeRequestToEvent(BridgeRequest{EventType: "price.compare",
+		Payload: BridgePayload{Query: " ssd example ", Link: " https://store.example/produto/1/x "}}, "ignored")
+	if eventType != "price.compare" || payload["query"] != "ssd example" || payload["link"] != "https://store.example/produto/1/x" || len(payload) != 2 {
+		t.Fatalf("mapped %s %v", eventType, payload)
+	}
+	result := map[string]any{string(core.DomainPrice): map[string]any{"found": true}}
+	if got := extractBridgePrice(core.ProcessResult{Event: core.Event{Type: "price.compare"}, Result: result}); got["found"] != true {
+		t.Fatalf("comparison not handed back: %v", got)
+	}
+}

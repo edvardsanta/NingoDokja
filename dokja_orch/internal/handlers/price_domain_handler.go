@@ -27,12 +27,18 @@ const (
 
 // PriceDomainHandler serves price.* events: the scheduled intake and assessments.
 type PriceDomainHandler struct {
-	domain *pricedomain.Domain
-	intake *PriceIntakeTask
+	domain    *pricedomain.Domain
+	intake    *PriceIntakeTask
+	feeds     pricedomainFeeds
+	commenter priceCommenter
 }
 
 func NewPriceDomainHandler(domain *pricedomain.Domain, intake *PriceIntakeTask) *PriceDomainHandler {
-	return &PriceDomainHandler{domain: domain, intake: intake}
+	handler := &PriceDomainHandler{domain: domain, intake: intake}
+	if intake != nil {
+		handler.feeds = intake.feeds
+	}
+	return handler
 }
 
 func (h *PriceDomainHandler) Domain() core.Domain {
@@ -48,6 +54,9 @@ func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workf
 			return nil, fmt.Errorf("price intake is not configured")
 		}
 		return h.intake.Start(event)
+	}
+	if workflow.Action == pricedomain.ActionCompareProduct {
+		return h.compare(ctx, event)
 	}
 	result, err := h.domain.Handle(ctx, pricedomain.Request{
 		Action: workflow.Action,
