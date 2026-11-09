@@ -86,6 +86,15 @@ class LocalGPUTranscriptionTests(unittest.TestCase):
     def test_a_plain_text_result_is_still_accepted(self):
         self.assertEqual(self.service(b'{"text":"  recognized  "}').transcribe(wav_bytes(1), "wav", "pt"), "recognized")
 
+    def test_a_laugh_is_written_kkkk_once_and_words_stay_words(self):
+        # Portuguese test data: the laugh below is what this provider returned for a recorded laugh.
+        body = json.dumps({"segments": [
+            {"text": " E aí, Ningo.", "avg_logprob": -0.1, "words": [{"word": " E", "probability": 0.9}]},
+            {"text": " Hehehehe", "avg_logprob": -0.47, "words": [{"word": " Hehehehe", "probability": 0.53}]},
+            {"text": " hahaha", "avg_logprob": -0.3, "words": [{"word": " hahaha", "probability": 0.7}]},
+        ]}).encode()
+        self.assertEqual(self.service(body).transcribe(wav_bytes(1), "wav", "pt"), "E aí, Ningo. kkkk")
+
 
 if __name__ == "__main__":
     unittest.main()

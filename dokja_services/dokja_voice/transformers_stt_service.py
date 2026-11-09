@@ -9,6 +9,7 @@ import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 from audio_utils import wav_bytes_to_mono_16k
+from laughter import with_laughter
 from speech_activity import SpeechDetector
 
 
@@ -89,7 +90,7 @@ class TransformersSTTService:
             clipped_pct,
             getattr(self, "device", -1),
         )
-        return text.strip()
+        return with_laughter(text.strip())
 
 
 def decode_audio_b64(payload: str) -> bytes:
