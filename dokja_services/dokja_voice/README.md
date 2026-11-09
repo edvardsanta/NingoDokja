@@ -249,6 +249,9 @@ server's `no_speech_prob` stays near zero even for pure noise, so it is not used
 Each `stt completed` log line reports `segments_kept`, `segments_dropped`,
 `min_avg_logprob` and `min_word_prob`, never the text, so the thresholds
 (`MIN_AVG_LOGPROB`, `MIN_WORD_PROBABILITY`) can be tuned from real rooms.
+The overlay starts the server with `--no-language-probabilities`. Without it,
+`verbose_json` runs an extra language-detection pass that doubles the time per
+segment (about 1.5 s to 3 s with large-v3-turbo on an RX 6600).
 
 Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
 if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects
