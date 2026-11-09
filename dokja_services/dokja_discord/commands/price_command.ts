@@ -21,6 +21,7 @@ const messages: Record<string, Catalog> = {
     more: "…e mais {count} produto(s). Refine a busca.",
     failed: "Não consegui consultar os preços agora.",
     market: "Mínimo do mercado",
+    market_history_note: "trecho baseado no histórico existente do Zoom/Buscapé",
     pix: "PIX",
     card: "cartão",
     unknown: "",
@@ -58,6 +59,7 @@ const messages: Record<string, Catalog> = {
     more: "…and {count} more product(s). Narrow the search.",
     failed: "I could not check prices right now.",
     market: "Market low",
+    market_history_note: "excerpt based on existing Zoom/Buscapé history",
     pix: "PIX",
     card: "card",
     unknown: "",
@@ -136,6 +138,9 @@ function field(row: Assessment, words: Catalog, locale: string) {
     ? `${text(words, "market")} · ${String(row.merchant)}`
     : [String(row.merchant), text(words, String(row.price_kind))].filter(Boolean).join(" · ");
   const lines = [`**${money(row.latest_cents, locale)}**`];
+  if (row.series === "market_min") {
+    lines.push(`_${text(words, "market_history_note")}_`);
+  }
   if (typeof row.median_30_cents === "number" && row.median_30_cents > 0) {
     lines.push(`${text(words, "median")}: ${money(row.median_30_cents, locale)}`);
   }
