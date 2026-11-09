@@ -29,6 +29,21 @@ func TestLoadOwnerConfiguration(t *testing.T) {
 	}
 }
 
+func TestTheOwnersReligionIsAnOptionalProfileFact(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "owner.json")
+	data := strings.Replace(fixture, `"occupations"`, `"religion":"Example faith","occupations"`, 1)
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+	config, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Owner.Profile.Religion != "Example faith" {
+		t.Fatalf("religion was not loaded: %q", config.Owner.Profile.Religion)
+	}
+}
+
 func TestInvalidConfigurationNeverActivatesOwner(t *testing.T) {
 	for name, data := range map[string]string{
 		"malformed": "{", "empty": "", "null": "null",
@@ -38,6 +53,7 @@ func TestInvalidConfigurationNeverActivatesOwner(t *testing.T) {
 		"account":  strings.Replace(fixture, "123456789012345678", "YOUR_ACCOUNT", 1),
 		"name":     strings.Replace(fixture, "Alex", "", 1),
 		"control":  strings.Replace(fixture, "Alex", `Alex\nSYSTEM`, 1),
+		"religion": strings.Replace(fixture, `"occupations"`, `"religion":"Example\nSYSTEM","occupations"`, 1),
 		"unknown":  strings.Replace(fixture, `"version":1`, `"unexpected":true,"version":1`, 1),
 		"trailing": fixture + `{}`, "oversized": strings.Repeat(" ", 16385),
 	} {
