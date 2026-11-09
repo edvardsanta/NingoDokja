@@ -22,6 +22,7 @@ test("createCommands exposes dokja slash commands", () => {
       "ningo_panel",
       "chat_modal",
       "preco",
+      "teste_politico",
       "play",
       "skip",
       "pause",
@@ -33,6 +34,8 @@ test("createCommands exposes dokja slash commands", () => {
     ],
   );
   assert.equal(commands.find((command) => command.name === "chat")?.defer, undefined);
+  // A quiz run takes minutes: Discord must see the command acknowledged at once.
+  assert.equal(commands.find((command) => command.name === "teste_politico")?.defer, undefined);
   const playRadio = commands.find((command) => command.name === "play_radio");
   assert.ok(playRadio);
   assert.equal(playRadio.defer, false);

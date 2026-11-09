@@ -144,6 +144,18 @@ per price source and the verdicts translated from the Price domain's codes in
 `commands/price_command.ts` (`pt-BR` and `en`, from `DOKJA_DISCORD_LOCALE`).
 Store names come from the owner's collector data; the adapter names none.
 
+
+## Questionnaires
+
+`/teste_politico link:<url>` asks the orchestrator for `quiz.take`: Ningo takes
+the online questionnaire himself, through an owner's Feeds quiz runner, and
+answers from his persona and private worldview. Discord sees the command
+acknowledged at once; the reply follows within 14 minutes and is public. It
+states how many answers he gave and the site's label, adds his short comment
+and ends with the site's own result link. A refusal (`busy`, `no_runner`,
+`unsupported`, `unavailable`, `unanswered`, `invalid_link` or `failed`) is
+worded from the command's catalog in `commands/quiz_command.ts`; a site's own
+text never reaches the channel, and no link is invented when a run fails.
 ## Live group voice
 
 Join a server voice channel and run `/voice_chat_start` once. Ningo listens to
