@@ -3,6 +3,7 @@ package price
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -27,8 +28,10 @@ type Search struct {
 	// Query holds words that must all appear in the product's title or key, such as "hd"
 	// or "rtx 5070".
 	Query string
-	// Brand is one more word that must appear, such as "amd".
+	// Brand must match the product's brand, or its title when the collector gave no brand.
 	Brand string
+	// Merchant keeps only the histories of that merchant key, such as one store.
+	Merchant string
 	// History asks for each product's market-low points of the last year, for a chart. A chat
 	// reply has no use for them, so they come only when asked.
 	History bool
@@ -40,6 +43,8 @@ type ProductAssessments struct {
 	Product     Product
 	Assessments []Assessment
 	Market      []Point
+	// URLs are the offers' pages, by history, for a person to open.
+	URLs map[Key]string
 }
 
 // SearchResult is what a search found, at most maxSearchProducts products.
@@ -47,11 +52,18 @@ type SearchResult struct {
 	Products []ProductAssessments
 	// Matched counts every matching product, including those beyond the limit.
 	Matched int
+	// Merchants lists every merchant key known, for a person to pick a store from.
+	Merchants []string
+	// Watch reports what the search did to the watched searches, when it could change them.
+	Watch *WatchOutcome
 }
 
 func (s Search) validate() error {
 	if s.Product != "" && !keyPattern.MatchString(s.Product) {
 		return fmt.Errorf("product must be 1 to 80 lowercase letters, digits, '.', '_', ':' or '-'")
+	}
+	if s.Merchant != "" && !keyPattern.MatchString(s.Merchant) {
+		return fmt.Errorf("merchant must be 1 to 80 lowercase letters, digits, '.', '_', ':' or '-'")
 	}
 	for name, value := range map[string]string{"query": s.Query, "brand": s.Brand} {
 		if !utf8.ValidString(value) || utf8.RuneCountInString(value) > maxSearchText {
@@ -70,13 +82,28 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 	if err != nil {
 		return SearchResult{}, err
 	}
-	wanted := append(words(search.Query), words(search.Brand)...)
+	query, brand := words(search.Query), words(search.Brand)
+	merchants := map[string]bool{}
 	var result SearchResult
 	for _, product := range products {
-		if search.Product != "" && product.Key != search.Product {
+		keys, err := d.repository.Keys(ctx, product.Key)
+		if err != nil {
+			return SearchResult{}, err
+		}
+		sold := false
+		for _, key := range keys {
+			merchants[key.Merchant] = true
+			sold = sold || search.Merchant == "" || key.Merchant == search.Merchant
+		}
+		if !sold || (search.Product != "" && product.Key != search.Product) {
 			continue
 		}
-		if !matches(words(product.Title+" "+product.Key), wanted) {
+		described := words(strings.Join([]string{product.Title, product.Key, product.Category, product.Brand, product.PartNumber}, " "))
+		branded := described
+		if product.Brand != "" {
+			branded = words(product.Brand)
+		}
+		if !matches(described, query) || !matches(branded, brand) {
 			continue
 		}
 		result.Matched++
@@ -87,7 +114,20 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 		if err != nil {
 			return SearchResult{}, err
 		}
-		found := ProductAssessments{Product: product, Assessments: assessments}
+		if search.Merchant != "" {
+			kept := assessments[:0]
+			for _, assessment := range assessments {
+				if assessment.Key.Merchant == search.Merchant {
+					kept = append(kept, assessment)
+				}
+			}
+			assessments = kept
+		}
+		urls, err := d.repository.OfferURLs(ctx, product.Key)
+		if err != nil {
+			return SearchResult{}, err
+		}
+		found := ProductAssessments{Product: product, Assessments: assessments, URLs: urls}
 		if search.History {
 			if found.Market, err = d.marketHistory(ctx, assessments); err != nil {
 				return SearchResult{}, err
@@ -95,6 +135,10 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 		}
 		result.Products = append(result.Products, found)
 	}
+	for merchant := range merchants {
+		result.Merchants = append(result.Merchants, merchant)
+	}
+	sort.Strings(result.Merchants)
 	return result, nil
 }
 
@@ -170,9 +214,14 @@ func (r SearchResult) Map() map[string]any {
 	for _, product := range r.Products {
 		rows := make([]any, 0, len(product.Assessments))
 		for _, assessment := range product.Assessments {
-			rows = append(rows, assessment.Map())
+			row := assessment.Map()
+			row["url"] = product.URLs[assessment.Key]
+			rows = append(rows, row)
 		}
-		entry := map[string]any{"product": product.Product.Key, "title": product.Product.Title, "assessments": rows}
+		entry := map[string]any{
+			"product": product.Product.Key, "title": product.Product.Title, "assessments": rows,
+			"category": product.Product.Category, "brand": product.Product.Brand, "part_number": product.Product.PartNumber,
+		}
 		if product.Market != nil {
 			market := make([]any, 0, len(product.Market))
 			for _, point := range product.Market {
@@ -182,5 +231,13 @@ func (r SearchResult) Map() map[string]any {
 		}
 		products = append(products, entry)
 	}
-	return map[string]any{"products": products, "matched": r.Matched, "count": len(products)}
+	merchants := make([]any, 0, len(r.Merchants))
+	for _, merchant := range r.Merchants {
+		merchants = append(merchants, merchant)
+	}
+	out := map[string]any{"products": products, "matched": r.Matched, "count": len(products), "merchants": merchants}
+	if r.Watch != nil {
+		out["watch"] = r.Watch.Map()
+	}
+	return out
 }
