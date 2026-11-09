@@ -749,7 +749,7 @@ test("digest filters are allowlisted and empty filters preserve the existing req
 
 test("price.search asks for the words and the history, and nothing the screen adds", () => {
   const build = ACTIONS["price.search"].payload;
-  assert.deepEqual(build({ query: " hd ", brand: " wd ", history: false, limit: 99 }), { query: "hd", brand: "wd", order: "opportunity", history: true });
+  assert.deepEqual(build({ query: " hd ", brand: " brandv ", history: false, limit: 99 }), { query: "hd", brand: "brandv", order: "opportunity", history: true });
   assert.deepEqual(build({ query: "", brand: "  " }), { order: "opportunity", history: true });
   assert.equal((build({ query: "x".repeat(300) })?.query as string).length, 100);
 });
@@ -798,7 +798,7 @@ test("price.search hands the screen a token for each store page, never the addre
   forgetOffers();
   const body = {
     matched: 1, merchants: ["aggregator", "store-a", "Bad Key"],
-    watch: { category: "ssd sata", brand: "samsung", status: "added" },
+    watch: { category: "ssd sata", brand: "brandx", status: "added" },
     products: [{ product: "p", title: "P", assessments: [
       { merchant: "store-a", series: "merchant", price_kind: "pix", latest_cents: 100, url: "https://store-a.example/p" },
       { merchant: "store-b", series: "merchant", price_kind: "pix", latest_cents: 90, url: "javascript:alert(1)" },
@@ -815,7 +815,7 @@ test("price.search hands the screen a token for each store page, never the addre
   assert.equal(offerAddress("0000000000000000"), undefined);
   assert.equal(offerAddress("../etc"), undefined);
   assert.deepEqual(projected.merchants, ["aggregator", "store-a"]);
-  assert.deepEqual(projected.watch, { category: "ssd sata", brand: "samsung", status: "added" });
+  assert.deepEqual(projected.watch, { category: "ssd sata", brand: "brandx", status: "added" });
 });
 
 test("asking price.search to watch is a change; a store must be a merchant key", () => {
@@ -830,10 +830,10 @@ test("asking price.search to watch is a change; a store must be a merchant key",
 
 test("price.watches lists the watched searches and price.unwatch needs a category", () => {
   assert.deepEqual(ACTIONS["price.watches"].project(compactOf("price", {
-    watches: [{ category: "hd", brand: "wd" }, { category: "", brand: "x" }, 3], limit: 50,
-  })), { watches: [{ category: "hd", brand: "wd" }], limit: 50 });
-  assert.deepEqual(ACTIONS["price.unwatch"].payload({ category: " hd ", brand: " wd ", extra: 1 }), { category: "hd", brand: "wd" });
-  assert.equal(ACTIONS["price.unwatch"].payload({ brand: "wd" }), undefined);
+    watches: [{ category: "hd", brand: "brandv" }, { category: "", brand: "x" }, 3], limit: 50,
+  })), { watches: [{ category: "hd", brand: "brandv" }], limit: 50 });
+  assert.deepEqual(ACTIONS["price.unwatch"].payload({ category: " hd ", brand: " brandv ", extra: 1 }), { category: "hd", brand: "brandv" });
+  assert.equal(ACTIONS["price.unwatch"].payload({ brand: "brandv" }), undefined);
   assert.deepEqual(ACTIONS["price.unwatch"].project(compactOf("price", { removed: true })), { removed: true });
   assert.ok(WRITE_ACTION_TYPES.includes("price.unwatch"));
 });

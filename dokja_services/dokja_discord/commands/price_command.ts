@@ -195,13 +195,13 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
     options: [
       {
         name: "produto",
-        description: "Words to find, such as hd, ssd or rtx 5070",
+        description: "Words to find, such as hd, ssd or video card",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
       {
         name: "marca",
-        description: "Brand, such as amd or samsung",
+        description: "Brand name",
         type: ApplicationCommandOptionType.String,
         required: false,
       },

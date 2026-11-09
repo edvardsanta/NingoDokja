@@ -20,7 +20,7 @@ const (
 	// maxSearchProducts bounds one answer; a chat reply cannot hold more.
 	maxSearchProducts = 10
 	// prefixMinRunes: a search word this long also matches the start of a longer word
-	// ("ryz" finds "ryzen"); shorter ones must match a whole word, so "hd" does not
+	// ("zen" finds "zenith"); shorter ones must match a whole word, so "hd" does not
 	// find "hdmi".
 	prefixMinRunes = 3
 )
@@ -31,7 +31,7 @@ type Search struct {
 	// Product is an exact product key.
 	Product string
 	// Query holds words that must all appear in the product's title or key, such as "hd"
-	// or "rtx 5070".
+	// or "gx 5000".
 	Query string
 	// Brand must match the product's brand, or its title when the collector gave no brand.
 	Brand string

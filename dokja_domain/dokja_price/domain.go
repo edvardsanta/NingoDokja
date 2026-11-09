@@ -14,7 +14,7 @@ const (
 	// every watched product.
 	ActionAssessPrice = "assess-price"
 	// ActionSearchPrices assesses the watched products that match words, such as a kind of
-	// product ("hd") or a brand ("amd").
+	// product ("hd") or a brand ("brandz").
 	ActionSearchPrices = "search-prices"
 	// ActionListWatches lists the watched searches the collectors run.
 	ActionListWatches = "list-price-watches"

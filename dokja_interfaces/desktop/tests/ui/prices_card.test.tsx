@@ -71,12 +71,12 @@ describe("the watched prices", () => {
     const { calls, transport } = routedTransport({ "price.search": [ok(search([GPU, CPU])), ok(search([CPU]))] });
     renderCard(transport);
     await screen.findByRole("heading", { name: "GPU Example 12GB" });
-    fireEvent.change(screen.getByLabelText("Brand"), { target: { value: "amd" } });
+    fireEvent.change(screen.getByLabelText("Brand"), { target: { value: "brandz" } });
     const searches = () => calls.filter((call) => call.type === "price.search");
     await waitFor(() => expect(searches().length).toBe(2));
-    expect(searches()[1]).toMatchObject({ type: "price.search", payload: { query: "", brand: "amd" } });
+    expect(searches()[1]).toMatchObject({ type: "price.search", payload: { query: "", brand: "brandz" } });
     await waitFor(() => expect(screen.queryByRole("heading", { name: "GPU Example 12GB" })).toBeNull());
-    expect((screen.getByLabelText("Brand") as HTMLInputElement).value).toBe("amd");
+    expect((screen.getByLabelText("Brand") as HTMLInputElement).value).toBe("brandz");
   });
 
   it("says when nothing matches, when products did not fit and when prices are switched off", async () => {
@@ -109,38 +109,38 @@ describe("watching searches, picking a store and opening a store page", () => {
   });
 
   it("watches a search only on a press, says so and lists it; typing alone watches nothing", async () => {
-    const watched = { ...search([CPU]), watch: { category: "ssd sata", brand: "samsung", status: "added" as const } };
+    const watched = { ...search([CPU]), watch: { category: "ssd sata", brand: "brandx", status: "added" as const } };
     const { calls, transport } = routedTransport({
       "price.search": [ok(search([GPU, CPU])), ok(search([CPU])), ok(watched), ok(search([CPU]))],
-      "price.watches": [ok({ watches: [], limit: 50 }), ok({ watches: [{ category: "ssd sata", brand: "samsung" }], limit: 50 })],
+      "price.watches": [ok({ watches: [], limit: 50 }), ok({ watches: [{ category: "ssd sata", brand: "brandx" }], limit: 50 })],
     });
     renderCard(transport, "pt");
     await screen.findByRole("heading", { name: "GPU Example 12GB" });
     const watch = screen.getByRole("button", { name: "Vigiar esta busca" });
     expect((watch as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Produto"), { target: { value: "ssd sata" } });
-    fireEvent.change(screen.getByLabelText("Marca"), { target: { value: "samsung" } });
+    fireEvent.change(screen.getByLabelText("Marca"), { target: { value: "brandx" } });
     await waitFor(() => expect(calls.filter((call) => call.type === "price.search").length).toBeGreaterThan(1));
     expect(calls.some((call) => call.type === "price.search" && call.payload?.watch === true)).toBe(false);
 
     fireEvent.click(watch);
-    expect(await screen.findByText("Passei a vigiar ssd sata · samsung. Os produtos chegam em instantes.")).toBeTruthy();
+    expect(await screen.findByText("Passei a vigiar ssd sata · brandx. Os produtos chegam em instantes.")).toBeTruthy();
     const asked = calls.find((call) => call.type === "price.search" && call.payload?.watch === true);
-    expect(asked?.payload).toMatchObject({ query: "ssd sata", brand: "samsung", watch: true });
+    expect(asked?.payload).toMatchObject({ query: "ssd sata", brand: "brandx", watch: true });
     await waitFor(() => expect(screen.getByText("Buscas vigiadas (1)")).toBeTruthy());
   });
 
   it("removes a watched search", async () => {
     const { calls, transport } = routedTransport({
       "price.search": ok(search([CPU])),
-      "price.watches": [ok({ watches: [{ category: "hd", brand: "wd" }], limit: 50 }), ok({ watches: [], limit: 50 })],
+      "price.watches": [ok({ watches: [{ category: "hd", brand: "brandv" }], limit: 50 }), ok({ watches: [], limit: 50 })],
       "price.unwatch": ok({ removed: true }),
     });
     renderCard(transport);
     fireEvent.click(await screen.findByText("Watched searches (1)"));
-    fireEvent.click(screen.getByRole("button", { name: "Stop watching hd · wd" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop watching hd · brandv" }));
     await waitFor(() => expect(screen.getByText("Watched searches (0)")).toBeTruthy());
-    expect(calls.find((call) => call.type === "price.unwatch")?.payload).toEqual({ category: "hd", brand: "wd" });
+    expect(calls.find((call) => call.type === "price.unwatch")?.payload).toEqual({ category: "hd", brand: "brandv" });
   });
 
   it("asks the shell to open a store page by its token, and offers nothing without one", async () => {

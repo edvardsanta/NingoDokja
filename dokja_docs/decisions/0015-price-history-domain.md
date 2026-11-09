@@ -148,7 +148,7 @@ The owner asked for `/preco produto:<words>` and `/preco marca:<brand>`.
 `price.search` (action `search-prices`) takes optional `product` (exact key),
 `query` and `brand`, matches whole words of a product's title or key without
 accents or case (three letters or more also match a word's start, so `hd` does
-not match `hdmi` but `ryz` matches `ryzen`), and answers at most 10 products with
+not match `hdmi` but `zen` matches `zenith`), and answers at most 10 products with
 their assessments, titles and the count of all matches. `price.assess` keeps its
 earlier shape. The bridge passes `query` and `brand` in and hands the result back
 as a structured `price` field, so the interface renders it in its own language;
@@ -169,7 +169,7 @@ Desktop catalogs.
 ## Watched searches (implemented: contract and storage)
 
 The owner watches categories and brands, not single products: "ssd sata" from
-"samsung", "hd" from any brand. What a person asks for decides the rest.
+one brand, "hd" from any brand. What a person asks for decides the rest.
 
 - **The domain owns the list** (`watches`: a category and an optional brand,
   normalized to lowercase words without accents, at most 50). Only the owner
