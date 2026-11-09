@@ -44,6 +44,20 @@ type fakeCommenter struct {
 	err      error
 }
 
+type bindingCommenter struct {
+	fakeCommenter
+	bindings []string
+	failures map[string]bool
+}
+
+func (c *bindingCommenter) GenerateMessagesWithBinding(_ context.Context, provider, model string, messages []map[string]string) (map[string]any, error) {
+	c.bindings = append(c.bindings, provider+":"+model)
+	if c.failures[provider] {
+		return nil, errors.New("provider unavailable")
+	}
+	return c.GenerateMessages(context.Background(), messages)
+}
+
 type fakeQueryCache struct {
 	queries []string
 	hits    int
@@ -180,6 +194,21 @@ func TestCompetitorQueriesUseCacheBeforeProvider(t *testing.T) {
 	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"})
 	if len(queries) != 1 || queries[0] != cache.queries[0] || cache.hits != 1 || cache.puts != 0 {
 		t.Fatalf("cache was not used: queries=%v hits=%d puts=%d", queries, cache.hits, cache.puts)
+	}
+}
+
+func TestCompetitorPlanningFallsBackInConfiguredOrder(t *testing.T) {
+	commenter := &bindingCommenter{
+		fakeCommenter: fakeCommenter{reply: `{"queries":["processador 8 cores 16 threads am5"]}`},
+		failures:      map[string]bool{"claude_code": true, "codex": true},
+	}
+	handler, _ := compareHandler(&compareResolver{}, commenter)
+	queries := handler.competitorQueries(context.Background(), map[string]any{
+		"title": "CPU", "category": "cpu",
+	}, map[string]any{"id": "cpu"})
+	if len(queries) != 1 || commenter.bindings[0] != "claude_code:haiku" ||
+		commenter.bindings[1] != "codex:gpt-6-luna" || commenter.bindings[2] != "ollama:qwen3:4b" {
+		t.Fatalf("fallback order: bindings=%v queries=%v", commenter.bindings, queries)
 	}
 }
 

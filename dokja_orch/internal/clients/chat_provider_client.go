@@ -72,6 +72,12 @@ func (c *ChatProviderClient) GenerateMessages(ctx context.Context, messages []ma
 	return c.call(ctx, "POST", "/chat", map[string]any{"messages": messages})
 }
 
+func (c *ChatProviderClient) GenerateMessagesWithBinding(ctx context.Context, provider, model string, messages []map[string]string) (map[string]any, error) {
+	return c.call(ctx, "POST", "/chat", map[string]any{
+		"messages": messages, "provider": provider, "model": model,
+	})
+}
+
 func (c *ChatProviderClient) RenderMath(ctx context.Context, expression string) ([]byte, error) {
 	result, err := c.call(ctx, http.MethodPost, "/math/render", map[string]string{"expression": expression})
 	if err != nil {

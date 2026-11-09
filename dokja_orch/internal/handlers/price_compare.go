@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -32,6 +33,10 @@ const (
 // leaves the comparison without a comment.
 type priceCommenter interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
+}
+
+type priceProviderBindingCommenter interface {
+	GenerateMessagesWithBinding(context.Context, string, string, []map[string]string) (map[string]any, error)
 }
 
 type competitorQueryCache interface {
@@ -251,10 +256,11 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 	if err != nil {
 		return nil
 	}
-	reply, err := h.commenter.GenerateMessages(ctx, []map[string]string{
+	messages := []map[string]string{
 		{"role": "system", "content": competitorDiscoveryInstructions},
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
-	})
+	}
+	reply, err := h.generateCompetitorPlan(ctx, messages)
 	if err != nil {
 		return nil
 	}
@@ -283,6 +289,36 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 		}
 	}
 	return queries
+}
+
+func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, messages []map[string]string) (map[string]any, error) {
+	if bindingCommenter, ok := h.commenter.(priceProviderBindingCommenter); ok {
+		providers := []struct{ provider, model string }{
+			{"claude_code", envOrDefault("DOKJA_PRICE_CLAUDE_MODEL", "haiku")},
+			{"codex", envOrDefault("DOKJA_PRICE_CODEX_MODEL", "gpt-6-luna")},
+			{"ollama", envOrDefault("DOKJA_PRICE_OLLAMA_MODEL", "qwen3:4b")},
+		}
+		var lastErr error
+		for _, binding := range providers {
+			reply, err := bindingCommenter.GenerateMessagesWithBinding(ctx, binding.provider, binding.model, messages)
+			if err == nil {
+				return reply, nil
+			}
+			lastErr = err
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+		}
+		return nil, lastErr
+	}
+	return h.commenter.GenerateMessages(ctx, messages)
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func cacheKey(value any) (string, error) {
