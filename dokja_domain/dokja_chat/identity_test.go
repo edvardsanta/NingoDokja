@@ -23,10 +23,10 @@ func TestOwnerIdentityRequiresVerifiedMetadataAndADirectQuestion(t *testing.T) {
 }
 
 func TestConfiguredProfileIdentityReply(t *testing.T) {
-	profile := OwnerProfile{Name: "Alex", BirthDate: "2000-01-01", Occupations: []string{"musician"}}
+	profile := OwnerProfile{Name: "Alex", BirthDate: "2000-01-01", Occupations: []string{"musician"}, Religion: "Example faith"}
 	for _, question := range []string{"Who am I?", "Quem sou eu?"} {
 		reply := OwnerProfileIdentityReply(question, true, profile, OwnerByDiscord)
-		if !strings.Contains(reply, "Alex") || strings.Contains(reply, profile.BirthDate) || strings.Contains(reply, "musician") {
+		if !strings.Contains(reply, "Alex") || strings.Contains(reply, profile.BirthDate) || strings.Contains(reply, "musician") || strings.Contains(reply, "Example faith") {
 			t.Fatalf("unexpected profile disclosure: %q", reply)
 		}
 		if OwnerProfileIdentityReply(question, false, profile, OwnerByDiscord) != "" {

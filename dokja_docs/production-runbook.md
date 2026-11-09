@@ -180,8 +180,8 @@ runs a build that knows it: unknown fields stop startup. Restart the orchestrato
 from the desktop afterwards.
 
 Version 1 requires `owner.id`, `owner.profile.name`, and
-`owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD) and `occupations` are
-optional. Unknown fields, unsupported versions, invalid dates, invalid account
+`owner.accounts.discord.user_id`; `birth_date` (YYYY-MM-DD), `occupations` and
+`religion` (single-line text, such as a faith and denomination) are optional. Unknown fields, unsupported versions, invalid dates, invalid account
 IDs, oversized files and control characters in profile text stop startup.
 An absent file disables owner recognition; an invalid file stops startup. The
 removed `DOKJA_OWNER_DISCORD_USER_ID` environment setting is ignored. Migrate its
@@ -192,7 +192,7 @@ facts cannot be edited by chat messages.
 The authenticated bridge attaches profile facts only to turns from the configured
 Discord account. Other interfaces, mentions and identity claims cannot activate
 them. Direct identity questions include the preferred name without automatically
-listing the birthday or occupations. Ordinary model generation receives the
+listing the birthday, occupations or religion. Ordinary model generation receives the
 private profile as application context, with instructions not to volunteer private
 facts in shared channels. Those model instructions are not a guarantee of secrecy;
 omit any profile fact you would not want the model to receive. Ownership grants

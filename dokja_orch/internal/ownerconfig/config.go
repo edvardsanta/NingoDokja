@@ -82,6 +82,9 @@ func Load(path string) (Config, error) {
 			return Config{}, fmt.Errorf("owner occupations must be nonempty single-line text of at most 128 bytes")
 		}
 	}
+	if religion := config.Owner.Profile.Religion; religion != "" && !validText(religion, 128) {
+		return Config{}, fmt.Errorf("owner religion must be single-line text of at most 128 bytes")
+	}
 	if err := validNingo(config.Ningo); err != nil {
 		return Config{}, err
 	}

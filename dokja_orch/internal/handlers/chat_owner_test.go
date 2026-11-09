@@ -10,7 +10,7 @@ import (
 	"read_books/internal/core"
 )
 
-var configuredOwner = chat.OwnerProfile{Name: "Alex", Occupations: []string{"engineer"}}
+var configuredOwner = chat.OwnerProfile{Name: "Alex", Occupations: []string{"engineer"}, Religion: "Example faith"}
 
 func TestTheDesktopKnowsTheOwnerByTheConfiguredProfile(t *testing.T) {
 	archive := archiveFor(t)
@@ -58,7 +58,7 @@ func TestTheSelfChatPromptSaysItIsTheOwnersWhatsApp(t *testing.T) {
 	if _, err := handler.Handle(context.Background(), whatsappTurn("Still there?", "MSG1", true), archiveStep); err != nil {
 		t.Fatal(err)
 	}
-	if system := model.system[0]; !strings.Contains(system, `"message yourself" chat`) || !strings.Contains(system, `"name":"Alex"`) {
+	if system := model.system[0]; !strings.Contains(system, `"message yourself" chat`) || !strings.Contains(system, `"name":"Alex"`) || !strings.Contains(system, `"religion":"Example faith"`) {
 		t.Fatal(system)
 	}
 }

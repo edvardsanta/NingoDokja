@@ -12,6 +12,8 @@ type OwnerProfile struct {
 	Name        string   `json:"name"`
 	BirthDate   string   `json:"birth_date,omitempty"`
 	Occupations []string `json:"occupations,omitempty"`
+	// Religion is the owner's faith, in their own words.
+	Religion string `json:"religion,omitempty"`
 }
 
 // NingoFacts are private facts about the assistant and the people around it. They stay in the owner's
