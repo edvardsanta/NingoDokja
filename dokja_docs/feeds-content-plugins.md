@@ -23,6 +23,7 @@ mechanisms; they neither route workflows nor send messages to chat platforms.
 | `media.perceive.v1` | `feeds.invoke`, `screen`, `read-text`, `attachment` | Screening, OCR or attachment bytes |
 | `audio.resolve.v1` | `feeds.invoke`, `read {url}` or `search {query, limit}` | `handled`, and `refused` or `tracks` (see Music sources) |
 | `social.resolve.v1` | `feeds.invoke`, `read {url}` | `handled`, and `refused` or `post` (see Post readers) |
+| `quiz.run.v1` | `feeds.invoke`, `questions {url}` or `submit {url, answers}` | `handled`, and `refused`, `quiz` or `result` (see Quiz runners) |
 
 A `feeds.invoke` payload is `{capability, action, input}`. An optional `plugin`
 selects an explicitly named provider. The subprocess receives
@@ -118,6 +119,38 @@ named by the `FEEDS_PLUGIN_REQUIREMENTS` build argument as a path inside the bui
 context (for example `feeds_plugins/requirements.txt`). The default,
 `dokja_services/dokja_feeds/no-plugin-requirements.txt`, lists nothing. The
 example needs `yt-dlp` there. Rebuild Feeds after changing the list.
+
+### Quiz runners
+
+A quiz runner is a plugin providing `quiz.run.v1`. It lets Ningo take an online
+questionnaire, such as a political test, and return the site's own result link.
+The Quiz workflow asks the model for the answers; the runner only reads and clicks.
+Like a post reader, it answers `{handled: false}` for a link it does not serve and
+`{handled: true, refused}` for one it cannot run. `refused` is one of
+`unsupported`, `unavailable` and, for `submit`, `unanswered` (the site asked a
+question the answers did not cover) or `failed`.
+
+`questions {url}` answers `{handled: true, quiz: {title, questions}}`. Each question
+has an `id` (1 to 64 characters of letters, digits, `.`, `_`, `:` or `-`), a `text`
+and 2 to 12 distinct `options`, all plain text. A runner returns every question the
+site may ask, at most 400: when the site draws a subset at random, the list is the
+whole pool, and every item gets an answer.
+
+`submit {url, answers}` receives `answers` as `{id: option}`, each option copied
+from `questions`. It answers `{handled: true, result: {url, label}}`: `url` is the
+site's result link, on the same host as the quiz link, and the optional `label` is
+the short verdict the site shows.
+
+A runner never types text, signs in or pays. A screen that needs any of these is
+`unsupported`. Quiz runs may take up to five minutes, the longest plugin timeout;
+declare that in `limits.timeout_ms`. Output is capped at 2 MiB. The repository
+ships no runner: runners reach third-party sites, so they live with the owner's
+plugins in `feeds_plugins/`. A runner that needs a browser uses the one the
+`FEEDS_PLUGIN_BROWSER=chromium` build argument installs (Playwright for Python,
+with Chromium, under `/opt/feeds-browsers`). Feeds passes a plugin only `PATH` and
+the variables its manifest lists in `env`, so such a runner lists
+`PLAYWRIGHT_BROWSERS_PATH`; in a container it should also launch Chromium with
+`--disable-dev-shm-usage`.
 
 ### Post readers
 

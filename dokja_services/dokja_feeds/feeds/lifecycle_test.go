@@ -87,6 +87,23 @@ func TestAVersionedExtractorIsDisabledUntilEnabled(t *testing.T) {
 	}
 }
 
+func TestAQuizRunnerMayPrintQuestionsButNotMedia(t *testing.T) {
+	runner := func(output int) map[string]any {
+		return v1(map[string]any{"provides": []string{CapabilityQuizRun}, "formats": nil,
+			"limits": map[string]any{"timeout_ms": 300000, "output_bytes": output}})
+	}
+	root := t.TempDir()
+	newPlugin(t, root, "quiz", runner(maxQuizOutput))
+	if found := discoverOne(t, root); found.Err != nil || found.Plugin.OutputBytes != maxQuizOutput {
+		t.Fatalf("quiz runner budget refused: %#v, %v", found.Plugin, found.Err)
+	}
+	root = t.TempDir()
+	newPlugin(t, root, "quiz", runner(maxQuizOutput+1))
+	if found := discoverOne(t, root); found.Err == nil {
+		t.Fatal("quiz runner budget above the ceiling was accepted")
+	}
+}
+
 func TestAPostReaderMayPrintOneBase64MediaFile(t *testing.T) {
 	reader := func(output int) map[string]any {
 		return v1(map[string]any{"provides": []string{CapabilitySocialResolve}, "formats": nil,

@@ -40,6 +40,18 @@ RUN if grep -q '^[^#[:space:]]' /tmp/owner-plugin-requirements.txt; then \
       { [ -d /opt/feeds-plugins ] || python3 -m venv --system-site-packages /opt/feeds-plugins; } \
       && /opt/feeds-plugins/bin/pip install --no-cache-dir -r /tmp/owner-plugin-requirements.txt; \
     fi
+# A browser for the owner's plugins that must run a page's scripts, such as a quiz runner.
+# Off by default: Chromium and its libraries add several hundred megabytes.
+ARG FEEDS_PLUGIN_BROWSER=none
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/feeds-browsers
+RUN case "$FEEDS_PLUGIN_BROWSER" in \
+      none) ;; \
+      chromium) { [ -d /opt/feeds-plugins ] || python3 -m venv --system-site-packages /opt/feeds-plugins; } \
+        && /opt/feeds-plugins/bin/pip install --no-cache-dir playwright==1.49.1 \
+        && /opt/feeds-plugins/bin/playwright install --with-deps chromium \
+        && rm -rf /var/lib/apt/lists/* ;; \
+      *) exit 2 ;; \
+    esac
 ENV PATH="/opt/feeds-plugins/bin:${PATH}"
 
 # Keep the Go module cache in the image, outside the source bind mount. Dev/lite
