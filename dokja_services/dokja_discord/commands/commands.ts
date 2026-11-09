@@ -9,6 +9,7 @@ import type { DiscordVoiceController } from "../voice/voice.js";
 import { createMusic, type MusicFeature } from "../music/commands.js";
 import { buildNingoPanelReply } from "./interactions.js";
 import { localizeNotice } from "../messages/notices.js";
+import { adapterText, translateCommand } from "../messages/commands.js";
 import { createCompareCommand, createPriceCommand } from "./price_command.js";
 import { createQuizCommand } from "./quiz_command.js";
 
@@ -56,13 +57,13 @@ function createDokjaCommand(params: DokjaCommandParams): DiscordSlashCommand {
             ...(buildPayload?.(context) ?? {}),
           }),
         );
-        const reply = localizeNotice(response.notice, response.reply.trim() || "No response.", locale);
+        const reply = localizeNotice(response.notice, response.reply.trim() || adapterText(locale, "no_response"), locale);
         await context.reply(response.attachments?.length
           ? { content: reply, attachments: response.attachments }
           : reply, { ephemeral: ephemeralResponse });
       } catch (error) {
         console.error(`[dokja-discord] command ${name} failed`, error);
-        await context.reply("Command failed.", { ephemeral: true });
+        await context.reply(adapterText(locale, "command_failed"), { ephemeral: true });
       }
     },
   };
@@ -79,6 +80,7 @@ export function createCommands(
     music?: MusicFeature;
   },
 ): DiscordSlashCommand[] {
+  const locale = options?.locale;
   return [
     ...observerCommands(orchestratorEndpoint, orchestratorTimeoutMs, voice, options?.locale),
     createDokjaCommand({
@@ -103,6 +105,7 @@ export function createCommands(
     }),
     createDokjaCommand({
       name: "meme_fetch",
+      locale,
       description: "Fetch memes from Dokja.",
       orchestratorEndpoint,
       orchestratorTimeoutMs,
@@ -120,14 +123,8 @@ export function createCommands(
       }),
     }),
     createDokjaCommand({
-      name: "meme_status",
-      description: "Show meme service status.",
-      orchestratorEndpoint,
-      orchestratorTimeoutMs,
-      eventType: "meme.status",
-    }),
-    createDokjaCommand({
       name: "meme_refresh",
+      locale,
       description: "Refresh the meme pool.",
       orchestratorEndpoint,
       orchestratorTimeoutMs,
@@ -158,12 +155,12 @@ export function createCommands(
       ],
       async handle(context: DiscordCommandContext) {
         if (!voice) {
-          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          await context.reply(adapterText(locale, "voice_missing"), { ephemeral: true });
           return;
         }
 
         const prompt = context.getString("prompt");
-        await context.reply("Starting speech playback...", { ephemeral: true });
+        await context.reply(adapterText(locale, "speech_starting"), { ephemeral: true });
 
         void voice
           .speakText({
@@ -176,7 +173,7 @@ export function createCommands(
           .catch((error) => {
             console.error("[dokja-discord] command speak failed", error);
             return context.updateReply(
-              error instanceof Error ? error.message : "Could not start speech playback.",
+              error instanceof Error ? error.message : adapterText(locale, "speech_failed"),
             );
           });
       },
@@ -185,13 +182,27 @@ export function createCommands(
       name: "voice_chat_start",
       description: "Join the live conversation with everyone in your voice channel.",
       defer: false,
+      options: [
+        {
+          name: "mode",
+          description: "When Ningo answers",
+          type: ApplicationCommandOptionType.String,
+          required: false,
+          choices: [
+            { name: "Always", value: "always" },
+            { name: "Only after the wake word", value: "wakeword" },
+          ],
+        },
+      ],
       async handle(context: DiscordCommandContext) {
+        // Always answering is the default; the wake word makes Ningo wait to be called.
+        const activationMode = context.getString("mode") === "wakeword" ? "wakeword" : "always";
         if (!voice) {
-          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          await context.reply(adapterText(locale, "voice_missing"), { ephemeral: true });
           return;
         }
 
-        await context.reply("Starting voice conversation...", { ephemeral: true });
+        await context.reply(adapterText(locale, activationMode === "wakeword" ? "wake_starting" : "voice_starting"), { ephemeral: true });
 
         const voiceSessionId = randomUUID();
 
@@ -201,7 +212,7 @@ export function createCommands(
           .startConversation({
             guildId: context.guildId,
             userId: context.userId,
-            activationMode: "always",
+            activationMode,
             originChannelId: context.channelId,
             onHeard: mirror?.heard,
             onStopped: mirror?.stop,
@@ -241,72 +252,7 @@ export function createCommands(
             mirror?.stop();
             console.error("[dokja-discord] command voice_chat_start failed", error);
             return context.updateReply(
-              error instanceof Error ? error.message : "Could not start voice conversation.",
-            );
-          });
-      },
-    },
-    {
-      name: "wake_chat",
-      description: "Listen in the current voice channel and only answer after the wake word.",
-      defer: false,
-      async handle(context: DiscordCommandContext) {
-        if (!voice) {
-          await context.reply("Voice controller is not configured.", { ephemeral: true });
-          return;
-        }
-
-        await context.reply("Starting wake-word voice conversation...", { ephemeral: true });
-
-        const voiceSessionId = randomUUID();
-
-        // What is said is also shown live in the owner's Desktop realtime view.
-        const mirror = await startVoiceChatMirror(orchestratorEndpoint, orchestratorTimeoutMs, context, voice);
-        void voice
-          .startConversation({
-            guildId: context.guildId,
-            userId: context.userId,
-            activationMode: "wakeword",
-            originChannelId: context.channelId,
-            onHeard: mirror?.heard,
-            onStopped: mirror?.stop,
-            onTurn: async (_transcript, turn) => {
-              if (!turn) throw new Error("Voice speaker metadata is required");
-              // Ningo's words join the live transcript as each sentence starts playing.
-              const said = mirror?.reply(Math.max(0, ...turn.turns.map((heard) => heard.sequence)));
-              const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
-                guildId: context.guildId, originChannelId: context.channelId, turn,
-                voiceSessionId, voiceStartedBy: context.userId,
-                onSpeech: async (sentence) => {
-                  await turn.waitForFloor?.();
-                  const speech = { guildId: context.guildId, userId: turn.userId,
-                    channelId: turn.channelId, originChannelId: context.channelId,
-                    text: sentence, signal: turn.signal, trace: turn.trace };
-                  said?.said(sentence);
-                  if (voice.speakReply) await voice.speakReply(speech);
-                  else await voice.speakText(speech);
-                },
-              });
-              turn.signal.throwIfAborted();
-              if (reply.trim()) {
-                const speech = {
-                  guildId: context.guildId, userId: turn.userId, channelId: turn.channelId,
-                  originChannelId: context.channelId, text: reply, signal: turn.signal, trace: turn.trace,
-                  waitForFloor: turn.waitForFloor,
-                };
-                await turn.waitForFloor?.();
-                said?.said(reply);
-                if (voice.speakReply) await voice.speakReply(speech);
-                else await voice.speakText(speech);
-              }
-            },
-          })
-          .then((reply) => context.updateReply(reply))
-          .catch((error) => {
-            mirror?.stop();
-            console.error("[dokja-discord] command wake_chat failed", error);
-            return context.updateReply(
-              error instanceof Error ? error.message : "Could not start wake-word voice conversation.",
+              error instanceof Error ? error.message : adapterText(locale, "voice_failed"),
             );
           });
       },
@@ -323,7 +269,7 @@ export function createCommands(
           await context.reply(reply, { ephemeral: true });
         } catch (error) {
           console.error("[dokja-discord] command voice_chat_stop failed", error);
-          await context.reply("Could not stop voice conversation.", { ephemeral: true });
+          await context.reply(adapterText(locale, "voice_stop_failed"), { ephemeral: true });
         }
       },
     },
@@ -341,12 +287,12 @@ export function createCommands(
       ],
       async handle(context: DiscordCommandContext) {
         if (!voice) {
-          await context.reply("Voice controller is not configured.", { ephemeral: true });
+          await context.reply(adapterText(locale, "voice_missing"), { ephemeral: true });
           return;
         }
 
         const streamUrl = context.getString("url");
-        await context.reply("Starting radio playback...", { ephemeral: true });
+        await context.reply(adapterText(locale, "radio_starting"), { ephemeral: true });
 
         void voice
           .playRadio({
@@ -368,7 +314,7 @@ export function createCommands(
           .catch((error) => {
             console.error("[dokja-discord] command play_radio failed", error);
             return context.updateReply(
-              error instanceof Error ? error.message : "Could not start the radio.",
+              error instanceof Error ? error.message : adapterText(locale, "radio_failed"),
             );
           });
       },
@@ -385,7 +331,7 @@ export function createCommands(
           await context.reply(reply, { ephemeral: true });
         } catch (error) {
           console.error("[dokja-discord] command stop_radio failed", error);
-          await context.reply("Could not stop the radio.", { ephemeral: true });
+          await context.reply(adapterText(locale, "radio_stop_failed"), { ephemeral: true });
         }
       },
     },
@@ -394,27 +340,7 @@ export function createCommands(
       description: "Open the Ningo interaction panel.",
       defer: false,
       async handle(context: DiscordCommandContext) {
-        await context.reply(buildNingoPanelReply(), { ephemeral: true });
-      },
-    },
-    {
-      name: "chat_modal",
-      description: "Open a chat prompt modal.",
-      defer: false,
-      async handle(context: DiscordCommandContext) {
-        await context.showModal({
-          customId: "chat_prompt_modal",
-          title: "Chat With Dokja",
-          fields: [
-            {
-              customId: "prompt",
-              label: "Prompt",
-              placeholder: "Ask Dokja something...",
-              required: true,
-              style: "paragraph",
-            },
-          ],
-        });
+        await context.reply(buildNingoPanelReply(locale), { ephemeral: true });
       },
     },
     createPriceCommand(orchestratorEndpoint, orchestratorTimeoutMs, options?.locale),
@@ -422,5 +348,5 @@ export function createCommands(
     createQuizCommand(orchestratorEndpoint, options?.locale),
     // Music in a voice channel: the queue lives in the orchestrator.
     ...(options?.music ?? createMusic({ orchestratorEndpoint, orchestratorTimeoutMs, voice })).commands,
-  ];
+  ].map(translateCommand);
 }

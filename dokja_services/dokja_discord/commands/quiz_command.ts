@@ -69,7 +69,7 @@ export function buildQuizReply(run: unknown, locale = "pt-BR"): DiscordReply {
 
 export function createQuizCommand(orchestratorEndpoint: string, locale?: string): DiscordSlashCommand {
   return {
-    name: "teste_politico",
+    name: "political_test",
     description: "Ningo takes an online questionnaire himself and posts his result link.",
     options: [
       {

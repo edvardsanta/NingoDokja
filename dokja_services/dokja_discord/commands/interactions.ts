@@ -1,5 +1,6 @@
 import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import { localizeNotice } from "../messages/notices.js";
+import { adapterText } from "../messages/commands.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -11,49 +12,53 @@ import type {
 } from "../types.js";
 import type { DiscordVoiceController } from "../voice/voice.js";
 
-function ningoPanelComponents(): DiscordComponentSpec[] {
+function ningoPanelComponents(locale?: string): DiscordComponentSpec[] {
   return [
     {
       kind: "button",
       customId: "ningo_status_button",
-      label: "Ningo Status",
+      label: adapterText(locale, "panel_status"),
       style: "secondary",
     },
     {
       kind: "button",
       customId: "meme_fetch_button",
-      label: "Solta um meme ai",
+      label: adapterText(locale, "panel_meme"),
       style: "primary",
     },
     {
       kind: "button",
       customId: "chat_modal_button",
-      label: "Fale comigo, Dokja!",
+      label: adapterText(locale, "panel_chat"),
       style: "success",
     },
     {
       kind: "button",
       customId: "radio_stop_button",
-      label: "Stop Radio",
+      label: adapterText(locale, "panel_radio_stop"),
       style: "danger",
     },
     {
       kind: "select",
       customId: "meme_fetch_select",
-      placeholder: "Escolha quantos memes",
-      options: [
-        { label: "1 meme", value: "1" },
-        { label: "3 memes", value: "3" },
-        { label: "5 memes", value: "5" },
-      ],
+      placeholder: adapterText(locale, "panel_meme_count"),
+      options: memeCounts(locale),
     },
   ];
 }
 
-export function buildNingoPanelReply() {
+function memeCounts(locale?: string) {
+  return [
+    { label: adapterText(locale, "panel_one_meme"), value: "1" },
+    { label: adapterText(locale, "panel_memes", { count: 3 }), value: "3" },
+    { label: adapterText(locale, "panel_memes", { count: 5 }), value: "5" },
+  ];
+}
+
+export function buildNingoPanelReply(locale?: string) {
   return {
-    content: "Ningo controls",
-    components: ningoPanelComponents(),
+    content: adapterText(locale, "panel_title"),
+    components: ningoPanelComponents(locale),
   } as const;
 }
 
@@ -122,13 +127,13 @@ export function createInteractionDefinitions(params: {
 
   const chatModal: DiscordModalAction = {
     customId: "chat_prompt_modal",
-    title: "Chat With Dokja",
+    title: adapterText(params.locale, "modal_title"),
     defer: true,
     fields: [
       {
         customId: "prompt",
-        label: "Prompt",
-        placeholder: "Ask Dokja something...",
+        label: adapterText(params.locale, "modal_label"),
+        placeholder: adapterText(params.locale, "modal_placeholder"),
         required: true,
         style: "paragraph",
       },
@@ -153,7 +158,7 @@ export function createInteractionDefinitions(params: {
     buttons: [
       {
         customId: "ningo_status_button",
-        label: "Ningo Status",
+        label: adapterText(params.locale, "panel_status"),
         style: "secondary",
         defer: true,
         handle: async (context) => {
@@ -171,13 +176,13 @@ export function createInteractionDefinitions(params: {
           );
           await context.update({
             content: reply,
-            components: ningoPanelComponents(),
+            components: ningoPanelComponents(params.locale),
           });
         },
       },
       {
         customId: "meme_fetch_button",
-        label: "Fetch Meme",
+        label: adapterText(params.locale, "panel_meme"),
         style: "primary",
         defer: true,
         handle: async (context) => {
@@ -185,13 +190,13 @@ export function createInteractionDefinitions(params: {
           const reply = await fetchMemeReply(context, orchestratorEndpoint, orchestratorTimeoutMs, 1);
           await context.update({
             content: reply,
-            components: ningoPanelComponents(),
+            components: ningoPanelComponents(params.locale),
           });
         },
       },
       {
         customId: "chat_modal_button",
-        label: "Chat Prompt",
+        label: adapterText(params.locale, "panel_chat"),
         style: "success",
         defer: false,
         handle: async (context) => {
@@ -205,7 +210,7 @@ export function createInteractionDefinitions(params: {
       },
       {
         customId: "radio_stop_button",
-        label: "Stop Radio",
+        label: adapterText(params.locale, "panel_radio_stop"),
         style: "danger",
         defer: false,
         handle: async (context) => {
@@ -220,13 +225,9 @@ export function createInteractionDefinitions(params: {
     selects: [
       {
         customId: "meme_fetch_select",
-        placeholder: "Choose meme fetch count",
+        placeholder: adapterText(params.locale, "panel_meme_count"),
         defer: true,
-        options: [
-          { label: "1 meme", value: "1" },
-          { label: "3 memes", value: "3" },
-          { label: "5 memes", value: "5" },
-        ],
+        options: memeCounts(params.locale),
         handle: async (context) => {
           console.log(
             "[dokja-discord] interaction meme fetch select",
@@ -241,7 +242,7 @@ export function createInteractionDefinitions(params: {
           );
           await context.update({
             content: reply,
-            components: ningoPanelComponents(),
+            components: ningoPanelComponents(params.locale),
           });
         },
       },

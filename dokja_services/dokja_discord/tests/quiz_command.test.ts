@@ -42,7 +42,7 @@ test("refusals are worded from fixed codes and never show a link", () => {
   assert.equal(buildQuizReply(undefined, "pt-BR"), "O teste falhou no meio do caminho. Não vou inventar um resultado.");
 });
 
-test("teste_politico sends the link as quiz.take and replies publicly with the result", async () => {
+test("political_test sends the link as quiz.take and replies publicly with the result", async () => {
   const originalFetch = globalThis.fetch;
   let sent: any;
   globalThis.fetch = (async (_input, init) => {
@@ -54,7 +54,7 @@ test("teste_politico sends the link as quiz.take and replies publicly with the r
   try {
     const replies: unknown[] = [];
     const command = createQuizCommand("http://orch", "pt-BR");
-    assert.equal(command.name, "teste_politico");
+    assert.equal(command.name, "political_test");
     assert.equal(command.options?.[0].name, "link");
     assert.equal(command.options?.[0].required, true);
     await command.handle(context("https://quiz.example.com/start", replies));

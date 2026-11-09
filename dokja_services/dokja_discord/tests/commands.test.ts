@@ -11,39 +11,31 @@ test("createCommands exposes dokja slash commands", () => {
       "conversation_start", "conversation_stop",
       "chat",
       "meme_fetch",
-      "meme_status",
       "meme_refresh",
       "speak",
       "voice_chat_start",
-      "wake_chat",
       "voice_chat_stop",
       "play_radio",
       "stop_radio",
       "ningo_panel",
-      "chat_modal",
-      "preco",
-      "comparar_produto",
-      "teste_politico",
+      "price",
+      "compare_product",
+      "political_test",
+      // the player's buttons pause, resume, skip, stop and set the volume
       "play",
-      "skip",
-      "pause",
-      "resume",
-      "stop",
       "queue",
       "history",
-      "volume",
     ],
   );
   assert.equal(commands.find((command) => command.name === "chat")?.defer, undefined);
   // A quiz run takes minutes: Discord must see the command acknowledged at once.
-  assert.equal(commands.find((command) => command.name === "teste_politico")?.defer, undefined);
+  assert.equal(commands.find((command) => command.name === "political_test")?.defer, undefined);
   const playRadio = commands.find((command) => command.name === "play_radio");
   assert.ok(playRadio);
   assert.equal(playRadio.defer, false);
   assert.equal(playRadio.options?.[0]?.name, "url");
   assert.equal(playRadio.options?.[0]?.required, true);
   assert.equal(commands.find((command) => command.name === "ningo_panel")?.defer, false);
-  assert.equal(commands.find((command) => command.name === "chat_modal")?.defer, false);
 });
 
 test("chat command forwards prompt and replies with orchestrator response", async () => {
@@ -120,7 +112,7 @@ test("play_radio command forwards the url to the voice controller", async () => 
     channelId: "c1",
     messageId: "m1",
     guildId: "g1",
-    getString: () => "https://24493.live.streamtheworld.com/RADIO_89FM_SC",
+    getString: () => "https://radio.example/stream",
     getNumber: () => undefined,
     reply: async (message: string, opts?: { ephemeral?: boolean }) => {
       replyText = message;
@@ -132,7 +124,7 @@ test("play_radio command forwards the url to the voice controller", async () => 
     showModal: async () => {},
   });
 
-  assert.equal(replyText, "Starting radio playback...");
+  assert.equal(replyText, "Começando a rádio...");
   assert.equal(replyEphemeral, true);
   releasePlayRadio?.();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -140,7 +132,7 @@ test("play_radio command forwards the url to the voice controller", async () => 
   assert.deepEqual(receivedArgs, {
     guildId: "g1",
     userId: "u1",
-    streamUrl: "https://24493.live.streamtheworld.com/RADIO_89FM_SC",
+    streamUrl: "https://radio.example/stream",
   });
   assert.equal(updatedReplyText, "Radio started.");
 });
@@ -193,7 +185,7 @@ test("speak command forwards text to the voice controller", async () => {
     showModal: async () => {},
   });
 
-  assert.equal(replyText, "Starting speech playback...");
+  assert.equal(replyText, "Começando a falar...");
   assert.equal(replyEphemeral, true);
   releaseSpeak?.();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -251,13 +243,14 @@ test("voice_chat_start starts listening through the voice controller", async () 
     showModal: async () => {},
   });
 
-  assert.equal(replyText, "Starting voice conversation...");
+  assert.equal(replyText, "Começando a conversa de voz...");
   assert.equal(receivedArgs?.guildId, "g1");
   assert.equal(receivedArgs?.userId, "u1");
   assert.equal(updatedReplyText, "Listening to your voice in <#g1>");
 });
 
-test("wake_chat starts listening through the wakeword mode", async () => {
+test("voice_chat_start with the wake word mode waits to be called", async () => {
+  let replyText = "";
   let updatedReplyText = "";
   let activationMode: "always" | "wakeword" | undefined;
 
@@ -278,7 +271,7 @@ test("wake_chat starts listening through the wakeword mode", async () => {
     async stopConversation() {
       return "Conversation stopped.";
     },
-  }).find((entry) => entry.name === "wake_chat");
+  }).find((entry) => entry.name === "voice_chat_start");
 
   assert.ok(command);
 
@@ -287,15 +280,18 @@ test("wake_chat starts listening through the wakeword mode", async () => {
     channelId: "c1",
     messageId: "m1",
     guildId: "g1",
-    getString: () => "",
+    getString: (name: string) => (name === "mode" ? "wakeword" : ""),
     getNumber: () => undefined,
-    reply: async () => {},
+    reply: async (message) => {
+      replyText = String(message);
+    },
     updateReply: async (message) => {
       updatedReplyText = typeof message === "string" ? message : message.content;
     },
     showModal: async () => {},
   });
 
+  assert.equal(replyText, "Começando a conversa de voz; respondo depois da palavra de chamada...");
   assert.equal(activationMode, "wakeword");
   assert.equal(updatedReplyText, "Listening for the wake word in <#g1>");
 });

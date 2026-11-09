@@ -208,23 +208,23 @@ export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): 
 
 export function createPriceCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
   return {
-    name: "preco",
+    name: "price",
     description: "Check watched product prices: is it a real discount?",
     options: [
       {
-        name: "produto",
-        description: "Words to find, such as hd, ssd or rtx 5070",
+        name: "product",
+        description: "Words to find, such as hd, ssd or video card",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
       {
-        name: "marca",
-        description: "Brand, such as amd or samsung",
+        name: "brand",
+        description: "Brand name",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
       {
-        name: "loja",
+        name: "store",
         description: "Only this store; suggestions list the stores already seen",
         type: ApplicationCommandOptionType.String,
         required: false,
@@ -232,7 +232,7 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
       },
     ],
     autocomplete: async (context) => {
-      if (context.option !== "loja") return [];
+      if (context.option !== "store") return [];
       // Discord waits about three seconds for suggestions.
       const response = await dispatchToOrchestratorResponse(orchestratorEndpoint, Math.min(orchestratorTimeoutMs, AUTOCOMPLETE_TIMEOUT_MS), buildBridgePayload({
         eventType: "price.merchants", userId: context.userId, channelId: context.channelId, messageId: "autocomplete", guildId: context.guildId,
@@ -246,9 +246,9 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
     },
     handle: async (context: DiscordCommandContext) => {
       try {
-        const query = context.getString("produto");
-        const brand = context.getString("marca");
-        const merchant = context.getString("loja");
+        const query = context.getString("product");
+        const brand = context.getString("brand");
+        const merchant = context.getString("store");
         const response = await dispatchToOrchestratorResponse(
           orchestratorEndpoint,
           orchestratorTimeoutMs,
@@ -314,15 +314,15 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
 
 export function createCompareCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
   return {
-    name: "comparar_produto",
+    name: "compare_product",
     description: "Compare one product across stores, by name, part number or link",
     options: [
-      { name: "produto", description: "Name or part number, such as ssd 1tb", type: ApplicationCommandOptionType.String, required: false },
+      { name: "product", description: "Name or part number, such as ssd 1tb", type: ApplicationCommandOptionType.String, required: false },
       { name: "link", description: "A product link from a store; it is read, never opened", type: ApplicationCommandOptionType.String, required: false },
     ],
     handle: async (context: DiscordCommandContext) => {
       const words = catalog(locale);
-      const query = context.getString("produto").trim();
+      const query = context.getString("product").trim();
       const link = context.getString("link").trim();
       if (!query && !link) {
         await context.reply(text(words, "compare_need"), { ephemeral: true });
@@ -336,7 +336,7 @@ export function createCompareCommand(orchestratorEndpoint: string, orchestratorT
         const reply = response.price === undefined && response.reply.trim() ? response.reply : buildCompareReply(response.price, locale);
         await context.reply(reply, { ephemeral: true });
       } catch (error) {
-        console.error("[dokja-discord] command comparar_produto failed", error);
+        console.error("[dokja-discord] command compare_product failed", error);
         await context.reply(text(words, "compare_failed"), { ephemeral: true });
       }
     },
