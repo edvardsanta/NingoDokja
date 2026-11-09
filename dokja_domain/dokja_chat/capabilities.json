@@ -174,6 +174,22 @@
       "limits": [
         "Destination policy, enabled interfaces and successful transport determine delivery. Describing this capability in chat does not send anything."
       ]
+    },
+    {
+      "id": "quiz.take",
+      "description": "Take an online questionnaire, such as a political test, yourself: answer every question from your own worldview and post the site's own result link with a short comment.",
+      "entry_points": [
+        {
+          "interface": "discord",
+          "usage": "Someone runs /teste_politico link:<the questionnaire's link>. The reply follows in about two minutes, publicly, in the same channel."
+        }
+      ],
+      "limits": [
+        "Ordinary chat text cannot start a run: only the /teste_politico command does. Never say you are taking a test now; tell people to use the command.",
+        "Only sites with a quiz runner installed by the owner can be taken; any other link is refused. Only one run happens at a time.",
+        "A failed run posts no result and no link is ever made up. For a site without a runner, people can paste the questions in chat and you answer them there.",
+        "Your past runs, with the label, link and your answers, are given to you in a separate record when available."
+      ]
     }
   ]
 }
