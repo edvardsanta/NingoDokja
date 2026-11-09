@@ -160,7 +160,7 @@ func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
 	intake := NewPriceIntakeTask(resolver, domain, nil)
 	handler := NewPriceDomainHandler(domain, intake)
 	got, err := handler.Handle(context.Background(), core.Event{
-		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"query": "SSD Sata", "brand": "Samsung"},
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"},
 		Context: map[string]any{"is_owner": true},
 	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 	if err != nil || got["watch"].(map[string]any)["status"] != "added" {
@@ -171,7 +171,7 @@ func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
 		t.Fatalf("asked %v", asked)
 	}
 	again, _ := handler.Handle(context.Background(), core.Event{
-		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"query": "ssd sata", "brand": "samsung"},
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "ssd sata", "brand": "samsung"},
 		Context: map[string]any{"is_owner": true},
 	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 	intake.wait()
@@ -243,7 +243,7 @@ func TestPriceHandlerPassesTheOwnerMarkToTheDomain(t *testing.T) {
 	search := func(owner bool) any {
 		got, err := handler.Handle(context.Background(), core.Event{
 			Type: "price.search", Source: core.SourceDiscord,
-			Payload: map[string]any{"query": "ssd", "brand": "samsung"},
+			Payload: map[string]any{"watch": true, "query": "ssd", "brand": "samsung"},
 			Context: map[string]any{"is_owner": owner},
 		}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 		if err != nil {
