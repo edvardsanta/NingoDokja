@@ -31,10 +31,12 @@ const (
 
 // PriceDomainHandler serves price.* events: the scheduled intake and assessments.
 type PriceDomainHandler struct {
-	domain    *pricedomain.Domain
-	intake    *PriceIntakeTask
-	feeds     pricedomainFeeds
-	commenter priceCommenter
+	domain           *pricedomain.Domain
+	intake           *PriceIntakeTask
+	feeds            pricedomainFeeds
+	commenter        priceCommenter
+	competitorCache  competitorQueryCache
+	equivalenceCache competitorEquivalenceCache
 	// watchWait bounds the wait for a new watched search's first collection; 0 answers at once.
 	watchWait time.Duration
 }

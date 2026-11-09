@@ -40,11 +40,17 @@ func (h inferenceHTTPHandler) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h inferenceHTTPHandler) chat(w http.ResponseWriter, r *http.Request) {
-	messages, ok := decodeChatMessages(w, r)
+	messages, binding, ok := decodeChatRequest(w, r)
 	if !ok {
 		return
 	}
-	result, err := h.domain.Chat(r.Context(), messages)
+	var result domain.ChatReply
+	var err error
+	if binding.Provider != "" || binding.Model != "" {
+		result, err = h.domain.ChatWithBinding(r.Context(), binding, messages)
+	} else {
+		result, err = h.domain.Chat(r.Context(), messages)
+	}
 	if err != nil {
 		writeInferenceError(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -70,15 +76,22 @@ func (h inferenceHTTPHandler) measured(w http.ResponseWriter, r *http.Request) {
 	serveMeasuredChat(w, r, h.domain, fail)
 }
 
-func decodeChatMessages(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, bool) {
+func decodeChatRequest(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, domain.ChatBinding, bool) {
 	var body struct {
 		Messages []domain.ChatMessage `json:"messages"`
+		Provider string               `json:"provider"`
+		Model    string               `json:"model"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 131072)).Decode(&body) != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return nil, false
+		return nil, domain.ChatBinding{}, false
 	}
-	return body.Messages, true
+	return body.Messages, domain.ChatBinding{Provider: body.Provider, Model: body.Model}, true
+}
+
+func decodeChatMessages(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, bool) {
+	messages, _, ok := decodeChatRequest(w, r)
+	return messages, ok
 }
 
 func writeInferenceError(w http.ResponseWriter, status int, message string) {

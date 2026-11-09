@@ -36,6 +36,9 @@ test("registration keeps what each option declares, translations, bounds and cho
   const store = (price.options as any[]).find((option) => option.name === "store");
   assert.equal(store.autocomplete, true);
   assert.equal(store.name_localizations["pt-BR"], "loja");
+  const compare = commands.find((command) => command.name === "compare_product")!;
+  const budget = (compare.options as any[]).find((option) => option.name === "budget");
+  assert.equal(budget.name_localizations["pt-BR"], "orçamento");
   const voice = commands.find((command) => command.name === "voice_chat_start")!;
   const mode = (voice.options as any[])[0];
   assert.deepEqual(mode.choices.map((choice: any) => [choice.value, choice.name_localizations["pt-BR"]]),

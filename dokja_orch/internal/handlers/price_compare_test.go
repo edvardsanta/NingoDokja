@@ -40,12 +40,49 @@ func (r *compareResolver) Dispatch(_ context.Context, _ string, payload map[stri
 type fakeCommenter struct {
 	messages [][]map[string]string
 	reply    string
+	replies  []string
 	err      error
+}
+
+type bindingCommenter struct {
+	fakeCommenter
+	bindings []string
+	failures map[string]bool
+}
+
+func (c *bindingCommenter) GenerateMessagesWithBinding(_ context.Context, provider, model string, messages []map[string]string) (map[string]any, error) {
+	c.bindings = append(c.bindings, provider+":"+model)
+	if c.failures[provider] {
+		return nil, errors.New("provider unavailable")
+	}
+	return c.GenerateMessages(context.Background(), messages)
+}
+
+type fakeQueryCache struct {
+	queries []string
+	hits    int
+	puts    int
+}
+
+func (c *fakeQueryCache) Get(context.Context, string) ([]string, bool, error) {
+	c.hits++
+	return c.queries, len(c.queries) > 0, nil
+}
+
+func (c *fakeQueryCache) Put(_ context.Context, _ string, queries []string) error {
+	c.puts++
+	c.queries = append([]string(nil), queries...)
+	return nil
 }
 
 func (c *fakeCommenter) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	c.messages = append(c.messages, messages)
-	return map[string]any{"reply": c.reply}, c.err
+	reply := c.reply
+	if len(c.replies) > 0 {
+		reply = c.replies[0]
+		c.replies = c.replies[1:]
+	}
+	return map[string]any{"reply": reply}, c.err
 }
 
 func offerObservation(product, part, merchant string, kind string, price string) map[string]any {
@@ -84,7 +121,7 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 			offerObservation("pn:xy650ss-240gt-r", "XY650SS-240GT-R", "store-b", "unknown", "119.90"),
 		},
 	}
-	commenter := &fakeCommenter{reply: "Compre na store-b, plebeu."}
+	commenter := &fakeCommenter{replies: []string{`{"queries":[]}`, "Compre na store-b, plebeu."}}
 	handler, _ := compareHandler(resolver, commenter)
 
 	got := runCompare(t, handler, true, map[string]any{"link": "https://store-z.example/produto/10527/ssd-example"})
@@ -102,9 +139,10 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 		t.Fatalf("link %v", got["link"])
 	}
 	// the comment is written from the facts, marked as data, with the persona
-	user := commenter.messages[0][1]["content"]
-	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(commenter.messages[0][0]["content"], chatPersona) {
-		t.Fatalf("comment prompt %v", commenter.messages[0])
+	comment := commenter.messages[len(commenter.messages)-1]
+	user := comment[1]["content"]
+	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(comment[0]["content"], chatPersona) {
+		t.Fatalf("comment prompt %v", comment)
 	}
 }
 
@@ -131,5 +169,61 @@ func TestCompareAnswersAnUnknownLinkWithoutGuessing(t *testing.T) {
 	got := runCompare(t, handler, true, map[string]any{"link": "https://unknown.example/x"})
 	if got["found"] != false || got["link"].(map[string]any)["known"] != false {
 		t.Fatalf("unknown link %v", got)
+	}
+
+}
+
+func TestCompetitorQueriesComeFromStructuredProviderOutput(t *testing.T) {
+	handler, _ := compareHandler(&compareResolver{}, &fakeCommenter{
+		reply: `{"queries":["processador 8 cores 16 threads am5","processador 6 cores 12 threads am5"]}`,
+	})
+	queries := handler.competitorQueries(context.Background(), map[string]any{
+		"title": "Processador 8 cores 16 threads", "category": "cpu",
+		"specifications": map[string]any{"cores": float64(8), "threads": float64(16), "socket": "am5"},
+	}, map[string]any{"id": "cpu"})
+	assert := strings.Join(queries, "|")
+	if !strings.Contains(assert, "8 cores 16 threads") || strings.Contains(assert, "ryzen") || strings.Contains(assert, "intel") {
+		t.Fatalf("queries %v", queries)
+	}
+}
+
+func TestCompetitorQueriesUseCacheBeforeProvider(t *testing.T) {
+	cache := &fakeQueryCache{queries: []string{"processador 8 cores 16 threads am5"}}
+	handler, _ := compareHandler(&compareResolver{}, &fakeCommenter{reply: `{"queries":["provider query"]}`})
+	handler.WithCompetitorQueryCache(cache)
+	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"})
+	if len(queries) != 1 || queries[0] != cache.queries[0] || cache.hits != 1 || cache.puts != 0 {
+		t.Fatalf("cache was not used: queries=%v hits=%d puts=%d", queries, cache.hits, cache.puts)
+	}
+}
+
+func TestCompetitorPlanningFallsBackInConfiguredOrder(t *testing.T) {
+	commenter := &bindingCommenter{
+		fakeCommenter: fakeCommenter{reply: `{"queries":["processador 8 cores 16 threads am5"]}`},
+		failures:      map[string]bool{"claude_code": true, "codex": true},
+	}
+	handler, _ := compareHandler(&compareResolver{}, commenter)
+	queries := handler.competitorQueries(context.Background(), map[string]any{
+		"title": "CPU", "category": "cpu",
+	}, map[string]any{"id": "cpu"})
+	if len(queries) != 1 || commenter.bindings[0] != "claude_code:haiku" ||
+		commenter.bindings[1] != "codex:gpt-6-luna" || commenter.bindings[2] != "ollama:qwen3:4b" {
+		t.Fatalf("fallback order: bindings=%v queries=%v", commenter.bindings, queries)
+	}
+}
+
+func TestObservationItemsWithCategoryFillsOnlyMissingCategory(t *testing.T) {
+	raw := []any{
+		map[string]any{"product": "one", "category": "", "title": "Ryzen"},
+		map[string]any{"product": "two", "category": "gpu", "title": "RTX"},
+	}
+	items := observationItemsWithCategory(raw, "cpu")
+	first := items[0].(map[string]any)["body"].(string)
+	second := items[1].(map[string]any)["body"].(string)
+	if !strings.Contains(first, `"category":"cpu"`) {
+		t.Fatalf("missing category was not filled: %s", first)
+	}
+	if !strings.Contains(second, `"category":"gpu"`) {
+		t.Fatalf("existing category was overwritten: %s", second)
 	}
 }

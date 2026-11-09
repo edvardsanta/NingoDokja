@@ -234,6 +234,7 @@ func (c Comparison) Map() map[string]any {
 		out["product"] = map[string]any{
 			"product": c.Product.Key, "title": c.Product.Title, "category": c.Product.Category,
 			"brand": c.Product.Brand, "part_number": c.Product.PartNumber,
+			"specifications": c.Product.Specifications,
 		}
 		out["offers"] = offers
 		out["decision"] = c.Decision.Map()

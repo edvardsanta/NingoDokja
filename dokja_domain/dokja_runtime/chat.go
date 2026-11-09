@@ -95,18 +95,28 @@ func (d *Domain) Chat(ctx context.Context, messages []ChatMessage) (ChatReply, e
 	return d.ChatStream(ctx, messages, nil)
 }
 
+// ChatWithBinding runs one explicitly validated provider/model binding. It is used by
+// bounded internal tasks that have their own provider fallback order.
+func (d *Domain) ChatWithBinding(ctx context.Context, binding ChatBinding, messages []ChatMessage) (ChatReply, error) {
+	return d.chatStreamWithBinding(ctx, binding, messages, nil)
+}
+
 // ChatStream is Chat with a preview: while the provider writes, onPreview receives the text so far.
 // The preview is provisional and never the reply: it is not validated, and the reply is only what
 // ChatStream returns, under the same rules as Chat. An inference that cannot stream gives no preview.
 func (d *Domain) ChatStream(ctx context.Context, messages []ChatMessage, onPreview func(string)) (ChatReply, error) {
-	if err := ctx.Err(); err != nil {
-		return ChatReply{}, err
-	}
 	b, err := d.ChatBinding()
 	if err != nil {
 		return ChatReply{}, err
 	}
-	if err = d.validateChat(b); err != nil {
+	return d.chatStreamWithBinding(ctx, b, messages, onPreview)
+}
+
+func (d *Domain) chatStreamWithBinding(ctx context.Context, b ChatBinding, messages []ChatMessage, onPreview func(string)) (ChatReply, error) {
+	if err := ctx.Err(); err != nil {
+		return ChatReply{}, err
+	}
+	if err := d.validateChat(b); err != nil {
 		return ChatReply{}, err
 	}
 	if d.chatInference == nil {
@@ -118,6 +128,7 @@ func (d *Domain) ChatStream(ctx context.Context, messages []ChatMessage, onPrevi
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	var reply string
+	var err error
 	if streaming, ok := d.chatInference.(ChatStreamInference); ok && onPreview != nil {
 		reply, err = streaming.GenerateStream(ctx, b, messages, onPreview)
 	} else {

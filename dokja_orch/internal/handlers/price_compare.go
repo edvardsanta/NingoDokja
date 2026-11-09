@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -15,10 +18,15 @@ import (
 const (
 	// compareLookupLimit bounds the products a one-off lookup may bring in.
 	compareLookupLimit = 3
+	// competitorLookupLimit bounds the candidates returned by each family query.
+	competitorLookupLimit = 5
+	// maxCompetitorQueries prevents one comparison from turning into an unbounded crawl.
+	maxCompetitorQueries = 4
 	// compareStepTimeout bounds each call the comparison makes (identify, lookup, comment).
 	compareStepTimeout = 40 * time.Second
 	// maxCompareComment bounds Ningo's comment.
-	maxCompareComment = 600
+	maxCompareComment     = 600
+	competitorPlanVersion = "1"
 )
 
 // priceCommenter writes Ningo's few lines about a comparison. It is the chat provider; nil
@@ -27,9 +35,35 @@ type priceCommenter interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
 }
 
+type priceProviderBindingCommenter interface {
+	GenerateMessagesWithBinding(context.Context, string, string, []map[string]string) (map[string]any, error)
+}
+
+type competitorQueryCache interface {
+	Get(context.Context, string) ([]string, bool, error)
+	Put(context.Context, string, []string) error
+}
+
+type competitorEquivalenceCache interface {
+	GetEquivalences(context.Context, string) ([]map[string]any, bool, error)
+	PutEquivalences(context.Context, string, []map[string]any) error
+}
+
 // WithCommenter lets Ningo comment on comparisons.
 func (h *PriceDomainHandler) WithCommenter(commenter priceCommenter) *PriceDomainHandler {
 	h.commenter = commenter
+	return h
+}
+
+// WithCompetitorQueryCache avoids repeating provider planning for identical product facts.
+func (h *PriceDomainHandler) WithCompetitorQueryCache(cache competitorQueryCache) *PriceDomainHandler {
+	h.competitorCache = cache
+	return h
+}
+
+// WithCompetitorEquivalenceCache stores technically comparable candidates separately from prices.
+func (h *PriceDomainHandler) WithCompetitorEquivalenceCache(cache competitorEquivalenceCache) *PriceDomainHandler {
+	h.equivalenceCache = cache
 	return h
 }
 
@@ -71,7 +105,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	if growable, _ := result["growable"].(bool); growable && h.feeds != nil {
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"part_number": payload["part_number"], "query": payload["query"], "limit": compareLookupLimit})
 		if err == nil {
-			items := observationItems(looked["observations"])
+			items := observationItemsWithCategory(looked["observations"], categoryForProduct("", payload["query"].(string)))
 			if outcome, err := h.domain.Record(ctx, items); err == nil {
 				logger.Info(fmt.Sprintf("price compare lookup event_id=%s observations=%d invalid=%d", event.EventID, outcome.Observations, len(outcome.Invalid)))
 				if result, err = ask(); err != nil {
@@ -81,6 +115,16 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 			}
 		}
 	}
+	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
+		if discovered := h.discoverCompetitors(ctx, result); discovered {
+			if refreshed, refreshErr := ask(); refreshErr == nil {
+				result = refreshed
+				h.persistEquivalences(ctx, result)
+				result["competitors_discovered"] = true
+			}
+		}
+	}
+
 	if link != nil {
 		result["link"] = link
 	}
@@ -98,6 +142,210 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	return result, nil
+}
+
+func (h *PriceDomainHandler) persistEquivalences(ctx context.Context, result map[string]any) {
+	if h.equivalenceCache == nil {
+		return
+	}
+	product, _ := result["product"].(map[string]any)
+	key, err := cacheKey(map[string]any{
+		"plan_version": competitorPlanVersion,
+		"product":      product,
+		"profile":      result["profile"],
+	})
+	if err != nil {
+		return
+	}
+	rawAlternatives, _ := result["alternatives"].([]any)
+	items := make([]map[string]any, 0, len(rawAlternatives))
+	for _, raw := range rawAlternatives {
+		alternative, _ := raw.(map[string]any)
+		classification, _ := alternative["classification"].(string)
+		if classification != "technically_comparable" && classification != "technically_superior" {
+			continue
+		}
+		confidence, _ := alternative["confidence"].(string)
+		if confidence == "" || confidence == "low" {
+			continue
+		}
+		item := map[string]any{
+			"product_key":       alternative["product"],
+			"title":             alternative["title"],
+			"category":          alternative["category"],
+			"brand":             alternative["brand"],
+			"part_number":       alternative["part_number"],
+			"classification":    classification,
+			"confidence":        confidence,
+			"shared_attributes": alternative["shared_attributes"],
+		}
+		if query, _ := alternative["part_number"].(string); strings.TrimSpace(query) != "" {
+			item["query"] = query
+		} else {
+			item["query"] = alternative["title"]
+		}
+		items = append(items, item)
+	}
+	if len(items) > 0 {
+		_ = h.equivalenceCache.PutEquivalences(ctx, key, items)
+	}
+}
+
+func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any) bool {
+	product, _ := result["product"].(map[string]any)
+	title, _ := product["title"].(string)
+	category, _ := product["category"].(string)
+	queries := h.competitorQueries(ctx, product, result["profile"])
+	changed := false
+	for _, query := range queries {
+		looked, err := h.invoke(ctx, "lookup", map[string]any{"query": query, "limit": competitorLookupLimit})
+		if err != nil {
+			continue
+		}
+		items := observationItemsWithCategory(looked["observations"], categoryForProduct(category, title))
+		if len(items) == 0 {
+			continue
+		}
+		outcome, err := h.domain.Record(ctx, items)
+		if err == nil && outcome.Observations > 0 {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any) []string {
+	input := map[string]any{
+		"plan_version": competitorPlanVersion,
+		"product":      product,
+		"profile":      profile,
+	}
+	if h.equivalenceCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			if items, hit, getErr := h.equivalenceCache.GetEquivalences(ctx, key); getErr == nil && hit {
+				queries := make([]string, 0, len(items))
+				seen := map[string]bool{}
+				for _, item := range items {
+					query, _ := item["query"].(string)
+					if strings.TrimSpace(query) == "" {
+						query, _ = item["part_number"].(string)
+					}
+					if strings.TrimSpace(query) == "" {
+						query, _ = item["title"].(string)
+					}
+					query = strings.TrimSpace(query)
+					if query != "" && len(query) <= 100 && !seen[strings.ToLower(query)] {
+						seen[strings.ToLower(query)] = true
+						queries = append(queries, query)
+					}
+				}
+				if len(queries) > 0 {
+					return queries
+				}
+			}
+		}
+	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			if queries, hit, getErr := h.competitorCache.Get(ctx, key); getErr == nil && hit {
+				return queries
+			}
+		}
+	}
+	facts, err := json.Marshal(input)
+	if err != nil {
+		return nil
+	}
+	messages := []map[string]string{
+		{"role": "system", "content": competitorDiscoveryInstructions},
+		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
+	}
+	reply, err := h.generateCompetitorPlan(ctx, messages)
+	if err != nil {
+		return nil
+	}
+	text, _ := reply["reply"].(string)
+	var proposal struct {
+		Queries []string `json:"queries"`
+	}
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(text)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&proposal); err != nil || len(proposal.Queries) == 0 || len(proposal.Queries) > maxCompetitorQueries {
+		return nil
+	}
+	seen := map[string]bool{}
+	queries := make([]string, 0, len(proposal.Queries))
+	for _, query := range proposal.Queries {
+		query = strings.TrimSpace(query)
+		if query == "" || len(query) > 100 || strings.Contains(query, "://") || seen[strings.ToLower(query)] {
+			continue
+		}
+		seen[strings.ToLower(query)] = true
+		queries = append(queries, query)
+	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			_ = h.competitorCache.Put(ctx, key, queries)
+		}
+	}
+	return queries
+}
+
+func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, messages []map[string]string) (map[string]any, error) {
+	if bindingCommenter, ok := h.commenter.(priceProviderBindingCommenter); ok {
+		providers := []struct{ provider, model string }{
+			{"claude_code", envOrDefault("DOKJA_PRICE_CLAUDE_MODEL", "haiku")},
+			{"codex", envOrDefault("DOKJA_PRICE_CODEX_MODEL", "gpt-6-luna")},
+			{"ollama", envOrDefault("DOKJA_PRICE_OLLAMA_MODEL", "qwen3:4b")},
+		}
+		var lastErr error
+		for _, binding := range providers {
+			reply, err := bindingCommenter.GenerateMessagesWithBinding(ctx, binding.provider, binding.model, messages)
+			if err == nil {
+				return reply, nil
+			}
+			lastErr = err
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+		}
+		return nil, lastErr
+	}
+	return h.commenter.GenerateMessages(ctx, messages)
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func cacheKey(value any) (string, error) {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func categoryForProduct(category, title string) string {
+	value := strings.ToLower(strings.TrimSpace(category + " " + title))
+	switch {
+	case strings.Contains(value, "processador"), strings.Contains(value, "ryzen"), strings.Contains(value, "intel core"):
+		return "cpu"
+	case strings.Contains(value, "placa de video"), strings.Contains(value, "geforce"), strings.Contains(value, "radeon"), strings.Contains(value, "arc "):
+		return "gpu"
+	case strings.Contains(value, "ssd"), strings.Contains(value, "hard disk"), strings.Contains(value, "hd sata"), strings.Contains(value, "nvme"):
+		return "storage"
+	case strings.Contains(value, "smartphone"), strings.Contains(value, "celular"), strings.Contains(value, "iphone"), strings.Contains(value, "galaxy"):
+		return "mobile"
+	case strings.Contains(value, "monitor"), strings.Contains(value, "televisor"), strings.Contains(value, "televisao"):
+		return "display"
+	default:
+		return strings.TrimSpace(category)
+	}
 }
 
 func productKey(result map[string]any) string {
@@ -129,6 +377,9 @@ func (h *PriceDomainHandler) persistDecision(ctx context.Context, event core.Eve
 	product.Category, _ = productRaw["category"].(string)
 	product.Brand, _ = productRaw["brand"].(string)
 	product.PartNumber, _ = productRaw["part_number"].(string)
+	if specifications, ok := productRaw["specifications"].(map[string]any); ok {
+		product.Specifications = specifications
+	}
 	var decision pricedomain.Decision
 	encoded, err := json.Marshal(result["decision"])
 	if err != nil {
@@ -167,9 +418,20 @@ func (h *PriceDomainHandler) invoke(ctx context.Context, action string, input ma
 
 // observationItems wraps resolver observations as item bodies, the one shape the domain checks.
 func observationItems(raw any) []any {
+	return observationItemsWithCategory(raw, "")
+}
+
+func observationItemsWithCategory(raw any, category string) []any {
 	observations, _ := raw.([]any)
 	items := make([]any, 0, len(observations))
 	for index, observation := range observations {
+		if category != "" {
+			if values, ok := observation.(map[string]any); ok {
+				if current, _ := values["category"].(string); strings.TrimSpace(current) == "" {
+					values["category"] = category
+				}
+			}
+		}
 		body, err := json.Marshal(observation)
 		if err != nil {
 			continue
@@ -188,6 +450,17 @@ moment to buy, and where. Use only these facts. Never write a price or number th
 and do not list every store: the person sees the table. If the decision says over_budget or
 seek_alternative, do not say "buy now"; explain that the current offer does not fit the budget.
 If the facts do not support a recommendation, say so plainly.`
+
+const competitorDiscoveryInstructions = `You are a product discovery planner. Return only valid JSON in this exact shape:
+{"queries":["..."]}.
+
+Create at most four short Brazilian Portuguese search queries for products that could solve the same
+use case as the supplied product. Use only functional category terms and explicit specifications
+present in FACTS, such as capacity, interface, socket, cores, threads, screen size or refresh rate.
+Do not use manufacturer names, brands, logos, model names, part numbers, invented benchmarks or
+unsupported specifications. Do not repeat the original product query. The queries are search hints,
+not evidence of equivalence; the stores and the deterministic comparison engine provide the evidence.
+If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
 // the comparison stands on its own.
