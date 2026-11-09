@@ -3,6 +3,7 @@ package price
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -126,4 +127,55 @@ func (d *Domain) MissingMarket(ctx context.Context, limit int) ([]Product, error
 		}
 	}
 	return missing, nil
+}
+
+// MarketPage is a product whose market page the collector already found: it can refresh the
+// stores' offers and the market history from that page instead of searching for it again.
+type MarketPage struct {
+	Product Product
+	// Page is the market page the collector gave with the market history.
+	Page string
+	// SeenOn is the newest market day known, so the stalest pages are refreshed first.
+	SeenOn string
+}
+
+// MarketPages lists up to limit products with a known market page, the least recently seen
+// first, so every product's offers are refreshed in turn even when a run cannot cover them all.
+func (d *Domain) MarketPages(ctx context.Context, limit int) ([]MarketPage, error) {
+	products, err := d.repository.Products(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var pages []MarketPage
+	for _, product := range products {
+		urls, err := d.repository.OfferURLs(ctx, product.Key)
+		if err != nil {
+			return nil, err
+		}
+		for key, page := range urls {
+			if key.Series != SeriesMarketMin || page == "" {
+				continue
+			}
+			points, err := d.repository.History(ctx, key, "", "")
+			if err != nil {
+				return nil, err
+			}
+			seen := ""
+			if len(points) > 0 {
+				seen = points[len(points)-1].On
+			}
+			pages = append(pages, MarketPage{Product: product, Page: page, SeenOn: seen})
+			break
+		}
+	}
+	sort.SliceStable(pages, func(i, j int) bool {
+		if pages[i].SeenOn != pages[j].SeenOn {
+			return pages[i].SeenOn < pages[j].SeenOn
+		}
+		return pages[i].Product.Key < pages[j].Product.Key
+	})
+	if len(pages) > limit {
+		pages = pages[:limit]
+	}
+	return pages, nil
 }
