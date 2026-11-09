@@ -13,6 +13,7 @@ import (
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	memedomain "read_books/dokja_domain/dokja_meme"
+	pricedomain "read_books/dokja_domain/dokja_price"
 	store "read_books/dokja_store"
 	"read_books/internal/app"
 	"read_books/internal/clients"
@@ -199,6 +200,12 @@ func main() {
 		feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
 		func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	))
+	// Price history lives in process memory until its PostgreSQL adapter is configured (ADR 0015),
+	// so a restart forgets it; the scheduled intake records again what Feeds still holds.
+	priceDomain := pricedomain.New(pricedomain.NewMemoryRepository())
+	priceHandler := handlers.NewPriceDomainHandler(priceDomain, handlers.NewPriceIntakeTask(
+		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
+	))
 	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
 	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an
 	// earlier process left unsettled.
@@ -224,6 +231,7 @@ func main() {
 		handlers.NewBookDomainHandler(bookClient),
 		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
+		priceHandler,
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },

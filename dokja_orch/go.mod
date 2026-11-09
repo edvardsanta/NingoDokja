@@ -16,6 +16,8 @@ require read_books/dokja_domain/dokja_knowledge v0.0.0
 
 require read_books/dokja_domain/dokja_digest v0.0.0
 
+require read_books/dokja_domain/dokja_price v0.0.0
+
 require read_books/dokja_domain/dokja_memory v0.0.0
 
 require read_books/dokja_store v0.0.0
@@ -27,6 +29,8 @@ replace read_books/dokja_domain/dokja_book => ../dokja_domain/dokja_book
 replace read_books/dokja_domain/dokja_conversation => ../dokja_domain/dokja_conversation
 
 replace read_books/dokja_domain/dokja_digest => ../dokja_domain/dokja_digest
+
+replace read_books/dokja_domain/dokja_price => ../dokja_domain/dokja_price
 
 replace read_books/dokja_domain/dokja_knowledge => ../dokja_domain/dokja_knowledge
 
