@@ -11,6 +11,7 @@ import type {
   DigestPage,
   PriceProduct,
   PriceSearch,
+  PriceWatches,
   DigestStatus,
   KnowledgeSearch,
   KnowledgeStatus,
@@ -208,23 +209,23 @@ function priceProducts(): PriceProduct[] {
     {
       key: "gpu-example-12gb", title: "Placa de vídeo Example 12GB",
       rows: [
-        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 618_599, median30Cents: 0, lowestCents: 0 },
-        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "inflated_before_sale", signals: ["raised_before_drop"], latestOn: yesterday, latestCents: 647_058, median30Cents: 1_096_137, lowestCents: 399_999 },
+        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 618_599, median30Cents: 0, lowestCents: 0, offer: "0123456789abcdef" },
+        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "inflated_before_sale", signals: ["raised_before_drop"], latestOn: yesterday, latestCents: 647_058, median30Cents: 1_096_137, lowestCents: 399_999, offer: "0123456789abcdef" },
       ],
       market: year(440_000, 60_000, 647_058),
     },
     {
       key: "cpu-example-8c", title: "Processador Example 8 núcleos",
       rows: [
-        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "real_discount", signals: ["all_time_low"], latestOn: yesterday, latestCents: 214_900, median30Cents: 238_999, lowestCents: 214_900 },
+        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "real_discount", signals: ["all_time_low"], latestOn: yesterday, latestCents: 214_900, median30Cents: 238_999, lowestCents: 214_900, offer: "0123456789abcdef" },
       ],
       market: year(270_000, 20_000, 214_900).map((point) => ({ ...point, cents: Math.max(point.cents - 30_000, 215_000) })),
     },
     {
       key: "hd-example-2tb", title: "HD Example 2TB",
       rows: [
-        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 106_900, median30Cents: 0, lowestCents: 0 },
-        { merchant: "store-a", series: "merchant", kind: "card", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 112_500, median30Cents: 0, lowestCents: 0 },
+        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 106_900, median30Cents: 0, lowestCents: 0, offer: "0123456789abcdef" },
+        { merchant: "store-a", series: "merchant", kind: "card", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 112_500, median30Cents: 0, lowestCents: 0, offer: "0123456789abcdef" },
       ],
       market: [],
     },
@@ -658,9 +659,18 @@ export function createFakeTransport(delayMs = 400): Transport {
             const have = priceWords(`${product.title} ${product.key}`);
             return wanted.every((want) => have.some((word) => word === want || (want.length >= 3 && word.startsWith(want))));
           });
-          const search: PriceSearch = { products, matched: products.length };
+          const search: PriceSearch = {
+            products, matched: products.length, merchants: ["aggregator", "store-a"],
+            ...(payload?.watch === true && String(payload?.query ?? "").trim()
+              ? { watch: { category: String(payload.query).trim().toLowerCase(), brand: String(payload?.brand ?? "").trim().toLowerCase(), status: "added" as const } } : {}),
+          };
           return ok(search);
         }
+        case "price.watches": {
+          const watches: PriceWatches = { watches: [{ category: "hd", brand: "example" }, { category: "ssd sata", brand: "example" }], limit: 50 };
+          return ok(watches);
+        }
+        case "price.unwatch": return ok({ removed: true });
         case "digest.status":
           return ok(DIGEST_STATUS);
         case "digest.items": {
@@ -695,6 +705,9 @@ export function createFakeTransport(delayMs = 400): Transport {
     },
 
     // The folder of a saved post; in the preview there is no file manager to open.
+    async openOffer() {
+      return ok({ opened: true });
+    },
     async openSavedPost() {
       await sleep(delayMs);
       return ok({ opened: true });

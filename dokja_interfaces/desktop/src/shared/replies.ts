@@ -198,6 +198,8 @@ export type PriceRow = {
   latestCents: number;
   median30Cents: number;
   lowestCents: number;
+  // an opaque token for the store page, which only the shell can open; "" when there is none
+  offer: string;
 };
 
 export type PricePoint = { on: string; cents: number };
@@ -214,7 +216,15 @@ export type PriceSearch = {
   products: PriceProduct[];
   // every product that matched, including those past the answer's limit
   matched: number;
+  // every merchant key with a history, for a store picker
+  merchants: string[];
+  // what the search did to the watched searches, when it asked to watch
+  watch?: PriceWatchOutcome;
 };
+
+export type PriceWatch = { category: string; brand: string };
+export type PriceWatchOutcome = PriceWatch & { status: "added" | "watched" | "full" | "not_owner" };
+export type PriceWatches = { off?: false; watches: PriceWatch[]; limit: number };
 
 // What adding to the research base did. One document or many (a feed file is many): how many were
 // new, how many replaced an earlier version of the same document, and how many were already there.

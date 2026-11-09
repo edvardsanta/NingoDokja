@@ -1,4 +1,4 @@
-import type { Off, PricePoint, PriceProduct, PriceRow, PriceSearch } from "../../shared/replies.js";
+import type { Off, PricePoint, PriceProduct, PriceRow, PriceSearch, PriceWatches, PriceWatchOutcome } from "../../shared/replies.js";
 import type { MessageId } from "../i18n/i18n.js";
 
 // The verdicts the Price domain returns, in the order that decides which one speaks for a product:
@@ -114,11 +114,34 @@ export function parsePriceSearch(value: unknown): PriceSearch | Off | undefined 
       latestCents: Number(row.latestCents) || 0,
       median30Cents: Number(row.median30Cents) || 0,
       lowestCents: Number(row.lowestCents) || 0,
+      offer: typeof row.offer === "string" && /^[0-9a-f]{16}$/.test(row.offer) ? row.offer : "",
     })),
     market: (Array.isArray(product.market) ? product.market : []).filter(isRecord)
       .map((point) => ({ on: String(point.on ?? ""), cents: Number(point.cents) || 0 }))
       .filter((point) => PRICE_DAY.test(point.on) && point.cents > 0),
   })).filter((product) => product.key !== "");
   const matched = typeof value.matched === "number" ? Math.max(value.matched, products.length) : products.length;
-  return { products, matched };
+  const merchants = Array.isArray(value.merchants) ? value.merchants.filter((merchant): merchant is string => typeof merchant === "string" && merchant !== "") : [];
+  const watch = isRecord(value.watch) && typeof value.watch.category === "string" && WATCH_STATUSES.has(String(value.watch.status))
+    ? { watch: { category: value.watch.category, brand: typeof value.watch.brand === "string" ? value.watch.brand : "", status: value.watch.status as PriceWatchOutcome["status"] } }
+    : {};
+  return { products, matched, merchants, ...watch };
+}
+
+const WATCH_STATUSES = new Set(["added", "watched", "full", "not_owner"]);
+
+// Checks the watched searches the shell handed over.
+export function parsePriceWatches(value: unknown): PriceWatches | Off | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.off === true) return { off: true, reason: typeof value.reason === "string" ? value.reason : "" };
+  if (!Array.isArray(value.watches)) return undefined;
+  const watches = value.watches.filter(isRecord)
+    .map((watch) => ({ category: String(watch.category ?? ""), brand: String(watch.brand ?? "") }))
+    .filter((watch) => watch.category !== "");
+  return { watches, limit: typeof value.limit === "number" ? value.limit : 0 };
+}
+
+// "ssd sata · samsung", as a watched search reads.
+export function watchLabel(watch: { category: string; brand: string }): string {
+  return [watch.category, watch.brand].filter(Boolean).join(" · ");
 }

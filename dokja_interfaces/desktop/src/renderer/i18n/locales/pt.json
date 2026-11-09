@@ -853,5 +853,19 @@
   "price_verdict_unknown": "Sem veredito",
   "price_signal_all_time_low": "menor preço histórico",
   "price_signal_raised_before_drop": "subiu antes de cair",
-  "price_signal_list_above_observed_max": "preço \"de\" acima do que já foi cobrado"
+  "price_signal_list_above_observed_max": "preço \"de\" acima do que já foi cobrado",
+  "prices_store": "Loja",
+  "prices_store_any": "Qualquer loja",
+  "prices_watch": "Vigiar esta busca",
+  "prices_watch_added": "Passei a vigiar {search}. Os produtos chegam em instantes.",
+  "prices_watch_already": "{search} já é vigiada.",
+  "prices_watch_full": "A lista de buscas vigiadas está cheia; remova uma para vigiar {search}.",
+  "prices_watch_not_owner": "Só o dono vigia buscas novas.",
+  "prices_watch_failed": "Não consegui vigiar essa busca agora.",
+  "prices_watches": "Buscas vigiadas ({count})",
+  "prices_watches_empty": "Nada vigiado ainda. Digite produto e marca e use Vigiar esta busca.",
+  "prices_watch_remove": "Remover",
+  "prices_watch_remove_named": "Parar de vigiar {search}",
+  "prices_open": "abrir na loja",
+  "prices_open_named": "Abrir {source} na loja"
 }
