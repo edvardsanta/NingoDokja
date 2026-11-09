@@ -44,6 +44,23 @@ type fakeCommenter struct {
 	err      error
 }
 
+type fakeQueryCache struct {
+	queries []string
+	hits    int
+	puts    int
+}
+
+func (c *fakeQueryCache) Get(context.Context, string) ([]string, bool, error) {
+	c.hits++
+	return c.queries, len(c.queries) > 0, nil
+}
+
+func (c *fakeQueryCache) Put(_ context.Context, _ string, queries []string) error {
+	c.puts++
+	c.queries = append([]string(nil), queries...)
+	return nil
+}
+
 func (c *fakeCommenter) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	c.messages = append(c.messages, messages)
 	reply := c.reply
@@ -153,6 +170,16 @@ func TestCompetitorQueriesComeFromStructuredProviderOutput(t *testing.T) {
 	assert := strings.Join(queries, "|")
 	if !strings.Contains(assert, "8 cores 16 threads") || strings.Contains(assert, "ryzen") || strings.Contains(assert, "intel") {
 		t.Fatalf("queries %v", queries)
+	}
+}
+
+func TestCompetitorQueriesUseCacheBeforeProvider(t *testing.T) {
+	cache := &fakeQueryCache{queries: []string{"processador 8 cores 16 threads am5"}}
+	handler, _ := compareHandler(&compareResolver{}, &fakeCommenter{reply: `{"queries":["provider query"]}`})
+	handler.WithCompetitorQueryCache(cache)
+	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"}, nil)
+	if len(queries) != 1 || queries[0] != cache.queries[0] || cache.hits != 1 || cache.puts != 0 {
+		t.Fatalf("cache was not used: queries=%v hits=%d puts=%d", queries, cache.hits, cache.puts)
 	}
 }
 

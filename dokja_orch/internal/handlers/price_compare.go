@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	pricedomain "read_books/dokja_domain/dokja_price"
@@ -31,9 +33,20 @@ type priceCommenter interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
 }
 
+type competitorQueryCache interface {
+	Get(context.Context, string) ([]string, bool, error)
+	Put(context.Context, string, []string) error
+}
+
 // WithCommenter lets Ningo comment on comparisons.
 func (h *PriceDomainHandler) WithCommenter(commenter priceCommenter) *PriceDomainHandler {
 	h.commenter = commenter
+	return h
+}
+
+// WithCompetitorQueryCache avoids repeating provider planning for identical product facts.
+func (h *PriceDomainHandler) WithCompetitorQueryCache(cache competitorQueryCache) *PriceDomainHandler {
+	h.competitorCache = cache
 	return h
 }
 
@@ -136,11 +149,19 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, or
 }
 
 func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any, original map[string]any) []string {
-	facts, err := json.Marshal(map[string]any{
+	input := map[string]any{
 		"product":      product,
 		"profile":      profile,
 		"budget_cents": original["budget_cents"],
-	})
+	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			if queries, hit, getErr := h.competitorCache.Get(ctx, key); getErr == nil && hit {
+				return queries
+			}
+		}
+	}
+	facts, err := json.Marshal(input)
 	if err != nil {
 		return nil
 	}
@@ -170,7 +191,21 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 		seen[strings.ToLower(query)] = true
 		queries = append(queries, query)
 	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			_ = h.competitorCache.Put(ctx, key, queries)
+		}
+	}
 	return queries
+}
+
+func cacheKey(value any) (string, error) {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func categoryForProduct(category, title string) string {
