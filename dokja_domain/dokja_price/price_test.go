@@ -414,3 +414,99 @@ func TestDomainReportsStorageFailures(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func searchDomain(t *testing.T) *Domain {
+	t.Helper()
+	repo := NewMemoryRepository()
+	for _, product := range []struct{ key, title string }{
+		{"hd-blue-2tb", "HD WD Blue 2TB SATA"},
+		{"ssd-990pro-1tb", "SSD Samsung 990 PRO 1TB NVMe"},
+		{"cpu-ryzen7-9800x3d", "Processador AMD Ryzen 7 9800X3D"},
+		{"gpu-rx9070", "Placa de vídeo AMD Radeon RX 9070"},
+		{"gpu-rtx5070", "Placa de vídeo NVIDIA RTX 5070 HDMI"},
+	} {
+		repo.Upsert(context.Background(), Observation{
+			Product: product.key, Title: product.title, Merchant: "store-a",
+			Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 100}},
+		})
+	}
+	return New(repo).WithClock(func() time.Time { return today })
+}
+
+func searchKeys(t *testing.T, domain *Domain, search Search) []string {
+	t.Helper()
+	result, err := domain.SearchProducts(context.Background(), search)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := []string{}
+	for _, product := range result.Products {
+		keys = append(keys, product.Product.Key)
+	}
+	return keys
+}
+
+func TestSearchFindsProductsByWordsAndBrand(t *testing.T) {
+	domain := searchDomain(t)
+	cases := []struct {
+		search Search
+		want   []string
+	}{
+		// "hd" is a whole word: the RTX title's "HDMI" does not count.
+		{Search{Query: "hd"}, []string{"hd-blue-2tb"}},
+		{Search{Brand: "amd"}, []string{"cpu-ryzen7-9800x3d", "gpu-rx9070"}},
+		{Search{Query: "placa de video", Brand: "AMD"}, []string{"gpu-rx9070"}},
+		{Search{Query: "Vídeo"}, []string{"gpu-rtx5070", "gpu-rx9070"}},
+		{Search{Query: "ryz"}, []string{"cpu-ryzen7-9800x3d"}},
+		{Search{Query: "990pro"}, []string{"ssd-990pro-1tb"}},
+		{Search{Product: "hd-blue-2tb"}, []string{"hd-blue-2tb"}},
+		{Search{Brand: "intel"}, []string{}},
+		{Search{}, []string{"cpu-ryzen7-9800x3d", "gpu-rtx5070", "gpu-rx9070", "hd-blue-2tb", "ssd-990pro-1tb"}},
+	}
+	for _, c := range cases {
+		if got := searchKeys(t, domain, c.search); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%+v: got %v, want %v", c.search, got, c.want)
+		}
+	}
+}
+
+func TestSearchIsBoundedAndCountsWhatItLeftOut(t *testing.T) {
+	repo := NewMemoryRepository()
+	for i := 0; i < maxSearchProducts+3; i++ {
+		repo.Upsert(context.Background(), Observation{
+			Product: fmt.Sprintf("hd-%02d", i), Title: "HD Example", Merchant: "store-a",
+			Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 100}},
+		})
+	}
+	result, err := New(repo).WithClock(func() time.Time { return today }).SearchProducts(context.Background(), Search{Query: "hd"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Products) != maxSearchProducts || result.Matched != maxSearchProducts+3 {
+		t.Fatalf("products %d matched %d", len(result.Products), result.Matched)
+	}
+}
+
+func TestSearchActionReturnsTitlesAndRefusesBadFields(t *testing.T) {
+	domain := searchDomain(t)
+	got, err := domain.Handle(context.Background(), Request{
+		Action: ActionSearchPrices, Event: Event{Payload: map[string]any{"query": "hd"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	products := got["products"].([]any)
+	first := products[0].(map[string]any)
+	if got["matched"] != 1 || first["title"] != "HD WD Blue 2TB SATA" || len(first["assessments"].([]any)) != 1 {
+		t.Fatalf("result %v", got)
+	}
+	for _, payload := range []map[string]any{
+		{"brand": 3},
+		{"query": strings.Repeat("x", maxSearchText+1)},
+		{"product": "Not A Key"},
+	} {
+		if _, err := domain.Handle(context.Background(), Request{Action: ActionSearchPrices, Event: Event{Payload: payload}}); err == nil {
+			t.Errorf("%v accepted", payload)
+		}
+	}
+}
