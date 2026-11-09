@@ -72,8 +72,8 @@ func TestNingoFactsAreOptionalAndChecked(t *testing.T) {
 	if err != nil || config.Ningo.NamedBy != "" || len(config.Ningo.People) != 0 {
 		t.Fatal("they stay optional", config.Ningo, err)
 	}
-	good := `{"named_by":"Sam","groups":["120363000000000001@g.us"],"people":[{"name":"Sam","whatsapp":"5511912345678","about":["writer"]}]}`
-	if config, err = Load(write(with(good))); err != nil || config.Ningo.NamedBy != "Sam" || config.Ningo.People[0].About[0] != "writer" {
+	good := `{"named_by":"Sam","groups":["120363000000000001@g.us"],"people":[{"name":"Sam","whatsapp":"5511912345678","about":["writer"],"warm":true}]}`
+	if config, err = Load(write(with(good))); err != nil || config.Ningo.NamedBy != "Sam" || config.Ningo.People[0].About[0] != "writer" || !config.Ningo.People[0].Warm {
 		t.Fatal(config.Ningo, err)
 	}
 	long, _ := json.Marshal(strings.Repeat("x", 129))

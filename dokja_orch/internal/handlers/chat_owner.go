@@ -66,6 +66,9 @@ func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
 		people = append(people, chat.KnownPerson{Name: person.Name, About: person.About})
 		if person.WhatsApp != "" && communications.SameNumber(person.WhatsApp, numbers) {
 			event.Context["known_speaker"] = person.Name
+			if person.Warm {
+				event.Context["warm_speaker"] = true
+			}
 		}
 	}
 	if len(people) > 0 {
@@ -98,7 +101,7 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 // only the Discord gateway attaches a profile for Discord.
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
-	for _, granted := range []string{"owner_interface", "ningo_visions", "ningo_named_by", "known_people", "known_speaker", "known_facts", "facts_available", "fact_in_message"} {
+	for _, granted := range []string{"owner_interface", "ningo_visions", "ningo_named_by", "known_people", "known_speaker", "warm_speaker", "known_facts", "facts_available", "fact_in_message"} {
 		delete(event.Context, granted)
 	}
 	if h.visions != "" {

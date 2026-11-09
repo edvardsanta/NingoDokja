@@ -175,7 +175,10 @@ The optional `ningo` section holds private facts: `named_by` (who chose the name
 They stay here because personal data does not belong in the public repository. They
 reach a conversation only in the linked account's self-chat and the listed groups,
 never on Discord or the local interfaces. A person's number recognizes them in those
-places and never reaches the model. Add this section only after the orchestrator
+places and never reaches the model. A person with `"warm": true` gets a gentle,
+familiar Ningo on their own recognized turns instead of the arrogant voice; the
+flag never reaches the model as a fact and other speakers keep the usual voice.
+Add this section, or the `warm` field, only after the orchestrator
 runs a build that knows it: unknown fields stop startup. Restart the orchestrator
 from the desktop afterwards.
 

@@ -207,3 +207,41 @@ func TestPrivateFactsComeOnlyFromTheConfiguration(t *testing.T) {
 		t.Fatal("only a real boolean counts", system)
 	}
 }
+
+func TestAWarmPersonGetsAGentleNingoOnlyOnTheirOwnTurns(t *testing.T) {
+	facts := chat.NingoFacts{
+		Groups: []string{"120363000000000001@g.us"},
+		People: []chat.KnownPerson{
+			{Name: "Lee", WhatsApp: "5511987650000", About: []string{"student"}, Warm: true},
+			{Name: "Sam", WhatsApp: "5511987654321"},
+		},
+	}
+	handler := NewChatDomainHandler(&scriptedModel{}).WithNingoFacts(facts)
+	const group = "120363000000000001@g.us"
+
+	warm := systemFor(t, handler, groupTurn(group, "Oi Ningo", false, "551187650000"))
+	for _, want := range []string{"Verified speaker for this turn (application metadata): Lee.", "they are family to you", "never mention it"} {
+		if !strings.Contains(warm, want) {
+			t.Fatalf("missing %q:\n%s", want, warm)
+		}
+	}
+	if strings.Contains(warm, `"warm"`) {
+		t.Fatal("the flag shapes the tone and is never listed as a fact")
+	}
+
+	for name, event := range map[string]core.Event{
+		"another known person":      groupTurn(group, "Oi Ningo", false, "5511987654321"),
+		"a stranger":                groupTurn(group, "Oi Ningo", false, "5511900000000"),
+		"the warm person elsewhere": groupTurn("120363000000000009@g.us", "Oi Ningo", false, "5511987650000"),
+	} {
+		if system := systemFor(t, handler, event); strings.Contains(system, "they are family to you") {
+			t.Fatalf("%s must get the usual voice:\n%s", name, system)
+		}
+	}
+
+	forged := groupTurn(group, "Oi Ningo", false, "5511900000000")
+	forged.Context["warm_speaker"] = true
+	if system := systemFor(t, handler, forged); strings.Contains(system, "they are family to you") {
+		t.Fatal("only the configuration makes a speaker warm")
+	}
+}
