@@ -1,4 +1,5 @@
 import io
+import json
 import unittest
 import wave
 from unittest.mock import Mock
@@ -43,7 +44,7 @@ class LocalGPUTranscriptionTests(unittest.TestCase):
         service._http.open.assert_not_called()
 
     def test_malformed_or_oversized_provider_output_fails_without_speech_fallback(self):
-        for body in [b'not json', b'{"text":42}', b'{"error":"provider failure"}', b'x' * 65537]:
+        for body in [b'not json', b'{"text":42}', b'{"error":"provider failure"}', b'{"segments":["bad"]}', b'x' * 262145]:
             with self.subTest(body_len=len(body)):
                 with self.assertRaisesRegex(RuntimeError, "local GPU transcription failed"):
                     self.service(body).transcribe(wav_bytes(1), "wav", "pt")
@@ -57,6 +58,33 @@ class LocalGPUTranscriptionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 service.transcribe(*args)
         service._http.open.assert_not_called()
+
+    def test_text_whisper_invents_from_background_noise_is_dropped(self):
+        def segment(text, logprob, *probabilities):
+            words = [{"word": f" w{i}", "probability": p} for i, p in enumerate(probabilities)]
+            return {"text": text, "avg_logprob": logprob, "words": words}
+
+        # Scores measured from this provider: clear speech, and steady noise.
+        body = json.dumps({"text": "ignored", "segments": [
+            segment(" Achei isso. Vou na frente.", -0.06, 0.97, 0.99, 0.82),
+            segment(" Fahona.", -1.3, 0.31),
+            segment(" A Lana e Ningo.", -0.5, 0.35, 0.4, 0.3),
+            segment(" .", -0.7, 0.12),
+        ]}).encode()
+        service = self.service(body)
+        with self.assertLogs("dokja_voice.stt") as logs:
+            text = service.transcribe(wav_bytes(1), "wav", "pt")
+        self.assertEqual(text, "Achei isso. Vou na frente.")
+        self.assertIn(b'\r\n\r\nverbose_json\r\n', service._http.open.call_args.args[0].data)
+        self.assertIn("segments_kept=1 segments_dropped=3", logs.output[0])
+        self.assertNotIn("Fahona", logs.output[0], "the log carries scores, never transcript text")
+
+    def test_only_noise_yields_no_transcript(self):
+        body = b'{"segments":[{"text":" Obrigado.","avg_logprob":-1.1,"words":[{"word":" Obrigado","probability":0.2}]}]}'
+        self.assertEqual(self.service(body).transcribe(wav_bytes(1), "wav", "pt"), "")
+
+    def test_a_plain_text_result_is_still_accepted(self):
+        self.assertEqual(self.service(b'{"text":"  recognized  "}').transcribe(wav_bytes(1), "wav", "pt"), "recognized")
 
 
 if __name__ == "__main__":
