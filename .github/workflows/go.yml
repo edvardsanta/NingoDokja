@@ -48,6 +48,10 @@ jobs:
       working-directory: ./dokja_domain/dokja_price
       run: go test -race ./...
 
+    - name: Test the quiz domain
+      working-directory: ./dokja_domain/dokja_quiz
+      run: go test -race ./...
+
     - name: Test the conversation domain
       working-directory: ./dokja_domain/dokja_conversation
       run: go test -race ./...
