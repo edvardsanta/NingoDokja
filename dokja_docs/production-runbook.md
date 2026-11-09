@@ -175,10 +175,11 @@ The optional `ningo` section holds private facts: `named_by` (who chose the name
 They stay here because personal data does not belong in the public repository. They
 reach a conversation only in the linked account's self-chat and the listed groups,
 never on Discord or the local interfaces. A person's number recognizes them in those
-places and never reaches the model. A person with `"warm": true` gets a gentle,
-familiar Ningo on their own recognized turns instead of the arrogant voice; the
-flag never reaches the model as a fact and other speakers keep the usual voice.
-Add this section, or the `warm` field, only after the orchestrator
+places and never reaches the model. A person with `"warm": true` gets the manner
+described in `.dokja/warm.md` on their own recognized turns instead of the
+arrogant voice; the flag never reaches the model as a fact, other speakers keep
+the usual voice, and without that file nothing changes (see "Ningo's warm
+manner" below). Add this section, or the `warm` field, only after the orchestrator
 runs a build that knows it: unknown fields stop startup. Restart the orchestrator
 from the desktop afterwards.
 
@@ -216,6 +217,19 @@ The orchestrator reads the file once at startup. It must be UTF-8 text of at mos
 the working directory; set `DOKJA_VISIONS_FILE` for another path. All three
 Compose stacks set `DOKJA_VISIONS_FILE=/run/dokja-config/visions.md` on the
 read-only `.dokja/` mount. Restart the orchestrator after editing it.
+
+### Ningo's warm manner
+
+How Ningo talks with the people marked `"warm": true` in `ningo.people` lives in
+`.dokja/warm.md`, a free Markdown file that stays outside Git because it is about
+real people. It reaches a turn only when WhatsApp recognizes that person by their
+number where the private facts are allowed, and Ningo is told never to mention or
+explain it. Without the file those people get the usual voice.
+
+The same rules as the visions file apply: UTF-8 text of at most 8 KiB, read once
+at startup, `DOKJA_WARM_FILE` for another path, and all three Compose stacks set
+`DOKJA_WARM_FILE=/run/dokja-config/warm.md` on the read-only `.dokja/` mount.
+Restart the orchestrator after editing it.
 
 Do not deploy with `CHANGE_ME_*` values.
 

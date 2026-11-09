@@ -29,6 +29,13 @@ func (h *ChatDomainHandler) WithVisions(visions string) *ChatDomainHandler {
 	return h
 }
 
+// WithWarmth gives the handler the operator's private description of how Ningo talks with the
+// people marked warm. Without it those people get the usual voice.
+func (h *ChatDomainHandler) WithWarmth(manner string) *ChatDomainHandler {
+	h.warm = manner
+	return h
+}
+
 // privateFactsAllowed is where the owner allowed the private facts: their own WhatsApp chat and the
 // groups they listed. Nowhere else, Discord and the local interfaces included.
 func (h *ChatDomainHandler) privateFactsAllowed(event core.Event) bool {
@@ -66,8 +73,8 @@ func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
 		people = append(people, chat.KnownPerson{Name: person.Name, About: person.About})
 		if person.WhatsApp != "" && communications.SameNumber(person.WhatsApp, numbers) {
 			event.Context["known_speaker"] = person.Name
-			if person.Warm {
-				event.Context["warm_speaker"] = true
+			if person.Warm && h.warm != "" {
+				event.Context["warm_manner"] = h.warm
 			}
 		}
 	}
@@ -101,7 +108,7 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 // only the Discord gateway attaches a profile for Discord.
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
-	for _, granted := range []string{"owner_interface", "ningo_visions", "ningo_named_by", "known_people", "known_speaker", "warm_speaker", "known_facts", "facts_available", "fact_in_message"} {
+	for _, granted := range []string{"owner_interface", "ningo_visions", "ningo_named_by", "known_people", "known_speaker", "warm_manner", "known_facts", "facts_available", "fact_in_message"} {
 		delete(event.Context, granted)
 	}
 	if h.visions != "" {
