@@ -200,9 +200,11 @@ func main() {
 		feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
 		func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	))
-	// Price history lives in process memory until its PostgreSQL adapter is configured (ADR 0015),
-	// so a restart forgets it; the scheduled intake records again what Feeds still holds.
-	priceDomain := pricedomain.New(pricedomain.NewMemoryRepository())
+	// Price history is kept in PostgreSQL when DOKJA_PRICE_POSTGRES_DSN names an initialized
+	// namespace, and in memory otherwise (ADR 0015).
+	priceRepository, closePriceHistory := configurePriceHistory(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
+	defer closePriceHistory()
+	priceDomain := pricedomain.New(priceRepository)
 	priceHandler := handlers.NewPriceDomainHandler(priceDomain, handlers.NewPriceIntakeTask(
 		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	))
