@@ -16,6 +16,12 @@ export function formatNumber(
   }).format(value);
 }
 
+// Reais from whole cents, as the language writes money: R$ 1,234.50 in English, R$ 1.234,50 in
+// Portuguese. Watched prices are Brazilian, so the currency is fixed.
+export function formatMoney(locale: Locale, cents: number): string {
+  return new Intl.NumberFormat(TAGS[locale], { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
 // Names in a row as the language says them: "A, B and C", "A, B e C". Plain leaves the "and" out, for a
 // row that goes on ("A, B, C and 2 more").
 export function formatList(locale: Locale, items: readonly string[], plain = false): string {

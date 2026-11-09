@@ -510,3 +510,46 @@ func TestSearchActionReturnsTitlesAndRefusesBadFields(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchHandsTheMarketHistoryOnlyWhenAsked(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	repo.Upsert(ctx, Observation{Product: "ssd-a", Title: "SSD A", Merchant: "aggregator", Series: SeriesMarketMin, Kind: KindUnknown,
+		Points: []Point{{On: today.AddDate(-2, 0, 0).Format(dateLayout), Cents: 1}, {On: day(-2), Cents: 900}, {On: day(-1), Cents: 800}}})
+	repo.Upsert(ctx, Observation{Product: "ssd-a", Title: "SSD A", Merchant: "store-a", Series: SeriesMerchant, Kind: KindPix,
+		Points: []Point{{On: day(0), Cents: 850}}})
+	repo.Upsert(ctx, Observation{Product: "hd-b", Title: "HD B", Merchant: "store-a", Series: SeriesMerchant, Kind: KindPix,
+		Points: []Point{{On: day(0), Cents: 300}}})
+	domain := New(repo).WithClock(func() time.Time { return today })
+
+	plain, err := domain.Handle(ctx, Request{Action: ActionSearchPrices, Event: Event{Payload: map[string]any{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range plain["products"].([]any) {
+		if _, has := raw.(map[string]any)["market"]; has {
+			t.Fatal("a search that did not ask carried a history")
+		}
+	}
+
+	charted, err := domain.Handle(ctx, Request{Action: ActionSearchPrices, Event: Event{Payload: map[string]any{"history": true}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]map[string]any{}
+	for _, raw := range charted["products"].([]any) {
+		entry := raw.(map[string]any)
+		byKey[entry["product"].(string)] = entry
+	}
+	// Only the last year, oldest first; a product without a market series has none.
+	want := []any{map[string]any{"on": day(-2), "cents": int64(900)}, map[string]any{"on": day(-1), "cents": int64(800)}}
+	if !reflect.DeepEqual(byKey["ssd-a"]["market"], want) {
+		t.Fatalf("market %v", byKey["ssd-a"]["market"])
+	}
+	if _, has := byKey["hd-b"]["market"]; has {
+		t.Fatal("a store-only product carried a market history")
+	}
+	if _, err := domain.Handle(ctx, Request{Action: ActionSearchPrices, Event: Event{Payload: map[string]any{"history": "yes"}}}); err == nil {
+		t.Fatal("a history flag that is not a boolean was accepted")
+	}
+}

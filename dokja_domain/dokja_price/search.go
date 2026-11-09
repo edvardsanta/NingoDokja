@@ -29,12 +29,17 @@ type Search struct {
 	Query string
 	// Brand is one more word that must appear, such as "amd".
 	Brand string
+	// History asks for each product's market-low points of the last year, for a chart. A chat
+	// reply has no use for them, so they come only when asked.
+	History bool
 }
 
-// ProductAssessments are the assessments of one product.
+// ProductAssessments are the assessments of one product, and its market-low history when the
+// search asked for it.
 type ProductAssessments struct {
 	Product     Product
 	Assessments []Assessment
+	Market      []Point
 }
 
 // SearchResult is what a search found, at most maxSearchProducts products.
@@ -82,9 +87,28 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 		if err != nil {
 			return SearchResult{}, err
 		}
-		result.Products = append(result.Products, ProductAssessments{Product: product, Assessments: assessments})
+		found := ProductAssessments{Product: product, Assessments: assessments}
+		if search.History {
+			if found.Market, err = d.marketHistory(ctx, assessments); err != nil {
+				return SearchResult{}, err
+			}
+		}
+		result.Products = append(result.Products, found)
 	}
 	return result, nil
+}
+
+// marketHistory is the first market-low history among a product's assessments, over the last
+// year; a product followed at one store only has none.
+func (d *Domain) marketHistory(ctx context.Context, assessments []Assessment) ([]Point, error) {
+	for _, assessment := range assessments {
+		if assessment.Key.Series != SeriesMarketMin {
+			continue
+		}
+		from := d.now().UTC().AddDate(-1, 0, 0).Format(dateLayout)
+		return d.repository.History(ctx, assessment.Key, from, "")
+	}
+	return nil, nil
 }
 
 // matches reports whether every wanted word is one of the product's words, or the start of
@@ -148,9 +172,15 @@ func (r SearchResult) Map() map[string]any {
 		for _, assessment := range product.Assessments {
 			rows = append(rows, assessment.Map())
 		}
-		products = append(products, map[string]any{
-			"product": product.Product.Key, "title": product.Product.Title, "assessments": rows,
-		})
+		entry := map[string]any{"product": product.Product.Key, "title": product.Product.Title, "assessments": rows}
+		if product.Market != nil {
+			market := make([]any, 0, len(product.Market))
+			for _, point := range product.Market {
+				market = append(market, map[string]any{"on": point.On, "cents": point.Cents})
+			}
+			entry["market"] = market
+		}
+		products = append(products, entry)
 	}
 	return map[string]any{"products": products, "matched": r.Matched, "count": len(products)}
 }

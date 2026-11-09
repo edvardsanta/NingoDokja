@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 import type { Locale } from "../../shared/locale.js";
-import { formatAgo, formatDay, formatList, formatNumber, formatTime } from "./format.js";
+import { formatAgo, formatDay, formatList, formatMoney, formatNumber, formatTime } from "./format.js";
 import { createTranslator, type Translate } from "./i18n.js";
 
 const TranslateContext = createContext<Translate>(createTranslator("en"));
@@ -26,6 +26,7 @@ export function useNumbers() {
   return {
     fixed: (value: number, digits: number) => formatNumber(locale, value, digits),
     signed: (value: number, digits: number) => formatNumber(locale, value, digits, { signed: true }),
+    money: (cents: number) => formatMoney(locale, cents),
   };
 }
 

@@ -744,3 +744,46 @@ test("digest filters are allowlisted and empty filters preserve the existing req
   });
   assert.deepEqual(build({ source: "", query: " ", from: "", to: "" }), { limit: 8, offset: 0 });
 });
+
+test("price.search asks for the words and the history, and nothing the screen adds", () => {
+  const build = ACTIONS["price.search"].payload;
+  assert.deepEqual(build({ query: " hd ", brand: " wd ", history: false, limit: 99 }), { query: "hd", brand: "wd", history: true });
+  assert.deepEqual(build({ query: "", brand: "  " }), { history: true });
+  assert.equal((build({ query: "x".repeat(300) })?.query as string).length, 100);
+});
+
+test("price.search keeps codes, whole cents and days, and drops what has no shape", () => {
+  const body = {
+    matched: 12,
+    products: [
+      {
+        product: "hd-example-2tb", title: "HD Example 2TB",
+        assessments: [
+          { merchant: "store-a", series: "merchant", price_kind: "pix", verdict: "real_discount", signals: ["all_time_low", "<b>bad</b>"],
+            latest_on: "2026-11-08", latest_cents: 43990.7, median_30_cents: 50000, lowest_cents: 45000, extra: "dropped" },
+          { merchant: "aggregator", series: "market_min", price_kind: "weird", verdict: "Not A Code", signals: [], latest_on: "yesterday", latest_cents: 41000 },
+          { merchant: "", series: "merchant", price_kind: "pix", latest_cents: 1 },
+          { merchant: "store-b", series: "merchant", price_kind: "card", latest_cents: 0 },
+        ],
+        market: [{ on: "2026-11-06", cents: 42000 }, { on: "bad", cents: 1 }, { on: "2026-11-07", cents: 0 }, 5],
+      },
+      { title: "no key" },
+      "x",
+    ],
+  };
+  assert.deepEqual(ACTIONS["price.search"].project(compactOf("price", body)), {
+    matched: 12,
+    products: [
+      {
+        key: "hd-example-2tb", title: "HD Example 2TB",
+        rows: [
+          { merchant: "store-a", series: "merchant", kind: "pix", verdict: "real_discount", signals: ["all_time_low"], latestOn: "2026-11-08", latestCents: 43990, median30Cents: 50000, lowestCents: 45000 },
+          { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "", signals: [], latestOn: "", latestCents: 41000, median30Cents: 0, lowestCents: 0 },
+        ],
+        market: [{ on: "2026-11-06", cents: 42000 }],
+      },
+    ],
+  });
+  assert.deepEqual(ACTIONS["price.search"].project(compactOf("price", { skipped: true, reason: "switched off" })), { off: true, reason: "switched off" });
+  assert.throws(() => ACTIONS["price.search"].project(compactOf("digest", {})), /unexpected price reply/);
+});

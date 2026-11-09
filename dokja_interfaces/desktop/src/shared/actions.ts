@@ -79,6 +79,8 @@ export const ACTION_TYPES = [
   // Opening a post link reaches the outside world through a reader and downloads its files, so it
   // needs a real press, like a change; it changes nothing and asks for no window.
   "digest.link.read",
+  // Reading the watched prices only reads.
+  "price.search",
   "knowledge.ingest",
   "knowledge.list",
   "knowledge.classify",

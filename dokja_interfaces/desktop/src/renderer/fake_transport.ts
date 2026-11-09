@@ -9,6 +9,8 @@ import type {
   KnowledgeDocuments,
   ReindexResult,
   DigestPage,
+  PriceProduct,
+  PriceSearch,
   DigestStatus,
   KnowledgeSearch,
   KnowledgeStatus,
@@ -191,6 +193,46 @@ function digestItems(): DigestItem[] {
       published: number === 7 ? "" : minutesAgo(number * 47),
     };
   });
+}
+
+// Watched prices with invented products and stores: a markup, a real discount, and one followed at a
+// single store that has no history yet.
+function priceProducts(): PriceProduct[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const year = (start: number, wave: number, end: number) => Array.from({ length: 52 }, (_, week) => ({
+    on: new Date(Date.now() - (52 - week) * 7 * 86_400_000).toISOString().slice(0, 10),
+    cents: week === 51 ? end : Math.round(start + Math.sin(week / 4) * wave + week * 400),
+  }));
+  return [
+    {
+      key: "gpu-example-12gb", title: "Placa de vídeo Example 12GB",
+      rows: [
+        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 618_599, median30Cents: 0, lowestCents: 0 },
+        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "inflated_before_sale", signals: ["raised_before_drop"], latestOn: yesterday, latestCents: 647_058, median30Cents: 1_096_137, lowestCents: 399_999 },
+      ],
+      market: year(440_000, 60_000, 647_058),
+    },
+    {
+      key: "cpu-example-8c", title: "Processador Example 8 núcleos",
+      rows: [
+        { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "real_discount", signals: ["all_time_low"], latestOn: yesterday, latestCents: 214_900, median30Cents: 238_999, lowestCents: 214_900 },
+      ],
+      market: year(270_000, 20_000, 214_900).map((point) => ({ ...point, cents: Math.max(point.cents - 30_000, 215_000) })),
+    },
+    {
+      key: "hd-example-2tb", title: "HD Example 2TB",
+      rows: [
+        { merchant: "store-a", series: "merchant", kind: "pix", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 106_900, median30Cents: 0, lowestCents: 0 },
+        { merchant: "store-a", series: "merchant", kind: "card", verdict: "insufficient_history", signals: [], latestOn: today, latestCents: 112_500, median30Cents: 0, lowestCents: 0 },
+      ],
+      market: [],
+    },
+  ];
+}
+
+function priceWords(text: string): string[] {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
 }
 
 function minutesAgo(minutes: number): string {
@@ -609,6 +651,15 @@ export function createFakeTransport(delayMs = 400): Transport {
           const remaining = documents.reduce((sum, document) => sum + document.chunks - document.embedded, 0);
           const result: ReindexResult = { embedded, remaining, degraded: false, reason: "" };
           return ok(result);
+        }
+        case "price.search": {
+          const wanted = [...priceWords(String(payload?.query ?? "")), ...priceWords(String(payload?.brand ?? ""))];
+          const products = priceProducts().filter((product) => {
+            const have = priceWords(`${product.title} ${product.key}`);
+            return wanted.every((want) => have.some((word) => word === want || (want.length >= 3 && word.startsWith(want))));
+          });
+          const search: PriceSearch = { products, matched: products.length };
+          return ok(search);
         }
         case "digest.status":
           return ok(DIGEST_STATUS);

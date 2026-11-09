@@ -3401,3 +3401,214 @@ button.cfg-toggle:focus-visible {
 
 /* The owner's verdict on an answer sits under it, quiet until asked. */
 .answer-verdict { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-top:var(--space-2); color:var(--text-secondary); }
+
+/* Watched prices (Library › Prices). A product's tone is its leading verdict: the colour of its top
+   edge, its badge and the dot of each history, so a warning reads before a discount. */
+.price-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-block: 1rem 0.75rem;
+}
+
+.price-filters label {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.price-filters .price-search {
+  flex: 2 1 16rem;
+}
+
+.price-filters input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
+.price-filters input:focus-visible,
+.price-chip:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+[data-tone="good"] { --price-tone: var(--status-ok); }
+[data-tone="warning"] { --price-tone: var(--status-pending); }
+[data-tone="problem"] { --price-tone: var(--status-problem-text); }
+[data-tone="plain"] { --price-tone: var(--text-secondary); }
+[data-tone="quiet"] { --price-tone: var(--status-off-text); }
+
+.price-verdicts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block-end: 0.75rem;
+}
+
+.price-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.price-chip[aria-pressed="true"] {
+  border-color: var(--price-tone);
+  color: var(--text-primary);
+}
+
+.price-dot {
+  display: inline-block;
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--price-tone);
+}
+
+.price-empty {
+  padding: var(--space-6);
+  border: 1px dashed var(--border-default);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.price-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-top: 3px solid var(--price-tone);
+  background: var(--surface-panel);
+}
+
+.price-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.price-card h3 {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.price-badge {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--price-tone);
+  color: var(--price-tone);
+  font-size: 0.8rem;
+}
+
+.price-best {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.price-best strong {
+  font-size: 1.6rem;
+  color: var(--action-primary);
+}
+
+.price-signals {
+  margin: 0;
+  color: var(--status-pending);
+  font-size: 0.85rem;
+}
+
+.price-chart {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+}
+
+.price-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.price-chart svg {
+  width: 100%;
+  height: 4rem;
+}
+
+.price-chart polyline {
+  stroke: var(--action-primary);
+  stroke-width: 2;
+}
+
+.price-chart circle {
+  fill: var(--price-tone);
+}
+
+.price-no-chart {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--border-subtle);
+}
+
+.price-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.price-rows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.15rem var(--space-3);
+  padding-block: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.price-rows strong {
+  text-align: end;
+  color: var(--text-primary);
+}
+
+.price-row-verdict {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  color: var(--price-tone);
+  font-size: 0.85rem;
+}
