@@ -853,5 +853,19 @@
   "price_verdict_unknown": "No verdict",
   "price_signal_all_time_low": "all-time low",
   "price_signal_raised_before_drop": "rose before dropping",
-  "price_signal_list_above_observed_max": "\"from\" price above anything charged"
+  "price_signal_list_above_observed_max": "\"from\" price above anything charged",
+  "prices_store": "Store",
+  "prices_store_any": "Any store",
+  "prices_watch": "Watch this search",
+  "prices_watch_added": "Now watching {search}. Its products arrive in a moment.",
+  "prices_watch_already": "{search} is already watched.",
+  "prices_watch_full": "The watched searches are full; remove one to watch {search}.",
+  "prices_watch_not_owner": "Only the owner can watch new searches.",
+  "prices_watch_failed": "The search could not be watched now.",
+  "prices_watches": "Watched searches ({count})",
+  "prices_watches_empty": "Nothing is watched yet. Type a product and brand, then Watch this search.",
+  "prices_watch_remove": "Remove",
+  "prices_watch_remove_named": "Stop watching {search}",
+  "prices_open": "open at the store",
+  "prices_open_named": "Open {source} at the store"
 }

@@ -22,6 +22,7 @@ import { PostStore } from "./post_store.js";
 import { postMediaResponse } from "./post_media.js";
 import { createTranslator } from "../renderer/i18n/i18n.js";
 import { MediaGate } from "./media_gate.js";
+import { offerAddress } from "./offer_book.js";
 import { createPreviewer } from "./media_preview.js";
 import { BridgeChat, BridgeMissing } from "./chat_stream.js";
 import { handleRequest, isAllowedAction } from "./ipc.js";
@@ -183,6 +184,21 @@ async function main(): Promise<void> {
     if (!folder) return { ok: false, error: { code: "denied", message: "that post was not saved in this run" } };
     const failed = await shell.openPath(folder);
     return failed ? { ok: false, error: { code: "unavailable", message: "the folder could not be opened" } } : { ok: true, result: { opened: true } };
+  });
+
+  // Opens a store page a price reply listed, in the browser: only an http(s) address the shell kept
+  // from a price search in this run, only on a real press. The screen never sees the address.
+  ipcMain.handle(CHANNELS.openOffer, async (event, offer: unknown): Promise<TransportResult> => {
+    if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
+    if (!presence.recent()) return { ok: false, error: { code: "denied", message: "opening a page needs a click or a key press just before it" } };
+    const address = offerAddress(offer);
+    if (!address) return { ok: false, error: { code: "denied", message: "that offer was not listed in this run" } };
+    try {
+      await shell.openExternal(address);
+      return { ok: true, result: { opened: true } };
+    } catch {
+      return { ok: false, error: { code: "unavailable", message: "the page could not be opened" } };
+    }
   });
 
   // Saves a post's media on this computer without sending it to the Library.

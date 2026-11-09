@@ -6,7 +6,7 @@ import type { PriceProduct, PriceRow } from "../src/shared/replies.js";
 
 const row = (overrides: Partial<PriceRow>): PriceRow => ({
   merchant: "store-a", series: "merchant", kind: "pix", verdict: "no_discount", signals: [],
-  latestOn: "2026-11-08", latestCents: 1000, median30Cents: 0, lowestCents: 0, ...overrides,
+  latestOn: "2026-11-08", latestCents: 1000, median30Cents: 0, lowestCents: 0, offer: "", ...overrides,
 });
 const product = (rows: PriceRow[], market: PriceProduct["market"] = []): PriceProduct => ({ key: "p", title: "P", rows, market });
 

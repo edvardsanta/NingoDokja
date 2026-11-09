@@ -79,8 +79,11 @@ export const ACTION_TYPES = [
   // Opening a post link reaches the outside world through a reader and downloads its files, so it
   // needs a real press, like a change; it changes nothing and asks for no window.
   "digest.link.read",
-  // Reading the watched prices only reads.
+  // Reading the watched prices only reads; asking to watch the search is a change (see writes).
   "price.search",
+  "price.watches",
+  // Forgetting a watched search is a change, but it can be asked again: no window.
+  "price.unwatch",
   "knowledge.ingest",
   "knowledge.list",
   "knowledge.classify",
@@ -116,6 +119,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "services.set",
   "scheduler.jobs.set",
   "digest.link.read",
+  "price.unwatch",
   "knowledge.ingest",
   "knowledge.delete",
   "knowledge.reindex",

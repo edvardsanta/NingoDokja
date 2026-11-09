@@ -42,6 +42,9 @@ export type Transport = {
   openSavedPost?(documentId: string): Promise<TransportResult>;
   // Copies a post's media into a folder chosen by the owner, without adding it to the Library.
   savePostLocally?(documentId: string): Promise<TransportResult>;
+  // Opens the store page behind a price offer's token in the browser, on a real press. Absent where
+  // nothing can be opened (a test, a browser).
+  openOffer?(offer: string): Promise<TransportResult>;
 };
 
 // The reply of a Talk turn written so far, for the conversation that asked. Never the reply.
@@ -58,4 +61,5 @@ export const CHANNELS = {
   chatPreview: "dokja:chat-preview",
   openSavedPost: "dokja:open-saved-post",
   savePostLocally: "dokja:save-post-locally",
+  openOffer: "dokja:open-offer",
 } as const;

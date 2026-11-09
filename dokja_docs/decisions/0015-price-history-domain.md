@@ -204,12 +204,27 @@ The owner watches categories and brands, not single products: "ssd sata" from
   owner's search started a new watched search. The adapter now answers
   autocomplete interactions for any command that declares a suggester.
 
+## Explicit watching and the Desktop (implemented)
+
+- **Growing the list needs an explicit request.** `price.search` adds a
+  watched search only when its payload sets `watch: true` (and the person may,
+  as before). Discord's `/preco` is a deliberate command, so its bridge sets it;
+  the Desktop searches as the owner types, so it sets it only from the "Watch
+  this search" button, and a search typed on the way leaves no watch behind.
+- **Desktop Library › Prices** gains a store picker (the search's merchant
+  list), the "Watch this search" button with its outcome, the watched searches
+  with removal (`price.watches`, `price.unwatch`), and the best-buy order.
+- **Store pages stay in the shell.** The Desktop's projection replaces each
+  offer's `url` with an opaque token; the shell keeps the newest 2,000 pages
+  and opens one in the browser only for a token a price reply listed in this
+  run, only for an http(s) address without credentials, and only on a real
+  press (`dokja:open-offer`). The screen never sees an address, as the Desktop
+  plan requires for every reply.
+
 ## Pending work (stacked follow-ups)
 
 - **A product link for a comparison** (`price.resolve.v1` action `read`):
   links are parsed against known stores and never fetched as given.
-- **The Desktop**: the watched searches with removal, the store filter and
-  the links.
 - **`/comparar_produto`**: offers across stores for one product, with a short
   comment from Ningo written from the domain's facts.
 

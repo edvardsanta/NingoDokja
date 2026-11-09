@@ -3621,3 +3621,71 @@ button.cfg-toggle:focus-visible {
   gap: var(--space-2);
   color: var(--status-pending);
 }
+
+/* Watching a search, the watched list and a store page's link. */
+.price-watch-button {
+  align-self: end;
+  min-height: 2.75rem;
+}
+
+.price-watch-notice {
+  margin: 0 0 var(--space-3);
+  color: var(--status-ok);
+}
+
+.price-watches {
+  margin-block: var(--space-4);
+}
+
+.price-watches summary {
+  width: max-content;
+  padding-block: 0.4rem;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.price-watches summary:focus-visible,
+.price-open:focus-visible,
+.price-watch-remove:focus-visible {
+  outline: var(--focus-width) solid var(--focus-accent-ring);
+  outline-offset: var(--focus-offset-tight);
+}
+
+.price-watches ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.price-watches li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.2rem 0.3rem 0.2rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.price-watch-remove,
+.price-open {
+  min-height: 2.75rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--action-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.price-filters select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}

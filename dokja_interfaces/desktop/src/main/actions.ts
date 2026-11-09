@@ -1,3 +1,4 @@
+import { rememberOffer } from "./offer_book.js";
 import { passageLocator, originalReading } from "../shared/passages.js";
 import { observerSnapshot } from "../shared/realtime.js";
 import { speakInput, speech, transcribeInput, transcript, MAX_SPEAK_TEXT, MAX_UTTERANCE_BASE64, VOICE_SESSION } from "../shared/desktop_voice.js";
@@ -31,6 +32,9 @@ import type {
   PriceProduct,
   PriceRow,
   PriceSearch,
+  PriceWatch,
+  PriceWatches,
+  PriceWatchOutcome,
   DigestStatus,
   IngestResult,
   InterfaceLink,
@@ -662,11 +666,32 @@ function priceSearch(body: Record<string, unknown>): PriceSearch {
       latestCents: cents(row.latest_cents),
       median30Cents: cents(row.median_30_cents),
       lowestCents: cents(row.lowest_cents),
+      // the page stays in the shell; the screen gets a token it can ask to open
+      offer: rememberOffer(text(row.url)),
     })).filter((row) => row.merchant !== "" && row.latestCents > 0).slice(0, MAX_PRICE_ROWS),
     market: records(product.market, (point): PricePoint => ({ on: day(point.on), cents: cents(point.cents) }))
       .filter((point) => point.on !== "" && point.cents > 0).slice(-MAX_PRICE_POINTS),
   })).filter((product) => product.key !== "").slice(0, MAX_PRICE_PRODUCTS);
-  return { products, matched: Math.max(clampInt(body.matched, 0, 100_000, 0), products.length) };
+  const merchants = words(body.merchants).filter((merchant) => PRICE_KEY.test(merchant)).slice(0, MAX_PRICE_MERCHANTS);
+  const watch = isRecord(body.watch) && WATCH_STATUSES.has(text(body.watch.status))
+    ? { watch: { ...priceWatch(body.watch), status: text(body.watch.status) as PriceWatchOutcome["status"] } } : {};
+  return { products, matched: Math.max(clampInt(body.matched, 0, 100_000, 0), products.length), merchants, ...watch };
+}
+
+const PRICE_KEY = /^[a-z0-9][a-z0-9._:-]{0,79}$/;
+const MAX_PRICE_MERCHANTS = 100;
+const MAX_WATCH_CHARS = 60;
+const WATCH_STATUSES = new Set(["added", "watched", "full", "not_owner"]);
+
+function priceWatch(body: Record<string, unknown>): PriceWatch {
+  return { category: shorten(text(body.category), MAX_WATCH_CHARS), brand: shorten(text(body.brand), MAX_WATCH_CHARS) };
+}
+
+function priceWatches(body: Record<string, unknown>): PriceWatches {
+  return {
+    watches: records(body.watches, priceWatch).filter((watch) => watch.category !== "").slice(0, 100),
+    limit: clampInt(body.limit, 0, 1000, 0),
+  };
 }
 
 function digestPage(body: Record<string, unknown>): DigestPage {
@@ -1021,13 +1046,32 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     settle: async (projected) => (posts ? posts.hold(projected) : { status: "refused", refused: "failed" }),
   },
   "price.search": {
-    // The words of the search, and always the history: the screen draws it.
-    payload: (raw) => ({
-      ...Object.fromEntries(["query", "brand"].filter((key) => typeof raw[key] === "string" && (raw[key] as string).trim())
-        .map((key) => [key, (raw[key] as string).trim().slice(0, MAX_PRICE_SEARCH_CHARS)])),
-      history: true,
-    }),
+    // The words of the search, the store, the best buys first and always the history: the screen
+    // draws it. Asking to watch the search changes what is collected, so it needs a real press.
+    writes: (payload) => payload.watch === true,
+    payload: (raw) => {
+      if (typeof raw.merchant === "string" && raw.merchant.trim() && !PRICE_KEY.test(raw.merchant.trim())) return undefined;
+      return {
+        ...Object.fromEntries(["query", "brand", "merchant"].filter((key) => typeof raw[key] === "string" && (raw[key] as string).trim())
+          .map((key) => [key, (raw[key] as string).trim().slice(0, MAX_PRICE_SEARCH_CHARS)])),
+        order: "opportunity",
+        history: true,
+        ...(raw.watch === true ? { watch: true } : {}),
+      };
+    },
     project: (result) => inDomain(result, "price", priceSearch),
+  },
+  "price.watches": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "price", priceWatches),
+  },
+  "price.unwatch": {
+    payload: (raw) => {
+      const category = typeof raw.category === "string" ? raw.category.trim().slice(0, MAX_WATCH_CHARS) : "";
+      const brand = typeof raw.brand === "string" ? raw.brand.trim().slice(0, MAX_WATCH_CHARS) : "";
+      return category ? { category, brand } : undefined;
+    },
+    project: (result) => inDomain(result, "price", (body) => ({ removed: body.removed === true })),
   },
   "knowledge.ingest": {
     // A book travels whole as base64 text, however large it is.

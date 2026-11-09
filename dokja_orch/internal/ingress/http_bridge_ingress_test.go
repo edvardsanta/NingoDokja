@@ -193,7 +193,7 @@ func TestBridgeMapsAPriceSearchAndHandsItsResultBack(t *testing.T) {
 		EventType: "price.search",
 		Payload:   BridgePayload{Query: " hd ", Brand: "amd", Content: "ignored"},
 	}, "ignored")
-	if eventType != "price.search" || payload["query"] != "hd" || payload["brand"] != "amd" || payload["order"] != "opportunity" || len(payload) != 4 {
+	if eventType != "price.search" || payload["query"] != "hd" || payload["brand"] != "amd" || payload["order"] != "opportunity" || payload["watch"] != true || len(payload) != 5 {
 		t.Fatalf("mapped %s %v", eventType, payload)
 	}
 

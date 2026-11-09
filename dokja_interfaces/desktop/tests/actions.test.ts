@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { createHash } from "node:crypto";
 import { ACTIONS } from "../src/main/actions.js";
-import { isWriteAction, needsConfirmation } from "../src/shared/actions.js";
+import { forgetOffers, offerAddress } from "../src/main/offer_book.js";
+import { WRITE_ACTION_TYPES, isWriteAction, needsConfirmation } from "../src/shared/actions.js";
 import { buildIngest } from "../src/main/ingest.js";
 
 // Hand-built replies in the shapes the orchestrator uses, never a captured one: a real reply
@@ -747,8 +749,8 @@ test("digest filters are allowlisted and empty filters preserve the existing req
 
 test("price.search asks for the words and the history, and nothing the screen adds", () => {
   const build = ACTIONS["price.search"].payload;
-  assert.deepEqual(build({ query: " hd ", brand: " wd ", history: false, limit: 99 }), { query: "hd", brand: "wd", history: true });
-  assert.deepEqual(build({ query: "", brand: "  " }), { history: true });
+  assert.deepEqual(build({ query: " hd ", brand: " wd ", history: false, limit: 99 }), { query: "hd", brand: "wd", order: "opportunity", history: true });
+  assert.deepEqual(build({ query: "", brand: "  " }), { order: "opportunity", history: true });
   assert.equal((build({ query: "x".repeat(300) })?.query as string).length, 100);
 });
 
@@ -760,7 +762,8 @@ test("price.search keeps codes, whole cents and days, and drops what has no shap
         product: "hd-example-2tb", title: "HD Example 2TB",
         assessments: [
           { merchant: "store-a", series: "merchant", price_kind: "pix", verdict: "real_discount", signals: ["all_time_low", "<b>bad</b>"],
-            latest_on: "2026-11-08", latest_cents: 43990.7, median_30_cents: 50000, lowest_cents: 45000, extra: "dropped" },
+            latest_on: "2026-11-08", latest_cents: 43990.7, median_30_cents: 50000, lowest_cents: 45000, extra: "dropped",
+            url: "https://store-a.example/p/1" },
           { merchant: "aggregator", series: "market_min", price_kind: "weird", verdict: "Not A Code", signals: [], latest_on: "yesterday", latest_cents: 41000 },
           { merchant: "", series: "merchant", price_kind: "pix", latest_cents: 1 },
           { merchant: "store-b", series: "merchant", price_kind: "card", latest_cents: 0 },
@@ -777,13 +780,60 @@ test("price.search keeps codes, whole cents and days, and drops what has no shap
       {
         key: "hd-example-2tb", title: "HD Example 2TB",
         rows: [
-          { merchant: "store-a", series: "merchant", kind: "pix", verdict: "real_discount", signals: ["all_time_low"], latestOn: "2026-11-08", latestCents: 43990, median30Cents: 50000, lowestCents: 45000 },
-          { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "", signals: [], latestOn: "", latestCents: 41000, median30Cents: 0, lowestCents: 0 },
+          { merchant: "store-a", series: "merchant", kind: "pix", verdict: "real_discount", signals: ["all_time_low"], latestOn: "2026-11-08", latestCents: 43990, median30Cents: 50000, lowestCents: 45000, offer: offerOf("https://store-a.example/p/1") },
+          { merchant: "aggregator", series: "market_min", kind: "unknown", verdict: "", signals: [], latestOn: "", latestCents: 41000, median30Cents: 0, lowestCents: 0, offer: "" },
         ],
         market: [{ on: "2026-11-06", cents: 42000 }],
       },
     ],
+    merchants: [],
   });
   assert.deepEqual(ACTIONS["price.search"].project(compactOf("price", { skipped: true, reason: "switched off" })), { off: true, reason: "switched off" });
   assert.throws(() => ACTIONS["price.search"].project(compactOf("digest", {})), /unexpected price reply/);
+});
+
+const offerOf = (address: string) => createHash("sha256").update(address).digest("hex").slice(0, 16);
+
+test("price.search hands the screen a token for each store page, never the address, and the shell can open it", () => {
+  forgetOffers();
+  const body = {
+    matched: 1, merchants: ["aggregator", "store-a", "Bad Key"],
+    watch: { category: "ssd sata", brand: "samsung", status: "added" },
+    products: [{ product: "p", title: "P", assessments: [
+      { merchant: "store-a", series: "merchant", price_kind: "pix", latest_cents: 100, url: "https://store-a.example/p" },
+      { merchant: "store-b", series: "merchant", price_kind: "pix", latest_cents: 90, url: "javascript:alert(1)" },
+      { merchant: "store-c", series: "merchant", price_kind: "pix", latest_cents: 80, url: "https://user:pw@store-c.example/p" },
+    ] }],
+  };
+  const projected = ACTIONS["price.search"].project(compactOf("price", body)) as { products: Array<{ rows: Array<{ offer: string }> }>; merchants: string[]; watch: unknown };
+  const [safe, script, credentials] = projected.products[0]!.rows;
+  assert.match(safe!.offer, /^[0-9a-f]{16}$/);
+  assert.equal(script!.offer, "");
+  assert.equal(credentials!.offer, "");
+  assert.doesNotMatch(JSON.stringify(projected), /store-a\.example/);
+  assert.equal(offerAddress(safe!.offer), "https://store-a.example/p");
+  assert.equal(offerAddress("0000000000000000"), undefined);
+  assert.equal(offerAddress("../etc"), undefined);
+  assert.deepEqual(projected.merchants, ["aggregator", "store-a"]);
+  assert.deepEqual(projected.watch, { category: "ssd sata", brand: "samsung", status: "added" });
+});
+
+test("asking price.search to watch is a change; a store must be a merchant key", () => {
+  const action = ACTIONS["price.search"];
+  const watched = action.payload({ query: "ssd", watch: true })!;
+  assert.equal(watched.watch, true);
+  assert.equal(action.writes?.(watched), true);
+  assert.equal(action.writes?.(action.payload({ query: "ssd", watch: "yes" })!), false);
+  assert.equal(action.payload({ merchant: "store-a" })?.merchant, "store-a");
+  assert.equal(action.payload({ merchant: "Not A Key" }), undefined);
+});
+
+test("price.watches lists the watched searches and price.unwatch needs a category", () => {
+  assert.deepEqual(ACTIONS["price.watches"].project(compactOf("price", {
+    watches: [{ category: "hd", brand: "wd" }, { category: "", brand: "x" }, 3], limit: 50,
+  })), { watches: [{ category: "hd", brand: "wd" }], limit: 50 });
+  assert.deepEqual(ACTIONS["price.unwatch"].payload({ category: " hd ", brand: " wd ", extra: 1 }), { category: "hd", brand: "wd" });
+  assert.equal(ACTIONS["price.unwatch"].payload({ brand: "wd" }), undefined);
+  assert.deepEqual(ACTIONS["price.unwatch"].project(compactOf("price", { removed: true })), { removed: true });
+  assert.ok(WRITE_ACTION_TYPES.includes("price.unwatch"));
 });
