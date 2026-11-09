@@ -66,6 +66,8 @@ func ServiceForEvent(eventType string) string {
 	return ""
 }
 
+// persistedJob is a job's saved choice. A job runs only when the operator switched it on:
+// a missing entry, or one without "enabled", is off.
 type persistedJob struct {
 	Enabled  *bool  `json:"enabled,omitempty"`
 	Interval string `json:"interval,omitempty"`
@@ -202,8 +204,12 @@ func (c *Controls) SetService(name string, enabled bool) error {
 func (c *Controls) JobEnabled(name string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	job := c.state.Jobs[name]
-	return job.Enabled == nil || *job.Enabled
+	return jobOn(c.state.Jobs[name])
+}
+
+// jobOn reports whether the operator switched the job on; nothing saved means off.
+func jobOn(job persistedJob) bool {
+	return job.Enabled != nil && *job.Enabled
 }
 
 // JobPatch changes a job. Nil fields are left alone; ClearInterval drops the override.
@@ -228,8 +234,8 @@ func (c *Controls) SetJob(name string, patch JobPatch) error {
 	if patch.Enabled != nil {
 		enabled := *patch.Enabled
 		job.Enabled = &enabled
-		if enabled {
-			job.Enabled = nil // enabled is the default; keep the file minimal
+		if !enabled {
+			job.Enabled = nil // off is the default; keep the file minimal
 		}
 	}
 	if patch.ClearInterval {
@@ -331,7 +337,7 @@ func (c *Controls) Jobs() []JobInfo {
 	out := make([]JobInfo, 0, len(KnownJobs))
 	for _, name := range KnownJobs {
 		job := c.state.Jobs[name]
-		info := JobInfo{Name: name, Enabled: job.Enabled == nil || *job.Enabled}
+		info := JobInfo{Name: name, Enabled: jobOn(job)}
 		if override := c.intervalOverrideLocked(name); override > 0 {
 			info.Interval, info.IntervalOverride = override, true
 		}

@@ -35,7 +35,8 @@ The scheduler only publishes, so it is controlled through the orchestrator:
 
 - `DOKJA_STATE_FILE` points at the state file the orchestrator writes. The scheduler re-reads it every 5 s
   for per-job `interval` overrides (1 minute to 30 days, anything else ignored) and restarts a job's
-  countdown when its interval changes. Pausing a job is enforced by the orchestrator, so the scheduler still
-  ticks and its startup run still happens; the orchestrator skips it.
+  countdown when its interval changes. Every job starts switched off, and switching a job on or off is
+  enforced by the orchestrator: the scheduler still ticks and its startup run still happens, and the
+  orchestrator skips every run of a job nobody switched on.
 - It announces its jobs (`scheduler.jobs.announce`: interval, last and next fire) at startup, after every
   run and about once a minute, so the orchestrator and the TUI can show the schedule.
