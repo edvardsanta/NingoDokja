@@ -335,6 +335,12 @@ The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`
 - `/data/dokja_chat_sessions.db`: durable non-archived session snapshots, created
   with mode `0600` and covered by the existing data volume. Include it in backups.
   An older build ignores this separate file; do not delete it during rollback.
+- `/data/dokja_quiz_runs.db`, beside `DOKJA_DB_FILE`, with no new variable: the
+  questionnaires Ningo took through `/teste_politico` (site, date, label, result link, his
+  comment and the questions the site asked with his answers), the newest 20 runs. Chat turns
+  read the newest three so he remembers them; how he brings them up is set in the private
+  `.dokja/visions.md`. Created with mode `0600` on the first start of a build that has it;
+  an older build ignores it. Include it in backups.
 - `/data/dokja_conversations.db`, beside `DOKJA_DB_FILE` and named from it, so there is no new
   variable: the owner's conversations with Ningo, as written by the desktop and the CLI.
   - Only the orchestrator opens it; it is created on the first start of a build that keeps

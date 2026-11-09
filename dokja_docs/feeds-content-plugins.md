@@ -138,9 +138,11 @@ site may ask, at most 400: when the site draws a subset at random, the list is t
 whole pool, and every item gets an answer.
 
 `submit {url, answers}` receives `answers` as `{id: option}`, each option copied
-from `questions`. It answers `{handled: true, result: {url, label}}`: `url` is the
-site's result link, on the same host as the quiz link, and the optional `label` is
-the short verdict the site shows.
+from `questions`. It answers `{handled: true, result: {url, label, asked}}`: `url` is
+the site's result link, on the same host as the quiz link, the optional `label` is
+the short verdict the site shows, and the optional `asked` lists the ids of the
+questions the site actually showed, in order. Ningo remembers a finished run with
+those questions and his answers; without `asked` he remembers only the result.
 
 A runner never types text, signs in or pays. A screen that needs any of these is
 `unsupported`. Quiz runs may take up to five minutes, the longest plugin timeout;

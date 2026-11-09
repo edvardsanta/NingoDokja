@@ -49,7 +49,7 @@ func TestBundledCapabilitiesHaveVersionedBoundedAccessAndLimits(t *testing.T) {
 			}
 		}
 	}
-	for _, id := range []string{"music.playback", "music.history", "radio.playback", "conversation.voice", "memes.examples", "memory.facts"} {
+	for _, id := range []string{"music.playback", "music.history", "radio.playback", "conversation.voice", "memes.examples", "memory.facts", "quiz.take"} {
 		if !seen[id] {
 			t.Fatal("missing product capability", id)
 		}
