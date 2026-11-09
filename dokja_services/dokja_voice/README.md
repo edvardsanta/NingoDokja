@@ -241,6 +241,15 @@ no published port and no connection to the application network. Provider logs
 are disabled, the model mount is read-only, and uploaded WAV data is handled in
 memory (the optional upstream ffmpeg file converter is not enabled).
 
+Steady background noise can pass the speech gate, and Whisper then invents short
+phrases from it. `whisper_cpp` asks the server for `verbose_json` and keeps only
+confident segments: an average log probability of at least -0.8 and a mean word
+probability of at least 0.5. Punctuation-only segments are always dropped. The
+server's `no_speech_prob` stays near zero even for pure noise, so it is not used.
+Each `stt completed` log line reports `segments_kept`, `segments_dropped`,
+`min_avg_logprob` and `min_word_prob`, never the text, so the thresholds
+(`MIN_AVG_LOGPROB`, `MIN_WORD_PROBABILITY`) can be tuned from real rooms.
+
 Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
 if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects
 `DOKJA_VOICE_STT_PROVIDER=whisper_cpp` and the internal
