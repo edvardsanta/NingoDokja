@@ -109,19 +109,19 @@ func TestOnlyTheOwnerGrowsTheWatchedSearches(t *testing.T) {
 		return watch["status"]
 	}
 
-	if got := searchAs(t, domain, "discord", false, map[string]any{"query": "SSD Sata", "brand": "Samsung"}); status(got) != "not_owner" {
+	if got := searchAs(t, domain, "discord", false, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"}); status(got) != "not_owner" {
 		t.Fatalf("a guest grew the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"query": "SSD Sata", "brand": "Samsung"}); status(got) != "added" {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"}); status(got) != "added" {
 		t.Fatalf("the owner did not grow the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"query": "ssd   SATA", "brand": "samsung"}); status(got) != "watched" {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "ssd   SATA", "brand": "samsung"}); status(got) != "watched" {
 		t.Fatalf("the same search, written differently, was added twice: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "desktop", false, map[string]any{"query": "hd", "brand": ""}); status(got) != "added" {
+	if got := searchAs(t, domain, "desktop", false, map[string]any{"watch": true, "query": "hd", "brand": ""}); status(got) != "added" {
 		t.Fatalf("the operator at the Desktop may grow the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"brand": "amd"}); got["watch"] != nil {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "brand": "amd"}); got["watch"] != nil {
 		t.Fatalf("a brand without a category is not a store query: %v", got["watch"])
 	}
 
@@ -148,7 +148,7 @@ func TestTheWatchedSearchesStopAtTheirLimit(t *testing.T) {
 		repo.AddWatch(context.Background(), Watch{Category: fmt.Sprintf("thing %d", i)})
 	}
 	domain := New(repo).WithClock(func() time.Time { return today })
-	got := searchAs(t, domain, "cli", false, map[string]any{"query": "one more"})
+	got := searchAs(t, domain, "cli", false, map[string]any{"watch": true, "query": "one more"})
 	if got["watch"].(map[string]any)["status"] != "full" {
 		t.Fatalf("watch %v", got["watch"])
 	}
@@ -175,5 +175,17 @@ func TestTheCollectorIsToldWhichProductsLackAMarketHistory(t *testing.T) {
 	repo.AddWatch(ctx, Watch{Category: "ssd"})
 	if watches, _ := domain.Watches(ctx); len(watches) != 1 {
 		t.Fatalf("watches %+v", watches)
+	}
+}
+
+func TestASearchWithoutAskingToWatchLeavesTheListAlone(t *testing.T) {
+	domain := New(NewMemoryRepository()).WithClock(func() time.Time { return today })
+	got := searchAs(t, domain, "desktop", false, map[string]any{"query": "ss"})
+	if got["watch"] != nil {
+		t.Fatalf("a search typed on the way added a watch: %v", got["watch"])
+	}
+	list, _ := domain.Handle(context.Background(), Request{Action: ActionListWatches, Event: Event{}})
+	if list["count"] != 0 {
+		t.Fatalf("watches %v", list)
 	}
 }

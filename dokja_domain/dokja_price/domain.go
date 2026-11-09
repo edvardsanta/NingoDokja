@@ -119,10 +119,13 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		if err != nil {
 			return nil, err
 		}
-		// The owner asking for a category and brand is how the watched searches grow; the
-		// answer still comes from what is already known.
-		if result.Watch, err = d.watchFromSearch(ctx, request.Event, search); err != nil {
-			return nil, err
+		// The owner asking to watch a category and brand is how the watched searches grow; the
+		// answer still comes from what is already known. Only an explicit request counts: a
+		// search typed as the person goes must not leave a watch for every word on the way.
+		if wanted, _ := request.Event.Payload["watch"].(bool); wanted {
+			if result.Watch, err = d.watchFromSearch(ctx, request.Event, search); err != nil {
+				return nil, err
+			}
 		}
 		return result.Map(), nil
 	case ActionListWatches:
