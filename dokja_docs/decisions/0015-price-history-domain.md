@@ -91,7 +91,9 @@ Thresholds are constants in `assess.go`, in basis points:
   than that peak but within 5% of the usual price.
 - `fake_discount`: the merchant advertises at least 10% off its list price, and
   the history shows no real discount.
-- `stale`: the latest point is more than a day older than the day being judged.
+- `stale`: the latest point is more than two days older than the UTC day being
+  judged. Aggregators publish only closed days, so their latest point is
+  yesterday in Brazil, two UTC days back late in the evening.
 
 ## Orchestrator intake (implemented)
 
