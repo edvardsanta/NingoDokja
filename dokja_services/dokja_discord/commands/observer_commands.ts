@@ -25,7 +25,18 @@ const observed = (room: Observer, observation: VoiceObservation) => ({
   transcription_status:"final",revision:1,
 });
 
-export type VoiceChatMirror = { heard(observation: VoiceObservation): void; stop(): void };
+// One line of Ningo's spoken reply, revised as each sentence is said.
+export type SpokenReplyMirror = { said(sentence: string): void };
+export type VoiceChatMirror = {
+  heard(observation: VoiceObservation): void;
+  // Ningo's reply to the turn ending at this capture sequence; it is placed right after it.
+  reply(sequence: number): SpokenReplyMirror;
+  stop(): void;
+};
+
+// The engine refuses a line spanning more than 30 s; a long reply keeps its first 30 s of span.
+const MAX_LINE_SPAN_MS = 30_000;
+const MAX_LINE_TEXT = 8000;
 
 // Mirrors a voice chat Ningo answers into the owner's Desktop realtime view: the same ephemeral,
 // channel-wide journal an observer keeps, marked voice_chat. Segments are sent one at a time, in
@@ -39,6 +50,13 @@ export async function startVoiceChatMirror(endpoint: string, timeout: number, st
     await accepted(realtimeRequest(endpoint, timeout, starter, room, "realtime.start", {mode:"voice_chat"}));
   } catch (failure) { error("[dokja-discord] voice chat transcript mirror unavailable", failure); return undefined; }
   let queue = Promise.resolve();
+  let replies = 0;
+  const send = (speaker: Speaker, type: string, extra: Record<string, unknown>) => {
+    queue = queue.then(async () => {
+      if (!room.active) return;
+      await accepted(realtimeRequest(endpoint, timeout, speaker, room, type, extra));
+    }).catch((failure) => { error("[dokja-discord] voice chat transcript mirror stopped", failure); stop(); });
+  };
   const stop = () => {
     if (!room.active) return;
     room.active = false;
@@ -47,10 +65,27 @@ export async function startVoiceChatMirror(endpoint: string, timeout: number, st
   return {
     heard(observation) {
       if (!room.active) return;
-      queue = queue.then(async () => {
-        if (!room.active) return;
-        await accepted(realtimeRequest(endpoint, timeout, {...starter,userId:observation.userId,userName:observation.userName}, room, "realtime.observe", observed(room, observation)));
-      }).catch((failure) => { error("[dokja-discord] voice chat transcript mirror stopped", failure); stop(); });
+      send({...starter,userId:observation.userId,userName:observation.userName}, "realtime.observe", observed(room, observation));
+    },
+    reply(sequence) {
+      const id = `${room.id}:ningo:${++replies}`;
+      const started = Date.now();
+      let text = "";
+      let revision = 0;
+      return {
+        said(sentence) {
+          const words = sentence.trim();
+          if (!room.active || !words || text.length >= MAX_LINE_TEXT) return;
+          text = `${text} ${words}`.trim().slice(0, MAX_LINE_TEXT);
+          revision++;
+          const ended = Math.min(Date.now(), started + MAX_LINE_SPAN_MS);
+          send(starter, "realtime.observe", {
+            capture_sequence:sequence,message_id:id,text,speaker_role:"ningo",
+            timestamp_start:new Date(started).toISOString(),timestamp_end:new Date(ended).toISOString(),
+            transcription_status:"final",revision,
+          });
+        },
+      };
     },
     stop,
   };

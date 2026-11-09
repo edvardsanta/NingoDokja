@@ -50,6 +50,11 @@ The Discord interface exposes `/conversation_start` and `/conversation_stop` for
 observer. `realtime.start` takes an optional `mode`, either `observer` (the default) or `voice_chat`.
 `/voice_chat_start` and `/wake_chat` open a `voice_chat` journal and mirror what their listener
 transcribes into it, without changing reply generation. The snapshot carries each session's `mode`.
+In a `voice_chat` journal, Ningo's spoken reply is one line with `role: "ningo"`, placed after
+the turn it answers and revised as each sentence starts playing. Only the orchestrator sets the
+role, from the adapter's `speaker_role` marker. A role in the message body is ignored, an
+observer journal refuses it, and Ningo is never listed as a participant. Desktop shows the line
+in red.
 The orchestrator starts channel-wide admission in the domain. The legacy domain
 `Start`/`Consent` API and join/leave routes remain for compatibility with older
 callers; they do not manage channel-wide sessions. The snapshot's existing

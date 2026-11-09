@@ -205,6 +205,8 @@ export function createCommands(
             onStopped: mirror?.stop,
             onTurn: async (_transcript, turn) => {
               if (!turn) throw new Error("Voice speaker metadata is required");
+              // Ningo's words join the live transcript as each sentence starts playing.
+              const said = mirror?.reply(Math.max(0, ...turn.turns.map((heard) => heard.sequence)));
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
                 voiceSessionId, voiceStartedBy: context.userId,
@@ -213,6 +215,7 @@ export function createCommands(
                   const speech = { guildId: context.guildId, userId: turn.userId,
                     channelId: turn.channelId, originChannelId: context.channelId,
                     text: sentence, signal: turn.signal, trace: turn.trace };
+                  said?.said(sentence);
                   if (voice.speakReply) await voice.speakReply(speech);
                   else await voice.speakText(speech);
                 },
@@ -225,6 +228,7 @@ export function createCommands(
                   waitForFloor: turn.waitForFloor,
                 };
                 await turn.waitForFloor?.();
+                said?.said(reply);
                 if (voice.speakReply) await voice.speakReply(speech);
                 else await voice.speakText(speech);
               }
@@ -266,6 +270,8 @@ export function createCommands(
             onStopped: mirror?.stop,
             onTurn: async (_transcript, turn) => {
               if (!turn) throw new Error("Voice speaker metadata is required");
+              // Ningo's words join the live transcript as each sentence starts playing.
+              const said = mirror?.reply(Math.max(0, ...turn.turns.map((heard) => heard.sequence)));
               const reply = await conversationReply(orchestratorEndpoint, orchestratorTimeoutMs, {
                 guildId: context.guildId, originChannelId: context.channelId, turn,
                 voiceSessionId, voiceStartedBy: context.userId,
@@ -274,6 +280,7 @@ export function createCommands(
                   const speech = { guildId: context.guildId, userId: turn.userId,
                     channelId: turn.channelId, originChannelId: context.channelId,
                     text: sentence, signal: turn.signal, trace: turn.trace };
+                  said?.said(sentence);
                   if (voice.speakReply) await voice.speakReply(speech);
                   else await voice.speakText(speech);
                 },
@@ -286,6 +293,7 @@ export function createCommands(
                   waitForFloor: turn.waitForFloor,
                 };
                 await turn.waitForFloor?.();
+                said?.said(reply);
                 if (voice.speakReply) await voice.speakReply(speech);
                 else await voice.speakText(speech);
               }

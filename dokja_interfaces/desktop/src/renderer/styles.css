@@ -3354,6 +3354,12 @@ button.cfg-toggle:focus-visible {
 .realtime-transcript strong { color: var(--cyan); }
 .realtime-transcript time { margin-left: var(--space-2); color: var(--ink-dim); font-size: 0.8125rem; }
 .realtime-transcript p { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+.realtime-transcript li[data-role="ningo"] {
+  border-left-color: var(--speaker-ningo);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--speaker-ningo) 10%, transparent), transparent 60%);
+}
+.realtime-transcript li[data-role="ningo"] strong,
+.realtime-transcript li[data-role="ningo"] p { color: var(--speaker-ningo); }
 @media (prefers-reduced-motion: reduce) { .realtime-transcript li { animation: none; } }
 
 /*

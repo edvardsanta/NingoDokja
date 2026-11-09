@@ -108,3 +108,27 @@ test("voice_chat_start still starts when the realtime mirror is refused",async()
   assert.ok(params,"the voice chat started");assert.equal(params.onHeard,undefined);
  }finally{globalThis.fetch=previous;console.error=errors;}
 });
+
+test("voice_chat_start shows Ningo's spoken reply as one line revised sentence by sentence, after the question",async()=>{
+ const previous=globalThis.fetch;const events:any[]=[];let params:any;const spoken:string[]=[];
+ globalThis.fetch=async(url,init)=>{
+  if(String(url).endsWith("/voice/chat/stream"))return new Response(['{"accepted":true}','{"speech":"Nenhum."}','{"speech":"A perfeição é para quem não governa."}','{"status":"ok","reply":""}'].join("\n")+"\n");
+  const body=JSON.parse(String(init?.body));events.push(body);return new Response('{"status":"ok","realtime":{"accepted":true}}');
+ };
+ const voice={getVoiceChannelId:async()=>"voice",startConversation:async(p:any)=>{params=p;return "started";},stopConversation:async()=>"stopped",
+  speakText:async(p:any)=>{spoken.push(p.text);return "";}} as unknown as DiscordVoiceController;
+ const commands=createCommands("http://orch",1000,voice,{locale:"en"});
+ const context:DiscordCommandContext={userId:"a",userName:"Starter",guildId:"g",channelId:"text",messageId:"request",getString:()=>"",getNumber:()=>undefined,reply:async()=>{},updateReply:async()=>{},showModal:async()=>{}};
+ const settle=async()=>{for(let i=0;i<30;i++)await new Promise(resolve=>setImmediate(resolve));};
+ try{
+  await commands.find(c=>c.name==="voice_chat_start")!.handle(context);await settle();
+  await params.onTurn("qual é o sistema de governo perfeito?",{userId:"b",userName:"draco",channelId:"voice",signal:new AbortController().signal,
+   turns:[{userId:"b",userName:"draco",text:"qual é o sistema de governo perfeito?",sequence:7}]});
+  await settle();
+  assert.deepEqual(spoken,["Nenhum.","A perfeição é para quem não governa."]);
+  const lines=events.filter(e=>e.event_type==="realtime.observe").map(e=>e.payload.realtime);
+  assert.equal(lines.length,2);
+  assert.ok(lines.every(l=>l.speaker_role==="ningo"&&l.capture_sequence===7&&l.message_id===lines[0].message_id));
+  assert.deepEqual(lines.map(l=>[l.revision,l.text]),[[1,"Nenhum."],[2,"Nenhum. A perfeição é para quem não governa."]]);
+ }finally{globalThis.fetch=previous;}
+});
