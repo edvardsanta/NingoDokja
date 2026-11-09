@@ -568,7 +568,7 @@ test("the status carries the jobs when the orchestrator reports them, and nothin
   const body = result.result as { services: Record<string, unknown>; jobs: Array<Record<string, unknown>> };
   assert.deepEqual(body.services.meme, { status: "ok", detail: "", enabled: true });
   assert.equal(body.jobs.length, 2);
-  assert.deepEqual(body.jobs[0], { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "2026-10-03T12:00:00Z", lastAt: "2026-10-03T06:00:00Z", lastOutcome: "ran", lastError: "" });
+  assert.deepEqual(body.jobs[0], { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "2026-10-03T12:00:00Z", lastAt: "2026-10-03T06:00:00Z", lastOutcome: "ran", lastError: "", lastReason: "" });
   assert.equal(body.jobs[1]?.enabled, false);
   assert.equal(body.jobs[1]?.intervalOverride, true);
   assert.ok(String(body.jobs[1]?.lastError).length <= 200, "a long error is cut");

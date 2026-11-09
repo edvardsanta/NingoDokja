@@ -20,7 +20,7 @@ function renderCard(transport: Transport, locale: Locale = "en") {
 }
 
 const job = (name: string, overrides: Partial<JobState> = {}): JobState => ({
-  name, enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "", lastError: "", ...overrides,
+  name, enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "", lastError: "", lastReason: "", ...overrides,
 });
 
 const UP = {
@@ -250,7 +250,7 @@ describe("the scheduled jobs on the health card", () => {
 
     expect(screen.getByRole("switch", { name: "chave de Memes" }).textContent).toBe("Ligado");
     expect(screen.getByRole("switch", { name: "chave de Postar memes" }).textContent).toBe("Desligado");
-    screen.getByText(/a cada 6h · última execução há 2 horas: ran/);
+    screen.getByText(/a cada 6h · última execução há 2 horas: rodou/);
   });
 });
 
@@ -307,5 +307,46 @@ describe("the interfaces on the health card", () => {
     await screen.findByText("Memes");
 
     expect(screen.queryByRole("heading", { name: "Communication services" })).toBeNull();
+  });
+});
+
+describe("a job the scheduler's switch holds back", () => {
+  const SCHEDULER_OFF = { ...UP, scheduler: { status: "ok", detail: "rodando", enabled: false } };
+  const held = job("price.intake", { lastAt: minutesAgo(1), lastOutcome: "skipped", lastError: "scheduler is paused", lastReason: "scheduler_off" });
+
+  it("says why it does not run, in the screen's language, and offers to switch the scheduler on", async () => {
+    const { transport, calls } = routedTransport({
+      "ningo.status": [status(SCHEDULER_OFF, [held]), status(UP, [held])],
+      "services.set": ok({ name: "scheduler", enabled: true }),
+    });
+    renderCard(transport, "pt");
+    expect(await screen.findByText("Não rodou: a chave do Agendador está desligada.")).toBeTruthy();
+    expect(screen.getByText(/última execução .*: pulada/)).toBeTruthy();
+    // the English reason the orchestrator also sends is not shown
+    expect(screen.queryByText("scheduler is paused")).toBeNull();
+    expect(screen.getByText(/Este job está ligado, mas não roda/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ligar o Agendador" }));
+    await waitFor(() => expect(changes(calls)).toEqual([["services.set", { name: "scheduler", enabled: true }]]));
+  });
+
+  it("says nothing of the scheduler for a job that is off, or while the scheduler is on", async () => {
+    const off = job("meme.dispatch", { enabled: false, lastOutcome: "skipped", lastReason: "job_off", lastAt: minutesAgo(2) });
+    const { transport } = routedTransport({ "ningo.status": status(SCHEDULER_OFF, [off]) });
+    renderCard(transport);
+    expect(await screen.findByText("Not run: this job is switched off.")).toBeTruthy();
+    expect(screen.queryByText(/will not run while the scheduler switch is off/)).toBeNull();
+
+    const running = routedTransport({ "ningo.status": status(UP, [job("price.intake", { lastOutcome: "ran", lastAt: minutesAgo(1) })]) });
+    renderCard(running.transport);
+    expect(await screen.findByText(/last run .*: ran/)).toBeTruthy();
+  });
+
+  it("keeps the message of a run that failed", async () => {
+    const failed = job("price.intake", { lastOutcome: "error", lastError: "feeds unavailable", lastAt: minutesAgo(1) });
+    const { transport } = routedTransport({ "ningo.status": status(UP, [failed]) });
+    renderCard(transport);
+    expect(await screen.findByText("feeds unavailable")).toBeTruthy();
+    expect(screen.getByText(/last run .*: failed/)).toBeTruthy();
   });
 });

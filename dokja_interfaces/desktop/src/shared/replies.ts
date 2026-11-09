@@ -24,6 +24,8 @@ export type JobState = {
   lastAt: string;
   lastOutcome: string;
   lastError: string;
+  // why the last scheduled run was skipped, as a code the screen translates
+  lastReason: "" | "scheduler_off" | "job_off" | "service_off";
 };
 
 // The state of an interface that links to an account and, while it waits for the link, the picture

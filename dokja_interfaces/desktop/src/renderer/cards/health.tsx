@@ -174,6 +174,8 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
   const { ok, problem, off, unchecked } = health.counts;
   const summary = t("health_summary", { ok, problem, off });
   const switchableScheduler = health.rows.some((row) => row.name === "scheduler" && row.enabled !== undefined);
+  // The scheduler's own switch holds every job back, whatever the job's switch says.
+  const schedulerOff = health.rows.some((row) => row.name === "scheduler" && row.enabled === false);
   return (
     <>
       {!unified && <><div className="strip" aria-hidden="true">
@@ -217,7 +219,7 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
           <h3>{t("jobs_title")}</h3>
           <ul className="jobs">
             {health.jobs.map((job) => (
-              <JobItem key={job.name} job={job} busy={busy} onChange={onChange} />
+              <JobItem key={job.name} job={job} busy={busy} onChange={onChange} schedulerOff={schedulerOff} />
             ))}
           </ul>
         </>
@@ -441,7 +443,14 @@ function Switch({ label, on, busy, onToggle }: { label: string; on: boolean; bus
   );
 }
 
-function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChange: (change: Change) => void }) {
+const OUTCOMES: Record<string, MessageId> = { ran: "job_outcome_ran", skipped: "job_outcome_skipped", error: "job_outcome_error" };
+const REASONS: Record<Exclude<JobState["lastReason"], "">, MessageId> = {
+  scheduler_off: "job_reason_scheduler_off",
+  job_off: "job_reason_job_off",
+  service_off: "job_reason_service_off",
+};
+
+function JobItem({ job, busy, onChange, schedulerOff }: { job: JobState; busy: boolean; onChange: (change: Change) => void; schedulerOff: boolean }) {
   const t = useTranslate();
   const { ago } = useTimes();
   const start = intervalFields(job.interval);
@@ -468,12 +477,25 @@ function JobItem({ job, busy, onChange }: { job: JobState; busy: boolean; onChan
         {[
           job.interval ? t("job_every", { interval: formatInterval(job.interval) }) : "",
           job.intervalOverride ? t("job_custom") : "",
-          when ? t("job_last", { when, outcome: job.lastOutcome || "?" }) : t("job_never"),
+          when ? t("job_last", { when, outcome: OUTCOMES[job.lastOutcome] ? t(OUTCOMES[job.lastOutcome]!) : job.lastOutcome || "?" }) : t("job_never"),
         ]
           .filter((part) => part !== "")
           .join(" · ")}
       </span>
-      {job.lastError && <span className="service-detail">{job.lastError}</span>}
+      {/* A skip says why in the screen's language; an error keeps the message the run gave. */}
+      {job.lastReason ? (
+        <span className="service-detail">{t(REASONS[job.lastReason])}</span>
+      ) : (
+        job.lastError && <span className="service-detail">{job.lastError}</span>
+      )}
+      {job.enabled && schedulerOff && (
+        <span className="job-held">
+          {t("job_held_by_scheduler")}
+          <Button size="compact" disabled={busy} onClick={() => onChange({ type: "services.set", payload: { name: "scheduler", enabled: true } })}>
+            {t("job_scheduler_on")}
+          </Button>
+        </span>
+      )}
       <form className="job-interval" onSubmit={submit}>
         <input
           type="number"

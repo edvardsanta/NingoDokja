@@ -117,7 +117,7 @@ test("jobs are read when they have a name and a switch, and there are none when 
   assert.equal(health?.jobs.length, 1);
   assert.deepEqual(health?.jobs[0], {
     name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: true,
-    nextAt: "", lastAt: "2026-10-03T06:00:00Z", lastOutcome: "ran", lastError: "",
+    nextAt: "", lastAt: "2026-10-03T06:00:00Z", lastOutcome: "ran", lastError: "", lastReason: "",
   });
   assert.deepEqual(parseHealth({ status: "ok", services: {} })?.jobs, []);
 });
