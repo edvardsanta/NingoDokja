@@ -75,7 +75,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	if growable, _ := result["growable"].(bool); growable && h.feeds != nil {
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"part_number": payload["part_number"], "query": payload["query"], "limit": compareLookupLimit})
 		if err == nil {
-			items := observationItemsWithCategory(looked["observations"], categoryForProduct("", originalString(payload, "query")))
+			items := observationItemsWithCategory(looked["observations"], categoryForProduct("", payload["query"].(string)))
 			if outcome, err := h.domain.Record(ctx, items); err == nil {
 				logger.Info(fmt.Sprintf("price compare lookup event_id=%s observations=%d invalid=%d", event.EventID, outcome.Observations, len(outcome.Invalid)))
 				if result, err = ask(); err != nil {
@@ -85,7 +85,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 			}
 		}
 	}
-	if found, _ := result["found"].(bool); found && h.feeds != nil {
+	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
 		if discovered := h.discoverCompetitors(ctx, result, payload); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
@@ -116,18 +116,14 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, or
 	product, _ := result["product"].(map[string]any)
 	title, _ := product["title"].(string)
 	category, _ := product["category"].(string)
-	originalKey, _ := product["product"].(string)
-	queries := competitorQueries(category, title)
-	if len(queries) == 0 {
-		queries = competitorQueries("", originalString(original, "query"))
-	}
+	queries := h.competitorQueries(ctx, product, result["profile"], original)
 	changed := false
 	for _, query := range queries {
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"query": query, "limit": competitorLookupLimit})
 		if err != nil {
 			continue
 		}
-		items := competitorObservationItems(looked["observations"], categoryForProduct(category, title), originalKey)
+		items := observationItemsWithCategory(looked["observations"], categoryForProduct(category, title))
 		if len(items) == 0 {
 			continue
 		}
@@ -139,67 +135,42 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, or
 	return changed
 }
 
-func originalString(values map[string]any, key string) string {
-	value, _ := values[key].(string)
-	return value
-}
-
-func competitorQueries(category, title string) []string {
-	family := categoryForProduct(category, title)
-	lower := strings.ToLower(title)
-	switch family {
-	case "cpu":
-		queries := []string{"processador ryzen 7", "processador ryzen 5", "processador ryzen 9", "processador intel core i7"}
-		if strings.Contains(lower, "intel") {
-			queries = []string{"processador intel core i5", "processador intel core i7", "processador intel core i9", "processador ryzen 7"}
-		}
-		return uniqueQueries(queries, lower)
-	case "gpu":
-		return uniqueQueries([]string{"placa de video radeon", "placa de video geforce", "placa de video intel arc", "placa de video"}, lower)
-	case "storage":
-		return uniqueQueries([]string{"ssd sata", "ssd nvme", "hd sata iii", "ssd"}, lower)
-	case "mobile":
-		return uniqueQueries([]string{"smartphone samsung", "smartphone motorola", "smartphone xiaomi", "smartphone apple"}, lower)
-	case "display":
-		return uniqueQueries([]string{"monitor gamer", "monitor 144hz", "monitor 165hz", "monitor ips"}, lower)
-	default:
+func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any, original map[string]any) []string {
+	facts, err := json.Marshal(map[string]any{
+		"product":      product,
+		"profile":      profile,
+		"budget_cents": original["budget_cents"],
+	})
+	if err != nil {
 		return nil
 	}
-}
-
-func uniqueQueries(queries []string, original string) []string {
+	reply, err := h.commenter.GenerateMessages(ctx, []map[string]string{
+		{"role": "system", "content": competitorDiscoveryInstructions},
+		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
+	})
+	if err != nil {
+		return nil
+	}
+	text, _ := reply["reply"].(string)
+	var proposal struct {
+		Queries []string `json:"queries"`
+	}
+	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(text)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&proposal); err != nil || len(proposal.Queries) == 0 || len(proposal.Queries) > maxCompetitorQueries {
+		return nil
+	}
 	seen := map[string]bool{}
-	out := make([]string, 0, maxCompetitorQueries)
-	for _, query := range queries {
+	queries := make([]string, 0, len(proposal.Queries))
+	for _, query := range proposal.Queries {
 		query = strings.TrimSpace(query)
-		normalizedQuery := strings.ReplaceAll(strings.ToLower(query), "processador ", "")
-		if query == "" || strings.Contains(original, normalizedQuery) || seen[query] {
+		if query == "" || len(query) > 100 || strings.Contains(query, "://") || seen[strings.ToLower(query)] {
 			continue
 		}
-
-		seen[query] = true
-		out = append(out, query)
-		if len(out) == maxCompetitorQueries {
-			break
-		}
+		seen[strings.ToLower(query)] = true
+		queries = append(queries, query)
 	}
-	return out
-}
-
-func competitorObservationItems(raw any, category, originalKey string) []any {
-	observations, _ := raw.([]any)
-	filtered := make([]any, 0, len(observations))
-	for _, observation := range observations {
-		values, ok := observation.(map[string]any)
-		if !ok {
-			continue
-		}
-		if key, _ := values["product"].(string); key == originalKey {
-			continue
-		}
-		filtered = append(filtered, observation)
-	}
-	return observationItemsWithCategory(filtered, category)
+	return queries
 }
 
 func categoryForProduct(category, title string) string {
@@ -249,6 +220,9 @@ func (h *PriceDomainHandler) persistDecision(ctx context.Context, event core.Eve
 	product.Category, _ = productRaw["category"].(string)
 	product.Brand, _ = productRaw["brand"].(string)
 	product.PartNumber, _ = productRaw["part_number"].(string)
+	if specifications, ok := productRaw["specifications"].(map[string]any); ok {
+		product.Specifications = specifications
+	}
 	var decision pricedomain.Decision
 	encoded, err := json.Marshal(result["decision"])
 	if err != nil {
@@ -319,6 +293,17 @@ moment to buy, and where. Use only these facts. Never write a price or number th
 and do not list every store: the person sees the table. If the decision says over_budget or
 seek_alternative, do not say "buy now"; explain that the current offer does not fit the budget.
 If the facts do not support a recommendation, say so plainly.`
+
+const competitorDiscoveryInstructions = `You are a product discovery planner. Return only valid JSON in this exact shape:
+{"queries":["..."]}.
+
+Create at most four short Brazilian Portuguese search queries for products that could solve the same
+use case as the supplied product. Use only functional category terms and explicit specifications
+present in FACTS, such as capacity, interface, socket, cores, threads, screen size or refresh rate.
+Do not use manufacturer names, brands, logos, model names, part numbers, invented benchmarks or
+unsupported specifications. Do not repeat the original product query. The queries are search hints,
+not evidence of equivalence; the stores and the deterministic comparison engine provide the evidence.
+If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
 // the comparison stands on its own.

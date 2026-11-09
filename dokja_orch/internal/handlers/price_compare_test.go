@@ -40,12 +40,18 @@ func (r *compareResolver) Dispatch(_ context.Context, _ string, payload map[stri
 type fakeCommenter struct {
 	messages [][]map[string]string
 	reply    string
+	replies  []string
 	err      error
 }
 
 func (c *fakeCommenter) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	c.messages = append(c.messages, messages)
-	return map[string]any{"reply": c.reply}, c.err
+	reply := c.reply
+	if len(c.replies) > 0 {
+		reply = c.replies[0]
+		c.replies = c.replies[1:]
+	}
+	return map[string]any{"reply": reply}, c.err
 }
 
 func offerObservation(product, part, merchant string, kind string, price string) map[string]any {
@@ -84,14 +90,14 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 			offerObservation("pn:xy650ss-240gt-r", "XY650SS-240GT-R", "store-b", "unknown", "119.90"),
 		},
 	}
-	commenter := &fakeCommenter{reply: "Compre na store-b, plebeu."}
+	commenter := &fakeCommenter{replies: []string{`{"queries":[]}`, "Compre na store-b, plebeu."}}
 	handler, _ := compareHandler(resolver, commenter)
 
 	got := runCompare(t, handler, true, map[string]any{"link": "https://store-z.example/produto/10527/ssd-example"})
 	if got["found"] != true || got["looked_up"] != true || got["comment"] != "Compre na store-b, plebeu." {
 		t.Fatalf("result %v", got)
 	}
-	if strings.Join(resolver.actions, ",") != "identify,lookup,lookup,lookup,lookup" || resolver.inputs[1]["part_number"] != "XY650SS-240GT-R" {
+	if strings.Join(resolver.actions, ",") != "identify,lookup" || resolver.inputs[1]["part_number"] != "XY650SS-240GT-R" {
 		t.Fatalf("actions %v inputs %v", resolver.actions, resolver.inputs)
 	}
 	offers := got["offers"].([]any)
@@ -102,9 +108,10 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 		t.Fatalf("link %v", got["link"])
 	}
 	// the comment is written from the facts, marked as data, with the persona
-	user := commenter.messages[0][1]["content"]
-	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(commenter.messages[0][0]["content"], chatPersona) {
-		t.Fatalf("comment prompt %v", commenter.messages[0])
+	comment := commenter.messages[len(commenter.messages)-1]
+	user := comment[1]["content"]
+	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(comment[0]["content"], chatPersona) {
+		t.Fatalf("comment prompt %v", comment)
 	}
 }
 
@@ -135,16 +142,17 @@ func TestCompareAnswersAnUnknownLinkWithoutGuessing(t *testing.T) {
 
 }
 
-func TestCompetitorQueriesCoverOtherCPUFamilies(t *testing.T) {
-	queries := competitorQueries("processador", "AMD Ryzen 7 9700X")
-	joined := strings.Join(queries, "|")
-	for _, want := range []string{"processador ryzen 5", "processador ryzen 9", "processador intel core i7"} {
-		if !strings.Contains(joined, want) {
-			t.Fatalf("queries %v do not include %q", queries, want)
-		}
-	}
-	if strings.Contains(joined, "processador ryzen 7") {
-		t.Fatalf("original family should not be queried again: %v", queries)
+func TestCompetitorQueriesComeFromStructuredProviderOutput(t *testing.T) {
+	handler, _ := compareHandler(&compareResolver{}, &fakeCommenter{
+		reply: `{"queries":["processador 8 cores 16 threads am5","processador 6 cores 12 threads am5"]}`,
+	})
+	queries := handler.competitorQueries(context.Background(), map[string]any{
+		"title": "Processador 8 cores 16 threads", "category": "cpu",
+		"specifications": map[string]any{"cores": float64(8), "threads": float64(16), "socket": "am5"},
+	}, map[string]any{"id": "cpu"}, map[string]any{"budget_cents": int64(190000)})
+	assert := strings.Join(queries, "|")
+	if !strings.Contains(assert, "8 cores 16 threads") || strings.Contains(assert, "ryzen") || strings.Contains(assert, "intel") {
+		t.Fatalf("queries %v", queries)
 	}
 }
 
