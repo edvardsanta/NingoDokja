@@ -253,6 +253,13 @@ The overlay starts the server with `--no-language-probabilities`. Without it,
 `verbose_json` runs an extra language-detection pass that doubles the time per
 segment (about 1.5 s to 3 s with large-v3-turbo on an RX 6600).
 
+A laugh is written `kkkk`, the way the group writes it. A segment made only of laugh
+syllables ("Hehehe", "ha ha", "ahahah", "kkk", "rsrs", "huehue") or a sound tag
+(`*laughs*`, "(risos)") becomes `kkkk`, once per laugh. Words such as "E aí" or "Ah!"
+are never rewritten. This is a text rule (`laughter.py`) and applies to both STT
+providers. A Whisper prompt asking for `kkkk` was tested and rejected: it turned pure
+noise into "Kkkk" and made real laughs loop.
+
 Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
 if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects
 `DOKJA_VOICE_STT_PROVIDER=whisper_cpp` and the internal

@@ -13,6 +13,7 @@ import wave
 import numpy as np
 
 from audio_utils import wav_bytes_to_mono_16k
+from laughter import LAUGHTER, with_laughter
 from speech_activity import SpeechDetector
 
 
@@ -48,7 +49,7 @@ def _transcript(result: object) -> tuple[str, int, int, float, float]:
         text = result.get("text")
         if not isinstance(text, str) or len(text) > 16000:
             raise ValueError("invalid transcription response")
-        return text, 1, 0, 0.0, 1.0
+        return with_laughter(text), 1, 0, 0.0, 1.0
     kept, dropped, lowest_logprob, lowest_word = [], 0, 0.0, 1.0
     for segment in segments:
         if not isinstance(segment, dict):
@@ -56,7 +57,10 @@ def _transcript(result: object) -> tuple[str, int, int, float, float]:
         confident, logprob, word = _confident(segment)
         lowest_logprob, lowest_word = min(lowest_logprob, logprob), min(lowest_word, word)
         if confident:
-            kept.append(segment["text"].strip())
+            text = with_laughter(segment["text"].strip())
+            # One laugh is one kkkk, however many segments it spans.
+            if not (text == LAUGHTER and kept and kept[-1] == LAUGHTER):
+                kept.append(text)
         else:
             dropped += 1
     text = " ".join(kept)
