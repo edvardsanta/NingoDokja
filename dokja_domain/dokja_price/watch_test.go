@@ -10,13 +10,13 @@ import (
 
 func TestAnObservationCarriesItsDescriptionAndOfferPage(t *testing.T) {
 	text := body(t, []map[string]any{point(day(0), "10")}, func(m map[string]any) {
-		m["category"], m["brand"], m["part_number"], m["url"] = " SSD  SATA ", "Samsung", "MZ-77E1T0B", "https://store.example/p/1"
+		m["category"], m["brand"], m["part_number"], m["url"] = " SSD  SATA ", "Brandx", "AB-1000X1", "https://store.example/p/1"
 	})
 	got, err := ParseObservation(text, today)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Category != "SSD SATA" || got.Brand != "Samsung" || got.PartNumber != "MZ-77E1T0B" || got.URL != "https://store.example/p/1" {
+	if got.Category != "SSD SATA" || got.Brand != "Brandx" || got.PartNumber != "AB-1000X1" || got.URL != "https://store.example/p/1" {
 		t.Fatalf("observation %+v", got)
 	}
 	for _, bad := range []string{"ftp://store.example/p", "/relative", "https://user:secret@store.example/p", "https://"} {
@@ -37,18 +37,18 @@ func describedObservation(product, merchant, brand, address string, cents int64)
 func TestTheRepositoryKeepsTheLatestNonEmptyDescriptionAndPagePerOffer(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
-	repo.Upsert(ctx, describedObservation("mz-77e1t0b", "store-a", "samsung", "https://a.example/1", 100))
-	later := describedObservation("mz-77e1t0b", "store-a", "", "", 90)
+	repo.Upsert(ctx, describedObservation("ab-1000x1", "store-a", "brandx", "https://a.example/1", 100))
+	later := describedObservation("ab-1000x1", "store-a", "", "", 90)
 	later.Category = ""
 	repo.Upsert(ctx, later)
-	repo.Upsert(ctx, describedObservation("mz-77e1t0b", "store-b", "samsung", "https://b.example/1", 95))
+	repo.Upsert(ctx, describedObservation("ab-1000x1", "store-b", "brandx", "https://b.example/1", 95))
 
 	products, _ := repo.Products(ctx)
-	if len(products) != 1 || products[0].Brand != "samsung" || products[0].Category != "ssd sata" {
+	if len(products) != 1 || products[0].Brand != "brandx" || products[0].Category != "ssd sata" {
 		t.Fatalf("an empty description must not erase a known one: %+v", products)
 	}
-	urls, _ := repo.OfferURLs(ctx, "mz-77e1t0b")
-	if len(urls) != 2 || urls[Key{Product: "mz-77e1t0b", Merchant: "store-b", Series: SeriesMerchant, Kind: KindPix}] != "https://b.example/1" {
+	urls, _ := repo.OfferURLs(ctx, "ab-1000x1")
+	if len(urls) != 2 || urls[Key{Product: "ab-1000x1", Merchant: "store-b", Series: SeriesMerchant, Kind: KindPix}] != "https://b.example/1" {
 		t.Fatalf("urls %v", urls)
 	}
 }
@@ -56,16 +56,16 @@ func TestTheRepositoryKeepsTheLatestNonEmptyDescriptionAndPagePerOffer(t *testin
 func TestSearchFiltersByStoreAndBrandAndHandsBackPages(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
-	repo.Upsert(ctx, describedObservation("ssd-a", "store-a", "samsung", "https://a.example/a", 100))
-	repo.Upsert(ctx, describedObservation("ssd-a", "store-b", "samsung", "https://b.example/a", 90))
-	repo.Upsert(ctx, describedObservation("ssd-b", "store-b", "kingston", "https://b.example/b", 80))
+	repo.Upsert(ctx, describedObservation("ssd-a", "store-a", "brandx", "https://a.example/a", 100))
+	repo.Upsert(ctx, describedObservation("ssd-a", "store-b", "brandx", "https://b.example/a", 90))
+	repo.Upsert(ctx, describedObservation("ssd-b", "store-b", "brandy", "https://b.example/b", 80))
 	// a product with no brand from its collector still matches by its title
 	untagged := describedObservation("ssd-c", "store-a", "", "", 70)
-	untagged.Title = "SSD Samsung Old"
+	untagged.Title = "SSD Brandx Old"
 	repo.Upsert(ctx, untagged)
 	domain := New(repo).WithClock(func() time.Time { return today })
 
-	got, err := domain.SearchProducts(ctx, Search{Query: "ssd", Brand: "samsung"})
+	got, err := domain.SearchProducts(ctx, Search{Query: "ssd", Brand: "brandx"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestSearchFiltersByStoreAndBrandAndHandsBackPages(t *testing.T) {
 	}
 	mapped := onlyB.Map()["products"].([]any)[0].(map[string]any)
 	row := mapped["assessments"].([]any)[0].(map[string]any)
-	if row["url"] != "https://b.example/a" || mapped["brand"] != "samsung" || mapped["category"] != "ssd sata" {
+	if row["url"] != "https://b.example/a" || mapped["brand"] != "brandx" || mapped["category"] != "ssd sata" {
 		t.Fatalf("mapped %v", mapped)
 	}
 	if _, err := domain.SearchProducts(ctx, Search{Merchant: "Not A Key"}); err == nil {
@@ -109,24 +109,24 @@ func TestOnlyTheOwnerGrowsTheWatchedSearches(t *testing.T) {
 		return watch["status"]
 	}
 
-	if got := searchAs(t, domain, "discord", false, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"}); status(got) != "not_owner" {
+	if got := searchAs(t, domain, "discord", false, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Brandx"}); status(got) != "not_owner" {
 		t.Fatalf("a guest grew the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"}); status(got) != "added" {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "SSD Sata", "brand": "Brandx"}); status(got) != "added" {
 		t.Fatalf("the owner did not grow the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "ssd   SATA", "brand": "samsung"}); status(got) != "watched" {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "query": "ssd   SATA", "brand": "brandx"}); status(got) != "watched" {
 		t.Fatalf("the same search, written differently, was added twice: %v", got["watch"])
 	}
 	if got := searchAs(t, domain, "desktop", false, map[string]any{"watch": true, "query": "hd", "brand": ""}); status(got) != "added" {
 		t.Fatalf("the operator at the Desktop may grow the list: %v", got["watch"])
 	}
-	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "brand": "amd"}); got["watch"] != nil {
+	if got := searchAs(t, domain, "discord", true, map[string]any{"watch": true, "brand": "brandz"}); got["watch"] != nil {
 		t.Fatalf("a brand without a category is not a store query: %v", got["watch"])
 	}
 
 	list, _ := domain.Handle(context.Background(), Request{Action: ActionListWatches, Event: Event{}})
-	want := []any{map[string]any{"category": "hd", "brand": ""}, map[string]any{"category": "ssd sata", "brand": "samsung"}}
+	want := []any{map[string]any{"category": "hd", "brand": ""}, map[string]any{"category": "ssd sata", "brand": "brandx"}}
 	if !reflect.DeepEqual(list["watches"], want) {
 		t.Fatalf("watches %v", list["watches"])
 	}
@@ -157,12 +157,12 @@ func TestTheWatchedSearchesStopAtTheirLimit(t *testing.T) {
 func TestTheCollectorIsToldWhichProductsLackAMarketHistory(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
-	repo.Upsert(ctx, describedObservation("ssd-a", "store-a", "samsung", "", 100))
-	repo.Upsert(ctx, describedObservation("ssd-b", "store-a", "samsung", "", 100))
+	repo.Upsert(ctx, describedObservation("ssd-a", "store-a", "brandx", "", 100))
+	repo.Upsert(ctx, describedObservation("ssd-b", "store-a", "brandx", "", 100))
 	market := describedObservation("ssd-b", "aggregator", "", "", 90)
 	market.Series, market.Kind = SeriesMarketMin, KindUnknown
 	repo.Upsert(ctx, market)
-	repo.Upsert(ctx, describedObservation("ssd-c", "store-a", "samsung", "", 100))
+	repo.Upsert(ctx, describedObservation("ssd-c", "store-a", "brandx", "", 100))
 	domain := New(repo)
 
 	missing, err := domain.MissingMarket(ctx, 5)

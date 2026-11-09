@@ -87,7 +87,7 @@ test("preco sends a price search with its words and replies with cards", async (
     const replies: Array<{ message: unknown; ephemeral?: boolean }> = [];
     await createPriceCommand("http://orch", 1000, "pt-BR").handle({
       userId: "u", channelId: "c", messageId: "m", guildId: "g",
-      getString: (name: string) => ({ produto: "hd", marca: "wd" } as Record<string, string>)[name] ?? "",
+      getString: (name: string) => ({ produto: "hd", marca: "brandv" } as Record<string, string>)[name] ?? "",
       getNumber: () => undefined,
       reply: async (message, opts) => { replies.push({ message, ephemeral: opts?.ephemeral }); },
       updateReply: async () => {},
@@ -95,10 +95,10 @@ test("preco sends a price search with its words and replies with cards", async (
     });
     assert.equal(sent.event_type, "price.search");
     assert.equal(sent.payload.query, "hd");
-    assert.equal(sent.payload.brand, "wd");
+    assert.equal(sent.payload.brand, "brandv");
     assert.equal(replies.length, 1);
     assert.equal(embedsOf(replies[0].message)[0].title, "HD Example 2TB");
-    assert.match((replies[0].message as { content: string }).content, /\*\*hd wd\*\*/);
+    assert.match((replies[0].message as { content: string }).content, /\*\*hd brandv\*\*/);
     assert.equal(replies[0].ephemeral, true);
   } finally {
     globalThis.fetch = originalFetch;
@@ -141,9 +141,9 @@ test("each source links to its store page and the card title links to the cheape
 });
 
 test("a search the owner starts to watch says so, even before its products arrive", () => {
-  const added = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "added" } };
-  assert.match(String(buildPriceReply(added, "pt-BR")), /Passei a vigiar \*\*ssd sata · samsung\*\*/);
-  const guest = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "not_owner" } };
+  const added = { products: [], matched: 0, watch: { category: "ssd sata", brand: "brandx", status: "added" } };
+  assert.match(String(buildPriceReply(added, "pt-BR")), /Passei a vigiar \*\*ssd sata · brandx\*\*/);
+  const guest = { products: [], matched: 0, watch: { category: "ssd sata", brand: "brandx", status: "not_owner" } };
   assert.equal(buildPriceReply(guest, "pt-BR"), "Nenhum produto da watchlist corresponde a essa busca.");
   const withProducts = { ...result, watch: { category: "hd", status: "added" } };
   assert.match((buildPriceReply(withProducts, "en") as { content: string }).content, /^👁️ Now watching \*\*hd\*\*/);

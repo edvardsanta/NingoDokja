@@ -141,7 +141,7 @@ export function parsePriceWatches(value: unknown): PriceWatches | Off | undefine
   return { watches, limit: typeof value.limit === "number" ? value.limit : 0 };
 }
 
-// "ssd sata · samsung", as a watched search reads.
+// "ssd sata · brandx", as a watched search reads.
 export function watchLabel(watch: { category: string; brand: string }): string {
   return [watch.category, watch.brand].filter(Boolean).join(" · ");
 }
