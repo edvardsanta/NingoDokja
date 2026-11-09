@@ -225,15 +225,19 @@ func main() {
 	priceRepository, closePriceHistory := configurePriceHistory(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
 	defer closePriceHistory()
 	priceDomain := pricedomain.New(priceRepository)
-	competitorCache, err := competitorcache.Open(competitorcache.PathBeside(sharedPath))
-	if err != nil {
-		logger.Error("open competitor query cache", err)
-		os.Exit(1)
+	var competitorCache *competitorcache.Store
+	if opened, cacheErr := competitorcache.Open(competitorcache.PathBeside(sharedPath)); cacheErr != nil {
+		logger.Error("open competitor query cache; continuing without cache", cacheErr)
+	} else {
+		competitorCache = opened
+		defer competitorCache.Close()
 	}
-	defer competitorCache.Close()
 	priceHandler := handlers.NewPriceDomainHandler(priceDomain, handlers.NewPriceIntakeTask(
 		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
-	)).WithCommenter(clients.NewChatProviderClient("")).WithCompetitorQueryCache(competitorCache)
+	)).WithCommenter(clients.NewChatProviderClient(""))
+	if competitorCache != nil {
+		priceHandler.WithCompetitorQueryCache(competitorCache)
+	}
 	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
 	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an
 	// earlier process left unsettled.
