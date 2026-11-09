@@ -189,3 +189,34 @@ func TestASearchWithoutAskingToWatchLeavesTheListAlone(t *testing.T) {
 		t.Fatalf("watches %v", list)
 	}
 }
+
+func TestTheCollectorIsGivenTheKnownMarketPagesStalestFirst(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	market := func(product, page, on string) {
+		o := describedObservation(product, "aggregator", "", page, 100)
+		o.Series, o.Kind, o.Points = SeriesMarketMin, KindUnknown, []Point{{On: on, Cents: 100}}
+		repo.Upsert(ctx, o)
+	}
+	market("ssd-fresh", "https://market.example/fresh", day(-1))
+	market("ssd-stale", "https://market.example/stale", day(-9))
+	market("ssd-no-page", "", day(-3))
+	repo.Upsert(ctx, describedObservation("ssd-store-only", "store-a", "", "https://store.example/p", 100))
+	domain := New(repo)
+
+	pages, err := domain.MarketPages(ctx, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, page := range pages {
+		got = append(got, page.Product.Key+"="+page.Page)
+	}
+	want := []string{"ssd-stale=https://market.example/stale", "ssd-fresh=https://market.example/fresh"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("pages %v, want %v", got, want)
+	}
+	if one, _ := domain.MarketPages(ctx, 1); len(one) != 1 || one[0].Product.Key != "ssd-stale" {
+		t.Fatalf("limit %+v", one)
+	}
+}

@@ -258,3 +258,24 @@ func TestPriceHandlerPassesTheOwnerMarkToTheDomain(t *testing.T) {
 		t.Fatalf("the owner: %v", got)
 	}
 }
+
+func TestPriceIntakeHandsTheKnownMarketPagesBack(t *testing.T) {
+	resolver := &fakeResolver{extra: []any{map[string]any{
+		"contract": pricedomain.ContractVersion, "product": "found-hd", "title": "Found hd", "merchant": "aggregator",
+		"series": "market_min", "price_kind": "unknown", "currency": "BRL", "url": "https://market.example/found-hd",
+		"points": []any{map[string]any{"on": time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02"), "price": json.Number("400")}},
+	}}}
+	task := NewPriceIntakeTask(resolver, watchedDomain(t, pricedomain.Watch{Category: "hd"}), nil)
+	task.run(context.Background(), core.Event{EventID: "e1"}, nil)
+	task.run(context.Background(), core.Event{EventID: "e2"}, nil)
+	market, _ := resolver.inputs[1]["market"].([]any)
+	var pages []string
+	for _, raw := range market {
+		if page, _ := raw.(map[string]any)["page"].(string); page != "" {
+			pages = append(pages, page)
+		}
+	}
+	if !reflect.DeepEqual(pages, []string{"https://market.example/found-hd"}) {
+		t.Fatalf("pages %v in %v", pages, market)
+	}
+}

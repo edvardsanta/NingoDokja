@@ -102,11 +102,17 @@ Thresholds are constants in `assess.go`, in basis points:
   job, it can be switched off or given another interval through the controls;
   no variable was added.
 - **Intake task (collection by watched search).** A typed task in three steps:
-  - plan: the domain's watched searches, or the one the owner just added, and
-    up to 5 products that lack a market history;
+  - plan: the domain's watched searches, or the one the owner just added; up
+    to 10 products that lack a market history, for the collector to look up;
+    and up to 40 known market pages, the least recently seen first, for it to
+    read again for today's store offers and market history;
   - collect: `feeds.invoke` with `price.resolve.v1`, action `search`, input
     `{searches: [{category, brand}], limit: 30, market: [{product, title,
-    part_number}]}`; the plugin answers `{observations: [...]}`;
+    part_number, page?}]}`; the plugin answers `{observations: [...]}`. A
+    market history carries its market page as `url`; the domain keeps it per
+    history and hands it back as `page`, so a page is found once and then
+    refreshed. Store offers read from that page become one `merchant` history
+    per store;
   - record: each observation goes to `record-price-observations` as an item
     body, the one shape the domain validates.
 
