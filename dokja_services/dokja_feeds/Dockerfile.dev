@@ -48,7 +48,7 @@ RUN case "$FEEDS_PLUGIN_BROWSER" in \
       none) ;; \
       chromium) { [ -d /opt/feeds-plugins ] || python3 -m venv --system-site-packages /opt/feeds-plugins; } \
         && /opt/feeds-plugins/bin/pip install --no-cache-dir playwright==1.49.1 \
-        && /opt/feeds-plugins/bin/playwright install --with-deps chromium \
+        && /opt/feeds-plugins/bin/playwright install --with-deps --only-shell chromium \
         && rm -rf /var/lib/apt/lists/* ;; \
       *) exit 2 ;; \
     esac
