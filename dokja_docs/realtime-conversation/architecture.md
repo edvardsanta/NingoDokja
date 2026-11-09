@@ -48,7 +48,7 @@ observations. No event-envelope field, route, or storage schema changes.
 
 The Discord interface exposes `/conversation_start` and `/conversation_stop` for a silent
 observer. `realtime.start` takes an optional `mode`, either `observer` (the default) or `voice_chat`.
-`/voice_chat_start` and `/wake_chat` open a `voice_chat` journal and mirror what their listener
+`/voice_chat_start`, in either mode, opens a `voice_chat` journal and mirrors what its listener
 transcribes into it, without changing reply generation. The snapshot carries each session's `mode`.
 In a `voice_chat` journal, Ningo's spoken reply is one line with `role: "ningo"`, placed after
 the turn it answers and revised as each sentence starts playing. Only the orchestrator sets the

@@ -29,9 +29,9 @@ Current capabilities:
 
 ## Music
 
-`/play song:<words or a link>`, `/skip`, `/pause`, `/resume`, `/stop`, `/queue`, `/history` and
-`/volume percent:<0-100>` send `music.*` events through the bridge, from the channel they were
-typed in, so the server and allowed-channel checks apply. The orchestrator keeps the queue; every
+`/play song:<words or a link>`, `/queue` and `/history`, and the player panel's buttons (pause,
+resume, skip, stop and volume steps), send `music.*` events through the bridge, from the channel
+they were used in, so the server and allowed-channel checks apply. The orchestrator keeps the queue; every
 music reply carries it (`music` in the bridge response, with an `epoch` and a `version`), and the
 adapter plays what it says, ignoring a reply older than the last one it applied.
 
@@ -109,14 +109,31 @@ Relevant files:
 
 ### Slash Commands
 
-Current commands:
+Each command has an English base name and description, and a Portuguese translation that
+Discord shows to people whose client is in Portuguese (`/price` reads `/preco`). Interactions
+always carry the base names, so handlers read options by them. All names, descriptions and the
+adapter's own replies live in [messages/commands.ts](../dokja_services/dokja_discord/messages/commands.ts);
+replies follow `DOKJA_DISCORD_LOCALE`.
 
-- `/chat`
-- `/meme_fetch`
-- `/meme_status`
-- `/meme_refresh`
-- `/ningo_panel`
-- `/chat_modal`
+| Command | Portuguese |
+| --- | --- |
+| `/chat prompt` | `/conversar mensagem` |
+| `/meme_fetch limit` | `/buscar_meme quantidade` |
+| `/meme_refresh max_items` | `/atualizar_memes max_itens` |
+| `/speak prompt` | `/falar texto` |
+| `/voice_chat_start mode` (always or wake word) | `/conversa_voz modo` |
+| `/voice_chat_stop` | `/parar_conversa_voz` |
+| `/play_radio url` | `/tocar_radio url` |
+| `/stop_radio` | `/parar_radio` |
+| `/ningo_panel` | `/painel_ningo` |
+| `/conversation_start`, `/conversation_stop` | `/iniciar_transcricao`, `/parar_transcricao` |
+| `/play song`, `/queue`, `/history` | `/tocar musica`, `/fila`, `/historico` |
+| `/price product brand store` | `/preco produto marca loja` |
+| `/compare_product product link` | `/comparar_produto produto link` |
+| `/political_test link` | `/teste_politico link` |
+
+The music player's buttons pause, resume, skip, stop and change the volume, and the Ningo
+panel's buttons show the status, fetch a meme, open the chat prompt and stop the radio.
 
 Relevant files:
 

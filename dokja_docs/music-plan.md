@@ -140,7 +140,8 @@ plays only pages the orchestrator gave it. This adds no container, port or volum
    `umutxyp/MusicBot` is used). yt-dlp uses the image's node for pages that run
    JavaScript. Details in [the Discord interface](discord-interface.md#music).
 4. **Commands (built).** `/play`, `/skip`, `/pause`, `/resume`, `/stop`,
-   `/queue` and `/volume` on Discord. By voice through the existing voice
+   `/queue` and `/volume` on Discord (the player panel's buttons later
+   replaced `/skip`, `/pause`, `/resume`, `/stop` and `/volume`). By voice through the existing voice
    conversation, and desktop or CLI controls, can follow.
 5. **Memory (built).** When a song leaves the queue it becomes an experience of
    the person who asked for it: action `music.listen:<user id>`, the song as the
