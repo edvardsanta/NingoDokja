@@ -206,6 +206,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "intake-price"
 		case "price.assess":
 			return "assess-price"
+		case "price.search":
+			return "search-prices"
 		default:
 			return "handle-price-event"
 		}

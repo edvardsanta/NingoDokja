@@ -54,6 +54,8 @@ type BridgePayload struct {
 	MentionedUserIDs    []string               `json:"mentionedUserIds"`
 	Limit               *int                   `json:"limit"`
 	MaxItems            *int                   `json:"maxItemsPerScraper"`
+	Query               string                 `json:"query"` // price.search words
+	Brand               string                 `json:"brand"` // price.search brand
 	UserID              string                 `json:"userId"`
 	UserName            string                 `json:"userName"`
 	ChannelID           string                 `json:"channelId"`
@@ -84,6 +86,8 @@ type BridgeResponse struct {
 	Attachments      []chat.Attachment `json:"attachments,omitempty"`
 	// Music is a server's queue after a music command, for the interface that plays it.
 	Music map[string]any `json:"music,omitempty"`
+	// Price is a price search's result, for the interface to render in its own language.
+	Price map[string]any `json:"price,omitempty"`
 }
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
@@ -235,6 +239,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Notice:           notice,
 		Attachments:      extractChatAttachments(result),
 		Music:            extractBridgeMusic(result),
+		Price:            extractBridgePrice(result),
 		Voice:            extractBridgeVoice(result),
 		Realtime:         extractBridgeRealtime(result),
 	})
@@ -285,6 +290,16 @@ func extractBridgeMusic(result core.ProcessResult) map[string]any {
 	communicationsResult, _ := result.Result[string(core.DomainCommunications)].(map[string]any)
 	music, _ := communicationsResult["music"].(map[string]any)
 	return music
+}
+
+// extractBridgePrice hands a price search's result back to the interface, which renders it with
+// its own translations; the bridge writes no prices into the reply text.
+func extractBridgePrice(result core.ProcessResult) map[string]any {
+	if strings.TrimSpace(result.Event.Type) != "price.search" {
+		return nil
+	}
+	price, _ := result.Result[string(core.DomainPrice)].(map[string]any)
+	return price
 }
 
 // authorize checks the bearer token every bridge route requires; it answers the status to send when
@@ -614,6 +629,10 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "meme.pool.refresh", payload
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
+	case "price.search":
+		return "price.search", map[string]any{
+			"query": strings.TrimSpace(request.Payload.Query), "brand": strings.TrimSpace(request.Payload.Brand),
+		}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":
