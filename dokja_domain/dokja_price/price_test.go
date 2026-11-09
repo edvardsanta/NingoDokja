@@ -135,9 +135,11 @@ func TestMemoryRepositoryUpsertIsIdempotentAndLatestWins(t *testing.T) {
 	if written, _ := repo.Upsert(ctx, first); written != 2 {
 		t.Fatalf("first write %d", written)
 	}
+
 	if written, _ := repo.Upsert(ctx, first); written != 0 {
 		t.Fatalf("repeated write %d", written)
 	}
+
 	later := first
 	later.Points = []Point{{On: day(0), Cents: 80}}
 	if written, _ := repo.Upsert(ctx, later); written != 1 {
@@ -156,6 +158,28 @@ func TestMemoryRepositoryUpsertIsIdempotentAndLatestWins(t *testing.T) {
 	}
 	if bounded, _ := repo.History(ctx, first.Key(), day(0), day(0)); len(bounded) != 1 {
 		t.Fatalf("bounded %+v", bounded)
+	}
+}
+
+func TestMemoryRepositoryScopesDecisionMemoryByUserAndProduct(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	for _, item := range []DecisionMemory{
+		{ID: "one", UserID: "u1", Product: Product{Key: "pn:a"}},
+		{ID: "two", UserID: "u2", Product: Product{Key: "pn:a"}},
+		{ID: "three", UserID: "u1", Product: Product{Key: "pn:b"}},
+		{ID: "four", UserID: "u1", Product: Product{Key: "pn:a"}},
+	} {
+		if err := repo.SaveDecision(ctx, item); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := repo.RecentDecisions(ctx, "u1", "pn:a", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != "four" || got[1].ID != "one" {
+		t.Fatalf("got %+v", got)
 	}
 }
 

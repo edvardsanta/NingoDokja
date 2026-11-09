@@ -213,6 +213,19 @@ test("a comparison says when it found several, nothing, or an unknown link's sto
   assert.equal(buildCompareReply({ found: false, candidates: [], link: { known: false } }, "pt-BR"), "Não reconheço a loja desse link.");
 });
 
+test("a comparison renders current alternative candidates with cautious labels", () => {
+  const reply = buildCompareReply({
+    ...compared,
+    alternatives: [
+      { product: "pn:other", title: "SSD Example 2TB", classification: "within_budget", price_cents: 15990 },
+      { product: "pn:third", title: "SSD Example 4TB", classification: "same_category_candidate", price_cents: 19990 },
+    ],
+  }, "pt-BR") as { content: string };
+  assert.match(reply.content, /Candidatos encontrados com os dados atuais:/);
+  assert.match(reply.content, /SSD Example 2TB — dentro do orçamento · R\$\s*159,90/);
+  assert.match(reply.content, /SSD Example 4TB — mesma categoria; equivalência técnica não confirmada/);
+});
+
 test("compare_product sends the words and the link, and asks for something when given nothing", async () => {
   const originalFetch = globalThis.fetch;
   const sent: any[] = [];
@@ -226,6 +239,7 @@ test("compare_product sends the words and the link, and asks for something when 
       userId: "u", channelId: "c", messageId: "m", getString: (name: string) => values[name] ?? "", getNumber: () => undefined,
       reply: async (message) => { replies.push(message); }, updateReply: async () => {}, showModal: async () => {},
     });
+
     await run({});
     assert.equal(replies[0], "Mande o nome, o código ou o link do produto.");
     assert.equal(sent.length, 0);
@@ -236,6 +250,14 @@ test("compare_product sends the words and the link, and asks for something when 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("a comparison warns when the deterministic decision is over budget", () => {
+  const reply = buildCompareReply({
+    ...compared,
+    decision: { action: "seek_alternative" },
+  }, "pt-BR") as { content: string };
+  assert.match(reply.content, /ultrapassa o orçamento informado/);
 });
 
 test("a new watch the orchestrator already collected says so, with or without products", () => {

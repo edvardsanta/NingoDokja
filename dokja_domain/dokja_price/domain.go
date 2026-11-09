@@ -57,6 +57,22 @@ type Domain struct {
 	now        func() time.Time
 }
 
+// SaveDecision persists an auditable decision snapshot without exposing repository details.
+func (d *Domain) SaveDecision(ctx context.Context, memory DecisionMemory) error {
+	if d == nil || d.repository == nil {
+		return fmt.Errorf("price domain is not configured")
+	}
+	return d.repository.SaveDecision(ctx, memory)
+}
+
+// RecentDecisions returns only decisions scoped to the requested user.
+func (d *Domain) RecentDecisions(ctx context.Context, userID, product string, limit int) ([]DecisionMemory, error) {
+	if d == nil || d.repository == nil {
+		return nil, fmt.Errorf("price domain is not configured")
+	}
+	return d.repository.RecentDecisions(ctx, userID, product, limit)
+}
+
 func New(repository Repository) *Domain {
 	return &Domain{repository: repository, now: time.Now}
 }

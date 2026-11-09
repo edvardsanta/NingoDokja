@@ -680,7 +680,7 @@ function priceSearch(body: Record<string, unknown>): PriceSearch {
 
 const PRICE_KEY = /^[a-z0-9][a-z0-9._:-]{0,79}$/;
 const MAX_PRICE_MERCHANTS = 100;
-const MAX_WATCH_CHARS = 60;
+const MAX_WATCH_CHARS = MAX_PRICE_SEARCH_CHARS;
 const WATCH_STATUSES = new Set(["added", "watched", "full", "not_owner"]);
 
 function priceWatch(body: Record<string, unknown>): PriceWatch {

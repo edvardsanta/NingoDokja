@@ -9,11 +9,12 @@ import (
 // Product is what the domain knows about a watched product besides its points. Category,
 // Brand and PartNumber come from the latest observation that carried them.
 type Product struct {
-	Key        string
-	Title      string
-	Category   string
-	Brand      string
-	PartNumber string
+	Key            string
+	Title          string
+	Category       string
+	Brand          string
+	PartNumber     string
+	Specifications map[string]any
 }
 
 // Watch is a search the owner asked to follow: a category and an optional brand, in the owner's
@@ -21,6 +22,18 @@ type Product struct {
 type Watch struct {
 	Category string
 	Brand    string
+}
+
+// DecisionMemory is an auditable snapshot of one purchase decision. Evidence is kept as
+// structured JSON-compatible data so later explanations never depend on mutable store rows.
+type DecisionMemory struct {
+	ID          string
+	UserID      string
+	Product     Product
+	BudgetCents int64
+	Decision    Decision
+	Evidence    []map[string]any
+	CreatedAt   string
 }
 
 // Repository keeps histories and the watched searches. The durable adapter lives behind this
@@ -48,16 +61,19 @@ type Repository interface {
 	AddWatch(ctx context.Context, watch Watch) (added bool, err error)
 	// RemoveWatch forgets a search; removed is false when it was not watched.
 	RemoveWatch(ctx context.Context, watch Watch) (removed bool, err error)
+	SaveDecision(ctx context.Context, memory DecisionMemory) error
+	RecentDecisions(ctx context.Context, userID, product string, limit int) ([]DecisionMemory, error)
 }
 
 // MemoryRepository is a Repository held in process memory. It is the reference
 // behavior for durable adapters and the store used by tests.
 type MemoryRepository struct {
-	mu       sync.Mutex
-	points   map[Key]map[string]Point
-	products map[string]Product
-	urls     map[Key]string
-	watches  map[Watch]bool
+	mu        sync.Mutex
+	points    map[Key]map[string]Point
+	products  map[string]Product
+	urls      map[Key]string
+	watches   map[Watch]bool
+	decisions []DecisionMemory
 }
 
 func NewMemoryRepository() *MemoryRepository {
@@ -65,6 +81,29 @@ func NewMemoryRepository() *MemoryRepository {
 		points: map[Key]map[string]Point{}, products: map[string]Product{},
 		urls: map[Key]string{}, watches: map[Watch]bool{},
 	}
+}
+
+func (m *MemoryRepository) SaveDecision(_ context.Context, memory DecisionMemory) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.decisions = append(m.decisions, memory)
+	return nil
+}
+
+func (m *MemoryRepository) RecentDecisions(_ context.Context, userID, product string, limit int) ([]DecisionMemory, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit <= 0 {
+		return []DecisionMemory{}, nil
+	}
+	result := make([]DecisionMemory, 0, limit)
+	for i := len(m.decisions) - 1; i >= 0 && len(result) < limit; i-- {
+		item := m.decisions[i]
+		if item.UserID == userID && (product == "" || item.Product.Key == product) {
+			result = append(result, item)
+		}
+	}
+	return result, nil
 }
 
 func (m *MemoryRepository) Upsert(_ context.Context, observation Observation) (int, error) {
@@ -89,11 +128,26 @@ func (m *MemoryRepository) Upsert(_ context.Context, observation Observation) (i
 	keepNonEmpty(&product.Category, observation.Category)
 	keepNonEmpty(&product.Brand, observation.Brand)
 	keepNonEmpty(&product.PartNumber, observation.PartNumber)
+	if len(observation.Specifications) > 0 {
+		product.Specifications = cloneMap(observation.Specifications)
+	}
 	m.products[observation.Product] = product
 	if observation.URL != "" {
 		m.urls[key] = observation.URL
 	}
+
 	return written, nil
+}
+
+func cloneMap(values map[string]any) map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	copy := make(map[string]any, len(values))
+	for key, value := range values {
+		copy[key] = value
+	}
+	return copy
 }
 
 func keepNonEmpty(field *string, value string) {
