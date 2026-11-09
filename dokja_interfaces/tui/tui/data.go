@@ -52,6 +52,7 @@ type jobRow struct {
 	LastAt      time.Time
 	LastOutcome string
 	LastError   string
+	LastReason  string
 	AnnouncedAt time.Time
 }
 
@@ -239,6 +240,7 @@ func parseStatus(system, meme map[string]any, now time.Time) statusData {
 				LastAt:      parseTime(str(fields, "last_at")),
 				LastOutcome: str(fields, "last_outcome"),
 				LastError:   str(fields, "last_error"),
+				LastReason:  str(fields, "last_reason"),
 				AnnouncedAt: parseTime(str(fields, "announced_at")),
 			}
 			row.Enabled, _ = fields["enabled"].(bool)

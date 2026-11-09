@@ -367,5 +367,9 @@
   "send_dispatched": "Being answered",
   "turn_being_answered": "Still being answered.",
   "turn_state_unknown": "In a state this TUI does not know.",
-  "nothing_said_yet": "Nothing said yet."
+  "nothing_said_yet": "Nothing said yet.",
+  "job_reason_scheduler_off": "(the scheduler switch is off)",
+  "job_reason_job_off": "(this job is off)",
+  "job_reason_service_off": "(its service is off)",
+  "job_held_by_scheduler": "held: switch the scheduler on to run it"
 }

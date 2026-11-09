@@ -367,5 +367,9 @@
   "send_dispatched": "Sendo respondido",
   "turn_being_answered": "Ainda sendo respondido.",
   "turn_state_unknown": "Num estado que esta TUI não conhece.",
-  "nothing_said_yet": "Nada dito ainda."
+  "nothing_said_yet": "Nada dito ainda.",
+  "job_reason_scheduler_off": "(a chave do Agendador está desligada)",
+  "job_reason_job_off": "(este job está desligado)",
+  "job_reason_service_off": "(o serviço dele está desligado)",
+  "job_held_by_scheduler": "segurado: ligue o Agendador para rodar"
 }
