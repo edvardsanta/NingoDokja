@@ -7,7 +7,7 @@ Current jobs:
 - `meme.pool.refresh` every `45m` by default
 - `meme.dispatch.scheduled` every `6h` by default
 - `knowledge.intake.run` every `1h` by default
-- `price.intake.run` every `15m` by default (no variable; change it per job through the orchestrator)
+- `price.intake.run` every `6h` by default (no variable; change it per job through the orchestrator)
 
 Configuration:
 
@@ -26,7 +26,7 @@ Notes:
 - The dispatch job is asynchronous and emits `meme.dispatch.scheduled`.
 - The orchestrator handles scheduled meme delivery and chooses the interface/channel.
 - The intake job (`knowledge.intake`) only emits `knowledge.intake.run`. The orchestrator knows which sources were chosen; with none, it does nothing.
-- The price intake job (`price.intake`) only emits `price.intake.run`. The orchestrator hands what Feeds holds to the Price domain, which keeps only price observations.
+- The price intake job (`price.intake`) only emits `price.intake.run`. The orchestrator asks the Price domain for the watched searches, invokes the Feeds price resolver with them and records what comes back.
 - On startup, the scheduler runs an initial refresh, waits for the bootstrap grace period, and only then emits the first scheduled dispatch.
 
 ## Operator control

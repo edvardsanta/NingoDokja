@@ -27,6 +27,7 @@ import { pdfAttachments } from "../messages/documents.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
+  DiscordChoice,
   DiscordEmbedSpec,
   DiscordModalAction,
   DiscordModalContext,
@@ -115,6 +116,11 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
         await handleChatInputCommand(command, interaction, buttons, selects, modals, params);
         return;
       }
+      if (interaction.isAutocomplete()) {
+        const command = params.commands.find((entry) => entry.name === interaction.commandName);
+        if (command) await answerAutocomplete(command, interaction, params);
+        return;
+      }
       if (interaction.isButton()) {
         const button = buttons.find((entry) => entry.customId === interaction.customId);
         if (!button) {
@@ -196,7 +202,8 @@ function serializeCommand(command: DiscordSlashCommand) {
         input
           .setName(option.name)
           .setDescription(option.description)
-          .setRequired(Boolean(option.required)),
+          .setRequired(Boolean(option.required))
+          .setAutocomplete(Boolean(option.autocomplete)),
       );
       continue;
     }
@@ -211,6 +218,41 @@ function serializeCommand(command: DiscordSlashCommand) {
   }
 
   return builder.toJSON();
+}
+
+// Discord's limits for suggestions: 25 of them, 100 characters each.
+const MAX_CHOICES = 25;
+const MAX_CHOICE_TEXT = 100;
+
+type AutocompleteInteraction = {
+  commandName: string;
+  user: { id: string };
+  channelId: string | null;
+  guildId: string | null;
+  options: { getFocused(full: true): { name: string; value: unknown } };
+  respond(choices: DiscordChoice[]): Promise<unknown>;
+};
+
+// Answers a suggestion request. A failing or slow suggester answers nothing rather than leaving
+// Discord waiting, and what it suggests is cut to Discord's limits.
+export async function answerAutocomplete(definition: DiscordSlashCommand, interaction: AutocompleteInteraction, params: Pick<StartDiscordJsRuntimeParams, "error">) {
+  let choices: DiscordChoice[] = [];
+  if (definition.autocomplete) {
+    const focused = interaction.options.getFocused(true);
+    try {
+      choices = await definition.autocomplete({
+        option: focused.name, value: String(focused.value ?? ""),
+        userId: interaction.user.id, channelId: interaction.channelId ?? "", guildId: interaction.guildId ?? undefined,
+      });
+    } catch (error) {
+      params.error?.("[dokja-discord] autocomplete failed", error);
+    }
+  }
+  const bounded = choices
+    .filter((choice) => choice.name.trim() && choice.value.trim())
+    .slice(0, MAX_CHOICES)
+    .map((choice) => ({ name: choice.name.slice(0, MAX_CHOICE_TEXT), value: choice.value.slice(0, MAX_CHOICE_TEXT) }));
+  await interaction.respond(bounded);
 }
 
 export async function handleChatInputCommand(
@@ -628,6 +670,7 @@ export function toEmbed(embed: DiscordEmbedSpec) {
     ...(Number.isInteger(embed.color) && embed.color! >= 0 && embed.color! <= 0xffffff ? { color: embed.color } : {}),
     ...(fields.length ? { fields } : {}),
     ...(embed.footer ? { footer: { text: embed.footer.slice(0, 2048) } } : {}),
+    ...(embed.url && /^https?:\/\//.test(embed.url) ? { url: embed.url } : {}),
   };
 }
 

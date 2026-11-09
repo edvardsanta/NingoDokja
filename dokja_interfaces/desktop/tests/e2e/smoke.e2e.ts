@@ -83,7 +83,7 @@ describe("the built app", { skip: hasDisplay ? false : "no display (set WAYLAND_
       await page.evaluate("[typeof require, typeof process, typeof module, typeof Buffer, typeof __dirname].join()"),
       "undefined,undefined,undefined,undefined,undefined",
     );
-    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,onChatPreview,openSavedPost,preview,request,savePostLocally");
+    assert.equal(await page.evaluate("Object.keys(window.dokja).sort().join()"), "bootstrap,onChatPreview,openOffer,openSavedPost,preview,request,savePostLocally");
     assert.equal(await page.evaluate("[typeof window.electron, typeof window.ipcRenderer].join()"), "undefined,undefined");
   });
 

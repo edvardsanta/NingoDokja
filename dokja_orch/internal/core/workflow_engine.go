@@ -210,6 +210,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "search-prices"
 		case "price.watches":
 			return "list-price-watches"
+		case "price.merchants":
+			return "list-price-merchants"
 		case "price.unwatch":
 			return "unwatch-prices"
 		default:

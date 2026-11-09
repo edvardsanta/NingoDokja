@@ -54,8 +54,9 @@ type BridgePayload struct {
 	MentionedUserIDs    []string               `json:"mentionedUserIds"`
 	Limit               *int                   `json:"limit"`
 	MaxItems            *int                   `json:"maxItemsPerScraper"`
-	Query               string                 `json:"query"` // price.search words
-	Brand               string                 `json:"brand"` // price.search brand
+	Query               string                 `json:"query"`    // price.search words
+	Brand               string                 `json:"brand"`    // price.search brand
+	Merchant            string                 `json:"merchant"` // price.search store
 	UserID              string                 `json:"userId"`
 	UserName            string                 `json:"userName"`
 	ChannelID           string                 `json:"channelId"`
@@ -298,7 +299,7 @@ func extractBridgeMusic(result core.ProcessResult) map[string]any {
 // extractBridgePrice hands a price search's result back to the interface, which renders it with
 // its own translations; the bridge writes no prices into the reply text.
 func extractBridgePrice(result core.ProcessResult) map[string]any {
-	if strings.TrimSpace(result.Event.Type) != "price.search" {
+	if eventType := strings.TrimSpace(result.Event.Type); eventType != "price.search" && eventType != "price.merchants" {
 		return nil
 	}
 	price, _ := result.Result[string(core.DomainPrice)].(map[string]any)
@@ -643,9 +644,14 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
 	case "price.search":
+		// A chat reply shows the best buys first. A /preco is a deliberate request, so it asks to
+		// watch its category and brand; the domain decides whether this person may.
 		return "price.search", map[string]any{
 			"query": strings.TrimSpace(request.Payload.Query), "brand": strings.TrimSpace(request.Payload.Brand),
+			"merchant": strings.TrimSpace(request.Payload.Merchant), "order": "opportunity", "watch": true,
 		}
+	case "price.merchants":
+		return "price.merchants", map[string]any{}
 	case "quiz.take":
 		return "quiz.take", map[string]any{"url": content, "locale": strings.TrimSpace(request.Payload.Locale)}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":

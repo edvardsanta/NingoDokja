@@ -97,14 +97,25 @@ Thresholds are constants in `assess.go`, in basis points:
 
 ## Orchestrator intake (implemented)
 
-- **Scheduler.** The `price.intake` job emits `price.intake.run` every 15
-  minutes by default, matching a Feeds collector's default interval. Feeds
-  keeps only a collector's last run, so reading less often would lose the
-  chunks of a multi-run backfill. Like every job, it can be paused or given
-  another interval through the controls; no variable was added.
-- **Intake task.** A typed task reads `feeds.items` without refreshing and
-  hands every item to `record-price-observations`. It skips the run while
-  Feeds is switched off or another run is going.
+- **Scheduler.** The `price.intake` job emits `price.intake.run` every 6 hours
+  by default: each run queries the stores for every watched search. Like every
+  job, it can be switched off or given another interval through the controls;
+  no variable was added.
+- **Intake task (collection by watched search).** A typed task in three steps:
+  - plan: the domain's watched searches, or the one the owner just added, and
+    up to 5 products that lack a market history;
+  - collect: `feeds.invoke` with `price.resolve.v1`, action `search`, input
+    `{searches: [{category, brand}], limit: 30, market: [{product, title,
+    part_number}]}`; the plugin answers `{observations: [...]}`;
+  - record: each observation goes to `record-price-observations` as an item
+    body, the one shape the domain validates.
+
+  A scheduled run collects every watched search; a search the owner just added
+  is collected at once, on its own. Asked while a run is going, both wait and
+  run next. The run is skipped while Feeds is switched off, and fails with
+  `no_watches` when nothing is watched. This replaces reading `feeds.items`:
+  the scheduled collector (`source.collect.v1`) is retired for prices, so only
+  one path writes them.
 - **Route.** `price.assess` routes to `assess-price`. It works while Feeds is
   off, because it reads only the history.
 - **Digest.** It drops items of kind `price` in the one place it reads Feeds
@@ -179,13 +190,41 @@ The owner watches categories and brands, not single products: "ssd sata" from
 - This replaces "the contract is the opt-in, so no list of sources is
   configured": collectors no longer pick what to follow.
 
+## Store, links and opportunity order (implemented)
+
+- `price.search` takes `order: "opportunity"`: real discounts first (deepest
+  first), then ordinary prices by their discount against the 30-day median,
+  then products still gathering history (cheapest first), and warnings last.
+  Up to 300 matching products are assessed to rank them; the answer still
+  holds 10. The Discord bridge always asks for it.
+- `price.merchants` (`list-price-merchants`) lists the merchant keys with a
+  history from one query, for a store picker.
+- Discord's `/preco` gains `loja` with autocomplete, links each source to its
+  store page and the card title to the cheapest offer, and says when the
+  owner's search started a new watched search. The adapter now answers
+  autocomplete interactions for any command that declares a suggester.
+
+## Explicit watching and the Desktop (implemented)
+
+- **Growing the list needs an explicit request.** `price.search` adds a
+  watched search only when its payload sets `watch: true` (and the person may,
+  as before). Discord's `/preco` is a deliberate command, so its bridge sets it;
+  the Desktop searches as the owner types, so it sets it only from the "Watch
+  this search" button, and a search typed on the way leaves no watch behind.
+- **Desktop Library › Prices** gains a store picker (the search's merchant
+  list), the "Watch this search" button with its outcome, the watched searches
+  with removal (`price.watches`, `price.unwatch`), and the best-buy order.
+- **Store pages stay in the shell.** The Desktop's projection replaces each
+  offer's `url` with an opaque token; the shell keeps the newest 2,000 pages
+  and opens one in the browser only for a token a price reply listed in this
+  run, only for an http(s) address without credentials, and only on a real
+  press (`dokja:open-offer`). The screen never sees an address, as the Desktop
+  plan requires for every reply.
+
 ## Pending work (stacked follow-ups)
 
-- **Collection by watched search.** A `price.resolve.v1` Feeds capability
-  invoked by the orchestrator with the watched searches (and with a known
-  store's product link for a comparison), replacing the scheduled collector.
-  Links are parsed against known stores and never fetched as given.
-- **`/preco` with store, links and opportunity order, then the Desktop.**
+- **A product link for a comparison** (`price.resolve.v1` action `read`):
+  links are parsed against known stores and never fetched as given.
 - **`/comparar_produto`**: offers across stores for one product, with a short
   comment from Ningo written from the domain's facts.
 

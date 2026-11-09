@@ -18,6 +18,8 @@ const (
 	ActionSearchPrices = "search-prices"
 	// ActionListWatches lists the watched searches the collectors run.
 	ActionListWatches = "list-price-watches"
+	// ActionListMerchants lists the merchant keys with a history, for a person to pick a store.
+	ActionListMerchants = "list-price-merchants"
 	// ActionUnwatch forgets a watched search; only the owner may.
 	ActionUnwatch = "unwatch-prices"
 	// ActionIntakePrice names the scheduled run that reads Feeds and records what it
@@ -95,7 +97,7 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		return map[string]any{"assessments": rows, "count": len(rows)}, nil
 	case ActionSearchPrices:
 		search := Search{}
-		for name, target := range map[string]*string{"product": &search.Product, "query": &search.Query, "brand": &search.Brand, "merchant": &search.Merchant} {
+		for name, target := range map[string]*string{"product": &search.Product, "query": &search.Query, "brand": &search.Brand, "merchant": &search.Merchant, "order": &search.Order} {
 			raw, present := request.Event.Payload[name]
 			if !present || raw == nil {
 				continue
@@ -117,14 +119,27 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 		if err != nil {
 			return nil, err
 		}
-		// The owner asking for a category and brand is how the watched searches grow; the
-		// answer still comes from what is already known.
-		if result.Watch, err = d.watchFromSearch(ctx, request.Event, search); err != nil {
-			return nil, err
+		// The owner asking to watch a category and brand is how the watched searches grow; the
+		// answer still comes from what is already known. Only an explicit request counts: a
+		// search typed as the person goes must not leave a watch for every word on the way.
+		if wanted, _ := request.Event.Payload["watch"].(bool); wanted {
+			if result.Watch, err = d.watchFromSearch(ctx, request.Event, search); err != nil {
+				return nil, err
+			}
 		}
 		return result.Map(), nil
 	case ActionListWatches:
 		return d.watchList(ctx)
+	case ActionListMerchants:
+		merchants, err := d.repository.Merchants(ctx)
+		if err != nil {
+			return nil, err
+		}
+		rows := make([]any, 0, len(merchants))
+		for _, merchant := range merchants {
+			rows = append(rows, merchant)
+		}
+		return map[string]any{"merchants": rows}, nil
 	case ActionUnwatch:
 		category, _ := request.Event.Payload["category"].(string)
 		brand, _ := request.Event.Payload["brand"].(string)

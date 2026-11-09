@@ -40,6 +40,10 @@ const (
 	CapabilityMediaPerceive    = "media.perceive.v1"
 	CapabilityAudioResolve     = "audio.resolve.v1"
 	CapabilitySocialResolve    = "social.resolve.v1"
+	// CapabilityPriceResolve finds offers for the Price domain on demand: the orchestrator sends
+	// the watched searches (or a known store's product link) and validates nothing here; the
+	// domain checks every observation the plugin returns.
+	CapabilityPriceResolve = "price.resolve.v1"
 	// CapabilityQuizRun reads an online questionnaire's questions and submits answers for its
 	// result link. The repository ships no runner: runners reach third-party sites.
 	CapabilityQuizRun = "quiz.run.v1"
@@ -55,7 +59,7 @@ var (
 	envPattern     = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 	versionPattern = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+-]{0,39}$`)
 	formatPattern  = regexp.MustCompile(`^\.[a-z0-9]{1,10}$`)
-	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true, CapabilityDocumentProcess: true, CapabilityMediaLibrary: true, CapabilityMediaPerceive: true, CapabilityAudioResolve: true, CapabilitySocialResolve: true, CapabilityQuizRun: true}
+	knownProvides  = map[string]bool{CapabilitySourceCollect: true, CapabilityDocumentExtract: true, CapabilityDocumentClassify: true, CapabilityDocumentProcess: true, CapabilityMediaLibrary: true, CapabilityMediaPerceive: true, CapabilityAudioResolve: true, CapabilitySocialResolve: true, CapabilityPriceResolve: true, CapabilityQuizRun: true}
 )
 
 // manifest is plugin.json. It is read without running the plugin, so a plugin that is

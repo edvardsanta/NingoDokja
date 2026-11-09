@@ -1583,6 +1583,14 @@ tables. An invalid DSN, an unavailable database or an unsupported schema logs a
 sanitized message and keeps the history in memory; the rest of the orchestrator
 starts.
 
+**Price collection.** Prices come from an owner-installed Feeds plugin that
+provides `price.resolve.v1` (kept in the plugins directory, outside git). The
+`price.intake` job, every 6 hours by default and off until switched on, hands it
+the watched searches; a search the owner adds is collected at once. A collector
+that still provides `source.collect.v1` for prices is no longer read: switch it
+off when the resolver is enabled. With no resolver enabled, a run fails with
+`price_resolver_unavailable` and nothing else changes.
+
 **Upgrade to schema version 2 (watched searches).** Run `price-history-init`
 again before restarting the orchestrator on the new build: it upgrades a
 version 1 namespace in one transaction and keeps every point. Started first,

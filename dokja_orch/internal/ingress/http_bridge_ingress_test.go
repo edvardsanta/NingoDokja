@@ -210,7 +210,7 @@ func TestBridgeMapsAPriceSearchAndHandsItsResultBack(t *testing.T) {
 		EventType: "price.search",
 		Payload:   BridgePayload{Query: " hd ", Brand: "amd", Content: "ignored"},
 	}, "ignored")
-	if eventType != "price.search" || payload["query"] != "hd" || payload["brand"] != "amd" || len(payload) != 2 {
+	if eventType != "price.search" || payload["query"] != "hd" || payload["brand"] != "amd" || payload["order"] != "opportunity" || payload["watch"] != true || len(payload) != 5 {
 		t.Fatalf("mapped %s %v", eventType, payload)
 	}
 
@@ -220,5 +220,20 @@ func TestBridgeMapsAPriceSearchAndHandsItsResultBack(t *testing.T) {
 	}
 	if got := extractBridgePrice(core.ProcessResult{Event: core.Event{Type: "price.assess"}, Result: result}); got != nil {
 		t.Fatalf("a non-search event carried a price result: %v", got)
+	}
+}
+
+func TestBridgePassesAStoreAndListsTheMerchants(t *testing.T) {
+	_, payload := mapBridgeRequestToEvent(BridgeRequest{EventType: "price.search", Payload: BridgePayload{Merchant: " kabum "}}, "")
+	if payload["merchant"] != "kabum" {
+		t.Fatalf("merchant %v", payload)
+	}
+	eventType, payload := mapBridgeRequestToEvent(BridgeRequest{EventType: "price.merchants"}, "ignored")
+	if eventType != "price.merchants" || len(payload) != 0 {
+		t.Fatalf("merchants %s %v", eventType, payload)
+	}
+	result := map[string]any{string(core.DomainPrice): map[string]any{"merchants": []any{"kabum"}}}
+	if got := extractBridgePrice(core.ProcessResult{Event: core.Event{Type: "price.merchants"}, Result: result}); got == nil {
+		t.Fatal("the merchants list was not handed back")
 	}
 }

@@ -182,10 +182,10 @@ func (s *Service) runKnowledgeIntake(ctx context.Context) error {
 	return s.emit(ctx, event)
 }
 
-// priceIntakeInterval matches the default interval of a Feeds collector. Feeds keeps only a
-// collector's last run, so reading less often than collectors run would miss the chunks of a
-// backfill spread over several runs. The operator can still change it per job.
-const priceIntakeInterval = 15 * time.Minute
+// priceIntakeInterval spaces the price collections: each run queries the stores for every
+// watched search, so it runs a few times a day. A search the owner just added is collected at
+// once anyway. The operator can still change it per job.
+const priceIntakeInterval = 6 * time.Hour
 
 // runPriceIntake asks the orchestrator to record the prices the collectors observed. Which
 // items are observations is the Price domain's to decide.

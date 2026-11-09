@@ -134,7 +134,14 @@ Response body:
 
 ## Price search
 
-`/preco produto:<words> marca:<brand>` asks the orchestrator for `price.search`.
+`/preco produto:<words> marca:<brand> loja:<store>` asks the orchestrator for
+`price.search`, best buys first (real discounts, deepest first; then ordinary
+prices by how far under their median; then products still gathering history;
+warnings last). `loja` suggests the stores already seen as you type
+(`price.merchants`, answered within Discord's three seconds; a failure suggests
+nothing). Each card's title links to its cheapest offer and each source has an
+"open at the store" link; only http(s) addresses become links. When the owner's
+search starts a new watched search, the reply says so.
 Both options are optional and match whole words of a watched product's title or
 key, without accents or case (`produto: hd`, `produto: rtx 5070`, `marca: amd`);
 a word of three letters or more also matches the start of a longer one. The

@@ -9,7 +9,12 @@ import (
 	"unicode/utf8"
 )
 
+// OrderOpportunity sorts a search by how good a buy each product is now.
+const OrderOpportunity = "opportunity"
+
 const (
+	// maxRanked bounds how many matching products are assessed to be ranked by opportunity.
+	maxRanked = 300
 	// maxSearchText bounds what a person may type in a search field.
 	maxSearchText = 100
 	// maxSearchProducts bounds one answer; a chat reply cannot hold more.
@@ -32,6 +37,10 @@ type Search struct {
 	Brand string
 	// Merchant keeps only the histories of that merchant key, such as one store.
 	Merchant string
+	// Order is "" (product key) or "opportunity": real discounts first, deepest first, then
+	// ordinary prices by how far under their median they are, then products still gathering
+	// history, cheapest first, and warnings last.
+	Order string
 	// History asks for each product's market-low points of the last year, for a chart. A chat
 	// reply has no use for them, so they come only when asked.
 	History bool
@@ -62,6 +71,9 @@ func (s Search) validate() error {
 	if s.Product != "" && !keyPattern.MatchString(s.Product) {
 		return fmt.Errorf("product must be 1 to 80 lowercase letters, digits, '.', '_', ':' or '-'")
 	}
+	if s.Order != "" && s.Order != OrderOpportunity {
+		return fmt.Errorf("order must be empty or %q", OrderOpportunity)
+	}
 	if s.Merchant != "" && !keyPattern.MatchString(s.Merchant) {
 		return fmt.Errorf("merchant must be 1 to 80 lowercase letters, digits, '.', '_', ':' or '-'")
 	}
@@ -83,19 +95,10 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 		return SearchResult{}, err
 	}
 	query, brand := words(search.Query), words(search.Brand)
-	merchants := map[string]bool{}
 	var result SearchResult
+	var matched []Product
 	for _, product := range products {
-		keys, err := d.repository.Keys(ctx, product.Key)
-		if err != nil {
-			return SearchResult{}, err
-		}
-		sold := false
-		for _, key := range keys {
-			merchants[key.Merchant] = true
-			sold = sold || search.Merchant == "" || key.Merchant == search.Merchant
-		}
-		if !sold || (search.Product != "" && product.Key != search.Product) {
+		if search.Product != "" && product.Key != search.Product {
 			continue
 		}
 		described := words(strings.Join([]string{product.Title, product.Key, product.Category, product.Brand, product.PartNumber}, " "))
@@ -106,10 +109,34 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 		if !matches(described, query) || !matches(branded, brand) {
 			continue
 		}
-		result.Matched++
-		if len(result.Products) == maxSearchProducts {
-			continue
+		if search.Merchant != "" {
+			keys, err := d.repository.Keys(ctx, product.Key)
+			if err != nil {
+				return SearchResult{}, err
+			}
+			sold := false
+			for _, key := range keys {
+				sold = sold || key.Merchant == search.Merchant
+			}
+			if !sold {
+				continue
+			}
 		}
+		matched = append(matched, product)
+	}
+	result.Matched = len(matched)
+
+	// Each candidate is assessed once; ranking needs every assessment, a plain answer only the
+	// first page's.
+	candidates := matched
+	if search.Order != OrderOpportunity && len(candidates) > maxSearchProducts {
+		candidates = candidates[:maxSearchProducts]
+	}
+	if len(candidates) > maxRanked {
+		candidates = candidates[:maxRanked]
+	}
+	assessed := make([]ProductAssessments, 0, len(candidates))
+	for _, product := range candidates {
 		assessments, err := d.AssessProduct(ctx, product.Key)
 		if err != nil {
 			return SearchResult{}, err
@@ -123,23 +150,74 @@ func (d *Domain) SearchProducts(ctx context.Context, search Search) (SearchResul
 			}
 			assessments = kept
 		}
-		urls, err := d.repository.OfferURLs(ctx, product.Key)
+		assessed = append(assessed, ProductAssessments{Product: product, Assessments: assessments})
+	}
+	if search.Order == OrderOpportunity {
+		sort.SliceStable(assessed, func(i, j int) bool { return opportunityLess(assessed[i], assessed[j]) })
+	}
+	if len(assessed) > maxSearchProducts {
+		assessed = assessed[:maxSearchProducts]
+	}
+	for _, found := range assessed {
+		urls, err := d.repository.OfferURLs(ctx, found.Product.Key)
 		if err != nil {
 			return SearchResult{}, err
 		}
-		found := ProductAssessments{Product: product, Assessments: assessments, URLs: urls}
+		found.URLs = urls
 		if search.History {
-			if found.Market, err = d.marketHistory(ctx, assessments); err != nil {
+			if found.Market, err = d.marketHistory(ctx, found.Assessments); err != nil {
 				return SearchResult{}, err
 			}
 		}
 		result.Products = append(result.Products, found)
 	}
-	for merchant := range merchants {
-		result.Merchants = append(result.Merchants, merchant)
+	merchants, err := d.repository.Merchants(ctx)
+	if err != nil {
+		return SearchResult{}, err
 	}
-	sort.Strings(result.Merchants)
+	result.Merchants = merchants
 	return result, nil
+}
+
+// opportunityRank places a product by its assessments: 0 a real discount, 1 an ordinary price,
+// 2 still gathering history, 3 a warning (a fake discount or a markup outranks everything else,
+// as on every screen). Within a rank, a deeper discount, then a lower price, comes first.
+func opportunityRank(found ProductAssessments) (rank int, discount int64, cheapest int64) {
+	rank, discount, cheapest = 2, -1<<62, 1<<62
+	warned, real, plain := false, false, false
+	for _, assessment := range found.Assessments {
+		switch assessment.Verdict {
+		case VerdictFakeDiscount, VerdictInflatedBeforeSale:
+			warned = true
+		case VerdictRealDiscount:
+			real = true
+		case VerdictNoDiscount, VerdictStale:
+			plain = true
+		}
+		discount = max(discount, assessment.DiscountVs30Bps)
+		cheapest = min(cheapest, assessment.Latest.Cents)
+	}
+	switch {
+	case warned:
+		rank = 3
+	case real:
+		rank = 0
+	case plain:
+		rank = 1
+	}
+	return rank, discount, cheapest
+}
+
+func opportunityLess(a, b ProductAssessments) bool {
+	rankA, discountA, cheapA := opportunityRank(a)
+	rankB, discountB, cheapB := opportunityRank(b)
+	if rankA != rankB {
+		return rankA < rankB
+	}
+	if rankA <= 1 && discountA != discountB {
+		return discountA > discountB
+	}
+	return cheapA < cheapB
 }
 
 // marketHistory is the first market-low history among a product's assessments, over the last
