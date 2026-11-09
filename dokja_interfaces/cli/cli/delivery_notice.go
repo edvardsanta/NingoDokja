@@ -82,6 +82,8 @@ func jobEffect(name string, status any) string {
 		return "refreshes the meme pool and posts nothing"
 	case "knowledge.intake":
 		return "keeps what the chosen sources published and posts nothing"
+	case "price.intake":
+		return "records the prices the collectors observed and posts nothing"
 	}
 	return "runs its scheduled event"
 }
