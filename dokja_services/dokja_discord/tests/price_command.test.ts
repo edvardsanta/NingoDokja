@@ -141,9 +141,9 @@ test("each source links to its store page and the card title links to the cheape
 });
 
 test("a search the owner starts to watch says so, even before its products arrive", () => {
-  const added = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "added" } };
-  assert.match(String(buildPriceReply(added, "pt-BR")), /Passei a vigiar \*\*ssd sata · samsung\*\*/);
-  const guest = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "not_owner" } };
+  const added = { products: [], matched: 0, watch: { category: "ssd sata", brand: "brandx", status: "added" } };
+  assert.match(String(buildPriceReply(added, "pt-BR")), /Passei a vigiar \*\*ssd sata · brandx\*\*/);
+  const guest = { products: [], matched: 0, watch: { category: "ssd sata", brand: "brandx", status: "not_owner" } };
   assert.equal(buildPriceReply(guest, "pt-BR"), "Nenhum produto da watchlist corresponde a essa busca.");
   const withProducts = { ...result, watch: { category: "hd", status: "added" } };
   assert.match((buildPriceReply(withProducts, "en") as { content: string }).content, /^👁️ Now watching \*\*hd\*\*/);

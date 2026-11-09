@@ -21,6 +21,7 @@ import (
 	"read_books/internal/handlers"
 	chatsessions "read_books/internal/infrastructure/chat_sessions"
 	"read_books/internal/infrastructure/conversations"
+	quizruns "read_books/internal/infrastructure/quiz_runs"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
 	"read_books/internal/ownerconfig"
@@ -66,6 +67,12 @@ func main() {
 	if sharedPath == "" {
 		sharedPath = filepath.Join(".dokja", "dokja.db")
 	}
+	quizRuns, err := quizruns.Open(quizruns.PathBeside(sharedPath))
+	if err != nil {
+		logger.Error("open quiz run memory", err)
+		os.Exit(1)
+	}
+	defer quizRuns.Close()
 	chatSessions, err := chatsessions.Open(chatsessions.PathBeside(sharedPath))
 	if err != nil {
 		logger.Error("open durable chat sessions", err)
@@ -246,8 +253,8 @@ func main() {
 		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
-		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions).WithMemory(quizRuns),
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {

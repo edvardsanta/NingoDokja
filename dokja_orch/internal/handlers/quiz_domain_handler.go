@@ -21,6 +21,12 @@ const quizRunBudget = 13 * time.Minute
 // maxQuizRunners bounds how many enabled runners are asked for one link.
 const maxQuizRunners = 8
 
+// QuizMemory keeps the questionnaires Ningo took, so later conversations remember them.
+type QuizMemory interface {
+	Save(ctx context.Context, run quiz.Run) error
+	Recent(ctx context.Context, limit int) ([]quiz.Run, error)
+}
+
 // QuizFeeds is the part of the Feeds client the quiz workflow uses.
 type QuizFeeds interface {
 	Dispatch(ctx context.Context, eventType string, payload map[string]any) (map[string]any, error)
@@ -34,11 +40,19 @@ type QuizDomainHandler struct {
 	generator ChatConversationGenerator
 	enabled   func() bool
 	visions   string
+	memory    QuizMemory
+	now       func() time.Time
 	running   atomic.Bool
 }
 
 func NewQuizDomainHandler(feeds QuizFeeds, generator ChatConversationGenerator, enabled func() bool) *QuizDomainHandler {
-	return &QuizDomainHandler{feeds: feeds, generator: generator, enabled: enabled}
+	return &QuizDomainHandler{feeds: feeds, generator: generator, enabled: enabled, now: time.Now}
+}
+
+// WithMemory keeps every finished run, so Ningo remembers it in later conversations.
+func (h *QuizDomainHandler) WithMemory(memory QuizMemory) *QuizDomainHandler {
+	h.memory = memory
+	return h
 }
 
 // WithVisions gives the quiz Ningo's convictions, the same ones every chat turn carries.
@@ -101,10 +115,32 @@ func (h *QuizDomainHandler) take(ctx context.Context, link, language string) (ma
 		return nil, quiz.RefusedFailed
 	}
 	logger.Info(fmt.Sprintf("quiz run finished questions=%d answered=%d", len(questionnaire.Questions), len(answers)))
+	comment := h.comment(ctx, result, language)
+	h.remember(ctx, link, questionnaire, result, answers, reply["result"], comment)
 	return map[string]any{
 		"status": "ok", "url": result.URL, "label": result.Label, "title": questionnaire.Title,
-		"answered": len(answers), "comment": h.comment(ctx, result, language),
+		"answered": len(answers), "comment": comment,
 	}, ""
+}
+
+// remember keeps the finished run with the questions the site actually asked, when the runner
+// says which. A storage failure never costs the person their result.
+func (h *QuizDomainHandler) remember(ctx context.Context, link string, questionnaire quiz.Quiz, result quiz.Result, answers map[string]string, raw any, comment string) {
+	if h.memory == nil {
+		return
+	}
+	reported, _ := raw.(map[string]any)
+	asked, err := quiz.ParseAsked(reported["asked"], questionnaire)
+	if err != nil {
+		logger.Error("quiz runner reported invalid asked questions", err)
+		asked = nil
+	}
+	run := quiz.NewRun(link, questionnaire, result, answers, asked, comment, h.now())
+	if err := h.memory.Save(ctx, run); err != nil {
+		logger.Error("quiz run was not remembered", err)
+		return
+	}
+	logger.Info(fmt.Sprintf("quiz run remembered items=%d", len(run.Items)))
 }
 
 // questions asks the enabled runners, in id order, and keeps the first that handles the link. A

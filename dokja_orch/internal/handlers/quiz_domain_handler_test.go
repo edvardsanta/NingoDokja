@@ -207,3 +207,56 @@ func TestAnEnglishInterfaceGetsTheCommentInEnglish(t *testing.T) {
 		t.Fatal("the comment language follows the interface's locale")
 	}
 }
+
+type fakeQuizMemory struct {
+	runs []quiz.Run
+	fail bool
+}
+
+func (m *fakeQuizMemory) Save(_ context.Context, run quiz.Run) error {
+	if m.fail {
+		return fmt.Errorf("disk full")
+	}
+	m.runs = append([]quiz.Run{run}, m.runs...)
+	return nil
+}
+
+func (m *fakeQuizMemory) Recent(_ context.Context, limit int) ([]quiz.Run, error) {
+	return m.runs[:min(limit, len(m.runs))], nil
+}
+
+func TestAFinishedRunIsRememberedWithTheQuestionsTheSiteAsked(t *testing.T) {
+	submit := map[string]any{"handled": true, "result": map[string]any{"url": "https://quiz.example.com/r", "label": "Example verdict", "asked": []any{"q2", "religion"}}}
+	feeds := &fakeQuizFeeds{providers: quizProviders(), questions: threeQuestions(), submit: submit}
+	model := &scriptedQuizModel{replies: []string{quizAnswers("q1", "Concordo", "q2", "Discordo", "religion", "Cristianismo")}}
+	memory := &fakeQuizMemory{}
+	result, err := NewQuizDomainHandler(feeds, model, nil).WithMemory(memory).Handle(context.Background(), quizEvent("https://quiz.example.com/start"), quizStep)
+	if err != nil || result["status"] != "ok" || len(memory.runs) != 1 {
+		t.Fatalf("result = %#v, %v, runs = %d", result, err, len(memory.runs))
+	}
+	run := memory.runs[0]
+	if run.Site != "quiz.example.com" || run.Label != "Example verdict" || run.Comment != result["comment"] || len(run.Items) != 2 {
+		t.Fatalf("run = %#v", run)
+	}
+	if run.Items[0] != (quiz.AnsweredItem{Question: "Tradition matters.", Answer: "Discordo"}) || run.Items[1].Answer != "Cristianismo" {
+		t.Fatalf("items = %#v", run.Items)
+	}
+}
+
+func TestAnUnusableAskedListOrAFailedSaveNeverCostsTheResult(t *testing.T) {
+	submit := map[string]any{"handled": true, "result": map[string]any{"url": "https://quiz.example.com/r", "asked": []any{"q-unknown"}}}
+	feeds := &fakeQuizFeeds{providers: quizProviders(), questions: threeQuestions(), submit: submit}
+	memory := &fakeQuizMemory{}
+	model := &scriptedQuizModel{replies: []string{quizAnswers("q1", "Concordo", "q2", "Concordo", "religion", "Outra")}}
+	result, err := NewQuizDomainHandler(feeds, model, nil).WithMemory(memory).Handle(context.Background(), quizEvent("https://quiz.example.com/start"), quizStep)
+	if err != nil || result["status"] != "ok" || len(memory.runs) != 1 || len(memory.runs[0].Items) != 0 {
+		t.Fatalf("an invalid asked list keeps the result without items: %#v %v %#v", result, err, memory.runs)
+	}
+
+	feeds = &fakeQuizFeeds{providers: quizProviders(), questions: threeQuestions(), submit: submit}
+	model = &scriptedQuizModel{replies: []string{quizAnswers("q1", "Concordo", "q2", "Concordo", "religion", "Outra")}}
+	result, err = NewQuizDomainHandler(feeds, model, nil).WithMemory(&fakeQuizMemory{fail: true}).Handle(context.Background(), quizEvent("https://quiz.example.com/start"), quizStep)
+	if err != nil || result["status"] != "ok" {
+		t.Fatalf("a failed save must not fail the run: %#v %v", result, err)
+	}
+}

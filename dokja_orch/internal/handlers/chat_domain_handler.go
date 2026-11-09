@@ -54,6 +54,7 @@ type ChatDomainHandler struct {
 	web              *webConversationReading
 	ningo            chat.NingoFacts
 	visions          string
+	quizRuns         QuizRunReader
 	warm             string
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
@@ -109,6 +110,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 	event = h.withOwnerInterface(event)
 	h.attachKnownFacts(ctx, event)
+	h.attachQuizRuns(ctx, event)
 	// The owner writing from the phone continues the archived conversation. Without an archive (it
 	// could not be opened) the self-chat answers as before, from the process's own session.
 	if selfChatRequest(event) && h.archive != nil {

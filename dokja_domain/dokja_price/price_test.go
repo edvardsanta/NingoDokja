@@ -419,11 +419,11 @@ func searchDomain(t *testing.T) *Domain {
 	t.Helper()
 	repo := NewMemoryRepository()
 	for _, product := range []struct{ key, title string }{
-		{"hd-blue-2tb", "HD WD Blue 2TB SATA"},
-		{"ssd-990pro-1tb", "SSD Samsung 990 PRO 1TB NVMe"},
-		{"cpu-ryzen7-9800x3d", "Processador AMD Ryzen 7 9800X3D"},
-		{"gpu-rx9070", "Placa de vídeo AMD Radeon RX 9070"},
-		{"gpu-rtx5070", "Placa de vídeo NVIDIA RTX 5070 HDMI"},
+		{"hd-blue-2tb", "HD Brandv Blue 2TB SATA"},
+		{"ssd-x900pro-1tb", "SSD Brandx X900 PRO 1TB NVMe"},
+		{"cpu-zenith7-9000", "Processador Brandz Zenith 7 9000"},
+		{"gpu-vx9000", "Placa de vídeo Brandz Vertex VX 9000"},
+		{"gpu-gx5000", "Placa de vídeo Brandw GX 5000 HDMI"},
 	} {
 		repo.Upsert(context.Background(), Observation{
 			Product: product.key, Title: product.title, Merchant: "store-a",
@@ -452,16 +452,16 @@ func TestSearchFindsProductsByWordsAndBrand(t *testing.T) {
 		search Search
 		want   []string
 	}{
-		// "hd" is a whole word: the RTX title's "HDMI" does not count.
+		// "hd" is a whole word: the GX title's "HDMI" does not count.
 		{Search{Query: "hd"}, []string{"hd-blue-2tb"}},
-		{Search{Brand: "amd"}, []string{"cpu-ryzen7-9800x3d", "gpu-rx9070"}},
-		{Search{Query: "placa de video", Brand: "AMD"}, []string{"gpu-rx9070"}},
-		{Search{Query: "Vídeo"}, []string{"gpu-rtx5070", "gpu-rx9070"}},
-		{Search{Query: "ryz"}, []string{"cpu-ryzen7-9800x3d"}},
-		{Search{Query: "990pro"}, []string{"ssd-990pro-1tb"}},
+		{Search{Brand: "brandz"}, []string{"cpu-zenith7-9000", "gpu-vx9000"}},
+		{Search{Query: "placa de video", Brand: "BRANDZ"}, []string{"gpu-vx9000"}},
+		{Search{Query: "Vídeo"}, []string{"gpu-gx5000", "gpu-vx9000"}},
+		{Search{Query: "zen"}, []string{"cpu-zenith7-9000"}},
+		{Search{Query: "x900pro"}, []string{"ssd-x900pro-1tb"}},
 		{Search{Product: "hd-blue-2tb"}, []string{"hd-blue-2tb"}},
-		{Search{Brand: "intel"}, []string{}},
-		{Search{}, []string{"cpu-ryzen7-9800x3d", "gpu-rtx5070", "gpu-rx9070", "hd-blue-2tb", "ssd-990pro-1tb"}},
+		{Search{Brand: "brandq"}, []string{}},
+		{Search{}, []string{"cpu-zenith7-9000", "gpu-gx5000", "gpu-vx9000", "hd-blue-2tb", "ssd-x900pro-1tb"}},
 	}
 	for _, c := range cases {
 		if got := searchKeys(t, domain, c.search); !reflect.DeepEqual(got, c.want) {
@@ -497,7 +497,7 @@ func TestSearchActionReturnsTitlesAndRefusesBadFields(t *testing.T) {
 	}
 	products := got["products"].([]any)
 	first := products[0].(map[string]any)
-	if got["matched"] != 1 || first["title"] != "HD WD Blue 2TB SATA" || len(first["assessments"].([]any)) != 1 {
+	if got["matched"] != 1 || first["title"] != "HD Brandv Blue 2TB SATA" || len(first["assessments"].([]any)) != 1 {
 		t.Fatalf("result %v", got)
 	}
 	for _, payload := range []map[string]any{

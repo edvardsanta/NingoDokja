@@ -82,7 +82,7 @@ func TestStoreBehavesLikeTheMemoryRepository(t *testing.T) {
 		observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-02", Cents: 49000, Seller: "Store B"}),
 		observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-02", Cents: 45000}),
 		observation(pricedomain.KindCard, pricedomain.Point{On: "2026-11-02", Cents: 52000}),
-		described("store-a", "samsung", "https://a.example/1"),
+		described("store-a", "brandx", "https://a.example/1"),
 		described("store-b", "", "https://b.example/1"),
 		described("store-a", "", ""),
 	}
@@ -131,7 +131,7 @@ func TestStoreBehavesLikeTheMemoryRepository(t *testing.T) {
 		add   bool
 		watch pricedomain.Watch
 	}{
-		{true, pricedomain.Watch{Category: "ssd sata", Brand: "samsung"}},
+		{true, pricedomain.Watch{Category: "ssd sata", Brand: "brandx"}},
 		{true, pricedomain.Watch{Category: "hd"}},
 		{true, pricedomain.Watch{Category: "hd"}},
 		{false, pricedomain.Watch{Category: "nvme"}},
