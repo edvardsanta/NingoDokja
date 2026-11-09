@@ -112,6 +112,8 @@ export type DiscordVoiceController = {
     activationMode?: "always" | "wakeword";
     consentingUsers?: ReadonlySet<string>;
     onObservation?(observation: VoiceObservation): Promise<void>;
+    // A copy of each transcribed segment of a conversation Ningo answers; it never delays a reply.
+    onHeard?(observation: VoiceObservation): void;
     onStopped?(): void;
     originChannelId?: string;
     onTurn: (transcript: string, turn?: VoiceTurnContext) => Promise<void>;
@@ -641,7 +643,7 @@ export function createDiscordVoiceController(options: {
       if (!member.voice.channel) throw new Error("Join the observer voice channel first");
       return member.voice.channel.id;
     },
-    async startConversation({ guildId, userId, originChannelId, activationMode = "always", onTurn, consentingUsers, onObservation, onStopped }) {
+    async startConversation({ guildId, userId, originChannelId, activationMode = "always", onTurn, consentingUsers, onObservation, onHeard, onStopped }) {
       if (!guildId) {
         throw new Error("Voice conversation only works in guild voice channels");
       }
@@ -685,7 +687,7 @@ export function createDiscordVoiceController(options: {
         activationMode,
         log: options.log,
         error: options.error,
-        onTurn, onObservation, onStopped,
+        onTurn, onObservation, onHeard, onStopped,
       });
       sessions.set(guildId, session);
 
@@ -755,6 +757,7 @@ export function createListeningSession(params: {
   originChannelId: string;
   participant(id: string): { userId: string; userName?: string } | undefined;
   onObservation?(observation: VoiceObservation): Promise<void>;
+  onHeard?(observation: VoiceObservation): void;
   onStopped?(): void;
   logTranscripts: boolean;
   activationMode: "always" | "wakeword";
@@ -830,7 +833,15 @@ export function createListeningSession(params: {
               await params.onObservation({ userId: participant.userId, userName: participant.userName, channelId: params.session.channelId,
                 sequence: seq, text, startedAt: captureStart, endedAt });
               conversation.finish(seq, undefined, "observed");
-            } else if (!params.onObservation) conversation.finish(seq, { ...participant, text });
+            } else if (!params.onObservation) {
+              if (text) {
+                try {
+                  params.onHeard?.({ userId: participant.userId, userName: participant.userName, channelId: params.session.channelId,
+                    sequence: seq, text, startedAt: captureStart, endedAt });
+                } catch (error) { params.error?.("[dokja-discord] voice transcript mirror failed", error); }
+              }
+              conversation.finish(seq, { ...participant, text });
+            }
           }
         } catch (error) {
           if (!lifetime.signal.aborted) params.error?.("[dokja-discord] voice transcription failed", error);

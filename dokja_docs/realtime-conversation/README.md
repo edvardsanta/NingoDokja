@@ -33,8 +33,10 @@ this ephemeral MVP. Nothing is imported into Knowledge or durable Memory.
 Stopping or restarting the orchestrator loses these observer journals. This is
 an explicit privacy-first MVP boundary, not durable conversation storage.
 
-The existing `/voice_chat_start` and music commands retain their existing behavior.
-Use the observer start/stop commands for silent channel transcription.
+`/voice_chat_start` and `/wake_chat` keep their behavior, and Ningo still answers. They
+also mirror each transcribed segment into a journal with `mode: "voice_chat"`, so the
+Desktop Realtime view shows a voice chat live. The journal is deleted on `/voice_chat_stop`.
+Use the observer start/stop commands for silent channel transcription (`mode: "observer"`).
 
 ## Current limits
 

@@ -73,7 +73,29 @@ func (e *ConversationContextEngine) StartChannel(id, guild, channel, origin, spe
 	return e.start(id, guild, channel, origin, speaker, true)
 }
 
+// Realtime session modes: a silent observer, or a live voice chat in which Ningo also speaks.
+const (
+	ModeObserver  = "observer"
+	ModeVoiceChat = "voice_chat"
+)
+
+// StartChannelMode opens a channel-wide journal in the given mode. A voice chat
+// mirrors what its listener transcribes, so the owner can follow it in real time.
+func (e *ConversationContextEngine) StartChannelMode(id, guild, channel, origin, speaker, mode string) error {
+	if mode == "" {
+		mode = ModeObserver
+	}
+	if mode != ModeObserver && mode != ModeVoiceChat {
+		return ErrRealtime
+	}
+	return e.startMode(id, guild, channel, origin, speaker, true, mode)
+}
+
 func (e *ConversationContextEngine) start(id, guild, channel, origin, speaker string, channelWide bool) error {
+	return e.startMode(id, guild, channel, origin, speaker, channelWide, ModeObserver)
+}
+
+func (e *ConversationContextEngine) startMode(id, guild, channel, origin, speaker string, channelWide bool, mode string) error {
 	if !bounded(id, 128) || !bounded(guild, 100) || !bounded(channel, 100) || !bounded(origin, 100) || !bounded(speaker, 100) {
 		return ErrRealtime
 	}
@@ -81,7 +103,7 @@ func (e *ConversationContextEngine) start(id, guild, channel, origin, speaker st
 	defer e.mu.Unlock()
 	e.prune()
 	if prior, ok := e.sessions[id]; ok {
-		if prior.GuildID == guild && prior.ChannelID == channel && prior.OriginChannelID == origin && prior.startedBy == speaker && prior.channelWide == channelWide && prior.Active {
+		if prior.GuildID == guild && prior.ChannelID == channel && prior.OriginChannelID == origin && prior.startedBy == speaker && prior.channelWide == channelWide && prior.Mode == mode && prior.Active {
 			return nil
 		}
 		return ErrRealtime
@@ -89,7 +111,7 @@ func (e *ConversationContextEngine) start(id, guild, channel, origin, speaker st
 	if len(e.sessions) >= 32 {
 		return errors.New("realtime session capacity reached")
 	}
-	e.sessions[id] = RealtimeSession{channelWide: channelWide, startedBy: speaker, SessionID: id, GuildID: guild, ChannelID: channel, OriginChannelID: origin, Mode: "observer", Active: true, Consenting: []string{speaker}, Messages: []RealtimeMessage{}, UpdatedAt: e.now()}
+	e.sessions[id] = RealtimeSession{channelWide: channelWide, startedBy: speaker, SessionID: id, GuildID: guild, ChannelID: channel, OriginChannelID: origin, Mode: mode, Active: true, Consenting: []string{speaker}, Messages: []RealtimeMessage{}, UpdatedAt: e.now()}
 	return nil
 }
 func allowed(s RealtimeSession, speaker string) bool {

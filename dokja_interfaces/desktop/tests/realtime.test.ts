@@ -23,3 +23,8 @@ test("observer preserves bounded display names and accepts snapshots without nam
  assert.equal(snapshot.sessions[0]!.messages[1]!.speaker_name,"");
  assert.equal(snapshot.sessions[0]!.messages[2]!.speaker_name?.length,200);
 });
+
+test("a session's mode is voice_chat or observer, never another value",()=>{
+ const modes=observerSnapshot({sessions:[{mode:"voice_chat"},{mode:"observer"},{mode:"broadcast"},{}]}).sessions.map(s=>s.mode);
+ assert.deepEqual(modes,["voice_chat","observer","observer","observer"]);
+});

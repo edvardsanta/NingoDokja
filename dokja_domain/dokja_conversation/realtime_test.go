@@ -190,3 +190,34 @@ func TestRealtimeSpeakerNamesAreOptionalBoundedPresentationText(t *testing.T) {
 func finalMessageForNameTest() RealtimeMessage {
 	return RealtimeMessage{MessageID: "named", SessionID: "session", SpeakerID: "speaker", Text: "speech", Status: "final", Revision: 1, TimestampStart: time.Unix(100, 0), TimestampEnd: time.Unix(102, 0)}
 }
+
+func TestVoiceChatSessionKeepsItsModeAndRefusesUnknownModes(t *testing.T) {
+	e := NewConversationContextEngine()
+	if e.StartChannelMode("bad", "guild", "voice", "text", "a", "broadcast") == nil {
+		t.Fatal("unknown mode accepted")
+	}
+	if err := e.StartChannelMode("session", "guild", "voice", "text", "a", ModeVoiceChat); err != nil {
+		t.Fatal(err)
+	}
+	if e.StartChannelMode("session", "guild", "voice", "text", "a", ModeObserver) == nil {
+		t.Fatal("a session changed mode on restart")
+	}
+	if err := e.StartChannelMode("session", "guild", "voice", "text", "a", ModeVoiceChat); err != nil {
+		t.Fatal("an identical restart must be idempotent", err)
+	}
+	if err := e.Observe("guild", "text", observation("one", "b", "what did Malthus fear?")); err != nil {
+		t.Fatal(err)
+	}
+	snap := e.Snapshot()
+	if len(snap) != 1 || snap[0].Mode != ModeVoiceChat || len(snap[0].Messages) != 1 {
+		t.Fatalf("voice chat journal = %#v", snap)
+	}
+	if err := e.StartChannelMode("plain", "guild2", "voice", "text", "a", ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range e.Snapshot() {
+		if s.SessionID == "plain" && s.Mode != ModeObserver {
+			t.Fatal("an unnamed mode must stay an observer")
+		}
+	}
+}
