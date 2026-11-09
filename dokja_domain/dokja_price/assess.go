@@ -12,7 +12,7 @@ type Verdict string
 const (
 	// VerdictInsufficientHistory: too few earlier days to judge.
 	VerdictInsufficientHistory Verdict = "insufficient_history"
-	// VerdictStale: the latest point is older than the day being judged.
+	// VerdictStale: the latest point is more than staleAfterDays older than the day being judged.
 	VerdictStale Verdict = "stale"
 	// VerdictRealDiscount: clearly below what this history usually costs.
 	VerdictRealDiscount Verdict = "real_discount"
@@ -41,6 +41,10 @@ const (
 // The thresholds below are in basis points (1/100 of a percent) so the arithmetic stays
 // in integers.
 const (
+	// staleAfterDays is how old the latest point may be. Aggregators publish only closed days,
+	// so their latest point is yesterday in the collector's time zone, which is already two
+	// days before the UTC date late in a Brazilian evening.
+	staleAfterDays = 2
 	// minHistoryDays is how many earlier days a judgement needs.
 	minHistoryDays = 7
 	// realDiscountBps: the price must be at least 5% under the 30-day median.
@@ -96,7 +100,7 @@ func Assess(key Key, points []Point, today time.Time) Assessment {
 	assessment.AdvertisedDiscountBps = discountBps(latest.ListCents, latest.Cents)
 
 	latestDay, _ := time.Parse(dateLayout, latest.On)
-	if today.UTC().Format(dateLayout) > latestDay.AddDate(0, 0, 1).Format(dateLayout) {
+	if today.UTC().Format(dateLayout) > latestDay.AddDate(0, 0, staleAfterDays).Format(dateLayout) {
 		assessment.Verdict = VerdictStale
 		return assessment
 	}

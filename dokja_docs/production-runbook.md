@@ -1515,6 +1515,33 @@ Remove it from `.env` and `.env.prod` on the next approved rollout. The
 `knowledge.application.supervision.*` request types are refused. Journal data
 and schema are unchanged.
 
+## Optional price history store
+
+`DOKJA_PRICE_POSTGRES_DSN` names the PostgreSQL database that keeps the Price
+domain's history ([ADR 0015](decisions/0015-price-history-domain.md)), including
+the database's explicit TLS policy. It is optional and unset by default; only
+the orchestrator and the `price-history-init` command read it. Unset, the
+history is kept in memory and a restart forgets it.
+
+The dev, lite and prod stacks project the DSN into the orchestrator. With the
+PostgreSQL overlay that `make start` applies, a DSN of the form
+`postgres://dokja:<password>@dokja-postgres:5432/dokja?sslmode=disable` uses the
+stack's own database; the password is `DOKJA_POSTGRES_PASSWORD`. Keep the DSN in
+`.env` or `.env.prod`, never in a committed file.
+
+Initialize the `dokja_price` namespace once with the explicit
+`price-history-init` command before restarting the orchestrator; production
+images include `/app/price-history-init`, and dev/lite can run
+`go run ./cmd/price-history-init` from `dokja_orch` with the DSN set. The command
+is idempotent. Startup only opens an initialized namespace and never creates
+tables. An invalid DSN, an unavailable database or an unsupported schema logs a
+sanitized message and keeps the history in memory; the rest of the orchestrator
+starts.
+
+Back up the namespace with the database (`pg_dump --schema=dokja_price`).
+Rolling back to a build without the adapter leaves the namespace unused;
+dropping it (`DROP SCHEMA dokja_price CASCADE`) deletes the history.
+
 Discord chat PDF size is configured with `DOKJA_PDF_MAX_MIB` (1–100 MiB,
 default 25). Desktop exposes it under Settings → Library → Chat PDF limit.
 Saving recreates orchestrator and feeds together. Blank or invalid environment
