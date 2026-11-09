@@ -38,6 +38,8 @@ type Repository interface {
 	Keys(ctx context.Context, product string) ([]Key, error)
 	// Products returns the watched products, in key order.
 	Products(ctx context.Context) ([]Product, error)
+	// Merchants returns every merchant key with a history, sorted.
+	Merchants(ctx context.Context) ([]string, error)
 	// OfferURLs returns the known page of each history of a product that has one.
 	OfferURLs(ctx context.Context, product string) (map[Key]string, error)
 	// Watches returns the watched searches, in category then brand order.
@@ -135,6 +137,21 @@ func (m *MemoryRepository) Products(_ context.Context) ([]Product, error) {
 	}
 	sort.Slice(products, func(i, j int) bool { return products[i].Key < products[j].Key })
 	return products, nil
+}
+
+func (m *MemoryRepository) Merchants(_ context.Context) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	seen := map[string]bool{}
+	merchants := []string{}
+	for key := range m.points {
+		if !seen[key.Merchant] {
+			seen[key.Merchant] = true
+			merchants = append(merchants, key.Merchant)
+		}
+	}
+	sort.Strings(merchants)
+	return merchants, nil
 }
 
 func (m *MemoryRepository) OfferURLs(_ context.Context, product string) (map[Key]string, error) {
