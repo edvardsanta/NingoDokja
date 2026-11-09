@@ -153,3 +153,27 @@ func TestTheWatchedSearchesStopAtTheirLimit(t *testing.T) {
 		t.Fatalf("watch %v", got["watch"])
 	}
 }
+
+func TestTheCollectorIsToldWhichProductsLackAMarketHistory(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	repo.Upsert(ctx, describedObservation("ssd-a", "store-a", "samsung", "", 100))
+	repo.Upsert(ctx, describedObservation("ssd-b", "store-a", "samsung", "", 100))
+	market := describedObservation("ssd-b", "aggregator", "", "", 90)
+	market.Series, market.Kind = SeriesMarketMin, KindUnknown
+	repo.Upsert(ctx, market)
+	repo.Upsert(ctx, describedObservation("ssd-c", "store-a", "samsung", "", 100))
+	domain := New(repo)
+
+	missing, err := domain.MissingMarket(ctx, 5)
+	if err != nil || len(missing) != 2 || missing[0].Key != "ssd-a" || missing[1].Key != "ssd-c" {
+		t.Fatalf("missing %+v %v", missing, err)
+	}
+	if one, _ := domain.MissingMarket(ctx, 1); len(one) != 1 {
+		t.Fatalf("limit ignored: %+v", one)
+	}
+	repo.AddWatch(ctx, Watch{Category: "ssd"})
+	if watches, _ := domain.Watches(ctx); len(watches) != 1 {
+		t.Fatalf("watches %+v", watches)
+	}
+}
