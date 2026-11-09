@@ -17,9 +17,12 @@ const (
 	priceIntakeDeadline = 6 * time.Minute
 	// priceSearchLimit bounds the products one watched search may bring in.
 	priceSearchLimit = 30
-	// priceMarketLookups bounds how many products a run asks the collector to find a
-	// market-low history for; the rest wait for later runs.
-	priceMarketLookups = 5
+	// priceMarketLookups bounds how many products a run asks the collector to find a market
+	// page for (a search on the market site each); the rest wait for later runs.
+	priceMarketLookups = 10
+	// priceMarketRefresh bounds how many known market pages a run hands back to the collector to
+	// refresh the stores' offers and the market history from, the stalest first.
+	priceMarketRefresh = 40
 )
 
 // PriceDomainHandler serves price.* events: the scheduled intake and assessments.
@@ -172,6 +175,7 @@ func (t *PriceIntakeTask) wait() {
 type priceIntakeRun struct {
 	searches []pricedomain.Watch
 	market   []pricedomain.Product
+	pages    []pricedomain.MarketPage
 	items    []any
 	refused  int
 	outcome  pricedomain.RecordOutcome
@@ -195,8 +199,8 @@ func (t *PriceIntakeTask) run(ctx context.Context, event core.Event, only []pric
 	// Only the shape of what happened is logged; invalid observations name the item so a broken
 	// collector can be found.
 	logger.Info(fmt.Sprintf(
-		"price intake attempt=%s status=%s reason=%s searches=%d market_lookups=%d observations=%d points=%d written=%d invalid=%d",
-		result.AttemptID, result.Status, result.Reason, len(run.searches), len(run.market), run.outcome.Observations,
+		"price intake attempt=%s status=%s reason=%s searches=%d market_lookups=%d market_refreshes=%d observations=%d points=%d written=%d invalid=%d",
+		result.AttemptID, result.Status, result.Reason, len(run.searches), len(run.market), len(run.pages), run.outcome.Observations,
 		run.outcome.Points, run.outcome.Written, len(run.outcome.Invalid),
 	))
 	for _, invalid := range run.outcome.Invalid {
@@ -223,8 +227,14 @@ func (t *PriceIntakeTask) plan(run *priceIntakeRun, only []pricedomain.Watch) co
 		if err != nil {
 			return core.StepResult{Disposition: core.StepFail, Reason: "price_watches_unavailable"}, nil
 		}
-		run.market = market
-		return core.StepResult{Disposition: core.StepContinue, Output: map[string]any{"searches": len(run.searches), "market_lookups": len(market)}}, nil
+		pages, err := t.domain.MarketPages(ctx, priceMarketRefresh)
+		if err != nil {
+			return core.StepResult{Disposition: core.StepFail, Reason: "price_watches_unavailable"}, nil
+		}
+		run.market, run.pages = market, pages
+		return core.StepResult{Disposition: core.StepContinue, Output: map[string]any{
+			"searches": len(run.searches), "market_lookups": len(market), "market_refreshes": len(pages),
+		}}, nil
 	}
 }
 
@@ -236,9 +246,15 @@ func (t *PriceIntakeTask) collect(run *priceIntakeRun) core.TaskStepFunc {
 		for _, watch := range run.searches {
 			searches = append(searches, map[string]any{"category": watch.Category, "brand": watch.Brand})
 		}
-		market := make([]any, 0, len(run.market))
+		market := make([]any, 0, len(run.market)+len(run.pages))
 		for _, product := range run.market {
 			market = append(market, map[string]any{"product": product.Key, "title": product.Title, "part_number": product.PartNumber})
+		}
+		// A known page needs no search: the collector reads it again for today's offers.
+		for _, page := range run.pages {
+			market = append(market, map[string]any{
+				"product": page.Product.Key, "title": page.Product.Title, "part_number": page.Product.PartNumber, "page": page.Page,
+			})
 		}
 		reply, err := t.feeds.Dispatch(ctx, "feeds.invoke", map[string]any{
 			"capability": "price.resolve.v1", "action": "search",
