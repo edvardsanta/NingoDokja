@@ -30,6 +30,7 @@ func (s *Service) jobs() []job {
 		{"meme.refresh", s.refreshInterval, s.runMemeRefresh},
 		{"meme.dispatch", s.dispatchInterval, s.runMemeDispatch},
 		{"knowledge.intake", s.intakeInterval, s.runKnowledgeIntake},
+		{"price.intake", priceIntakeInterval, s.runPriceIntake},
 	}
 }
 
