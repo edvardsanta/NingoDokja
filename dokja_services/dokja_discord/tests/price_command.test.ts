@@ -121,3 +121,58 @@ test("preco passes a refusal through instead of an empty result", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("each source links to its store page and the card title links to the cheapest offer", () => {
+  const linked = {
+    matched: 1,
+    products: [{
+      product: "pn:mz-example", title: "SSD Example",
+      assessments: [
+        { merchant: "store-a", series: "merchant", price_kind: "pix", verdict: "no_discount", signals: [], latest_on: "2026-11-08", latest_cents: 50000, url: "https://store-a.example/p/1" },
+        { merchant: "store-b", series: "merchant", price_kind: "pix", verdict: "no_discount", signals: [], latest_on: "2026-11-08", latest_cents: 45000, url: "https://store-b.example/p/1" },
+        { merchant: "store-c", series: "merchant", price_kind: "pix", verdict: "no_discount", signals: [], latest_on: "2026-11-08", latest_cents: 40000, url: "javascript:alert(1)" },
+      ],
+    }],
+  };
+  const [card] = embedsOf(buildPriceReply(linked, "pt-BR"));
+  assert.equal(card.url, "https://store-b.example/p/1");
+  assert.match(card.fields?.[0].value ?? "", /\[abrir na loja\]\(https:\/\/store-a\.example\/p\/1\)$/);
+  assert.doesNotMatch(card.fields?.[2].value ?? "", /javascript/);
+});
+
+test("a search the owner starts to watch says so, even before its products arrive", () => {
+  const added = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "added" } };
+  assert.match(String(buildPriceReply(added, "pt-BR")), /Passei a vigiar \*\*ssd sata · samsung\*\*/);
+  const guest = { products: [], matched: 0, watch: { category: "ssd sata", brand: "samsung", status: "not_owner" } };
+  assert.equal(buildPriceReply(guest, "pt-BR"), "Nenhum produto da watchlist corresponde a essa busca.");
+  const withProducts = { ...result, watch: { category: "hd", status: "added" } };
+  assert.match((buildPriceReply(withProducts, "en") as { content: string }).content, /^👁️ Now watching \*\*hd\*\*/);
+});
+
+test("preco sends the store and suggests the stores already seen", async () => {
+  const originalFetch = globalThis.fetch;
+  const sent: any[] = [];
+  globalThis.fetch = (async (_input, init) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    sent.push(body);
+    const price = body.event_type === "price.merchants" ? { merchants: ["aggregator", "store-a", "store-b"] } : result;
+    return new Response(JSON.stringify({ status: "ok", price }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const command = createPriceCommand("http://orch", 5000, "pt-BR");
+    const choices = await command.autocomplete!({ option: "loja", value: "STORE", userId: "u", channelId: "c" });
+    assert.deepEqual(choices, [{ name: "store-a", value: "store-a" }, { name: "store-b", value: "store-b" }]);
+    assert.deepEqual(await command.autocomplete!({ option: "marca", value: "", userId: "u", channelId: "c" }), []);
+
+    await command.handle({
+      userId: "u", channelId: "c", messageId: "m", guildId: "g",
+      getString: (name: string) => ({ produto: "hd", loja: "store-a" } as Record<string, string>)[name] ?? "",
+      getNumber: () => undefined, reply: async () => {}, updateReply: async () => {}, showModal: async () => {},
+    });
+    const search = sent.find((body) => body.event_type === "price.search");
+    assert.equal(search.payload.merchant, "store-a");
+    assert.equal(search.payload.query, "hd");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

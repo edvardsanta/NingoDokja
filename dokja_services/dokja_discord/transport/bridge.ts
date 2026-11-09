@@ -18,6 +18,7 @@ export type BridgeRequest = {
     maxItemsPerScraper?: number;
     query?: string;
     brand?: string;
+    merchant?: string;
     userId: string;
     userName?: string;
     channelId: string;
@@ -176,6 +177,7 @@ export function buildBridgePayload(params: {
   maxItemsPerScraper?: number;
   query?: string;
   brand?: string;
+  merchant?: string;
   startSession?: boolean;
   userId: string;
   userName?: string;
@@ -201,6 +203,7 @@ export function buildBridgePayload(params: {
       maxItemsPerScraper: params.maxItemsPerScraper,
       query: params.query?.slice(0, 100),
       brand: params.brand?.slice(0, 100),
+      merchant: params.merchant?.slice(0, 80),
       userId: params.userId,
       userName: params.userName === undefined ? undefined : Array.from(params.userName).slice(0, 100).join(""),
       channelId: params.channelId,

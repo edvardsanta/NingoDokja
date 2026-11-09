@@ -116,6 +116,11 @@ func TestStoreBehavesLikeTheMemoryRepository(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(gotProducts, wantProducts) {
 		t.Fatalf("products %v (%v), want %v", gotProducts, err, wantProducts)
 	}
+	wantMerchants, _ := memory.Merchants(ctx)
+	gotMerchants, err := store.Merchants(ctx)
+	if err != nil || !reflect.DeepEqual(gotMerchants, wantMerchants) {
+		t.Fatalf("merchants %v (%v), want %v", gotMerchants, err, wantMerchants)
+	}
 	wantURLs, _ := memory.OfferURLs(ctx, "ssd-example-1tb")
 	gotURLs, err := store.OfferURLs(ctx, "ssd-example-1tb")
 	if err != nil || !reflect.DeepEqual(gotURLs, wantURLs) || len(gotURLs) != 2 {

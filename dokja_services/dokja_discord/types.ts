@@ -43,6 +43,8 @@ export type DiscordEmbedSpec = {
   color?: number;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
   footer?: string;
+  // the page the title links to; kept only when it is an http(s) address
+  url?: string;
 };
 
 export type DiscordModalSpec = {
@@ -100,7 +102,20 @@ export type DiscordSlashCommand = {
   options?: any[];
   defer?: boolean;
   handle(context: DiscordCommandContext): Promise<void>;
+  // Suggests values for an option declared with autocomplete: true, as the person types. Discord
+  // shows at most 25 and waits about three seconds.
+  autocomplete?(context: DiscordAutocompleteContext): Promise<DiscordChoice[]>;
 };
+
+export type DiscordAutocompleteContext = {
+  option: string;
+  value: string;
+  userId: string;
+  channelId: string;
+  guildId?: string;
+};
+
+export type DiscordChoice = { name: string; value: string };
 
 export type DiscordMessageHandler = (context: DiscordMessageContext) => Promise<void>;
 

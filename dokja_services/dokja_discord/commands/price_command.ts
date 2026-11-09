@@ -3,6 +3,9 @@ import { ApplicationCommandOptionType } from "discord-api-types/v10";
 import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordCommandContext, DiscordEmbedSpec, DiscordReply, DiscordSlashCommand } from "../types.js";
 
+// Discord waits about three seconds for autocomplete suggestions.
+const AUTOCOMPLETE_TIMEOUT_MS = 2000;
+
 // Discord allows 10 embeds per message and 6000 characters across them.
 const MAX_EMBEDS = 10;
 const MAX_EMBED_TEXT = 5800;
@@ -33,6 +36,9 @@ const messages: Record<string, Catalog> = {
     all_time_low: "menor preço histórico",
     list_above_observed_max: "preço \"de\" acima do que já foi cobrado",
     raised_before_drop: "subiu antes de cair",
+    open: "abrir na loja",
+    watch_added: "👁️ Passei a vigiar **{search}**. Os produtos chegam em instantes: pergunte de novo daqui a pouco.",
+    watch_full: "A lista de buscas vigiadas está cheia; remova uma para vigiar **{search}**.",
   },
   en: {
     header: "🔎 {count} product(s) found",
@@ -56,6 +62,9 @@ const messages: Record<string, Catalog> = {
     all_time_low: "all-time low",
     list_above_observed_max: "\"from\" price above anything charged",
     raised_before_drop: "rose before dropping",
+    open: "open at the store",
+    watch_added: "👁️ Now watching **{search}**. Its products arrive in a moment: ask again shortly.",
+    watch_full: "The watched searches are full; remove one to watch **{search}**.",
   },
 };
 
@@ -113,7 +122,15 @@ function field(row: Assessment, words: Catalog, locale: string) {
   }
   const look = looksOf(row.verdict);
   lines.push(`${look.icon} ${text(words, String(row.verdict))}`);
+  const page = safeUrl(row.url);
+  if (page) lines.push(`[${text(words, "open")}](${page})`);
   return { name, value: lines.join("\n"), inline: true };
+}
+
+// A store page for a link: an http(s) address without characters that would break the markdown.
+function safeUrl(value: unknown): string {
+  const address = typeof value === "string" ? value.trim() : "";
+  return /^https?:\/\/[^\s()<>]+$/.test(address) ? address : "";
 }
 
 function embedFor(product: Record<string, unknown>, words: Catalog, locale: string): DiscordEmbedSpec {
@@ -123,8 +140,11 @@ function embedFor(product: Record<string, unknown>, words: Catalog, locale: stri
   const signals = [...new Set(rows.flatMap((row) => (Array.isArray(row.signals) ? row.signals.map(String) : [])))]
     .map((signal) => text(words, signal));
   const latest = rows.map((row) => String(row.latest_on ?? "")).sort().at(-1);
+  const cheapest = [...rows].filter((row) => safeUrl(row.url))
+    .sort((a, b) => Number(a.latest_cents ?? 0) - Number(b.latest_cents ?? 0))[0];
   return {
     title: String(product.title ?? product.product),
+    ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
     description: [`${look.icon} **${text(words, String(lead?.verdict ?? ""))}**`, ...signals].join(" · "),
     color: look.color,
     fields: rows.map((row) => field(row, words, locale)),
@@ -140,10 +160,14 @@ function embedLength(embed: DiscordEmbedSpec): number {
 // buildPriceReply renders the bridge's price result as one card per product; exported for tests.
 export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): DiscordReply {
   const words = catalog(locale);
-  const result = (price ?? {}) as { products?: Array<Record<string, unknown>>; matched?: number };
+  const result = (price ?? {}) as { products?: Array<Record<string, unknown>>; matched?: number; watch?: { category?: string; brand?: string; status?: string } };
   const products = Array.isArray(result.products) ? result.products : [];
+  // What the search did to the watched searches: only a new watch or a full list is worth saying.
+  const watched = [result.watch?.category, result.watch?.brand].filter((part) => part?.trim()).join(" · ");
+  const notice = result.watch?.status === "added" ? text(words, "watch_added", { search: watched })
+    : result.watch?.status === "full" ? text(words, "watch_full", { search: watched }) : "";
   if (products.length === 0) {
-    return text(words, "none");
+    return notice ? `${notice}\n${text(words, "none")}` : text(words, "none");
   }
   const matched = Math.max(result.matched ?? products.length, products.length);
   const embeds: DiscordEmbedSpec[] = [];
@@ -160,8 +184,8 @@ export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): 
     ? text(words, "header_for", { count: matched, search: search.trim() })
     : text(words, "header", { count: matched });
   const left = matched - embeds.length;
-  const content = left > 0 ? `${header}\n${text(words, "more", { count: left })}` : header;
-  return { content, embeds };
+  const lines = [notice, header, left > 0 ? text(words, "more", { count: left }) : ""].filter(Boolean);
+  return { content: lines.join("\n"), embeds };
 }
 
 export function createPriceCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
@@ -181,11 +205,32 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
         type: ApplicationCommandOptionType.String,
         required: false,
       },
+      {
+        name: "loja",
+        description: "Only this store; suggestions list the stores already seen",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        autocomplete: true,
+      },
     ],
+    autocomplete: async (context) => {
+      if (context.option !== "loja") return [];
+      // Discord waits about three seconds for suggestions.
+      const response = await dispatchToOrchestratorResponse(orchestratorEndpoint, Math.min(orchestratorTimeoutMs, AUTOCOMPLETE_TIMEOUT_MS), buildBridgePayload({
+        eventType: "price.merchants", userId: context.userId, channelId: context.channelId, messageId: "autocomplete", guildId: context.guildId,
+      }));
+      const typed = context.value.trim().toLowerCase();
+      const merchants = (response.price as { merchants?: unknown } | undefined)?.merchants;
+      return (Array.isArray(merchants) ? merchants : [])
+        .map(String)
+        .filter((merchant) => merchant.toLowerCase().includes(typed))
+        .map((merchant) => ({ name: merchant, value: merchant }));
+    },
     handle: async (context: DiscordCommandContext) => {
       try {
         const query = context.getString("produto");
         const brand = context.getString("marca");
+        const merchant = context.getString("loja");
         const response = await dispatchToOrchestratorResponse(
           orchestratorEndpoint,
           orchestratorTimeoutMs,
@@ -193,6 +238,7 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
             eventType: "price.search",
             query,
             brand,
+            merchant,
             userId: context.userId,
             channelId: context.channelId,
             messageId: context.messageId,
@@ -202,7 +248,7 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
         // A switched-off or refused request carries a reply and no price result.
         const reply = response.price === undefined && response.reply.trim()
           ? response.reply
-          : buildPriceReply(response.price, locale, [query, brand].filter((part) => part?.trim()).join(" "));
+          : buildPriceReply(response.price, locale, [query, brand, merchant].filter((part) => part?.trim()).join(" "));
         await context.reply(reply, { ephemeral: true });
       } catch (error) {
         console.error("[dokja-discord] command preco failed", error);

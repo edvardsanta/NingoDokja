@@ -54,8 +54,9 @@ type BridgePayload struct {
 	MentionedUserIDs    []string               `json:"mentionedUserIds"`
 	Limit               *int                   `json:"limit"`
 	MaxItems            *int                   `json:"maxItemsPerScraper"`
-	Query               string                 `json:"query"` // price.search words
-	Brand               string                 `json:"brand"` // price.search brand
+	Query               string                 `json:"query"`    // price.search words
+	Brand               string                 `json:"brand"`    // price.search brand
+	Merchant            string                 `json:"merchant"` // price.search store
 	UserID              string                 `json:"userId"`
 	UserName            string                 `json:"userName"`
 	ChannelID           string                 `json:"channelId"`
@@ -295,7 +296,7 @@ func extractBridgeMusic(result core.ProcessResult) map[string]any {
 // extractBridgePrice hands a price search's result back to the interface, which renders it with
 // its own translations; the bridge writes no prices into the reply text.
 func extractBridgePrice(result core.ProcessResult) map[string]any {
-	if strings.TrimSpace(result.Event.Type) != "price.search" {
+	if eventType := strings.TrimSpace(result.Event.Type); eventType != "price.search" && eventType != "price.merchants" {
 		return nil
 	}
 	price, _ := result.Result[string(core.DomainPrice)].(map[string]any)
@@ -630,9 +631,13 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
 	case "price.search":
+		// A chat reply shows the best buys first; the interface asks for nothing else.
 		return "price.search", map[string]any{
 			"query": strings.TrimSpace(request.Payload.Query), "brand": strings.TrimSpace(request.Payload.Brand),
+			"merchant": strings.TrimSpace(request.Payload.Merchant), "order": "opportunity",
 		}
+	case "price.merchants":
+		return "price.merchants", map[string]any{}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":

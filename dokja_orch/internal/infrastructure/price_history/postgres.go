@@ -346,3 +346,24 @@ func (s *Store) RemoveWatch(ctx context.Context, watch pricedomain.Watch) (bool,
 	}
 	return affected == 1, nil
 }
+
+// Merchants returns every merchant key with a history, sorted.
+func (s *Store) Merchants(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT DISTINCT merchant FROM dokja_price.points ORDER BY merchant`)
+	if err != nil {
+		return nil, safeError(ctx)
+	}
+	defer rows.Close()
+	merchants := []string{}
+	for rows.Next() {
+		var merchant string
+		if err := rows.Scan(&merchant); err != nil {
+			return nil, safeError(ctx)
+		}
+		merchants = append(merchants, merchant)
+	}
+	if rows.Err() != nil {
+		return nil, safeError(ctx)
+	}
+	return merchants, nil
+}

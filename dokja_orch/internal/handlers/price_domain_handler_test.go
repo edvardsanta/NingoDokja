@@ -217,6 +217,7 @@ func TestPriceEventsRouteToThePriceDomain(t *testing.T) {
 		"price.assess":     pricedomain.ActionAssessPrice,
 		"price.search":     pricedomain.ActionSearchPrices,
 		"price.watches":    pricedomain.ActionListWatches,
+		"price.merchants":  pricedomain.ActionListMerchants,
 		"price.unwatch":    pricedomain.ActionUnwatch,
 	} {
 		event := core.Event{Type: eventType, Source: core.SourceOrchestrator}
