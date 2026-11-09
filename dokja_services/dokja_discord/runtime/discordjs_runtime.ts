@@ -437,6 +437,7 @@ export function splitDiscordReply(message: DiscordReply): DiscordReply[] {
     ephemeral: base.ephemeral,
     components: index === 0 ? base.components : undefined,
     attachments: index === 0 ? base.attachments : undefined,
+    embeds: index === 0 ? base.embeds : undefined,
   }));
 }
 
@@ -611,16 +612,24 @@ export function toMessageReply(message: DiscordReply) {
   };
 }
 
-// An embed in Discord's own shape; a picture only from an http(s) address.
+// An embed in Discord's own shape; a picture only from an http(s) address. Text is cut to
+// Discord's limits: 25 fields, 256 characters per field name, 1024 per value, 2048 for the footer.
 export function toEmbed(embed: DiscordEmbedSpec) {
+  const fields = (embed.fields ?? [])
+    .filter((field) => field.name.trim() && field.value.trim())
+    .slice(0, 25)
+    .map((field) => ({ name: field.name.slice(0, 256), value: field.value.slice(0, 1024), inline: field.inline === true }));
   return {
     ...(embed.title ? { title: embed.title.slice(0, 256) } : {}),
     ...(embed.description ? { description: embed.description.slice(0, 4096) } : {}),
     ...(embed.thumbnailUrl && /^https?:\/\//.test(embed.thumbnailUrl) ? { thumbnail: { url: embed.thumbnailUrl } } : {}),
+    ...(Number.isInteger(embed.color) && embed.color! >= 0 && embed.color! <= 0xffffff ? { color: embed.color } : {}),
+    ...(fields.length ? { fields } : {}),
+    ...(embed.footer ? { footer: { text: embed.footer.slice(0, 2048) } } : {}),
   };
 }
 
-function toInteractionReply(
+export function toInteractionReply(
   message: DiscordReply,
   opts?: { ephemeral?: boolean },
   buttons: DiscordButtonAction[] = [],
@@ -638,10 +647,11 @@ function toInteractionReply(
     components: buildRows(message.components ?? [], buttons, selects),
     flags: message.ephemeral || opts?.ephemeral ? MessageFlags.Ephemeral : undefined,
     files: attachmentFiles(message),
+    ...(message.embeds ? { embeds: message.embeds.map(toEmbed) } : {}),
   };
 }
 
-function toInteractionEditReply(
+export function toInteractionEditReply(
   message: DiscordReply,
   buttons: DiscordButtonAction[] = [],
   selects: DiscordSelectAction[] = [],
@@ -654,6 +664,7 @@ function toInteractionEditReply(
     content: message.content,
     components: buildRows(message.components ?? [], buttons, selects),
     files: attachmentFiles(message),
+    ...(message.embeds ? { embeds: message.embeds.map(toEmbed) } : {}),
   };
 }
 

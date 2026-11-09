@@ -116,6 +116,7 @@ func TestPriceEventsRouteToThePriceDomain(t *testing.T) {
 	for eventType, action := range map[string]string{
 		"price.intake.run": pricedomain.ActionIntakePrice,
 		"price.assess":     pricedomain.ActionAssessPrice,
+		"price.search":     pricedomain.ActionSearchPrices,
 	} {
 		event := core.Event{Type: eventType, Source: core.SourceOrchestrator}
 		route, err := router.Route(context.Background(), event)

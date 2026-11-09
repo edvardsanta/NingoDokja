@@ -2,7 +2,7 @@
 
 Date: 2026-11-08. Status: proposed by the owner's request; the domain contract,
 rules, reference repository, orchestrator intake and PostgreSQL adapter are
-implemented. Commands and alerts are pending.
+implemented, and Discord's `/preco` searches them. Alerts are pending.
 Related: [ADR 0002](./0002-plugin-lifecycle.md), [ADR 0003](./0003-state-ownership.md),
 [ADR 0014](./0014-application-postgres-adoption.md).
 
@@ -125,14 +125,27 @@ Thresholds are constants in `assess.go`, in basis points:
   compares their answers.
 - Backup, rollback and configuration are in the production runbook.
 
+## Discord search (implemented)
+
+The owner asked for `/preco produto:<words>` and `/preco marca:<brand>`.
+`price.search` (action `search-prices`) takes optional `product` (exact key),
+`query` and `brand`, matches whole words of a product's title or key without
+accents or case (three letters or more also match a word's start, so `hd` does
+not match `hdmi` but `ryz` matches `ryzen`), and answers at most 10 products with
+their assessments, titles and the count of all matches. `price.assess` keeps its
+earlier shape. The bridge passes `query` and `brand` in and hands the result back
+as a structured `price` field, so the interface renders it in its own language;
+the bridge writes no prices into reply text. Brands and kinds of product are
+found because collectors put them in titles; the contract gained no field.
+
 ## Pending work (stacked follow-ups)
 
 - **Collection runs with the stack.** Observations are recorded only while the
   owner's stack is up (`make start`); there is no separate host capture, so days
   the stack is down have no merchant points. The aggregator's rolling history
   can backfill the market minimum for those days.
-- **Commands and alerts** in Desktop, CLI or Discord. These need the owner's
-  approval of the command surface before they are added.
+- **Alerts** to a channel, and price commands in Desktop or CLI. These need the
+  owner's approval of the surface before they are added.
 
 ## Compatibility
 

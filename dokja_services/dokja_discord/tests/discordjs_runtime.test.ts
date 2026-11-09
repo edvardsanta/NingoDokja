@@ -161,3 +161,37 @@ test("an embed keeps a picture only from an http(s) address and bounds its text"
   assert.deepEqual(toEmbed({ title: "t", thumbnailUrl: "file:///etc/passwd" }), { title: "t" });
   assert.equal(toEmbed({ title: "x".repeat(300) }).title?.length, 256);
 });
+
+test("an embed keeps a valid colour, bounded fields and a footer", async () => {
+  const { toEmbed } = await import("../runtime/discordjs_runtime.js");
+  const embed = toEmbed({
+    title: "t",
+    color: 0x2ecc71,
+    footer: "f".repeat(3000),
+    fields: [
+      { name: "a", value: "v".repeat(2000), inline: true },
+      { name: " ", value: "dropped" },
+      ...Array.from({ length: 30 }, (_, index) => ({ name: `n${index}`, value: "x" })),
+    ],
+  });
+  assert.equal(embed.color, 0x2ecc71);
+  assert.equal(embed.fields?.length, 25);
+  assert.deepEqual(embed.fields?.[0], { name: "a", value: "v".repeat(1024), inline: true });
+  assert.equal(embed.footer?.text.length, 2048);
+  assert.equal(toEmbed({ title: "t", color: -1 }).color, undefined);
+  assert.equal(toEmbed({ title: "t", color: 1.5 }).color, undefined);
+});
+
+test("command replies and their edits carry embeds, and a long reply keeps them on its first part", async () => {
+  // Regression: slash command replies dropped embeds, so cards never reached Discord.
+  const { toInteractionReply, toInteractionEditReply, splitDiscordReply } = await import("../runtime/discordjs_runtime.js");
+  const message = { content: "header", embeds: [{ title: "card", color: 0x2ecc71 }] };
+  assert.deepEqual(toInteractionReply(message, { ephemeral: true }).embeds, [{ title: "card", color: 0x2ecc71 }]);
+  assert.deepEqual(toInteractionEditReply(message).embeds, [{ title: "card", color: 0x2ecc71 }]);
+  assert.equal(toInteractionReply("plain").embeds, undefined);
+
+  const parts = splitDiscordReply({ content: "x".repeat(4500), embeds: [{ title: "card" }] });
+  assert.ok(parts.length > 1);
+  assert.deepEqual((parts[0] as { embeds?: unknown }).embeds, [{ title: "card" }]);
+  assert.equal((parts[1] as { embeds?: unknown }).embeds, undefined);
+});

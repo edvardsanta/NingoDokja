@@ -13,6 +13,9 @@ const (
 	// ActionAssessPrice judges the latest price of every history of a product, or of
 	// every watched product.
 	ActionAssessPrice = "assess-price"
+	// ActionSearchPrices assesses the watched products that match words, such as a kind of
+	// product ("hd") or a brand ("amd").
+	ActionSearchPrices = "search-prices"
 	// ActionIntakePrice names the scheduled run that reads Feeds and records what it
 	// holds. The orchestrator sequences it; the domain only records.
 	ActionIntakePrice = "intake-price"
@@ -86,6 +89,24 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 			rows = append(rows, assessment.Map())
 		}
 		return map[string]any{"assessments": rows, "count": len(rows)}, nil
+	case ActionSearchPrices:
+		search := Search{}
+		for name, target := range map[string]*string{"product": &search.Product, "query": &search.Query, "brand": &search.Brand} {
+			raw, present := request.Event.Payload[name]
+			if !present || raw == nil {
+				continue
+			}
+			value, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be a string", name)
+			}
+			*target = value
+		}
+		result, err := d.SearchProducts(ctx, search)
+		if err != nil {
+			return nil, err
+		}
+		return result.Map(), nil
 	}
 	return nil, fmt.Errorf("unsupported price action %q for event type %q", request.Action, request.Event.Type)
 }

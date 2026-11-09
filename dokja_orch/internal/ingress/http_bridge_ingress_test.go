@@ -187,3 +187,21 @@ func TestTheBridgeHandsTheQueueBackOnlyForMusicCommands(t *testing.T) {
 		t.Fatalf("%#v", event)
 	}
 }
+
+func TestBridgeMapsAPriceSearchAndHandsItsResultBack(t *testing.T) {
+	eventType, payload := mapBridgeRequestToEvent(BridgeRequest{
+		EventType: "price.search",
+		Payload:   BridgePayload{Query: " hd ", Brand: "amd", Content: "ignored"},
+	}, "ignored")
+	if eventType != "price.search" || payload["query"] != "hd" || payload["brand"] != "amd" || len(payload) != 2 {
+		t.Fatalf("mapped %s %v", eventType, payload)
+	}
+
+	result := map[string]any{string(core.DomainPrice): map[string]any{"matched": 1}}
+	if got := extractBridgePrice(core.ProcessResult{Event: core.Event{Type: "price.search"}, Result: result}); got["matched"] != 1 {
+		t.Fatalf("price result %v", got)
+	}
+	if got := extractBridgePrice(core.ProcessResult{Event: core.Event{Type: "price.assess"}, Result: result}); got != nil {
+		t.Fatalf("a non-search event carried a price result: %v", got)
+	}
+}

@@ -34,11 +34,15 @@ export type DiscordReply =
       embeds?: DiscordEmbedSpec[];
     };
 
-// A card under a message: a title, some text and a small picture beside it.
+// A card under a message: a title, some text and a small picture beside it, with an
+// optional side colour, short labelled fields and a footer line.
 export type DiscordEmbedSpec = {
   title?: string;
   description?: string;
   thumbnailUrl?: string;
+  color?: number;
+  fields?: Array<{ name: string; value: string; inline?: boolean }>;
+  footer?: string;
 };
 
 export type DiscordModalSpec = {

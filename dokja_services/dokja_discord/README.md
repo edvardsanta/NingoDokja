@@ -132,6 +132,18 @@ Response body:
 }
 ```
 
+## Price search
+
+`/preco produto:<words> marca:<brand>` asks the orchestrator for `price.search`.
+Both options are optional and match whole words of a watched product's title or
+key, without accents or case (`produto: hd`, `produto: rtx 5070`, `marca: amd`);
+a word of three letters or more also matches the start of a longer one. The
+reply is private to the person who asked: one card per product, at most 10,
+coloured by the leading verdict (a warning outranks a discount), with one field
+per price source and the verdicts translated from the Price domain's codes in
+`commands/price_command.ts` (`pt-BR` and `en`, from `DOKJA_DISCORD_LOCALE`).
+Store names come from the owner's collector data; the adapter names none.
+
 ## Live group voice
 
 Join a server voice channel and run `/voice_chat_start` once. Ningo listens to
