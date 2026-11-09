@@ -213,7 +213,7 @@ function serializeCommand(command: DiscordSlashCommand) {
   return builder.toJSON();
 }
 
-async function handleChatInputCommand(
+export async function handleChatInputCommand(
   definition: DiscordSlashCommand,
   interaction: ChatInputCommandInteraction,
   buttons: DiscordButtonAction[],
@@ -240,7 +240,9 @@ async function handleChatInputCommand(
     channelId: interaction.channelId,
     messageId: interaction.id,
     guildId: interaction.guildId ?? undefined,
-    getString: (name: string) => interaction.options.getString(name, true),
+    // Discord itself enforces required options; an optional one left empty reads as "", as
+    // in the Carbon runtime, instead of throwing.
+    getString: (name: string) => interaction.options.getString(name) ?? "",
     getNumber: (name: string) => interaction.options.getNumber(name) ?? undefined,
     reply: async (message: DiscordReply, opts?: { ephemeral?: boolean }) => {
       params.log?.(
