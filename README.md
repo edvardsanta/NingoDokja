@@ -117,6 +117,11 @@ different credential file for both Compose and Desktop while retaining the lite
 stack. Desktop's module controller supports only the lite stack. Closing Desktop
 leaves the services running. Run `make help` for the available commands.
 
+When the env file sets `DOKJA_VOICE_CPP_MODEL_FILE`, these commands also apply
+`docker-compose.voice-gpu.yml` and start `dokja-whisper-gpu`, so speech is
+transcribed on the GPU instead of the CPU fallback. `make start VOICE_GPU=0`
+leaves the overlay out, and `VOICE_GPU=1` requires it.
+
 The build includes the host runtime controller. Opening System starts or
 reconnects to that background daemon; it does not start all application modules.
 

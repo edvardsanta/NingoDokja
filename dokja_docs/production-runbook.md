@@ -1560,7 +1560,13 @@ at startup. `DOKJA_VOICE_CPP_MODEL_FILE` names the existing host model file and
 setting for separately provisioned providers. A blank endpoint is invalid when
 this provider is selected, rather than a reason to run a stub.
 
-For a prepared local model and compatible GPU:
+`make start`, `make up`, `make status` and `make logs` apply this overlay
+whenever the env file sets `DOKJA_VOICE_CPP_MODEL_FILE`, and add `dokja-whisper-gpu`
+to the started and restarted services. A stack recreated without the overlay
+silently falls back to `DOKJA_VOICE_STT_PROVIDER` and its CPU model.
+Use `VOICE_GPU=0` to leave it out, or `VOICE_GPU=1` to require it.
+
+For a prepared local model and compatible GPU, outside `make`:
 
 ```sh
 docker compose -f docker-compose.lite.yml -f docker-compose.voice-gpu.yml up -d --build dokja-voice
