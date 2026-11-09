@@ -30,8 +30,12 @@ export async function loadMemory(transport: Transport): Promise<LoadResult<Memor
   }
   if (status.off) return { ok: true, data: { off: true, reason: status.reason } };
 
-  const stats = await transport.request("memory.stats", {}, { timeoutMs: TIMEOUT_MS });
-  return { ok: true, data: { off: false, status, score: scoreViewOf(stats) } };
+  // Each action is scored on its own: answers judged in Talk say nothing about hashtags.
+  const [stats, answers] = await Promise.all([
+    transport.request("memory.stats", {}, { timeoutMs: TIMEOUT_MS }),
+    transport.request("memory.stats", { action: "chat.answer" }, { timeoutMs: TIMEOUT_MS }),
+  ]);
+  return { ok: true, data: { off: false, status, score: scoreViewOf(stats), answers: scoreViewOf(answers) } };
 }
 
 export function MemoryCard({ transport }: { transport: Transport }) {
@@ -94,6 +98,8 @@ function MemoryBody({ view }: { view: Extract<MemoryView, { off: false }> }) {
     <details className="wp-section memory-numbers" open={view.score.kind === "error"}>
       <summary>{t("memory_score_title")}</summary>
       <ScoreBody score={view.score} />
+      <h3>{t("memory_score_answers")}</h3>
+      <ScoreBody score={view.answers} />
       <p className="note" data-tone={similarity === "on" ? "ok" : "unchecked"}>
         {similarity === "on" && t("memory_similarity_on", { model: status.embedModel })}
         {similarity === "off" && t("memory_similarity_off")}

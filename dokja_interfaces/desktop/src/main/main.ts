@@ -10,6 +10,7 @@ import {
   type TransportResult,
 } from "../shared/transport.js";
 import { RuntimeClient, runtimeRoot, runtimeStateHome } from "./runtime_client.js";
+import { DesktopVoiceGate, withVoicePresence } from "./desktop_voice.js";
 import { DEFAULT_ENDPOINT } from "./config.js";
 import { localPostMediaOrigin, parseConfig } from "./config.js";
 import { communicationsToken } from "./communications_config.js";
@@ -46,7 +47,8 @@ async function main(): Promise<void> {
   const distDir = join(__dirname, "..");
   const page = appPage(config, distDir);
 
-  installPermissionPolicy(session.defaultSession, page);
+  const desktopVoice = new DesktopVoiceGate();
+  installPermissionPolicy(session.defaultSession, page, () => desktopVoice.listening);
   blockRemoteRequests(session.defaultSession, config.devServerUrl);
 
   const root = runtimeRoot(config.runtimeRoot ?? process.cwd());
@@ -59,8 +61,13 @@ async function main(): Promise<void> {
   const bridgeToken = process.env.DOKJA_GATEWAY_INGRESS_TOKEN?.trim() ?? "";
   const bridge = config.bridgeEndpoint && bridgeToken ? new BridgeChat({ endpoint: config.bridgeEndpoint, token: bridgeToken }) : undefined;
   const client = {
-    request:(type:string,payload:Record<string,unknown>,timeout:number) =>
-      type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout),
+    request:async(type:string,payload:Record<string,unknown>,timeout:number) => {
+      // The microphone session lives here, in the shell: only a started session may transcribe.
+      if (type === "voice.desktop.start") return desktopVoice.startReply();
+      if (type === "voice.desktop.stop") return desktopVoice.stopReply(payload.voice_session_id);
+      if (type === "voice.transcribe") return desktopVoice.turn(payload.voice_session_id, () => orchestrator.request(type,payload,timeout));
+      return type.startsWith("runtime.") ? runtime.request(type,payload,timeout) : orchestrator.request(type,payload,timeout);
+    },
     // A bridge that never saw the turn (not listening, or too old to stream) leaves it to the socket.
     ...(bridge ? { streamChat:(payload:Record<string,unknown>,timeout:number,onPreview:(text:string)=>void,onQueued?:(queued:boolean)=>void) =>
       bridge.stream(payload,timeout,onPreview,onQueued).catch((error:unknown) => {
@@ -117,6 +124,7 @@ async function main(): Promise<void> {
     postMediaResponse(request, posts.file(request.url)));
   let disposed = false;
   app.on("will-quit", (event) => {
+    desktopVoice.stop();
     if (disposed) return;
     event.preventDefault();
     disposed = true;
@@ -131,7 +139,7 @@ async function main(): Promise<void> {
     if (!isTrustedSender(event.senderFrame?.url, page)) return untrusted;
 
     const started = Date.now();
-    const result = await handleRequest(raw, client, limits, media, presence, confirm, (preview) => {
+    const result = await handleRequest(raw, client, limits, media, withVoicePresence(presence, desktopVoice), confirm, (preview) => {
       if (!event.sender.isDestroyed()) event.sender.send(CHANNELS.chatPreview, preview);
     });
     // Only the action name and the outcome are logged, never a payload or a reply.

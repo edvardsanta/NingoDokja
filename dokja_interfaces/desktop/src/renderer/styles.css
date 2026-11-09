@@ -2501,6 +2501,10 @@ button.icon-button[aria-expanded="true"] {
 .composer button[type="submit"] { grid-column: 2; min-height: var(--composer-field-min-height); padding-inline: var(--space-5); }
 .composer-foot { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4); }
 .composer-hint { margin: 0; font-size: .75rem; }
+/* Talk by voice sits in the quiet row: the toggle, what the microphone is doing, and a problem if any. */
+.talk-voice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+.talk-voice-state { margin: 0; font-size: .75rem; }
+.talk-voice-issue { flex-basis: 100%; margin: 0; font-size: .75rem; }
 /* The label is for screen readers here: the docked field says what it is by its place and hint. */
 .composer > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @container ws (max-width: 30rem) {
@@ -3388,3 +3392,6 @@ button.cfg-toggle:focus-visible {
   .wp-section .decision,
   .kept-facts li { animation: none; }
 }
+
+/* The owner's verdict on an answer sits under it, quiet until asked. */
+.answer-verdict { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); margin-top:var(--space-2); color:var(--text-secondary); }

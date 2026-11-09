@@ -660,6 +660,43 @@ describe("a send waiting for its turn", () => {
     await screen.findByRole("button", { name: "Stop the reply" });
   });
 
+  it("asks for a verdict on each answer only when the orchestrator keeps verdicts, and the first one stands", async () => {
+    const answered = ok({ conversation: {}, turns: [archivedTurn({ content: "why?", reply: "Because.", state: "completed", seq: 2 })] });
+    const list = ok({ conversations: [{ id: archiveId(1), kind: "general", reading_id: "", title: "Judged", updated_at: "2026-01-01T00:00:00Z", revision: 1, turns: 1 }], next: "" });
+    const older = routedTransport({ "conversation.list": list, "conversation.read": answered });
+    const view = render(<I18nProvider locale="en"><AssistantCard transport={older.transport} /></I18nProvider>);
+    await screen.findByText("Because.");
+    await waitFor(() => expect(older.calls.some((call) => call.type === "conversation.capabilities")).toBe(true));
+    expect(screen.queryByRole("group", { name: "Was this answer useful?" })).toBeNull();
+    view.unmount();
+
+    const { transport, calls } = routedTransport({
+      "conversation.list": list, "conversation.read": answered,
+      "conversation.capabilities": ok({ operations: { feedback: "supported" } }),
+      "conversation.feedback": ok({ found: true, resolved: false, verdict: "useful" }),
+    });
+    render(<I18nProvider locale="en"><AssistantCard transport={transport} /></I18nProvider>);
+    await screen.findByRole("group", { name: "Was this answer useful?" });
+    fireEvent.click(screen.getByRole("button", { name: "Wrong" }));
+    // An earlier verdict from another interface stands, and the screen says which.
+    await screen.findByText("Already marked useful; the first verdict stands.");
+    expect(calls.find((call) => call.type === "conversation.feedback")?.payload).toEqual({ conversation_id: archiveId(1), turn_id: archiveId(0x102), seq: 2, verdict: "wrong" });
+    expect(screen.queryByRole("button", { name: "Useful" })).toBeNull();
+  });
+
+  it("says plainly when an answer is older than verdicts", async () => {
+    const answered = ok({ conversation: {}, turns: [archivedTurn({ content: "why?", reply: "Because.", state: "completed" })] });
+    const list = ok({ conversations: [{ id: archiveId(1), kind: "general", reading_id: "", title: "Old", updated_at: "2026-01-01T00:00:00Z", revision: 1, turns: 1 }], next: "" });
+    const { transport } = routedTransport({
+      "conversation.list": list, "conversation.read": answered,
+      "conversation.capabilities": ok({ operations: { feedback: "supported" } }),
+      "conversation.feedback": ok({ found: false, resolved: false }),
+    });
+    render(<I18nProvider locale="pt"><AssistantCard transport={transport} /></I18nProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: "Útil" }));
+    await screen.findByText("Esta resposta é anterior aos vereditos, então não há o que marcar.");
+  });
+
   it("stops a send another interface left on its way, and reads how it ended", async () => {
     const { transport, calls } = routedTransport({
       "conversation.list": ok({ conversations: [{ id: archiveId(1), kind: "general", reading_id: "", title: "Elsewhere", updated_at: "2026-01-01T00:00:00Z", revision: 1, turns: 1 }], next: "" }),

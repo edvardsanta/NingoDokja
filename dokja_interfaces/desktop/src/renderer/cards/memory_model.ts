@@ -15,7 +15,7 @@ export type ScoreView =
 
 export type MemoryView =
   | { off: true; reason: string }
-  | { off: false; status: MemoryStatus; score: ScoreView };
+  | { off: false; status: MemoryStatus; score: ScoreView; answers: ScoreView };
 
 const num = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;

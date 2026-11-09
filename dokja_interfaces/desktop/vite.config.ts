@@ -34,5 +34,9 @@ export default defineConfig({
   root: "src/renderer",
   base: "./",
   plugins: [react(), contentSecurityPolicy()],
-  build: { outDir: "../../dist/renderer", emptyOutDir: true, target: "chrome150" },
+  build: {
+    outDir: "../../dist/renderer", emptyOutDir: true, target: "chrome150",
+    // The microphone worklet is a module the policy allows only from 'self', never as a data: URL.
+    assetsInlineLimit: (file) => (file.endsWith("pcm_worklet.js") ? false : undefined),
+  },
 });

@@ -124,6 +124,7 @@ test("each action builds its own payload, so the screen cannot add fields", asyn
   );
   assert.deepEqual(await sent("knowledge.search", { query: "free will" }), { query: "free will", k: 5 });
   assert.deepEqual(await sent("memory.stats", { action: "something.else" }), { action: "hashtag.suggest" });
+  assert.deepEqual(await sent("memory.stats", { action: "chat.answer" }), { action: "chat.answer" });
   assert.deepEqual(await sent("meme.list", {}), { scope: "unsent", limit: 12, offset: 0 });
   assert.deepEqual(await sent("meme.list", { scope: "sent", limit: 500, offset: -4, nsfw: false }), {
     scope: "sent",
@@ -784,6 +785,26 @@ test("stopping a send needs a press and names only the conversation and the send
   const stopped = await handleRequest({type:"conversation.stop",payload:{...stop,scope:"other"}},client,limits,undefined,present);
   assert.deepEqual(stopped,{ok:true,result:{stopping:true}});
   assert.deepEqual(calls,[{type:"conversation.stop",payload:stop}]);
+});
+
+test("a verdict on an answer needs a press and names only the answer and the verdict", async () => {
+  const id = "c".repeat(32), turn = "d".repeat(32);
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) {
+    calls.push({type,payload});
+    return {status:"ok",result:{domain:"conversation",result:{turn_id:turn,found:true,resolved:true,verdict:"useful"}}};
+  } };
+  const limits = {defaultTimeoutMs:15000,maxTimeoutMs:120000};
+  const verdict = {conversation_id:id,turn_id:turn,seq:3,verdict:"useful"};
+  assert.equal((await handleRequest({type:"conversation.feedback",payload:verdict},client,limits)).ok,false,"a verdict needs a press");
+  const present = {recent:()=>true};
+  for (const payload of [{...verdict,verdict:"meh"},{...verdict,seq:0},{...verdict,seq:1.5},{...verdict,turn_id:"../x"},{...verdict,conversation_id:"x"},{conversation_id:id,turn_id:turn,verdict:"wrong"}]) {
+    assert.equal((await handleRequest({type:"conversation.feedback",payload},client,limits,undefined,present)).ok,false,JSON.stringify(payload));
+  }
+  assert.deepEqual(calls,[]);
+  const judged = await handleRequest({type:"conversation.feedback",payload:{...verdict,outcome:"accepted",ref:"chat:other"}},client,limits,undefined,present);
+  assert.deepEqual(judged,{ok:true,result:{found:true,resolved:true,verdict:"useful"}});
+  assert.deepEqual(calls,[{type:"conversation.feedback",payload:verdict}],"the screen cannot name an outcome or a memory ref");
 });
 
 test("renaming needs a press and deleting also the person's yes; both name the version they saw", async () => {
