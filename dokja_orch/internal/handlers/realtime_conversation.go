@@ -47,6 +47,11 @@ func (h *ConversationDomainHandler) realtimeHandle(_ context.Context, event core
 		if m.SpeakerName == m.SpeakerID {
 			m.SpeakerName = ""
 		}
+		// Only the adapter's own marker makes a line Ningo's reply; a role in the message body is ignored.
+		m.Role = ""
+		if payloadString(event.Payload, "speaker_role") == conversation.RoleNingo {
+			m.Role, m.SpeakerID, m.SpeakerName = conversation.RoleNingo, conversation.RoleNingo, "Ningo"
+		}
 		err = h.realtime.Observe(guild, event.Channel.ID, m)
 	default:
 		return nil, conversation.ErrRealtime

@@ -25,7 +25,13 @@ type RealtimeMessage struct {
 	Revision        int       `json:"revision"`
 	ThreadIDs       []string  `json:"thread_ids"`
 	ReplyTo         string    `json:"reply_to,omitempty"`
+	// Role is "ningo" for what Ningo said aloud in a voice chat, and empty for a participant.
+	Role string `json:"role,omitempty"`
 }
+
+// RoleNingo marks Ningo's own spoken reply in a voice chat journal.
+const RoleNingo = "ningo"
+
 type RealtimeSession struct {
 	channelWide     bool
 	startedBy       string
@@ -179,7 +185,11 @@ func (e *ConversationContextEngine) Observe(guild, origin string, m RealtimeMess
 	if !ok || !s.Active || s.GuildID != guild || s.OriginChannelID != origin || (!s.channelWide && !allowed(s, m.SpeakerID)) {
 		return ErrRealtime
 	}
-	if !allowed(s, m.SpeakerID) {
+	// Ningo speaks only in a voice chat; a silent observer never carries his words.
+	if m.Role != "" && (m.Role != RoleNingo || s.Mode != ModeVoiceChat) {
+		return ErrRealtime
+	}
+	if m.Role == "" && !allowed(s, m.SpeakerID) {
 		if len(s.Consenting) >= 16 {
 			return ErrRealtime
 		}
@@ -190,7 +200,7 @@ func (e *ConversationContextEngine) Observe(guild, origin string, m RealtimeMess
 	m.ReplyTo = ""
 	for i, old := range s.Messages {
 		if old.MessageID == m.MessageID {
-			if old.SpeakerID != m.SpeakerID || old.CaptureSequence != m.CaptureSequence {
+			if old.SpeakerID != m.SpeakerID || old.CaptureSequence != m.CaptureSequence || old.Role != m.Role {
 				return ErrRealtime
 			}
 			if m.Revision == old.Revision {

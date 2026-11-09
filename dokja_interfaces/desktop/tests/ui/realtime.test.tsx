@@ -70,3 +70,17 @@ test("a voice chat from /voice_chat_start is transcribed here and shown as a con
  expect(screen.getByText("Conversa por voz: Ningo escuta e responde.")).toBeTruthy();
  expect(screen.queryByText("Só transcrição: Ningo permanece em silêncio.")).toBeNull();
 });
+
+test("Ningo's spoken reply in a voice chat is marked apart from the participants",async()=>{
+ const transport:Transport={preview:async()=>({ok:false,error:{code:"denied",message:"disabled"}}),request:async()=>({ok:true,result:{sessions:[{
+  mode:"voice_chat",session_id:"s",consenting_participants:["a"],messages:[
+   {message_id:"q",speaker_id:"a",speaker_name:"draco_t",text:"Qual é o sistema de governo perfeito?",transcription_status:"final"},
+   {message_id:"r",speaker_id:"ningo",speaker_name:"Ningo",role:"ningo",revision:2,text:"Nenhum. A perfeição é para quem não governa.",transcription_status:"final"},
+  ],
+ }]}})};
+ render(<I18nProvider locale="pt"><RealtimeCard transport={transport}/></I18nProvider>);
+ const reply=(await screen.findByText("Nenhum. A perfeição é para quem não governa.")).closest("li")!;
+ expect(reply.getAttribute("data-role")).toBe("ningo");
+ expect(reply.querySelector("strong")!.textContent).toBe("Ningo");
+ expect(screen.getByText("Qual é o sistema de governo perfeito?").closest("li")!.hasAttribute("data-role")).toBe(false);
+});

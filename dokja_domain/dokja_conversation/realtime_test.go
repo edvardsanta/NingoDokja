@@ -221,3 +221,54 @@ func TestVoiceChatSessionKeepsItsModeAndRefusesUnknownModes(t *testing.T) {
 		}
 	}
 }
+
+func TestNingoReplyGrowsByRevisionAfterTheQuestionOnlyInAVoiceChat(t *testing.T) {
+	e := NewConversationContextEngine()
+	if err := e.StartChannelMode("session", "guild", "voice", "text", "a", ModeVoiceChat); err != nil {
+		t.Fatal(err)
+	}
+	question := observation("q", "b", "Ningo, qual é o sistema de governo perfeito?")
+	question.CaptureSequence = 4
+	if err := e.Observe("guild", "text", question); err != nil {
+		t.Fatal(err)
+	}
+	reply := observation("r", "ningo", "Nenhum.")
+	reply.CaptureSequence, reply.Role, reply.SpeakerName = 4, RoleNingo, "Ningo"
+	if err := e.Observe("guild", "text", reply); err != nil {
+		t.Fatal(err)
+	}
+	reply.Revision, reply.Text = 2, "Nenhum. A perfeição é um conceito para quem não governa."
+	if err := e.Observe("guild", "text", reply); err != nil {
+		t.Fatal(err)
+	}
+	later := observation("l", "b", "kkkk")
+	later.CaptureSequence = 5
+	if err := e.Observe("guild", "text", later); err != nil {
+		t.Fatal(err)
+	}
+	s := e.Snapshot()[0]
+	if len(s.Messages) != 3 || s.Messages[1].Role != RoleNingo || s.Messages[1].Revision != 2 || s.Messages[1].Text != reply.Text || s.Messages[2].MessageID != "l" {
+		t.Fatalf("journal = %#v", s.Messages)
+	}
+	for _, id := range s.Consenting {
+		if id == "ningo" {
+			t.Fatal("Ningo is not a participant")
+		}
+	}
+	reply.Revision, reply.Role = 3, ""
+	if e.Observe("guild", "text", reply) == nil {
+		t.Fatal("a revision changed who spoke")
+	}
+	observer := NewConversationContextEngine()
+	if err := observer.StartChannel("session", "guild", "voice", "text", "a"); err != nil {
+		t.Fatal(err)
+	}
+	reply.Revision, reply.Role, reply.MessageID = 1, RoleNingo, "x"
+	if observer.Observe("guild", "text", reply) == nil {
+		t.Fatal("a silent observer recorded Ningo speaking")
+	}
+	reply.Role = "admin"
+	if e.Observe("guild", "text", reply) == nil {
+		t.Fatal("unknown role accepted")
+	}
+}

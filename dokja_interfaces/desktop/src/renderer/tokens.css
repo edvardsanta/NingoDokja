@@ -15,6 +15,7 @@
   --color-magenta-500: #ff3d8b;
   --color-magenta-400: #ff6aa5;
   --color-amber-400: #ffb22e;
+  --color-red-400: #ff4f4f;
   --font-family-mono: "B612 Mono", ui-monospace, "DejaVu Sans Mono", monospace;
   --font-family-display: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
   --space-1: 0.25rem;
@@ -44,6 +45,8 @@
   --status-problem-text: var(--color-magenta-400);
   --status-pending: var(--color-amber-400);
   --status-off: var(--color-slate-500);
+  /* Ningo's own spoken words in a live transcript; red, apart from the magenta of a problem. */
+  --speaker-ningo: var(--color-red-400);
   --status-off-text: var(--text-secondary);
   --status-progress: var(--text-primary);
   --focus-ring: var(--color-cyan-400);
