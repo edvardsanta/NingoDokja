@@ -53,6 +53,7 @@ type ChatDomainHandler struct {
 	incoming         *IncomingContentWorkflow
 	web              *webConversationReading
 	ningo            chat.NingoFacts
+	visions          string
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.

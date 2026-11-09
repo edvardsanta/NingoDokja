@@ -22,6 +22,13 @@ func (h *ChatDomainHandler) WithNingoFacts(facts chat.NingoFacts) *ChatDomainHan
 	return h
 }
 
+// WithVisions gives the handler Ningo's convictions from the operator's private visions file. Unlike
+// the private facts they describe Ningo himself, so every turn carries them.
+func (h *ChatDomainHandler) WithVisions(visions string) *ChatDomainHandler {
+	h.visions = visions
+	return h
+}
+
 // privateFactsAllowed is where the owner allowed the private facts: their own WhatsApp chat and the
 // groups they listed. Nowhere else, Discord and the local interfaces included.
 func (h *ChatDomainHandler) privateFactsAllowed(event core.Event) bool {
@@ -91,8 +98,11 @@ func ownerChannel(event core.Event) (chat.OwnerChannel, bool) {
 // only the Discord gateway attaches a profile for Discord.
 func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 	event.Context = cloneChatContext(event.Context)
-	for _, granted := range []string{"owner_interface", "ningo_named_by", "known_people", "known_speaker", "known_facts", "facts_available", "fact_in_message"} {
+	for _, granted := range []string{"owner_interface", "ningo_visions", "ningo_named_by", "known_people", "known_speaker", "known_facts", "facts_available", "fact_in_message"} {
 		delete(event.Context, granted)
+	}
+	if h.visions != "" {
+		event.Context["ningo_visions"] = h.visions
 	}
 	h.attachPrivateFacts(event)
 	if event.Source != core.SourceDiscord {

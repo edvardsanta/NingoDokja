@@ -199,6 +199,21 @@ omit any profile fact you would not want the model to receive. Ownership grants
 no policy bypass or additional action permissions. Tokens remain in the ignored
 environment files.
 
+### Ningo's worldview
+
+Ningo's political and philosophical convictions live in `.dokja/visions.md`, a free
+Markdown file that stays outside Git. Every chat turn carries it, on every
+interface, text and voice alike. Ningo raises it when asked for an opinion, in a
+debate, or when someone pastes a quiz question with answer options; he then picks
+exactly one of the given options. Without the file Ningo has no configured
+worldview and chat goes on as before.
+
+The orchestrator reads the file once at startup. It must be UTF-8 text of at most
+8 KiB, or startup stops. Native runs default to `.dokja/visions.md` relative to
+the working directory; set `DOKJA_VISIONS_FILE` for another path. All three
+Compose stacks set `DOKJA_VISIONS_FILE=/run/dokja-config/visions.md` on the
+read-only `.dokja/` mount. Restart the orchestrator after editing it.
+
 Do not deploy with `CHANGE_ME_*` values.
 
 ## Validate Configuration
