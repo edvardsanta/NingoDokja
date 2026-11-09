@@ -37,6 +37,8 @@ const (
 	DomainConversation Domain = "conversation"
 	// Price history of the products the owner watches, and whether a price is a real promotion.
 	DomainPrice Domain = "price"
+	// Online questionnaires Ningo takes himself through an owner's quiz runner.
+	DomainQuiz Domain = "quiz"
 )
 
 type Event struct {

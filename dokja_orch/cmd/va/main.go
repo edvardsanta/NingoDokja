@@ -246,6 +246,7 @@ func main() {
 		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
+		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions),
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
