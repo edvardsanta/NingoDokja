@@ -96,6 +96,7 @@ func TestOtherServicesAndAdminEventsAreNotAffected(t *testing.T) {
 
 func TestPausedJobSkipsScheduledRunsButNotManualOnes(t *testing.T) {
 	service, controls, handlers := gatedService(t)
+	switchOn(t, controls, "meme.refresh")
 	off := false
 	if err := controls.SetJob("meme.dispatch", JobPatch{Enabled: &off}); err != nil {
 		t.Fatal(err)
@@ -139,6 +140,7 @@ func TestScheduledRunOutcomesAreRecorded(t *testing.T) {
 		return JobInfo{}
 	}
 
+	switchOn(t, controls, "meme.refresh")
 	process(t, service, "meme.pool.refresh", "meme.refresh")
 	if job := find(); job.LastOutcome != "ran" || job.LastAt.IsZero() {
 		t.Fatalf("expected a ran outcome, got %+v", job)
@@ -180,6 +182,7 @@ func TestControlsPersistAcrossRestarts(t *testing.T) {
 	if err := controls.SetJob("meme.dispatch", JobPatch{Enabled: &off, Interval: &interval}); err != nil {
 		t.Fatal(err)
 	}
+	switchOn(t, controls, "meme.refresh")
 
 	reloaded, err := NewControls(path)
 	if err != nil {
@@ -189,7 +192,7 @@ func TestControlsPersistAcrossRestarts(t *testing.T) {
 		t.Fatal("service switches must survive a restart")
 	}
 	if reloaded.JobEnabled("meme.dispatch") || !reloaded.JobEnabled("meme.refresh") {
-		t.Fatal("job pauses must survive a restart")
+		t.Fatal("job switches must survive a restart")
 	}
 	for _, job := range reloaded.Jobs() {
 		if job.Name == "meme.dispatch" && (job.Interval != interval || !job.IntervalOverride) {
@@ -197,12 +200,12 @@ func TestControlsPersistAcrossRestarts(t *testing.T) {
 		}
 	}
 
-	// Turning everything back on leaves an empty (default) state, not stale entries.
-	on := true
+	// Going back to the defaults (services on, jobs off) leaves an empty state, not stale entries.
 	_ = reloaded.SetService("book", true)
-	_ = reloaded.SetJob("meme.dispatch", JobPatch{Enabled: &on, ClearInterval: true})
+	_ = reloaded.SetJob("meme.dispatch", JobPatch{Enabled: &off, ClearInterval: true})
+	_ = reloaded.SetJob("meme.refresh", JobPatch{Enabled: &off})
 	raw, _ := os.ReadFile(path)
-	if strings.Contains(string(raw), "book") || strings.Contains(string(raw), "meme.dispatch") {
+	if strings.Contains(string(raw), "book") || strings.Contains(string(raw), "meme.") {
 		t.Fatalf("defaults should not be stored, file is %s", raw)
 	}
 }
@@ -245,7 +248,7 @@ func TestControlsRejectUnknownNamesAndBadIntervals(t *testing.T) {
 			t.Fatalf("interval %s must be rejected", bad)
 		}
 	}
-	if !controls.JobEnabled("meme.refresh") {
+	if controls.JobEnabled("meme.refresh") {
 		t.Fatal("a rejected change must not alter state")
 	}
 }
@@ -267,8 +270,8 @@ func TestFailedSaveRollsTheChangeBack(t *testing.T) {
 	if !controls.ServiceEnabled("meme") {
 		t.Fatal("state must not change when it cannot be persisted")
 	}
-	off := false
-	if err := controls.SetJob("meme.refresh", JobPatch{Enabled: &off}); err == nil || !controls.JobEnabled("meme.refresh") {
+	on := true
+	if err := controls.SetJob("meme.refresh", JobPatch{Enabled: &on}); err == nil || controls.JobEnabled("meme.refresh") {
 		t.Fatal("a failed job change must roll back too")
 	}
 }
@@ -320,6 +323,8 @@ func TestControlsAreSafeForConcurrentIngresses(t *testing.T) {
 
 func TestSwitchingTheSchedulerOffPausesEveryScheduledRunButNotManualOnes(t *testing.T) {
 	service, controls, _ := gatedService(t)
+	switchOn(t, controls, "meme.refresh")
+	switchOn(t, controls, "meme.dispatch")
 	if err := controls.SetService("scheduler", false); err != nil {
 		t.Fatal(err)
 	}
@@ -533,5 +538,65 @@ func TestRetiredChatSwitchPreservesDisabledIntent(t *testing.T) {
 	loaded, err := NewControls(path)
 	if err != nil || !loaded.ServiceEnabled("chat") {
 		t.Fatal(err)
+	}
+}
+
+func switchOn(t *testing.T, controls *Controls, job string) {
+	t.Helper()
+	on := true
+	if err := controls.SetJob(job, JobPatch{Enabled: &on}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJobsStayOffUntilTheOperatorSwitchesEachOn(t *testing.T) {
+	service, controls, handlers := gatedService(t)
+	for _, name := range KnownJobs {
+		if controls.JobEnabled(name) {
+			t.Fatalf("job %s must start switched off", name)
+		}
+	}
+	for _, job := range controls.Jobs() {
+		if job.Enabled {
+			t.Fatalf("the job view must show %s off", job.Name)
+		}
+	}
+	result := process(t, service, "meme.dispatch.scheduled", "meme.dispatch")
+	if result.Result["skipped"] != true || result.Result["reason"] != "job meme.dispatch is paused" || handlers[DomainSystem].calls != 0 {
+		t.Fatalf("a job nobody switched on must not run, got %#v", result.Result)
+	}
+	if result := process(t, service, "meme.dispatch.scheduled", ""); result.Result["skipped"] != nil {
+		t.Fatalf("a manual run needs no switch, got %#v", result.Result)
+	}
+
+	switchOn(t, controls, "meme.dispatch")
+	if result := process(t, service, "meme.dispatch.scheduled", "meme.dispatch"); result.Result["skipped"] != nil {
+		t.Fatalf("a job switched on runs, got %#v", result.Result)
+	}
+	if controls.JobEnabled("meme.refresh") {
+		t.Fatal("switching one job on leaves the others off")
+	}
+}
+
+func TestAStateSavedBeforeJobsDefaultedOffKeepsThemOff(t *testing.T) {
+	// Before this change a job missing from the file ran. Now only "enabled": true runs it, so
+	// an upgrade leaves every job off until the operator turns it on.
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, []byte(`{"jobs":{"meme.dispatch":{"interval":"2h"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	controls, err := NewControls(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range KnownJobs {
+		if controls.JobEnabled(name) {
+			t.Fatalf("job %s must be off after the upgrade", name)
+		}
+	}
+	switchOn(t, controls, "price.intake")
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), `"price.intake":{"enabled":true}`) && !strings.Contains(string(raw), `"enabled": true`) {
+		t.Fatalf("a job switched on must be saved explicitly, file is %s", raw)
 	}
 }
