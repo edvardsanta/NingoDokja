@@ -127,7 +127,7 @@ export function PricesCard({ transport }: { transport: Transport }) {
 }
 
 // The searches the collectors run, each removable; the list grows from "Watch this search" here
-// and from the owner's /preco in Discord.
+// and from the owner's /price (/preco) in Discord.
 function WatchedSearches({ transport, round }: { transport: Transport; round: number }) {
   const t = useTranslate();
   const [watches, setWatches] = useState<PriceWatch[] | undefined>();

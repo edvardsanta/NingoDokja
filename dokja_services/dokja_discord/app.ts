@@ -24,7 +24,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     log: runtime.log,
     error: runtime.error,
   });
-  const MUSIC_COMMANDS = new Set(["play", "skip", "pause", "resume", "stop", "queue", "volume"]);
+  const MUSIC_COMMANDS = new Set(["play", "queue"]);
   // One music feature: its commands and its panel buttons share the queue they play.
   const music = createMusic({
     orchestratorEndpoint: cfg.orchestratorEndpoint,
@@ -44,7 +44,6 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
             entry.name.startsWith("conversation_") ||
             entry.name === "speak" ||
             entry.name === "voice_chat_start" ||
-            entry.name === "wake_chat" ||
             entry.name === "voice_chat_stop" ||
             entry.name === "play_radio" ||
             entry.name === "stop_radio" ||

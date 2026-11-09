@@ -100,7 +100,7 @@ export function createQuizCommand(orchestratorEndpoint: string, locale?: string)
           : buildQuizReply(response.quiz, locale);
         await context.reply(reply);
       } catch (error) {
-        console.error("[dokja-discord] command teste_politico failed", error);
+        console.error("[dokja-discord] command political_test failed", error);
         await context.reply(text(catalog(locale), "failed"));
       }
     },
