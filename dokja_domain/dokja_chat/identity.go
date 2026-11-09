@@ -28,11 +28,13 @@ type NingoFacts struct {
 }
 
 // KnownPerson is someone Ningo knows. WhatsApp recognizes them by the number and never reaches the
-// model; Name and About do.
+// model; Name and About do. Warm makes Ningo gentle and familiar on that person's own turns; the flag
+// shapes the turn's tone and is never listed to the model as a fact about anyone.
 type KnownPerson struct {
 	Name     string   `json:"name"`
 	WhatsApp string   `json:"whatsapp,omitempty"`
 	About    []string `json:"about,omitempty"`
+	Warm     bool     `json:"warm,omitempty"`
 }
 
 // OwnerChannel is how the owner was recognized for this turn, and so what the reply says about it.
