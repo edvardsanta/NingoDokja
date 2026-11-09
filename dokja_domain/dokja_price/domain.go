@@ -102,6 +102,13 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 			}
 			*target = value
 		}
+		if raw, present := request.Event.Payload["history"]; present && raw != nil {
+			wanted, ok := raw.(bool)
+			if !ok {
+				return nil, fmt.Errorf("history must be true or false")
+			}
+			search.History = wanted
+		}
 		result, err := d.SearchProducts(ctx, search)
 		if err != nil {
 			return nil, err
