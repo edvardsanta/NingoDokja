@@ -24,7 +24,8 @@ const (
 	// compareStepTimeout bounds each call the comparison makes (identify, lookup, comment).
 	compareStepTimeout = 40 * time.Second
 	// maxCompareComment bounds Ningo's comment.
-	maxCompareComment = 600
+	maxCompareComment     = 600
+	competitorPlanVersion = "1"
 )
 
 // priceCommenter writes Ningo's few lines about a comparison. It is the chat provider; nil
@@ -150,6 +151,7 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result, or
 
 func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any, original map[string]any) []string {
 	input := map[string]any{
+		"plan_version": competitorPlanVersion,
 		"product":      product,
 		"profile":      profile,
 		"budget_cents": original["budget_cents"],

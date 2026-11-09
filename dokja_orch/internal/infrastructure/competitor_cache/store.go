@@ -11,14 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 const (
 	FileName = "dokja_competitor_cache.db"
-	ttl      = 30 * 24 * time.Hour
 	maxJSON  = 64 << 10
 )
 
@@ -52,10 +50,8 @@ func (s *Store) migrate() error {
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS competitor_queries (
 	cache_key TEXT PRIMARY KEY,
-	queries_json TEXT NOT NULL,
-	expires_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS competitor_queries_expires_at ON competitor_queries(expires_at);`)
+	queries_json TEXT NOT NULL
+);`)
 	return err
 }
 
@@ -80,17 +76,12 @@ func Key(facts any) (string, error) {
 
 func (s *Store) Get(ctx context.Context, key string) ([]string, bool, error) {
 	var raw string
-	var expires int64
-	err := s.db.QueryRowContext(ctx, `SELECT queries_json, expires_at FROM competitor_queries WHERE cache_key = ?`, key).Scan(&raw, &expires)
+	err := s.db.QueryRowContext(ctx, `SELECT queries_json FROM competitor_queries WHERE cache_key = ?`, key).Scan(&raw)
 	if err == sql.ErrNoRows {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, err
-	}
-	if expires <= time.Now().UnixNano() {
-		_, _ = s.db.ExecContext(ctx, `DELETE FROM competitor_queries WHERE cache_key = ?`, key)
-		return nil, false, nil
 	}
 	var queries []string
 	if err := json.Unmarshal([]byte(raw), &queries); err != nil {
@@ -105,8 +96,20 @@ func (s *Store) Put(ctx context.Context, key string, queries []string) error {
 		return fmt.Errorf("competitor cache result exceeds storage bounds")
 	}
 	_, err = s.db.ExecContext(ctx, `
-INSERT INTO competitor_queries(cache_key, queries_json, expires_at) VALUES(?, ?, ?)
-ON CONFLICT(cache_key) DO UPDATE SET queries_json=excluded.queries_json, expires_at=excluded.expires_at`,
-		key, string(raw), time.Now().Add(ttl).UnixNano())
+INSERT INTO competitor_queries(cache_key, queries_json) VALUES(?, ?)
+ON CONFLICT(cache_key) DO UPDATE SET queries_json=excluded.queries_json`,
+		key, string(raw))
+	return err
+}
+
+// Delete removes one plan after a profile or policy change.
+func (s *Store) Delete(ctx context.Context, key string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries WHERE cache_key = ?`, key)
+	return err
+}
+
+// Clear removes all durable plans. It is intended for explicit operator invalidation.
+func (s *Store) Clear(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM competitor_queries`)
 	return err
 }
