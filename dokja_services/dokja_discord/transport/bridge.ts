@@ -19,6 +19,7 @@ export type BridgeRequest = {
     query?: string;
     brand?: string;
     merchant?: string;
+    link?: string;
     userId: string;
     userName?: string;
     channelId: string;
@@ -183,6 +184,7 @@ export function buildBridgePayload(params: {
   query?: string;
   brand?: string;
   merchant?: string;
+  link?: string;
   startSession?: boolean;
   userId: string;
   userName?: string;
@@ -209,6 +211,7 @@ export function buildBridgePayload(params: {
       query: params.query?.slice(0, 100),
       brand: params.brand?.slice(0, 100),
       merchant: params.merchant?.slice(0, 80),
+      link: params.link?.slice(0, 500),
       userId: params.userId,
       userName: params.userName === undefined ? undefined : Array.from(params.userName).slice(0, 100).join(""),
       channelId: params.channelId,

@@ -176,3 +176,63 @@ test("preco sends the store and suggests the stores already seen", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+import { buildCompareReply, createCompareCommand } from "../commands/price_command.js";
+
+const compared = {
+  found: true, looked_up: true,
+  product: { product: "pn:xy650ss-240gt-r", title: "SSD Example 240GB", part_number: "XY650SS-240GT-R" },
+  offers: [
+    { merchant: "store-b", series: "merchant", price_kind: "unknown", verdict: "insufficient_history", signals: [], latest_cents: 11990, url: "https://store-b.example/p" },
+    { merchant: "store-a", series: "merchant", price_kind: "pix", verdict: "real_discount", signals: [], latest_cents: 12990, url: "https://store-a.example/p" },
+    { merchant: "aggregator", series: "market_min", price_kind: "unknown", verdict: "no_discount", signals: [], latest_cents: 11000, url: "https://market.example/p" },
+  ],
+  comment: "Compre agora, mortal.",
+  link: { known: true, store: "store-z", store_name: "Store Z" },
+};
+
+test("a comparison is one card: every store cheapest first, Ningo's words, the part number and what was unreadable", () => {
+  const reply = buildCompareReply(compared, "pt-BR") as { content: string; embeds: DiscordEmbedSpec[] };
+  assert.match(reply.content, /^⚖️ Comparação de \*\*SSD Example 240GB\*\*/);
+  assert.match(reply.content, /Não consigo ler a página da Store Z; comparei o mesmo produto nas outras lojas\./);
+  const [card] = reply.embeds;
+  assert.equal(card.description, "Compre agora, mortal.");
+  assert.equal(card.url, "https://store-b.example/p");
+  assert.equal(card.footer, "Código XY650SS-240GT-R");
+  assert.deepEqual(card.fields?.map((entry) => entry.name), ["store-b", "store-a · PIX", "Mínimo do mercado · aggregator"]);
+  // a store the link names that is among the offers is not called unreadable
+  const read = buildCompareReply({ ...compared, link: { known: true, store: "store-a", store_name: "Store A" } }, "pt-BR") as { content: string };
+  assert.doesNotMatch(read.content, /Não consigo ler/);
+});
+
+test("a comparison says when it found several, nothing, or an unknown link's store", () => {
+  assert.match(String(buildCompareReply({ found: false, candidates: [{ product: "a", title: "SSD A" }, { product: "b", title: "SSD B" }] }, "pt-BR")), /Achei mais de um produto[\s\S]*• SSD A\n• SSD B/);
+  assert.equal(buildCompareReply({ found: false, candidates: [] }, "pt-BR"), "Ainda não acompanho esse produto.");
+  assert.equal(buildCompareReply({ found: false, candidates: [], looked_up: true }, "en"), "I looked and did not find that product at the stores I can read.");
+  assert.equal(buildCompareReply({ found: false, candidates: [], link: { known: false } }, "pt-BR"), "Não reconheço a loja desse link.");
+});
+
+test("comparar_produto sends the words and the link, and asks for something when given nothing", async () => {
+  const originalFetch = globalThis.fetch;
+  const sent: any[] = [];
+  globalThis.fetch = (async (_input, init) => {
+    sent.push(JSON.parse(String(init?.body ?? "{}")));
+    return new Response(JSON.stringify({ status: "ok", price: compared }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const replies: unknown[] = [];
+    const run = (values: Record<string, string>) => createCompareCommand("http://orch", 1000, "pt-BR").handle({
+      userId: "u", channelId: "c", messageId: "m", getString: (name: string) => values[name] ?? "", getNumber: () => undefined,
+      reply: async (message) => { replies.push(message); }, updateReply: async () => {}, showModal: async () => {},
+    });
+    await run({});
+    assert.equal(replies[0], "Mande o nome, o código ou o link do produto.");
+    assert.equal(sent.length, 0);
+    await run({ link: " https://store-z.example/produto/1/x " });
+    assert.equal(sent[0].event_type, "price.compare");
+    assert.equal(sent[0].payload.link, "https://store-z.example/produto/1/x");
+    assert.equal((replies[1] as { embeds: DiscordEmbedSpec[] }).embeds[0].title, "SSD Example 240GB");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -22,6 +22,7 @@ test("createCommands exposes dokja slash commands", () => {
       "ningo_panel",
       "chat_modal",
       "preco",
+      "comparar_produto",
       "teste_politico",
       "play",
       "skip",
