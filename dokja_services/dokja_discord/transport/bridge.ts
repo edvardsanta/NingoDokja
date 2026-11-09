@@ -16,6 +16,8 @@ export type BridgeRequest = {
     mentionedUserIds?: string[];
     limit?: number;
     maxItemsPerScraper?: number;
+    query?: string;
+    brand?: string;
     userId: string;
     userName?: string;
     channelId: string;
@@ -43,12 +45,16 @@ type BridgeResponse = {
   attachments?: unknown;
   // a server's queue, after a music command
   music?: unknown;
+  // a price search's result, after price.search
+  price?: unknown;
   realtime?: { accepted?: boolean };
 };
 
 export type OrchestratorReply = {
   reply: string;
   notice?: string;
+  // a price search's result (price.search), rendered by the interface in its own language
+  price?: unknown;
   attachments?: DiscordAttachment[];
   music?: unknown;
   realtime?: { accepted?: boolean };
@@ -127,6 +133,7 @@ export async function dispatchToOrchestratorResponse(
       notice: payload.notice,
       ...(attachments.length ? { attachments } : {}),
       ...(payload.music !== undefined ? { music: payload.music } : {}),
+      ...(payload.price !== undefined ? { price: payload.price } : {}),
       ...(payload.realtime?.accepted === true ? { realtime: {accepted: true} } : {}),
     };
   } catch (error) {
@@ -167,6 +174,8 @@ export function buildBridgePayload(params: {
   mentionedUserIds?: string[];
   limit?: number;
   maxItemsPerScraper?: number;
+  query?: string;
+  brand?: string;
   startSession?: boolean;
   userId: string;
   userName?: string;
@@ -190,6 +199,8 @@ export function buildBridgePayload(params: {
       mentionedUserIds: params.mentionedUserIds?.slice(0, 20),
       limit: params.limit,
       maxItemsPerScraper: params.maxItemsPerScraper,
+      query: params.query?.slice(0, 100),
+      brand: params.brand?.slice(0, 100),
       userId: params.userId,
       userName: params.userName === undefined ? undefined : Array.from(params.userName).slice(0, 100).join(""),
       channelId: params.channelId,

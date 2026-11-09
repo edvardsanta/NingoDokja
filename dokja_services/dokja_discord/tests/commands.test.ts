@@ -21,6 +21,7 @@ test("createCommands exposes dokja slash commands", () => {
       "stop_radio",
       "ningo_panel",
       "chat_modal",
+      "preco",
       "play",
       "skip",
       "pause",
