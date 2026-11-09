@@ -227,3 +227,29 @@ test("an optional string option left empty reads as empty text instead of failin
   );
   assert.deepEqual(seen, ["hd", ""]);
 });
+
+test("autocomplete answers what the command suggests, cut to Discord's limits, and nothing on failure", async () => {
+  const { answerAutocomplete, toEmbed } = await import("../runtime/discordjs_runtime.js");
+  const answered: unknown[] = [];
+  const interaction = (value: string) => ({
+    commandName: "preco", user: { id: "u" }, channelId: "c", guildId: "g",
+    options: { getFocused: () => ({ name: "loja", value }) },
+    respond: async (choices: unknown) => { answered.push(choices); },
+  });
+  const many = Array.from({ length: 30 }, (_, index) => ({ name: `store-${index}`, value: `store-${index}` }));
+  let asked: unknown;
+  await answerAutocomplete({
+    name: "preco", description: "d", handle: async () => {},
+    autocomplete: async (context) => { asked = context; return [{ name: "x".repeat(150), value: "v" }, { name: " ", value: "drop" }, ...many]; },
+  }, interaction("st") as any, {});
+  assert.deepEqual(asked, { option: "loja", value: "st", userId: "u", channelId: "c", guildId: "g" });
+  const first = answered[0] as Array<{ name: string }>;
+  assert.equal(first.length, 25);
+  assert.equal(first[0]?.name.length, 100);
+
+  await answerAutocomplete({ name: "preco", description: "d", handle: async () => {}, autocomplete: async () => { throw new Error("down"); } }, interaction("") as any, {});
+  assert.deepEqual(answered[1], []);
+
+  assert.equal(toEmbed({ title: "t", url: "https://store.example/p" }).url, "https://store.example/p");
+  assert.equal(toEmbed({ title: "t", url: "javascript:alert(1)" }).url, undefined);
+});
