@@ -44,6 +44,7 @@ test("each product is a card: the warning leads, colours the card and every sour
   assert.match(card.fields?.[0].value ?? "", /^\*\*R\$\s?439,90\*\*\nmediana 30d: R\$\s?500,00\nmenor já visto: R\$\s?450,00\n🟢 Promoção real$/);
   // The merchant comes from the data; no store name is written in the adapter.
   assert.equal(card.fields?.[1].name, "Mínimo do mercado · aggregator");
+  assert.match(card.fields?.[1].value ?? "", /trecho baseado no histórico existente do Zoom\/Buscapé/);
   assert.equal(card.fields?.[1].inline, true);
 });
 
