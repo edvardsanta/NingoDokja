@@ -21,6 +21,8 @@ COPY dokja_domain/dokja_knowledge/go.mod ../dokja_domain/dokja_knowledge/go.mod
 COPY dokja_domain/dokja_memory/go.mod ../dokja_domain/dokja_memory/go.mod
 COPY dokja_domain/dokja_meme/go.mod ../dokja_domain/dokja_meme/go.mod
 COPY dokja_domain/dokja_moderation/go.mod ../dokja_domain/dokja_moderation/go.mod
+COPY dokja_domain/dokja_price/go.mod ../dokja_domain/dokja_price/go.mod
+COPY dokja_domain/dokja_quiz/go.mod ../dokja_domain/dokja_quiz/go.mod
 COPY dokja_store/go.mod dokja_store/go.sum ../dokja_store/
 # Downloads are checked against go.sum by Go; local replacements have no zip hash.
 RUN go mod download
