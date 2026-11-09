@@ -492,3 +492,26 @@ func TestDigestKeepsTheSourceMediaForPreview(t *testing.T) {
 		t.Fatalf("media reference lost: %#v", got)
 	}
 }
+
+func TestPriceObservationsAreNeitherShownNorCited(t *testing.T) {
+	article := entry("article", "Alpha", "An article about storage", 1, "https://example.com/article")
+	observation := entry("price-1", "Alpha", "SSD Example 1TB at Store A", 1, "https://example.com/ssd")
+	observation["kind"] = "price"
+	reply := itemsReply(t, article, observation)
+
+	expectTitles(t, readDigest(t, reply, nil), "An article about storage")
+
+	domain := New(&fakeService{reply: reply}).WithClock(func() time.Time { return now })
+	if _, err := domain.Reference(context.Background(), "price-1"); err == nil {
+		t.Fatal("a price observation resolved as a reference")
+	}
+	recent, err := domain.RecentReferences(context.Background(), "What did Alpha publish?", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reference := range recent {
+		if reference.ID == "price-1" {
+			t.Fatalf("a price observation was cited: %#v", recent)
+		}
+	}
+}
