@@ -319,11 +319,31 @@ func (m *Model) jobState(job jobRow) string {
 			style = styleBad
 		}
 		parts = append(parts, style.Render(text))
+		if reason := skipReason(job.LastReason); reason != "" && job.LastOutcome == "skipped" {
+			parts = append(parts, styleDim.Render(reason))
+		}
+	}
+	// The scheduler's own switch holds every job back, whatever the job's switch says.
+	if scheduler, ok := m.status.service("scheduler"); job.Enabled && ok && !scheduler.Enabled {
+		parts = append(parts, styleWarn.Render(tr("job_held_by_scheduler")))
 	}
 	if job.Enabled && !job.NextAt.IsZero() {
 		parts = append(parts, styleDim.Render(tr("next")+clock(job.NextAt, m.status.UpdatedAt)+" ("+until(job.NextAt.Sub(m.status.UpdatedAt))+")"))
 	}
 	return strings.Join(parts, "  ")
+}
+
+// skipReason translates the code the orchestrator gives for a skipped run; an unknown one says nothing.
+func skipReason(code string) string {
+	switch code {
+	case "scheduler_off":
+		return tr("job_reason_scheduler_off")
+	case "job_off":
+		return tr("job_reason_job_off")
+	case "service_off":
+		return tr("job_reason_service_off")
+	}
+	return ""
 }
 
 // clock prints a time in the local zone, with the date only when it is not today.

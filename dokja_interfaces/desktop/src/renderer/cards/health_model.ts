@@ -93,6 +93,7 @@ function parseJob(value: unknown): JobState | undefined {
     lastAt: text(value.lastAt),
     lastOutcome: text(value.lastOutcome),
     lastError: text(value.lastError),
+    lastReason: value.lastReason === "scheduler_off" || value.lastReason === "job_off" || value.lastReason === "service_off" ? value.lastReason : "",
   };
 }
 

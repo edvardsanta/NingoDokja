@@ -600,3 +600,38 @@ func TestAStateSavedBeforeJobsDefaultedOffKeepsThemOff(t *testing.T) {
 		t.Fatalf("a job switched on must be saved explicitly, file is %s", raw)
 	}
 }
+
+func TestASkippedRunRecordsWhyAsACode(t *testing.T) {
+	service, controls, _ := gatedService(t)
+	reasonOf := func(name string) (string, string) {
+		for _, job := range controls.Jobs() {
+			if job.Name == name {
+				return job.LastOutcome, job.LastReason
+			}
+		}
+		t.Fatalf("job %s missing", name)
+		return "", ""
+	}
+	_ = controls.SetService("scheduler", false)
+	process(t, service, "meme.pool.refresh", "meme.refresh")
+	if outcome, reason := reasonOf("meme.refresh"); outcome != "skipped" || reason != SkipSchedulerOff {
+		t.Fatalf("scheduler off: %s %s", outcome, reason)
+	}
+	_ = controls.SetService("scheduler", true)
+	off := false
+	_ = controls.SetJob("meme.refresh", JobPatch{Enabled: &off})
+	process(t, service, "meme.pool.refresh", "meme.refresh")
+	if _, reason := reasonOf("meme.refresh"); reason != SkipJobOff {
+		t.Fatalf("job off: %s", reason)
+	}
+	_ = controls.SetService("meme", false)
+	process(t, service, "meme.pool.refresh", "meme.refresh")
+	if _, reason := reasonOf("meme.refresh"); reason != SkipServiceOff {
+		t.Fatalf("service off: %s", reason)
+	}
+	// a run that happened clears the reason
+	controls.RecordRun("meme.refresh", "ran", nil, time.Now())
+	if outcome, reason := reasonOf("meme.refresh"); outcome != "ran" || reason != "" {
+		t.Fatalf("ran: %s %s", outcome, reason)
+	}
+}

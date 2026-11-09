@@ -827,6 +827,7 @@ func (h *SystemDomainHandler) jobsView() []map[string]any {
 			"last_at":           formatTime(job.LastAt),
 			"last_outcome":      job.LastOutcome,
 			"last_error":        job.LastError,
+			"last_reason":       job.LastReason,
 			"announced_at":      formatTime(job.AnnouncedAt),
 		}
 		if job.Interval > 0 {

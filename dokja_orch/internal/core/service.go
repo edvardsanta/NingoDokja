@@ -42,25 +42,25 @@ func (s *Service) skipped(event Event, route Route) (ProcessResult, bool) {
 		return ProcessResult{}, false
 	}
 	schedule := scheduleOf(event)
-	reason := ""
+	reason, code := "", ""
 	// An interface that is off says nothing in its chat: "that is switched off" posted in every
 	// channel the bot sits in would be worse than the silence.
 	silent := false
 	if name := InterfaceForSource(event.Source); name != "" && !s.controls.ServiceEnabled(name) {
 		reason, silent = fmt.Sprintf("interface %s is switched off", name), true
 	} else if service := ServiceForEvent(event.Type); service != "" && !s.controls.ServiceEnabled(service) {
-		reason = fmt.Sprintf("service %s is disabled", service)
+		reason, code = fmt.Sprintf("service %s is disabled", service), SkipServiceOff
 	} else if schedule != "" && !s.controls.ServiceEnabled("scheduler") {
-		reason = "scheduler is paused"
+		reason, code = "scheduler is paused", SkipSchedulerOff
 	} else if schedule != "" && !s.controls.JobEnabled(schedule) {
-		reason = fmt.Sprintf("job %s is paused", schedule)
+		reason, code = fmt.Sprintf("job %s is paused", schedule), SkipJobOff
 	}
 	if reason == "" {
 		return ProcessResult{}, false
 	}
 
 	logger.Info(fmt.Sprintf("orchestrator skipped event_id=%s type=%s reason=%q", event.EventID, event.Type, reason))
-	s.controls.RecordRun(schedule, "skipped", errors.New(reason), time.Now().UTC())
+	s.controls.RecordSkip(schedule, code, errors.New(reason), time.Now().UTC())
 	return ProcessResult{
 		Event:    event,
 		Workflow: route.Workflow,

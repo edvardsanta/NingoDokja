@@ -461,8 +461,11 @@ function jobState(job: Record<string, unknown>): JobState {
     lastAt: shorten(text(job.last_at), 40),
     lastOutcome: shorten(text(job.last_outcome), 30),
     lastError: shorten(text(job.last_error)),
+    lastReason: SKIP_REASONS.has(text(job.last_reason)) ? (text(job.last_reason) as JobState["lastReason"]) : "",
   };
 }
+
+const SKIP_REASONS = new Set(["scheduler_off", "job_off", "service_off"]);
 
 function memoryStatus(body: Record<string, unknown>): MemoryStatus {
   return {

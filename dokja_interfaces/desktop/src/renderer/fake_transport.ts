@@ -43,8 +43,8 @@ const STATUS: StatusReply = {
     whatsapp: { status: "error", detail: "", enabled: true, kind: "interface", state: "waiting_for_link" },
   },
   jobs: [
-    { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "ran", lastError: "" },
-    { name: "meme.dispatch", enabled: true, interval: "1h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "skipped", lastError: "" },
+    { name: "meme.refresh", enabled: true, interval: "6h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "ran", lastError: "", lastReason: "" },
+    { name: "meme.dispatch", enabled: true, interval: "1h0m0s", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "skipped", lastError: "scheduler is paused", lastReason: "scheduler_off" },
   ],
 };
 

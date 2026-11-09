@@ -3612,3 +3612,12 @@ button.cfg-toggle:focus-visible {
   color: var(--price-tone);
   font-size: 0.85rem;
 }
+
+/* A job switched on that the scheduler's switch holds back says so, with the way out beside it. */
+.job-held {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-pending);
+}

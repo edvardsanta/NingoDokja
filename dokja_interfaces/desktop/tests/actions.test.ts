@@ -42,7 +42,7 @@ test("ningo.status keeps only what the health card reads", () => {
       scheduler: { status: "stopped", detail: "never announced", enabled: false },
     },
     // the card reads each job's switch, interval, last run and last error, and nothing else of it
-    jobs: [{ name: "job-1", enabled: false, interval: "", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "", lastError: "job-error-1" }],
+    jobs: [{ name: "job-1", enabled: false, interval: "", intervalOverride: false, nextAt: "", lastAt: "", lastOutcome: "", lastError: "job-error-1", lastReason: "" }],
   });
 
   const serialized = JSON.stringify(projected);
