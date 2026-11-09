@@ -149,7 +149,45 @@ sets `history: true`; the Desktop shell always sets it and keeps only codes,
 whole cents and days from the reply. Verdicts and signals are translated in the
 Desktop catalogs.
 
+## Watched searches (implemented: contract and storage)
+
+The owner watches categories and brands, not single products: "ssd sata" from
+"samsung", "hd" from any brand. What a person asks for decides the rest.
+
+- **The domain owns the list** (`watches`: a category and an optional brand,
+  normalized to lowercase words without accents, at most 50). Only the owner
+  grows it: a `price.search` with a category from the Discord owner
+  (`is_owner`) or from the Desktop, CLI or TUI adds it; anyone else gets an
+  answer from what is already known, marked `not_owner`. `price.watches` lists
+  the searches and `price.unwatch` (owner only) removes one.
+- **The contract gains optional fields** in `price.observation.v1`:
+  `category` and `brand` (the words of the watched search that found the
+  product, so the domain never classifies anything), `part_number` (the
+  manufacturer's code, the anchor that spans stores) and `url` (this
+  merchant's page for the offer, shown to a person and never fetched by the
+  domain). A description is replaced only by a non-empty value; the page is
+  kept per history.
+- **The search filters by store** (`merchant`), matches a brand against the
+  product's brand when the collector gave one (else its title), returns each
+  row's `url`, the product's description, every known merchant key, and what
+  the search did to the watched searches (`watch.status`: added, watched,
+  full or not_owner).
+- **Schema version 2** adds the product description columns, `offers` (the
+  page per history) and `watches`. `price-history-init` upgrades a version 1
+  namespace in one transaction and keeps its points; until it runs, the
+  orchestrator refuses the version 1 namespace and keeps history in memory.
+- This replaces "the contract is the opt-in, so no list of sources is
+  configured": collectors no longer pick what to follow.
+
 ## Pending work (stacked follow-ups)
+
+- **Collection by watched search.** A `price.resolve.v1` Feeds capability
+  invoked by the orchestrator with the watched searches (and with a known
+  store's product link for a comparison), replacing the scheduled collector.
+  Links are parsed against known stores and never fetched as given.
+- **`/preco` with store, links and opportunity order, then the Desktop.**
+- **`/comparar_produto`**: offers across stores for one product, with a short
+  comment from Ningo written from the domain's facts.
 
 - **Collection runs with the stack.** Observations are recorded only while the
   owner's stack is up (`make start`); there is no separate host capture, so days

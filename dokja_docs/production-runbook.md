@@ -1580,6 +1580,13 @@ tables. An invalid DSN, an unavailable database or an unsupported schema logs a
 sanitized message and keeps the history in memory; the rest of the orchestrator
 starts.
 
+**Upgrade to schema version 2 (watched searches).** Run `price-history-init`
+again before restarting the orchestrator on the new build: it upgrades a
+version 1 namespace in one transaction and keeps every point. Started first,
+the orchestrator refuses the version 1 namespace, logs that it needs
+`price-history-init`, and keeps history in memory until the next restart after
+the upgrade. Back up the namespace before upgrading.
+
 Back up the namespace with the database (`pg_dump --schema=dokja_price`).
 Rolling back to a build without the adapter leaves the namespace unused;
 dropping it (`DROP SCHEMA dokja_price CASCADE`) deletes the history.
