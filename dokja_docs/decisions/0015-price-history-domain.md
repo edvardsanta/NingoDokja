@@ -190,11 +190,26 @@ The owner watches categories and brands, not single products: "ssd sata" from
 - This replaces "the contract is the opt-in, so no list of sources is
   configured": collectors no longer pick what to follow.
 
+## Store, links and opportunity order (implemented)
+
+- `price.search` takes `order: "opportunity"`: real discounts first (deepest
+  first), then ordinary prices by their discount against the 30-day median,
+  then products still gathering history (cheapest first), and warnings last.
+  Up to 300 matching products are assessed to rank them; the answer still
+  holds 10. The Discord bridge always asks for it.
+- `price.merchants` (`list-price-merchants`) lists the merchant keys with a
+  history from one query, for a store picker.
+- Discord's `/preco` gains `loja` with autocomplete, links each source to its
+  store page and the card title to the cheapest offer, and says when the
+  owner's search started a new watched search. The adapter now answers
+  autocomplete interactions for any command that declares a suggester.
+
 ## Pending work (stacked follow-ups)
 
 - **A product link for a comparison** (`price.resolve.v1` action `read`):
   links are parsed against known stores and never fetched as given.
-- **`/preco` with store, links and opportunity order, then the Desktop.**
+- **The Desktop**: the watched searches with removal, the store filter and
+  the links.
 - **`/comparar_produto`**: offers across stores for one product, with a short
   comment from Ningo written from the domain's facts.
 
