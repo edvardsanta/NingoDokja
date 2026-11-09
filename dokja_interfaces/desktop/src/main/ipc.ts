@@ -53,7 +53,7 @@ export async function handleRequest(
   if (!isRecord(raw)) return fail("invalid", "the request must be an object");
   const { type } = raw;
   if (!isAllowedAction(type)) return fail("denied", "this action is not allowed");
-  if (isWriteAction(type) && !presence?.recent()) {
+  if (isWriteAction(type) && !presence?.recent(type)) {
     return fail("denied", "a change needs a click or a key press just before it");
   }
 
@@ -66,7 +66,7 @@ export async function handleRequest(
   const built = action.payload(payload);
   if (!built) return fail("invalid", "the payload is not valid for this action");
   let wire = built;
-  if (action.writes?.(wire) && !presence?.recent()) {
+  if (action.writes?.(wire) && !presence?.recent(type)) {
     return fail("denied", "a change needs a click or a key press just before it");
   }
 

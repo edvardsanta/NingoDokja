@@ -7,14 +7,18 @@ import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportErrorCode } from "../../src/shared/transport.js";
 import { MEMORY_SCORE, MEMORY_STATUS, OFF, failure, ok, routedTransport } from "./support.js";
 
-// The kept facts sit below this card and have their own tests.
-const withFacts = (transport: Transport): Transport => ({
+// The kept facts sit below this card and have their own tests. The answers judged in Talk are scored
+// apart; these tests give them nothing scored unless one routes them, so each number shows once.
+const ANSWERS_UNSCORED = ok({ ...MEMORY_SCORE, scored: 0, unscored: 0 });
+const withFacts = (transport: Transport, answers = ANSWERS_UNSCORED): Transport => ({
   ...transport,
-  request: (type, payload, options) => type === "conversation.facts" ? Promise.resolve(ok({ facts: [] })) : transport.request(type, payload, options),
+  request: (type, payload, options) => type === "conversation.facts" ? Promise.resolve(ok({ facts: [] }))
+    : type === "memory.stats" && payload?.action === "chat.answer" ? Promise.resolve(answers)
+    : transport.request(type, payload, options),
 });
 
-function renderCard(plain: Transport, locale: Locale = "en") {
-  const transport = withFacts(plain);
+function renderCard(plain: Transport, locale: Locale = "en", answers = ANSWERS_UNSCORED) {
+  const transport = withFacts(plain, answers);
   return render(
     <I18nProvider locale={locale}>
       <MemoryCard transport={transport} />
@@ -45,6 +49,15 @@ describe("the memory card", () => {
       ["memory.status", { timeoutMs: 15_000 }],
       ["memory.stats", { timeoutMs: 15_000 }],
     ]);
+  });
+
+  it("scores the answers judged in Talk apart from the hashtags", async () => {
+    const answers = { ...MEMORY_SCORE, scored: 3, unscored: 1, enoughData: false };
+    const { transport } = routedTransport({ "memory.list": NO_EXPERIENCES, "memory.status": ok(MEMORY_STATUS), "memory.stats": ok(MEMORY_SCORE) });
+    renderCard(transport, "en", ok(answers));
+    await screen.findByText("Answers you judged in Talk");
+    await screen.findByText("3 scored, 1 not scored yet.");
+    screen.getByText("31 scored, 4 not scored yet.");
   });
 
   it("says when similarity is off or unreachable, and when experiences need embedding", async () => {
@@ -105,7 +118,8 @@ describe("the memory card", () => {
     });
     renderCard(transport);
 
-    await screen.findByText("Nothing scored yet: no resolved experience has a prediction.");
+    // The hashtags and the answers judged in Talk each say so.
+    await waitFor(() => expect(screen.getAllByText("Nothing scored yet: no resolved experience has a prediction.")).toHaveLength(2));
   });
 
   it("does not ask for the score of a memory that is switched off", async () => {

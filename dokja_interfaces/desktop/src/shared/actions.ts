@@ -10,6 +10,12 @@
 // erases the saved session, so it is asked in a window. Experience feedback (memory.resolve) also requires a gesture and confirmation because the first verdict is retained. What else changes something (forget, record, discord.send, the scheduler's own
 // heartbeat) is not here: communications.send is the one way to send.
 export const ACTION_TYPES = [
+  // Talk by voice: the microphone opens only on a press; an utterance is transcribed, sent as an
+  // ordinary message, and the kept reply is read aloud.
+  "voice.desktop.start",
+  "voice.desktop.stop",
+  "voice.transcribe",
+  "voice.reply.speak",
   "realtime.snapshot",
   "runtime.modules",
   "runtime.logs",
@@ -23,6 +29,7 @@ export const ACTION_TYPES = [
   "conversation.capabilities",
   // Stopping a reply on its way is a change on a real press, like renaming.
   "conversation.stop",
+  "conversation.feedback",
   // Renaming is a change on a real press; deleting also asks in the shell's own window.
   "conversation.rename",
   "conversation.delete",
@@ -82,6 +89,7 @@ export const ACTION_TYPES = [
 export type ActionType = (typeof ACTION_TYPES)[number];
 
 export const WRITE_ACTION_TYPES: readonly ActionType[] = [
+  "voice.desktop.start",
   "memory.resolve",
   "runtime.set",
   "runtime.providers.configure",
@@ -94,6 +102,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "message.created",
   "conversation.start",
   "conversation.stop",
+  "conversation.feedback",
   "conversation.rename",
   "conversation.delete",
   "conversation.fact_delete",

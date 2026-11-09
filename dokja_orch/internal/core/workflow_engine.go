@@ -133,6 +133,9 @@ func actionFor(domain Domain, eventType string) string {
 			return "handle-book-event"
 		}
 	case DomainChat:
+		if eventType == "voice.reply.speak" {
+			return chat.ActionSpeakReply
+		}
 		if eventType == "message.created" {
 			return "generate-response"
 		}

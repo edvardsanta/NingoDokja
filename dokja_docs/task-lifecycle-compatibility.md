@@ -254,7 +254,7 @@ or real Electron run was exercised; the process kill is the existing cancellatio
 answers what this orchestrator, as it is wired, does with their conversations:
 
 ```json
-{ "view": 1, "operations": { "send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported" } }
+{ "view": 1, "operations": { "send": "supported", "retry": "supported", "stop": "supported", "steer": "unsupported", "feedback": "supported" } }
 ```
 
 | Operation | Supported when |
@@ -263,6 +263,7 @@ answers what this orchestrator, as it is wired, does with their conversations:
 | `retry` | The archive's store has the atomic conversation-bound retry (`ConversationRetryStore`) |
 | `stop` | The handler shares `core.RunningSends` with chat |
 | `steer` | Never: a separate capability that nothing offers |
+| `feedback` | The handler is wired to memory, so the owner's verdict on an answer can be kept (see [answer feedback](answer-feedback.md)) |
 
 The report is read from the wiring, never from the request, and an operation it does not
 name is unsupported. It says what can work, not that a given send can be stopped now; that is

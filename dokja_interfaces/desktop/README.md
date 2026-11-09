@@ -139,6 +139,23 @@ conversation only; the reply that lands replaces it. Without both, a turn goes o
 and the screen waits for the whole reply, as before. Only Ollama and Codex give previews; a Claude
 reply arrives whole.
 
+## Talking by voice
+
+Talk has a **Talk by voice** toggle beside the model. A press opens the microphone and starts a
+session that the shell holds; the window may use the microphone only while that session listens,
+and never the camera. Speech is cut into utterances on pauses (at most 8 s each, 16 kHz mono) and
+each one goes to the orchestrator as `voice.transcribe`. The text is sent as an ordinary message
+of the open conversation, so it is archived, focused, stopped and retried like a typed one. The
+kept reply is then read aloud through `voice.reply.speak`: the Chat domain removes markup, links
+and citation markers and reads up to about 600 characters, ending at a sentence; the whole reply
+stays on screen. Capture pauses while an utterance is heard, answered and spoken.
+
+A spoken message arrives seconds after the press, past the window in which a change needs a click
+or key press. The listening session stands in for that press only to send a message and start its
+conversation; every other change still needs a fresh press. Microphone audio is not saved; the
+transcript is kept as the message. It needs the orchestrator's voice service (`dokja-voice`) with a
+speech-to-text provider; see `docker-compose.voice-gpu.yml` for the optional GPU one.
+
 ## WhatsApp conversations
 
 The messages workspace also lists the WhatsApp conversations the owner named on the interface

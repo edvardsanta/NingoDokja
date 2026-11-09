@@ -232,7 +232,7 @@ func main() {
 		knowledgeHandler,
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSessionStore(chatSessions).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
@@ -245,11 +245,11 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}).WithArchive(archive).WithFacts(facts).WithRunningSends(runningSends),
+		}).WithArchive(archive).WithAnswerExperience(handlers.NewChatAnswerExperience(memoryClient, memoryEnabled)).WithFacts(facts).WithRunningSends(runningSends),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience).
 			WithTagEvaluation(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
-		handlers.NewConversationDomainHandler(archive).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
+		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 

@@ -32,6 +32,12 @@ const reasonOwnerStopped = "the owner stopped this reply"
 
 // WithArchive keeps the owner's conversations: a turn that names one by its id, with a send id, is
 // recorded there before the model is asked, and ends there completed or failed.
+// WithAnswerExperience notes each archived answer in memory so the owner's verdict can resolve it.
+func (h *ChatDomainHandler) WithAnswerExperience(answers *ChatAnswerExperience) *ChatDomainHandler {
+	h.answers = answers
+	return h
+}
+
 func (h *ChatDomainHandler) WithArchive(archive *conversation.Archive) *ChatDomainHandler {
 	h.archive = archive
 	return h
@@ -217,6 +223,8 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	if err != nil {
 		return nil, archiveError(err)
 	}
+	// Settled first, so the verdict can only ever judge the answer the owner was shown.
+	h.answers.Answered(done, len(sources) > 0)
 	response := map[string]any{
 		"action": workflow.Action, "reply": reply, "raw": result,
 		"conversation_id": held.ID, "turn": turnView(done),
