@@ -108,7 +108,11 @@ Thresholds are constants in `assess.go`, in basis points:
     read again for today's store offers and market history;
   - collect: `feeds.invoke` with `price.resolve.v1`, action `search`, input
     `{searches: [{category, brand}], limit: 30, market: [{product, title,
-    part_number}]}`; the plugin answers `{observations: [...]}`;
+    part_number, page?}]}`; the plugin answers `{observations: [...]}`. A
+    market history carries its market page as `url`; the domain keeps it per
+    history and hands it back as `page`, so a page is found once and then
+    refreshed. Store offers read from that page become one `merchant` history
+    per store;
   - record: each observation goes to `record-price-observations` as an item
     body, the one shape the domain validates.
 
