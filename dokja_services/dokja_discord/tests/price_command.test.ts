@@ -73,7 +73,7 @@ test("cards stay within Discord's limits of 10 embeds and 6000 characters", () =
   assert.ok(size <= 6000, `size ${size}`);
 });
 
-test("preco sends a price search with its words and replies with cards", async () => {
+test("price sends a price search with its words and replies with cards", async () => {
   const originalFetch = globalThis.fetch;
   let sent: any;
   globalThis.fetch = (async (_input, init) => {
@@ -87,7 +87,7 @@ test("preco sends a price search with its words and replies with cards", async (
     const replies: Array<{ message: unknown; ephemeral?: boolean }> = [];
     await createPriceCommand("http://orch", 1000, "pt-BR").handle({
       userId: "u", channelId: "c", messageId: "m", guildId: "g",
-      getString: (name: string) => ({ produto: "hd", marca: "brandv" } as Record<string, string>)[name] ?? "",
+      getString: (name: string) => ({ product: "hd", brand: "brandv" } as Record<string, string>)[name] ?? "",
       getNumber: () => undefined,
       reply: async (message, opts) => { replies.push({ message, ephemeral: opts?.ephemeral }); },
       updateReply: async () => {},
@@ -105,7 +105,7 @@ test("preco sends a price search with its words and replies with cards", async (
   }
 });
 
-test("preco passes a refusal through instead of an empty result", async () => {
+test("price passes a refusal through instead of an empty result", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({ status: "ok", reply: "That is switched off right now (x)." }), {
     status: 200, headers: { "content-type": "application/json" },
@@ -149,7 +149,7 @@ test("a search the owner starts to watch says so, even before its products arriv
   assert.match((buildPriceReply(withProducts, "en") as { content: string }).content, /^👁️ Now watching \*\*hd\*\*/);
 });
 
-test("preco sends the store and suggests the stores already seen", async () => {
+test("price sends the store and suggests the stores already seen", async () => {
   const originalFetch = globalThis.fetch;
   const sent: any[] = [];
   globalThis.fetch = (async (_input, init) => {
@@ -160,13 +160,13 @@ test("preco sends the store and suggests the stores already seen", async () => {
   }) as typeof fetch;
   try {
     const command = createPriceCommand("http://orch", 5000, "pt-BR");
-    const choices = await command.autocomplete!({ option: "loja", value: "STORE", userId: "u", channelId: "c" });
+    const choices = await command.autocomplete!({ option: "store", value: "STORE", userId: "u", channelId: "c" });
     assert.deepEqual(choices, [{ name: "store-a", value: "store-a" }, { name: "store-b", value: "store-b" }]);
-    assert.deepEqual(await command.autocomplete!({ option: "marca", value: "", userId: "u", channelId: "c" }), []);
+    assert.deepEqual(await command.autocomplete!({ option: "brand", value: "", userId: "u", channelId: "c" }), []);
 
     await command.handle({
       userId: "u", channelId: "c", messageId: "m", guildId: "g",
-      getString: (name: string) => ({ produto: "hd", loja: "store-a" } as Record<string, string>)[name] ?? "",
+      getString: (name: string) => ({ product: "hd", store: "store-a" } as Record<string, string>)[name] ?? "",
       getNumber: () => undefined, reply: async () => {}, updateReply: async () => {}, showModal: async () => {},
     });
     const search = sent.find((body) => body.event_type === "price.search");
@@ -212,7 +212,7 @@ test("a comparison says when it found several, nothing, or an unknown link's sto
   assert.equal(buildCompareReply({ found: false, candidates: [], link: { known: false } }, "pt-BR"), "Não reconheço a loja desse link.");
 });
 
-test("comparar_produto sends the words and the link, and asks for something when given nothing", async () => {
+test("compare_product sends the words and the link, and asks for something when given nothing", async () => {
   const originalFetch = globalThis.fetch;
   const sent: any[] = [];
   globalThis.fetch = (async (_input, init) => {

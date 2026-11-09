@@ -645,7 +645,7 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 	case "ningo.status":
 		return "ningo.status", map[string]any{}
 	case "price.search":
-		// A chat reply shows the best buys first. A /preco is a deliberate request, so it asks to
+		// A chat reply shows the best buys first. A /price is a deliberate request, so it asks to
 		// watch its category and brand; the domain decides whether this person may.
 		return "price.search", map[string]any{
 			"query": strings.TrimSpace(request.Payload.Query), "brand": strings.TrimSpace(request.Payload.Brand),

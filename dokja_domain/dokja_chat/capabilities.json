@@ -7,7 +7,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Join a voice channel and use /play <song or link>, /skip, /pause, /resume, /stop, /queue or /volume."
+          "usage": "Join a voice channel and use /play <song or link> (/tocar in Portuguese) or /queue (/fila). The player panel's buttons pause, resume, skip, stop and change the volume."
         }
       ],
       "limits": [
@@ -22,7 +22,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Use /history to privately view your recent requested tracks."
+          "usage": "Use /history (/historico in Portuguese) to privately view your recent requested tracks."
         },
         {
           "interface": "desktop",
@@ -41,7 +41,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Use /play_radio or /stop_radio."
+          "usage": "Use /play_radio or /stop_radio (/tocar_radio or /parar_radio in Portuguese)."
         }
       ],
       "limits": [
@@ -54,7 +54,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Chat in an authorized channel or direct message, or use /chat."
+          "usage": "Chat in an authorized channel or direct message, or use /chat (/conversar in Portuguese)."
         },
         {
           "interface": "desktop",
@@ -80,7 +80,7 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Use /voice_chat_start, /wake_chat, /voice_chat_stop or /speak."
+          "usage": "Use /voice_chat_start (/conversa_voz in Portuguese; its wake-word mode answers only when called), /voice_chat_stop or /speak."
         },
         {
           "interface": "desktop",
@@ -136,7 +136,7 @@
         },
         {
           "interface": "discord",
-          "usage": "Use /meme_fetch, /meme_status or /meme_refresh."
+          "usage": "Use /meme_fetch or /meme_refresh (/buscar_meme or /atualizar_memes in Portuguese), or the buttons of /ningo_panel."
         }
       ],
       "limits": [
@@ -181,11 +181,11 @@
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Someone runs /teste_politico link:<the questionnaire's link>. The reply follows in about two minutes, publicly, in the same channel."
+          "usage": "Someone runs /political_test link:<the questionnaire's link> (/teste_politico in Portuguese). The reply follows in about two minutes, publicly, in the same channel."
         }
       ],
       "limits": [
-        "Ordinary chat text cannot start a run: only the /teste_politico command does. Never say you are taking a test now; tell people to use the command.",
+        "Ordinary chat text cannot start a run: only the /political_test command (/teste_politico in Portuguese) does. Never say you are taking a test now; tell people to use the command.",
         "Only sites with a quiz runner installed by the owner can be taken; any other link is refused. Only one run happens at a time.",
         "A failed run posts no result and no link is ever made up. For a site without a runner, people can paste the questions in chat and you answer them there.",
         "Your past runs, with the label, link and your answers, are given to you in a separate record when available."

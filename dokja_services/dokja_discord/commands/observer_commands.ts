@@ -145,7 +145,7 @@ export function observerCommands(endpoint: string, timeout: number, voice?: Disc
     }
   }
   return (["conversation_start","conversation_stop"] as const).map(name=>({
-    name,description: message(name),
+    name,description: observerMessage("en", name),
     defer:true,
     async handle(context: DiscordCommandContext) {
       const guild=context.guildId??"";

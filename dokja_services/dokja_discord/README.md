@@ -132,12 +132,22 @@ Response body:
 }
 ```
 
+## Command names and languages
+
+Commands have English base names and Portuguese translations that Discord shows
+to people whose client is in Portuguese; the full table is in
+[discord-interface.md](../../dokja_docs/discord-interface.md#slash-commands).
+Names, descriptions and the adapter's own replies live in
+`messages/commands.ts`; replies follow `DOKJA_DISCORD_LOCALE`. A test checks
+that every command, option and choice has a translation Discord accepts.
+
 ## Price search
 
-`/preco produto:<words> marca:<brand> loja:<store>` asks the orchestrator for
+`/price product:<words> brand:<brand> store:<store>` (`/preco produto marca
+loja` in Portuguese) asks the orchestrator for
 `price.search`, best buys first (real discounts, deepest first; then ordinary
 prices by how far under their median; then products still gathering history;
-warnings last). `loja` suggests the stores already seen as you type
+warnings last). `store` suggests the stores already seen as you type
 (`price.merchants`, answered within Discord's three seconds; a failure suggests
 nothing). Each card's title links to its cheapest offer and each source has an
 "open at the store" link; only http(s) addresses become links. When the owner's
@@ -154,7 +164,8 @@ Store names come from the owner's collector data; the adapter names none.
 
 ## Questionnaires
 
-`/teste_politico link:<url>` asks the orchestrator for `quiz.take`: Ningo takes
+`/political_test link:<url>` (`/teste_politico` in Portuguese) asks the
+orchestrator for `quiz.take`: Ningo takes
 the online questionnaire himself, through an owner's Feeds quiz runner, and
 answers from his persona and private worldview. Discord sees the command
 acknowledged at once; the reply follows within 14 minutes and is public. It
@@ -165,7 +176,8 @@ worded from the command's catalog in `commands/quiz_command.ts`; a site's own
 text never reaches the channel, and no link is invented when a run fails.
 ## Price comparison
 
-`/comparar_produto produto:<name or part number> link:<store link>` asks the
+`/compare_product product:<name or part number> link:<store link>`
+(`/comparar_produto` in Portuguese) asks the
 orchestrator for `price.compare`. A link is passed on as typed and never opened:
 the price resolver reads the store and the product's part number from the
 address. The private reply is one card with every store, cheapest first, each
@@ -190,7 +202,7 @@ which plays sentence by sentence with the next sentence prepared ahead.
 `/voice_chat_stop` cancels playback and outstanding work.
 
 What participants say is also shown live in the owner's Desktop **Realtime**
-view. `/voice_chat_start` and `/wake_chat` open the same ephemeral journal that
+view. `/voice_chat_start`, in either mode, opens the same ephemeral journal that
 `/conversation_start` keeps, marked `voice_chat`, and add each transcribed
 segment to it. The journal is deleted when the voice chat stops. If the
 orchestrator refuses the journal, the voice chat still works without it.

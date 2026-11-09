@@ -69,7 +69,7 @@ export function buildQuizReply(run: unknown, locale = "pt-BR"): DiscordReply {
 
 export function createQuizCommand(orchestratorEndpoint: string, locale?: string): DiscordSlashCommand {
   return {
-    name: "teste_politico",
+    name: "political_test",
     description: "Ningo takes an online questionnaire himself and posts his result link.",
     options: [
       {
@@ -100,7 +100,7 @@ export function createQuizCommand(orchestratorEndpoint: string, locale?: string)
           : buildQuizReply(response.quiz, locale);
         await context.reply(reply);
       } catch (error) {
-        console.error("[dokja-discord] command teste_politico failed", error);
+        console.error("[dokja-discord] command political_test failed", error);
         await context.reply(text(catalog(locale), "failed"));
       }
     },

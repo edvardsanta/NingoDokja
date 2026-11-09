@@ -53,9 +53,9 @@ for (const locale of [undefined, "pt-BR", "en", "en-US", "fr"]) {
     const run = async (name: string) => commands.find(command => command.name === name)!.handle(context);
     try {
       const start = commands.find(command => command.name === "conversation_start")!;
-      assert.equal(start.description, portuguese
-        ? "Inicie a transcrição do canal de voz; Ningo fica em silêncio."
-        : "Start transcribing the voice channel; Ningo stays silent.");
+      // The base description is English; people with Discord in Portuguese see the translation.
+      assert.equal(start.description, "Start transcribing the voice channel; Ningo stays silent.");
+      assert.equal(start.description_localizations?.["pt-BR"], "Transcreve o canal de voz; o Ningo fica em silêncio.");
       await run("conversation_start");
       const active = replies.at(-1)!;
       assert.equal(active, portuguese ? "Transcrição iniciada." : "Transcription started.");

@@ -12,7 +12,6 @@ import {
   ModalBuilder,
   REST,
   Routes,
-  SlashCommandBuilder,
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -191,33 +190,24 @@ export async function deployCommands(
   );
 }
 
-function serializeCommand(command: DiscordSlashCommand) {
-  const builder = new SlashCommandBuilder()
-    .setName(command.name)
-    .setDescription(command.description);
+// The command as Discord's API takes it. Every option field the commands declare passes through
+// (integer bounds, autocomplete, choices and the translations people see in their own language),
+// so nothing a command declares is dropped on the way.
+const OPTION_FIELDS = ["type", "name", "description", "required", "autocomplete", "min_value", "max_value",
+  "min_length", "max_length", "choices", "name_localizations", "description_localizations"] as const;
 
-  for (const option of command.options ?? []) {
-    if (option.type === 3) {
-      builder.addStringOption((input) =>
-        input
-          .setName(option.name)
-          .setDescription(option.description)
-          .setRequired(Boolean(option.required))
-          .setAutocomplete(Boolean(option.autocomplete)),
-      );
-      continue;
-    }
-    if (option.type === 10) {
-      builder.addNumberOption((input) =>
-        input
-          .setName(option.name)
-          .setDescription(option.description)
-          .setRequired(Boolean(option.required)),
-      );
-    }
-  }
-
-  return builder.toJSON();
+export function serializeCommand(command: DiscordSlashCommand) {
+  const options = (command.options ?? []).map((option) => Object.fromEntries(
+    OPTION_FIELDS.filter((field) => option[field] !== undefined).map((field) => [field, option[field]]),
+  ));
+  return {
+    type: 1,
+    name: command.name,
+    description: command.description,
+    ...(command.name_localizations ? { name_localizations: command.name_localizations } : {}),
+    ...(command.description_localizations ? { description_localizations: command.description_localizations } : {}),
+    ...(options.length > 0 ? { options } : {}),
+  };
 }
 
 // Discord's limits for suggestions: 25 of them, 100 characters each.

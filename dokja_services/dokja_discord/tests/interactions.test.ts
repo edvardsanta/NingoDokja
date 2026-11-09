@@ -5,7 +5,8 @@ import { buildNingoPanelReply, createInteractionDefinitions } from "../commands/
 
 test("buildNingoPanelReply returns buttons and a select menu", () => {
   const reply = buildNingoPanelReply();
-  assert.equal(reply.content, "Ningo controls");
+  assert.equal(reply.content, "Controles do Ningo");
+  assert.equal(buildNingoPanelReply("en").content, "Ningo controls");
   assert.equal(reply.components.length, 5);
   assert.equal(reply.components[0]?.kind, "button");
   assert.equal(reply.components[4]?.kind, "select");

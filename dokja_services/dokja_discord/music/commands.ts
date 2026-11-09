@@ -267,16 +267,9 @@ export function createMusic(params: {
       command("play", "Play a song in your voice channel: a few words or a link.", "music.play", [
         { name: "song", description: "A few words (song and artist) or a link", type: ApplicationCommandOptionType.String, required: true },
       ], (context) => context.getString("song")),
-      command("skip", "Skip the song playing.", "music.skip"),
-      command("pause", "Pause the music.", "music.pause"),
-      command("resume", "Resume the music.", "music.resume"),
-      command("stop", "Stop the music and empty the queue.", "music.stop"),
       command("queue", "Show the song playing and the ones waiting.", "music.queue", [], () => "", false),
       // One person's songs, seen by that person only.
       command("history", "Show the songs you asked for and how they ended.", "music.history", [], () => "", false, true),
-      command("volume", "Set the music volume, from 0 to 100.", "music.volume", [
-        { name: "percent", description: "0 to 100", type: ApplicationCommandOptionType.Integer, required: true, min_value: 0, max_value: 100 },
-      ], (context) => String(context.getNumber("percent") ?? "")),
     ],
     buttons: [
       button(PANEL.pause, say(locale, "pause"), "music.pause"),

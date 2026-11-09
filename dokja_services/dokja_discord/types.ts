@@ -99,6 +99,9 @@ export type DiscordDocumentAttachment = {
 export type DiscordSlashCommand = {
   name: string;
   description: string;
+  // Discord's translations, by locale: people see their own client's language.
+  name_localizations?: Record<string, string>;
+  description_localizations?: Record<string, string>;
   options?: any[];
   defer?: boolean;
   handle(context: DiscordCommandContext): Promise<void>;

@@ -61,8 +61,8 @@ const queue = (version: number, entry?: number) => ({
   } : {}),
 });
 
-function commands(voice: unknown, replies: Record<string, { reply: string; music?: unknown }>, sent: Sent[]) {
-  return createMusicCommands({
+function musicOf(voice: unknown, replies: Record<string, { reply: string; music?: unknown }>, sent: Sent[]) {
+  return createMusic({
     orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: voice as never, locale: "en",
     dispatch: async (eventType, request) => {
       sent.push({ eventType, ...request });
@@ -70,6 +70,14 @@ function commands(voice: unknown, replies: Record<string, { reply: string; music
     },
   });
 }
+function commands(voice: unknown, replies: Record<string, { reply: string; music?: unknown }>, sent: Sent[]) {
+  return musicOf(voice, replies, sent).commands;
+}
+// The player's controls are buttons only; this presses one as the person in context() would.
+const press = (music: ReturnType<typeof createMusic>, customId: string) => music.buttons.find((entry) => entry.customId === customId)!.handle({
+  customId, userId: "u1", channelId: "text1", messageId: "panel1", guildId: "g1",
+  reply: async () => {}, update: async () => {}, showModal: async () => {},
+} as never);
 const find = (list: ReturnType<typeof commands>, name: string) => list.find((entry) => entry.name === name)!;
 
 test("play answers at once, sends the words, and plays what the queue says", async () => {
@@ -92,21 +100,15 @@ test("play needs the person in a voice channel, and the one where music already 
   ({ ctx, replies } = context({ song: "x" }));
   await find(commands(fakeVoice("voice2", "voice1").voice, {}, sent), "play").handle(ctx);
   assert.match(replies.at(-1)!, /Music is playing in <#voice1>/);
-  ({ ctx, replies } = context());
-  await find(commands(fakeVoice("voice2", "voice1").voice, {}, sent), "skip").handle(ctx);
-  assert.match(replies.at(-1)!, /Join it to control the queue/);
   assert.deepEqual(sent, [], "nothing reached the orchestrator");
 });
 
-test("the queue can be read from anywhere, and the volume is sent as typed", async () => {
+test("the queue can be read from anywhere", async () => {
   const sent: Sent[] = [];
   const list = commands(fakeVoice(undefined, "voice1").voice, { "music.queue": { reply: "Nothing is playing." }, "music.volume": { reply: "Volume: 40%." } }, sent);
   let { ctx, replies } = context();
   await find(list, "queue").handle(ctx);
   assert.equal(replies.at(-1), "Nothing is playing.");
-  ({ ctx, replies } = context({ percent: 40 }));
-  await find(commands(fakeVoice("voice1", "voice1").voice, { "music.volume": { reply: "Volume: 40%." } }, sent), "volume").handle(ctx);
-  assert.equal(sent.at(-1)?.content, "40");
 });
 
 test("a track that ends is reported from the shared panel channel, and what comes next plays", async () => {
@@ -162,7 +164,7 @@ test("the panel is posted with the first song, edited as the queue changes, and 
   assert.match(fake.edited.at(-1)!.message.embeds[0].title, /Paused/);
   assert.ok(fake.edited.at(-1)!.message.components.some((button: any) => button.customId === PANEL.resume));
 
-  await music.commands.find((entry) => entry.name === "stop")!.handle(context().ctx);
+  await press(music, PANEL.stop);
   assert.deepEqual(fake.edited.at(-1)!.message.components, []);
   assert.match(fake.edited.at(-1)!.message.content, /queue is over/);
 });
@@ -304,7 +306,7 @@ test("a remark on a song that already ended is dropped", async () => {
   let answer: (reply: { reply: string; music?: unknown }) => void = () => {};
   const remark = new Promise<{ reply: string; music?: unknown }>((resolve) => { answer = resolve; });
   let plays = 0;
-  const list = createMusicCommands({
+  const music = createMusic({
     orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, voice: fake.voice as never, locale: "en",
     dispatch: async (eventType) => {
       if (eventType === "music.comment") return remark;
@@ -312,8 +314,8 @@ test("a remark on a song that already ended is dropped", async () => {
       return { reply: "", music: playingEntry(plays, plays) };
     },
   });
-  await find(list, "play").handle(ctx);
-  await find(list, "skip").handle(ctx);
+  await find(music.commands, "play").handle(ctx);
+  await press(music, PANEL.skip);
   const edits = fake.edited.length;
   answer({ reply: "", music: { ok: true, entry: 1, comment: "too late" } });
   await new Promise((resolve) => setImmediate(resolve));
@@ -454,10 +456,11 @@ test("the public panel includes queued tracks with safe localized text", async (
 test("active playback brings a buried panel back during conversation and stops checking when idle", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const fake = fakeVoice("voice1");
-  const list = commands(fake.voice, {
+  const music = musicOf(fake.voice, {
     "music.play": { reply: "", music: queue(1, 1) },
     "music.stop": { reply: "", music: queue(2) },
   }, []);
+  const list = music.commands;
   await find(list, "play").handle(context({ song: "x" }).ctx);
   fake.bury();
   t.mock.timers.tick(15_000);
@@ -467,7 +470,7 @@ test("active playback brings a buried panel back during conversation and stops c
   t.mock.timers.tick(15_000);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(fake.posted.length, 2, "no repost while the panel is still latest");
-  await find(list, "stop").handle(context().ctx);
+  await press(music, PANEL.stop);
   fake.bury();
   t.mock.timers.tick(60_000);
   await new Promise(resolve => setImmediate(resolve));

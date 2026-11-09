@@ -2,7 +2,7 @@
 
 Date: 2026-11-08. Status: proposed by the owner's request; the domain contract,
 rules, reference repository, orchestrator intake and PostgreSQL adapter are
-implemented, and Discord's `/preco` searches them. Alerts are pending.
+implemented, and Discord's `/price` (`/preco` in Portuguese) searches them. Alerts are pending.
 Related: [ADR 0002](./0002-plugin-lifecycle.md), [ADR 0003](./0003-state-ownership.md),
 [ADR 0014](./0014-application-postgres-adoption.md).
 
@@ -162,7 +162,7 @@ found because collectors put them in titles; the contract gained no field.
 
 ## Desktop view (implemented)
 
-Library › Prices shows the same search as `/preco`: product and brand fields,
+Library › Prices shows the same search as Discord's `/price`: product and brand fields,
 a filter by leading verdict, and one card per product with its sources, its
 lowest price now and a chart of the market low over the last year. The chart
 needs points a chat reply does not, so `price.search` returns each product's
@@ -210,7 +210,7 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
   holds 10. The Discord bridge always asks for it.
 - `price.merchants` (`list-price-merchants`) lists the merchant keys with a
   history from one query, for a store picker.
-- Discord's `/preco` gains `loja` with autocomplete, links each source to its
+- Discord's `/price` gains `store` (`loja`) with autocomplete, links each source to its
   store page and the card title to the cheapest offer, and says when the
   owner's search started a new watched search. The adapter now answers
   autocomplete interactions for any command that declares a suggester.
@@ -219,7 +219,7 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
 
 - **Growing the list needs an explicit request.** `price.search` adds a
   watched search only when its payload sets `watch: true` (and the person may,
-  as before). Discord's `/preco` is a deliberate command, so its bridge sets it;
+  as before). Discord's `/price` is a deliberate command, so its bridge sets it;
   the Desktop searches as the owner types, so it sets it only from the "Watch
   this search" button, and a search typed on the way leaves no watch behind.
 - **Desktop Library › Prices** gains a store picker (the search's merchant
@@ -251,8 +251,8 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
 - **Ningo's comment** is written by the chat provider from the comparison's
   facts only, inside data markers and with the persona; it never supplies a
   number, is cut to 600 characters, and is left out when no model answers.
-- Discord's `/comparar_produto produto:<name or part> link:<store link>`
-  renders one card: the stores cheapest first with links, the comment, the
+- Discord's `/compare_product product:<name or part> link:<store link>`
+  (`/comparar_produto` in Portuguese) renders one card: the stores cheapest first with links, the comment, the
   part number, and a note when the link's store is not among the offers.
 
 ## Pending work (stacked follow-ups)
