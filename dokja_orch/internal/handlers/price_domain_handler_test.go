@@ -117,6 +117,8 @@ func TestPriceEventsRouteToThePriceDomain(t *testing.T) {
 		"price.intake.run": pricedomain.ActionIntakePrice,
 		"price.assess":     pricedomain.ActionAssessPrice,
 		"price.search":     pricedomain.ActionSearchPrices,
+		"price.watches":    pricedomain.ActionListWatches,
+		"price.unwatch":    pricedomain.ActionUnwatch,
 	} {
 		event := core.Event{Type: eventType, Source: core.SourceOrchestrator}
 		route, err := router.Route(context.Background(), event)
@@ -133,5 +135,26 @@ func TestPriceEventsRouteToThePriceDomain(t *testing.T) {
 		if len(plan.Steps) == 0 || plan.Steps[0].Action != action {
 			t.Fatalf("%s planned %+v", eventType, plan)
 		}
+	}
+}
+
+func TestPriceHandlerPassesTheOwnerMarkToTheDomain(t *testing.T) {
+	handler := NewPriceDomainHandler(pricedomain.New(pricedomain.NewMemoryRepository()), nil)
+	search := func(owner bool) any {
+		got, err := handler.Handle(context.Background(), core.Event{
+			Type: "price.search", Source: core.SourceDiscord,
+			Payload: map[string]any{"query": "ssd", "brand": "samsung"},
+			Context: map[string]any{"is_owner": owner},
+		}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got["watch"].(map[string]any)["status"]
+	}
+	if got := search(false); got != "not_owner" {
+		t.Fatalf("a guest: %v", got)
+	}
+	if got := search(true); got != "added" {
+		t.Fatalf("the owner: %v", got)
 	}
 }
