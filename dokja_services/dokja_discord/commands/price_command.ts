@@ -41,6 +41,15 @@ const messages: Record<string, Catalog> = {
     watch_collected: "👁️ Passei a vigiar **{search}** e já busquei agora.",
     watch_collected_none: "👁️ Passei a vigiar **{search}** e já busquei agora, mas as lojas que consigo ler não trouxeram nada.",
     watch_full: "A lista de buscas vigiadas está cheia; remova uma para vigiar **{search}**.",
+    compare_header: "⚖️ Comparação de **{title}**",
+    compare_part: "Código {part}",
+    compare_candidates: "Achei mais de um produto. Mande o código ou o link de um deles:",
+    compare_unknown: "Ainda não acompanho esse produto.",
+    compare_not_found: "Procurei e não achei esse produto nas lojas que consigo ler.",
+    compare_unreadable: "Não consigo ler a página da {store}; comparei o mesmo produto nas outras lojas.",
+    compare_bad_link: "Não reconheço a loja desse link.",
+    compare_need: "Mande o nome, o código ou o link do produto.",
+    compare_failed: "Não consegui comparar agora.",
   },
   en: {
     header: "🔎 {count} product(s) found",
@@ -69,6 +78,15 @@ const messages: Record<string, Catalog> = {
     watch_collected: "👁️ Now watching **{search}**, and I searched just now.",
     watch_collected_none: "👁️ Now watching **{search}**. I searched just now, but the stores I can read brought nothing.",
     watch_full: "The watched searches are full; remove one to watch **{search}**.",
+    compare_header: "⚖️ Comparing **{title}**",
+    compare_part: "Part {part}",
+    compare_candidates: "More than one product matches. Send the part number or link of one:",
+    compare_unknown: "I do not follow that product yet.",
+    compare_not_found: "I looked and did not find that product at the stores I can read.",
+    compare_unreadable: "I cannot read {store}'s page; I compared the same product at the other stores.",
+    compare_bad_link: "I do not know that link's store.",
+    compare_need: "Send the product's name, part number or link.",
+    compare_failed: "I could not compare right now.",
   },
 };
 
@@ -208,13 +226,13 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
     options: [
       {
         name: "produto",
-        description: "Words to find, such as hd, ssd or rtx 5070",
+        description: "Words to find, such as hd, ssd or video card",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
       {
         name: "marca",
-        description: "Brand, such as amd or samsung",
+        description: "Brand name",
         type: ApplicationCommandOptionType.String,
         required: false,
       },
@@ -266,6 +284,73 @@ export function createPriceCommand(orchestratorEndpoint: string, orchestratorTim
       } catch (error) {
         console.error("[dokja-discord] command preco failed", error);
         await context.reply(text(catalog(locale), "failed"), { ephemeral: true });
+      }
+    },
+  };
+}
+
+// buildCompareReply renders a price.compare result: one card with every store, cheapest first,
+// Ningo's lines when there are any, and what kept a store or a product out. Exported for tests.
+export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordReply {
+  const words = catalog(locale);
+  const result = (compare ?? {}) as {
+    found?: boolean; product?: Record<string, unknown>; offers?: Assessment[]; candidates?: Array<Record<string, unknown>>;
+    comment?: string; looked_up?: boolean; link?: { known?: boolean; store?: string; store_name?: string };
+  };
+  if (result.link && result.link.known === false) return text(words, "compare_bad_link");
+  if (!result.found) {
+    const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+    if (candidates.length > 0) {
+      return [text(words, "compare_candidates"), ...candidates.map((candidate) => `• ${String(candidate.title ?? candidate.product)}`)].join("\n");
+    }
+    return text(words, result.looked_up ? "compare_not_found" : "compare_unknown");
+  }
+  const product = result.product ?? {};
+  const offers = Array.isArray(result.offers) ? result.offers : [];
+  const lead = [...offers].sort((a, b) => looksOf(a.verdict).rank - looksOf(b.verdict).rank)[0];
+  const cheapest = offers.find((offer) => offer.series !== "market_min" && safeUrl(offer.url));
+  const part = String(product.part_number ?? "");
+  const store = result.link?.store;
+  const notes = store && !offers.some((offer) => offer.merchant === store)
+    ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
+  const embed: DiscordEmbedSpec = {
+    title: String(product.title ?? product.product ?? ""),
+    ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
+    description: typeof result.comment === "string" && result.comment.trim() ? result.comment.trim() : undefined,
+    color: looksOf(lead?.verdict).color,
+    fields: offers.map((offer) => field(offer, words, locale)),
+    ...(part ? { footer: text(words, "compare_part", { part }) } : {}),
+  };
+  const header = text(words, "compare_header", { title: String(product.title ?? product.product ?? "") });
+  return { content: [header, ...notes].join("\n"), embeds: [embed] };
+}
+
+export function createCompareCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
+  return {
+    name: "comparar_produto",
+    description: "Compare one product across stores, by name, part number or link",
+    options: [
+      { name: "produto", description: "Name or part number, such as ssd 1tb", type: ApplicationCommandOptionType.String, required: false },
+      { name: "link", description: "A product link from a store; it is read, never opened", type: ApplicationCommandOptionType.String, required: false },
+    ],
+    handle: async (context: DiscordCommandContext) => {
+      const words = catalog(locale);
+      const query = context.getString("produto").trim();
+      const link = context.getString("link").trim();
+      if (!query && !link) {
+        await context.reply(text(words, "compare_need"), { ephemeral: true });
+        return;
+      }
+      try {
+        const response = await dispatchToOrchestratorResponse(orchestratorEndpoint, orchestratorTimeoutMs, buildBridgePayload({
+          eventType: "price.compare", query, link,
+          userId: context.userId, channelId: context.channelId, messageId: context.messageId, guildId: context.guildId,
+        }));
+        const reply = response.price === undefined && response.reply.trim() ? response.reply : buildCompareReply(response.price, locale);
+        await context.reply(reply, { ephemeral: true });
+      } catch (error) {
+        console.error("[dokja-discord] command comparar_produto failed", error);
+        await context.reply(text(words, "compare_failed"), { ephemeral: true });
       }
     },
   };

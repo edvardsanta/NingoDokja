@@ -90,7 +90,7 @@ type Observation struct {
 	Kind         Kind
 	Points       []Point
 	// Category and Brand are the words of the watched search that found the product, in the
-	// owner's own vocabulary ("ssd sata", "samsung"); the domain never classifies a product.
+	// owner's own vocabulary ("ssd sata" or a brand name); the domain never classifies a product.
 	Category string
 	Brand    string
 	// PartNumber is the manufacturer's code when the store shows one: the same product at two

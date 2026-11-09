@@ -226,7 +226,7 @@ func main() {
 	priceDomain := pricedomain.New(priceRepository)
 	priceHandler := handlers.NewPriceDomainHandler(priceDomain, handlers.NewPriceIntakeTask(
 		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
-	))
+	)).WithCommenter(clients.NewChatProviderClient(""))
 	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
 	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an
 	// earlier process left unsettled.

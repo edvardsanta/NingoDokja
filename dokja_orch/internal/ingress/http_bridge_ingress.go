@@ -57,6 +57,7 @@ type BridgePayload struct {
 	Query               string                 `json:"query"`    // price.search words
 	Brand               string                 `json:"brand"`    // price.search brand
 	Merchant            string                 `json:"merchant"` // price.search store
+	Link                string                 `json:"link"`     // price.compare product link
 	UserID              string                 `json:"userId"`
 	UserName            string                 `json:"userName"`
 	ChannelID           string                 `json:"channelId"`
@@ -299,7 +300,7 @@ func extractBridgeMusic(result core.ProcessResult) map[string]any {
 // extractBridgePrice hands a price search's result back to the interface, which renders it with
 // its own translations; the bridge writes no prices into the reply text.
 func extractBridgePrice(result core.ProcessResult) map[string]any {
-	if eventType := strings.TrimSpace(result.Event.Type); eventType != "price.search" && eventType != "price.merchants" {
+	if eventType := strings.TrimSpace(result.Event.Type); eventType != "price.search" && eventType != "price.merchants" && eventType != "price.compare" {
 		return nil
 	}
 	price, _ := result.Result[string(core.DomainPrice)].(map[string]any)
@@ -652,6 +653,11 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		}
 	case "price.merchants":
 		return "price.merchants", map[string]any{}
+	case "price.compare":
+		// The link is handed on as typed; it is never fetched, only read by the resolver.
+		return "price.compare", map[string]any{
+			"query": strings.TrimSpace(request.Payload.Query), "link": strings.TrimSpace(request.Payload.Link),
+		}
 	case "quiz.take":
 		return "quiz.take", map[string]any{"url": content, "locale": strings.TrimSpace(request.Payload.Locale)}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":

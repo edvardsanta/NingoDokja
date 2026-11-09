@@ -153,7 +153,7 @@ The owner asked for `/preco produto:<words>` and `/preco marca:<brand>`.
 `price.search` (action `search-prices`) takes optional `product` (exact key),
 `query` and `brand`, matches whole words of a product's title or key without
 accents or case (three letters or more also match a word's start, so `hd` does
-not match `hdmi` but `ryz` matches `ryzen`), and answers at most 10 products with
+not match `hdmi` but `zen` matches `zenith`), and answers at most 10 products with
 their assessments, titles and the count of all matches. `price.assess` keeps its
 earlier shape. The bridge passes `query` and `brand` in and hands the result back
 as a structured `price` field, so the interface renders it in its own language;
@@ -174,7 +174,7 @@ Desktop catalogs.
 ## Watched searches (implemented: contract and storage)
 
 The owner watches categories and brands, not single products: "ssd sata" from
-"samsung", "hd" from any brand. What a person asks for decides the rest.
+one brand, "hd" from any brand. What a person asks for decides the rest.
 
 - **The domain owns the list** (`watches`: a category and an optional brand,
   normalized to lowercase words without accents, at most 50). Only the owner
@@ -232,12 +232,31 @@ The owner watches categories and brands, not single products: "ssd sata" from
   press (`dokja:open-offer`). The screen never sees an address, as the Desktop
   plan requires for every reply.
 
+## Comparing one product (implemented)
+
+`price.compare` (`compare-product`) lays one product's offers side by side.
+
+- **Finding the product** is the domain's: an exact part number wins; a part
+  number that only starts a stored one picks it when one variant matches and
+  offers every variant as candidates when several do; without a part number,
+  words that match one product pick it and several give candidates (at most 5).
+  Offers come cheapest first, with the market low last as a reference.
+- **A link is never fetched.** The orchestrator asks the resolver to
+  `identify` it: the resolver reads the store, product id, title words and part
+  number from the address text alone, and refuses an address of a store it
+  does not know. Which stores it knows lives in the owner's plugin, not here.
+- **A missing product** is looked up once (`lookup`, at most 3 products) when
+  the person may grow what is collected (the same owner rule as watching), then
+  compared again; anyone else is told it is not followed yet.
+- **Ningo's comment** is written by the chat provider from the comparison's
+  facts only, inside data markers and with the persona; it never supplies a
+  number, is cut to 600 characters, and is left out when no model answers.
+- Discord's `/comparar_produto produto:<name or part> link:<store link>`
+  renders one card: the stores cheapest first with links, the comment, the
+  part number, and a note when the link's store is not among the offers.
+
 ## Pending work (stacked follow-ups)
 
-- **A product link for a comparison** (`price.resolve.v1` action `read`):
-  links are parsed against known stores and never fetched as given.
-- **`/comparar_produto`**: offers across stores for one product, with a short
-  comment from Ningo written from the domain's facts.
 
 - **Collection runs with the stack.** Observations are recorded only while the
   owner's stack is up (`make start`); there is no separate host capture, so days

@@ -163,6 +163,16 @@ and ends with the site's own result link. A refusal (`busy`, `no_runner`,
 `unsupported`, `unavailable`, `unanswered`, `invalid_link` or `failed`) is
 worded from the command's catalog in `commands/quiz_command.ts`; a site's own
 text never reaches the channel, and no link is invented when a run fails.
+## Price comparison
+
+`/comparar_produto produto:<name or part number> link:<store link>` asks the
+orchestrator for `price.compare`. A link is passed on as typed and never opened:
+the price resolver reads the store and the product's part number from the
+address. The private reply is one card with every store, cheapest first, each
+linked; Ningo's few lines when a chat model answers; the part number; and a
+note when the link's store could not be read. Several matches list the products
+to pick from; an unfollowed product is looked up for the owner first.
+
 ## Live group voice
 
 Join a server voice channel and run `/voice_chat_start` once. Ningo listens to

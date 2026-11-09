@@ -14,7 +14,7 @@ const (
 	// every watched product.
 	ActionAssessPrice = "assess-price"
 	// ActionSearchPrices assesses the watched products that match words, such as a kind of
-	// product ("hd") or a brand ("amd").
+	// product ("hd") or a brand ("brandz").
 	ActionSearchPrices = "search-prices"
 	// ActionListWatches lists the watched searches the collectors run.
 	ActionListWatches = "list-price-watches"
@@ -127,6 +127,18 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 				return nil, err
 			}
 		}
+		return result.Map(), nil
+	case ActionCompareProduct:
+		compare, err := compareFromPayload(request.Event.Payload)
+		if err != nil {
+			return nil, err
+		}
+		result, err := d.CompareProduct(ctx, compare)
+		if err != nil {
+			return nil, err
+		}
+		// Looking a missing product up grows what is collected, as watching does: the owner only.
+		result.Growable = !result.Found && mayGrowWatches(request.Event)
 		return result.Map(), nil
 	case ActionListWatches:
 		return d.watchList(ctx)

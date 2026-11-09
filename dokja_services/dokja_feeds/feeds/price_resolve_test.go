@@ -30,7 +30,7 @@ print(json.dumps({"result": {"operation": request["operation"], "action": reques
 
 	got, err := service.Dispatch(context.Background(), "feeds.invoke", map[string]any{
 		"capability": CapabilityPriceResolve, "action": "search",
-		"input": map[string]any{"searches": []any{map[string]any{"category": "ssd sata", "brand": "samsung"}}},
+		"input": map[string]any{"searches": []any{map[string]any{"category": "ssd sata", "brand": "brandx"}}},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -82,7 +82,7 @@ func watchedDomain(t *testing.T, watches ...pricedomain.Watch) *pricedomain.Doma
 
 func TestPriceIntakeCollectsEveryWatchedSearchAndRecordsWhatIsValid(t *testing.T) {
 	resolver := &fakeResolver{extra: []any{map[string]any{"contract": pricedomain.ContractVersion, "product": "Bad Key"}}}
-	domain := watchedDomain(t, pricedomain.Watch{Category: "ssd sata", Brand: "samsung"}, pricedomain.Watch{Category: "hd"})
+	domain := watchedDomain(t, pricedomain.Watch{Category: "ssd sata", Brand: "brandx"}, pricedomain.Watch{Category: "hd"})
 	task := NewPriceIntakeTask(resolver, domain, nil)
 
 	result, run, err := task.run(context.Background(), core.Event{EventID: "event-1", Type: "price.intake.run"}, nil)
@@ -101,8 +101,8 @@ func TestPriceIntakeCollectsEveryWatchedSearchAndRecordsWhatIsValid(t *testing.T
 	if run.outcome.Observations != 2 || len(run.outcome.Invalid) != 1 {
 		t.Fatalf("outcome %+v", run.outcome)
 	}
-	found, _ := domain.SearchProducts(context.Background(), pricedomain.Search{Query: "ssd sata", Brand: "samsung"})
-	if found.Matched != 1 || found.Products[0].Product.Brand != "samsung" {
+	found, _ := domain.SearchProducts(context.Background(), pricedomain.Search{Query: "ssd sata", Brand: "brandx"})
+	if found.Matched != 1 || found.Products[0].Product.Brand != "brandx" {
 		t.Fatalf("found %+v", found)
 	}
 
@@ -160,7 +160,7 @@ func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
 	intake := NewPriceIntakeTask(resolver, domain, nil)
 	handler := NewPriceDomainHandler(domain, intake)
 	got, err := handler.Handle(context.Background(), core.Event{
-		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "SSD Sata", "brand": "Samsung"},
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "SSD Sata", "brand": "Brandx"},
 		Context: map[string]any{"is_owner": true},
 	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 	// Discord waits for the first collection: the reply already carries what it found.
@@ -173,7 +173,7 @@ func TestAnOwnerSearchThatAddsAWatchIsCollectedAtOnce(t *testing.T) {
 		t.Fatalf("asked %v", asked)
 	}
 	again, _ := handler.Handle(context.Background(), core.Event{
-		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "ssd sata", "brand": "samsung"},
+		Type: "price.search", Source: core.SourceDiscord, Payload: map[string]any{"watch": true, "query": "ssd sata", "brand": "brandx"},
 		Context: map[string]any{"is_owner": true},
 	}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 	intake.wait()
@@ -220,6 +220,7 @@ func TestPriceEventsRouteToThePriceDomain(t *testing.T) {
 		"price.search":     pricedomain.ActionSearchPrices,
 		"price.watches":    pricedomain.ActionListWatches,
 		"price.merchants":  pricedomain.ActionListMerchants,
+		"price.compare":    pricedomain.ActionCompareProduct,
 		"price.unwatch":    pricedomain.ActionUnwatch,
 	} {
 		event := core.Event{Type: eventType, Source: core.SourceOrchestrator}
@@ -245,7 +246,7 @@ func TestPriceHandlerPassesTheOwnerMarkToTheDomain(t *testing.T) {
 	search := func(owner bool) any {
 		got, err := handler.Handle(context.Background(), core.Event{
 			Type: "price.search", Source: core.SourceDiscord,
-			Payload: map[string]any{"watch": true, "query": "ssd", "brand": "samsung"},
+			Payload: map[string]any{"watch": true, "query": "ssd", "brand": "brandx"},
 			Context: map[string]any{"is_owner": owner},
 		}, core.WorkflowStep{Action: pricedomain.ActionSearchPrices})
 		if err != nil {
