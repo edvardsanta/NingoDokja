@@ -82,6 +82,9 @@ func TestStoreBehavesLikeTheMemoryRepository(t *testing.T) {
 		observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-02", Cents: 49000, Seller: "Store B"}),
 		observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-02", Cents: 45000}),
 		observation(pricedomain.KindCard, pricedomain.Point{On: "2026-11-02", Cents: 52000}),
+		described("store-a", "samsung", "https://a.example/1"),
+		described("store-b", "", "https://b.example/1"),
+		described("store-a", "", ""),
 	}
 	for index, write := range writes {
 		want, _ := memory.Upsert(ctx, write)
@@ -112,6 +115,89 @@ func TestStoreBehavesLikeTheMemoryRepository(t *testing.T) {
 	gotProducts, err := store.Products(ctx)
 	if err != nil || !reflect.DeepEqual(gotProducts, wantProducts) {
 		t.Fatalf("products %v (%v), want %v", gotProducts, err, wantProducts)
+	}
+	wantURLs, _ := memory.OfferURLs(ctx, "ssd-example-1tb")
+	gotURLs, err := store.OfferURLs(ctx, "ssd-example-1tb")
+	if err != nil || !reflect.DeepEqual(gotURLs, wantURLs) || len(gotURLs) != 2 {
+		t.Fatalf("urls %v (%v), want %v", gotURLs, err, wantURLs)
+	}
+
+	for _, step := range []struct {
+		add   bool
+		watch pricedomain.Watch
+	}{
+		{true, pricedomain.Watch{Category: "ssd sata", Brand: "samsung"}},
+		{true, pricedomain.Watch{Category: "hd"}},
+		{true, pricedomain.Watch{Category: "hd"}},
+		{false, pricedomain.Watch{Category: "nvme"}},
+		{false, pricedomain.Watch{Category: "hd"}},
+	} {
+		var want, got bool
+		if step.add {
+			want, _ = memory.AddWatch(ctx, step.watch)
+			got, err = store.AddWatch(ctx, step.watch)
+		} else {
+			want, _ = memory.RemoveWatch(ctx, step.watch)
+			got, err = store.RemoveWatch(ctx, step.watch)
+		}
+		if err != nil || got != want {
+			t.Fatalf("%+v: store %v (%v), memory %v", step, got, err, want)
+		}
+	}
+	wantWatches, _ := memory.Watches(ctx)
+	gotWatches, err := store.Watches(ctx)
+	if err != nil || !reflect.DeepEqual(gotWatches, wantWatches) {
+		t.Fatalf("watches %v (%v), want %v", gotWatches, err, wantWatches)
+	}
+}
+
+func described(merchant, brand, address string) pricedomain.Observation {
+	o := observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-03", Cents: 47000})
+	o.Merchant, o.Brand, o.URL, o.Category, o.PartNumber = merchant, brand, address, "ssd sata", ""
+	if brand != "" {
+		o.PartNumber = "MZ-EXAMPLE"
+	}
+	return o
+}
+
+func TestAVersionOneNamespaceUpgradesAndKeepsItsPoints(t *testing.T) {
+	ctx := context.Background()
+	db := database(t)
+	if _, err := db.Exec(`
+CREATE SCHEMA dokja_price;
+CREATE TABLE dokja_price.schema_version (id SMALLINT PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL);
+CREATE TABLE dokja_price.products (product_key TEXT PRIMARY KEY, title TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE dokja_price.points (
+	product_key TEXT NOT NULL REFERENCES dokja_price.products (product_key), merchant TEXT NOT NULL,
+	series TEXT NOT NULL, price_kind TEXT NOT NULL, observed_on DATE NOT NULL, cents BIGINT NOT NULL,
+	list_cents BIGINT NOT NULL DEFAULT 0, seller TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (product_key, merchant, series, price_kind, observed_on));
+INSERT INTO dokja_price.schema_version VALUES (1, 1);
+INSERT INTO dokja_price.products (product_key, title) VALUES ('ssd-example-1tb', 'SSD Example 1TB');
+INSERT INTO dokja_price.points VALUES ('ssd-example-1tb', 'store-a', 'merchant', 'pix', '2026-11-01', 50000, 0, '');`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(ctx, db); !errors.Is(err, ErrSchema) {
+		t.Fatalf("a version 1 namespace must wait for its upgrade: %v", err)
+	}
+	store, err := Initialize(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	key := pricedomain.Key{Product: "ssd-example-1tb", Merchant: "store-a", Series: pricedomain.SeriesMerchant, Kind: pricedomain.KindPix}
+	points, err := store.History(ctx, key, "", "")
+	if err != nil || len(points) != 1 || points[0].Cents != 50000 {
+		t.Fatalf("points after the upgrade %+v (%v)", points, err)
+	}
+	products, err := store.Products(ctx)
+	if err != nil || len(products) != 1 || products[0].Brand != "" {
+		t.Fatalf("products after the upgrade %+v (%v)", products, err)
+	}
+	if added, err := store.AddWatch(ctx, pricedomain.Watch{Category: "ssd"}); err != nil || !added {
+		t.Fatalf("the upgraded namespace must hold watches: %v %v", added, err)
 	}
 }
 

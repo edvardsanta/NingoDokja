@@ -15,7 +15,8 @@ var (
 	ErrSchema  = errors.New("price history schema is unsupported or uninitialized")
 )
 
-const schemaVersion = 1
+// schemaVersion 2 added product descriptions, offer pages and the watched searches.
+const schemaVersion = 2
 
 // schemaLockKey serializes concurrent initializations of this namespace.
 const schemaLockKey = int64(0x0d0c_1a00_0015_0001)
@@ -74,9 +75,10 @@ CREATE TABLE IF NOT EXISTS dokja_price.schema_version (
 	var version int
 	err = tx.QueryRowContext(ctx, `SELECT version FROM dokja_price.schema_version WHERE id = 1 FOR UPDATE`).Scan(&version)
 	switch {
-	case err == nil && version != schemaVersion:
+	case err == nil && (version < 1 || version > schemaVersion):
 		return nil, ErrSchema
 	case errors.Is(err, sql.ErrNoRows):
+		version = 1
 		if _, err := tx.ExecContext(ctx, `
 CREATE TABLE dokja_price.products (
 	product_key TEXT PRIMARY KEY,
@@ -100,6 +102,32 @@ INSERT INTO dokja_price.schema_version (id, version) VALUES (1, 1);`); err != ni
 	case err != nil:
 		return nil, safeError(ctx)
 	}
+	// Each upgrade runs in this transaction and keeps every point already stored.
+	if version == 1 {
+		if _, err := tx.ExecContext(ctx, `
+ALTER TABLE dokja_price.products
+	ADD COLUMN category    TEXT NOT NULL DEFAULT '',
+	ADD COLUMN brand       TEXT NOT NULL DEFAULT '',
+	ADD COLUMN part_number TEXT NOT NULL DEFAULT '';
+CREATE TABLE dokja_price.offers (
+	product_key TEXT NOT NULL REFERENCES dokja_price.products (product_key),
+	merchant    TEXT NOT NULL,
+	series      TEXT NOT NULL,
+	price_kind  TEXT NOT NULL,
+	url         TEXT NOT NULL,
+	updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+	PRIMARY KEY (product_key, merchant, series, price_kind)
+);
+CREATE TABLE dokja_price.watches (
+	category   TEXT NOT NULL CHECK (category <> ''),
+	brand      TEXT NOT NULL DEFAULT '',
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	PRIMARY KEY (category, brand)
+);
+UPDATE dokja_price.schema_version SET version = 2 WHERE id = 1;`); err != nil {
+			return nil, safeError(ctx)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, safeError(ctx)
 	}
@@ -114,12 +142,31 @@ func (s *Store) Upsert(ctx context.Context, observation pricedomain.Observation)
 		return 0, safeError(ctx)
 	}
 	defer tx.Rollback()
+	// A description is replaced only by a non-empty value, as the memory repository does.
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO dokja_price.products (product_key, title) VALUES ($1, $2)
-ON CONFLICT (product_key) DO UPDATE SET title = EXCLUDED.title, updated_at = now()
-WHERE dokja_price.products.title IS DISTINCT FROM EXCLUDED.title`,
-		observation.Product, observation.Title); err != nil {
+INSERT INTO dokja_price.products (product_key, title, category, brand, part_number) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (product_key) DO UPDATE SET
+	title       = EXCLUDED.title,
+	category    = COALESCE(NULLIF(EXCLUDED.category, ''), dokja_price.products.category),
+	brand       = COALESCE(NULLIF(EXCLUDED.brand, ''), dokja_price.products.brand),
+	part_number = COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number),
+	updated_at  = now()
+WHERE (dokja_price.products.title, dokja_price.products.category, dokja_price.products.brand, dokja_price.products.part_number)
+	IS DISTINCT FROM (EXCLUDED.title,
+		COALESCE(NULLIF(EXCLUDED.category, ''), dokja_price.products.category),
+		COALESCE(NULLIF(EXCLUDED.brand, ''), dokja_price.products.brand),
+		COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number))`,
+		observation.Product, observation.Title, observation.Category, observation.Brand, observation.PartNumber); err != nil {
 		return 0, safeError(ctx)
+	}
+	if observation.URL != "" {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO dokja_price.offers (product_key, merchant, series, price_kind, url) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (product_key, merchant, series, price_kind) DO UPDATE SET url = EXCLUDED.url, updated_at = now()
+WHERE dokja_price.offers.url IS DISTINCT FROM EXCLUDED.url`,
+			observation.Product, observation.Merchant, string(observation.Series), string(observation.Kind), observation.URL); err != nil {
+			return 0, safeError(ctx)
+		}
 	}
 	written := 0
 	for _, point := range observation.Points {
@@ -206,7 +253,8 @@ ORDER BY merchant, series, price_kind`, product)
 
 // Products returns the watched products in key order.
 func (s *Store) Products(ctx context.Context) ([]pricedomain.Product, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT product_key, title FROM dokja_price.products ORDER BY product_key`)
+	rows, err := s.db.QueryContext(ctx, `
+SELECT product_key, title, category, brand, part_number FROM dokja_price.products ORDER BY product_key`)
 	if err != nil {
 		return nil, safeError(ctx)
 	}
@@ -214,7 +262,7 @@ func (s *Store) Products(ctx context.Context) ([]pricedomain.Product, error) {
 	products := []pricedomain.Product{}
 	for rows.Next() {
 		var product pricedomain.Product
-		if err := rows.Scan(&product.Key, &product.Title); err != nil {
+		if err := rows.Scan(&product.Key, &product.Title, &product.Category, &product.Brand, &product.PartNumber); err != nil {
 			return nil, safeError(ctx)
 		}
 		products = append(products, product)
@@ -223,4 +271,78 @@ func (s *Store) Products(ctx context.Context) ([]pricedomain.Product, error) {
 		return nil, safeError(ctx)
 	}
 	return products, nil
+}
+
+// OfferURLs returns the known page of each history of a product that has one.
+func (s *Store) OfferURLs(ctx context.Context, product string) (map[pricedomain.Key]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT merchant, series, price_kind, url FROM dokja_price.offers WHERE product_key = $1`, product)
+	if err != nil {
+		return nil, safeError(ctx)
+	}
+	defer rows.Close()
+	urls := map[pricedomain.Key]string{}
+	for rows.Next() {
+		key := pricedomain.Key{Product: product}
+		var series, kind, address string
+		if err := rows.Scan(&key.Merchant, &series, &kind, &address); err != nil {
+			return nil, safeError(ctx)
+		}
+		key.Series, key.Kind = pricedomain.Series(series), pricedomain.Kind(kind)
+		urls[key] = address
+	}
+	if rows.Err() != nil {
+		return nil, safeError(ctx)
+	}
+	return urls, nil
+}
+
+// Watches returns the watched searches, in category then brand order.
+func (s *Store) Watches(ctx context.Context) ([]pricedomain.Watch, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT category, brand FROM dokja_price.watches ORDER BY category, brand`)
+	if err != nil {
+		return nil, safeError(ctx)
+	}
+	defer rows.Close()
+	watches := []pricedomain.Watch{}
+	for rows.Next() {
+		var watch pricedomain.Watch
+		if err := rows.Scan(&watch.Category, &watch.Brand); err != nil {
+			return nil, safeError(ctx)
+		}
+		watches = append(watches, watch)
+	}
+	if rows.Err() != nil {
+		return nil, safeError(ctx)
+	}
+	return watches, nil
+}
+
+// AddWatch keeps a search; added is false when it was already watched.
+func (s *Store) AddWatch(ctx context.Context, watch pricedomain.Watch) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `
+INSERT INTO dokja_price.watches (category, brand) VALUES ($1, $2) ON CONFLICT (category, brand) DO NOTHING`,
+		watch.Category, watch.Brand)
+	if err != nil {
+		return false, safeError(ctx)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, safeError(ctx)
+	}
+	return affected == 1, nil
+}
+
+// RemoveWatch forgets a search; removed is false when it was not watched.
+func (s *Store) RemoveWatch(ctx context.Context, watch pricedomain.Watch) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM dokja_price.watches WHERE category = $1 AND brand = $2`,
+		watch.Category, watch.Brand)
+	if err != nil {
+		return false, safeError(ctx)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, safeError(ctx)
+	}
+	return affected == 1, nil
 }

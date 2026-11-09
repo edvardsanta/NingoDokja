@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +31,9 @@ const (
 	maxPoints = 400
 	maxTitle  = 300
 	maxName   = 80
+	// maxDescription bounds a category, a brand and a part number.
+	maxDescription = 60
+	maxURL         = 500
 	// maxCents is ten million reais, far above any storage device.
 	maxCents = int64(1_000_000_000)
 	// maxBodyBytes matches the size Feeds allows for an item body.
@@ -85,6 +89,15 @@ type Observation struct {
 	Series       Series
 	Kind         Kind
 	Points       []Point
+	// Category and Brand are the words of the watched search that found the product, in the
+	// owner's own vocabulary ("ssd sata", "samsung"); the domain never classifies a product.
+	Category string
+	Brand    string
+	// PartNumber is the manufacturer's code when the store shows one: the same product at two
+	// stores shares it.
+	PartNumber string
+	// URL is this merchant's page for the offer, for a person to open. The domain never fetches it.
+	URL string
 }
 
 // Key identifies one history.
@@ -124,6 +137,10 @@ type wireObservation struct {
 	PriceKind    Kind        `json:"price_kind"`
 	Currency     string      `json:"currency"`
 	Points       []wirePoint `json:"points"`
+	Category     string      `json:"category,omitempty"`
+	Brand        string      `json:"brand,omitempty"`
+	PartNumber   string      `json:"part_number,omitempty"`
+	URL          string      `json:"url,omitempty"`
 }
 
 // ParseObservation reads one price.observation.v1 body. today bounds the dates: a point
@@ -176,6 +193,18 @@ func (w wireObservation) validate(today time.Time) (Observation, error) {
 	if err != nil {
 		return Observation{}, fmt.Errorf("merchant_name must be plain text")
 	}
+	described := map[string]string{}
+	for field, value := range map[string]string{"category": w.Category, "brand": w.Brand, "part_number": w.PartNumber} {
+		clean, err := cleanText(value, maxDescription)
+		if err != nil {
+			return Observation{}, fmt.Errorf("%s must be plain text", field)
+		}
+		described[field] = clean
+	}
+	address, err := offerURL(w.URL)
+	if err != nil {
+		return Observation{}, err
+	}
 	if len(w.Points) == 0 || len(w.Points) > maxPoints {
 		return Observation{}, fmt.Errorf("points must hold 1 to %d entries", maxPoints)
 	}
@@ -196,6 +225,7 @@ func (w wireObservation) validate(today time.Time) (Observation, error) {
 	return Observation{
 		Product: w.Product, Title: title, Merchant: w.Merchant, MerchantName: name,
 		Series: w.Series, Kind: w.PriceKind, Points: points,
+		Category: described["category"], Brand: described["brand"], PartNumber: described["part_number"], URL: address,
 	}, nil
 }
 
@@ -223,6 +253,20 @@ func (w wirePoint) validate(latest string) (Point, error) {
 		return Point{}, fmt.Errorf("seller must be plain text")
 	}
 	return Point{On: w.On, Cents: cents, ListCents: list, Seller: seller}, nil
+}
+
+// offerURL keeps an offer's address only when it is an absolute http(s) address with a host
+// and no credentials; it is shown to a person and never fetched.
+func offerURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || len(raw) > maxURL || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil {
+		return "", fmt.Errorf("url must be an absolute http(s) address of at most %d characters without credentials", maxURL)
+	}
+	return parsed.String(), nil
 }
 
 // toCents reads a decimal amount without going through floating point. Sources that
