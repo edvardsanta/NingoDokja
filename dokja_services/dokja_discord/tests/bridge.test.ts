@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse } from "../transport/bridge.js";
+import { buildBridgePayload, dispatchToOrchestrator, dispatchToOrchestratorResponse, FETCH_HEADERS_LIMIT_MS } from "../transport/bridge.js";
 
 test("bridge forwards bounded formula PNGs and drops unsafe attachments", async () => {
   const originalFetch = globalThis.fetch;
@@ -91,5 +91,38 @@ test("dispatchToOrchestratorResponse returns presentation notice metadata", asyn
     assert.deepEqual(response, { reply: "hello back", notice: "chat.context_compacted" });
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+// Regression: Node's fetch drops a request after five minutes without headers, which failed every
+// quiz run that took longer. A request allowed to wait past that goes through node:http instead.
+test("only a request allowed past fetch's headers limit leaves fetch for node:http", async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((request, response) => {
+    request.resume();
+    request.on("end", () => {
+      setTimeout(() => {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ status: "ok", reply: "slow but fine" }));
+      }, 50);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  const endpoint = `http://127.0.0.1:${port}/orchestrator`;
+  const originalFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = (async (...args: Parameters<typeof fetch>) => { fetched++; return originalFetch(...args); }) as typeof fetch;
+  try {
+    const body = buildBridgePayload({ eventType: "quiz.take", content: "https://quiz.example.com", userId: "u", channelId: "c", messageId: "m" });
+    const long = await dispatchToOrchestratorResponse(endpoint, FETCH_HEADERS_LIMIT_MS, body);
+    assert.equal(long.reply, "slow but fine");
+    assert.equal(fetched, 0);
+    const short = await dispatchToOrchestratorResponse(endpoint, 30_000, body);
+    assert.equal(short.reply, "slow but fine");
+    assert.equal(fetched, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await new Promise((resolve) => server.close(resolve));
   }
 });

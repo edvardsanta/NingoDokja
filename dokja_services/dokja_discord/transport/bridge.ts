@@ -1,3 +1,6 @@
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
+
 import type { DiscordAttachment, DiscordDocumentAttachment } from "../types.js";
 
 export type BridgeRequest = {
@@ -75,6 +78,43 @@ export async function dispatchToOrchestrator(
   return result.reply;
 }
 
+// Node's fetch gives up after five minutes without response headers (undici's headersTimeout),
+// whatever the AbortController allows. A request allowed to wait longer, such as a quiz run, goes
+// through node:http, which waits until the caller's own deadline.
+export const FETCH_HEADERS_LIMIT_MS = 5 * 60 * 1000;
+
+type BridgeHTTPResponse = { ok: boolean; status: number; json(): Promise<unknown> };
+
+async function post(endpoint: string, timeoutMs: number, headers: Record<string, string>, body: string, signal: AbortSignal): Promise<BridgeHTTPResponse> {
+  if (timeoutMs < FETCH_HEADERS_LIMIT_MS) {
+    return fetch(endpoint, { method: "POST", headers, body, signal });
+  }
+  return longPost(endpoint, headers, body, signal);
+}
+
+function longPost(endpoint: string, headers: Record<string, string>, body: string, signal: AbortSignal): Promise<BridgeHTTPResponse> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(endpoint);
+    const send = url.protocol === "https:" ? httpsRequest : httpRequest;
+    const request = send(url, {
+      method: "POST",
+      headers: { ...headers, "content-length": Buffer.byteLength(body) },
+      signal,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("error", reject);
+      response.on("end", () => {
+        const status = response.statusCode ?? 0;
+        const text = Buffer.concat(chunks).toString("utf8");
+        resolve({ ok: status >= 200 && status < 300, status, json: async () => JSON.parse(text) });
+      });
+    });
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+
 export async function dispatchToOrchestratorResponse(
   endpoint: string,
   timeoutMs: number,
@@ -93,12 +133,10 @@ export async function dispatchToOrchestratorResponse(
         messageId: body.payload.messageId,
       }),
     );
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}` },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
+    const response = await post(endpoint, timeoutMs, {
+      "content-type": "application/json",
+      authorization: `Bearer ${process.env.DOKJA_GATEWAY_INGRESS_TOKEN ?? ""}`,
+    }, JSON.stringify(body), controller.signal);
     if (!response.ok) {
       console.error(
         "[dokja-discord] bridge http error",

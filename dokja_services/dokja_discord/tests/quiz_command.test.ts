@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 
 import { buildQuizReply, createQuizCommand, QUIZ_TIMEOUT_MS } from "../commands/quiz_command.js";
+import { FETCH_HEADERS_LIMIT_MS } from "../transport/bridge.js";
 
 const finished = {
   status: "ok",
@@ -42,48 +45,56 @@ test("refusals are worded from fixed codes and never show a link", () => {
   assert.equal(buildQuizReply(undefined, "pt-BR"), "O teste falhou no meio do caminho. Não vou inventar um resultado.");
 });
 
-test("political_test sends the link as quiz.take and replies publicly with the result", async () => {
-  const originalFetch = globalThis.fetch;
-  let sent: any;
-  globalThis.fetch = (async (_input, init) => {
-    sent = JSON.parse(String(init?.body ?? "{}"));
-    return new Response(JSON.stringify({ status: "ok", quiz: finished }), {
-      status: 200, headers: { "content-type": "application/json" },
+// A quiz run waits longer than fetch allows, so it goes through node:http: these tests use a real
+// local orchestrator instead of a fetch stub.
+async function withOrchestrator(answer: object, run: (endpoint: string, sent: () => any) => Promise<void>) {
+  let body = "";
+  const server = createServer((request, response) => {
+    let raw = "";
+    request.on("data", (chunk) => { raw += chunk; });
+    request.on("end", () => {
+      body = raw;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify(answer));
     });
-  }) as typeof fetch;
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
   try {
+    await run(`http://127.0.0.1:${port}/orchestrator`, () => JSON.parse(body || "{}"));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+test("political_test sends the link as quiz.take and replies publicly with the result", async () => {
+  await withOrchestrator({ status: "ok", quiz: finished }, async (endpoint, sent) => {
     const replies: unknown[] = [];
-    const command = createQuizCommand("http://orch", "pt-BR");
+    const command = createQuizCommand(endpoint, "pt-BR");
     assert.equal(command.name, "political_test");
     assert.equal(command.options?.[0].name, "link");
     assert.equal(command.options?.[0].required, true);
     await command.handle(context("https://quiz.example.com/start", replies));
-    assert.equal(sent.event_type, "quiz.take");
-    assert.equal(sent.payload.content, "https://quiz.example.com/start");
-    assert.equal(sent.payload.locale, "pt-BR");
+    assert.equal(sent().event_type, "quiz.take");
+    assert.equal(sent().payload.content, "https://quiz.example.com/start");
+    assert.equal(sent().payload.locale, "pt-BR");
     assert.equal(replies.length, 1);
     assert.match(String(replies[0]), /Resultado: https:\/\/quiz\.example\.com\/results\?a=1$/);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  });
 });
 
 test("a switched-off orchestrator's reply and a transport failure reach the person", async () => {
-  const originalFetch = globalThis.fetch;
-  try {
-    globalThis.fetch = (async () => new Response(JSON.stringify({ status: "ok", reply: "That is switched off right now (x)." }), {
-      status: 200, headers: { "content-type": "application/json" },
-    })) as typeof fetch;
-    const replies: unknown[] = [];
-    await createQuizCommand("http://orch", "en").handle(context("https://quiz.example.com", replies));
-    globalThis.fetch = (async () => { throw new Error("network down"); }) as typeof fetch;
-    await createQuizCommand("http://orch", "en").handle(context("https://quiz.example.com", replies));
-    assert.deepEqual(replies, ["That is switched off right now (x).", "The test failed midway. I will not make up a result."]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  const replies: unknown[] = [];
+  await withOrchestrator({ status: "ok", reply: "That is switched off right now (x)." }, async (endpoint) => {
+    await createQuizCommand(endpoint, "en").handle(context("https://quiz.example.com", replies));
+  });
+  // Nothing listens on port 9 of the loopback: the request fails to connect.
+  await createQuizCommand("http://127.0.0.1:9/orchestrator", "en").handle(context("https://quiz.example.com", replies));
+  assert.deepEqual(replies, ["That is switched off right now (x).", "The test failed midway. I will not make up a result."]);
 });
 
 test("the command waits longer than the orchestrator's run but less than Discord's interaction", () => {
   assert.ok(QUIZ_TIMEOUT_MS > 13 * 60 * 1000 && QUIZ_TIMEOUT_MS < 15 * 60 * 1000);
+  // Regression: fetch's five-minute headers limit failed every run that took longer.
+  assert.ok(QUIZ_TIMEOUT_MS >= FETCH_HEADERS_LIMIT_MS);
 });
