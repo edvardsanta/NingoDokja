@@ -577,3 +577,21 @@ func TestSearchHandsTheMarketHistoryOnlyWhenAsked(t *testing.T) {
 		t.Fatal("a history flag that is not a boolean was accepted")
 	}
 }
+
+func TestAnObservationKeepsItsNumericSpecifications(t *testing.T) {
+	body := `{"contract":"price.observation.v1","product":"cpu-example","title":"CPU Example 8-Cores","merchant":"store-a","series":"merchant","price_kind":"pix","currency":"BRL",` +
+		`"specifications":{"cores":8,"threads":16,"socket":"s1","boxed":true},"points":[{"on":"` + today.Format("2006-01-02") + `","price":"10"}]}`
+	got, err := ParseObservation(body, today)
+	if err != nil {
+		t.Fatalf("a numeric specification refused the whole observation: %v", err)
+	}
+	want := map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s1", "boxed": true}
+	if !reflect.DeepEqual(got.Specifications, want) {
+		t.Fatalf("specifications %v", got.Specifications)
+	}
+	for _, bad := range []string{`{"cores":-1}`, `{"cores":1e9}`} {
+		if _, err := ParseObservation(strings.Replace(body, `{"cores":8,"threads":16,"socket":"s1","boxed":true}`, bad, 1), today); err == nil {
+			t.Fatalf("%s was accepted", bad)
+		}
+	}
+}

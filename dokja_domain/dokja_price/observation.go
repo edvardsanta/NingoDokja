@@ -255,6 +255,13 @@ func cleanSpecifications(raw map[string]any) (map[string]any, error) {
 				return nil, fmt.Errorf("specification %s is too long", key)
 			}
 			clean[key] = typed
+		case json.Number:
+			// observations are decoded with UseNumber, so a number arrives as json.Number
+			number, err := typed.Float64()
+			if err != nil || number < 0 || number > 1_000_000 {
+				return nil, fmt.Errorf("specification %s is out of range", key)
+			}
+			clean[key] = number
 		case float64:
 			if typed < 0 || typed > 1_000_000 {
 				return nil, fmt.Errorf("specification %s is out of range", key)
