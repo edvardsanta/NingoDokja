@@ -50,9 +50,15 @@ const messages: Record<string, Catalog> = {
     compare_unreadable: "Não consigo ler a página da {store}; comparei o mesmo produto nas outras lojas.",
     compare_over_budget: "A oferta encontrada ultrapassa o orçamento informado; procurei uma alternativa, mas esta comparação não encontrou uma opção compatível.",
     compare_alternatives: "Candidatos encontrados com os dados atuais:",
-    alternative_lower_price: "mais barato",
-    alternative_within_budget: "dentro do orçamento",
+    compare_over_budget_alternatives: "A oferta encontrada ultrapassa o orçamento informado; veja os candidatos abaixo.",
+    compare_buy: "🛒 Melhor compra agora: **{store}** por {price}.",
+    compare_buy_low: "🛒 Mais barato agora: **{store}** por {price}, mas o histórico ainda é curto para dizer se é promoção.",
+    compare_no_price: "Ainda não há um preço atual para recomendar.",
+    alternative_technically_superior: "tecnicamente superior",
+    alternative_technically_comparable: "tecnicamente equivalente",
     alternative_same_category_candidate: "mesma categoria; equivalência técnica não confirmada",
+    alternative_reason_lower_current_price: "mais barato",
+    alternative_reason_within_budget: "dentro do orçamento",
     compare_bad_link: "Não reconheço a loja desse link.",
     compare_need: "Mande o nome, o código ou o link do produto.",
     compare_failed: "Não consegui comparar agora.",
@@ -93,9 +99,15 @@ const messages: Record<string, Catalog> = {
     compare_unreadable: "I cannot read {store}'s page; I compared the same product at the other stores.",
     compare_over_budget: "The offer found exceeds the stated budget; an alternative is needed, but this comparison found no compatible option.",
     compare_alternatives: "Candidates found with the current data:",
-    alternative_lower_price: "lower price",
-    alternative_within_budget: "within budget",
+    compare_over_budget_alternatives: "The offer found exceeds the stated budget; see the candidates below.",
+    compare_buy: "🛒 Best buy now: **{store}** at {price}.",
+    compare_buy_low: "🛒 Cheapest now: **{store}** at {price}, but the history is still too short to call it a deal.",
+    compare_no_price: "There is no current price to recommend yet.",
+    alternative_technically_superior: "technically superior",
+    alternative_technically_comparable: "technically comparable",
     alternative_same_category_candidate: "same category; technical equivalence unconfirmed",
+    alternative_reason_lower_current_price: "lower price",
+    alternative_reason_within_budget: "within budget",
     compare_bad_link: "I do not know that link's store.",
     compare_need: "Send the product's name, part number or link.",
     compare_failed: "I could not compare right now.",
@@ -326,7 +338,9 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const lead = [...offers].sort((a, b) => looksOf(a.verdict).rank - looksOf(b.verdict).rank)[0];
   const cheapest = offers.find((offer) => offer.series !== "market_min" && safeUrl(offer.url));
   const part = String(product.part_number ?? "");
-  const decision = (result as { decision?: { action?: string } }).decision;
+  const decision = (result as {
+    decision?: { action?: string; selected_merchant?: string; selected_cents?: number; confidence?: string; reason_codes?: string[] };
+  }).decision;
   const store = result.link?.store;
   const notes = store && !offers.some((offer) => offer.merchant === store)
     ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
@@ -338,7 +352,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     fields: offers.map((offer) => field(offer, words, locale)),
     ...(part ? { footer: text(words, "compare_part", { part }) } : {}),
   };
-  const decisionNote = decision?.action === "seek_alternative" ? text(words, "compare_over_budget") : "";
+  const decisionNote = decisionLine(decision, offers, words, locale, Array.isArray(result.alternatives) && result.alternatives.length > 0);
   const header = text(words, "compare_header", { title: String(product.title ?? product.product ?? "") });
   const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 5) : [];
   const alternativeLines = alternatives.length > 0
@@ -346,12 +360,40 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
       text(words, "compare_alternatives"),
       ...alternatives.map((alternative) => {
         const classification = text(words, `alternative_${String(alternative.classification ?? "")}`);
+        // price facts are reasons beside the technical classification
+        const reasons = (Array.isArray(alternative.reason_codes) ? alternative.reason_codes : [])
+          .map((code) => `alternative_reason_${String(code)}`)
+          .filter((key) => key in words)
+          .map((key) => text(words, key));
         const price = typeof alternative.price_cents === "number" ? ` · ${money(alternative.price_cents, locale)}` : "";
-        return `• ${String(alternative.title ?? alternative.product)} — ${classification}${price}`;
+        return `• ${String(alternative.title ?? alternative.product)} — ${[classification, ...reasons].join(", ")}${price}`;
       }),
     ]
     : [];
   return { content: [header, ...notes, decisionNote, ...alternativeLines].filter(Boolean).join("\n"), embeds: [embed] };
+}
+
+// decisionLine says what the domain decided: where to buy, that the offer is over budget, or that
+// there is no current price. A short history says so instead of calling the price a deal.
+function decisionLine(
+  decision: { action?: string; selected_merchant?: string; selected_cents?: number; confidence?: string; reason_codes?: string[] } | undefined,
+  offers: Assessment[], words: Catalog, locale: string, hasAlternatives: boolean,
+): string {
+  switch (decision?.action) {
+    case "buy_original": {
+      const store = String(decision.selected_merchant ?? "");
+      const chosen = offers.find((offer) => offer.merchant === store && offer.series !== "market_min");
+      const name = String(chosen?.merchant_name ?? store);
+      const values = { store: name, price: money(decision.selected_cents, locale) };
+      return text(words, decision.confidence === "low" ? "compare_buy_low" : "compare_buy", values);
+    }
+    case "seek_alternative":
+      return text(words, hasAlternatives ? "compare_over_budget_alternatives" : "compare_over_budget");
+    case "no_recommendation":
+      return text(words, "compare_no_price");
+    default:
+      return "";
+  }
 }
 
 export function createCompareCommand(orchestratorEndpoint: string, orchestratorTimeoutMs: number, locale?: string): DiscordSlashCommand {
