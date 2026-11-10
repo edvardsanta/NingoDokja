@@ -255,6 +255,31 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
   (`/comparar_produto` in Portuguese) renders one card: the stores cheapest first with links, the comment, the
   part number, and a note when the link's store is not among the offers.
 
+## Decision, alternatives and timing (implemented)
+
+- **The domain decides; the model only explains.** A comparison carries a
+  decision: `buy_original` names the cheapest current store offer, with
+  confidence from that offer's history (low under 30 days, medium from 30,
+  high from 90 days); `seek_alternative` when that offer is over the
+  person's `budget_cents`; `no_recommendation` without a current price.
+  Discord shows it in one line and, with low confidence, says the history is
+  too short to call the price a deal.
+- **Alternatives** are other products of the same category with a current
+  offer. Their classification is technical only: `technically_superior` or
+  `technically_comparable` when the category profile's specifications compare
+  (at least two shared, none incompatible), else `same_category_candidate`.
+  Being cheaper or within budget is a reason code beside it
+  (`lower_current_price`, `within_budget`), so a cheaper equivalent stays an
+  equivalent and its equivalence is kept. Closer candidates come first, then
+  the cheaper; at most 5.
+- **Specifications** come only from what a collector states, such as a
+  listing title; the domain never infers them.
+- **Timing.** A comparison has 165 seconds in all, inside Discord's 180.
+  Competitor lookups stop when one more lookup would leave less than 20
+  seconds for the comment. Ningo's comment, written by the configured chat
+  model with the whole persona, gets up to 90 seconds; with less than 20
+  left it is skipped. A failed comment logs its reason.
+
 ## Pending work (stacked follow-ups)
 
 
