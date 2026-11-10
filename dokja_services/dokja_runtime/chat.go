@@ -75,7 +75,13 @@ func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []do
 		args = append(args, "-c", `web_search="disabled"`, "-c", "features.skip_host_skill_discovery=true", "-c", "suppress_unstable_features_warning=true", "-o", filepath.Join(dir, "reply.txt"), "-")
 	case "ollama":
 		binary = "docker"
-		args = composeArgs(a.Root, []string{"exec", "-T", "dokja-ollama", "ollama", "run", b.Model})
+		run := []string{"exec", "-T", "dokja-ollama", "ollama", "run"}
+		if b.Format != "" {
+			// Only a request that asked for a format gets one ("json" or a JSON Schema the
+			// reply must match); chat replies stay text.
+			run = append(run, "--think=false", "--format", b.Format)
+		}
+		args = composeArgs(a.Root, append(run, b.Model))
 	default:
 		return "", fmt.Errorf("unsupported chat provider")
 	}

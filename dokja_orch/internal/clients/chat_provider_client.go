@@ -72,9 +72,11 @@ func (c *ChatProviderClient) GenerateMessages(ctx context.Context, messages []ma
 	return c.call(ctx, "POST", "/chat", map[string]any{"messages": messages})
 }
 
-func (c *ChatProviderClient) GenerateMessagesWithBinding(ctx context.Context, provider, model string, messages []map[string]string) (map[string]any, error) {
+// GenerateJSONWithBinding asks one provider/model for a reply matching a JSON Schema. A provider
+// that can enforce the schema does (Ollama); the caller still checks the reply against it.
+func (c *ChatProviderClient) GenerateJSONWithBinding(ctx context.Context, provider, model string, schema map[string]any, messages []map[string]string) (map[string]any, error) {
 	return c.call(ctx, "POST", "/chat", map[string]any{
-		"messages": messages, "provider": provider, "model": model,
+		"messages": messages, "provider": provider, "model": model, "format": schema,
 	})
 }
 

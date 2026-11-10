@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +12,19 @@ type ChatBinding struct {
 	Revision uint64 `json:"configuration_revision"`
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
+	// Format asks one request for a reply format: "" for text, ChatFormatJSON for one JSON
+	// value, or a JSON Schema object the reply must match. It belongs to a request, never to
+	// the saved chat configuration.
+	Format string `json:"format,omitempty"`
 }
+
+// ChatFormatJSON asks for a reply that is one JSON value. Providers that can enforce a format
+// do (Ollama's --format); the caller still checks the reply against its own contract.
+const ChatFormatJSON = "json"
+
+// maxChatFormat bounds a JSON Schema sent as a reply format.
+const maxChatFormat = 4096
+
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -47,6 +60,9 @@ func (d *Domain) ChatBinding() (ChatBinding, error) {
 	return d.chatSettings.ReadChat()
 }
 func (d *Domain) validateChat(b ChatBinding) error {
+	if !validChatFormat(b.Format) {
+		return fmt.Errorf("unsupported chat reply format")
+	}
 	if b.Provider == "" || !modelName.MatchString(b.Model) {
 		return fmt.Errorf("select a chat provider and model in Inference providers")
 	}
@@ -79,6 +95,7 @@ func (d *Domain) ConfigureChat(b ChatBinding) (ChatBinding, error) {
 	if b.Revision < 1 || b.Revision >= MaxProviderRevision {
 		return ChatBinding{}, fmt.Errorf("invalid chat configuration revision")
 	}
+	b.Format = "" // a reply format is asked per request, never saved
 	if err := d.validateChat(b); err != nil {
 		return ChatBinding{}, err
 	}
@@ -144,4 +161,13 @@ func (d *Domain) chatStreamWithBinding(ctx context.Context, b ChatBinding, messa
 		return ChatReply{}, fmt.Errorf("invalid chat provider response")
 	}
 	return ChatReply{Reply: reply, Provider: b.Provider, Model: b.Model}, nil
+}
+
+// validChatFormat accepts no format, "json", or one JSON Schema object of bounded size.
+func validChatFormat(format string) bool {
+	if format == "" || format == ChatFormatJSON {
+		return true
+	}
+	var schema map[string]any
+	return len(format) <= maxChatFormat && json.Unmarshal([]byte(format), &schema) == nil && schema["type"] != nil
 }

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	domain "read_books/dokja_domain/dokja_runtime"
@@ -81,12 +82,33 @@ func decodeChatRequest(w http.ResponseWriter, r *http.Request) ([]domain.ChatMes
 		Messages []domain.ChatMessage `json:"messages"`
 		Provider string               `json:"provider"`
 		Model    string               `json:"model"`
+		// Format is absent (text), "json", or a JSON Schema object; only an explicit
+		// provider/model binding may ask for it.
+		Format json.RawMessage `json:"format"`
 	}
 	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 131072)).Decode(&body) != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return nil, domain.ChatBinding{}, false
 	}
-	return body.Messages, domain.ChatBinding{Provider: body.Provider, Model: body.Model}, true
+	format := ""
+	if raw := bytes.TrimSpace(body.Format); len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
+		var named string
+		if json.Unmarshal(raw, &named) == nil {
+			format = named
+		} else {
+			var compact bytes.Buffer
+			if json.Compact(&compact, raw) != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return nil, domain.ChatBinding{}, false
+			}
+			format = compact.String()
+		}
+	}
+	if format != "" && body.Provider == "" && body.Model == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return nil, domain.ChatBinding{}, false
+	}
+	return body.Messages, domain.ChatBinding{Provider: body.Provider, Model: body.Model, Format: format}, true
 }
 
 func decodeChatMessages(w http.ResponseWriter, r *http.Request) ([]domain.ChatMessage, bool) {
