@@ -217,13 +217,27 @@ test("a comparison renders current alternative candidates with cautious labels",
   const reply = buildCompareReply({
     ...compared,
     alternatives: [
-      { product: "pn:other", title: "SSD Example 2TB", classification: "within_budget", price_cents: 15990 },
-      { product: "pn:third", title: "SSD Example 4TB", classification: "same_category_candidate", price_cents: 19990 },
+      { product: "pn:other", title: "SSD Example 2TB", classification: "technically_comparable", reason_codes: ["same_category", "lower_current_price", "within_budget"], price_cents: 15990 },
+      { product: "pn:third", title: "SSD Example 4TB", classification: "same_category_candidate", reason_codes: ["same_category"], price_cents: 19990 },
     ],
   }, "pt-BR") as { content: string };
   assert.match(reply.content, /Candidatos encontrados com os dados atuais:/);
-  assert.match(reply.content, /SSD Example 2TB — dentro do orçamento · R\$\s*159,90/);
-  assert.match(reply.content, /SSD Example 4TB — mesma categoria; equivalência técnica não confirmada/);
+  assert.match(reply.content, /SSD Example 2TB — tecnicamente equivalente, mais barato, dentro do orçamento · R\$\s*159,90/);
+  assert.match(reply.content, /SSD Example 4TB — mesma categoria; equivalência técnica não confirmada · /);
+});
+
+test("a comparison says what the domain decided", () => {
+  const decided = (decision: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+    (buildCompareReply({ ...compared, decision, ...extra }, "pt-BR") as { content: string }).content;
+  assert.match(decided({ action: "buy_original", selected_merchant: "store-b", selected_cents: 11990, confidence: "high" }),
+    /🛒 Melhor compra agora: \*\*store-b\*\* por R\$\s*119,90\./);
+  // a short history is not called a deal
+  assert.match(decided({ action: "buy_original", selected_merchant: "store-b", selected_cents: 11990, confidence: "low" }),
+    /Mais barato agora: \*\*store-b\*\* por R\$\s*119,90, mas o histórico ainda é curto/);
+  assert.match(decided({ action: "seek_alternative" }), /ultrapassa o orçamento informado; procurei uma alternativa/);
+  assert.match(decided({ action: "seek_alternative" }, { alternatives: [{ title: "SSD B", classification: "same_category_candidate" }] }),
+    /ultrapassa o orçamento informado; veja os candidatos abaixo/);
+  assert.match(decided({ action: "no_recommendation" }), /Ainda não há um preço atual para recomendar\./);
 });
 
 test("compare_product sends the words and the link, and asks for something when given nothing", async () => {
