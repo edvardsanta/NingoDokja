@@ -39,6 +39,8 @@ type PriceDomainHandler struct {
 	equivalenceCache competitorEquivalenceCache
 	// watchWait bounds the wait for a new watched search's first collection; 0 answers at once.
 	watchWait time.Duration
+	// compareTime bounds one comparison; 0 uses compareBudget.
+	compareTime time.Duration
 }
 
 func NewPriceDomainHandler(domain *pricedomain.Domain, intake *PriceIntakeTask) *PriceDomainHandler {

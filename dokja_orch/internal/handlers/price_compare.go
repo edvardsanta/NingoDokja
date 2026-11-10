@@ -22,8 +22,16 @@ const (
 	competitorLookupLimit = 5
 	// maxCompetitorQueries prevents one comparison from turning into an unbounded crawl.
 	maxCompetitorQueries = 4
-	// compareStepTimeout bounds each call the comparison makes (identify, lookup, comment).
+	// compareStepTimeout bounds each resolver call the comparison makes (identify, lookup).
 	compareStepTimeout = 40 * time.Second
+	// compareBudget bounds a whole comparison. Discord waits for the answer up to the adapter's
+	// request timeout (180 s by default), so the comparison ends before that.
+	compareBudget = 165 * time.Second
+	// compareCommentTimeout bounds Ningo's comment; the configured chat model writes it with the
+	// whole persona, which takes longer than a resolver call.
+	compareCommentTimeout = 90 * time.Second
+	// compareCommentFloor is the least time worth giving the comment; with less left it is skipped.
+	compareCommentFloor = 20 * time.Second
 	// maxCompareComment bounds Ningo's comment.
 	maxCompareComment     = 600
 	competitorPlanVersion = "1"
@@ -72,6 +80,7 @@ func (h *PriceDomainHandler) WithCompetitorEquivalenceCache(cache competitorEqui
 // resolver only reads stores. A link is never opened: the resolver reads the store, product and
 // part number from the address itself, and refuses an address of a store it does not know.
 func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map[string]any, error) {
+	deadline := time.Now().Add(h.compareBudget())
 	payload := map[string]any{}
 	query, _ := event.Payload["query"].(string)
 	payload["query"] = strings.TrimSpace(query)
@@ -116,7 +125,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
-		if discovered := h.discoverCompetitors(ctx, result); discovered {
+		if discovered := h.discoverCompetitors(ctx, result, deadline); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
 				h.persistEquivalences(ctx, result)
@@ -137,7 +146,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	if found, _ := result["found"].(bool); found && h.commenter != nil {
-		if comment := h.comment(ctx, result); comment != "" {
+		if comment := h.comment(ctx, result, deadline); comment != "" {
 			result["comment"] = comment
 		}
 	}
@@ -191,13 +200,27 @@ func (h *PriceDomainHandler) persistEquivalences(ctx context.Context, result map
 	}
 }
 
-func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any) bool {
+// compareBudget is the time one comparison may take; tests shorten it.
+func (h *PriceDomainHandler) compareBudget() time.Duration {
+	if h.compareTime > 0 {
+		return h.compareTime
+	}
+	return compareBudget
+}
+
+// discoverCompetitors looks the planned competitor queries up while there is still time for one
+// more lookup and Ningo's comment; the queries left over are logged, not run.
+func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any, deadline time.Time) bool {
 	product, _ := result["product"].(map[string]any)
 	title, _ := product["title"].(string)
 	category, _ := product["category"].(string)
 	queries := h.competitorQueries(ctx, product, result["profile"])
 	changed := false
-	for _, query := range queries {
+	for index, query := range queries {
+		if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
+			logger.Info(fmt.Sprintf("price competitor discovery stopped for time queries_left=%d", len(queries)-index))
+			break
+		}
 		looked, err := h.invoke(ctx, "lookup", map[string]any{"query": query, "limit": competitorLookupLimit})
 		if err != nil {
 			continue
@@ -512,7 +535,7 @@ If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
 // the comparison stands on its own.
-func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any) string {
+func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any, deadline time.Time) string {
 	facts, err := json.Marshal(map[string]any{
 		"product": result["product"], "offers": result["offers"], "decision": result["decision"],
 		"prior_decisions": result["prior_decisions"],
@@ -520,14 +543,19 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any)
 	if err != nil {
 		return ""
 	}
-	ctx, cancel := context.WithTimeout(ctx, compareStepTimeout)
+	wait := min(compareCommentTimeout, time.Until(deadline))
+	if wait < compareCommentFloor {
+		logger.Info(fmt.Sprintf("price compare comment skipped for time left=%s", wait.Round(time.Second)))
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	reply, err := h.commenter.GenerateMessages(ctx, []map[string]string{
 		{"role": "system", "content": chatPersona + "\n\n" + compareInstructions},
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
 	})
 	if err != nil {
-		logger.Info("price compare comment unavailable")
+		logger.Info(fmt.Sprintf("price compare comment unavailable: %v", err))
 		return ""
 	}
 	text, _ := reply["reply"].(string)

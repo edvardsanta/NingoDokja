@@ -254,3 +254,34 @@ func TestAPlanThatBreaksTheContractIsRefusedAndTheNextProviderAsked(t *testing.T
 		t.Fatalf("schema %v", commenter.schemas[0])
 	}
 }
+
+// deadlineCommenter records how long Ningo was given to comment.
+type deadlineCommenter struct {
+	fakeCommenter
+	left []time.Duration
+}
+
+func (c *deadlineCommenter) GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error) {
+	if deadline, ok := ctx.Deadline(); ok {
+		c.left = append(c.left, time.Until(deadline))
+	}
+	return c.fakeCommenter.GenerateMessages(ctx, messages)
+}
+
+func TestNingoGetsLongerThanAResolverCallToCommentAndNothingPastTheBudget(t *testing.T) {
+	resolver := &compareResolver{lookup: []any{offerObservation("pn:ab-1000x1", "AB-1000X1", "store-a", "pix", "10")}}
+	commenter := &deadlineCommenter{fakeCommenter: fakeCommenter{reply: "Compre."}}
+	handler, _ := compareHandler(resolver, commenter)
+	got := runCompare(t, handler, true, map[string]any{"query": "AB-1000X1"})
+	if got["comment"] != "Compre." || len(commenter.left) != 1 || commenter.left[0] <= compareStepTimeout {
+		t.Fatalf("comment %v, given %v", got["comment"], commenter.left)
+	}
+
+	late := &deadlineCommenter{fakeCommenter: fakeCommenter{reply: "Compre."}}
+	handler, _ = compareHandler(&compareResolver{lookup: resolver.lookup}, late)
+	handler.compareTime = compareCommentFloor / 2
+	got = runCompare(t, handler, true, map[string]any{"query": "AB-1000X1"})
+	if _, has := got["comment"]; has || len(late.left) != 0 {
+		t.Fatalf("with no time left the comparison answers without a comment: %v %v", got["comment"], late.left)
+	}
+}
