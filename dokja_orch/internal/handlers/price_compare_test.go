@@ -48,12 +48,19 @@ type bindingCommenter struct {
 	fakeCommenter
 	bindings []string
 	failures map[string]bool
+	// replies answers a provider with its own text instead of the shared reply
+	replies map[string]string
+	schemas []map[string]any
 }
 
-func (c *bindingCommenter) GenerateMessagesWithBinding(_ context.Context, provider, model string, messages []map[string]string) (map[string]any, error) {
+func (c *bindingCommenter) GenerateJSONWithBinding(_ context.Context, provider, model string, schema map[string]any, messages []map[string]string) (map[string]any, error) {
 	c.bindings = append(c.bindings, provider+":"+model)
+	c.schemas = append(c.schemas, schema)
 	if c.failures[provider] {
 		return nil, errors.New("provider unavailable")
+	}
+	if reply, ok := c.replies[provider]; ok {
+		return map[string]any{"reply": reply}, nil
 	}
 	return c.GenerateMessages(context.Background(), messages)
 }
@@ -207,7 +214,7 @@ func TestCompetitorPlanningFallsBackInConfiguredOrder(t *testing.T) {
 		"title": "CPU", "category": "cpu",
 	}, map[string]any{"id": "cpu"})
 	if len(queries) != 1 || commenter.bindings[0] != "claude_code:haiku" ||
-		commenter.bindings[1] != "codex:gpt-6-luna" || commenter.bindings[2] != "ollama:qwen3:4b" {
+		commenter.bindings[1] != "codex:gpt-6-luna" || commenter.bindings[2] != "ollama:qwen3.5:2b" {
 		t.Fatalf("fallback order: bindings=%v queries=%v", commenter.bindings, queries)
 	}
 }
@@ -225,5 +232,25 @@ func TestObservationItemsWithCategoryFillsOnlyMissingCategory(t *testing.T) {
 	}
 	if !strings.Contains(second, `"category":"gpu"`) {
 		t.Fatalf("existing category was overwritten: %s", second)
+	}
+}
+
+func TestAPlanThatBreaksTheContractIsRefusedAndTheNextProviderAsked(t *testing.T) {
+	commenter := &bindingCommenter{
+		replies: map[string]string{
+			"claude_code": `{"queries":[{"name":"not a string"}]}`,
+			"codex":       `here you go: {"queries":["x"]}`,
+			"ollama":      `{"queries":["processador 8 nucleos"]}`,
+		},
+	}
+	handler, _ := compareHandler(&compareResolver{}, commenter)
+	queries := handler.competitorQueries(context.Background(), map[string]any{"title": "CPU", "category": "cpu"}, map[string]any{"id": "cpu"})
+	if len(queries) != 1 || queries[0] != "processador 8 nucleos" || len(commenter.bindings) != 3 {
+		t.Fatalf("queries=%v bindings=%v", queries, commenter.bindings)
+	}
+	// every provider is handed the schema of the reply it must write
+	items := commenter.schemas[0]["properties"].(map[string]any)["queries"].(map[string]any)
+	if items["maxItems"] != maxCompetitorQueries || items["items"].(map[string]any)["type"] != "string" {
+		t.Fatalf("schema %v", commenter.schemas[0])
 	}
 }

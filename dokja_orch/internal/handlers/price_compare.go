@@ -36,7 +36,7 @@ type priceCommenter interface {
 }
 
 type priceProviderBindingCommenter interface {
-	GenerateMessagesWithBinding(context.Context, string, string, []map[string]string) (map[string]any, error)
+	GenerateJSONWithBinding(context.Context, string, string, map[string]any, []map[string]string) (map[string]any, error)
 }
 
 type competitorQueryCache interface {
@@ -260,49 +260,93 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 		{"role": "system", "content": competitorDiscoveryInstructions},
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
 	}
-	reply, err := h.generateCompetitorPlan(ctx, messages)
+	queries, err := h.generateCompetitorPlan(ctx, messages)
 	if err != nil {
+		logger.Info(fmt.Sprintf("price competitor planning unavailable: %v", err))
 		return nil
 	}
-	text, _ := reply["reply"].(string)
+	seen := map[string]bool{}
+	filtered := make([]string, 0, len(queries))
+	for _, query := range queries {
+		query = strings.TrimSpace(query)
+		if query == "" || len(query) > 100 || strings.Contains(query, "://") || seen[strings.ToLower(query)] {
+			continue
+		}
+		seen[strings.ToLower(query)] = true
+		filtered = append(filtered, query)
+	}
+	if len(filtered) == 0 {
+		logger.Info("price competitor planning returned no usable queries")
+		return nil
+	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			_ = h.competitorCache.Put(ctx, key, filtered)
+		}
+	}
+	return filtered
+}
+
+func decodeCompetitorQueries(text string) ([]string, error) {
 	var proposal struct {
 		Queries []string `json:"queries"`
 	}
 	decoder := json.NewDecoder(strings.NewReader(strings.TrimSpace(text)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&proposal); err != nil || len(proposal.Queries) == 0 || len(proposal.Queries) > maxCompetitorQueries {
-		return nil
+		return nil, fmt.Errorf("expected one to %d queries", maxCompetitorQueries)
 	}
-	seen := map[string]bool{}
-	queries := make([]string, 0, len(proposal.Queries))
-	for _, query := range proposal.Queries {
-		query = strings.TrimSpace(query)
-		if query == "" || len(query) > 100 || strings.Contains(query, "://") || seen[strings.ToLower(query)] {
-			continue
-		}
-		seen[strings.ToLower(query)] = true
-		queries = append(queries, query)
-	}
-	if h.competitorCache != nil {
-		if key, keyErr := cacheKey(input); keyErr == nil {
-			_ = h.competitorCache.Put(ctx, key, queries)
-		}
-	}
-	return queries
+	return proposal.Queries, nil
 }
 
-func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, messages []map[string]string) (map[string]any, error) {
+func responseSample(text string) string {
+	text = strings.TrimSpace(text)
+	if len(text) > 240 {
+		return text[:240] + "..."
+	}
+	return text
+}
+
+// competitorPlanSchema is the reply every planning provider must match: one to
+// maxCompetitorQueries search strings. Ollama enforces it while writing; every reply is still
+// checked against it, whichever provider wrote it.
+func competitorPlanSchema() map[string]any {
+	return map[string]any{
+		"type": "object", "additionalProperties": false, "required": []string{"queries"},
+		"properties": map[string]any{"queries": map[string]any{
+			"type": "array", "minItems": 1, "maxItems": maxCompetitorQueries,
+			"items": map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+		}},
+	}
+}
+
+// generateCompetitorPlan asks the planning providers in order and returns the first reply that
+// keeps the contract. A provider that fails or breaks the contract is logged and the next one is
+// asked; nothing is repaired.
+func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, messages []map[string]string) ([]string, error) {
+	decode := func(provider string, reply map[string]any) ([]string, error) {
+		text, _ := reply["reply"].(string)
+		queries, err := decodeCompetitorQueries(text)
+		if err != nil {
+			logger.Info(fmt.Sprintf("price competitor planning invalid response provider=%s: %v sample=%q", provider, err, responseSample(text)))
+		}
+		return queries, err
+	}
 	if bindingCommenter, ok := h.commenter.(priceProviderBindingCommenter); ok {
 		providers := []struct{ provider, model string }{
 			{"claude_code", envOrDefault("DOKJA_PRICE_CLAUDE_MODEL", "haiku")},
 			{"codex", envOrDefault("DOKJA_PRICE_CODEX_MODEL", "gpt-6-luna")},
-			{"ollama", envOrDefault("DOKJA_PRICE_OLLAMA_MODEL", "qwen3:4b")},
+			{"ollama", envOrDefault("DOKJA_PRICE_OLLAMA_MODEL", "qwen3.5:2b")},
 		}
 		var lastErr error
 		for _, binding := range providers {
-			reply, err := bindingCommenter.GenerateMessagesWithBinding(ctx, binding.provider, binding.model, messages)
+			reply, err := bindingCommenter.GenerateJSONWithBinding(ctx, binding.provider, binding.model, competitorPlanSchema(), messages)
 			if err == nil {
-				return reply, nil
+				queries, invalid := decode(binding.provider, reply)
+				if invalid == nil {
+					return queries, nil
+				}
+				err = invalid
 			}
 			lastErr = err
 			if ctx.Err() != nil {
@@ -311,7 +355,11 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 		}
 		return nil, lastErr
 	}
-	return h.commenter.GenerateMessages(ctx, messages)
+	reply, err := h.commenter.GenerateMessages(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+	return decode("chat", reply)
 }
 
 func envOrDefault(name, fallback string) string {

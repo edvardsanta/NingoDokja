@@ -76,6 +76,9 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 				if !strings.Contains(command, "fixture/model") {
 					t.Fatal("model ignored")
 				}
+				if id == "ollama" && strings.Contains(command, "--format") {
+					t.Fatal("a chat reply must stay text")
+				}
 				if id == "codex" {
 					if !strings.Contains(command, "features.shell_tool=false") || !strings.Contains(command, "--ignore-user-config") {
 						t.Fatal("isolation flags missing")
@@ -162,5 +165,32 @@ func TestChatAdaptersRejectLateReplies(t *testing.T) {
 				t.Fatal("late success accepted", reply, err, calls)
 			}
 		})
+	}
+}
+
+func TestOllamaIsHeldToJSONOnlyWhenARequestAsksForIt(t *testing.T) {
+	var commands []string
+	a := ChatAdapters{Root: t.TempDir(), Run: func(ctx context.Context, binary string, args []string, input, dir string) ([]byte, error) {
+		command := strings.Join(args, " ")
+		if strings.Contains(command, " show ") {
+			return []byte("installed"), nil
+		}
+		commands = append(commands, command)
+		return []byte(`{"queries":["x"]}`), nil
+	}}
+	messages := []domain.ChatMessage{{Role: "user", Content: "plan"}}
+	if _, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "ollama", Model: "fixture/model", Format: domain.ChatFormatJSON}, messages); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "ollama", Model: "fixture/model"}, messages); err != nil {
+		t.Fatal(err)
+	}
+	schema := `{"type":"object","properties":{"queries":{"type":"array","items":{"type":"string"}}}}`
+	if _, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "ollama", Model: "fixture/model", Format: schema}, messages); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) != 3 || !strings.Contains(commands[0], "--think=false --format json fixture/model") || strings.Contains(commands[1], "--format") ||
+		!strings.Contains(commands[2], "--format "+schema+" fixture/model") {
+		t.Fatalf("commands %q", commands)
 	}
 }
