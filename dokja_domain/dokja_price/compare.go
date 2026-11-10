@@ -186,12 +186,12 @@ func (d *Domain) alternatives(ctx context.Context, original Product, originalOff
 				reasons = append(reasons, "shared_attributes_comparable")
 			}
 		}
+		// Price facts are reasons, never the classification: a cheaper candidate that is
+		// technically comparable stays comparable, so its equivalence can be kept.
 		if originalPrice > 0 && cheapest.Assessment.Latest.Cents < originalPrice {
-			classification = "lower_price"
 			reasons = append(reasons, "lower_current_price")
 		}
 		if budget > 0 && cheapest.Assessment.Latest.Cents <= budget {
-			classification = "within_budget"
 			reasons = append(reasons, "within_budget")
 		}
 		result = append(result, Alternative{
@@ -199,13 +199,30 @@ func (d *Domain) alternatives(ctx context.Context, original Product, originalOff
 			ReasonCodes: reasons, Confidence: confidence, SharedAttributes: shared,
 		})
 	}
+	// Technically closer candidates first, then the cheaper.
 	sort.SliceStable(result, func(i, j int) bool {
+		left, right := technicalRank(result[i].Classification), technicalRank(result[j].Classification)
+		if left != right {
+			return left < right
+		}
 		return result[i].Offer.Assessment.Latest.Cents < result[j].Offer.Assessment.Latest.Cents
 	})
 	if len(result) > maxCandidates {
 		result = result[:maxCandidates]
 	}
 	return result
+}
+
+// technicalRank orders classifications from the closest match to an unconfirmed one.
+func technicalRank(classification string) int {
+	switch classification {
+	case "technically_superior":
+		return 0
+	case "technically_comparable":
+		return 1
+	default:
+		return 2
+	}
 }
 
 func cheapestMerchant(offers []Offer) int64 {

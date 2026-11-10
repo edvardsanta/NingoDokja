@@ -127,3 +127,28 @@ func TestACutShortPartNumberNamingSeveralVariantsOffersThemAll(t *testing.T) {
 		t.Fatalf("exact %+v", exact)
 	}
 }
+
+func TestACheaperComparableCandidateKeepsItsTechnicalClassification(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	add := func(key, part string, specs map[string]any, cents int64) {
+		repo.Upsert(ctx, Observation{Product: key, Title: "SSD Example " + part, PartNumber: part, Category: "ssd", Merchant: "store-a",
+			Series: SeriesMerchant, Kind: KindPix, Specifications: specs, Points: []Point{{On: day(0), Cents: cents}}})
+	}
+	add("pn:ab-1000x1", "AB-1000X1", map[string]any{"capacity_gb": 1000.0, "read_mbps": 500.0, "interface": "sata"}, 400_00)
+	add("pn:cd-1000x1", "CD-1000X1", map[string]any{"capacity_gb": 1000.0, "read_mbps": 550.0, "interface": "sata"}, 350_00)
+	add("pn:ef-0500x1", "EF-0500X1", nil, 200_00)
+	domain := New(repo).WithClock(func() time.Time { return today })
+	got, err := domain.CompareProduct(ctx, Compare{PartNumber: "AB-1000X1", BudgetCents: 380_00})
+	if err != nil || len(got.Alternatives) != 2 {
+		t.Fatalf("got %+v %v", got.Alternatives, err)
+	}
+	first := got.Alternatives[0]
+	if first.Product.Key != "pn:cd-1000x1" || first.Classification != "technically_comparable" ||
+		!reflect.DeepEqual(first.ReasonCodes, []string{"same_category", "shared_attributes_comparable", "lower_current_price", "within_budget"}) {
+		t.Fatalf("a cheaper comparable candidate comes first and stays comparable: %+v", first)
+	}
+	if second := got.Alternatives[1]; second.Classification != "same_category_candidate" {
+		t.Fatalf("an unconfirmed candidate, though cheapest, comes after: %+v", second)
+	}
+}
