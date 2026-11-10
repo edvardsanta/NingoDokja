@@ -230,7 +230,18 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map
 			continue
 		}
 		outcome, err := h.domain.Record(ctx, items)
-		if err == nil && outcome.Observations > 0 {
+		if err != nil {
+			logger.Info(fmt.Sprintf("price competitor lookup not recorded: %v", err))
+			continue
+		}
+		// What the domain refused is said, with the first reason, so a collector that breaks the
+		// contract is visible instead of leaving the comparison without competitors.
+		reason := ""
+		if len(outcome.Invalid) > 0 {
+			reason = fmt.Sprintf(" first_invalid=%q", outcome.Invalid[0].Reason)
+		}
+		logger.Info(fmt.Sprintf("price competitor lookup items=%d observations=%d invalid=%d%s", len(items), outcome.Observations, len(outcome.Invalid), reason))
+		if outcome.Observations > 0 {
 			changed = true
 		}
 	}
