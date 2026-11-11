@@ -906,6 +906,20 @@ or `dokja-cli providers chat <provider> <model>`. A missing selection is a setup
 there is no environment credential fallback or automatic provider fallback.
 The chat health row checks configuration, not authentication, quota or live inference.
 
+Internal lightweight tasks use the shared LLM task adapter and the private
+`GET /chat/tasks/lightweight` Runtime endpoint. Its candidates come from enabled
+provider registrations, in catalog order, including Kimi. Register the Kimi model
+alias in Inference providers to make it eligible. Luna, Haiku and smaller Qwen
+models are preferred within their registrations when available.
+
+The adapter shares the caller's deadline across provider attempts, applies a
+15-second per-attempt cap and falls back on transport errors, invalid JSON or
+contract rejection. Existing `DOKJA_PRICE_CLAUDE_MODEL`,
+`DOKJA_PRICE_CODEX_MODEL` and `DOKJA_PRICE_OLLAMA_MODEL` values are retained as
+compatibility model overrides. Rebuild and restart both the host Runtime
+controller and orchestrator after upgrading. A desktop that bundles the controller
+needs a rebuild too.
+
 ### Scheduled delivery issues
 
 Check:

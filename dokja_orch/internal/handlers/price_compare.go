@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -43,8 +42,8 @@ type priceCommenter interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
 }
 
-type priceProviderBindingCommenter interface {
-	GenerateJSONWithBinding(context.Context, string, string, map[string]any, []map[string]string) (map[string]any, error)
+type priceTaskGenerator interface {
+	GenerateTaskJSON(context.Context, string, map[string]any, []map[string]string, func(map[string]any) error) (map[string]any, error)
 }
 
 type competitorQueryCache interface {
@@ -421,44 +420,14 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 
 // generatePriceTask shares the lightweight bindings and validates each fallback response.
 func (h *PriceDomainHandler) generatePriceTask(ctx context.Context, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
-	if bindingCommenter, ok := h.commenter.(priceProviderBindingCommenter); ok {
-		providers := []struct{ provider, model string }{
-			{"claude_code", envOrDefault("DOKJA_PRICE_CLAUDE_MODEL", "haiku")},
-			{"codex", envOrDefault("DOKJA_PRICE_CODEX_MODEL", "gpt-6-luna")},
-			{"ollama", envOrDefault("DOKJA_PRICE_OLLAMA_MODEL", "qwen3.5:2b")},
-		}
-		var lastErr error
-		for _, binding := range providers {
-			attempt, cancel := context.WithTimeout(ctx, 15*time.Second)
-			reply, err := bindingCommenter.GenerateJSONWithBinding(attempt, binding.provider, binding.model, schema, messages)
-			cancel()
-			if err == nil {
-				invalid := accept(reply)
-				if invalid == nil {
-					return reply, nil
-				}
-				err = invalid
-			}
-			lastErr = err
-			logger.Info(fmt.Sprintf("price task provider unavailable provider=%s model=%s: %v", binding.provider, binding.model, err))
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-		}
-		return nil, lastErr
+	if generator, ok := h.commenter.(priceTaskGenerator); ok {
+		return generator.GenerateTaskJSON(ctx, "lightweight", schema, messages, accept)
 	}
 	reply, err := h.commenter.GenerateMessages(ctx, messages)
 	if err != nil {
 		return nil, err
 	}
 	return reply, accept(reply)
-}
-
-func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
-	}
-	return fallback
 }
 
 func cacheKey(value any) (string, error) {
@@ -638,7 +607,7 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any,
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
 	}
 	var reply map[string]any
-	if _, bound := h.commenter.(priceProviderBindingCommenter); bound {
+	if _, bound := h.commenter.(priceTaskGenerator); bound {
 		messages[0]["content"] += "\nReturn JSON {\"comment\":\"your short comment\"}."
 		schema := map[string]any{
 			"type": "object", "additionalProperties": false, "required": []string{"comment"},
