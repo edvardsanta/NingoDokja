@@ -187,8 +187,9 @@ once in the footer. Long lists report omitted rows. CPU alternatives can include
 other manufacturers and flag different sockets. Matching core and thread
 counts are labelled separately from performance equivalence, which needs
 comparable benchmark evidence. Lightweight models also provide qualitative technical estimates
-and explanations, explicitly labelled in the card and cached in SQLite across
-price changes. Several matches list the products
+and explanations, explicitly labelled in the card and regenerated for current
+prices, budget and alternatives. SQLite caches discovered competitors and search
+queries. Several matches list the products
 to pick from; an unfollowed product is looked up for the owner first.
 
 ## Live group voice
