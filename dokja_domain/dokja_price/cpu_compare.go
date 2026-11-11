@@ -59,8 +59,8 @@ func includeCompetingCPU(original Product, candidates []Alternative) []Alternati
 	for i, alternative := range candidates {
 		other := CPUBrand(alternative.Product.Brand, alternative.Product.Title)
 		if other != "" && other != brand {
-			if i >= maxCandidates {
-				candidates[maxCandidates-1] = alternative
+			if i >= maxAlternativePool {
+				candidates[maxAlternativePool-1] = alternative
 			}
 			break
 		}

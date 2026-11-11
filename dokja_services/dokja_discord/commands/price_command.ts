@@ -49,6 +49,13 @@ const messages: Record<string, Catalog> = {
     compare_specs_note: "Núcleos e threads iguais não garantem o mesmo desempenho.",
     compare_platform_note: "Socket diferente exige placa-mãe compatível.",
     compare_more_rows: "…e mais {count} oferta(s).",
+    shortlist_performance: "Desempenho próximo ou superior",
+    shortlist_economy: "Para economizar",
+    shortlist_different_brand: "Outra marca",
+    shortlist_advantage: "Vantagem específica",
+    shortlist_alternative: "Outra opção",
+    compare_estimated: "Análise estimada pelo modelo.",
+    compare_above_budget: "acima do orçamento",
     compare_part: "Código {part}",
     compare_candidates: "Achei mais de um produto. Mande o código ou o link de um deles:",
     compare_unknown: "Ainda não acompanho esse produto.",
@@ -112,6 +119,13 @@ const messages: Record<string, Catalog> = {
     compare_specs_note: "Matching core and thread counts do not guarantee equal performance.",
     compare_platform_note: "A different socket requires a compatible motherboard.",
     compare_more_rows: "…and {count} more offer(s).",
+    shortlist_performance: "Similar or higher performance",
+    shortlist_economy: "Lower-cost option",
+    shortlist_different_brand: "Another brand",
+    shortlist_advantage: "Specific advantage",
+    shortlist_alternative: "Another option",
+    compare_estimated: "Model-estimated analysis.",
+    compare_above_budget: "above budget",
     compare_part: "Part {part}",
     compare_candidates: "More than one product matches. Send the part number or link of one:",
     compare_unknown: "I do not follow that product yet.",
@@ -373,15 +387,16 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const notes = store && !offers.some((offer) => offer.merchant === store)
     ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
   const decisionNote = decisionLine(decision, offers, words, locale, Array.isArray(result.alternatives) && result.alternatives.length > 0);
-  const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 5) : [];
+  const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 3) : [];
   const alternativeLines = alternatives.map((alternative) => {
     const classificationKey = `alternative_${String(alternative.classification ?? "")}`;
-    const review = alternative.model_assessment as { relationship?: string; explanation?: string } | undefined;
+    const review = alternative.model_assessment as { relationship?: string; explanation?: string; advantage?: string } | undefined;
     const modelKey = `model_${String(review?.relationship ?? "")}`;
     const classification = text(words, classificationKey in words ? classificationKey : "alternative_same_category_candidate");
     const modelNote = review && modelKey in words ? text(words, modelKey) : "";
     // price facts are reasons beside the technical classification
     const reasons = (Array.isArray(alternative.reason_codes) ? alternative.reason_codes : [])
+      .filter((code) => code !== "lower_current_price" && code !== "within_budget")
       .map((code) => `alternative_reason_${String(code)}`)
       .filter((key) => key in words)
       .map((key) => text(words, key));
@@ -390,8 +405,12 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     const address = safeUrl(alternative.url);
     const page = address.length <= 300 ? address : "";
     const name = page ? `[${title}](${page})` : title;
-    const explanation = typeof review?.explanation === "string" ? review.explanation.slice(0, 400) : "";
-    return [`• ${name}${price}\n  ${[modelNote || classification, ...reasons].join(" · ")}`, explanation].filter(Boolean).join("\n");
+    const explanation = typeof review?.explanation === "string" ? shortExplanation(review.explanation) : "";
+    const roleKey = `shortlist_${String(alternative.selection_reason ?? "")}`;
+    const role = alternative.selection_reason === "advantage" && review?.advantage
+      ? review.advantage.slice(0, 60) : roleKey in words ? text(words, roleKey) : "";
+    const above = alternative.over_budget === true ? text(words, "compare_above_budget") : "";
+    return [`• ${name}${price}`, [role || modelNote || classification, ...reasons, above].filter(Boolean).join(" · "), explanation].filter(Boolean).join("\n");
   });
   const fields: NonNullable<DiscordEmbedSpec["fields"]> = [];
   if (offers.length > 0) {
@@ -407,18 +426,17 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
       const warning = ["fake_discount", "inflated_before_sale", "stale", "real_discount"].includes(String(offer.verdict))
         ? ` · ${text(words, String(offer.verdict))}` : "";
       return `• ${name}${payment ? ` · ${payment}` : ""} — **${amount}**${warning}`;
-    }), words, 2400));
+    }), words, 1700));
   }
   if (alternativeLines.length > 0) {
-    fields.push(...comparisonFields(text(words, "compare_alternatives"), alternativeLines, words, 1800));
-    if (alternatives.some((item) => item.classification === "same_category_candidate")) {
+    fields.push(...comparisonFields(text(words, "compare_alternatives"), alternativeLines, words, 2700));
+    if (alternatives.some((item) => item.model_assessment)) {
+      notes.push(text(words, "compare_estimated"));
+    } else if (alternatives.some((item) => item.classification === "same_category_candidate")) {
       notes.push(text(words, "compare_unconfirmed"));
     }
-    if (alternatives.some((item) => item.classification === "similar_cpu_specs")) {
+    if (!alternatives.some((item) => item.model_assessment) && alternatives.some((item) => item.classification === "similar_cpu_specs")) {
       notes.push(text(words, "compare_specs_note"));
-    }
-    if (alternatives.some((item) => Array.isArray(item.reason_codes) && item.reason_codes.includes("different_cpu_socket"))) {
-      notes.push(text(words, "compare_platform_note"));
     }
   }
   const budget = typeof decision?.budget_cents === "number" && decision.budget_cents > 0
@@ -439,8 +457,16 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
 
 function comparisonTitle(value: unknown): string {
   const title = String(value ?? "").replace(/[\[\]*_`]/g, "");
+  const cpu = title.match(/\b(?:(?:AMD\s+)?Ryzen\s+[3579]\s+\d+[a-z0-9]*|(?:Intel\s+)?Core\s+(?:Ultra\s+[3579]\s+\d+[a-z0-9]*|i[3579][ -]?\d+[a-z0-9]*))\b/i);
+  if (cpu) return cpu[0];
   const headline = title.split(",")[0].trim();
   return (title.length > 70 && headline.length >= 16 ? headline : title).slice(0, 120);
+}
+
+function shortExplanation(value: string): string {
+  const sentence = value.trim().match(/^.*?[.!?](?:\s|$)/)?.[0].trim() || value.trim();
+  if (sentence.length <= 160) return sentence;
+  return sentence.slice(0, 159).replace(/\s+\S*$/, "") + "…";
 }
 
 // Keep whole rows and links together within Discord's 1024-character field values.
@@ -450,17 +476,17 @@ function comparisonFields(name: string, lines: string[], words: Catalog, budget:
   let used = 0;
   for (const [index, line] of lines.entries()) {
     if (used + line.length + 100 > budget) {
-      fields.push({ name, value: [value, text(words, "compare_more_rows", { count: lines.length - index })].filter(Boolean).join("\n") });
+      fields.push({ name: fields.length === 0 ? name : "\u200b", value: [value, text(words, "compare_more_rows", { count: lines.length - index })].filter(Boolean).join("\n") });
       return fields;
     }
     if (value && value.length + line.length + 1 > 1024) {
-      fields.push({ name, value });
+      fields.push({ name: fields.length === 0 ? name : "\u200b", value });
       value = "";
     }
     value = [value, line].filter(Boolean).join("\n");
     used += line.length + 1;
   }
-  if (value) fields.push({ name, value });
+  if (value) fields.push({ name: fields.length === 0 ? name : "\u200b", value });
   return fields;
 }
 

@@ -14,10 +14,14 @@ func TechnicalReview(product string, raw map[string]any) (map[string]any, bool) 
 	}
 	switch relationship {
 	case "comparable", "superior", "inferior", "unknown":
-		return map[string]any{
+		review := map[string]any{
 			"product_key": key, "relationship": relationship,
 			"explanation": explanation, "estimated": true,
-		}, true
+		}
+		if advantage, _ := raw["advantage"].(string); advantage != "" && len([]rune(advantage)) <= 60 {
+			review["advantage"] = advantage
+		}
+		return review, true
 	default:
 		return nil, false
 	}

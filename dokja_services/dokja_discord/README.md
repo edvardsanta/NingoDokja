@@ -189,7 +189,9 @@ counts are labelled separately from performance equivalence, which needs
 comparable benchmark evidence. Lightweight models also provide qualitative technical estimates
 and explanations, explicitly labelled in the card and regenerated for current
 prices, budget and alternatives. SQLite caches discovered competitors and search
-queries. Several matches list the products
+queries. Up to three alternatives highlight performance, savings, another
+manufacturer or a specific advantage. Explanations are one short sentence and
+platform differences refer to the requested product. Several matches list the products
 to pick from; an unfollowed product is looked up for the owner first.
 
 ## Live group voice

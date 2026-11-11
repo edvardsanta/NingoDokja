@@ -329,6 +329,27 @@ qualitative estimates as a separate `model_assessment` with `estimated: true`.
 Collected specifications and benchmark classifications retain their evidence.
 An unavailable cache leaves the comparison usable.
 
+## Choosing alternatives for the comparison card
+
+The domain supplies up to 12 current candidates for the fresh technical review.
+After review, the domain selects at most three distinct products, prioritizing
+a technically comparable option, a lower-cost option that shares the reference
+socket when available, and a competing manufacturer. Remaining slots can show a
+specific advantage identified by the current model review or the next closest
+candidate. Within each technical group, options within budget come first.
+Selected options above budget are explicitly labelled.
+
+Only this selection is passed to the final comment. The SQLite discovery cache
+continues to receive the larger candidate pool before model opinions are added.
+Selection reasons and the number of considered candidates are response fields.
+
+Discord gives each choice a short purpose label and one concise explanation.
+CPU model names are extracted from listing titles for display. Continued
+fields repeat no section heading. Model estimates have one footer notice;
+socket differences stay beside the affected products. The model is instructed
+to describe platform differences against the requested product without assuming
+which equipment the user owns.
+
 ## Pending work (stacked follow-ups)
 
 
