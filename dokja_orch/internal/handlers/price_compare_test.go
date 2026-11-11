@@ -54,6 +54,27 @@ type bindingCommenter struct {
 	schemas []map[string]any
 }
 
+// This fixture simulates the shared adapter; price routines supply only a profile and validator.
+func (c *bindingCommenter) GenerateTaskJSON(ctx context.Context, profile string, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
+	if profile != "lightweight" {
+		return nil, errors.New("unexpected task profile")
+	}
+	var lastErr error
+	for _, binding := range []struct{ provider, model string }{
+		{"claude_code", "haiku"}, {"codex", "gpt-6-luna"}, {"ollama", "qwen3.5:2b"},
+	} {
+		reply, err := c.GenerateJSONWithBinding(ctx, binding.provider, binding.model, schema, messages)
+		if err == nil {
+			err = accept(reply)
+		}
+		if err == nil {
+			return reply, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 func (c *bindingCommenter) GenerateJSONWithBinding(_ context.Context, provider, model string, schema map[string]any, messages []map[string]string) (map[string]any, error) {
 	c.bindings = append(c.bindings, provider+":"+model)
 	c.schemas = append(c.schemas, schema)

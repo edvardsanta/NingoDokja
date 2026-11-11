@@ -77,6 +77,26 @@ Measured inference is opt-in through the Runtime `ChatMeasured` policy and priva
 `/chat/measured` endpoint. It reports structured provider usage and withholds
 results that exceed post-generation acceptance budgets. Existing chat/stream
 contracts remain unchanged. See [limits and compatibility](../../dokja_docs/inference-token-budgets.md).
+## Shared inference tasks
+
+The Runtime domain selects registered models for the `lightweight` task profile
+through the private `GET /chat/tasks/lightweight` endpoint. It follows the central
+provider catalog order, including Kimi, and skips disabled providers and providers
+with no declared models. Selection prefers Luna, Haiku and smaller Qwen models
+when those models are registered. Kimi uses its registered model alias.
+
+Orchestrator routines call the shared client's `GenerateTaskJSON` with the profile,
+JSON schema, messages and their contract validator. The adapter runs the returned
+bindings through the existing private inference transport and falls back after
+transport, JSON or contract errors. Each attempt has at most 15 seconds and gets
+a share of the remaining caller deadline. A successful validated reply stops the
+sequence. Routine code contains no provider list.
+
+The ordinary chat binding continues to select its configured provider and model.
+The existing price model environment overrides remain compatibility aliases in
+the shared client. New callers use Runtime registrations. Updating this support
+requires rebuilding and restarting the host controller and orchestrator.
+
 ## Owner-local host workers
 
 An optional, git-ignored `.dokja/host-workers.json` in the runtime checkout declares

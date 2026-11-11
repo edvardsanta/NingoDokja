@@ -308,9 +308,13 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
 
 ## Competitor discovery cache and fresh model reviews
 
-The configured lightweight bindings (Haiku, Luna and a small Qwen) handle search
-planning, qualitative technical assessment and the final comment, with provider
-fallback and response validation. Each provider attempt has a 15-second limit.
+The shared LLM task adapter handles provider selection for search planning,
+qualitative technical assessment and the final comment. The price workflow
+requests the Runtime's `lightweight` profile and supplies its response validator.
+Enabled registered models, including Kimi, are candidates; Luna, Haiku and smaller
+Qwen models are preferred when declared. Each provider attempt has a 15-second
+limit and a share of the remaining deadline. Provider lists and fallback logic
+are owned by the shared Runtime policy and client adapter.
 Technical assessment reserves at least 20 seconds for the final comment.
 
 SQLite caches search queries and discovered competitor identities, titles, part
