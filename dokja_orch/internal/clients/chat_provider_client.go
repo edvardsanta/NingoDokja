@@ -50,6 +50,9 @@ func (c *ChatProviderClient) call(ctx context.Context, method, path string, body
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 524289))
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	if err != nil || len(raw) > 524288 {
 		return nil, &inferenceCallError{message: "invalid chat provider response", code: "invalid_response"}
 	}

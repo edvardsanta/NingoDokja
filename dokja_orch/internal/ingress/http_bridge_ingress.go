@@ -58,6 +58,8 @@ type BridgePayload struct {
 	Brand               string                 `json:"brand"`    // price.search brand
 	Merchant            string                 `json:"merchant"` // price.search store
 	Link                string                 `json:"link"`     // price.compare product link
+	IntendedUse         string                 `json:"intended_use,omitempty"`
+	CurrentEquipment    string                 `json:"current_equipment,omitempty"`
 	BudgetCents         *int64                 `json:"budget_cents,omitempty"`
 	UserID              string                 `json:"userId"`
 	UserName            string                 `json:"userName"`
@@ -658,6 +660,12 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		// The link is handed on as typed; it is never fetched, only read by the resolver.
 		payload := map[string]any{
 			"query": strings.TrimSpace(request.Payload.Query), "link": strings.TrimSpace(request.Payload.Link),
+		}
+		if v := strings.TrimSpace(request.Payload.IntendedUse); v != "" {
+			payload["intended_use"] = v
+		}
+		if v := strings.TrimSpace(request.Payload.CurrentEquipment); v != "" {
+			payload["current_equipment"] = v
 		}
 		if request.Payload.BudgetCents != nil {
 			payload["budget_cents"] = *request.Payload.BudgetCents

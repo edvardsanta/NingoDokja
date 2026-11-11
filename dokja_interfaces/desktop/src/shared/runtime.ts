@@ -28,3 +28,8 @@ export type ProviderRegistrationChange = { provider: string; configurationRevisi
 export type ProviderRegistrationSaved = { provider: string; configurationRevision: number };
 
 export type ChatBinding = { configurationRevision: number; provider: string; model: string };
+
+export type TaskChoice = { provider: string; model: string };
+export type TaskProfiles = { configurationRevision: number; profiles: Record<"lightweight" | "analysis", TaskChoice[]> };
+export type TaskAttempt = { taskId: number; profile: string; provider: string; model: string; durationMs: number; outcome: string; reason: string; cause: string; startedAt: string; retryAfterMs: number; stage: string };
+export type TaskDiagnostics = { active: number; queued: number; limit: number; attempts: TaskAttempt[]; providers: (TaskChoice & { retryAfterMs: number; failureReason: string })[] };

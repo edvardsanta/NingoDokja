@@ -16,6 +16,7 @@ func ChatHandler(d *domain.Domain) http.Handler {
 	mux.HandleFunc("POST /chat", h.chat)
 	mux.HandleFunc("GET /chat/tasks/{profile}", h.taskBindings)
 	mux.HandleFunc("POST /chat/tasks/{profile}", h.taskChat)
+	mux.HandleFunc("POST /chat/task-attempts", h.taskAttempt)
 	mux.HandleFunc("POST /chat/stream", h.stream)
 	mux.HandleFunc("POST /chat/measured", h.measured)
 	mux.HandleFunc("POST /math/render", renderMath)

@@ -18,9 +18,11 @@ const maxAlternativePool = 12
 
 // Compare asks for one product: by its manufacturer's part number when known, else by words.
 type Compare struct {
-	PartNumber  string
-	Query       string
-	BudgetCents int64
+	PartNumber       string
+	Query            string
+	BudgetCents      int64
+	IntendedUse      string
+	CurrentEquipment string
 }
 
 // Offer is one history of the compared product, as a person reads it.
@@ -41,6 +43,8 @@ type Comparison struct {
 	Candidates   []Product
 	// Growable reports that the person may have the product looked up when it was not found.
 	Growable         bool
+	IntendedUse      string
+	CurrentEquipment string
 	ReferenceMatches int
 }
 
@@ -48,6 +52,11 @@ func (c Compare) validate() error {
 	for name, value := range map[string]string{"part_number": c.PartNumber, "query": c.Query} {
 		if !utf8.ValidString(value) || utf8.RuneCountInString(value) > maxSearchText {
 			return fmt.Errorf("%s must be text of at most %d characters", name, maxSearchText)
+		}
+	}
+	for name, value := range map[string]string{"intended_use": c.IntendedUse, "current_equipment": c.CurrentEquipment} {
+		if !utf8.ValidString(value) || utf8.RuneCountInString(value) > 500 {
+			return fmt.Errorf("%s must be at most 500 characters", name)
 		}
 	}
 	if strings.TrimSpace(c.PartNumber) == "" && strings.TrimSpace(c.Query) == "" {
@@ -144,6 +153,7 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 	allProducts = append(allProducts, products...)
 	alternatives := d.alternatives(ctx, *chosen, offers, products, compare.BudgetCents)
 	return Comparison{
+		IntendedUse: compare.IntendedUse, CurrentEquipment: compare.CurrentEquipment,
 		Found: true, Product: *chosen, Offers: offers, ReferenceMatches: referenceMatches,
 		Profile: CategoryProfileFor(chosen.Category), Alternatives: alternatives,
 		Decision: Decide(DecisionInput{
@@ -270,6 +280,7 @@ func (c Comparison) Map() map[string]any {
 			"brand": c.Product.Brand, "part_number": c.Product.PartNumber,
 			"specifications": c.Product.Specifications,
 		}
+		out["comparison_context"] = map[string]any{"intended_use": c.IntendedUse, "current_equipment": c.CurrentEquipment}
 		out["offers"] = offers
 		out["decision"] = c.Decision.Map()
 		out["profile"] = map[string]any{
@@ -299,7 +310,7 @@ func (c Comparison) Map() map[string]any {
 // compareFromPayload reads a compare request.
 func compareFromPayload(payload map[string]any) (Compare, error) {
 	var compare Compare
-	for name, target := range map[string]*string{"part_number": &compare.PartNumber, "query": &compare.Query} {
+	for name, target := range map[string]*string{"part_number": &compare.PartNumber, "query": &compare.Query, "intended_use": &compare.IntendedUse, "current_equipment": &compare.CurrentEquipment} {
 		raw, present := payload[name]
 		if !present || raw == nil {
 			continue

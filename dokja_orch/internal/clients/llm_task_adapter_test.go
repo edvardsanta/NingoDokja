@@ -15,6 +15,10 @@ import (
 func TestTaskAdapterFallsBackToKimiAfterTransportAndContractFailures(t *testing.T) {
 	seen := []string{}
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat/task-attempts" {
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
 		if r.Method == "GET" && r.URL.Path == "/chat/tasks/lightweight" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{
 				{"provider": "codex", "model": "luna"}, {"provider": "claude_code", "model": "haiku"},
@@ -81,6 +85,10 @@ func TestTaskAdapterPreservesLegacyModelOverrides(t *testing.T) {
 
 func TestTaskAdapterReservesTimeForTheNextProvider(t *testing.T) {
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat/task-attempts" {
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
 		if r.Method == "GET" && r.URL.Path == "/chat/tasks/lightweight" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{
 				{"provider": "codex", "model": "slow"}, {"provider": "kimi", "model": "registered"},
@@ -106,6 +114,10 @@ func TestTaskAdapterReservesTimeForTheNextProvider(t *testing.T) {
 func TestTaskAdapterSkipsCoolingProvidersWithoutGenerating(t *testing.T) {
 	calls := 0
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat/task-attempts" {
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
 		if r.Method == "GET" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]any{
 				{"provider": "codex", "model": "slow", "retry_after_ms": 60000},
@@ -133,6 +145,10 @@ func TestTaskAdapterSkipsCoolingProvidersWithoutGenerating(t *testing.T) {
 
 func TestFailedTaskDiagnosticsDoNotKeepPrivateProviderOrValidatorMessages(t *testing.T) {
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat/task-attempts" {
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
 		if r.Method == "GET" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{{"provider": "kimi", "model": "registered"}}})
 			return
@@ -147,5 +163,40 @@ func TestFailedTaskDiagnosticsDoNotKeepPrivateProviderOrValidatorMessages(t *tes
 	raw, _ := json.Marshal(failure)
 	if strings.Contains(string(raw), "private-prompt-marker") || strings.Contains(err.Error(), "private-prompt-marker") {
 		t.Fatal("private details retained")
+	}
+}
+
+func TestConfiguredTaskModelWinsOverLegacyPriceOverride(t *testing.T) {
+	t.Setenv("DOKJA_PRICE_CODEX_MODEL", "legacy")
+	reports := make(chan TaskAttempt, 1)
+	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			json.NewEncoder(w).Encode(map[string]any{"bindings": []any{map[string]any{"provider": "codex", "model": "chosen", "configured": true}}})
+			return
+		}
+		if r.URL.Path == "/chat/task-attempts" {
+			var a TaskAttempt
+			json.NewDecoder(r.Body).Decode(&a)
+			reports <- a
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		if body["model"] != "chosen" {
+			t.Errorf("explicit priority overridden: %v", body["model"])
+		}
+		json.NewEncoder(w).Encode(map[string]any{"reply": `{"ok":true}`})
+	})
+	if _, err := client.GenerateTaskJSON(t.Context(), "lightweight", nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case a := <-reports:
+		if a.Model != "chosen" || a.Outcome != "success" {
+			t.Fatal(a)
+		}
+	default:
+		t.Fatal("attempt metadata was not reported")
 	}
 }

@@ -44,6 +44,10 @@ const messages: Record<string, Catalog> = {
     watch_full: "A lista de buscas vigiadas está cheia; remova uma para vigiar **{search}**.",
     compare_header: "⚖️ {title}",
     compare_offers: "Preços nas lojas",
+    compare_sources: "Fontes técnicas coletadas",
+    compare_no_sources: "Sem fontes técnicas coletadas; a análise do modelo é uma estimativa.",
+    compare_context: "Uso: {use} · Equipamento atual: {equipment}",
+    compare_unspecified: "não informado",
     compare_budget: "Orçamento de {price}",
     compare_reference: "Encontrei {count} versões. Usei esta como referência pelo menor preço disponível entre elas.",
     compare_reference_unpriced: "Encontrei {count} versões e escolhi esta como referência para seguir com a comparação.",
@@ -117,6 +121,10 @@ const messages: Record<string, Catalog> = {
     watch_full: "The watched searches are full; remove one to watch **{search}**.",
     compare_header: "⚖️ {title}",
     compare_offers: "Store prices",
+    compare_sources: "Collected technical sources",
+    compare_no_sources: "No collected technical sources; the model analysis is an estimate.",
+    compare_context: "Use: {use} · Current equipment: {equipment}",
+    compare_unspecified: "not provided",
     compare_budget: "Budget {price}",
     compare_reference: "Found {count} variants. This reference has the lowest available price among them.",
     compare_reference_unpriced: "Found {count} variants and selected this reference to continue the comparison.",
@@ -372,6 +380,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     found?: boolean; product?: Record<string, unknown>; offers?: Assessment[]; candidates?: Array<Record<string, unknown>>;
     alternatives?: Array<Record<string, unknown>>;
     reference_selection?: {matches?: number; reason?: string};
+ comparison_context?:{intended_use?:string;current_equipment?:string};technical_sources?:Array<Record<string,unknown>>;
     comment?: string; looked_up?: boolean; link?: { known?: boolean; store?: string; store_name?: string };
   };
   if (result.link && result.link.known === false) return text(words, "compare_bad_link");
@@ -436,7 +445,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     }), words, 1700));
   }
   if (alternativeLines.length > 0) {
-    fields.push(...comparisonFields(text(words, "compare_alternatives"), alternativeLines, words, 2700));
+    fields.push(...comparisonFields(text(words, "compare_alternatives"), alternativeLines, words, result.technical_sources?.length ? 1900 : 2500));
     if (alternatives.some((item) => item.model_assessment)) {
       notes.push(text(words, "compare_estimated"));
     } else if (alternatives.some((item) => item.classification === "same_category_candidate")) {
@@ -446,22 +455,35 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
       notes.push(text(words, "compare_specs_note"));
     }
   }
+  const sources=Array.isArray(result.technical_sources)?result.technical_sources:[];
+  const sourceLines=[...new Map(sources.map(s=>[String(s.url),s])).values()].slice(0,5).flatMap(s=>{
+    const address=safeUrl(s.url);if(!address||address.length>300)return [];
+    const title=String(s.title??"").replace(/[\[\]*_`]/g,"").slice(0,100);
+    return [`• [${title}](${address})${s.workload?` · ${String(s.workload).slice(0,100)}`:""}${s.observed_at?` · ${String(s.observed_at).slice(0,10)}`:""}`];
+  });
+  if(sourceLines.length)fields.push(...comparisonFields(text(words,"compare_sources"),sourceLines,words,700));
+  else if(alternatives.some(a=>a.model_assessment))notes.push(text(words,"compare_no_sources"));
+  const comparisonContext=result.comparison_context;
+  const contextNote=comparisonContext&&(comparisonContext.intended_use||comparisonContext.current_equipment)?text(words,"compare_context",{use:shortExplanation(comparisonContext.intended_use||text(words,"compare_unspecified"),100),equipment:shortExplanation(comparisonContext.current_equipment||text(words,"compare_unspecified"),150)}):"";
   const budget = typeof decision?.budget_cents === "number" && decision.budget_cents > 0
     ? text(words, "compare_budget", { price: money(decision.budget_cents, locale) }) : "";
   const comment = typeof result.comment === "string" ? result.comment.trim().slice(0, 600) : "";
   const reference = (result.reference_selection?.matches ?? 0) > 1
     ? text(words,result.reference_selection?.reason === "lowest_current_offer" ? "compare_reference" : "compare_reference_unpriced",{count:result.reference_selection!.matches!}) : "";
-  return {
-    content: "",
-    embeds: [{
+  const embed: DiscordEmbedSpec={
       title: text(words, "compare_header", { title: comparisonTitle(product.title ?? product.product) }),
       ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
-      description: [decisionNote, budget, reference, comment].filter(Boolean).join("\n\n"),
+      description: [decisionNote, budget, contextNote, reference, comment].filter(Boolean).join("\n\n"),
       color: looksOf(lead?.verdict).color,
       fields,
       footer: [...notes, part ? text(words, "compare_part", { part }) : ""].filter(Boolean).join("\n"),
-    }],
   };
+  // Trim complete trailing rows/sections, preserving valid markdown links.
+  while(embedLength(embed)>MAX_EMBED_TEXT && embed.fields?.length){
+    const last=embed.fields.at(-1)!;const rows=last.value.split("\n");
+    if(rows.length>1){rows.pop();last.value=rows.join("\n");}else{embed.fields.pop();}
+  }
+  return {content:"",embeds:[embed]};
 }
 
 function comparisonTitle(value: unknown): string {
@@ -529,6 +551,8 @@ export function createCompareCommand(orchestratorEndpoint: string, orchestratorT
     options: [
       { name: "product", description: "Name or part number, such as ssd 1tb", type: ApplicationCommandOptionType.String, required: false },
       { name: "link", description: "A product link from a store; it is read, never opened", type: ApplicationCommandOptionType.String, required: false },
+      { name:"intended_use", description:"Intended workload, resolution or applications", type:ApplicationCommandOptionType.String, required:false,max_length:500 },
+      { name:"current_equipment", description:"Current CPU, GPU, motherboard or power supply", type:ApplicationCommandOptionType.String, required:false,max_length:500 },
       { name: "budget", description: "Maximum budget in BRL", type: ApplicationCommandOptionType.Number, required: false, min_value: 0 },
     ],
     handle: async (context: DiscordCommandContext) => {
@@ -543,6 +567,7 @@ export function createCompareCommand(orchestratorEndpoint: string, orchestratorT
       try {
         const response = await dispatchToOrchestratorResponse(orchestratorEndpoint, orchestratorTimeoutMs, buildBridgePayload({
           eventType: "price.compare", query, link,
+ intended_use:context.getString("intended_use").trim(),current_equipment:context.getString("current_equipment").trim(),
           ...(typeof budget === "number" && Number.isFinite(budget) && budget > 0 ? { budget_cents: Math.round(budget * 100) } : {}),
           userId: context.userId, channelId: context.channelId, messageId: context.messageId, guildId: context.guildId,
         }));

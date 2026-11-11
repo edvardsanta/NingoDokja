@@ -103,7 +103,7 @@ func (c *taskCircuit) finish(provider string, epoch uint64, err error, now time.
 
 // ChatTask shares transient provider recovery state across all task clients on this Runtime.
 func (d *Domain) ChatTask(ctx context.Context, profile string, binding ChatBinding, messages []ChatMessage) (ChatReply, error) {
-	if profile != "lightweight" {
+	if !validTaskProfile(profile) {
 		return ChatReply{}, errors.New("unsupported inference task profile")
 	}
 	if err := ctx.Err(); err != nil {
@@ -112,6 +112,14 @@ func (d *Domain) ChatTask(ctx context.Context, profile string, binding ChatBindi
 	if err := d.validateChat(binding); err != nil {
 		return ChatReply{}, err
 	}
+	// The HTTP caller's disconnect/deadline cancels both waiting and generation.
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	release, err := d.tasks.acquire(ctx, binding.Provider)
+	if err != nil {
+		return ChatReply{}, err
+	}
+	defer release()
 	epoch, err := d.taskCircuit.begin(binding.Provider, time.Now())
 	if err != nil {
 		return ChatReply{}, err

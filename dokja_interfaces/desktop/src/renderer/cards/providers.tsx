@@ -8,6 +8,7 @@ import { LocalModels, useRemoveModel } from "./local_models.js";
 import { availableProviderModels } from "./provider_model_catalog.js";
 import { useAction } from "./use_action.js";
 import { useCard, type LoadResult } from "./use_card.js";
+import { TaskWorkbench } from "./task_workbench.js";
 import { Button } from "./ui.js";
 
 // What inference the machine could offer, asked when the view opens (never before): discovery only,
@@ -61,6 +62,7 @@ export function ProvidersCard({ transport }: { transport: Transport }) {
   return <CardFrame title={t("providers_title")} state={state} onReload={reload}>
     {(data) => <>
       {data.configurationRevision ? <ChatSelection key={chatRound} transport={transport} providers={data.providers} onCurrent={setCurrent} /> : null}
+      <TaskWorkbench transport={transport} providers={data.providers} />
       <p className="detail">{t("providers_discovery_only")}</p>
       {action.state.phase === "error" && <Problem error={action.state.error} />}
       {using.state.phase === "error" && <Problem error={using.state.error} />}

@@ -56,7 +56,7 @@ type bindingCommenter struct {
 
 // This fixture simulates the shared adapter; price routines supply only a profile and validator.
 func (c *bindingCommenter) GenerateTaskJSON(ctx context.Context, profile string, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
-	if profile != "lightweight" {
+	if profile != "lightweight" && profile != "analysis" {
 		return nil, errors.New("unexpected task profile")
 	}
 	var lastErr error

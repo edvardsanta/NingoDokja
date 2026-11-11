@@ -3,7 +3,7 @@ import { passageLocator, originalReading } from "../shared/passages.js";
 import { observerSnapshot } from "../shared/realtime.js";
 import { speakInput, speech, transcribeInput, transcript, MAX_SPEAK_TEXT, MAX_UTTERANCE_BASE64, VOICE_SESSION } from "../shared/desktop_voice.js";
 import { createHash } from "node:crypto";
-import { runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
+import { runtimeTaskProfiles, runtimeTaskConfigure, runtimeTaskDiagnostics, runtimeModel, runtimeModels, runtimeChat, runtimeChatConfigure, runtimeProviderConfigure, runtimeProviderSaved, runtimeProviders, runtimeSet, runtimeSettings, runtimeSettingsSet, runtimeSnapshot, runtimeModule, runtimeLogs } from "./runtime_actions.js";
 import type { ActionType } from "../shared/actions.js";
 import { isRecord, text } from "../shared/records.js";
 import { memoryListPayload, memoryGetPayload, memoryPage, memoryDetail, memoryResolvePayload, memoryResolution } from "./memory_experiences.js";
@@ -962,6 +962,9 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },
   "runtime.chat": {payload:noPayload,project:(result)=>inDomain(result,"runtime",runtimeChat)},
   "runtime.chat.configure": {payload:runtimeChatConfigure,project:(result)=>inDomain(result,"runtime",runtimeChat)},
+  "runtime.tasks.profiles": { payload:noPayload, project:(result)=>inDomain(result,"runtime",runtimeTaskProfiles) },
+  "runtime.tasks.configure": { payload:runtimeTaskConfigure, project:(result)=>inDomain(result,"runtime",runtimeTaskProfiles) },
+  "runtime.tasks.diagnostics": { payload:noPayload, project:(result)=>inDomain(result,"runtime",runtimeTaskDiagnostics) },
   "runtime.providers": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeProviders) },
   "runtime.models.status": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeModels) },
   "runtime.models.engine.start": { payload: noPayload, project: (result) => inDomain(result,"runtime",runtimeModels) },
