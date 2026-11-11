@@ -96,10 +96,8 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 		matched = prefixed
 	}
 	if chosen == nil && len(matched) == 0 && strings.TrimSpace(compare.Query) != "" {
-		wanted := words(compare.Query)
 		for _, product := range products {
-			described := words(strings.Join([]string{product.Title, product.Key, product.Category, product.Brand, product.PartNumber}, " "))
-			if matches(described, wanted) {
+			if comparisonMatches(product, compare.Query) {
 				matched = append(matched, product)
 			}
 		}

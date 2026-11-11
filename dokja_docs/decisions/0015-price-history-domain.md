@@ -358,6 +358,20 @@ Discord keeps concise explanations, short model names and one alternatives
 heading. The final comment discusses the reference and eligible alternatives
 without assuming which equipment the user owns.
 
+## Matching requested model identities
+
+Comparison queries match numeric model identifiers against the listing title
+exactly. Category labels and collector search terms cannot establish a product's
+model identity. An exact part number or explicit internal product key remains
+supported. Common model spellings with joined or separated letters and digits
+are normalized, while model suffixes remain distinct.
+
+This prevents a low-priced unrelated product stored under a model-specific
+search category from becoming the comparison reference. The check applies to
+existing catalog records too. Model-family category labels are normalized to
+the appropriate GPU profile so existing records can still be compared with
+other GPU products. Price ordering runs after identity matching.
+
 ## Pending work (stacked follow-ups)
 
 

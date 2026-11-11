@@ -189,6 +189,19 @@ func TestGenericComparisonContinuesAfterSeveralVariantsAreCollected(t *testing.T
 	}
 }
 
+func TestModelQueryCannotChooseACheaperUnrelatedCollectedProduct(t *testing.T) {
+	wrong := offerObservation("wrong", "WRONG-GPU", "store-a", "pix", "619.90")
+	wrong["title"], wrong["category"] = "GPU RX 550", "RX 7600"
+	right := offerObservation("right", "RIGHT-GPU", "store-b", "pix", "1899.99")
+	right["title"], right["category"] = "GPU RX 7600 Challenger", "RX 7600"
+	handler, _ := compareHandler(&compareResolver{lookup: []any{wrong, right}}, nil)
+	result := runCompare(t, handler, true, map[string]any{"query": "RX 7600"})
+	product, _ := result["product"].(map[string]any)
+	if result["found"] != true || product["product"] != "right" {
+		t.Fatalf("unrelated reference: %v", result)
+	}
+}
+
 func TestCPUDiscoverySearchesTheCompetingManufacturer(t *testing.T) {
 	for _, test := range []struct {
 		title string
