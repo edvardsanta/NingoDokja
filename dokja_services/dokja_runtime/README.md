@@ -97,6 +97,25 @@ The existing price model environment overrides remain compatibility aliases in
 the shared client. New callers use Runtime registrations. Updating this support
 requires rebuilding and restarting the host controller and orchestrator.
 
+Task execution uses private `POST /chat/tasks/lightweight`. Two consecutive
+observed authentication, allowance or availability failures pause that provider
+for one minute across task clients. The next request after the pause is the only
+recovery probe allowed in flight. Success clears the failure count. Cancellation
+and caller contract rejection do not contribute to provider health. This state
+is transient and resets with the controller.
+
+The shared client supports `GenerateTaskJSON` and `GenerateTaskText`. Music remarks,
+quiz answer batches, quiz comments and price tasks use these APIs. Quiz answers
+still pass the Quiz domain's option validation and retain partial-batch retries.
+
+Shared-client task results include safe `attempts` metadata. The orchestrator also logs
+`LLM task attempt` JSON records with task id, stage, provider, model, start time,
+duration, outcome and categorized reason. Cooling providers produce skipped
+records with the remaining pause and cause when the inventory marks them as cooling.
+Prompts, answers and raw errors are
+excluded from these diagnostics. Failed tasks expose the same metadata in
+`TaskInferenceError`.
+
 ## Owner-local host workers
 
 An optional, git-ignored `.dokja/host-workers.json` in the runtime checkout declares
