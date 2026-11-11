@@ -139,3 +139,14 @@ func (d *DB) InitializeChatConfiguration(v map[string]string) (Configuration, er
 func (d *DB) UpdateChatConfiguration(rev uint64, v map[string]string) (Configuration, error) {
 	return d.updateConfiguration("runtime.chat.v1", rev, v)
 }
+
+// Task priorities have an independent revision and reuse the settings table.
+func (d *DB) TaskConfiguration() (Configuration, bool, error) {
+	return d.configuration("runtime.tasks.v1")
+}
+func (d *DB) InitializeTaskConfiguration(v map[string]string) (Configuration, error) {
+	return d.initializeConfiguration("runtime.tasks.v1", v)
+}
+func (d *DB) UpdateTaskConfiguration(rev uint64, v map[string]string) (Configuration, error) {
+	return d.updateConfiguration("runtime.tasks.v1", rev, v)
+}

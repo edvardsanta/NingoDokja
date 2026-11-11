@@ -91,6 +91,28 @@ func Handler(d *domain.Domain, project string) http.Handler {
 				return
 			}
 			reply("ok", result, "")
+		case "runtime.tasks.diagnostics":
+			reply("ok", d.TaskDiagnostics(), "")
+		case "runtime.tasks.profiles":
+			result, err := d.TaskProfiles()
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
+		case "runtime.tasks.configure":
+			data, _ := json.Marshal(e.Payload)
+			var p domain.TaskProfiles
+			if json.Unmarshal(data, &p) != nil {
+				reply("error", nil, "invalid task profiles")
+				return
+			}
+			result, err := d.ConfigureTaskProfiles(p)
+			if err != nil {
+				reply("error", nil, err.Error())
+				return
+			}
+			reply("ok", result, "")
 		case "runtime.providers":
 			view := d.Providers(r.Context())
 			if view.Error != "" {

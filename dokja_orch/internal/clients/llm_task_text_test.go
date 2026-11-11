@@ -9,6 +9,10 @@ import (
 func TestTaskTextUsesValidatedFallbackAndPreservesCallerMessages(t *testing.T) {
 	messages := []map[string]string{{"role": "system", "content": "Configured persona"}, {"role": "user", "content": "Private question"}}
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat/task-attempts" {
+			w.Write([]byte(`{"recorded":true}`))
+			return
+		}
 		if r.Method == "GET" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{{"provider": "kimi", "model": "registered"}}})
 			return

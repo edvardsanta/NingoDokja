@@ -131,6 +131,7 @@ type Domain struct {
 	timeout          time.Duration
 	models           *modelState
 	taskCircuit      taskCircuit
+	tasks            taskWorkbench
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {

@@ -15,15 +15,17 @@ var taskSequence atomic.Uint64
 // GenerateTaskJSON shares provider selection, deadlines and validated fallback across routines.
 // Runtime owns the task profile. The routine supplies its response contract validator.
 func (c *ChatProviderClient) GenerateTaskJSON(ctx context.Context, profile string, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
-	if profile != "lightweight" {
+	if profile != "lightweight" && profile != "analysis" {
 		return nil, fmt.Errorf("unsupported inference task profile")
 	}
+	ctx, cancelTask := context.WithTimeout(ctx, 90*time.Second)
+	defer cancelTask()
 	taskID := taskSequence.Add(1)
 	startedInventory := time.Now()
 	inventory, err := c.call(ctx, "GET", "/chat/tasks/"+profile, nil)
 	if err != nil {
 		entry := TaskAttempt{TaskID: taskID, Profile: profile, Provider: "runtime", StartedAt: startedInventory.UTC(), DurationMS: time.Since(startedInventory).Milliseconds(), Outcome: "failed", Reason: taskFailureReason(err), Stage: "catalog"}
-		logTaskAttempt(entry)
+		c.recordTaskAttempt(entry)
 		return nil, &TaskInferenceError{Reason: "inventory_unavailable", Attempts: []TaskAttempt{entry}}
 	}
 	bindings, _ := inventory["bindings"].([]any)
@@ -46,7 +48,9 @@ func (c *ChatProviderClient) GenerateTaskJSON(ctx context.Context, profile strin
 		if provider == "" || model == "" {
 			continue
 		}
-		model = legacyTaskModel(provider, model)
+		if profile == "lightweight" && binding["configured"] != true {
+			model = legacyTaskModel(provider, model)
+		}
 		entry := TaskAttempt{TaskID: taskID, Profile: profile, Provider: provider, Model: model, StartedAt: time.Now().UTC(), Stage: "generation"}
 		retry, _ := binding["retry_after_ms"].(float64)
 		if retry > 0 {
@@ -55,10 +59,13 @@ func (c *ChatProviderClient) GenerateTaskJSON(ctx context.Context, profile strin
 				entry.Cause = taskFailureReason(&inferenceCallError{code: cause})
 			}
 			attempts = append(attempts, entry)
-			logTaskAttempt(entry)
+			c.recordTaskAttempt(entry)
 			continue
 		}
 		wait := 15 * time.Second
+		if profile == "analysis" {
+			wait = 45 * time.Second
+		}
 		if deadline, ok := ctx.Deadline(); ok {
 			wait = min(wait, time.Until(deadline)/time.Duration(max(1, eligible)))
 		}
@@ -88,11 +95,17 @@ func (c *ChatProviderClient) GenerateTaskJSON(ctx context.Context, profile strin
 			entry.Outcome, entry.Reason = "success", ""
 		}
 		attempts = append(attempts, entry)
-		logTaskAttempt(entry)
+		c.recordTaskAttempt(entry)
 		if err == nil {
+			if ctx.Err() != nil {
+				return nil, &TaskInferenceError{Attempts: attempts, Reason: taskFailureReason(ctx.Err())}
+			}
 			reply["attempts"] = attempts
 			return reply, nil
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, &TaskInferenceError{Attempts: attempts, Reason: taskFailureReason(err)}
 	}
 	return nil, &TaskInferenceError{Attempts: attempts, Reason: "providers_exhausted"}
 }

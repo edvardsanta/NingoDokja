@@ -15,10 +15,11 @@ type TaskBinding struct {
 	ChatBinding
 	RetryAfterMS  int64  `json:"retry_after_ms,omitempty"`
 	FailureReason string `json:"failure_reason,omitempty"`
+	Configured    bool   `json:"configured,omitempty"`
 }
 
 func (d *Domain) TaskBindings(profile string) ([]TaskBinding, error) {
-	if profile != "lightweight" {
+	if !validTaskProfile(profile) {
 		return nil, fmt.Errorf("unsupported inference task profile")
 	}
 	if d.providerSettings == nil {
@@ -29,6 +30,24 @@ func (d *Domain) TaskBindings(profile string) ([]TaskBinding, error) {
 		return nil, err
 	}
 	bindings := []TaskBinding{}
+	profiles, err := d.TaskProfiles()
+	if err != nil {
+		return nil, err
+	}
+	if priorities := profiles.Profiles[profile]; len(priorities) > 0 {
+		for _, choice := range priorities {
+			// Removed or disabled registrations are never silently re-enabled by a profile.
+			if d.validateChat(choice) != nil {
+				continue
+			}
+			retry, reason := d.taskCircuit.status(choice.Provider, time.Now())
+			bindings = append(bindings, TaskBinding{Configured: true, ChatBinding: ChatBinding{Provider: choice.Provider, Model: choice.Model}, RetryAfterMS: retry, FailureReason: reason})
+		}
+		if len(bindings) == 0 {
+			return nil, fmt.Errorf("no configured task models are enabled")
+		}
+		return bindings, nil
+	}
 	for _, spec := range providerSpecs {
 		for _, registration := range preferences.Providers {
 			if registration.ID != spec.id || !registration.Enabled || len(registration.Models) == 0 {
@@ -36,7 +55,7 @@ func (d *Domain) TaskBindings(profile string) ([]TaskBinding, error) {
 			}
 			model := registration.Models[0]
 			for _, candidate := range registration.Models[1:] {
-				if lightweightModelRank(candidate) < lightweightModelRank(model) {
+				if (profile == "lightweight" && lightweightModelRank(candidate) < lightweightModelRank(model)) || (profile == "analysis" && lightweightModelRank(candidate) > lightweightModelRank(model)) {
 					model = candidate
 				}
 			}

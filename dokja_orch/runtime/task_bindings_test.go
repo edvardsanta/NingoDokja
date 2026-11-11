@@ -45,3 +45,20 @@ func TestTaskFailuresShareCooldownAcrossRequests(t *testing.T) {
 		t.Fatalf("paused provider invoked %d times", provider.calls)
 	}
 }
+
+func TestTaskAttemptAPIRejectsPrivateFailureText(t *testing.T) {
+	d := domain.New(nil, domain.Journal{}, nil)
+	h := ChatHandler(d)
+	for _, reason := range []string{"contract_rejected", "private generated reply"} {
+		w := httptest.NewRecorder()
+		body := `{"task_id":1,"profile":"analysis","provider":"kimi","model":"fixture","duration_ms":10,"outcome":"failed","stage":"generation","started_at":"2026-11-11T10:00:00Z","reason":"` + reason + `","prompt":"private prompt"}`
+		h.ServeHTTP(w, httptest.NewRequest("POST", "/chat/task-attempts", strings.NewReader(body)))
+		if (w.Code == 200) != (reason == "contract_rejected") {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	raw, _ := json.Marshal(d.TaskDiagnostics())
+	if strings.Contains(string(raw), "private") || len(d.TaskDiagnostics().Attempts) != 1 {
+		t.Fatal(string(raw))
+	}
+}

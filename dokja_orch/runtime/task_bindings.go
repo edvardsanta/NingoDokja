@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -26,7 +27,13 @@ func (h inferenceHTTPHandler) taskChat(w http.ResponseWriter, r *http.Request) {
 		failure := map[string]any{"error": "task inference failed", "code": "provider_error"}
 		var providerFailure *domain.ChatProviderFailure
 		var cooldown *domain.TaskCooldownError
-		if errors.As(err, &providerFailure) {
+		if errors.Is(err, context.Canceled) {
+			failure["code"] = "cancelled"
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			failure["code"] = "timeout"
+		} else if errors.Is(err, domain.ErrTaskQueueFull) {
+			failure["code"] = "queue_full"
+		} else if errors.As(err, &providerFailure) {
 			failure["error"], failure["code"] = providerFailure.Error(), string(providerFailure.SafeCode())
 		} else if errors.As(err, &cooldown) {
 			failure["code"], failure["retry_after_ms"] = "cooldown", cooldown.RetryAfterMS
@@ -36,4 +43,13 @@ func (h inferenceHTTPHandler) taskChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(result)
+}
+
+func (h inferenceHTTPHandler) taskAttempt(w http.ResponseWriter, r *http.Request) {
+	var a domain.TaskAttempt
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&a) != nil || h.domain.RecordTaskAttempt(a) != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"recorded": true})
 }

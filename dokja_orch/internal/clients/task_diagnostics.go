@@ -48,7 +48,7 @@ func taskFailureReason(err error) string {
 	var failure *inferenceCallError
 	if errors.As(err, &failure) {
 		switch failure.code {
-		case "session_limit", "usage_limit", "authentication_required", "model_unavailable", "cli_incompatible", "output_limit", "unavailable", "cooldown", "runtime_unavailable", "invalid_response":
+		case "queue_full", "timeout", "cancelled", "session_limit", "usage_limit", "authentication_required", "model_unavailable", "cli_incompatible", "output_limit", "unavailable", "cooldown", "runtime_unavailable", "invalid_response":
 			return failure.code
 		}
 	}
@@ -58,4 +58,12 @@ func taskFailureReason(err error) string {
 func logTaskAttempt(attempt TaskAttempt) {
 	data, _ := json.Marshal(attempt)
 	logger.Info("LLM task attempt " + string(data))
+}
+
+// Reporting has a small independent budget so cancellation still leaves safe metadata.
+func (c *ChatProviderClient) recordTaskAttempt(a TaskAttempt) {
+	logTaskAttempt(a)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_, _ = c.call(ctx, "POST", "/chat/task-attempts", a)
 }

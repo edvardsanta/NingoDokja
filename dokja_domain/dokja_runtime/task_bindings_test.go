@@ -21,6 +21,10 @@ func TestLightweightTasksUseRegisteredModelsAndIncludeKimi(t *testing.T) {
 			t.Fatalf("bindings %v", bindings)
 		}
 	}
+	analysis, err := d.TaskBindings("analysis")
+	if err != nil || analysis[0].Model != "large-model" || analysis[3].Model != "qwen3:32b" {
+		t.Fatal(analysis, err)
+	}
 	store.preferences.Providers[2].Enabled = false
 	bindings, err = d.TaskBindings("lightweight")
 	if err != nil || len(bindings) != 3 {
