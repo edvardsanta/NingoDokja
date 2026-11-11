@@ -308,7 +308,7 @@ func TestAnInventedQuoteIsTakenOut(t *testing.T) {
 	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
 	reply := `Ela diz: “vi um anjo com uma lança de ouro” [1].`
 	got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, textTurn())
-	if want := `Ela diz: “[…]” [1].`; got != want {
+	if want := `Ela diz.`; got != want {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -318,7 +318,7 @@ func TestEarlierQuoteCannotPointAtAnotherPassage(t *testing.T) {
 	sources := []knowledgeSource{{Number: 1, SourceID: "file:book#part1", Text: "Another passage entirely."}}
 	reply := `Ela diz: "baixar-me as asas, e digo isso" [1].`
 	got := focusHandler(base).verifyQuotes(context.Background(), reply, sources, textTurn())
-	if got != `Ela diz: "[…]" [1].` || len(base.scoped) != 0 {
+	if got != `Ela diz.` || len(base.scoped) != 0 {
 		t.Fatalf("%s searches=%v", got, base.scoped)
 	}
 }
@@ -330,7 +330,17 @@ func TestEachSideOfAnEllipsisMustBeInTheText(t *testing.T) {
 	if got := handler.verifyQuotes(context.Background(), reply, sources, textTurn()); got != reply {
 		t.Fatalf("got %q", got)
 	}
-	if got := handler.verifyQuotes(context.Background(), `“Basta ser mulher […] uma lança de ouro” [1]`, sources, textTurn()); got != `“[…]” [1]` {
+	// One invented side: the whole quote is replaced by the real passage it came from.
+	if got := handler.verifyQuotes(context.Background(), `“Basta ser mulher […] uma lança de ouro” [1]`, sources, textTurn()); got != `“Basta ser mulher para baixar-me as asas, e digo isso sem queixa alguma do Senhor.” [1]` {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestAnInexactQuoteIsRepairedWithTheRealPassage(t *testing.T) {
+	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: bookPassage}}
+	reply := `Ela escreve: "Basta ser mulher, disse ela, sem queixa alguma" [1].`
+	got := focusHandler(&documentBase{}).verifyQuotes(context.Background(), reply, sources, textTurn())
+	if want := `Ela escreve: "Basta ser mulher para baixar-me as asas, e digo isso sem queixa alguma do Senhor." [1].`; got != want {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -345,7 +355,7 @@ func TestOutsideATurnAboutTheTextOnlyACitedQuoteIsChecked(t *testing.T) {
 	}
 	// A stitched quote: both ends are the author's, the sentence is not.
 	stitched := `Ela escreve: "se não for conforme à fé, queime logo" [1].`
-	if got := handler.verifyQuotes(context.Background(), stitched, sources, turn); got != `Ela escreve: "[…]" [1].` {
+	if got := handler.verifyQuotes(context.Background(), stitched, sources, turn); got != `Ela escreve.` {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -370,7 +380,8 @@ func TestAQuoteThatCannotBeCheckedIsNotShown(t *testing.T) {
 	base := &documentBase{err: errors.New("down")}
 	sources := []knowledgeSource{{Number: 1, SourceID: "file:book", Text: "Another passage entirely."}}
 	got := focusHandler(base).verifyQuotes(context.Background(), `“uma frase qualquer de quatro palavras” [1]`, sources, textTurn())
-	if got != `“[…]” [1]` {
+	// The reply was only the quote, so nothing of it is left to show.
+	if got != `[…]` {
 		t.Fatalf("got %q", got)
 	}
 }

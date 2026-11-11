@@ -6,6 +6,7 @@ import (
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,11 +25,13 @@ const (
 	// knowledgeTopicRunes is the longest reply to "which topic?" that continues a request for text.
 	knowledgeTopicRunes = 60
 
-	quoteMinWords    = 4
-	quotePieceWords  = 2
-	quoteMaxChecks   = 8
-	quoteCheckBudget = 5 * time.Second
-	quoteRemoved     = "[…]"
+	quoteMinWords       = 4
+	quotePieceWords     = 2
+	quoteMaxChecks      = 8
+	quoteCheckBudget    = 5 * time.Second
+	quoteRemoved        = "[…]"
+	quoteRepairMinWords = 3
+	quoteRepairMaxChars = 240
 )
 
 // knowledgeTextBrief replaces the usual brief when the user asks about the text itself: there the
@@ -42,7 +45,8 @@ marks, copying exactly what is written here, and mark each quote with its number
 for example [1]. Each passage has a distinct number, including passages from the same book.
 Cite every paraphrase and source-dependent interpretation as well, so the reader can inspect its
 basis. Identify your interpretations as such. Quote only from these excerpts: never from memory, never a paraphrase in quotation
-marks, and every quote is checked against the document, so an inexact one will be removed. If they
+marks, and every quote is checked against the document, so an inexact one is
+replaced by the real passage or taken out. If they
 hold fewer passages than asked for, give the ones there are and say how many. Use a page or chapter label only when supplied; never invent a location. These are only some passages of the document: a quote from earlier
 in the conversation that is missing here may still be in it, so do not take one back for that. The
 whole document is in the user's library: never ask them to send you a passage of it, and if these
@@ -309,12 +313,16 @@ func (f *chatFocus) remember(turn knowledgeTurn, question string, cited []knowle
 var (
 	// The second group is the citation right after a quote, which is the reply saying "this is in
 	// the document".
-	straightQuote  = regexp.MustCompile(`"([^"\n]+)"(\s*\[\d[^\]]*\])?`)
-	curlyQuote     = regexp.MustCompile(`“([^”]+)”(\s*\[\d[^\]]*\])?`)
-	angleQuote     = regexp.MustCompile(`«([^»]+)»(\s*\[\d[^\]]*\])?`)
-	quoteEllipsis  = regexp.MustCompile(`\[?\s*(?:…|\.\.\.)\s*\]?`)
-	brokenWord     = regexp.MustCompile(`-\s+`)
-	whitespaceRuns = regexp.MustCompile(`\s+`)
+	straightQuote    = regexp.MustCompile(`"([^"\n]+)"(\s*\[\d[^\]]*\])?`)
+	curlyQuote       = regexp.MustCompile(`“([^”]+)”(\s*\[\d[^\]]*\])?`)
+	angleQuote       = regexp.MustCompile(`«([^»]+)»(\s*\[\d[^\]]*\])?`)
+	quoteEllipsis    = regexp.MustCompile(`\[?\s*(?:…|\.\.\.)\s*\]?`)
+	brokenWord       = regexp.MustCompile(`-\s+`)
+	whitespaceRuns   = regexp.MustCompile(`\s+`)
+	sentenceScan     = regexp.MustCompile(`[^.!?…]+[.!?…]*`)
+	spaceBeforePunct = regexp.MustCompile(`\s+([.,;:!?])`)
+	colonBeforePunct = regexp.MustCompile(`:\s*([.,;!?])`)
+	doubleSpaces     = regexp.MustCompile(` {2,}`)
 )
 
 // normalizeQuote makes a quote and a stored passage comparable. Extracted text keeps the line
@@ -347,18 +355,21 @@ func containsPieces(text string, pieces []string) bool {
 	return true
 }
 
-// verifyQuotes takes out of a reply any quote it attributes to a document that the document does
-// not contain. The model is told not to invent one, which is not the same as it not happening, and
-// an invented sentence by a real author is the worst thing a citation can carry. In a turn about
-// the text every quote counts; otherwise only one followed by a citation does, since the rest are
-// as often the user's own words. Short quotes are left alone for the same reason.
+// verifyQuotes keeps only quotes a document actually contains. The model is told not to invent
+// one, which is not the same as it not happening: an invented sentence by a real author is the
+// worst thing a citation can carry. An inexact quote is first replaced by the closest verbatim
+// passage of the source it cited, so a citation always shows real text; with nothing close
+// enough, quote and citation come out together, since a citation kept alone would point at a
+// passage the reply never showed. In a turn about the text every quote counts; otherwise only
+// one followed by a citation does, since the rest are as often the user's own words. Short
+// quotes are left alone for the same reason.
 func (h *ChatDomainHandler) verifyQuotes(ctx context.Context, reply string, sources []knowledgeSource, turn knowledgeTurn) string {
 	if !turn.planned || len(sources) == 0 {
 		return reply
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, quoteCheckBudget)
 	defer cancel()
-	removed, checked := 0, 0
+	repaired, removed, checked := 0, 0, 0
 	check := func(pattern *regexp.Regexp, open, closing string) {
 		reply = pattern.ReplaceAllStringFunc(reply, func(match string) string {
 			groups := pattern.FindStringSubmatch(match)
@@ -368,18 +379,32 @@ func (h *ChatDomainHandler) verifyQuotes(ctx context.Context, reply string, sour
 			}
 			pieces := quotePieces(inner)
 			checked++
-			if len(pieces) > 0 && checked <= quoteMaxChecks && h.quoteMatchesReference(checkCtx, inner, pieces, citation, sources) {
-				return match
+			if len(pieces) > 0 && checked <= quoteMaxChecks {
+				if h.quoteMatchesReference(checkCtx, inner, pieces, citation, sources) {
+					return match
+				}
+				if passage, ok := h.repairQuote(checkCtx, inner, citation, sources); ok {
+					repaired++
+					return open + passage + closing + citation
+				}
 			}
 			removed++
-			return open + quoteRemoved + closing + citation
+			return ""
 		})
 	}
 	check(curlyQuote, "“", "”")
 	check(angleQuote, "«", "»")
 	check(straightQuote, `"`, `"`)
+	if repaired > 0 || removed > 0 {
+		logger.Info(fmt.Sprintf("chat quotes repaired=%d removed=%d checked=%d", repaired, removed, checked))
+	}
+	if strings.TrimSpace(reply) == "" {
+		return quoteRemoved
+	}
 	if removed > 0 {
-		logger.Info(fmt.Sprintf("chat quotes removed=%d checked=%d", removed, checked))
+		reply = doubleSpaces.ReplaceAllString(reply, " ")
+		reply = spaceBeforePunct.ReplaceAllString(reply, "$1")
+		reply = colonBeforePunct.ReplaceAllString(reply, "$1")
 	}
 	return reply
 }
@@ -410,10 +435,65 @@ func (h *ChatDomainHandler) quoteIsInDocument(ctx context.Context, quote string,
 			return true
 		}
 	}
+	for _, passage := range h.documentPassages(ctx, quote, sources) {
+		if containsPieces(passage, pieces) {
+			return true
+		}
+	}
+	return false
+}
+
+// repairQuote finds the closest verbatim passage for an inexact quote. The replacement comes
+// from the source the reply cited, so the citation shows real text even when the model's
+// wording was loose; ok is false when no passage is close enough and the caller drops the
+// quote instead.
+func (h *ChatDomainHandler) repairQuote(ctx context.Context, quote, citation string, sources []knowledgeSource) (string, bool) {
+	want := contentTokens(quote)
+	if len(want) < quoteRepairMinWords {
+		return "", false
+	}
+	best, matched := "", 0
+	score := func(texts []string) {
+		for _, text := range texts {
+			for _, sentence := range sentenceScan.FindAllString(text, -1) {
+				have := strings.Fields(normalizeQuote(sentence))
+				hits := 0
+				for token := range want {
+					if slices.Contains(have, token) {
+						hits++
+					}
+				}
+				if hits > matched {
+					best, matched = strings.TrimSpace(sentence), hits
+				}
+			}
+		}
+	}
+	if strings.TrimSpace(citation) != "" {
+		for _, source := range citedSources(citation, sources) {
+			score([]string{source.Text})
+		}
+	} else {
+		texts := make([]string, 0, len(sources))
+		for _, source := range sources {
+			texts = append(texts, source.Text)
+		}
+		score(append(texts, h.documentPassages(ctx, quote, sources)...))
+	}
+	if matched < quoteRepairMinWords || float64(matched) < 0.5*float64(len(want)) {
+		return "", false
+	}
+	return trimRepairPassage(best), true
+}
+
+// documentPassages searches one quote inside each cited document, so a repair or a check can
+// draw on the whole text and not only the excerpts of this turn.
+func (h *ChatDomainHandler) documentPassages(ctx context.Context, quote string, sources []knowledgeSource) []string {
 	searcher, ok := h.knowledge.(DocumentKnowledgeSearcher)
 	if !ok {
-		return false
+		return nil
 	}
+	texts := []string{}
 	seen := map[string]bool{}
 	for _, source := range sources {
 		if source.Web {
@@ -432,10 +512,34 @@ func (h *ChatDomainHandler) quoteIsInDocument(ctx context.Context, quote string,
 		hits, _ := result["hits"].([]any)
 		for _, raw := range hits {
 			hit, _ := raw.(map[string]any)
-			if containsPieces(firstString(hit, "text"), pieces) {
-				return true
-			}
+			texts = append(texts, firstString(hit, "text"))
 		}
 	}
-	return false
+	return texts
+}
+
+func trimRepairPassage(passage string) string {
+	passage = whitespaceRuns.ReplaceAllString(strings.TrimSpace(passage), " ")
+	runes := []rune(passage)
+	if len(runes) <= quoteRepairMaxChars {
+		return passage
+	}
+	cut := string(runes[:quoteRepairMaxChars])
+	if index := strings.LastIndex(cut, " "); index > 0 {
+		cut = cut[:index]
+	}
+	return strings.TrimRight(cut, " .,;:") + " […]"
+}
+
+// contentTokens drops short words a match cannot rest on: articles and prepositions appear in
+// every sentence and would score an unrelated passage as close, and punctuation-only tokens
+// such as an in-quote ellipsis carry no words at all.
+func contentTokens(text string) map[string]bool {
+	tokens := map[string]bool{}
+	for _, token := range strings.Fields(normalizeQuote(text)) {
+		if len(token) >= 3 && strings.IndexFunc(token, unicode.IsLetter) >= 0 {
+			tokens[token] = true
+		}
+	}
+	return tokens
 }
