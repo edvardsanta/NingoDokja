@@ -180,9 +180,13 @@ text never reaches the channel, and no link is invented when a run fails.
 (`/comparar_produto` in Portuguese) asks the
 orchestrator for `price.compare`. A link is passed on as typed and never opened:
 the price resolver reads the store and the product's part number from the
-address. The private reply is one card with every store, cheapest first, each
-linked; Ningo's few lines when a chat model answers; the part number; and a
-note when the link's store could not be read. Several matches list the products
+address. The private reply is one compact card with the purchase decision,
+budget, Ningo's comment when a chat model answers, linked store prices and
+short linked alternative names. Technical caveats and the part number appear
+once in the footer. Long lists report omitted rows. CPU alternatives can include
+other manufacturers and flag different sockets. Matching core and thread
+counts are labelled separately from performance equivalence, which needs
+comparable benchmark evidence. Several matches list the products
 to pick from; an unfollowed product is looked up for the owner first.
 
 ## Live group voice

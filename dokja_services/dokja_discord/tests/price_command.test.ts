@@ -194,16 +194,19 @@ const compared = {
 
 test("a comparison is one card: every store cheapest first, Ningo's words, the part number and what was unreadable", () => {
   const reply = buildCompareReply(compared, "pt-BR") as { content: string; embeds: DiscordEmbedSpec[] };
-  assert.match(reply.content, /^⚖️ Comparação de \*\*SSD Example 240GB\*\*/);
-  assert.match(reply.content, /Não consigo ler a página da Store Z; comparei o mesmo produto nas outras lojas\./);
+  assert.equal(reply.content, "");
+  assert.match(reply.embeds[0].footer!, /Não consigo ler a página da Store Z/);
   const [card] = reply.embeds;
+  assert.equal(card.title, "⚖️ SSD Example 240GB");
   assert.equal(card.description, "Compre agora, mortal.");
   assert.equal(card.url, "https://store-b.example/p");
-  assert.equal(card.footer, "Código XY650SS-240GT-R");
-  assert.deepEqual(card.fields?.map((entry) => entry.name), ["store-b", "store-a · PIX", "Mínimo do mercado · aggregator"]);
+  assert.match(card.footer!, /Código XY650SS-240GT-R/);
+  assert.deepEqual(card.fields?.map((entry) => entry.name), ["Preços nas lojas"]);
+  assert.match(card.fields![0].value, /store-b.*119,90[\s\S]*store-a · PIX.*129,90[\s\S]*Mínimo do mercado/);
+  assert.doesNotMatch(card.fields![0].value, /Histórico insuficiente|abrir na loja/);
   // a store the link names that is among the offers is not called unreadable
   const read = buildCompareReply({ ...compared, link: { known: true, store: "store-a", store_name: "Store A" } }, "pt-BR") as { content: string };
-  assert.doesNotMatch(read.content, /Não consigo ler/);
+  assert.doesNotMatch(embedsOf(read)[0].footer!, /Não consigo ler/);
 });
 
 test("a comparison says when it found several, nothing, or an unknown link's store", () => {
@@ -221,14 +224,16 @@ test("a comparison renders current alternative candidates with cautious labels",
       { product: "pn:third", title: "SSD Example 4TB", classification: "same_category_candidate", reason_codes: ["same_category"], price_cents: 19990 },
     ],
   }, "pt-BR") as { content: string };
-  assert.match(reply.content, /Candidatos encontrados com os dados atuais:/);
-  assert.match(reply.content, /SSD Example 2TB — tecnicamente equivalente, mais barato, dentro do orçamento · R\$\s*159,90/);
-  assert.match(reply.content, /SSD Example 4TB — mesma categoria; equivalência técnica não confirmada · /);
+  const card = embedsOf(reply)[0];
+  const candidates = card.fields!.find((field) => field.name === "Alternativas")!.value;
+  assert.match(candidates, /SSD Example 2TB · R\$\s*159,90\n  tecnicamente equivalente · mais barato · dentro do orçamento/);
+  assert.match(candidates, /SSD Example 4TB · R\$\s*199,90\n  a avaliar/);
+  assert.match(card.footer!, /equivalência técnica.*não foi confirmada/);
 });
 
 test("a comparison says what the domain decided", () => {
   const decided = (decision: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
-    (buildCompareReply({ ...compared, decision, ...extra }, "pt-BR") as { content: string }).content;
+    embedsOf(buildCompareReply({ ...compared, decision, ...extra }, "pt-BR"))[0].description!;
   assert.match(decided({ action: "buy_original", selected_merchant: "store-b", selected_cents: 11990, confidence: "high" }),
     /🛒 Melhor compra agora: \*\*store-b\*\* por R\$\s*119,90\./);
   // a short history is not called a deal
@@ -260,7 +265,7 @@ test("compare_product sends the words and the link, and asks for something when 
     await run({ link: " https://store-z.example/produto/1/x " });
     assert.equal(sent[0].event_type, "price.compare");
     assert.equal(sent[0].payload.link, "https://store-z.example/produto/1/x");
-    assert.equal((replies[1] as { embeds: DiscordEmbedSpec[] }).embeds[0].title, "SSD Example 240GB");
+    assert.equal(embedsOf(replies[1])[0].title, "⚖️ SSD Example 240GB");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -271,7 +276,44 @@ test("a comparison warns when the deterministic decision is over budget", () => 
     ...compared,
     decision: { action: "seek_alternative" },
   }, "pt-BR") as { content: string };
-  assert.match(reply.content, /ultrapassa o orçamento informado/);
+  assert.match(embedsOf(reply)[0].description!, /ultrapassa o orçamento informado/);
+});
+
+test("a CPU comparison uses one compact card with the budget, linked models and platform caveats", () => {
+  const reply = buildCompareReply({
+    ...compared,
+    product: { title: "Processador Example CPU 7, 3.8GHz, 8-Cores 16-Threads, Socket S1, Sem Cooler, EXAMPLE-CPU-7" },
+    decision: { action: "buy_original", selected_merchant: "store-b", selected_cents: 11990, confidence: "low", budget_cents: 200000 },
+    alternatives: [{
+      title: "Processador Other CPU 7, 4.2GHz, Cache 32MB, 8 Cores, 16 Threads, Socket S2, EXAMPLE-OTHER-CPU-7",
+      classification: "similar_cpu_specs", price_cents: 9990, url: "https://other.example/cpu",
+      reason_codes: ["different_cpu_socket", "within_budget"],
+    }],
+  }, "pt-BR");
+  const card = embedsOf(reply)[0];
+  assert.equal((reply as { content: string }).content, "");
+  assert.equal(card.title, "⚖️ Processador Example CPU 7");
+  assert.match(card.description!, /Orçamento de R\$\s*2\.000,00/);
+  assert.match(card.description!, /Compre agora, mortal/);
+  const candidates = card.fields!.find((field) => field.name === "Alternativas")!.value;
+  assert.match(candidates, /\[Processador Other CPU 7\]\(https:\/\/other.example\/cpu\)/);
+  assert.match(candidates, /mesmos núcleos e threads · outro socket · dentro do orçamento/);
+  assert.match(card.footer!, /não garantem o mesmo desempenho/);
+  assert.match(card.footer!, /placa-mãe compatível/);
+});
+
+test("large comparisons keep full rows and links within Discord limits", () => {
+  const card = embedsOf(buildCompareReply({
+    ...compared,
+    offers: Array.from({ length: 80 }, (_, i) => ({
+      merchant: "store-" + i, series: "merchant", price_kind: "pix", latest_cents: 10000 + i,
+      url: "https://store.example/" + "p".repeat(180),
+    })),
+  }, "en"))[0];
+  assert.ok(card.fields!.every((field) => field.value.length <= 1024));
+  assert.match(card.fields!.at(-1)!.value, /more offer/);
+  const length = JSON.stringify(card).length;
+  assert.ok(length < 6000, String(length));
 });
 
 test("a new watch the orchestrator already collected says so, with or without products", () => {
