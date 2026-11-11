@@ -45,6 +45,8 @@ const messages: Record<string, Catalog> = {
     compare_header: "⚖️ {title}",
     compare_offers: "Preços nas lojas",
     compare_budget: "Orçamento de {price}",
+    compare_reference: "Encontrei {count} versões. Usei esta como referência pelo menor preço disponível entre elas.",
+    compare_reference_unpriced: "Encontrei {count} versões e escolhi esta como referência para seguir com a comparação.",
     compare_unconfirmed: "A equivalência técnica destes candidatos ainda não foi confirmada.",
     compare_specs_note: "Núcleos e threads iguais não garantem o mesmo desempenho.",
     compare_platform_note: "Socket diferente exige placa-mãe compatível.",
@@ -115,6 +117,8 @@ const messages: Record<string, Catalog> = {
     compare_header: "⚖️ {title}",
     compare_offers: "Store prices",
     compare_budget: "Budget {price}",
+    compare_reference: "Found {count} variants. This reference has the lowest available price among them.",
+    compare_reference_unpriced: "Found {count} variants and selected this reference to continue the comparison.",
     compare_unconfirmed: "Technical equivalence of these candidates is still unconfirmed.",
     compare_specs_note: "Matching core and thread counts do not guarantee equal performance.",
     compare_platform_note: "A different socket requires a compatible motherboard.",
@@ -365,6 +369,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const result = (compare ?? {}) as {
     found?: boolean; product?: Record<string, unknown>; offers?: Assessment[]; candidates?: Array<Record<string, unknown>>;
     alternatives?: Array<Record<string, unknown>>;
+    reference_selection?: {matches?: number; reason?: string};
     comment?: string; looked_up?: boolean; link?: { known?: boolean; store?: string; store_name?: string };
   };
   if (result.link && result.link.known === false) return text(words, "compare_bad_link");
@@ -387,7 +392,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const notes = store && !offers.some((offer) => offer.merchant === store)
     ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
   const decisionNote = decisionLine(decision, offers, words, locale, Array.isArray(result.alternatives) && result.alternatives.length > 0);
-  const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 3) : [];
+  const alternatives = Array.isArray(result.alternatives) ? result.alternatives : [];
   const alternativeLines = alternatives.map((alternative) => {
     const classificationKey = `alternative_${String(alternative.classification ?? "")}`;
     const review = alternative.model_assessment as { relationship?: string; explanation?: string; advantage?: string } | undefined;
@@ -405,7 +410,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     const address = safeUrl(alternative.url);
     const page = address.length <= 300 ? address : "";
     const name = page ? `[${title}](${page})` : title;
-    const explanation = typeof review?.explanation === "string" ? shortExplanation(review.explanation) : "";
+    const explanation = typeof review?.explanation === "string" ? shortExplanation(review.explanation, alternatives.length > 6 ? 80 : 160) : "";
     const roleKey = `shortlist_${String(alternative.selection_reason ?? "")}`;
     const role = alternative.selection_reason === "advantage" && review?.advantage
       ? review.advantage.slice(0, 60) : roleKey in words ? text(words, roleKey) : "";
@@ -442,12 +447,14 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const budget = typeof decision?.budget_cents === "number" && decision.budget_cents > 0
     ? text(words, "compare_budget", { price: money(decision.budget_cents, locale) }) : "";
   const comment = typeof result.comment === "string" ? result.comment.trim().slice(0, 600) : "";
+  const reference = (result.reference_selection?.matches ?? 0) > 1
+    ? text(words,result.reference_selection?.reason === "lowest_current_offer" ? "compare_reference" : "compare_reference_unpriced",{count:result.reference_selection!.matches!}) : "";
   return {
     content: "",
     embeds: [{
       title: text(words, "compare_header", { title: comparisonTitle(product.title ?? product.product) }),
       ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
-      description: [decisionNote, budget, comment].filter(Boolean).join("\n\n"),
+      description: [decisionNote, budget, reference, comment].filter(Boolean).join("\n\n"),
       color: looksOf(lead?.verdict).color,
       fields,
       footer: [...notes, part ? text(words, "compare_part", { part }) : ""].filter(Boolean).join("\n"),
@@ -463,10 +470,10 @@ function comparisonTitle(value: unknown): string {
   return (title.length > 70 && headline.length >= 16 ? headline : title).slice(0, 120);
 }
 
-function shortExplanation(value: string): string {
+function shortExplanation(value: string, limit = 160): string {
   const sentence = value.trim().match(/^.*?[.!?](?:\s|$)/)?.[0].trim() || value.trim();
-  if (sentence.length <= 160) return sentence;
-  return sentence.slice(0, 159).replace(/\s+\S*$/, "") + "…";
+  if (sentence.length <= limit) return sentence;
+  return sentence.slice(0, limit - 1).replace(/\s+\S*$/, "") + "…";
 }
 
 // Keep whole rows and links together within Discord's 1024-character field values.

@@ -18,6 +18,14 @@ func TechnicalReview(product string, raw map[string]any) (map[string]any, bool) 
 			"product_key": key, "relationship": relationship,
 			"explanation": explanation, "estimated": true,
 		}
+		if role, _ := raw["market_role"].(string); role != "" {
+			switch role {
+			case "direct_peer", "variant", "older_option", "different_tier", "unknown":
+				review["market_role"] = role
+			default:
+				return nil, false
+			}
+		}
 		if advantage, _ := raw["advantage"].(string); advantage != "" && len([]rune(advantage)) <= 60 {
 			review["advantage"] = advantage
 		}

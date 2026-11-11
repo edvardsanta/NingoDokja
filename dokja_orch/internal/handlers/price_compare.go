@@ -34,7 +34,7 @@ const (
 	compareCommentFloor = 20 * time.Second
 	// maxCompareComment bounds Ningo's comment.
 	maxCompareComment     = 600
-	competitorPlanVersion = "2"
+	competitorPlanVersion = "3"
 )
 
 // priceCommenter writes Ningo's few lines about a comparison. It is the chat provider; nil
@@ -297,6 +297,13 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 		"product":      product,
 		"profile":      profile,
 	}
+	if h.competitorCache != nil {
+		if key, keyErr := cacheKey(input); keyErr == nil {
+			if queries, hit, getErr := h.competitorCache.Get(ctx, key); getErr == nil && hit {
+				return queries
+			}
+		}
+	}
 	if h.equivalenceCache != nil {
 		if key, keyErr := cacheKey(input); keyErr == nil {
 			if items, hit, getErr := h.equivalenceCache.GetEquivalences(ctx, key); getErr == nil && hit {
@@ -322,13 +329,7 @@ func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[
 			}
 		}
 	}
-	if h.competitorCache != nil {
-		if key, keyErr := cacheKey(input); keyErr == nil {
-			if queries, hit, getErr := h.competitorCache.Get(ctx, key); getErr == nil && hit {
-				return queries
-			}
-		}
-	}
+
 	facts, err := json.Marshal(input)
 	if err != nil {
 		return nil
@@ -604,13 +605,14 @@ If the facts do not support a recommendation, say so plainly.`
 const competitorDiscoveryInstructions = `You are a product discovery planner. Return only valid JSON in this exact shape:
 {"queries":["..."]}.
 
-Create at most four short Brazilian Portuguese search queries for products that could solve the same
-use case as the supplied product. Use only functional category terms and explicit specifications
-present in FACTS, such as capacity, interface, socket, cores, threads, screen size or refresh rate.
-Do not use manufacturer names, brands, logos, model names, part numbers, invented benchmarks or
-unsupported specifications. Do not repeat the original product query. The queries are search hints,
-not evidence of equivalence; the stores and the deterministic comparison engine provide the evidence.
-Include a platform-neutral query without socket constraints so other manufacturers can be found.
+Create at most four short Brazilian Portuguese queries for direct competitors in the same market
+tier and product era. The first query should target a specific rival from another manufacturer,
+when you know one. Manufacturer and model names from your product knowledge are allowed as
+discovery hints. Prefer contemporary peers; avoid older generations or higher-tier older products
+just because their performance could overlap. Do not invent models, benchmark scores or specs.
+Use functional queries when you cannot confidently name a direct rival. Do not repeat the
+original query. Avoid socket constraints that exclude other CPU manufacturers. Store results
+establish availability; model hints alone do not establish equivalence or current market position.
 If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;

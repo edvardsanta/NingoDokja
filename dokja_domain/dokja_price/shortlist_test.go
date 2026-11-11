@@ -23,7 +23,7 @@ func TestShortlistKeepsDistinctOptionsAndACompetingBrand(t *testing.T) {
 	}
 	ShortlistAlternatives(result)
 	selected := result["alternatives"].([]any)
-	if len(selected) != 3 {
+	if len(selected) != 5 {
 		t.Fatalf("shortlist %v", selected)
 	}
 	for i, want := range []string{"close", "economy", "other-brand"} {
@@ -45,5 +45,28 @@ func TestShortlistSupportsMissingReviewsAndDoesNotDuplicateCandidates(t *testing
 	selected := result["alternatives"].([]any)
 	if len(selected) != 2 || selected[0].(map[string]any)["product"] == selected[1].(map[string]any)["product"] {
 		t.Fatal(selected)
+	}
+}
+
+func TestAlternativesKeepAllPeersAndExcludeOlderHigherTierOptions(t *testing.T) {
+	rows := []any{}
+	for _, id := range []string{"variant-a", "variant-b", "peer-a", "peer-b", "peer-c", "old-higher-tier"} {
+		role := "direct_peer"
+		if id == "old-higher-tier" {
+			role = "older_option"
+		}
+		rows = append(rows, map[string]any{"product": id, "price_cents": 150000.0,
+			"model_assessment": map[string]any{"relationship": "superior", "market_role": role}})
+	}
+	result := map[string]any{"alternatives": rows}
+	ShortlistAlternatives(result)
+	selected := result["alternatives"].([]any)
+	if len(selected) != 5 {
+		t.Fatalf("eligible peers were hidden: %v", selected)
+	}
+	for _, raw := range selected {
+		if raw.(map[string]any)["product"] == "old-higher-tier" {
+			t.Fatalf("older generation promoted: %v", selected)
+		}
 	}
 }

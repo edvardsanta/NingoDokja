@@ -189,10 +189,12 @@ counts are labelled separately from performance equivalence, which needs
 comparable benchmark evidence. Lightweight models also provide qualitative technical estimates
 and explanations, explicitly labelled in the card and regenerated for current
 prices, budget and alternatives. SQLite caches discovered competitors and search
-queries. Up to three alternatives highlight performance, savings, another
-manufacturer or a specific advantage. Explanations are one short sentence and
-platform differences refer to the requested product. Several matches list the products
-to pick from; an unfollowed product is looked up for the owner first.
+queries. Alternatives highlight performance, savings, another manufacturer or
+a specific advantage, with no fixed three-product limit. Explanations are one short sentence and
+platform differences refer to the requested product. Generic name searches choose a reference from recent merchant quotes and
+explain the choice. Ambiguous partial part numbers list candidates; an
+unfollowed product is looked up for the owner first. Model reviews exclude
+older-generation and different-tier options from the main alternatives.
 
 ## Live group voice
 

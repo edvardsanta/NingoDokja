@@ -40,7 +40,8 @@ type Comparison struct {
 	Alternatives []Alternative
 	Candidates   []Product
 	// Growable reports that the person may have the product looked up when it was not found.
-	Growable bool
+	Growable         bool
+	ReferenceMatches int
 }
 
 func (c Compare) validate() error {
@@ -106,6 +107,15 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 			chosen = &matched[0]
 		}
 	}
+	referenceMatches := 0
+	if chosen == nil && len(matched) > 1 && strings.TrimSpace(compare.PartNumber) == "" {
+		var selectionErr error
+		chosen, selectionErr = d.genericReference(ctx, matched)
+		if selectionErr != nil {
+			return Comparison{}, selectionErr
+		}
+		referenceMatches = len(matched)
+	}
 	if chosen == nil {
 		if len(matched) > maxCandidates {
 			matched = matched[:maxCandidates]
@@ -136,7 +146,7 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 	allProducts = append(allProducts, products...)
 	alternatives := d.alternatives(ctx, *chosen, offers, products, compare.BudgetCents)
 	return Comparison{
-		Found: true, Product: *chosen, Offers: offers,
+		Found: true, Product: *chosen, Offers: offers, ReferenceMatches: referenceMatches,
 		Profile: CategoryProfileFor(chosen.Category), Alternatives: alternatives,
 		Decision: Decide(DecisionInput{
 			Product: *chosen, Offers: offers, BudgetCents: compare.BudgetCents, Products: allProducts,
@@ -266,6 +276,13 @@ func (c Comparison) Map() map[string]any {
 		out["decision"] = c.Decision.Map()
 		out["profile"] = map[string]any{
 			"id": c.Profile.ID, "generic": c.Profile.Generic,
+		}
+		if c.ReferenceMatches > 1 {
+			reason := "matching_product"
+			if cheapestMerchant(c.Offers) > 0 {
+				reason = "lowest_current_offer"
+			}
+			out["reference_selection"] = map[string]any{"matches": c.ReferenceMatches, "reason": reason}
 		}
 		alternatives := make([]any, 0, len(c.Alternatives))
 		for _, alternative := range c.Alternatives {

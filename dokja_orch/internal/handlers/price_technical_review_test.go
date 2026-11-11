@@ -16,7 +16,7 @@ func TestTechnicalReviewReevaluatesAfterPriceChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	model := &bindingCommenter{fakeCommenter: fakeCommenter{
-		reply: `{"assessments":[{"product_key":"other","relationship":"comparable","explanation":"Desempenho estimado semelhante, com outra plataforma."}]}`,
+		reply: `{"assessments":[{"product_key":"other","relationship":"comparable","market_role":"direct_peer","explanation":"Desempenho estimado semelhante, com outra plataforma."}]}`,
 	}}
 	handler, _ := compareHandler(nil, model)
 	handler.WithCompetitorEquivalenceCache(cache)
@@ -56,8 +56,8 @@ func TestTechnicalReviewReevaluatesAfterPriceChanges(t *testing.T) {
 
 func TestTechnicalReviewRejectsInventedCandidatesAndFallsBack(t *testing.T) {
 	model := &bindingCommenter{replies: map[string]string{
-		"claude_code": `{"assessments":[{"product_key":"invented","relationship":"superior","explanation":"Invented."}]}`,
-		"codex":       `{"assessments":[{"product_key":"other","relationship":"unknown","explanation":"Dados insuficientes."}]}`,
+		"claude_code": `{"assessments":[{"product_key":"invented","relationship":"superior","market_role":"direct_peer","explanation":"Invented."}]}`,
+		"codex":       `{"assessments":[{"product_key":"other","relationship":"unknown","market_role":"direct_peer","explanation":"Dados insuficientes."}]}`,
 	}}
 	handler, _ := compareHandler(nil, model)
 	candidate := map[string]any{"product": "other", "title": "CPU Other"}
