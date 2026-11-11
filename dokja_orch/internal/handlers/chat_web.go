@@ -79,6 +79,9 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	}
 	w.mu.Unlock()
 	if len(links) == 0 && len(saved.documents) == 0 {
+		saved = webSessionReading{id: sessionID, documents: h.loadReadingContext(ctx, key, sessionID)}
+	}
+	if len(links) == 0 && len(saved.documents) == 0 {
 		return nil, nil
 	}
 	data := &webTurnData{}
@@ -111,6 +114,9 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 			}
 			saved.documents = append(saved.documents, document)
 		}
+	}
+	if len(links) > 0 {
+		h.saveReadingContext(ctx, key, sessionID, saved.documents)
 	}
 	saved.seen = now
 	w.mu.Lock()

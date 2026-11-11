@@ -7,6 +7,10 @@ import (
 )
 
 const (
+	ActionLoadContext      = "load-context"
+	ActionSaveContext      = "save-context"
+	ActionRememberContext  = "remember-context"
+	ActionRecallContext    = "recall-context"
 	ActionIngestKnowledge  = "ingest-knowledge"
 	ActionSearchKnowledge  = "search-knowledge"
 	ActionListKnowledge    = "list-knowledge"
@@ -44,6 +48,10 @@ func New(service Service) *Domain {
 // requiredFields are what each action cannot do without. Checking them here keeps a
 // malformed request from ever reaching the service.
 var requiredFields = map[string][]string{
+	ActionLoadContext:     {"scope", "session"},
+	ActionSaveContext:     {"scope", "session"},
+	ActionRememberContext: {"scope", "session", "event"},
+	ActionRecallContext:   {"scope"},
 	ActionSearchKnowledge: {"query"},
 	ActionDeleteKnowledge: {"source_id"},
 }
@@ -77,6 +85,10 @@ func validateIngest(payload map[string]any) error {
 }
 
 var eventTypes = map[string]string{
+	ActionLoadContext:      "knowledge.context.load",
+	ActionSaveContext:      "knowledge.context.save",
+	ActionRememberContext:  "knowledge.context.remember",
+	ActionRecallContext:    "knowledge.context.recall",
 	ActionIngestKnowledge:  "knowledge.ingest",
 	ActionSearchKnowledge:  "knowledge.search",
 	ActionListKnowledge:    "knowledge.list",

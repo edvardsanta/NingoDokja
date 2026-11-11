@@ -252,3 +252,20 @@ Knowledge Dockerfiles install them. PostgreSQL integration tests run only when
 `KNOWLEDGE_TEST_POSTGRES_DSN` is supplied and create their own disposable
 databases. The database role used for those tests must be able to create/drop
 these test databases. The production application never drops a database.
+
+### Durable conversation context
+
+The existing `KNOWLEDGE_POSTGRES_DSN` also enables scoped macro context. A SQLite
+library can keep its documents while a separate PostgreSQL connection stores
+reading snapshots and extracted ideas/decisions/questions/summaries. With the
+PostgreSQL library backend, both use the same store. Status reports
+`context_storage_backend`; missing PostgreSQL configuration leaves it
+`unconfigured`, without writing macro context to SQLite.
+
+`knowledge.context.load/save/remember/recall` require an orchestrator source.
+They use separate `discussion_context`, `discussion_ideas` and
+`discussion_captures` tables, never the global document corpus. Quotes, original
+page URLs, event/session provenance and unverified extraction status are retained.
+Recall is scoped and keyword ranked, with eight results; capture accepts at most
+three entries and duplicate event capture is idempotent. These additive tables
+preserve the existing library schema and do not import SQLite data.

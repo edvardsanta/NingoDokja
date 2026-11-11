@@ -106,7 +106,7 @@
         }
       ],
       "limits": [
-        "Extraction depends on source access and active reading services. Discord PDFs are limited to 25 MiB each and share a four-source limit with links. Scanned or protected PDFs may be unreadable; OCR is not included. Readings support temporary follow-ups in the same conversation, not permanent memory. Do not claim to have read unavailable content or performed an unrestricted web search."
+        "Extraction depends on source access and active reading services. Discord PDFs are limited to 25 MiB each and share a four-source limit with links. Scanned or protected PDFs may be unreadable; OCR is not included. With PostgreSQL macro context configured, document readings survive restarts within the same conversation/session. Otherwise readings remain temporary. Attributed ideas may be extracted automatically into scoped durable context; these are unverified historical context, not current access to the original document. Do not claim to have read unavailable content or performed an unrestricted web search."
       ]
     },
     {

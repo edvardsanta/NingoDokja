@@ -122,9 +122,12 @@ exposure but does not guarantee model resistance. Rebuild/restart Feeds, the
 orchestrator and the Discord adapter to use this additive feature. No new ports,
 variables, volumes or database migrations are needed.
 
-Readings are volatile: new link or PDF messages replace them, session resets clear them,
-and inactivity over 30 minutes, capacity eviction or restart loses their text.
-Resend the links after a restart when exact web evidence is needed. At most four
+With PostgreSQL macro context configured, new link/PDF messages replace the
+conversation's durable reading snapshot. The in-process 30-minute cache and its
+capacity limit are accelerators: a cache miss reloads validated passages from
+PostgreSQL without downloading the attachment again. A session reset changes the
+session ID, so the old snapshot is not reused. Without PostgreSQL, the existing
+volatile reading behavior remains; restart or cache eviction then loses the text. At most four
 sources (links or PDFs) and eight passages enter one turn; each HTML/text reader accepts at most 2 MiB and
 80,000 extracted characters, with a 12-second per-read deadline and a 15-second
 aggregate chat budget. Failed/excess links are disclosed in the reply. If every
@@ -1674,3 +1677,52 @@ Keep the overlay in subsequent Compose commands. The current Desktop Runtime
 module controller uses the lite base file alone; its recreate operations do not
 preserve this optional overlay. After such an operation, reapply the full Compose
 file selection and verify the provider again before comparing GPU measurements.
+
+## Conversation cache and macro context
+
+Conversation turns and their immediate compaction checkpoints continue in the
+existing SQLite session/archive files; no SQLite migration is introduced.
+PostgreSQL stores durable macro context separately from the globally searchable
+Knowledge documents: `discussion_context` holds bounded reading snapshots,
+`discussion_ideas` holds attributed ideas, decisions, questions and summaries,
+and `discussion_captures` makes a completed event capture idempotent. These are
+additive tables in `dokja_knowledge`; existing schema versions and library data
+are preserved. Older binaries ignore the new tables.
+
+Set the existing `KNOWLEDGE_POSTGRES_DSN` in the ignored environment file and
+recreate Knowledge plus the orchestrator after rebuilding. Existing dev, lite and
+prod Compose files already forward this setting. With
+`KNOWLEDGE_STORAGE_BACKEND=postgres`, the library and macro context share the
+PostgreSQL store. With `KNOWLEDGE_STORAGE_BACKEND=sqlite` and a PostgreSQL DSN,
+the library stays in SQLite while macro context opens PostgreSQL separately;
+there is no automatic library import. A configured PostgreSQL connection failure
+fails Knowledge startup rather than redirecting context writes to SQLite.
+With no PostgreSQL DSN and a SQLite library, macro context is unconfigured and
+chat keeps working with SQLite history and volatile readings. Inspect
+`knowledge.status.context_storage_backend` (`postgres` or `unconfigured`).
+
+Normal and archived chat turns attempt one bounded automatic extraction using
+the configured chat model (up to three entries, eight seconds). Every entry must
+quote supplied source text or the user's current message verbatim. Stored entries
+remain `extracted_unverified`, carry event/session/time/source provenance, and
+never become instructions or independently verified facts. Extraction/write
+failure does not erase the completed SQLite turn or claim a successful capture;
+chat results expose `macro_context` (`saved`, `no_ideas`, `disabled`,
+`unavailable`, or `extraction_failed`). An unavailable backend is probed before
+spending an extraction call. No background retry or historical backfill is added;
+only successfully processed new turns contribute. This adds bounded model and
+storage latency to each turn; no extra model is installed or selected.
+
+Recall ranks at most eight entries by PostgreSQL keyword relevance, then recency.
+Verified private owner interfaces share `owner:private`; shared channels and
+other users retain their conversation scope. Readings additionally require the
+current session ID. A new session does not erase durable macro entries.
+Macro data is not exposed by global Knowledge search or listing; its internal
+`knowledge.context.{load,save,remember,recall}` operations require an orchestrator
+source. Raw recalled content is injected as untrusted user-role data under a
+fixed application guard, never as a model-authored system instruction.
+
+Back up PostgreSQL together with the existing SQLite session files for full
+continuity. Restart-only tests preserve the SQLite session ID, restore exact
+page locators from PostgreSQL, and verify no second download is needed. No
+production cutover or deployment is performed by this change.
