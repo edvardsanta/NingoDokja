@@ -55,9 +55,14 @@ func (d *musicDesk) comment(ctx context.Context, guild *guildQueue, content stri
 func (d *musicDesk) remark(ctx context.Context, track communications.QueuedTrack, locale string) string {
 	ctx, cancel := context.WithTimeout(ctx, musicCommentBudget)
 	defer cancel()
-	result, err := d.comments.GenerateMessages(ctx, []map[string]string{
+	result, err := generateLightweightText(ctx, d.comments, []map[string]string{
 		{"role": "system", "content": fmt.Sprintf("%s\n\n%s\nWrite in the language of the locale %s.", chatPersona, musicCommentPrompt, locale)},
 		{"role": "user", "content": fmt.Sprintf("Title: %q\nArtist: %q", track.Title, track.Uploader)},
+	}, func(text string) error {
+		if communications.CommentLine(text) == "" {
+			return fmt.Errorf("empty music comment")
+		}
+		return nil
 	})
 	if err != nil {
 		logger.Info(fmt.Sprintf("music comment skipped: %v", err))

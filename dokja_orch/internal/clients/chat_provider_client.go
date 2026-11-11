@@ -46,20 +46,21 @@ func (c *ChatProviderClient) call(ctx context.Context, method, path string, body
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, fmt.Errorf("chat inference is unavailable; start or restart the local runtime controller")
+		return nil, &inferenceCallError{message: "chat inference is unavailable; start or restart the local runtime controller", code: "runtime_unavailable"}
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 524289))
 	if err != nil || len(raw) > 524288 {
-		return nil, fmt.Errorf("invalid chat provider response")
+		return nil, &inferenceCallError{message: "invalid chat provider response", code: "invalid_response"}
 	}
 	var result map[string]any
 	if json.Unmarshal(raw, &result) != nil {
-		return nil, fmt.Errorf("invalid chat provider response")
+		return nil, &inferenceCallError{message: "invalid chat provider response", code: "invalid_response"}
 	}
 	if resp.StatusCode != 200 {
 		if message, ok := result["error"].(string); ok {
-			return nil, fmt.Errorf("%s", message)
+			code, _ := result["code"].(string)
+			return nil, &inferenceCallError{message: message, code: code}
 		}
 		return nil, fmt.Errorf("chat inference failed")
 	}

@@ -73,6 +73,7 @@ const messages: Record<string, Catalog> = {
     alternative_technically_comparable: "tecnicamente equivalente",
     alternative_same_category_candidate: "a avaliar",
     alternative_similar_cpu_specs: "mesmos núcleos e threads",
+    alternative_same_model_variant: "variante do mesmo modelo de GPU",
     model_comparable: "equivalência estimada pelo modelo",
     model_superior: "superioridade estimada pelo modelo",
     model_inferior: "desempenho inferior estimado pelo modelo",
@@ -145,6 +146,7 @@ const messages: Record<string, Catalog> = {
     alternative_technically_comparable: "technically comparable",
     alternative_same_category_candidate: "unconfirmed",
     alternative_similar_cpu_specs: "matching cores and threads",
+    alternative_same_model_variant: "variant of the same GPU model",
     model_comparable: "model-estimated equivalence",
     model_superior: "model-estimated superiority",
     model_inferior: "model-estimated lower performance",
@@ -412,7 +414,7 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     const name = page ? `[${title}](${page})` : title;
     const explanation = typeof review?.explanation === "string" ? shortExplanation(review.explanation, alternatives.length > 6 ? 80 : 160) : "";
     const roleKey = `shortlist_${String(alternative.selection_reason ?? "")}`;
-    const role = alternative.selection_reason === "advantage" && review?.advantage
+    const role = alternative.selection_reason === "alternative" ? "" : alternative.selection_reason === "advantage" && review?.advantage
       ? review.advantage.slice(0, 60) : roleKey in words ? text(words, roleKey) : "";
     const above = alternative.over_budget === true ? text(words, "compare_above_budget") : "";
     return [`• ${name}${price}`, [role || modelNote || classification, ...reasons, above].filter(Boolean).join(" · "), explanation].filter(Boolean).join("\n");

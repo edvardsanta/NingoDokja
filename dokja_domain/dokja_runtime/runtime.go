@@ -130,6 +130,7 @@ type Domain struct {
 	busy             bool
 	timeout          time.Duration
 	models           *modelState
+	taskCircuit      taskCircuit
 }
 
 func New(backend Backend, journal Journal, save Save) *Domain {

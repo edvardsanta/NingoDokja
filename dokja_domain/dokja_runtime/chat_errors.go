@@ -1,8 +1,7 @@
 package runtime
 
-// ChatFailureCode describes the observed failure, never a reason to retry or
-// switch providers automatically. Infrastructure maps private diagnostics to
-// these categories; only fixed messages leave the inference boundary.
+// ChatFailureCode describes observed provider failures. Infrastructure reduces private
+// diagnostics to these fixed categories; opted-in task policy uses them for bounded recovery.
 type ChatFailureCode string
 
 const (
@@ -16,6 +15,15 @@ const (
 )
 
 type ChatProviderFailure struct{ Code ChatFailureCode }
+
+func (e *ChatProviderFailure) SafeCode() ChatFailureCode {
+	switch e.Code {
+	case ChatSessionLimit, ChatUsageLimit, ChatAuthentication, ChatModelUnavailable, ChatCLIIncompatible, ChatOutputLimit, ChatUnavailable:
+		return e.Code
+	default:
+		return ChatUnavailable
+	}
+}
 
 func (e *ChatProviderFailure) Error() string {
 	switch e.Code {

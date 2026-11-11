@@ -3,9 +3,11 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -13,14 +15,14 @@ import (
 func TestTaskAdapterFallsBackToKimiAfterTransportAndContractFailures(t *testing.T) {
 	seen := []string{}
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/chat/tasks/lightweight" {
+		if r.Method == "GET" && r.URL.Path == "/chat/tasks/lightweight" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{
 				{"provider": "codex", "model": "luna"}, {"provider": "claude_code", "model": "haiku"},
 				{"provider": "kimi", "model": "registered-kimi"}, {"provider": "ollama", "model": "small-qwen"},
 			}})
 			return
 		}
-		if r.URL.Path != "/chat" {
+		if r.URL.Path != "/chat/tasks/lightweight" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 		var body map[string]any
@@ -32,7 +34,7 @@ func TestTaskAdapterFallsBackToKimiAfterTransportAndContractFailures(t *testing.
 		}
 		switch provider {
 		case "codex":
-			http.Error(w, `{"error":"unavailable"}`, 503)
+			http.Error(w, `{"error":"private-prompt-marker"}`, 503)
 		case "claude_code":
 			json.NewEncoder(w).Encode(map[string]any{"reply": `{"wrong":true}`})
 		case "kimi":
@@ -57,6 +59,14 @@ func TestTaskAdapterFallsBackToKimiAfterTransportAndContractFailures(t *testing.
 	if err != nil || reply["provider"] != "kimi" || !reflect.DeepEqual(seen, []string{"codex", "claude_code", "kimi"}) {
 		t.Fatalf("reply %v error %v seen %v", reply, err, seen)
 	}
+	attempts := reply["attempts"].([]TaskAttempt)
+	if len(attempts) != 3 || attempts[1].Reason != "contract_rejected" || attempts[2].Outcome != "success" || attempts[0].TaskID != attempts[2].TaskID {
+		t.Fatalf("missing attempt diagnostics: %v", attempts)
+	}
+	raw, _ := json.Marshal(attempts)
+	if strings.Contains(string(raw), "private-prompt-marker") || strings.Contains(string(raw), "direct peer") {
+		t.Fatal("private content leaked into diagnostics")
+	}
 }
 
 func TestTaskAdapterPreservesLegacyModelOverrides(t *testing.T) {
@@ -71,7 +81,7 @@ func TestTaskAdapterPreservesLegacyModelOverrides(t *testing.T) {
 
 func TestTaskAdapterReservesTimeForTheNextProvider(t *testing.T) {
 	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/chat/tasks/lightweight" {
+		if r.Method == "GET" && r.URL.Path == "/chat/tasks/lightweight" {
 			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{
 				{"provider": "codex", "model": "slow"}, {"provider": "kimi", "model": "registered"},
 			}})
@@ -90,5 +100,52 @@ func TestTaskAdapterReservesTimeForTheNextProvider(t *testing.T) {
 	reply, err := client.GenerateTaskJSON(ctx, "lightweight", map[string]any{"type": "object"}, nil, nil)
 	if err != nil || reply["provider"] != "kimi" {
 		t.Fatalf("fallback was starved: %v %v", reply, err)
+	}
+}
+
+func TestTaskAdapterSkipsCoolingProvidersWithoutGenerating(t *testing.T) {
+	calls := 0
+	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]any{
+				{"provider": "codex", "model": "slow", "retry_after_ms": 60000},
+				{"provider": "kimi", "model": "registered"},
+			}})
+			return
+		}
+		calls++
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		if body["provider"] != "kimi" {
+			t.Error("cooling provider was invoked")
+		}
+		json.NewEncoder(w).Encode(map[string]any{"reply": `{"ok":true}`, "provider": "kimi"})
+	})
+	reply, err := client.GenerateTaskJSON(t.Context(), "lightweight", map[string]any{"type": "object"}, nil, nil)
+	if err != nil || calls != 1 {
+		t.Fatalf("reply %v error %v calls %d", reply, err, calls)
+	}
+	attempts := reply["attempts"].([]TaskAttempt)
+	if attempts[0].Outcome != "skipped" || attempts[0].Reason != "cooldown" || attempts[0].RetryAfterMS != 60000 {
+		t.Fatal(attempts)
+	}
+}
+
+func TestFailedTaskDiagnosticsDoNotKeepPrivateProviderOrValidatorMessages(t *testing.T) {
+	client := inferenceSocket(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			json.NewEncoder(w).Encode(map[string]any{"bindings": []map[string]string{{"provider": "kimi", "model": "registered"}}})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"reply": `{"private":"private-prompt-marker"}`})
+	})
+	_, err := client.GenerateTaskJSON(t.Context(), "lightweight", map[string]any{"type": "object"}, []map[string]string{{"role": "user", "content": "private-prompt-marker"}}, func(map[string]any) error { return fmt.Errorf("private-prompt-marker validation detail") })
+	var failure *TaskInferenceError
+	if !errors.As(err, &failure) || len(failure.Attempts) != 1 || failure.Attempts[0].Reason != "contract_rejected" {
+		t.Fatalf("diagnostics %v", err)
+	}
+	raw, _ := json.Marshal(failure)
+	if strings.Contains(string(raw), "private-prompt-marker") || strings.Contains(err.Error(), "private-prompt-marker") {
+		t.Fatal("private details retained")
 	}
 }

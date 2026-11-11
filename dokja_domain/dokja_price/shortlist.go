@@ -19,8 +19,7 @@ func ShortlistAlternatives(result map[string]any) {
 	candidates := []map[string]any{}
 	for _, row := range rows {
 		if item, ok := row.(map[string]any); ok {
-			review, _ := item["model_assessment"].(map[string]any)
-			if review["market_role"] == "older_option" || review["market_role"] == "different_tier" {
+			if !eligibleAlternative(product, item) {
 				continue
 			}
 			candidates = append(candidates, item)

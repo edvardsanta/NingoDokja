@@ -7,7 +7,7 @@ func TestShortlistKeepsDistinctOptionsAndACompetingBrand(t *testing.T) {
 		return map[string]any{
 			"product": id, "brand": brand, "price_cents": price,
 			"specifications":   map[string]any{"socket": socket},
-			"model_assessment": map[string]any{"relationship": relationship},
+			"model_assessment": map[string]any{"relationship": relationship, "market_role": "direct_peer"},
 		}
 	}
 	result := map[string]any{
@@ -38,8 +38,8 @@ func TestShortlistKeepsDistinctOptionsAndACompetingBrand(t *testing.T) {
 
 func TestShortlistSupportsMissingReviewsAndDoesNotDuplicateCandidates(t *testing.T) {
 	result := map[string]any{"alternatives": []any{
-		map[string]any{"product": "one", "price_cents": 10000.0},
-		map[string]any{"product": "two", "price_cents": 12000.0},
+		map[string]any{"product": "one", "price_cents": 10000.0, "classification": "technically_comparable"},
+		map[string]any{"product": "two", "price_cents": 12000.0, "classification": "technically_comparable"},
 	}}
 	ShortlistAlternatives(result)
 	selected := result["alternatives"].([]any)
