@@ -3,7 +3,7 @@
   "id": "cognitive-macrocomponents",
   "title": "Cognitive macro-components and plugin architecture",
   "status": "in_progress",
-  "updated_on": "2026-11-07",
+  "updated_on": "2026-11-11",
   "research": "dokja_docs/cognitive-macrocomponents-research.md",
   "current_step": "08",
   "status_values": [
@@ -1652,7 +1652,8 @@
         "Preparatory research complete: dokja_docs/cognitive-storage-research.md maps current code, target W1-W9 workloads, official engine capabilities and a reproducible spike protocol. ADR 0009 is proposed; no benchmark or engine adoption yet.",
         "W1 storage spike (owner accepted W1 as first consumer, 2026-10-20): dokja_store/spikes/cognitive_storage compares SQLite, PostgreSQL 17 + pgvector 0.8.7 and Neo4j 2026.09 Community on a generated fixture up to 108k chunks x 1024 dims. All exact modes matched the gold; no engine leaked scope, superseded or deleted rows; PostgreSQL approximate stayed at recall 1.00, Neo4j approximate 0.23-0.52; exact p95 at the largest size 95 ms (PostgreSQL), 111 ms (SQLite), 850 ms (Neo4j). W1 does not measure graph workloads. See dokja_docs/step-10-storage-spike.md.",
         "Incremental timeout fix ahead of durable execution: Knowledge ingest/reindex use a dedicated 110-second socket timeout instead of the generic five-second budget. Socket timeout/cancellation after dispatch reports knowledge_write_outcome_unknown; desktop preserves the form and advises checking stored documents before retrying. No automatic resend or durable acceptance is claimed.",
-        "2026-10-25: owner explicitly prioritized PostgreSQL+pgvector application adoption, Knowledge first then Memory, while preserving SQLite until verified migration. ADR 0014 records the accepted direction; new receipt-store implementation is deferred behind this adoption work."
+        "2026-10-25: owner explicitly prioritized PostgreSQL+pgvector application adoption, Knowledge first then Memory, while preserving SQLite until verified migration. ADR 0014 records the accepted direction; new receipt-store implementation is deferred behind this adoption work.",
+        "Application context continuation: SQLite conversation snapshots remain unchanged; PostgreSQL Knowledge now owns scoped durable reading snapshots and automatically extracted, unverified ideas/decisions/questions/summaries. Regression checks cover restart reload without a second download, scoped recall, duplicate capture and relevant older context. Go chat/knowledge domain tests and orchestrator handlers/core/startup race tests pass; Knowledge suite passes 201 tests against a disposable PostgreSQL database, with eight live Ollama checks skipped. No operator data migration or deployment was performed."
       ],
       "checks": [
         {

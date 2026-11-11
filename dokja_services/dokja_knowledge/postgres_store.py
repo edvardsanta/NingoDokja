@@ -13,13 +13,14 @@ import re
 import numpy as np
 import psycopg
 from chunker import Chunk
+from discussion_store import DiscussionStore
 from metadata import encode_metadata
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 from store import _now, parts_of
 
 
-class PostgresStore:
+class PostgresStore(DiscussionStore):
     backend = "postgres"
 
     def __init__(self, dsn: str):
@@ -66,6 +67,7 @@ class PostgresStore:
                 raise RuntimeError(
                     "PostgreSQL Knowledge schema is not supported by this build"
                 )
+            self.initialize_discussions()
             if current:
                 if current["version"] == 1:
                     self._migrate_originals()

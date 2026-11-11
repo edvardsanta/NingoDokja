@@ -85,3 +85,12 @@ func TestHandleRejectsUnknownActionsAndMissingWiring(t *testing.T) {
 		t.Fatal("expected a nil domain error")
 	}
 }
+
+func TestMacroContextCannotDispatchWithoutItsScope(t *testing.T) {
+	for _, action := range []string{ActionLoadContext, ActionSaveContext, ActionRememberContext, ActionRecallContext} {
+		service := &recordingService{}
+		if _, err := New(service).Handle(t.Context(), Request{Action: action, Event: Event{Payload: map[string]any{}}}); err == nil || service.calls != 0 {
+			t.Fatal("unscoped context reached storage", action, err)
+		}
+	}
+}

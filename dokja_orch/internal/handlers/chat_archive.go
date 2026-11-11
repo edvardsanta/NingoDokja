@@ -225,8 +225,10 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	// Settled first, so the verdict can only ever judge the answer the owner was shown.
 	h.answers.Answered(done, len(sources) > 0)
+	contextCapture := h.captureMacroContext(ctx, event, held.ID, turn.Content, raw, sources)
 	response := map[string]any{
-		"action": workflow.Action, "reply": reply, "raw": result,
+		"macro_context": contextCapture,
+		"action":        workflow.Action, "reply": reply, "raw": result,
 		"conversation_id": held.ID, "turn": turnView(done),
 	}
 	if len(sources) > 0 {

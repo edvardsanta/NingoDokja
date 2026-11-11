@@ -150,8 +150,15 @@ text helper. Original page numbers become citation fragments; extracted text,
 PDF metadata and filenames remain data rather than trusted instructions.
 The existing four-source, eight-passage and 25 MiB limits apply. Requested page
 fragments start the bounded excerpt; page-specific follow-ups can revisit cached
-passages. Readings remain temporary and scoped to the same conversation. No
-automatic Knowledge import, channel-history retrieval or OCR is added. Regression
+passages. With PostgreSQL macro context configured, reading snapshots survive
+process restarts and reload on cache misses for the same conversation/session.
+SQLite retains conversation messages. Automatic attributed ideas, decisions,
+questions and summaries persist separately in PostgreSQL and are recalled across
+sessions within the permitted scope; verified private owner interfaces share
+context while public channels remain isolated. Internal context actions follow
+Knowledge routing/workflow/handler/client contracts; source text remains untrusted.
+No global document import, historical backfill, channel-history retrieval or OCR
+is added. See the production runbook's conversation cache and macro context section. Regression
 coverage includes attachment-only messages, admission before fetch, malicious
 document evidence, citation sanitation, follow-ups, channel isolation and real
 PDF parser fixtures. An opt-in Feeds test can exercise a public PDF URL.

@@ -391,3 +391,127 @@ def test_original_versions_and_locators_survive_verified_round_trip(pg_store, tm
         assert KnowledgeService(restored, None).list_documents(payload)["documents"][0]["reading"] == original
     finally:
         restored.close()
+
+
+def test_macro_context_survives_restart_without_entering_global_corpus(
+    pg_store, postgres_dsn
+):
+    from discussion_context import dispatch
+
+    doc = {
+        "url": "https://example.com/report.pdf",
+        "title": "Report",
+        "passages": [
+            {
+                "text": "Persist events before processing.",
+                "label": "Page 35",
+                "url": "https://example.com/report.pdf#page=35",
+            }
+        ],
+    }
+    dispatch(
+        pg_store, "save", {"scope": "private", "session": "session", "documents": [doc]}
+    )
+    idea = {
+        "text": "Persist events before processing.",
+        "quote": "Persist events before processing",
+        "url": "https://example.com/report.pdf#page=35",
+        "label": "Report · Page 35",
+    }
+    payload = {
+        "scope": "private",
+        "session": "session",
+        "event": "event",
+        "ideas": [idea],
+    }
+    dispatch(pg_store, "remember", payload)
+    dispatch(pg_store, "remember", payload)
+    reopened = PostgresStore(postgres_dsn)
+    try:
+        assert dispatch(reopened, "load", {"scope": "private", "session": "session"})[
+            "documents"
+        ] == [doc]
+        assert (
+            dispatch(reopened, "load", {"scope": "private", "session": "reset"})[
+                "documents"
+            ]
+            == []
+        )
+        ideas = dispatch(reopened, "recall", {"scope": "private", "query": "events"})[
+            "ideas"
+        ]
+        assert len(ideas) == 1
+        assert ideas[0]["event"] == "event" and ideas[0]["recorded_at"]
+        assert ideas[0]["status"] == "extracted_unverified"
+        assert dispatch(reopened, "recall", {"scope": "another"})["ideas"] == []
+        assert (
+            KnowledgeService(reopened, FakeEmbedder(), model="fake").search(
+                {"query": "Persist events"}
+            )["hits"]
+            == []
+        )
+        dispatch(
+            reopened, "save", {"scope": "private", "session": "reset", "documents": []}
+        )
+        assert (
+            dispatch(reopened, "load", {"scope": "private", "session": "session"})[
+                "documents"
+            ]
+            == []
+        )
+        # A session reset changes working context, not durable extracted knowledge.
+        assert len(dispatch(reopened, "recall", {"scope": "private"})["ideas"]) == 1
+    finally:
+        reopened.close()
+
+
+def test_sqlite_library_can_use_postgres_macro_context(
+    postgres_dsn, monkeypatch, tmp_path
+):
+    from bootstrap import build_service
+
+    monkeypatch.setenv("KNOWLEDGE_STORAGE_BACKEND", "sqlite")
+    monkeypatch.setenv("KNOWLEDGE_POSTGRES_DSN", postgres_dsn)
+    monkeypatch.setenv("KNOWLEDGE_DB_FILE", str(tmp_path / "library.db"))
+    monkeypatch.setenv("DOKJA_EMBED", "off")
+    service = build_service()
+    try:
+        assert service.status()["storage_backend"] == "sqlite"
+        assert service.status()["context_storage_backend"] == "postgres"
+        result = service.dispatch(
+            {
+                "source": "orchestrator",
+                "type": "knowledge.context.recall",
+                "payload": {"scope": "owner"},
+            }
+        )
+        assert result == {"ideas": []}
+    finally:
+        service.context_store.close()
+        service.store.close()
+
+
+def test_macro_context_retrieves_relevant_older_ideas(pg_store):
+    from discussion_context import dispatch
+
+    for number in range(12):
+        text = (
+            "Inbox idempotency architecture"
+            if number == 0
+            else f"Unrelated gardening note {number}"
+        )
+        dispatch(
+            pg_store,
+            "remember",
+            {
+                "scope": "channel",
+                "session": "session",
+                "event": f"event-{number}",
+                "ideas": [{"text": text, "quote": text}],
+            },
+        )
+    ideas = dispatch(pg_store, "recall", {"scope": "channel", "query": "idempotency"})[
+        "ideas"
+    ]
+    assert len(ideas) == 8
+    assert ideas[0]["text"] == "Inbox idempotency architecture"

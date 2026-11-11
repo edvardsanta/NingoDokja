@@ -73,6 +73,11 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 			Workflow: "book",
 			Domains:  []Domain{DomainBook},
 		}, nil
+	case strings.HasPrefix(eventType, "knowledge.context."):
+		if event.Source != SourceOrchestrator {
+			return Route{}, fmt.Errorf("macro context operations require the orchestrator")
+		}
+		return Route{Workflow: "knowledge", Domains: []Domain{DomainKnowledge}}, nil
 	case strings.HasPrefix(eventType, "knowledge."):
 		return Route{
 			Workflow: "knowledge",

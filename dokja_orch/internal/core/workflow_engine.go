@@ -177,6 +177,14 @@ func actionFor(domain Domain, eventType string) string {
 			return "assess-knowledge-application"
 		case "knowledge.application.prepare":
 			return "prepare-knowledge-application"
+		case "knowledge.context.load":
+			return "load-context"
+		case "knowledge.context.save":
+			return "save-context"
+		case "knowledge.context.remember":
+			return "remember-context"
+		case "knowledge.context.recall":
+			return "recall-context"
 		case "knowledge.ingest":
 			return "ingest-knowledge"
 		case "knowledge.reclassify":

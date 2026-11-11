@@ -42,8 +42,16 @@ def build_service() -> KnowledgeService:
     fetch_enabled = os.getenv("KNOWLEDGE_FETCH", "on").strip().lower() not in {"off", "0", "false", "none"}
     if not fetch_enabled:
         logger.warning("fetching addresses is disabled (KNOWLEDGE_FETCH=off)")
+    store = open_store()
+    context_store = store
+    # The library can remain in SQLite while macro context uses PostgreSQL.
+    if store.backend != "postgres" and os.getenv("KNOWLEDGE_POSTGRES_DSN", "").strip():
+        from postgres_store import PostgresStore
+
+        context_store = PostgresStore(os.environ["KNOWLEDGE_POSTGRES_DSN"])
     return KnowledgeService(
-        open_store(),
+        store,
+        context_store=context_store,
         embedder=embedder,
         model=model,
         min_score=float(os.getenv("KNOWLEDGE_MIN_SCORE", str(DEFAULT_MIN_SCORE))),

@@ -24,6 +24,7 @@ import numpy as np
 
 import fetch as fetcher_module
 from chunker import chunk_text
+import discussion_context
 from passages import original_source, source_chunks, resolve
 from embedder import EmbedUnavailable
 from extractors import ExtractError, Registry, default_registry
@@ -112,13 +113,14 @@ class KnowledgeService:
                  min_score: float = DEFAULT_MIN_SCORE,
                  lexical_coverage: float = DEFAULT_LEXICAL_COVERAGE,
                  registry: Registry | None = None, fetch_enabled: bool = True, fetcher=None,
-                 max_file_mb: int = 0, max_text_chars: int = 0):
+                 max_file_mb: int = 0, max_text_chars: int = 0, context_store=None):
         self.registry = registry if registry is not None else default_registry()
         self.fetch_enabled = fetch_enabled
         # The owner's limits from Settings; zero means none, because books are as large as they are.
         self.max_file_mb = max_file_mb
         self.max_text_chars = max_text_chars
         self._fetch = fetcher if fetcher is not None else fetcher_module.fetch
+        self.context_store = context_store if context_store is not None else store
         self.store = store
         self.embedder = embedder
         self.model = model
@@ -131,6 +133,10 @@ class KnowledgeService:
     def dispatch(self, event: dict) -> dict:
         event_type = (event.get("type") or event.get("event_type") or "").strip()
         payload = event.get("payload") or {}
+        if event_type.startswith("knowledge.context."):
+            if event.get("source") != "orchestrator":
+                raise ValueError("context operations require the orchestrator")
+            return discussion_context.dispatch(self.context_store, event_type.removeprefix("knowledge.context."), payload)
         handlers = {
             "knowledge.ingest": self.ingest,
             "knowledge.metadata.get": self.metadata_get,
@@ -547,7 +553,7 @@ class KnowledgeService:
         reachable = None
         if self.embedder is not None and hasattr(self.embedder, "reachable"):
             reachable = self.embedder.reachable()
-        return {**stats, "storage_backend": self.store.backend, "pending_embeddings": stats["chunks"] - stats["embedded"],
+        return {**stats, "storage_backend": self.store.backend, "context_storage_backend": "postgres" if getattr(self.context_store, "backend", "") == "postgres" else "unconfigured", "pending_embeddings": stats["chunks"] - stats["embedded"],
                 "embed_model": self.model, "embedder_reachable": reachable,
                 "threshold": self.min_score, "formats": self.registry.extensions,
                 "fetchers": self.registry.schemes, "fetch_enabled": self.fetch_enabled}
