@@ -55,7 +55,7 @@ func (h *ChatDomainHandler) WithWebReading(service digest.Service, enabled func(
 }
 
 func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, sessionID, question string) ([]knowledgeSource, *webTurnData) {
-	if event.Source != core.SourceDiscord || h.web == nil {
+	if (event.Source != core.SourceDiscord && event.Source != core.SourceWhatsApp) || h.web == nil {
 		return nil, nil
 	}
 	w := h.web
@@ -372,4 +372,22 @@ func verifyWebQuotes(reply string, sources []knowledgeSource) string {
 		})
 	}
 	return reply
+}
+
+// Both ordinary and archived turns share source numbering and untrusted evidence framing.
+func (h *ChatDomainHandler) withWebSources(ctx context.Context, event core.Event, session, question string, sources []knowledgeSource) (core.Event, []knowledgeSource, *webTurnData) {
+	web, data := h.webSources(ctx, event, session, question)
+	if data == nil {
+		return event, sources, nil
+	}
+	event.Context = cloneChatContext(event.Context)
+	event.Context["web_reading_turn"] = data
+	if len(web) == 0 && len(data.Failures) > 0 {
+		data.FailureOnly = true
+		return event, nil, data
+	}
+	for i := range sources {
+		sources[i].Number += len(web)
+	}
+	return event, append(web, sources...), data
 }

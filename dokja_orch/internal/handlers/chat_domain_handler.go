@@ -238,18 +238,13 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		}
 		sources = h.lookupForTurn(lookupCtx, content, anchor, turn)
 		cancelLookup()
-		webSources, webData := h.webSources(ctx, event, lifecycle.SessionID, content)
+		var webData *webTurnData
+		event, sources, webData = h.withWebSources(ctx, event, lifecycle.SessionID, content, sources)
 		if webData != nil {
-			event.Context = cloneChatContext(event.Context)
-			event.Context["web_reading_turn"] = webData
-			for i := range sources {
-				sources[i].Number += len(webSources)
-			}
-			sources = append(webSources, sources...)
 			turn.planned = true
 			turn.text = true
 		}
-		if webData != nil && len(webSources) == 0 && len(webData.Failures) > 0 {
+		if webData != nil && len(sources) == 0 && len(webData.Failures) > 0 {
 			// No page was read. Return the application notice without letting
 			// the model improvise from URL slugs, titles or prior discussion.
 			webData.FailureOnly = true

@@ -183,6 +183,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	var result map[string]any
 	var keptLine string
 	var reading knowledgeTurn
+	var webData *webTurnData
 	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
 		result = map[string]any{"reply": identity}
 	} else if answer, ok := h.factReply(ctx, event, turn.Content); ok {
@@ -193,7 +194,16 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 		reading = h.planTurnReading("archive:"+held.ID, turn.Content)
 		reading.previousReply = previousReply(history)
 		sources = h.lookupForTurn(ctx, turn.Content, anchor, reading)
-		result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
+		event, sources, webData = h.withWebSources(ctx, event, held.ID, turn.Content, sources)
+		if webData != nil {
+			reading.planned = true
+			reading.text = true
+		}
+		if webData != nil && webData.FailureOnly {
+			result = map[string]any{"reply": webReadingStatus(event, webData)}
+		} else {
+			result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
+		}
 	}
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
@@ -203,11 +213,22 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 		return nil, h.failArchived(ctx, scope, turn, "the model returned no reply")
 	}
 	// Checked before the transcript keeps it, so a false quote is not repeated as a fact later.
+	if webData != nil {
+		raw = sanitizeWebReply(raw, sources)
+	}
 	raw = h.verifyQuotes(ctx, raw, sources, reading)
+	if webData != nil {
+		raw = verifyWebQuotes(raw, sources)
+	}
 	// The transcript keeps what the owner was shown, citations included.
 	sources = citedSources(raw, sources)
 	h.focus.remember(reading, turn.Content, sources)
 	reply := withKeptLine(citeSources(raw, sources), keptLine)
+	if webData != nil && !webData.FailureOnly {
+		if status := webReadingStatus(event, webData); status != "" {
+			reply += "\n\n" + status
+		}
+	}
 	provider, _ := result["provider"].(string)
 	// The runtime names the model it ran requested_model; it does not observe another one.
 	model, _ := result["requested_model"].(string)

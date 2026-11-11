@@ -140,6 +140,15 @@ Relevant implementation contracts:
 
 `message.* -> conversation route -> moderation:screen-event -> chat action`
 
+WhatsApp messages containing HTTP(S) links use the shared web-reading workflow,
+including the linked account's archived self-chat. Standalone links keep social
+post/media delivery first; unsupported links, missing social readers or unavailable media fall back
+to web reading. Login and other explicit post failures retain their delivery errors.
+Authorization precedes reading. Sources and follow-up excerpts remain scoped to
+the conversation/session; failed reads produce localized notices without asking
+the model to infer page contents. The self-chat archive keeps only validated
+citations and preserves the interface locale.
+
 Discord PDF attachments and HTTP(S) PDF links use the same link-conversation
 route and `converse-links` action as web readings. The adapter forwards attachment
 metadata as optional `documentAttachments`; the bridge maps it to

@@ -89,7 +89,8 @@ func (h *ChatDomainHandler) handleSelfChat(ctx context.Context, event core.Event
 		}
 	}
 	// The interface's own fields cannot pick a conversation, a send id or a retry.
-	event.Payload = map[string]any{"content": content}
+	locale, _ := event.Payload["locale"].(string)
+	event.Payload = map[string]any{"content": content, "locale": locale}
 	return h.answerArchived(ctx, event, workflow, archivedSend{
 		scope: scope, conversationID: held.ID, sendID: selfChatSendID(event), admitted: unlock, quietPending: true,
 	})
