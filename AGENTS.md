@@ -1,6 +1,6 @@
 # Ningo Dokja — instructions for AI agents
 
-<!-- agent-kit:start lang=en git-lang=en -->
+<!-- agent-kit:start docs-lang=en git-lang=en -->
 ## Default rules (agent-kit)
 
 This block is managed by agent-kit and replaced on every run. Do not edit between
@@ -9,7 +9,7 @@ the markers; change the rule in your agent-kit rules (see `agent-kit rules`) and
 
 ### Language
 
-- Talk and write documentation in English.
+- Write documentation in English.
 - Commits, branches, issues and PRs in English.
 
 ### Commits and PRs
@@ -32,11 +32,34 @@ the markers; change the rule in your agent-kit rules (see `agent-kit rules`) and
 - After the merge, `git worktree remove .worktrees/<name>` and `git worktree prune`.
 - For a quick change on the current branch, do not create a worktree.
 
+### Procedures
+
+- Use temporary directories only for disposable investigation artifacts.
+- Store reusable project workflows in `.agent-kit/procedures/`, not in `/tmp`, scratchpads
+  or agent-specific directories.
+- Treat procedures as version-controlled project documentation shared by users and all agents.
+- Create or update a procedure only when the user explicitly asks to preserve it.
+- If `.agent-kit/procedures/INDEX.md` exists, read it before planning a workflow.
+- When an index entry matches the task, read the full procedure before performing that workflow.
+
 ### Memory
 
 - Use ai-memory for cross-session continuity (routing block below).
 - Do not keep durable project facts in the harness's local memory; record them in
   ai-memory or in this file.
+
+## Project rules
+
+### Branding
+
+- Never use third-party brands, trademarks or brand names in the project
+  without authorization.
+- Keep the project clean, using only the Ningo Dokja brand.
+
+### Internationalization
+
+- Always use locales for messages in communication interfaces, never
+  hardcoded strings.
 <!-- agent-kit:end -->
 
 ## Overview
