@@ -270,11 +270,11 @@ func TestCPUComparisonDiscoversCompetitorsWithoutAChatModel(t *testing.T) {
 	original := offerObservation("cpu-original", "EXAMPLE-ORIGINAL", "store-a", "pix", "1700")
 	original["title"] = "Processador AMD Ryzen 7 Example"
 	original["category"] = "cpu"
-	original["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s1"}
+	original["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s1", "benchmark": "fixture-v1", "performance_score": 100.0}
 	candidate := offerObservation("cpu-other", "EXAMPLE-OTHER", "store-a", "pix", "1500")
 	candidate["title"] = "Processador Intel Core Example"
 	candidate["category"] = "cpu"
-	candidate["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s2"}
+	candidate["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s2", "benchmark": "fixture-v1", "performance_score": 100.0}
 	resolver := &compareResolver{lookup: []any{original, candidate}}
 	handler, _ := compareHandler(resolver, nil)
 	got := runCompare(t, handler, true, map[string]any{"query": "EXAMPLE-ORIGINAL", "budget_cents": 200000})
@@ -286,7 +286,7 @@ func TestCPUComparisonDiscoversCompetitorsWithoutAChatModel(t *testing.T) {
 		t.Fatalf("alternatives %v", got)
 	}
 	first := alternatives[0].(map[string]any)
-	if first["classification"] != "similar_cpu_specs" || first["specifications"] == nil {
+	if first["classification"] != "technically_comparable" || first["specifications"] == nil {
 		t.Fatalf("technical evidence %v", first)
 	}
 }

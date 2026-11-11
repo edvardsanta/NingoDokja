@@ -42,10 +42,6 @@ type priceCommenter interface {
 	GenerateMessages(ctx context.Context, messages []map[string]string) (map[string]any, error)
 }
 
-type priceTaskGenerator interface {
-	GenerateTaskJSON(context.Context, string, map[string]any, []map[string]string, func(map[string]any) error) (map[string]any, error)
-}
-
 type competitorQueryCache interface {
 	Get(context.Context, string) ([]string, bool, error)
 	Put(context.Context, string, []string) error
@@ -212,7 +208,7 @@ func (h *PriceDomainHandler) compareBudget() time.Duration {
 // discoverCompetitors looks the planned competitor queries up while there is still time for one
 // more lookup and Ningo's comment; the queries left over are logged, not run.
 func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any, deadline time.Time) bool {
-	if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
+	if time.Until(deadline) < compareStepTimeout+2*compareCommentFloor {
 		return false
 	}
 	product, _ := result["product"].(map[string]any)
@@ -230,7 +226,7 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map
 	}
 	changed := false
 	for index, query := range queries {
-		if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
+		if time.Until(deadline) < compareStepTimeout+2*compareCommentFloor {
 			logger.Info(fmt.Sprintf("price competitor discovery stopped for time queries_left=%d", len(queries)-index))
 			break
 		}
@@ -376,14 +372,6 @@ func decodeCompetitorQueries(text string) ([]string, error) {
 	return proposal.Queries, nil
 }
 
-func responseSample(text string) string {
-	text = strings.TrimSpace(text)
-	if len(text) > 240 {
-		return text[:240] + "..."
-	}
-	return text
-}
-
 // competitorPlanSchema is the reply every planning provider must match: one to
 // maxCompetitorQueries search strings. Ollama enforces it while writing; every reply is still
 // checked against it, whichever provider wrote it.
@@ -405,7 +393,7 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 		text, _ := reply["reply"].(string)
 		queries, err := decodeCompetitorQueries(text)
 		if err != nil {
-			logger.Info(fmt.Sprintf("price competitor planning invalid response provider=%s: %v sample=%q", provider, err, responseSample(text)))
+			logger.Info(fmt.Sprintf("price competitor planning invalid response provider=%s", provider))
 		}
 		return queries, err
 	}
@@ -420,7 +408,7 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 
 // generatePriceTask shares the lightweight bindings and validates each fallback response.
 func (h *PriceDomainHandler) generatePriceTask(ctx context.Context, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
-	if generator, ok := h.commenter.(priceTaskGenerator); ok {
+	if generator, ok := h.commenter.(taskJSONGenerator); ok {
 		return generator.GenerateTaskJSON(ctx, "lightweight", schema, messages, accept)
 	}
 	reply, err := h.commenter.GenerateMessages(ctx, messages)
@@ -607,7 +595,7 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any,
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
 	}
 	var reply map[string]any
-	if _, bound := h.commenter.(priceTaskGenerator); bound {
+	if _, bound := h.commenter.(taskJSONGenerator); bound {
 		messages[0]["content"] += "\nReturn JSON {\"comment\":\"your short comment\"}."
 		schema := map[string]any{
 			"type": "object", "additionalProperties": false, "required": []string{"comment"},
