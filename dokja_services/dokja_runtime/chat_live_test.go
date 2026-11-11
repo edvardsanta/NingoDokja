@@ -48,7 +48,7 @@ func TestLiveChatProvider(t *testing.T) {
 		t.Skip("opt in with -live-chat-provider and -live-chat-model; uses actual authenticated inference")
 	}
 	switch *liveChatProvider {
-	case "codex", "claude_code", "ollama":
+	case "codex", "claude_code", "kimi", "ollama":
 	default:
 		t.Fatal("select a supported live provider")
 	}

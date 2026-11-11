@@ -14,7 +14,7 @@ import (
 // These are controlled executables, not model mocks injected at the Run seam.
 // They exercise process I/O, launch isolation, trace rejection and cancellation.
 func TestChatCLIProcessIsolationAndCleanup(t *testing.T) {
-	for _, provider := range []string{"codex", "claude_code"} {
+	for _, provider := range []string{"codex", "claude_code", "kimi"} {
 		t.Run(provider, func(t *testing.T) {
 			fixture := t.TempDir()
 			for key, file := range map[string]string{"DOKJA_TEST_ARGS": "args", "DOKJA_TEST_CWD": "cwd", "DOKJA_TEST_INPUT": "input"} {
@@ -32,6 +32,10 @@ cat > "$DOKJA_TEST_INPUT"
  shift
 done
 printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.started"}' '{"type":"item.completed","item":{"type":"agent_message"}}' '{"type":"turn.completed"}'
+`
+			} else if provider == "kimi" {
+				name = "kimi"
+				script += `printf '%s\n' '{"role":"assistant","content":"answer"}'
 `
 			} else {
 				name = "claude"
@@ -58,6 +62,9 @@ printf '%s\n' '{"type":"thread.started"}' '{"type":"turn.started"}' '{"type":"it
 			flags := []string{"--model", "fixture/model", "--tools", "--strict-mcp-config", "--no-session-persistence", "disableAllHooks"}
 			if provider == "codex" {
 				flags = []string{"--json", "--ignore-rules", "--ignore-user-config", "--ephemeral", "features.shell_tool=false", "features.multi_agent=false", "features.plugins=false", "features.hooks=false", "features.memories=false", "features.skip_host_skill_discovery=true", `web_search="disabled"`}
+			}
+			if provider == "kimi" {
+				flags = []string{"-p", "--output-format", "stream-json", "-m", "fixture/model"}
 			}
 			for _, flag := range flags {
 				if !strings.Contains(string(args), flag) {

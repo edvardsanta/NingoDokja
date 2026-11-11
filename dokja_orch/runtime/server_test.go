@@ -234,7 +234,7 @@ func TestProviderInventoryIsReadOnlyAndSharedByLocalInterfaces(t *testing.T) {
 			Status string
 			Result struct{ Result domain.ProvidersView }
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" || len(reply.Result.Result.Providers) != 3 {
+		if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil || reply.Status != "ok" || len(reply.Result.Result.Providers) != 4 {
 			t.Fatal(w.Body.String(), err)
 		}
 		for _, row := range reply.Result.Result.Providers {

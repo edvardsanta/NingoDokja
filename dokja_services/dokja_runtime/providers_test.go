@@ -28,16 +28,16 @@ func discovered(t *testing.T, running bool, output string, runErr error) ([]doma
 		return []byte(`[{"Config":{"Labels":{"com.docker.compose.service":"dokja-ollama"}},"State":{"Running":true}}]`), nil
 	}}
 	p := ProviderDiscovery{Compose: c, LookPath: func(name string) (string, error) {
-		if name == "codex" {
-			return "/fixture/bin/codex", nil
+		if name == "codex" || name == "kimi" {
+			return "/fixture/bin/" + name, nil
 		}
 		return "", errors.New("missing")
 	}}
-	return p.Inspect(context.Background(), map[string]bool{"codex": true, "claude_code": true, "ollama": true}), calls
+	return p.Inspect(context.Background(), map[string]bool{"codex": true, "claude_code": true, "kimi": true, "ollama": true}), calls
 }
 func TestDiscoveryListsOnlyModelsInTheSelectedRunningStack(t *testing.T) {
 	rows, calls := discovered(t, true, "NAME ID SIZE MODIFIED\nbge-m3:latest 0123456789ab 1 GB today\nfixture/model:latest abcdef012345 2 GB today\n", nil)
-	if rows[0].State != "installed" || rows[1].Reason != "executable_missing" || rows[2].State != "reachable" || len(rows[2].Models) != 2 {
+	if rows[0].State != "installed" || rows[1].Reason != "executable_missing" || rows[2].State != "installed" || rows[3].State != "reachable" || len(rows[3].Models) != 2 {
 		t.Fatal(rows)
 	}
 	if len(calls) != 2 || strings.Join(calls[1], " ") != "exec -T dokja-ollama ollama list" {
@@ -46,15 +46,15 @@ func TestDiscoveryListsOnlyModelsInTheSelectedRunningStack(t *testing.T) {
 }
 func TestDiscoveryNeverStartsStoppedServicesAndDoesNotLeakFailures(t *testing.T) {
 	rows, calls := discovered(t, false, "", nil)
-	if rows[2].Reason != "service_stopped" || len(calls) != 1 {
+	if rows[3].Reason != "service_stopped" || len(calls) != 1 {
 		t.Fatal(rows, calls)
 	}
 	rows, _ = discovered(t, true, "private failure output", errors.New("private error"))
-	if rows[2].Reason != "inspection_failed" || len(rows[2].Models) != 0 {
+	if rows[3].Reason != "inspection_failed" || len(rows[3].Models) != 0 {
 		t.Fatal(rows)
 	}
 	rows, _ = discovered(t, true, "unknown new table layout", nil)
-	if rows[2].Reason != "invalid_response" {
+	if rows[3].Reason != "invalid_response" {
 		t.Fatal(rows)
 	}
 }

@@ -69,7 +69,7 @@ func TestProviderConflictRefusesStaleWriteAndPreservesOtherRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	final, err := s.ReadProviders()
-	if err != nil || final.Providers[0].Enabled || final.Providers[2].Enabled || !final.Providers[1].Enabled {
+	if err != nil || final.Providers[0].Enabled || !final.Providers[1].Enabled || !final.Providers[2].Enabled || final.Providers[3].Enabled {
 		t.Fatal(final, err)
 	}
 	if _, err = s.WriteProvider(final.Revision, domain.ProviderRegistration{ID: "codex", Models: []string{"bad\ncredential"}}); err == nil {
