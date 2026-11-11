@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
 	"strings"
@@ -170,6 +171,74 @@ func TestCompareNeverLooksUpForAGuestAndStandsWithoutAComment(t *testing.T) {
 	}
 }
 
+func TestCPUDiscoverySearchesTheCompetingManufacturer(t *testing.T) {
+	for _, test := range []struct {
+		title string
+		want  string
+	}{
+		{"Processador AMD Ryzen 7 9700X, 8 Cores", "processador intel core i7"},
+		{"Processador Intel Core i7 Example", "processador amd ryzen 7"},
+		{"Processador Intel Core Ultra 7 Example", "processador amd ryzen 7"},
+	} {
+		queries := competingCPUQueries(map[string]any{"title": test.title, "category": "cpu"})
+		if len(queries) == 0 || queries[0] != test.want {
+			t.Fatalf("%s: queries %v", test.title, queries)
+		}
+		for _, query := range queries {
+			if strings.Contains(query, "am5") || strings.Contains(query, "lga") {
+				t.Fatalf("discovery constrained to a socket: %v", queries)
+			}
+		}
+	}
+	if got := competingCPUQueries(map[string]any{"title": "SSD Example", "category": "ssd"}); len(got) != 0 {
+		t.Fatalf("CPU queries for storage: %v", got)
+	}
+}
+
+func TestComparisonCommentReceivesAlternativeEvidence(t *testing.T) {
+	commenter := &fakeCommenter{reply: "Considere o candidato."}
+	handler, _ := compareHandler(nil, commenter)
+	result := map[string]any{"alternatives": []any{map[string]any{
+		"title": "CPU Other", "classification": "similar_cpu_specs",
+		"reason_codes": []string{"different_cpu_socket"},
+	}}}
+	handler.comment(context.Background(), result, time.Now().Add(time.Minute))
+	var facts map[string]any
+	body := commenter.messages[0][1]["content"]
+	body = strings.TrimSuffix(strings.TrimPrefix(body, "<<FACTS>>\n"), "\n<<END FACTS>>")
+	if err := json.Unmarshal([]byte(body), &facts); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fmt.Sprint(facts["alternatives"]), "different_cpu_socket") {
+		t.Fatalf("missing alternative evidence: %v", facts)
+	}
+}
+
+func TestCPUComparisonDiscoversCompetitorsWithoutAChatModel(t *testing.T) {
+	original := offerObservation("cpu-original", "EXAMPLE-ORIGINAL", "store-a", "pix", "1700")
+	original["title"] = "Processador AMD Ryzen 7 Example"
+	original["category"] = "cpu"
+	original["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s1"}
+	candidate := offerObservation("cpu-other", "EXAMPLE-OTHER", "store-a", "pix", "1500")
+	candidate["title"] = "Processador Intel Core Example"
+	candidate["category"] = "cpu"
+	candidate["specifications"] = map[string]any{"cores": 8.0, "threads": 16.0, "socket": "s2"}
+	resolver := &compareResolver{lookup: []any{original, candidate}}
+	handler, _ := compareHandler(resolver, nil)
+	got := runCompare(t, handler, true, map[string]any{"query": "EXAMPLE-ORIGINAL", "budget_cents": 200000})
+	if len(resolver.inputs) < 2 || resolver.inputs[1]["query"] != "processador intel core i7" {
+		t.Fatalf("competing brand was not searched: %v", resolver.inputs)
+	}
+	alternatives, _ := got["alternatives"].([]any)
+	if len(alternatives) != 1 {
+		t.Fatalf("alternatives %v", got)
+	}
+	first := alternatives[0].(map[string]any)
+	if first["classification"] != "similar_cpu_specs" || first["specifications"] == nil {
+		t.Fatalf("technical evidence %v", first)
+	}
+}
+
 func TestCompareAnswersAnUnknownLinkWithoutGuessing(t *testing.T) {
 	resolver := &compareResolver{err: errors.New("unknown store")}
 	handler, _ := compareHandler(resolver, nil)
@@ -273,7 +342,7 @@ func TestNingoGetsLongerThanAResolverCallToCommentAndNothingPastTheBudget(t *tes
 	commenter := &deadlineCommenter{fakeCommenter: fakeCommenter{reply: "Compre."}}
 	handler, _ := compareHandler(resolver, commenter)
 	got := runCompare(t, handler, true, map[string]any{"query": "AB-1000X1"})
-	if got["comment"] != "Compre." || len(commenter.left) != 1 || commenter.left[0] <= compareStepTimeout {
+	if got["comment"] != "Compre." || len(commenter.left) != 2 || commenter.left[1] <= compareStepTimeout {
 		t.Fatalf("comment %v, given %v", got["comment"], commenter.left)
 	}
 

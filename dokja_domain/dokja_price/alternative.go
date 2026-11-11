@@ -18,6 +18,7 @@ func (a Alternative) Map() map[string]any {
 		"category":          a.Product.Category,
 		"brand":             a.Product.Brand,
 		"part_number":       a.Product.PartNumber,
+		"specifications":    cloneMap(a.Product.Specifications),
 		"merchant":          a.Offer.Assessment.Key.Merchant,
 		"price_cents":       a.Offer.Assessment.Latest.Cents,
 		"url":               a.Offer.URL,

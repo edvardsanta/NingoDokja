@@ -34,7 +34,7 @@ const (
 	compareCommentFloor = 20 * time.Second
 	// maxCompareComment bounds Ningo's comment.
 	maxCompareComment     = 600
-	competitorPlanVersion = "1"
+	competitorPlanVersion = "2"
 )
 
 // priceCommenter writes Ningo's few lines about a comparison. It is the chat provider; nil
@@ -124,7 +124,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 			}
 		}
 	}
-	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
+	if found, _ := result["found"].(bool); found && h.feeds != nil {
 		if discovered := h.discoverCompetitors(ctx, result, deadline); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
@@ -211,10 +211,22 @@ func (h *PriceDomainHandler) compareBudget() time.Duration {
 // discoverCompetitors looks the planned competitor queries up while there is still time for one
 // more lookup and Ningo's comment; the queries left over are logged, not run.
 func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any, deadline time.Time) bool {
+	if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
+		return false
+	}
 	product, _ := result["product"].(map[string]any)
 	title, _ := product["title"].(string)
 	category, _ := product["category"].(string)
-	queries := h.competitorQueries(ctx, product, result["profile"])
+	queries := competingCPUQueries(product)
+	if h.commenter != nil {
+		planCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		planned := h.competitorQueries(planCtx, product, result["profile"])
+		cancel()
+		queries = append(queries, planned...)
+	}
+	if len(queries) > maxCompetitorQueries {
+		queries = queries[:maxCompetitorQueries]
+	}
 	changed := false
 	for index, query := range queries {
 		if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
@@ -246,6 +258,35 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map
 		}
 	}
 	return changed
+}
+
+// These are discovery hints. Only collected specifications can establish a technical match.
+func competingCPUQueries(product map[string]any) []string {
+	title, _ := product["title"].(string)
+	category, _ := product["category"].(string)
+	if categoryForProduct(category, title) != "cpu" {
+		return nil
+	}
+	brand, _ := product["brand"].(string)
+	switch pricedomain.CPUBrand(brand, title) {
+	case "amd":
+		for _, tier := range []string{"3", "5", "7", "9"} {
+			if strings.Contains(strings.ToLower(title), "ryzen "+tier+" ") {
+				return []string{"processador intel core i" + tier, "processador intel core ultra " + tier}
+			}
+		}
+		return []string{"processador intel core"}
+	case "intel":
+		for _, tier := range []string{"3", "5", "7", "9"} {
+			name := strings.ToLower(title)
+			if strings.Contains(name, "core i"+tier) || strings.Contains(name, "core ultra "+tier+" ") {
+				return []string{"processador amd ryzen " + tier}
+			}
+		}
+		return []string{"processador amd ryzen"}
+	default:
+		return nil
+	}
 }
 
 func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any) []string {
@@ -531,6 +572,11 @@ In Brazilian Portuguese and in your own voice, write at most three short sentenc
 moment to buy, and where. Use only these facts. Never write a price or number that is not in them,
 and do not list every store: the person sees the table. If the decision says over_budget or
 seek_alternative, do not say "buy now"; explain that the current offer does not fit the budget.
+Discuss one or two useful alternatives from FACTS when present. Use their short model names.
+Respect their classification and reason codes: similar_cpu_specs only confirms matching core
+and thread counts, not equal performance. A different_cpu_socket needs a compatible motherboard.
+Only shared_cpu_benchmark supports a CPU performance comparison. Mention cheaper options and
+whether they fit the stated budget. Do not repeat the store list or the full listing titles.
 If the facts do not support a recommendation, say so plainly.`
 
 const competitorDiscoveryInstructions = `You are a product discovery planner. Return only valid JSON in this exact shape:
@@ -542,6 +588,7 @@ present in FACTS, such as capacity, interface, socket, cores, threads, screen si
 Do not use manufacturer names, brands, logos, model names, part numbers, invented benchmarks or
 unsupported specifications. Do not repeat the original product query. The queries are search hints,
 not evidence of equivalence; the stores and the deterministic comparison engine provide the evidence.
+Include a platform-neutral query without socket constraints so other manufacturers can be found.
 If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
@@ -550,6 +597,7 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any,
 	facts, err := json.Marshal(map[string]any{
 		"product": result["product"], "offers": result["offers"], "decision": result["decision"],
 		"prior_decisions": result["prior_decisions"],
+		"alternatives":    result["alternatives"],
 	})
 	if err != nil {
 		return ""

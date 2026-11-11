@@ -280,6 +280,32 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
   model with the whole persona, gets up to 90 seconds; with less than 20
   left it is skipped. A failed comment logs its reason.
 
+## Cross-manufacturer CPU comparisons and compact Discord cards
+
+- CPU discovery starts with searches for the competing manufacturer, including
+  family-tier search hints when the original title identifies one. These hints
+  establish no performance equivalence. The provider can add platform-neutral
+  searches. Planning has a 20-second limit, and discovery still reserves time
+  for the final comment. Plan version 2 invalidates earlier cached plans.
+- CPU alternatives can have different sockets. Known socket differences carry
+  `different_cpu_socket`, which the interface explains as requiring a compatible
+  motherboard. The highest-ranked competing brand remains on the first page
+  when one is available.
+- Matching positive core and thread counts give `similar_cpu_specs`, with low
+  confidence. CPU performance classifications require positive
+  `performance_score` values with the same nonempty `benchmark` identifier in
+  both products' collected specifications. That identifier must name the same
+  benchmark version, workload and scoring method. Scores at least 90% of the
+  original are comparable, and scores above 110% are superior for that
+  benchmark. Listing titles alone provide no benchmark evidence.
+- Alternatives include their collected specifications in the response. Ningo's
+  comment receives these alternatives and their platform and evidence codes.
+- Discord renders one card with a shortened listing title, the purchase
+  decision, budget and comment, compact linked offer rows and linked candidate
+  names. Technical caveats appear once in the footer. Long lists show how many
+  rows were omitted to stay within Discord limits. Portuguese and English use
+  the same layout.
+
 ## Pending work (stacked follow-ups)
 
 
