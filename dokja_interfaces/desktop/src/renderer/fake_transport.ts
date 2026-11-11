@@ -341,6 +341,7 @@ export function createFakeTransport(delayMs = 400): Transport {
     sizes: { "demo/embed:latest": "1.2 GB", "demo/small:latest": "2.0 GB" },
     chat: { configurationRevision: 1, provider: "", model: "" },
   };
+  let taskProfiles: import("../shared/runtime.js").TaskProfiles={configurationRevision:1,profiles:{lightweight:[],analysis:[]}};
   // The owner's verdicts on the demo's answers; the first one stands, as in the orchestrator.
   const verdicts = new Map<string, "useful" | "wrong">();
   // The demo's conversation archive, kept as the orchestrator keeps it: by its own opaque ids.
@@ -421,6 +422,9 @@ export function createFakeTransport(delayMs = 400): Transport {
           return ok({modules:structuredClone(modules),busy:false,error:""});
         }
         case "runtime.settings": return ok({settings:structuredClone(settings),webhookChannels:["1100000000000000002"],busy:false,error:""});
+        case "runtime.tasks.profiles": return ok(structuredClone(taskProfiles));
+        case "runtime.tasks.configure": taskProfiles={configurationRevision:taskProfiles.configurationRevision+1,profiles:structuredClone(payload?.profiles as import("../shared/runtime.js").TaskProfiles["profiles"])};return ok(structuredClone(taskProfiles));
+        case "runtime.tasks.diagnostics": return ok({active:0,queued:0,limit:2,attempts:[],providers:[]});
         case "runtime.providers": return ok({ configurationRevision: 1, checkedAt: new Date().toISOString(), providers: [
           { id: "ollama", name: "Ollama", enabled: true, declaredModels: [], state: "reachable", reason: "", models: [...local.models], modelSizes: { ...local.sizes }, embeddingModel: "demo/embed:latest", modelDiscovery: "listed", inferenceStatus: "not_tested", truncated: false },
           { id: "codex", name: "Codex", enabled: true, declaredModels: [], state: "installed", reason: "", models: [], modelDiscovery: "unsupported", inferenceStatus: "not_tested", truncated: false },

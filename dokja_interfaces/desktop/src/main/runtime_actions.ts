@@ -78,7 +78,7 @@ export function runtimeProviders(body: Record<string, unknown>): import("../shar
  const names: Record<string, string> = { codex: "Codex", claude_code: "Claude Code", kimi: "Kimi", ollama: "Ollama" };
  const seen = new Set<string>();
  const providers: import("../shared/runtime.js").ProviderRow[] = [];
- for (const raw of body.providers.slice(0, 3)) {
+ for (const raw of body.providers.slice(0, 4)) {
   if (!isRecord(raw) || typeof raw.id !== "string" || !Object.hasOwn(names, raw.id) || seen.has(raw.id)) continue;
   seen.add(raw.id);
   const declarations = declaredModels(raw.declared_models ?? []);
@@ -139,4 +139,29 @@ export function runtimeChat(raw: Record<string,unknown>): import("../shared/runt
 }
 export function runtimeChatConfigure(raw: Record<string,unknown>):Record<string,unknown>|undefined {
  try {const b=runtimeChat(raw);if(!b.provider||!b.model||b.configurationRevision>=Number.MAX_SAFE_INTEGER)return undefined;return {configuration_revision:b.configurationRevision,provider:b.provider,model:b.model};}catch{return undefined;}
+}
+
+const TASK_PROFILES = ["lightweight", "analysis"] as const;
+const TASK_REASONS = ["", "queue_full", "cancelled", "timeout", "session_limit", "usage_limit", "authentication_required", "model_unavailable", "cli_incompatible", "output_limit", "unavailable", "cooldown", "runtime_unavailable", "invalid_response", "provider_error", "invalid_json", "contract_rejected"];
+const taskReason = (raw: unknown): string => TASK_REASONS.includes(text(raw)) ? text(raw) : "provider_error";
+function taskChoices(raw: unknown): import("../shared/runtime.js").TaskChoice[] {
+ if (!Array.isArray(raw) || raw.length > 16) throw new Error("invalid task priorities");
+ return raw.map((b) => {
+  if (!isRecord(b) || !PROVIDER_IDS.includes(text(b.provider)) || !DECLARED_MODEL.test(text(b.model))) throw new Error("invalid task model");
+  return { provider: text(b.provider), model: text(b.model) };
+ });
+}
+export function runtimeTaskProfiles(raw: Record<string, unknown>): import("../shared/runtime.js").TaskProfiles {
+ if (!Number.isSafeInteger(raw.configuration_revision) || Number(raw.configuration_revision) < 1 || !isRecord(raw.profiles)) throw new Error("invalid task profiles");
+ return { configurationRevision: Number(raw.configuration_revision), profiles: { lightweight: taskChoices(raw.profiles.lightweight), analysis: taskChoices(raw.profiles.analysis) } };
+}
+export function runtimeTaskConfigure(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+ try { const p=runtimeTaskProfiles(raw); if(p.configurationRevision>=Number.MAX_SAFE_INTEGER)return undefined; return { configuration_revision:p.configurationRevision, profiles:p.profiles }; } catch { return undefined; }
+}
+export function runtimeTaskDiagnostics(raw: Record<string, unknown>): import("../shared/runtime.js").TaskDiagnostics {
+ const whole=(v:unknown):number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0 ? v : 0;
+ if(!Array.isArray(raw.attempts)||!Array.isArray(raw.providers))throw new Error("invalid task diagnostics");
+ return { active:whole(raw.active),queued:whole(raw.queued),limit:whole(raw.limit),
+  attempts:raw.attempts.slice(-100).filter(isRecord).map(a=>({taskId:whole(a.task_id),profile:TASK_PROFILES.includes(a.profile as "lightweight")?text(a.profile):"lightweight",provider:[...PROVIDER_IDS,"runtime"].includes(text(a.provider))?text(a.provider):"runtime",model:DECLARED_MODEL.test(text(a.model))?text(a.model):"",durationMs:whole(a.duration_ms),outcome:["success","failed","skipped"].includes(text(a.outcome))?text(a.outcome):"failed",reason:taskReason(a.reason),cause:taskReason(a.cause),startedAt:/^\d{4}-\d{2}-\d{2}T[0-9:.Z+-]+$/.test(text(a.started_at))?text(a.started_at):"",retryAfterMs:whole(a.retry_after_ms),stage:a.stage==="catalog"?"catalog":"generation"})),
+  providers:raw.providers.slice(0,16).filter(isRecord).flatMap(p=>PROVIDER_IDS.includes(text(p.provider))&&DECLARED_MODEL.test(text(p.model))?[{provider:text(p.provider),model:text(p.model),retryAfterMs:whole(p.retry_after_ms),failureReason:taskReason(p.failure_reason)}]:[]) };
 }

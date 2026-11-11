@@ -3689,3 +3689,11 @@ button.cfg-toggle:focus-visible {
   color: var(--ink);
   font: inherit;
 }
+
+/* Task metadata stays readable without widening provider columns or growing an unbounded list. */
+.task-workbench { min-width: 0; }
+.task-workbench dd, .task-workbench li { overflow-wrap: anywhere; }
+.task-workbench .task-attempts, .task-workbench .task-pauses { grid-template-columns: minmax(0, 1fr); }
+.task-workbench .task-attempts { max-height: 24rem; overflow: auto; }
+.task-workbench fieldset { min-width: 0; margin-block: 1rem; }
+.task-workbench select { max-width: 100%; }
