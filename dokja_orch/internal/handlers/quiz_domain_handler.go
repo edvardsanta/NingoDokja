@@ -189,7 +189,7 @@ func (h *QuizDomainHandler) answer(ctx context.Context, questions []quiz.Questio
 	for _, batch := range quiz.Batches(questions, quiz.BatchSize) {
 		pending := batch
 		for attempt := 0; attempt < 2 && len(pending) > 0; attempt++ {
-			reply, err := h.generate(ctx, quiz.BatchPrompt(pending))
+			reply, err := h.answerBatch(ctx, pending)
 			if err != nil {
 				if ctx.Err() != nil {
 					return nil, quiz.RefusedFailed
@@ -212,12 +212,46 @@ func (h *QuizDomainHandler) answer(ctx context.Context, questions []quiz.Questio
 
 // comment is Ningo's reaction to the verdict. Without one the link still stands.
 func (h *QuizDomainHandler) comment(ctx context.Context, result quiz.Result, language string) string {
-	reply, err := h.generate(ctx, quiz.CommentPrompt(result, language))
+	resultMap, err := generateLightweightText(ctx, h.generator, []map[string]string{
+		{"role": "system", "content": h.persona()},
+		{"role": "user", "content": quiz.CommentPrompt(result, language)},
+	}, nil)
 	if err != nil {
 		logger.Error("quiz comment was not generated", err)
 		return ""
 	}
-	return strings.TrimSpace(reply)
+	return strings.TrimSpace(chatReplyFromResult(resultMap))
+}
+
+func (h *QuizDomainHandler) answerBatch(ctx context.Context, questions []quiz.Question) (string, error) {
+	task, ok := h.generator.(taskJSONGenerator)
+	if !ok {
+		return h.generate(ctx, quiz.BatchPrompt(questions))
+	}
+	schema := map[string]any{
+		"type": "object", "additionalProperties": false, "required": []string{"answers"},
+		"properties": map[string]any{"answers": map[string]any{
+			"type": "array", "minItems": 1, "maxItems": len(questions),
+			"items": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"id", "option"},
+				"properties": map[string]any{"id": map[string]any{"type": "string"}, "option": map[string]any{"type": "string"}},
+			},
+		}},
+	}
+	result, err := task.GenerateTaskJSON(ctx, "lightweight", schema, []map[string]string{
+		{"role": "system", "content": h.persona()}, {"role": "user", "content": quiz.BatchPrompt(questions)},
+	}, func(reply map[string]any) error {
+		text, _ := reply["reply"].(string)
+		answers, _ := quiz.ParseAnswers(text, questions)
+		if len(answers) == 0 {
+			return fmt.Errorf("no valid quiz answers")
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	text, _ := result["reply"].(string)
+	return text, nil
 }
 
 func (h *QuizDomainHandler) generate(ctx context.Context, prompt string) (string, error) {
