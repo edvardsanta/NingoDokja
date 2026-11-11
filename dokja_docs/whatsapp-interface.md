@@ -336,3 +336,22 @@ never deleted by the service.
 - WhatsApp does not decide workflows
 - the text of a message can never pick how the orchestrator routes it: the event type is fixed to
   `message.created` by the interface and enforced again by the bridge
+
+### Automatic link reading
+
+Send a news or other HTTP(S) link, alone or with a question, in an allowed chat.
+The orchestrator uses the existing Feeds web reader, includes retrieved excerpts
+as untrusted evidence and appends validated source references to the reply.
+Follow-up questions reuse those excerpts in the same conversation/session.
+The linked account's self-chat keeps the cited answer in the shared conversation
+archive. Supported standalone social posts continue to deliver their media;
+links unsupported by social readers, with no social reader configured or without
+deliverable media fall back to web reading. Document attachments keep their
+existing intake workflow.
+
+Existing web-reader limits apply: four sources per message, bounded passages,
+a 15-second shared reading budget and the configured Feeds availability switch.
+Blocked, unavailable or unreadable pages produce existing English/Portuguese
+locale notices. No page contents are inferred when every read fails.
+Rebuild the orchestrator to enable this behavior; no WhatsApp command, bridge
+contract, database schema, environment variable or Compose change is required.

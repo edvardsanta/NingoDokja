@@ -103,7 +103,7 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 		}, nil
 	case eventType == "message.created" && event.Source == SourceWhatsApp && hasIncomingContent(event):
 		return Route{Workflow: "incoming-content", Domains: []Domain{DomainModeration, DomainChat}}, nil
-	case eventType == "message.created" && event.Source == SourceDiscord && hasWebReading(event):
+	case eventType == "message.created" && (event.Source == SourceDiscord || event.Source == SourceWhatsApp) && hasWebReading(event):
 		return Route{Workflow: "link-conversation", Domains: []Domain{DomainModeration, DomainChat}}, nil
 	case eventType == "message.created" && event.Source == SourceDesktop:
 		return Route{Workflow: "desktop-conversation", Domains: []Domain{DomainChat}}, nil

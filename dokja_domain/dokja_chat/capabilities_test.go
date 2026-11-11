@@ -73,3 +73,27 @@ func TestCapabilityContextSeparatesPlaybackHistoryFromTrainingAndExecution(t *te
 		}
 	}
 }
+
+func TestLinkReadingAdvertisesWhatsAppAccess(t *testing.T) {
+	var catalog struct {
+		Capabilities []struct {
+			ID          string `json:"id"`
+			EntryPoints []struct {
+				Interface string `json:"interface"`
+			} `json:"entry_points"`
+		} `json:"capabilities"`
+	}
+	if err := json.Unmarshal(capabilitiesJSON, &catalog); err != nil {
+		t.Fatal(err)
+	}
+	for _, capability := range catalog.Capabilities {
+		if capability.ID == "reading.links" {
+			for _, entry := range capability.EntryPoints {
+				if entry.Interface == "whatsapp" {
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("link reading is missing WhatsApp entry point")
+}

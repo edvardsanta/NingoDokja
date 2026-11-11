@@ -35,6 +35,9 @@ func (h *ChatDomainHandler) handleIncomingContent(ctx context.Context, event cor
 	if plan.Error != "" {
 		return contentRefusal(plan.Error), nil
 	}
+	if plan.Kind == "post" && h.incoming == nil && h.web != nil {
+		return h.Handle(ctx, event, core.WorkflowStep{Domain: core.DomainChat, Action: chat.ActionConverseLinks})
+	}
 	if h.incoming == nil || (h.incoming.enabled != nil && !h.incoming.enabled()) {
 		return contentRefusal("reader_unavailable"), nil
 	}
@@ -45,6 +48,9 @@ func (h *ChatDomainHandler) handleIncomingContent(ctx context.Context, event cor
 		}
 		if result["status"] != "ok" {
 			reason, _ := result["refused"].(string)
+			if h.web != nil && (reason == digest.RefusedUnsupported || reason == digest.RefusedNoReader || reason == digest.RefusedUnavailable) {
+				return h.Handle(ctx, event, core.WorkflowStep{Domain: core.DomainChat, Action: chat.ActionConverseLinks})
+			}
 			return contentRefusal("post_" + reason), nil
 		}
 		post, _ := result["post"].(map[string]any)

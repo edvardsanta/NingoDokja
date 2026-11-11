@@ -103,6 +103,10 @@
         {
           "interface": "desktop",
           "usage": "Open readings and discuss them in an assistant conversation."
+        },
+        {
+          "interface": "whatsapp",
+          "usage": "Send a news or other HTTP(S) link in an allowed chat, alone or with a question. Continue discussing the fetched passages in the same conversation. Supported standalone social posts retain their media delivery."
         }
       ],
       "limits": [
