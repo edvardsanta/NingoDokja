@@ -332,6 +332,21 @@ test("a model review explains estimated equivalence alongside current prices", (
   assert.match(value, /Desempenho semelhante estimado em uso geral/);
 });
 
+test("generic comparisons explain the chosen reference and show more than three alternatives", () => {
+  const card = embedsOf(buildCompareReply({
+    ...compared,
+    reference_selection: { matches: 3, reason: "lowest_current_offer" },
+    alternatives: Array.from({ length: 5 }, (_, i) => ({
+      product: String(i), title: "GPU Variant " + i, price_cents: 100000 + i,
+      classification: "technically_comparable",
+    })),
+  }, "pt-BR"))[0];
+  assert.match(card.description!, /Encontrei 3 versões/);
+  const text = card.fields!.map((field) => field.value).join("\n");
+  assert.match(text, /GPU Variant 4/);
+  assert.doesNotMatch(card.description!, /Mande o código/);
+});
+
 test("shortlisted alternatives keep concise explanations and one section heading", () => {
   const card = embedsOf(buildCompareReply({
     ...compared,

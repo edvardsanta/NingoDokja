@@ -329,26 +329,34 @@ qualitative estimates as a separate `model_assessment` with `estimated: true`.
 Collected specifications and benchmark classifications retain their evidence.
 An unavailable cache leaves the comparison usable.
 
-## Choosing alternatives for the comparison card
+## Generic searches and relevant competitors
+
+A generic name query that matches several products selects a reference using
+the lowest recent merchant quote. Recent quotes take precedence over stale
+quotes and aggregator histories. The reply explains how many matches were
+found and why that reference was chosen, then continues the comparison. An
+ambiguous explicit partial part number retains its candidate response.
 
 The domain supplies up to 12 current candidates for the fresh technical review.
-After review, the domain selects at most three distinct products, prioritizing
-a technically comparable option, a lower-cost option that shares the reference
-socket when available, and a competing manufacturer. Remaining slots can show a
-specific advantage identified by the current model review or the next closest
-candidate. Within each technical group, options within budget come first.
-Selected options above budget are explicitly labelled.
+That workload bound keeps provider requests finite. Replies have no fixed
+three-product limit. Alternatives retain purpose ordering and remain subject
+to Discord's character limits, with omitted rows reported.
 
-Only this selection is passed to the final comment. The SQLite discovery cache
-continues to receive the larger candidate pool before model opinions are added.
-Selection reasons and the number of considered candidates are response fields.
+The review identifies direct peers, variants of the same model, older options,
+different market tiers and uncertain cases. Older options and different tiers
+are excluded from the principal alternatives even if their estimated performance
+is higher. These are fresh model assessments, and the discovery cache continues
+to hold only competitor facts and queries.
 
-Discord gives each choice a short purpose label and one concise explanation.
-CPU model names are extracted from listing titles for display. Continued
-fields repeat no section heading. Model estimates have one footer notice;
-socket differences stay beside the affected products. The model is instructed
-to describe platform differences against the requested product without assuming
-which equipment the user owns.
+Discovery plan version 3 prioritizes specific cross-manufacturer rival queries
+from model knowledge, followed by functional queries when needed. Search hints
+establish no product facts until collection returns actual offers. Cached query
+plans take precedence over known candidate lookups so the broader candidate
+inventory does not displace direct-rival discovery.
+
+Discord keeps concise explanations, short model names and one alternatives
+heading. The final comment discusses the reference and eligible alternatives
+without assuming which equipment the user owns.
 
 ## Pending work (stacked follow-ups)
 

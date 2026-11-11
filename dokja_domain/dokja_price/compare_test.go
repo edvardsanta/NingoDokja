@@ -44,14 +44,14 @@ func TestCompareFindsAProductByPartNumberAndListsItsOffersCheapestFirst(t *testi
 	}
 }
 
-func TestCompareByWordsPicksOneOrOffersCandidates(t *testing.T) {
+func TestCompareByWordsAutomaticallyChoosesAPricedReference(t *testing.T) {
 	domain := compareRepo(t)
 	one, _ := domain.CompareProduct(context.Background(), Compare{Query: "example 2tb"})
 	if !one.Found || one.Product.Key != "pn:ab-2000x1" {
 		t.Fatalf("one %+v", one)
 	}
 	several, _ := domain.CompareProduct(context.Background(), Compare{Query: "ssd example"})
-	if several.Found || len(several.Candidates) != 2 {
+	if !several.Found || several.Product.Key != "pn:ab-1000x1" || several.ReferenceMatches != 2 {
 		t.Fatalf("several %+v", several)
 	}
 	none, _ := domain.CompareProduct(context.Background(), Compare{Query: "rtx 5090"})

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ShortlistAlternatives selects distinct purchase options after the current model review.
+// ShortlistAlternatives orders distinct purchase options after the current model review.
 func ShortlistAlternatives(result map[string]any) {
 	rows, _ := result["alternatives"].([]any)
 	product, _ := result["product"].(map[string]any)
@@ -19,6 +19,10 @@ func ShortlistAlternatives(result map[string]any) {
 	candidates := []map[string]any{}
 	for _, row := range rows {
 		if item, ok := row.(map[string]any); ok {
+			review, _ := item["model_assessment"].(map[string]any)
+			if review["market_role"] == "older_option" || review["market_role"] == "different_tier" {
+				continue
+			}
 			candidates = append(candidates, item)
 		}
 	}
@@ -73,7 +77,7 @@ func ShortlistAlternatives(result map[string]any) {
 	used := map[string]bool{}
 	add := func(item map[string]any, role string) {
 		id, _ := item["product"].(string)
-		if id == "" || used[id] || len(selected) == 3 {
+		if id == "" || used[id] {
 			return
 		}
 		item["selection_reason"] = role
@@ -123,5 +127,5 @@ func ShortlistAlternatives(result map[string]any) {
 		add(item, "alternative")
 	}
 	result["alternatives"] = selected
-	result["alternatives_considered"] = len(candidates)
+	result["alternatives_considered"] = len(rows)
 }

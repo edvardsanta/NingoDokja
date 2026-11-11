@@ -22,6 +22,10 @@ Describe socket differences neutrally without assuming a purchase or upgrade dir
 Write one sentence of at most 160 characters per explanation, focused on the decisive tradeoff.
 Optionally include "advantage" with a specific useful benefit in at most 60 characters, such as
 integrated graphics, when you can support it. Omit it otherwise.
+Include "market_role" for each candidate using one of direct_peer, variant, older_option,
+different_tier or unknown. Assess its generation and market tier relative to the requested
+product. Variants share the same main chip/model. An older higher-tier product is older_option,
+even when its estimated performance is higher. Choose unknown if this cannot be established.
 Do not return prices or a purchase decision.`
 
 func technicalIdentity(product map[string]any) map[string]any {
@@ -63,12 +67,13 @@ func (h *PriceDomainHandler) reviewAlternatives(ctx context.Context, result map[
 			"type": "array", "minItems": 1, "maxItems": len(pending),
 			"items": map[string]any{
 				"type": "object", "additionalProperties": false,
-				"required": []string{"product_key", "relationship", "explanation"},
+				"required": []string{"product_key", "relationship", "explanation", "market_role"},
 				"properties": map[string]any{
 					"product_key":  map[string]any{"type": "string"},
 					"relationship": map[string]any{"type": "string", "enum": []string{"comparable", "superior", "inferior", "unknown"}},
 					"explanation":  map[string]any{"type": "string", "minLength": 1, "maxLength": 400},
 					"advantage":    map[string]any{"type": "string", "maxLength": 60},
+					"market_role":  map[string]any{"type": "string", "enum": []string{"direct_peer", "variant", "older_option", "different_tier", "unknown"}},
 				},
 			},
 		}},
@@ -86,7 +91,7 @@ func (h *PriceDomainHandler) reviewAlternatives(ctx context.Context, result map[
 		for _, raw := range decoded.Assessments {
 			id, _ := raw["product_key"].(string)
 			review, valid := pricedomain.TechnicalReview(id, raw)
-			if !valid || pending[id] == nil || validated[id] != nil {
+			if !valid || review["market_role"] == nil || pending[id] == nil || validated[id] != nil {
 				return fmt.Errorf("invalid technical review candidate")
 			}
 			validated[id] = review

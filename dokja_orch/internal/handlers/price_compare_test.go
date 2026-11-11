@@ -171,6 +171,24 @@ func TestCompareNeverLooksUpForAGuestAndStandsWithoutAComment(t *testing.T) {
 	}
 }
 
+func TestGenericComparisonContinuesAfterSeveralVariantsAreCollected(t *testing.T) {
+	variants := []any{}
+	for i, price := range []string{"1900", "2000", "2100"} {
+		o := offerObservation(fmt.Sprintf("variant-%d", i), fmt.Sprintf("GPU-EXAMPLE-%d", i), "store-a", "pix", price)
+		o["title"] = fmt.Sprintf("GPU Example Challenger Variant %d", i)
+		o["category"] = "gpu"
+		variants = append(variants, o)
+	}
+	handler, _ := compareHandler(&compareResolver{lookup: variants}, nil)
+	got := runCompare(t, handler, true, map[string]any{"query": "GPU Example Challenger"})
+	if got["found"] != true || got["reference_selection"] == nil || got["decision"] == nil {
+		t.Fatalf("comparison still requires a manual variant: %v", got)
+	}
+	if got["product"].(map[string]any)["product"] != "variant-0" {
+		t.Fatalf("reference %v", got)
+	}
+}
+
 func TestCPUDiscoverySearchesTheCompetingManufacturer(t *testing.T) {
 	for _, test := range []struct {
 		title string
