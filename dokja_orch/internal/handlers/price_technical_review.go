@@ -16,8 +16,13 @@ Core counts and family tier names alone do not establish equivalent performance.
 actual models. State uncertainty or use unknown when you cannot identify a model confidently.
 These are qualitative estimates. Do not invent benchmark scores, percentages, measurements,
 prices or sources. Do not claim that you searched the web. For CPUs distinguish gaming and
-general productivity when they differ. Mention a motherboard change for different sockets.
-Keep each explanation under 400 characters. Do not return prices or a purchase decision.`
+general productivity when they differ. Compare each candidate against the requested product.
+The requested product is a comparison reference; the user's installed equipment is unknown.
+Describe socket differences neutrally without assuming a purchase or upgrade direction.
+Write one sentence of at most 160 characters per explanation, focused on the decisive tradeoff.
+Optionally include "advantage" with a specific useful benefit in at most 60 characters, such as
+integrated graphics, when you can support it. Omit it otherwise.
+Do not return prices or a purchase decision.`
 
 func technicalIdentity(product map[string]any) map[string]any {
 	return map[string]any{
@@ -63,6 +68,7 @@ func (h *PriceDomainHandler) reviewAlternatives(ctx context.Context, result map[
 					"product_key":  map[string]any{"type": "string"},
 					"relationship": map[string]any{"type": "string", "enum": []string{"comparable", "superior", "inferior", "unknown"}},
 					"explanation":  map[string]any{"type": "string", "minLength": 1, "maxLength": 400},
+					"advantage":    map[string]any{"type": "string", "maxLength": 60},
 				},
 			},
 		}},

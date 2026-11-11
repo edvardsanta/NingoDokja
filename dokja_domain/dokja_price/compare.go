@@ -14,6 +14,8 @@ const ActionCompareProduct = "compare-product"
 // maxCandidates bounds the products offered back when a comparison matches several.
 const maxCandidates = 5
 
+const maxAlternativePool = 12
+
 // Compare asks for one product: by its manufacturer's part number when known, else by words.
 type Compare struct {
 	PartNumber  string
@@ -209,11 +211,11 @@ func (d *Domain) alternatives(ctx context.Context, original Product, originalOff
 		}
 		return result[i].Offer.Assessment.Latest.Cents < result[j].Offer.Assessment.Latest.Cents
 	})
-	if len(result) > maxCandidates {
+	if len(result) > maxAlternativePool {
 		if CategoryProfileFor(original.Category).ID == "cpu" {
 			result = includeCompetingCPU(original, result)
 		}
-		result = result[:maxCandidates]
+		result = result[:maxAlternativePool]
 	}
 	return result
 }

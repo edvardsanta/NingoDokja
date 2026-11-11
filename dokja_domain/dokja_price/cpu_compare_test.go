@@ -42,9 +42,9 @@ func TestCPUComparisonUsesBenchmarkEvidenceAcrossPlatforms(t *testing.T) {
 
 func TestCPUComparisonKeepsCompetingBrandVisible(t *testing.T) {
 	repo := NewMemoryRepository()
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 15; i++ {
 		brand := "brand-a"
-		if i == 7 {
+		if i == 14 {
 			brand = "brand-b"
 		}
 		_, err := repo.Upsert(context.Background(), Observation{
@@ -58,10 +58,10 @@ func TestCPUComparisonKeepsCompetingBrandVisible(t *testing.T) {
 	}
 	domain := New(repo).WithClock(func() time.Time { return today })
 	result, err := domain.CompareProduct(context.Background(), Compare{Query: "CPU Example 0"})
-	if err != nil || len(result.Alternatives) != 5 {
+	if err != nil || len(result.Alternatives) != maxAlternativePool {
 		t.Fatalf("comparison %+v, error %v", result, err)
 	}
-	if last := result.Alternatives[4]; last.Product.Brand != "brand-b" || last.Classification != "same_category_candidate" {
+	if last := result.Alternatives[maxAlternativePool-1]; last.Product.Brand != "brand-b" || last.Classification != "same_category_candidate" {
 		t.Fatalf("missing competing candidate: %+v", result.Alternatives)
 	}
 }

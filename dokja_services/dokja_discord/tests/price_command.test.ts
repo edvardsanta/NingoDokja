@@ -226,8 +226,8 @@ test("a comparison renders current alternative candidates with cautious labels",
   }, "pt-BR") as { content: string };
   const card = embedsOf(reply)[0];
   const candidates = card.fields!.find((field) => field.name === "Alternativas")!.value;
-  assert.match(candidates, /SSD Example 2TB · R\$\s*159,90\n  tecnicamente equivalente · mais barato · dentro do orçamento/);
-  assert.match(candidates, /SSD Example 4TB · R\$\s*199,90\n  a avaliar/);
+  assert.match(candidates, /SSD Example 2TB · R\$\s*159,90\ntecnicamente equivalente/);
+  assert.match(candidates, /SSD Example 4TB · R\$\s*199,90\na avaliar/);
   assert.match(card.footer!, /equivalência técnica.*não foi confirmada/);
 });
 
@@ -297,9 +297,9 @@ test("a CPU comparison uses one compact card with the budget, linked models and 
   assert.match(card.description!, /Compre agora, mortal/);
   const candidates = card.fields!.find((field) => field.name === "Alternativas")!.value;
   assert.match(candidates, /\[Processador Other CPU 7\]\(https:\/\/other.example\/cpu\)/);
-  assert.match(candidates, /mesmos núcleos e threads · outro socket · dentro do orçamento/);
+  assert.match(candidates, /mesmos núcleos e threads · outro socket/);
   assert.match(card.footer!, /não garantem o mesmo desempenho/);
-  assert.match(card.footer!, /placa-mãe compatível/);
+  assert.doesNotMatch(card.footer!, /placa-mãe compatível/);
 });
 
 test("large comparisons keep full rows and links within Discord limits", () => {
@@ -330,6 +330,28 @@ test("a model review explains estimated equivalence alongside current prices", (
   const value = card.fields!.find((field) => field.name === "Alternativas")!.value;
   assert.match(value, /equivalência estimada pelo modelo/);
   assert.match(value, /Desempenho semelhante estimado em uso geral/);
+});
+
+test("shortlisted alternatives keep concise explanations and one section heading", () => {
+  const card = embedsOf(buildCompareReply({
+    ...compared,
+    product: { title: "Processador AMD Ryzen 7 9700X, 8 Cores, AM5" },
+    alternatives: ["performance", "economy", "different_brand"].map((role, i) => ({
+      product: String(i), title: "Processador AMD Ryzen 7 5700X 3.4GHz (4.6GHz Turbo), Box, 8 Cores, 16 Threads",
+      price_cents: 100000 + i, selection_reason: role, classification: "same_category_candidate",
+      url: "https://store.example/" + "a".repeat(180),
+      model_assessment: { relationship: "comparable", explanation: "Uma diferença relevante. Outra frase que pode ser removida." },
+    })),
+  }, "pt-BR"))[0];
+  assert.equal(card.title, "⚖️ AMD Ryzen 7 9700X");
+  const fields = card.fields!.filter((field) => field.name !== "Preços nas lojas");
+  assert.equal(fields.filter((field) => field.name === "Alternativas").length, 1);
+  const value = fields.map((field) => field.value).join("\n");
+  assert.match(value, /Para economizar/);
+  assert.match(value, /Outra marca/);
+  assert.doesNotMatch(value, /Outra frase|3.4GHz/);
+  assert.match(card.footer!, /Análise estimada/);
+  assert.doesNotMatch(card.footer!, /ainda não foi confirmada/);
 });
 
 test("a new watch the orchestrator already collected says so, with or without products", () => {
