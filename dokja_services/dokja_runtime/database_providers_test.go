@@ -83,3 +83,34 @@ func TestDisabledProvidersAreNotInspected(t *testing.T) {
 		t.Fatal(rows, calls)
 	}
 }
+
+func TestProviderPreferencesWrittenBeforeAProviderJoinedStillRead(t *testing.T) {
+	s := databaseFixture(t)
+	old := map[string]string{
+		"codex.enabled": "true", "codex.models": "",
+		"claude_code.enabled": "true", "claude_code.models": "haiku",
+		"ollama.enabled": "true", "ollama.models": "",
+	}
+	if _, err := s.DB.InitializeProviderConfiguration(old); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.ReadProviders()
+	if err != nil || len(p.Providers) != 4 {
+		t.Fatal(p, err)
+	}
+	var kimi, claude domain.ProviderRegistration
+	for _, row := range p.Providers {
+		if row.ID == "kimi" {
+			kimi = row
+		}
+		if row.ID == "claude_code" {
+			claude = row
+		}
+	}
+	if !kimi.Enabled || len(kimi.Models) != 0 || len(claude.Models) != 1 || claude.Models[0] != "haiku" {
+		t.Fatal(kimi, claude)
+	}
+	if _, err = s.WriteProvider(p.Revision, domain.ProviderRegistration{ID: "kimi", Enabled: true, Models: []string{"kimi-code/k3.1-pro"}}); err != nil {
+		t.Fatal("a write after the fill must land", err)
+	}
+}

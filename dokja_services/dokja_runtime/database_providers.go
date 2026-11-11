@@ -19,7 +19,37 @@ func (s *DatabaseSettings) providerSnapshot() (domain.ProviderPreferences, error
 			return domain.ProviderPreferences{}, fmt.Errorf("cannot initialize provider configuration")
 		}
 	}
+	if missing := missingProviderValues(c.Values); len(missing) > 0 {
+		// A row written before the registry gained a provider: the new keys take
+		// their defaults, persisted when possible, like NewSettings does for the
+		// operational catalog. A conflict only means another writer saved first;
+		// the merged view still decodes.
+		merged := make(map[string]string, len(c.Values)+len(missing))
+		for key, value := range c.Values {
+			merged[key] = value
+		}
+		for key, value := range missing {
+			merged[key] = value
+		}
+		revision := c.Revision
+		if updated, err := s.DB.UpdateProviderConfiguration(c.Revision, missing); err == nil {
+			merged, revision = updated.Values, updated.Revision
+		}
+		return domain.DecodeProviderPreferences(revision, merged)
+	}
 	return domain.DecodeProviderPreferences(c.Revision, c.Values)
+}
+
+// missingProviderValues returns the default entries a stored row lacks for the
+// current registry: registrations made before a provider joined the specs.
+func missingProviderValues(values map[string]string) map[string]string {
+	missing := map[string]string{}
+	for key, value := range domain.DefaultProviderValues() {
+		if _, ok := values[key]; !ok {
+			missing[key] = value
+		}
+	}
+	return missing
 }
 func (s *DatabaseSettings) ReadProviders() (domain.ProviderPreferences, error) {
 	s.mu.Lock()
