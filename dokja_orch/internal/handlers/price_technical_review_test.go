@@ -97,3 +97,30 @@ func TestCachedCompetitorsContainDiscoveryFacts(t *testing.T) {
 		}
 	}
 }
+
+func TestTechnicalReviewUsesEquipmentContextAndCollectedSourceExcerpts(t *testing.T) {
+	for _, tc := range []struct {
+		name, url, excerpt string
+		accepted           bool
+	}{
+		{"collected excerpt", "https://bench.example/review", "Measured under the supplied workload", true},
+		{"invented citation", "https://invented.example/review", "Measured under the supplied workload", false},
+		{"unread URL", "https://bench.example/review", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			model := &bindingCommenter{fakeCommenter: fakeCommenter{reply: `{"assessments":[{"product_key":"other","relationship":"comparable","market_role":"direct_peer","explanation":"Qualitative estimate for the supplied workload.","source_urls":["` + tc.url + `"]}]}`}}
+			handler, _ := compareHandler(nil, model)
+			candidate := map[string]any{"product": "other", "title": "GPU Example"}
+			result := map[string]any{"product": map[string]any{"product": "reference", "specifications": map[string]any{"technical_sources": []any{map[string]any{"title": "Example test lab", "url": "https://bench.example/review", "observed_at": "2026-11-11T10:00:00Z", "excerpt": tc.excerpt}}}}, "alternatives": []any{candidate}, "comparison_context": map[string]any{"intended_use": "1080p gaming", "current_equipment": "Example CPU / 500W"}}
+			handler.reviewAlternatives(t.Context(), result, time.Now().Add(time.Minute))
+			_, ok := candidate["model_assessment"]
+			if ok != tc.accepted {
+				t.Fatal(candidate)
+			}
+			facts := model.messages[0][1]["content"]
+			if !strings.Contains(facts, "1080p gaming") || !strings.Contains(facts, "Example CPU / 500W") {
+				t.Fatal(facts)
+			}
+		})
+	}
+}

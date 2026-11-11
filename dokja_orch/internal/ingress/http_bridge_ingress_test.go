@@ -249,3 +249,11 @@ func TestBridgeHandsAComparisonOnWithItsLinkUntouched(t *testing.T) {
 		t.Fatalf("comparison not handed back: %v", got)
 	}
 }
+
+func TestBridgePreservesOptionalComparisonContext(t *testing.T) {
+	budget := int64(200000)
+	_, payload := mapBridgeRequestToEvent(BridgeRequest{EventType: "price.compare", Payload: BridgePayload{Query: "GPU Example", BudgetCents: &budget, IntendedUse: " 1080p gaming ", CurrentEquipment: " Example CPU "}}, "")
+	if payload["intended_use"] != "1080p gaming" || payload["current_equipment"] != "Example CPU" || payload["budget_cents"] != budget {
+		t.Fatal(payload)
+	}
+}

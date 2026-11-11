@@ -916,7 +916,7 @@ alias in Inference providers to make it eligible. Luna, Haiku and smaller Qwen
 models are preferred within their registrations when available.
 
 The adapter shares the caller's deadline across provider attempts, applies a
-15-second per-attempt cap and falls back on transport errors, invalid JSON or
+15-second per-attempt cap for lightweight tasks (45 seconds for analysis) and falls back on transport errors, invalid JSON or
 contract rejection. Existing `DOKJA_PRICE_CLAUDE_MODEL`,
 `DOKJA_PRICE_CODEX_MODEL` and `DOKJA_PRICE_OLLAMA_MODEL` values are retained as
 compatibility model overrides. Rebuild and restart both the host Runtime
@@ -941,6 +941,15 @@ reason code. Skipped providers include `retry_after_ms` and the categorized caus
 Successful shared-client results and `TaskInferenceError` expose the same attempt metadata.
 These diagnostic records exclude prompts, generated answers and raw failure
 messages. Model registrations and main-chat configuration remain operator-owned.
+
+The desktop's System → Inference providers → Tasks and fallback panel shows
+current capacity, queued work, cooling providers and the last 100 safe attempts.
+It also configures ordered model priorities for `lightweight` and `analysis`.
+See [LLM task workbench](llm-task-workbench.md) for limits, cancellation,
+configuration persistence and price-evidence contracts. Rebuild the desktop,
+host Runtime controller and orchestrator together. The additive Discord options
+require refreshing command registration; no ports, environment variables,
+Compose services or volumes change.
 
 ### Scheduled delivery issues
 

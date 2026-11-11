@@ -529,7 +529,8 @@
         "Owner decisions: adopt the workspace for multi-faculty workflows, adopt the reading host, keep shadow prediction with a local agent CLI (Claude Code or Codex) before Ollama as direction, accept the latency budgets.",
         "2026-10-26: source diagnosis found ordinary reading remains read -> ingest -> classify; generic consolidation 09.3 is pending and cognitive inference remains experimental. Owner selected understanding/application across documents and confirmed Feeds as external Knowledge integration. The original evaluations remain historical, scoped evidence.",
         "2026-10-29: reviewed design-system-patterns and ui-ux-pro-max against current desktop CSS/components, the conversation archive plan, ADR 0011 and the Cindy source study. Targeted local UX matches cover visible focus, linked form errors and stable/efficient history lists. Added pending steps 09.6-09.9 and delegation evaluation 10.5; active 08.2, gate 08.3 and historical implementation evidence remain intact. Planning evidence only; no visual/runtime acceptance is claimed.",
-        "2026-10-29 owner correction: prioritize architectural findings from Cindy beyond UI. Reviewed conversation/send archive semantics, fresh per-invocation task/attempt IDs, inference ports and stream outcomes. Added pending 10.6 backend foundations; changed phase 10 to depend on cognitive evaluation 08, made 09.8 consume 10.6 and removed its prerequisite from 10.5. Final deployment 11 still waits for both adoption 09 and backend 10. Planning/source evidence only."
+        "2026-10-29 owner correction: prioritize architectural findings from Cindy beyond UI. Reviewed conversation/send archive semantics, fresh per-invocation task/attempt IDs, inference ports and stream outcomes. Added pending 10.6 backend foundations; changed phase 10 to depend on cognitive evaluation 08, made 09.8 consume 10.6 and removed its prerequisite from 10.5. Final deployment 11 still waits for both adoption 09 and backend 10. Planning/source evidence only.",
+        "The shared inference task adapter now has Runtime-owned concurrency and cancellation, metadata-only desktop diagnostics and independently revisioned lightweight/analysis priorities; price review receives workload/equipment context and collector-provided technical excerpts. This does not close the application behavior gate."
       ],
       "checks": [
         {
@@ -564,7 +565,8 @@
         "dokja_docs/model-assisted-cognition-follow-up.md",
         "dokja_docs/design-system-refactoring-review.md",
         "dokja_docs/session-task-architecture-review.md",
-        "dokja_docs/knowledge-comparison-results.md"
+        "dokja_docs/knowledge-comparison-results.md",
+        "dokja_docs/llm-task-workbench.md"
       ],
       "substeps": [
         {

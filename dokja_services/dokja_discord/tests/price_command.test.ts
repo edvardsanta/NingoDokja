@@ -255,15 +255,18 @@ test("compare_product sends the words and the link, and asks for something when 
   try {
     const replies: unknown[] = [];
     const run = (values: Record<string, string>) => createCompareCommand("http://orch", 1000, "pt-BR").handle({
-      userId: "u", channelId: "c", messageId: "m", getString: (name: string) => values[name] ?? "", getNumber: () => undefined,
+      userId: "u", channelId: "c", messageId: "m", getString: (name: string) => values[name] ?? "", getNumber: () => 2000,
       reply: async (message) => { replies.push(message); }, updateReply: async () => {}, showModal: async () => {},
     });
 
     await run({});
     assert.equal(replies[0], "Mande o nome, o código ou o link do produto.");
     assert.equal(sent.length, 0);
-    await run({ link: " https://store-z.example/produto/1/x " });
+    await run({ link: " https://store-z.example/produto/1/x ", intended_use:" 1080p gaming ",current_equipment:" Example CPU " });
     assert.equal(sent[0].event_type, "price.compare");
+    assert.equal(sent[0].payload.budget_cents,200000);
+    assert.equal(sent[0].payload.intended_use,"1080p gaming");
+    assert.equal(sent[0].payload.current_equipment,"Example CPU");
     assert.equal(sent[0].payload.link, "https://store-z.example/produto/1/x");
     assert.equal(embedsOf(replies[1])[0].title, "⚖️ SSD Example 240GB");
   } finally {
@@ -376,4 +379,10 @@ test("a new watch the orchestrator already collected says so, with or without pr
   assert.doesNotMatch(found.content, /pergunte de novo/);
   assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "added", collected: true } }, "en"),
     "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing.");
+});
+
+test("comparison cards show workload context and collected technical references",()=>{
+ const card=embedsOf(buildCompareReply({...compared,comparison_context:{intended_use:"1080p gaming",current_equipment:"Example CPU / 500W"},technical_sources:[{title:"Example test lab",url:"https://bench.example/review",workload:"1080p"}]},"pt-BR"))[0];
+ assert.match(card.description!,/1080p gaming/);assert.match(card.description!,/Example CPU/);
+ assert.match(card.fields!.find(f=>f.name==="Fontes técnicas coletadas")!.value,/https:\/\/bench.example\/review/);
 });

@@ -249,6 +249,14 @@ func cleanSpecifications(raw map[string]any) (map[string]any, error) {
 		if !regexp.MustCompile(`^[a-z0-9_]{1,40}$`).MatchString(key) {
 			return nil, fmt.Errorf("specification key must contain lowercase letters, digits and underscores")
 		}
+		if key == "technical_sources" {
+			sources, err := cleanTechnicalSources(value)
+			if err != nil {
+				return nil, err
+			}
+			clean[key] = sources
+			continue
+		}
 		switch typed := value.(type) {
 		case string:
 			if len(typed) > 80 {

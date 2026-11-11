@@ -23,6 +23,9 @@ export type BridgeRequest = {
     brand?: string;
     merchant?: string;
     link?: string;
+  budget_cents?: number;
+  intended_use?: string;
+  current_equipment?: string;
     userId: string;
     userName?: string;
     channelId: string;
@@ -223,6 +226,9 @@ export function buildBridgePayload(params: {
   brand?: string;
   merchant?: string;
   link?: string;
+  budget_cents?: number;
+  intended_use?: string;
+  current_equipment?: string;
   startSession?: boolean;
   userId: string;
   userName?: string;
@@ -250,6 +256,9 @@ export function buildBridgePayload(params: {
       brand: params.brand?.slice(0, 100),
       merchant: params.merchant?.slice(0, 80),
       link: params.link?.slice(0, 500),
+      budget_cents: params.budget_cents,
+      intended_use: params.intended_use?.slice(0,500),
+      current_equipment: params.current_equipment?.slice(0,500),
       userId: params.userId,
       userName: params.userName === undefined ? undefined : Array.from(params.userName).slice(0, 100).join(""),
       channelId: params.channelId,
