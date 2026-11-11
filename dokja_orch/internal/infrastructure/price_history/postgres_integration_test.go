@@ -165,6 +165,30 @@ func described(merchant, brand, address string) pricedomain.Observation {
 	return o
 }
 
+func TestUpsertUpdatesProductSpecifications(t *testing.T) {
+	ctx := context.Background()
+	store, err := Initialize(ctx, database(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write := observation(pricedomain.KindPix, pricedomain.Point{On: "2026-11-03", Cents: 47000})
+	if written, err := store.Upsert(ctx, write); err != nil || written != 1 {
+		t.Fatalf("initial upsert wrote %d points, error %v", written, err)
+	}
+
+	specifications := map[string]any{"interface": "sata", "capacity_gb": float64(1000)}
+	for _, input := range []map[string]any{specifications, nil} {
+		write.Specifications = input
+		if written, err := store.Upsert(ctx, write); err != nil || written != 0 {
+			t.Fatalf("upsert with specifications %v wrote %d points, error %v", input, written, err)
+		}
+		products, err := store.Products(ctx)
+		if err != nil || len(products) != 1 || !reflect.DeepEqual(products[0].Specifications, specifications) {
+			t.Fatalf("after upsert with specifications %v, products = %+v, error %v", input, products, err)
+		}
+	}
+}
+
 func TestAVersionOneNamespaceUpgradesAndKeepsItsPoints(t *testing.T) {
 	ctx := context.Background()
 	db := database(t)

@@ -189,11 +189,14 @@ ON CONFLICT (product_key) DO UPDATE SET
 	part_number = COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number),
 	specifications = CASE WHEN EXCLUDED.specifications <> '{}'::jsonb THEN EXCLUDED.specifications ELSE dokja_price.products.specifications END,
 	updated_at  = now()
-WHERE (dokja_price.products.title, dokja_price.products.category, dokja_price.products.brand, dokja_price.products.part_number)
+WHERE (dokja_price.products.title, dokja_price.products.category, dokja_price.products.brand, dokja_price.products.part_number,
+		dokja_price.products.specifications)
 	IS DISTINCT FROM (EXCLUDED.title,
 		COALESCE(NULLIF(EXCLUDED.category, ''), dokja_price.products.category),
 		COALESCE(NULLIF(EXCLUDED.brand, ''), dokja_price.products.brand),
-		COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number))`,
+		COALESCE(NULLIF(EXCLUDED.part_number, ''), dokja_price.products.part_number),
+		CASE WHEN EXCLUDED.specifications <> '{}'::jsonb THEN EXCLUDED.specifications ELSE dokja_price.products.specifications END)`,
+		observation.Product, observation.Title, observation.Category, observation.Brand, observation.PartNumber,
 		specificationsJSON(observation.Specifications)); err != nil {
 		return 0, safeError(ctx)
 	}
