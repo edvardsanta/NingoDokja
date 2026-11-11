@@ -18,10 +18,13 @@ func TestProviderInventoryCannotClaimSuccessfulInference(t *testing.T) {
 		{ID: "arbitrary", State: "reachable"},
 	})
 	v := d.Providers(context.Background())
-	if len(v.Providers) != 3 || v.Providers[0].State != "installed" || len(v.Providers[0].Models) != 0 || v.Providers[0].ModelDiscovery != "unsupported" {
+	if len(v.Providers) != 4 || v.Providers[0].State != "installed" || len(v.Providers[0].Models) != 0 || v.Providers[0].ModelDiscovery != "unsupported" {
 		t.Fatal(v)
 	}
-	if len(v.Providers[2].Models) != 2 || v.Providers[2].Models[0] != "bge-m3:latest" {
+	if v.Providers[2].ID != "kimi" || v.Providers[2].State != "unavailable" {
+		t.Fatal(v)
+	}
+	if len(v.Providers[3].Models) != 2 || v.Providers[3].Models[0] != "bge-m3:latest" {
 		t.Fatal(v)
 	}
 	for _, row := range v.Providers {
@@ -42,7 +45,7 @@ func TestMalformedModelsAndMissingInspectorRemainUnavailable(t *testing.T) {
 		}
 	}
 	d.WithProviders(providerFixture{{ID: "ollama", State: "reachable", Models: []string{"safe/model", "bad\nsecret"}}})
-	row := d.Providers(context.Background()).Providers[2]
+	row := d.Providers(context.Background()).Providers[3]
 	if row.State != "unavailable" || row.Reason != "invalid_response" || len(row.Models) != 0 {
 		t.Fatal(row)
 	}

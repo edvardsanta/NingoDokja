@@ -73,6 +73,14 @@ func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []do
 			args = append(args, "-c", "features."+feature+"=false")
 		}
 		args = append(args, "-c", `web_search="disabled"`, "-c", "features.skip_host_skill_discovery=true", "-c", "suppress_unstable_features_warning=true", "-o", filepath.Join(dir, "reply.txt"), "-")
+	case "kimi":
+		binary = "kimi"
+		// kimi takes the prompt as the -p value, not stdin, so one call is bounded
+		// by a single argv string's size; past it the invocation cannot run at all.
+		if len(prompt) > maxKimiPromptBytes {
+			return "", &domain.ChatProviderFailure{Code: domain.ChatCLIIncompatible}
+		}
+		args = []string{"-p", prompt, "--output-format", "stream-json", "-m", b.Model}
 	case "ollama":
 		binary = "docker"
 		run := []string{"exec", "-T", "dokja-ollama", "ollama", "run"}
@@ -145,9 +153,52 @@ func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []do
 			return "", fmt.Errorf("chat reply exceeds supported size")
 		}
 		return string(raw), nil
+	case "kimi":
+		return kimiReply(output)
 	default:
 		return string(output), nil
 	}
+}
+
+// maxKimiPromptBytes stays under one argv string's size limit: kimi reads the prompt
+// from the -p value, so a longer transcript cannot reach the CLI at all.
+const maxKimiPromptBytes = 100_000
+
+// kimiReply reads the stream-json transcript of one kimi -p call. Hook context may
+// appear as assistant lines before the model answers and carries no distinguishing
+// marker, so the reply is the last assistant line of the stream; tool attempts and
+// malformed events are refused, exactly like the codex trace gate.
+func kimiReply(output []byte) (string, error) {
+	reply := ""
+	for _, line := range bytes.Split(output, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var event struct {
+			Role      string `json:"role"`
+			Content   any    `json:"content"`
+			ToolCalls any    `json:"tool_calls"`
+		}
+		if json.Unmarshal(line, &event) != nil {
+			return "", fmt.Errorf("invalid chat provider event")
+		}
+		if event.Role != "assistant" {
+			continue
+		}
+		if event.ToolCalls != nil {
+			return "", fmt.Errorf("chat provider attempted a tool or unsupported event")
+		}
+		text, ok := event.Content.(string)
+		if !ok {
+			return "", fmt.Errorf("chat provider returned an unsupported event")
+		}
+		reply = text
+	}
+	if strings.TrimSpace(reply) == "" {
+		return "", fmt.Errorf("chat provider returned no reply")
+	}
+	return reply, nil
 }
 
 // validateChatEvents accepts inference messages only. Disabling tools at launch

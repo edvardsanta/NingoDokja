@@ -47,7 +47,7 @@ func TestChatBindingSurvivesReopenAndRejectsStaleWrites(t *testing.T) {
 	}
 }
 func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
-	for _, id := range []string{"codex", "claude_code", "ollama"} {
+	for _, id := range []string{"codex", "claude_code", "kimi", "ollama"} {
 		t.Run(id, func(t *testing.T) {
 			calls := 0
 			var isolated string
@@ -91,13 +91,21 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 					}
 					return []byte(`{"result":"answer"}`), nil
 				}
+				if id == "kimi" {
+					if !strings.Contains(command, "--output-format stream-json") || !strings.Contains(command, "-p ") {
+						t.Fatal("stream-json one-shot launch missing")
+					}
+					return []byte("{\"role\":\"meta\",\"type\":\"system.version\"}\n" +
+						"{\"role\":\"assistant\",\"content\":\"hook context before the answer\"}\n" +
+						"{\"role\":\"assistant\",\"content\":\"answer\"}\n"), nil
+				}
 				return []byte("answer"), nil
 			}}
 			reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: id, Model: "fixture/model"}, []domain.ChatMessage{
 				{Role: "system", Content: "context"}, {Role: "user", Content: "question"},
 				{Role: "assistant", Content: "A billboard on the avenue."}, {Role: "user", Content: "followup"},
 			})
-			if err != nil || reply != "answer" || calls != map[string]int{"codex": 1, "claude_code": 1, "ollama": 2}[id] {
+			if err != nil || reply != "answer" || calls != map[string]int{"codex": 1, "claude_code": 1, "kimi": 1, "ollama": 2}[id] {
 				t.Fatal(reply, err, calls)
 			}
 			if _, err := os.Stat(isolated); !os.IsNotExist(err) {
@@ -141,6 +149,33 @@ func TestChatAdaptersRejectCodexToolEventsEvenWithReplyFile(t *testing.T) {
 	}}
 	if reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "codex", Model: "fixture"}, nil); err == nil || reply != "" {
 		t.Fatal("accepted tool output", reply, err)
+	}
+}
+
+func TestKimiReplyKeepsTheLastAssistantLineAndRefusesTools(t *testing.T) {
+	stream := func(lines ...string) []byte { return []byte(strings.Join(lines, "\n") + "\n") }
+	a := ChatAdapters{Run: func(context.Context, string, []string, string, string) ([]byte, error) {
+		return stream(
+			`{"role":"meta","type":"system.version","version":"2.5.3"}`,
+			`{"role":"assistant","content":"hook context"}`,
+			`{"role":"assistant","content":"part one "}`,
+			`{"role":"assistant","content":"part two"}`,
+			`{"role":"meta","type":"session.resume_hint"}`,
+		), nil
+	}}
+	if reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "kimi", Model: "fixture"}, nil); err != nil || reply != "part two" {
+		t.Fatal("the last assistant line must win over hook context", reply, err)
+	}
+	for name, output := range map[string][]byte{
+		"tool call": stream(`{"role":"assistant","content":"","tool_calls":[{"name":"Bash"}]}`),
+		"bad event": stream(`{"role":"assistant","content":{"kind":"text"}}`),
+		"garbage":   []byte("not json\n"),
+		"no answer": stream(`{"role":"meta","type":"system.version"}`),
+	} {
+		a := ChatAdapters{Run: func(context.Context, string, []string, string, string) ([]byte, error) { return output, nil }}
+		if reply, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "kimi", Model: "fixture"}, nil); err == nil || reply != "" {
+			t.Fatalf("%s accepted: %q %v", name, reply, err)
+		}
 	}
 }
 func TestChatAdaptersRejectLateReplies(t *testing.T) {

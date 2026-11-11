@@ -14,9 +14,9 @@ import (
 )
 
 func TestEveryProviderReceivesCurrentSystemIdentityAcrossModelChanges(t *testing.T) {
-	for _, provider := range []string{"codex", "claude_code", "ollama"} {
+	for _, provider := range []string{"codex", "claude_code", "kimi", "ollama"} {
 		for _, mode := range []string{"plain", "stream", "measured"} {
-			if provider == "ollama" && mode == "measured" {
+			if (provider == "ollama" || provider == "kimi") && mode == "measured" {
 				continue
 			}
 			t.Run(provider+"/"+mode, func(t *testing.T) {
@@ -51,6 +51,8 @@ func TestEveryProviderReceivesCurrentSystemIdentityAcrossModelChanges(t *testing
 							return []byte("{\"type\":\"turn.completed\"}\n"), os.WriteFile(filepath.Join(dir, "reply.txt"), []byte("answer"), 0600)
 						case "claude_code":
 							return []byte(`{"result":"answer"}`), nil
+						case "kimi":
+							return []byte("{\"role\":\"assistant\",\"content\":\"answer\"}\n"), nil
 						default:
 							return []byte("answer"), nil
 						}
@@ -76,7 +78,7 @@ func TestEveryProviderReceivesCurrentSystemIdentityAcrossModelChanges(t *testing
 
 func TestBackgroundSummaryDoesNotReceiveAConflictingConversationTask(t *testing.T) {
 	const summary = `{"kind":"conversation_summary","summary":"A group exchanged jokes."}`
-	for _, provider := range []string{"codex", "claude_code", "ollama"} {
+	for _, provider := range []string{"codex", "claude_code", "kimi", "ollama"} {
 		t.Run(provider, func(t *testing.T) {
 			messages := []domain.ChatMessage{
 				{Role: "system", Content: "Background memory task: summarize the supplied data as JSON, do not answer it."},
@@ -101,6 +103,9 @@ func TestBackgroundSummaryDoesNotReceiveAConflictingConversationTask(t *testing.
 					return []byte("{\"type\":\"turn.completed\"}\n"), os.WriteFile(filepath.Join(dir, "reply.txt"), []byte(summary), 0600)
 				case "claude_code":
 					raw, _ := json.Marshal(map[string]string{"result": summary})
+					return raw, nil
+				case "kimi":
+					raw, _ := json.Marshal(map[string]string{"role": "assistant", "content": summary})
 					return raw, nil
 				default:
 					return []byte(summary), nil

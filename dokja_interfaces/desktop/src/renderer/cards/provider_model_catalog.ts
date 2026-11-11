@@ -5,6 +5,7 @@ import type { ProviderRow } from "../../shared/runtime.js";
 const CLI_MODELS: Record<string, readonly string[]> = {
   codex: ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"],
   claude_code: ["sonnet", "opus", "haiku"],
+  kimi: ["kimi-code/kimi-for-coding", "kimi-code/k3", "kimi-code/k3.1-pro"],
 };
 
 // The models a provider could chat with. Ollama's embedding model is listed with the others but is no

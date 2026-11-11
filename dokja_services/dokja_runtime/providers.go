@@ -22,7 +22,7 @@ func (p ProviderDiscovery) Inspect(ctx context.Context, enabled map[string]bool)
 		lookup = exec.LookPath
 	}
 	rows := []domain.ProviderObservation{}
-	for _, entry := range []struct{ id, binary string }{{"codex", "codex"}, {"claude_code", "claude"}} {
+	for _, entry := range []struct{ id, binary string }{{"codex", "codex"}, {"claude_code", "claude"}, {"kimi", "kimi"}} {
 		if !enabled[entry.id] {
 			continue
 		}

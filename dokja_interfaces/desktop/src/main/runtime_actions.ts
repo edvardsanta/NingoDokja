@@ -51,7 +51,7 @@ export function runtimeSettings(body:Record<string,unknown>):RuntimeSettings {
  return {settings,webhookChannels:strings(body.webhook_channels,64,20).filter(id=>/^[0-9]+$/.test(id)),busy:body.busy,error:text(body.error).slice(0,400)};
 }
 
-const PROVIDER_IDS = ["codex", "claude_code", "ollama"];
+const PROVIDER_IDS = ["codex", "claude_code", "kimi", "ollama"];
 const DECLARED_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 function declaredModels(raw: unknown): string[] | undefined {
  if (!Array.isArray(raw) || raw.length > 16) return undefined;
@@ -75,7 +75,7 @@ export function runtimeProviders(body: Record<string, unknown>): import("../shar
  if (!Array.isArray(body.providers)) throw new Error("invalid provider inventory");
  const revision = body.configuration_revision ?? 0;
  if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) throw new Error("invalid provider configuration revision");
- const names: Record<string, string> = { codex: "Codex", claude_code: "Claude Code", ollama: "Ollama" };
+ const names: Record<string, string> = { codex: "Codex", claude_code: "Claude Code", kimi: "Kimi", ollama: "Ollama" };
  const seen = new Set<string>();
  const providers: import("../shared/runtime.js").ProviderRow[] = [];
  for (const raw of body.providers.slice(0, 3)) {

@@ -12,7 +12,7 @@ const MaxProviderModels = 16
 const MaxProviderRevision uint64 = 9007199254740991
 
 var ErrProviderConflict = errors.New("provider configuration changed; reload before saving")
-var providerSpecs = []struct{ id, name string }{{"codex", "Codex"}, {"claude_code", "Claude Code"}, {"ollama", "Ollama"}}
+var providerSpecs = []struct{ id, name string }{{"codex", "Codex"}, {"claude_code", "Claude Code"}, {"kimi", "Kimi"}, {"ollama", "Ollama"}}
 
 // Registrations declare operator intent. They establish neither model
 // availability nor successful inference nor a capability binding.
