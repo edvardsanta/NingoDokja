@@ -64,6 +64,10 @@ const messages: Record<string, Catalog> = {
     alternative_technically_comparable: "tecnicamente equivalente",
     alternative_same_category_candidate: "a avaliar",
     alternative_similar_cpu_specs: "mesmos núcleos e threads",
+    model_comparable: "equivalência estimada pelo modelo",
+    model_superior: "superioridade estimada pelo modelo",
+    model_inferior: "desempenho inferior estimado pelo modelo",
+    model_unknown: "análise técnica inconclusiva",
     alternative_reason_different_cpu_socket: "outro socket",
     alternative_reason_shared_cpu_benchmark: "benchmark comparável",
     alternative_reason_lower_cpu_benchmark: "desempenho inferior no benchmark",
@@ -123,6 +127,10 @@ const messages: Record<string, Catalog> = {
     alternative_technically_comparable: "technically comparable",
     alternative_same_category_candidate: "unconfirmed",
     alternative_similar_cpu_specs: "matching cores and threads",
+    model_comparable: "model-estimated equivalence",
+    model_superior: "model-estimated superiority",
+    model_inferior: "model-estimated lower performance",
+    model_unknown: "inconclusive technical analysis",
     alternative_reason_different_cpu_socket: "different socket",
     alternative_reason_shared_cpu_benchmark: "comparable benchmark",
     alternative_reason_lower_cpu_benchmark: "lower benchmark performance",
@@ -368,7 +376,10 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 5) : [];
   const alternativeLines = alternatives.map((alternative) => {
     const classificationKey = `alternative_${String(alternative.classification ?? "")}`;
+    const review = alternative.model_assessment as { relationship?: string; explanation?: string } | undefined;
+    const modelKey = `model_${String(review?.relationship ?? "")}`;
     const classification = text(words, classificationKey in words ? classificationKey : "alternative_same_category_candidate");
+    const modelNote = review && modelKey in words ? text(words, modelKey) : "";
     // price facts are reasons beside the technical classification
     const reasons = (Array.isArray(alternative.reason_codes) ? alternative.reason_codes : [])
       .map((code) => `alternative_reason_${String(code)}`)
@@ -379,7 +390,8 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     const address = safeUrl(alternative.url);
     const page = address.length <= 300 ? address : "";
     const name = page ? `[${title}](${page})` : title;
-    return `• ${name}${price}\n  ${[classification, ...reasons].join(" · ")}`;
+    const explanation = typeof review?.explanation === "string" ? review.explanation.slice(0, 400) : "";
+    return [`• ${name}${price}\n  ${[modelNote || classification, ...reasons].join(" · ")}`, explanation].filter(Boolean).join("\n");
   });
   const fields: NonNullable<DiscordEmbedSpec["fields"]> = [];
   if (offers.length > 0) {

@@ -316,6 +316,22 @@ test("large comparisons keep full rows and links within Discord limits", () => {
   assert.ok(length < 6000, String(length));
 });
 
+test("a model review explains estimated equivalence alongside current prices", () => {
+  const card = embedsOf(buildCompareReply({
+    ...compared,
+    alternatives: [{
+      product: "other", title: "CPU Other", classification: "same_category_candidate",
+      price_cents: 150000, model_assessment: {
+        relationship: "comparable", estimated: true,
+        explanation: "Desempenho semelhante estimado em uso geral.",
+      },
+    }],
+  }, "pt-BR"))[0];
+  const value = card.fields!.find((field) => field.name === "Alternativas")!.value;
+  assert.match(value, /equivalência estimada pelo modelo/);
+  assert.match(value, /Desempenho semelhante estimado em uso geral/);
+});
+
 test("a new watch the orchestrator already collected says so, with or without products", () => {
   const product = { product: "hd-example-2tb", title: "HD Example 2TB", sources: [] };
   const found = buildPriceReply({ products: [product], matched: 1, watch: { category: "hd", brand: "", status: "added", collected: true } }, "pt-BR") as { content: string };

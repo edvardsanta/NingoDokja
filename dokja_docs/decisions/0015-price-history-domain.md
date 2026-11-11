@@ -306,6 +306,28 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
   rows were omitted to stay within Discord limits. Portuguese and English use
   the same layout.
 
+## Cached model technical reviews
+
+The configured lightweight bindings (Haiku, Luna and a small Qwen) handle search
+planning, qualitative technical assessment and the final comment, with provider
+fallback and response validation. Each provider attempt has a 15-second limit.
+Technical assessment reserves at least 20 seconds for the final comment.
+
+The model may use its product knowledge to estimate cross-manufacturer
+equivalence and explain workload and platform tradeoffs. The domain validates
+candidate identities and review codes. Responses expose this as a separate
+`model_assessment` with `estimated: true`; collected specifications and
+benchmark classifications retain their evidence. Model reviews add no prices,
+benchmark numbers or purchase decisions.
+
+Reviews reuse the existing SQLite `product_equivalences` table, with a separate
+key per original/candidate identity and specification pair, review policy
+version and UTC calendar month. Prices, merchants and budgets are excluded
+from this key. Reopening the database or changing prices reuses the review.
+Changing product specifications, policy version or month causes a fresh review.
+An unavailable cache leaves the comparison usable. Price-dependent comments
+are generated from current offers.
+
 ## Pending work (stacked follow-ups)
 
 
