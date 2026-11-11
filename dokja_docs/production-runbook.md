@@ -923,6 +923,25 @@ compatibility model overrides. Rebuild and restart both the host Runtime
 controller and orchestrator after upgrading. A desktop that bundles the controller
 needs a rebuild too.
 
+Music remarks, questionnaire answer batches and questionnaire comments use the
+shared lightweight task adapter. Execution uses private
+`POST /chat/tasks/lightweight`; rebuild both the controller and orchestrator when
+upgrading this transport.
+
+Two consecutive observed authentication, allowance, availability, model-access
+or CLI-compatibility failures pause a task provider for one minute. Other task
+providers remain eligible. After the pause, one request probes recovery, and a
+successful response clears the failure count. Caller cancellation and output
+contract rejection do not count toward the pause. This state is held in the
+Runtime process and resets when it restarts.
+
+Inspect orchestrator logs for `LLM task attempt` JSON records. They contain a
+task id, profile, provider, model, start time, elapsed milliseconds, outcome and
+reason code. Skipped providers include `retry_after_ms` and the categorized cause.
+Successful shared-client results and `TaskInferenceError` expose the same attempt metadata.
+These diagnostic records exclude prompts, generated answers and raw failure
+messages. Model registrations and main-chat configuration remain operator-owned.
+
 ### Scheduled delivery issues
 
 Check:

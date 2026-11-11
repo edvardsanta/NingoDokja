@@ -362,6 +362,15 @@ Discord keeps concise explanations, short model names and one alternatives
 heading. The final comment discusses the reference and eligible alternatives
 without assuming which equipment the user owns.
 
+## Alternatives when technical review is unavailable
+
+Discovery reserves time for both technical review and the final comment.
+If no review establishes a candidate as a direct peer, the main list requires
+collected technical evidence or an identifiable variant of the requested GPU
+model. A shared broad category and a lower price are insufficient. Model suffixes
+remain distinct when identifying variants. These checks run before assigning an
+economy label. The Discord variant label uses its Portuguese and English catalogs.
+
 ## Matching requested model identities
 
 Comparison queries match numeric model identifiers against the listing title
