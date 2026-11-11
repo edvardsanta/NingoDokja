@@ -176,7 +176,9 @@ func (d *Domain) alternatives(ctx context.Context, original Product, originalOff
 		profile := CategoryProfileFor(original.Category)
 		shared, better, compatible := comparableScore(profile, original, product)
 		confidence := CandidateConfidence(product)
-		if !profile.Generic && compatible && shared > 0 {
+		if profile.ID == "cpu" {
+			classification, confidence, reasons = compareCPUs(original, product, reasons)
+		} else if !profile.Generic && compatible && shared > 0 {
 			confidence = "medium"
 			if shared >= 2 && better == shared {
 				classification = "technically_superior"
@@ -208,6 +210,9 @@ func (d *Domain) alternatives(ctx context.Context, original Product, originalOff
 		return result[i].Offer.Assessment.Latest.Cents < result[j].Offer.Assessment.Latest.Cents
 	})
 	if len(result) > maxCandidates {
+		if CategoryProfileFor(original.Category).ID == "cpu" {
+			result = includeCompetingCPU(original, result)
+		}
 		result = result[:maxCandidates]
 	}
 	return result
@@ -220,8 +225,10 @@ func technicalRank(classification string) int {
 		return 0
 	case "technically_comparable":
 		return 1
-	default:
+	case "similar_cpu_specs":
 		return 2
+	default:
+		return 3
 	}
 }
 

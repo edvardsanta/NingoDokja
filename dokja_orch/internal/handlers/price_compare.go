@@ -34,7 +34,7 @@ const (
 	compareCommentFloor = 20 * time.Second
 	// maxCompareComment bounds Ningo's comment.
 	maxCompareComment     = 600
-	competitorPlanVersion = "1"
+	competitorPlanVersion = "2"
 )
 
 // priceCommenter writes Ningo's few lines about a comparison. It is the chat provider; nil
@@ -124,7 +124,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 			}
 		}
 	}
-	if found, _ := result["found"].(bool); found && h.feeds != nil && h.commenter != nil {
+	if found, _ := result["found"].(bool); found && h.feeds != nil {
 		if discovered := h.discoverCompetitors(ctx, result, deadline); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
@@ -146,6 +146,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		}
 	}
 	if found, _ := result["found"].(bool); found && h.commenter != nil {
+		h.reviewAlternatives(ctx, result, deadline)
 		if comment := h.comment(ctx, result, deadline); comment != "" {
 			result["comment"] = comment
 		}
@@ -211,10 +212,22 @@ func (h *PriceDomainHandler) compareBudget() time.Duration {
 // discoverCompetitors looks the planned competitor queries up while there is still time for one
 // more lookup and Ningo's comment; the queries left over are logged, not run.
 func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map[string]any, deadline time.Time) bool {
+	if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
+		return false
+	}
 	product, _ := result["product"].(map[string]any)
 	title, _ := product["title"].(string)
 	category, _ := product["category"].(string)
-	queries := h.competitorQueries(ctx, product, result["profile"])
+	queries := competingCPUQueries(product)
+	if h.commenter != nil {
+		planCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		planned := h.competitorQueries(planCtx, product, result["profile"])
+		cancel()
+		queries = append(queries, planned...)
+	}
+	if len(queries) > maxCompetitorQueries {
+		queries = queries[:maxCompetitorQueries]
+	}
 	changed := false
 	for index, query := range queries {
 		if time.Until(deadline) < compareStepTimeout+compareCommentFloor {
@@ -246,6 +259,35 @@ func (h *PriceDomainHandler) discoverCompetitors(ctx context.Context, result map
 		}
 	}
 	return changed
+}
+
+// These are discovery hints. Only collected specifications can establish a technical match.
+func competingCPUQueries(product map[string]any) []string {
+	title, _ := product["title"].(string)
+	category, _ := product["category"].(string)
+	if categoryForProduct(category, title) != "cpu" {
+		return nil
+	}
+	brand, _ := product["brand"].(string)
+	switch pricedomain.CPUBrand(brand, title) {
+	case "amd":
+		for _, tier := range []string{"3", "5", "7", "9"} {
+			if strings.Contains(strings.ToLower(title), "ryzen "+tier+" ") {
+				return []string{"processador intel core i" + tier, "processador intel core ultra " + tier}
+			}
+		}
+		return []string{"processador intel core"}
+	case "intel":
+		for _, tier := range []string{"3", "5", "7", "9"} {
+			name := strings.ToLower(title)
+			if strings.Contains(name, "core i"+tier) || strings.Contains(name, "core ultra "+tier+" ") {
+				return []string{"processador amd ryzen " + tier}
+			}
+		}
+		return []string{"processador amd ryzen"}
+	default:
+		return nil
+	}
 }
 
 func (h *PriceDomainHandler) competitorQueries(ctx context.Context, product map[string]any, profile any) []string {
@@ -366,6 +408,17 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 		}
 		return queries, err
 	}
+	var queries []string
+	_, err := h.generatePriceTask(ctx, competitorPlanSchema(), messages, func(reply map[string]any) error {
+		var err error
+		queries, err = decode("price-task", reply)
+		return err
+	})
+	return queries, err
+}
+
+// generatePriceTask shares the lightweight bindings and validates each fallback response.
+func (h *PriceDomainHandler) generatePriceTask(ctx context.Context, schema map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
 	if bindingCommenter, ok := h.commenter.(priceProviderBindingCommenter); ok {
 		providers := []struct{ provider, model string }{
 			{"claude_code", envOrDefault("DOKJA_PRICE_CLAUDE_MODEL", "haiku")},
@@ -374,15 +427,18 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 		}
 		var lastErr error
 		for _, binding := range providers {
-			reply, err := bindingCommenter.GenerateJSONWithBinding(ctx, binding.provider, binding.model, competitorPlanSchema(), messages)
+			attempt, cancel := context.WithTimeout(ctx, 15*time.Second)
+			reply, err := bindingCommenter.GenerateJSONWithBinding(attempt, binding.provider, binding.model, schema, messages)
+			cancel()
 			if err == nil {
-				queries, invalid := decode(binding.provider, reply)
+				invalid := accept(reply)
 				if invalid == nil {
-					return queries, nil
+					return reply, nil
 				}
 				err = invalid
 			}
 			lastErr = err
+			logger.Info(fmt.Sprintf("price task provider unavailable provider=%s model=%s: %v", binding.provider, binding.model, err))
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
@@ -393,7 +449,7 @@ func (h *PriceDomainHandler) generateCompetitorPlan(ctx context.Context, message
 	if err != nil {
 		return nil, err
 	}
-	return decode("chat", reply)
+	return reply, accept(reply)
 }
 
 func envOrDefault(name, fallback string) string {
@@ -531,6 +587,13 @@ In Brazilian Portuguese and in your own voice, write at most three short sentenc
 moment to buy, and where. Use only these facts. Never write a price or number that is not in them,
 and do not list every store: the person sees the table. If the decision says over_budget or
 seek_alternative, do not say "buy now"; explain that the current offer does not fit the budget.
+Discuss one or two useful alternatives from FACTS when present. Use their short model names.
+Respect their classification and reason codes: similar_cpu_specs only confirms matching core
+and thread counts, not equal performance. A different_cpu_socket needs a compatible motherboard.
+The model_assessment is a qualitative model estimate with its own explanation. You may explain
+its proposed equivalence and tradeoffs, identifying it as an estimate. Collected benchmark
+evidence is separate. Mention cheaper options and
+whether they fit the stated budget. Do not repeat the store list or the full listing titles.
 If the facts do not support a recommendation, say so plainly.`
 
 const competitorDiscoveryInstructions = `You are a product discovery planner. Return only valid JSON in this exact shape:
@@ -542,6 +605,7 @@ present in FACTS, such as capacity, interface, socket, cores, threads, screen si
 Do not use manufacturer names, brands, logos, model names, part numbers, invented benchmarks or
 unsupported specifications. Do not repeat the original product query. The queries are search hints,
 not evidence of equivalence; the stores and the deterministic comparison engine provide the evidence.
+Include a platform-neutral query without socket constraints so other manufacturers can be found.
 If the facts are insufficient for a functional query, return {"queries":[]}.`
 
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
@@ -550,6 +614,7 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any,
 	facts, err := json.Marshal(map[string]any{
 		"product": result["product"], "offers": result["offers"], "decision": result["decision"],
 		"prior_decisions": result["prior_decisions"],
+		"alternatives":    result["alternatives"],
 	})
 	if err != nil {
 		return ""
@@ -561,10 +626,35 @@ func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any,
 	}
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
-	reply, err := h.commenter.GenerateMessages(ctx, []map[string]string{
+	messages := []map[string]string{
 		{"role": "system", "content": chatPersona + "\n\n" + compareInstructions},
 		{"role": "user", "content": "<<FACTS>>\n" + string(facts) + "\n<<END FACTS>>"},
-	})
+	}
+	var reply map[string]any
+	if _, bound := h.commenter.(priceProviderBindingCommenter); bound {
+		messages[0]["content"] += "\nReturn JSON {\"comment\":\"your short comment\"}."
+		schema := map[string]any{
+			"type": "object", "additionalProperties": false, "required": []string{"comment"},
+			"properties": map[string]any{"comment": map[string]any{"type": "string", "minLength": 1, "maxLength": maxCompareComment}},
+		}
+		var comment string
+		reply, err = h.generatePriceTask(ctx, schema, messages, func(response map[string]any) error {
+			raw, _ := response["reply"].(string)
+			var decoded struct {
+				Comment string `json:"comment"`
+			}
+			if err := json.Unmarshal([]byte(raw), &decoded); err != nil || strings.TrimSpace(decoded.Comment) == "" {
+				return fmt.Errorf("invalid price comment")
+			}
+			comment = decoded.Comment
+			return nil
+		})
+		if err == nil {
+			reply["reply"] = comment
+		}
+	} else {
+		reply, err = h.commenter.GenerateMessages(ctx, messages)
+	}
 	if err != nil {
 		logger.Info(fmt.Sprintf("price compare comment unavailable: %v", err))
 		return ""

@@ -42,21 +42,35 @@ const messages: Record<string, Catalog> = {
     watch_collected: "👁️ Passei a vigiar **{search}** e já busquei agora.",
     watch_collected_none: "👁️ Passei a vigiar **{search}** e já busquei agora, mas as lojas que consigo ler não trouxeram nada.",
     watch_full: "A lista de buscas vigiadas está cheia; remova uma para vigiar **{search}**.",
-    compare_header: "⚖️ Comparação de **{title}**",
+    compare_header: "⚖️ {title}",
+    compare_offers: "Preços nas lojas",
+    compare_budget: "Orçamento de {price}",
+    compare_unconfirmed: "A equivalência técnica destes candidatos ainda não foi confirmada.",
+    compare_specs_note: "Núcleos e threads iguais não garantem o mesmo desempenho.",
+    compare_platform_note: "Socket diferente exige placa-mãe compatível.",
+    compare_more_rows: "…e mais {count} oferta(s).",
     compare_part: "Código {part}",
     compare_candidates: "Achei mais de um produto. Mande o código ou o link de um deles:",
     compare_unknown: "Ainda não acompanho esse produto.",
     compare_not_found: "Procurei e não achei esse produto nas lojas que consigo ler.",
     compare_unreadable: "Não consigo ler a página da {store}; comparei o mesmo produto nas outras lojas.",
     compare_over_budget: "A oferta encontrada ultrapassa o orçamento informado; procurei uma alternativa, mas esta comparação não encontrou uma opção compatível.",
-    compare_alternatives: "Candidatos encontrados com os dados atuais:",
+    compare_alternatives: "Alternativas",
     compare_over_budget_alternatives: "A oferta encontrada ultrapassa o orçamento informado; veja os candidatos abaixo.",
     compare_buy: "🛒 Melhor compra agora: **{store}** por {price}.",
     compare_buy_low: "🛒 Mais barato agora: **{store}** por {price}, mas o histórico ainda é curto para dizer se é promoção.",
     compare_no_price: "Ainda não há um preço atual para recomendar.",
     alternative_technically_superior: "tecnicamente superior",
     alternative_technically_comparable: "tecnicamente equivalente",
-    alternative_same_category_candidate: "mesma categoria; equivalência técnica não confirmada",
+    alternative_same_category_candidate: "a avaliar",
+    alternative_similar_cpu_specs: "mesmos núcleos e threads",
+    model_comparable: "equivalência estimada pelo modelo",
+    model_superior: "superioridade estimada pelo modelo",
+    model_inferior: "desempenho inferior estimado pelo modelo",
+    model_unknown: "análise técnica inconclusiva",
+    alternative_reason_different_cpu_socket: "outro socket",
+    alternative_reason_shared_cpu_benchmark: "benchmark comparável",
+    alternative_reason_lower_cpu_benchmark: "desempenho inferior no benchmark",
     alternative_reason_lower_current_price: "mais barato",
     alternative_reason_within_budget: "dentro do orçamento",
     compare_bad_link: "Não reconheço a loja desse link.",
@@ -91,21 +105,35 @@ const messages: Record<string, Catalog> = {
     watch_collected: "👁️ Now watching **{search}**, and I searched just now.",
     watch_collected_none: "👁️ Now watching **{search}**. I searched just now, but the stores I can read brought nothing.",
     watch_full: "The watched searches are full; remove one to watch **{search}**.",
-    compare_header: "⚖️ Comparing **{title}**",
+    compare_header: "⚖️ {title}",
+    compare_offers: "Store prices",
+    compare_budget: "Budget {price}",
+    compare_unconfirmed: "Technical equivalence of these candidates is still unconfirmed.",
+    compare_specs_note: "Matching core and thread counts do not guarantee equal performance.",
+    compare_platform_note: "A different socket requires a compatible motherboard.",
+    compare_more_rows: "…and {count} more offer(s).",
     compare_part: "Part {part}",
     compare_candidates: "More than one product matches. Send the part number or link of one:",
     compare_unknown: "I do not follow that product yet.",
     compare_not_found: "I looked and did not find that product at the stores I can read.",
     compare_unreadable: "I cannot read {store}'s page; I compared the same product at the other stores.",
     compare_over_budget: "The offer found exceeds the stated budget; an alternative is needed, but this comparison found no compatible option.",
-    compare_alternatives: "Candidates found with the current data:",
+    compare_alternatives: "Alternatives",
     compare_over_budget_alternatives: "The offer found exceeds the stated budget; see the candidates below.",
     compare_buy: "🛒 Best buy now: **{store}** at {price}.",
     compare_buy_low: "🛒 Cheapest now: **{store}** at {price}, but the history is still too short to call it a deal.",
     compare_no_price: "There is no current price to recommend yet.",
     alternative_technically_superior: "technically superior",
     alternative_technically_comparable: "technically comparable",
-    alternative_same_category_candidate: "same category; technical equivalence unconfirmed",
+    alternative_same_category_candidate: "unconfirmed",
+    alternative_similar_cpu_specs: "matching cores and threads",
+    model_comparable: "model-estimated equivalence",
+    model_superior: "model-estimated superiority",
+    model_inferior: "model-estimated lower performance",
+    model_unknown: "inconclusive technical analysis",
+    alternative_reason_different_cpu_socket: "different socket",
+    alternative_reason_shared_cpu_benchmark: "comparable benchmark",
+    alternative_reason_lower_cpu_benchmark: "lower benchmark performance",
     alternative_reason_lower_current_price: "lower price",
     alternative_reason_within_budget: "within budget",
     compare_bad_link: "I do not know that link's store.",
@@ -339,38 +367,101 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const cheapest = offers.find((offer) => offer.series !== "market_min" && safeUrl(offer.url));
   const part = String(product.part_number ?? "");
   const decision = (result as {
-    decision?: { action?: string; selected_merchant?: string; selected_cents?: number; confidence?: string; reason_codes?: string[] };
+    decision?: { action?: string; selected_merchant?: string; selected_cents?: number; confidence?: string; reason_codes?: string[]; budget_cents?: number };
   }).decision;
   const store = result.link?.store;
   const notes = store && !offers.some((offer) => offer.merchant === store)
     ? [text(words, "compare_unreadable", { store: result.link?.store_name || store })] : [];
-  const embed: DiscordEmbedSpec = {
-    title: String(product.title ?? product.product ?? ""),
-    ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
-    description: typeof result.comment === "string" && result.comment.trim() ? result.comment.trim() : undefined,
-    color: looksOf(lead?.verdict).color,
-    fields: offers.map((offer) => field(offer, words, locale)),
-    ...(part ? { footer: text(words, "compare_part", { part }) } : {}),
-  };
   const decisionNote = decisionLine(decision, offers, words, locale, Array.isArray(result.alternatives) && result.alternatives.length > 0);
-  const header = text(words, "compare_header", { title: String(product.title ?? product.product ?? "") });
   const alternatives = Array.isArray(result.alternatives) ? result.alternatives.slice(0, 5) : [];
-  const alternativeLines = alternatives.length > 0
-    ? [
-      text(words, "compare_alternatives"),
-      ...alternatives.map((alternative) => {
-        const classification = text(words, `alternative_${String(alternative.classification ?? "")}`);
-        // price facts are reasons beside the technical classification
-        const reasons = (Array.isArray(alternative.reason_codes) ? alternative.reason_codes : [])
-          .map((code) => `alternative_reason_${String(code)}`)
-          .filter((key) => key in words)
-          .map((key) => text(words, key));
-        const price = typeof alternative.price_cents === "number" ? ` · ${money(alternative.price_cents, locale)}` : "";
-        return `• ${String(alternative.title ?? alternative.product)} — ${[classification, ...reasons].join(", ")}${price}`;
-      }),
-    ]
-    : [];
-  return { content: [header, ...notes, decisionNote, ...alternativeLines].filter(Boolean).join("\n"), embeds: [embed] };
+  const alternativeLines = alternatives.map((alternative) => {
+    const classificationKey = `alternative_${String(alternative.classification ?? "")}`;
+    const review = alternative.model_assessment as { relationship?: string; explanation?: string } | undefined;
+    const modelKey = `model_${String(review?.relationship ?? "")}`;
+    const classification = text(words, classificationKey in words ? classificationKey : "alternative_same_category_candidate");
+    const modelNote = review && modelKey in words ? text(words, modelKey) : "";
+    // price facts are reasons beside the technical classification
+    const reasons = (Array.isArray(alternative.reason_codes) ? alternative.reason_codes : [])
+      .map((code) => `alternative_reason_${String(code)}`)
+      .filter((key) => key in words)
+      .map((key) => text(words, key));
+    const price = typeof alternative.price_cents === "number" ? ` · ${money(alternative.price_cents, locale)}` : "";
+    const title = comparisonTitle(alternative.title ?? alternative.product);
+    const address = safeUrl(alternative.url);
+    const page = address.length <= 300 ? address : "";
+    const name = page ? `[${title}](${page})` : title;
+    const explanation = typeof review?.explanation === "string" ? review.explanation.slice(0, 400) : "";
+    return [`• ${name}${price}\n  ${[modelNote || classification, ...reasons].join(" · ")}`, explanation].filter(Boolean).join("\n");
+  });
+  const fields: NonNullable<DiscordEmbedSpec["fields"]> = [];
+  if (offers.length > 0) {
+    fields.push(...comparisonFields(text(words, "compare_offers"), offers.map((offer) => {
+      const name = (offer.series === "market_min"
+        ? text(words, "market")
+        : String(offer.merchant_name ?? offer.merchant)).slice(0, 80);
+      const payment = text(words, String(offer.price_kind ?? "unknown"));
+      const price = money(offer.latest_cents, locale);
+      const address = safeUrl(offer.url);
+      const page = address.length <= 300 ? address : "";
+      const amount = page ? `[${price}](${page})` : price;
+      const warning = ["fake_discount", "inflated_before_sale", "stale", "real_discount"].includes(String(offer.verdict))
+        ? ` · ${text(words, String(offer.verdict))}` : "";
+      return `• ${name}${payment ? ` · ${payment}` : ""} — **${amount}**${warning}`;
+    }), words, 2400));
+  }
+  if (alternativeLines.length > 0) {
+    fields.push(...comparisonFields(text(words, "compare_alternatives"), alternativeLines, words, 1800));
+    if (alternatives.some((item) => item.classification === "same_category_candidate")) {
+      notes.push(text(words, "compare_unconfirmed"));
+    }
+    if (alternatives.some((item) => item.classification === "similar_cpu_specs")) {
+      notes.push(text(words, "compare_specs_note"));
+    }
+    if (alternatives.some((item) => Array.isArray(item.reason_codes) && item.reason_codes.includes("different_cpu_socket"))) {
+      notes.push(text(words, "compare_platform_note"));
+    }
+  }
+  const budget = typeof decision?.budget_cents === "number" && decision.budget_cents > 0
+    ? text(words, "compare_budget", { price: money(decision.budget_cents, locale) }) : "";
+  const comment = typeof result.comment === "string" ? result.comment.trim().slice(0, 600) : "";
+  return {
+    content: "",
+    embeds: [{
+      title: text(words, "compare_header", { title: comparisonTitle(product.title ?? product.product) }),
+      ...(cheapest ? { url: safeUrl(cheapest.url) } : {}),
+      description: [decisionNote, budget, comment].filter(Boolean).join("\n\n"),
+      color: looksOf(lead?.verdict).color,
+      fields,
+      footer: [...notes, part ? text(words, "compare_part", { part }) : ""].filter(Boolean).join("\n"),
+    }],
+  };
+}
+
+function comparisonTitle(value: unknown): string {
+  const title = String(value ?? "").replace(/[\[\]*_`]/g, "");
+  const headline = title.split(",")[0].trim();
+  return (title.length > 70 && headline.length >= 16 ? headline : title).slice(0, 120);
+}
+
+// Keep whole rows and links together within Discord's 1024-character field values.
+function comparisonFields(name: string, lines: string[], words: Catalog, budget: number): NonNullable<DiscordEmbedSpec["fields"]> {
+  const fields: NonNullable<DiscordEmbedSpec["fields"]> = [];
+  let value = "";
+  let used = 0;
+  for (const [index, line] of lines.entries()) {
+    if (used + line.length + 100 > budget) {
+      fields.push({ name, value: [value, text(words, "compare_more_rows", { count: lines.length - index })].filter(Boolean).join("\n") });
+      return fields;
+    }
+    if (value && value.length + line.length + 1 > 1024) {
+      fields.push({ name, value });
+      value = "";
+    }
+    value = [value, line].filter(Boolean).join("\n");
+    used += line.length + 1;
+  }
+  if (value) fields.push({ name, value });
+  return fields;
 }
 
 // decisionLine says what the domain decided: where to buy, that the offer is over budget, or that
