@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS product_equivalences (
 	equivalence_json TEXT NOT NULL,
 	PRIMARY KEY (source_key, candidate_key)
 );`)
+	if err != nil {
+		return err
+	}
+	// Earlier versions cached model opinions alongside discovery records.
+	_, err = s.db.Exec(`DELETE FROM product_equivalences
+WHERE json_valid(equivalence_json)
+AND json_extract(equivalence_json, '$.estimated') = 1
+AND json_extract(equivalence_json, '$.relationship') IS NOT NULL`)
 	return err
 }
 

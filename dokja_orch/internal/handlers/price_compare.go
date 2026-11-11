@@ -69,7 +69,7 @@ func (h *PriceDomainHandler) WithCompetitorQueryCache(cache competitorQueryCache
 	return h
 }
 
-// WithCompetitorEquivalenceCache stores technically comparable candidates separately from prices.
+// WithCompetitorEquivalenceCache caches competitor identities and discovery queries.
 func (h *PriceDomainHandler) WithCompetitorEquivalenceCache(cache competitorEquivalenceCache) *PriceDomainHandler {
 	h.equivalenceCache = cache
 	return h
@@ -128,10 +128,13 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 		if discovered := h.discoverCompetitors(ctx, result, deadline); discovered {
 			if refreshed, refreshErr := ask(); refreshErr == nil {
 				result = refreshed
-				h.persistEquivalences(ctx, result)
 				result["competitors_discovered"] = true
 			}
 		}
+	}
+
+	if found, _ := result["found"].(bool); found {
+		h.persistCompetitors(ctx, result)
 	}
 
 	if link != nil {
@@ -154,7 +157,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	return result, nil
 }
 
-func (h *PriceDomainHandler) persistEquivalences(ctx context.Context, result map[string]any) {
+func (h *PriceDomainHandler) persistCompetitors(ctx context.Context, result map[string]any) {
 	if h.equivalenceCache == nil {
 		return
 	}
@@ -171,23 +174,16 @@ func (h *PriceDomainHandler) persistEquivalences(ctx context.Context, result map
 	items := make([]map[string]any, 0, len(rawAlternatives))
 	for _, raw := range rawAlternatives {
 		alternative, _ := raw.(map[string]any)
-		classification, _ := alternative["classification"].(string)
-		if classification != "technically_comparable" && classification != "technically_superior" {
-			continue
-		}
-		confidence, _ := alternative["confidence"].(string)
-		if confidence == "" || confidence == "low" {
+		if id, _ := alternative["product"].(string); id == "" {
 			continue
 		}
 		item := map[string]any{
-			"product_key":       alternative["product"],
-			"title":             alternative["title"],
-			"category":          alternative["category"],
-			"brand":             alternative["brand"],
-			"part_number":       alternative["part_number"],
-			"classification":    classification,
-			"confidence":        confidence,
-			"shared_attributes": alternative["shared_attributes"],
+			"product_key":    alternative["product"],
+			"title":          alternative["title"],
+			"category":       alternative["category"],
+			"brand":          alternative["brand"],
+			"part_number":    alternative["part_number"],
+			"specifications": alternative["specifications"],
 		}
 		if query, _ := alternative["part_number"].(string); strings.TrimSpace(query) != "" {
 			item["query"] = query

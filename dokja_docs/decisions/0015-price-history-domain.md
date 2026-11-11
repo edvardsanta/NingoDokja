@@ -306,27 +306,28 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
   rows were omitted to stay within Discord limits. Portuguese and English use
   the same layout.
 
-## Cached model technical reviews
+## Competitor discovery cache and fresh model reviews
 
 The configured lightweight bindings (Haiku, Luna and a small Qwen) handle search
 planning, qualitative technical assessment and the final comment, with provider
 fallback and response validation. Each provider attempt has a 15-second limit.
 Technical assessment reserves at least 20 seconds for the final comment.
 
-The model may use its product knowledge to estimate cross-manufacturer
-equivalence and explain workload and platform tradeoffs. The domain validates
-candidate identities and review codes. Responses expose this as a separate
-`model_assessment` with `estimated: true`; collected specifications and
-benchmark classifications retain their evidence. Model reviews add no prices,
-benchmark numbers or purchase decisions.
+SQLite caches search queries and discovered competitor identities, titles, part
+numbers and collected specifications in the existing tables. Candidates with
+unconfirmed equivalence are useful discovery records too. Their cached queries
+can refresh offers during the next comparison.
 
-Reviews reuse the existing SQLite `product_equivalences` table, with a separate
-key per original/candidate identity and specification pair, review policy
-version and UTC calendar month. Prices, merchants and budgets are excluded
-from this key. Reopening the database or changing prices reuses the review.
-Changing product specifications, policy version or month causes a fresh review.
-An unavailable cache leaves the comparison usable. Price-dependent comments
-are generated from current offers.
+Every comparison generates its model assessment from current offers, budget
+and the full current alternative set. Model opinions, classifications, confidence
+and explanations are excluded from discovery cache writes. Startup removes
+legacy model review rows created by the earlier cache implementation while
+preserving discovery records and queries.
+
+The domain validates candidate identities and review codes. Responses expose
+qualitative estimates as a separate `model_assessment` with `estimated: true`.
+Collected specifications and benchmark classifications retain their evidence.
+An unavailable cache leaves the comparison usable.
 
 ## Pending work (stacked follow-ups)
 

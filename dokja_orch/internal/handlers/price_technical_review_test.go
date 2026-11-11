@@ -4,11 +4,12 @@ import (
 	"context"
 	"path/filepath"
 	competitorcache "read_books/internal/infrastructure/competitor_cache"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestTechnicalReviewSurvivesReopenAndPriceChanges(t *testing.T) {
+func TestTechnicalReviewReevaluatesAfterPriceChanges(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cache.db")
 	cache, err := competitorcache.Open(path)
 	if err != nil {
@@ -37,13 +38,18 @@ func TestTechnicalReviewSurvivesReopenAndPriceChanges(t *testing.T) {
 	handler.WithCompetitorEquivalenceCache(cache)
 	delete(candidate, "model_assessment")
 	candidate["price_cents"] = 160000
+	result["decision"] = map[string]any{"budget_cents": 170000}
 	handler.reviewAlternatives(context.Background(), result, time.Now().Add(time.Minute))
-	if candidate["model_assessment"] == nil || len(model.bindings) != 1 {
-		t.Fatalf("cache missed after price change: %v %v", candidate, model.bindings)
+	if candidate["model_assessment"] == nil || len(model.bindings) != 2 {
+		t.Fatalf("review was reused after price change: %v %v", candidate, model.bindings)
+	}
+	latest := model.messages[len(model.messages)-1][1]["content"]
+	if !strings.Contains(latest, "160000") || !strings.Contains(latest, "170000") {
+		t.Fatalf("missing current context: %s", latest)
 	}
 	candidate["specifications"] = map[string]any{"cores": 8.0}
 	handler.reviewAlternatives(context.Background(), result, time.Now().Add(time.Minute))
-	if len(model.bindings) != 2 {
+	if len(model.bindings) != 3 {
 		t.Fatalf("specification change reused stale review: %v", model.bindings)
 	}
 }
@@ -60,5 +66,34 @@ func TestTechnicalReviewRejectsInventedCandidatesAndFallsBack(t *testing.T) {
 	}, time.Now().Add(time.Minute))
 	if len(model.bindings) != 2 || model.bindings[1] != "codex:gpt-6-luna" || candidate["model_assessment"] == nil {
 		t.Fatalf("fallback %v assessment %v", model.bindings, candidate)
+	}
+}
+
+func TestCachedCompetitorsContainDiscoveryFacts(t *testing.T) {
+	cache, err := competitorcache.Open(filepath.Join(t.TempDir(), "cache.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.Close()
+	handler, _ := compareHandler(nil, nil)
+	handler.WithCompetitorEquivalenceCache(cache)
+	product := map[string]any{"product": "original", "title": "CPU Original"}
+	result := map[string]any{"product": product, "alternatives": []any{map[string]any{
+		"product": "other", "title": "CPU Other", "part_number": "OTHER-CPU", "classification": "same_category_candidate",
+		"confidence": "low", "price_cents": 150000, "model_assessment": map[string]any{"explanation": "Old opinion"},
+	}}}
+	handler.persistCompetitors(context.Background(), result)
+	queries := handler.competitorQueries(context.Background(), product, nil)
+	if len(queries) != 1 || queries[0] != "OTHER-CPU" {
+		t.Fatalf("competitors %v", queries)
+	}
+	key, _ := cacheKey(map[string]any{"plan_version": competitorPlanVersion, "product": product, "profile": nil})
+	items, _, _ := cache.GetEquivalences(context.Background(), key)
+	for _, item := range items {
+		for _, field := range []string{"model_assessment", "price_cents", "classification", "confidence", "relationship", "explanation"} {
+			if item[field] != nil {
+				t.Fatalf("cached opinion or price: %v", item)
+			}
+		}
 	}
 }
