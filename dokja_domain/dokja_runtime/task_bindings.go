@@ -5,12 +5,19 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var taskModelSize = regexp.MustCompile(`(?i):([0-9]+(?:\.[0-9]+)?)b(?:$|[-_])`)
 
 // TaskBindings selects registered models for bounded tasks without changing the chat binding.
-func (d *Domain) TaskBindings(profile string) ([]ChatBinding, error) {
+type TaskBinding struct {
+	ChatBinding
+	RetryAfterMS  int64  `json:"retry_after_ms,omitempty"`
+	FailureReason string `json:"failure_reason,omitempty"`
+}
+
+func (d *Domain) TaskBindings(profile string) ([]TaskBinding, error) {
 	if profile != "lightweight" {
 		return nil, fmt.Errorf("unsupported inference task profile")
 	}
@@ -21,7 +28,7 @@ func (d *Domain) TaskBindings(profile string) ([]ChatBinding, error) {
 	if err != nil {
 		return nil, err
 	}
-	bindings := []ChatBinding{}
+	bindings := []TaskBinding{}
 	for _, spec := range providerSpecs {
 		for _, registration := range preferences.Providers {
 			if registration.ID != spec.id || !registration.Enabled || len(registration.Models) == 0 {
@@ -33,7 +40,8 @@ func (d *Domain) TaskBindings(profile string) ([]ChatBinding, error) {
 					model = candidate
 				}
 			}
-			bindings = append(bindings, ChatBinding{Provider: registration.ID, Model: model})
+			retry, reason := d.taskCircuit.status(registration.ID, time.Now())
+			bindings = append(bindings, TaskBinding{ChatBinding: ChatBinding{Provider: registration.ID, Model: model}, RetryAfterMS: retry, FailureReason: reason})
 		}
 	}
 	if len(bindings) == 0 {
