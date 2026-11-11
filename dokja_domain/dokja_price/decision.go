@@ -147,10 +147,10 @@ func stringSpec(specs map[string]any, key string) (string, bool) {
 }
 
 func categoryToken(value string) string {
-	words := strings.Fields(strings.ToLower(value))
+	words := comparisonWords(value)
 	for _, word := range words {
 		switch word {
-		case "gpu", "placa", "video", "placas":
+		case "gpu", "placa", "video", "placas", "rx", "rtx", "gtx":
 			return "gpu"
 		case "cpu", "processador", "processadores":
 			return "cpu"
