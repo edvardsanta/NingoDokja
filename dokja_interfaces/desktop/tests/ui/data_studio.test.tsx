@@ -167,9 +167,9 @@ describe("the data studio", () => {
 
     expect(calls.map((c) => [c.type, c.payload])).toEqual([
       ["datastudio.sources.list", {}],
-      ["datastudio.postgres.schemas", { id: "postgres:1" }],
-      ["datastudio.postgres.tables", { id: "postgres:1", schema: "dokja_price" }],
-      ["datastudio.postgres.table", { id: "postgres:1", schema: "dokja_price", table: "observations" }],
+      ["datastudio.postgres.schemas", { connection_id: "postgres:1" }],
+      ["datastudio.postgres.tables", { connection_id: "postgres:1", schema: "dokja_price" }],
+      ["datastudio.postgres.table", { connection_id: "postgres:1", schema: "dokja_price", table: "observations" }],
     ]);
   });
 
