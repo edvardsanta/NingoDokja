@@ -98,8 +98,10 @@ not independently certify a benchmark or establish equivalence: model reviews
 remain labeled qualitative estimates. Discord links collected references and
 shows their workload and observation date. Without collected sources it states
 that the analysis is an estimate. The public repository does not include owner
-collectors, and this change does not add an automatic web fetcher; collectors
-must provide the technical excerpts before sourced analysis is available.
+collectors with real publisher URLs. An optional disabled example now fetches
+operator-configured benchmark tables through `price.technical.v1`; see
+[collected technical evidence](price-technical-evidence.md) for source fields,
+measurement matching, cache policy and activation.
 
 Rebuild the desktop, host controller, orchestrator and Discord adapter; refresh
 Discord command registration for the optional fields. Deploy the controller

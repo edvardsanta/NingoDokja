@@ -136,6 +136,7 @@ func (h *PriceDomainHandler) compare(ctx context.Context, event core.Event) (map
 	}
 
 	if found, _ := result["found"].(bool); found {
+		h.collectTechnicalEvidence(ctx, result, deadline)
 		h.persistCompetitors(ctx, result)
 	}
 
@@ -588,10 +589,24 @@ If the facts are insufficient for a functional query, return {"queries":[]}.`
 // comment asks Ningo for a few lines from the comparison's facts. Any failure gives no comment;
 // the comparison stands on its own.
 func (h *PriceDomainHandler) comment(ctx context.Context, result map[string]any, deadline time.Time) string {
+	product, _ := result["product"].(map[string]any)
+	commentAlternatives := []any{}
+	if items, ok := result["alternatives"].([]any); ok {
+		for _, raw := range items {
+			item, _ := raw.(map[string]any)
+			copy := map[string]any{}
+			for key, value := range item {
+				if key != "specifications" {
+					copy[key] = value
+				}
+			}
+			commentAlternatives = append(commentAlternatives, copy)
+		}
+	}
 	facts, err := json.Marshal(map[string]any{
-		"product": result["product"], "offers": result["offers"], "decision": result["decision"],
+		"product": technicalIdentity(product), "offers": result["offers"], "decision": result["decision"],
 		"prior_decisions":    result["prior_decisions"],
-		"alternatives":       result["alternatives"],
+		"alternatives":       commentAlternatives,
 		"comparison_context": result["comparison_context"], "technical_sources": result["technical_sources"],
 	})
 	if err != nil {

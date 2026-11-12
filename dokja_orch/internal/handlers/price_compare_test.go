@@ -22,6 +22,9 @@ type compareResolver struct {
 }
 
 func (r *compareResolver) Dispatch(_ context.Context, _ string, payload map[string]any) (map[string]any, error) {
+	if payload["capability"] == "price.technical.v1" {
+		return map[string]any{"evidence": []any{}}, nil
+	}
 	action, _ := payload["action"].(string)
 	r.actions = append(r.actions, action)
 	input, _ := payload["input"].(map[string]any)

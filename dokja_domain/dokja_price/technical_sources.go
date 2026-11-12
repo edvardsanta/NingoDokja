@@ -23,7 +23,7 @@ func cleanTechnicalSources(raw any) ([]any, error) {
 			return nil, fmt.Errorf("invalid technical source")
 		}
 		result := map[string]any{}
-		for field, limit := range map[string]int{"title": 120, "url": 500, "excerpt": 1200, "workload": 120, "observed_at": 35} {
+		for field, limit := range map[string]int{"title": 120, "url": 500, "excerpt": 1200, "workload": 120, "observed_at": 35, "published_at": 35, "updated_at": 35, "test_conditions": 600} {
 			value, exists := row[field]
 			if !exists {
 				continue
@@ -43,6 +43,22 @@ func cleanTechnicalSources(raw any) ([]any, error) {
 		}
 		if _, err := time.Parse(time.RFC3339, stamp); err != nil {
 			return nil, fmt.Errorf("technical source requires observed_at")
+		}
+		for _, key := range []string{"published_at", "updated_at"} {
+			if value, _ := result[key].(string); value != "" {
+				if _, err := time.Parse(time.RFC3339, value); err != nil {
+					if _, err := time.Parse("2006-01-02", value); err != nil {
+						return nil, fmt.Errorf("invalid source date")
+					}
+				}
+			}
+		}
+		if rawBenchmarks, ok := row["benchmarks"]; ok {
+			metrics, err := cleanBenchmarks(rawBenchmarks)
+			if err != nil {
+				return nil, err
+			}
+			result["benchmarks"] = metrics
 		}
 		if !seen[address] {
 			clean = append(clean, result)

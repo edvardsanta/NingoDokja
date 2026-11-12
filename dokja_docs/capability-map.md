@@ -136,6 +136,17 @@ Relevant implementation contracts:
 
 ## Representative source-level flows
 
+### Technical comparison evidence
+
+`price.compare -> Price domain products -> feeds.invoke (price.technical.v1, collect)
+-> configured collector -> Price source/sample validation -> scoped benchmark
+arithmetic -> fresh analysis task -> localized Discord comparison`
+
+The optional disabled example collects benchmark tables, original excerpts,
+publication/modification dates and test conditions. Validated facts use the
+existing SQLite cache with bounded age; model opinions do not. See
+[technical evidence](price-technical-evidence.md) for limits and activation.
+
 ### Conversation
 
 `message.* -> conversation route -> moderation:screen-event -> chat action`

@@ -15,7 +15,11 @@ candidates. Consider the current offers, budget and full alternative set for thi
 Core counts and family tier names alone do not establish equivalent performance. Consider the
 actual models. State uncertainty or use unknown when you cannot identify a model confidently.
 These are qualitative estimates. Do not invent benchmark scores, percentages, measurements,
-prices or sources. Do not claim that you searched the web. For CPUs distinguish gaming and
+prices or sources. Use benchmark_comparisons only for their named workload and conditions.
+The sample field identifies the tested model; board cooling, OC, VRAM, BIOS and power limits
+may differ. Do not claim the exact store board was measured. The application computed those numeric differences from matching table snapshots; do not treat
+them as universal performance equivalence. Compare seconds/ms using higher_is_better.
+Do not claim that you personally searched the web. For CPUs distinguish gaming and
 general productivity when they differ. Compare each candidate against the requested product.
 The reference is not the installed equipment. comparison_context describes the intended use and
 current equipment only when provided; otherwise these are unknown. Assess compatibility with
@@ -34,10 +38,17 @@ even when its estimated performance is higher. Choose unknown if this cannot be 
 Do not return prices or a purchase decision.`
 
 func technicalIdentity(product map[string]any) map[string]any {
+	specs, _ := product["specifications"].(map[string]any)
+	identitySpecs := map[string]any{}
+	for key, value := range specs {
+		if key != "technical_sources" {
+			identitySpecs[key] = value
+		}
+	}
 	return map[string]any{
 		"product": product["product"], "title": product["title"],
 		"category": product["category"], "brand": product["brand"],
-		"part_number": product["part_number"], "specifications": product["specifications"],
+		"part_number": product["part_number"], "specifications": identitySpecs,
 	}
 }
 
@@ -57,14 +68,23 @@ func (h *PriceDomainHandler) reviewAlternatives(ctx context.Context, result map[
 		}
 		delete(item, "model_assessment")
 		pending[id] = item
-		candidates = append(candidates, item)
+		candidate := technicalIdentity(item)
+		for _, key := range []string{"price_cents", "classification", "reason_codes", "benchmark_comparisons"} {
+			candidate[key] = item[key]
+			if key == "benchmark_comparisons" {
+				if rows, ok := item[key].([]any); ok && len(rows) > 2 {
+					candidate[key] = rows[:2]
+				}
+			}
+		}
+		candidates = append(candidates, candidate)
 	}
 	if len(pending) == 0 || time.Until(deadline) < 2*compareCommentFloor {
 		return
 	}
 	sources := pricedomain.ComparisonSources(result)
 	facts, err := json.Marshal(map[string]any{"comparison_context": result["comparison_context"], "technical_sources": sources, "product": technicalIdentity(product), "candidates": candidates, "offers": result["offers"], "decision": result["decision"]})
-	if err != nil {
+	if err != nil || len(facts) > 110000 {
 		return
 	}
 	schema := map[string]any{

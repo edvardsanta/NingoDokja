@@ -951,6 +951,15 @@ host Runtime controller and orchestrator together. The additive Discord options
 require refreshing command registration; no ports, environment variables,
 Compose services or volumes change.
 
+### Price benchmark evidence
+
+Technical source collection is optional and uses `price.technical.v1` through
+Feeds. Configure and enable the benchmark-table collector in the existing
+owner plugin directory, then rebuild Feeds, the orchestrator and Discord.
+See [technical evidence](price-technical-evidence.md). Existing comparisons work
+without this provider; missing or changed sources remain estimates. No new ports,
+environment variables, services, volumes or database schema are introduced.
+
 ### Scheduled delivery issues
 
 Check:
