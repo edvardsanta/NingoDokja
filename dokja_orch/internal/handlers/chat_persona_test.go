@@ -239,6 +239,26 @@ func TestBanterKeepsIndependentJudgmentUnderSocialPressure(t *testing.T) {
 	}
 }
 
+// Regression: a roast leaned on Ningo's own meme posted earlier in the same channel. The denial
+// ("mano onde q eu falei de fortnite, vc esta louco") made him concede the reference as an
+// invented "internet meme", fabricating an outside origin for his own material and killing the
+// bit instead of owning it in character.
+func TestBanterKeepsAJokesOwnAttributionWhenDenied(t *testing.T) {
+	normalized := strings.Join(strings.Fields(chatPersona), " ")
+	for _, want := range []string{
+		"A joke that leans on the channel's own history",
+		"your own earlier messages, memes and running gags",
+		"do not invent an outside origin for it",
+		"do not fold the whole bit over a denial",
+		"own the exaggeration in character and let the roast continue",
+		"say you cannot verify it without surrendering the joke",
+	} {
+		if !strings.Contains(normalized, want) {
+			t.Fatalf("the persona lost %q", want)
+		}
+	}
+}
+
 // The owner asked that, with him, Ningo may disagree once but accepts his decision; the note
 // only appears for the owner the gateway verified, and still grants no permissions.
 func TestTheOwnersWordSettlesAQuestionButGrantsNoPermission(t *testing.T) {
