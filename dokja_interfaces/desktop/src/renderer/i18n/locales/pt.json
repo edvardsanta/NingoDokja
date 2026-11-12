@@ -940,5 +940,6 @@
   "data_studio_back_to_table": "Voltar à tabela",
   "data_studio_filter_placeholder": "Filtrar fontes por nome",
   "data_studio_filter_label": "Filtrar fontes",
-  "data_studio_filter_empty": "Nenhuma fonte corresponde ao filtro."
+  "data_studio_filter_empty": "Nenhuma fonte corresponde ao filtro.",
+  "data_studio_sort_by": "Ordenar por {column}"
 }

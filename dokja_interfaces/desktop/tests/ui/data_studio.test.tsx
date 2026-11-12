@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DataStudioCard } from "../../src/renderer/cards/data_studio.js";
@@ -153,6 +153,59 @@ describe("the data studio", () => {
     await screen.findByText('"row-101"');
     expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
     expect(calls.filter((c) => c.type === "datastudio.sqlite.rows").map((c) => c.payload?.offset)).toEqual([0, 100]);
+  });
+
+  it("sorts table rows from the column header, starting over at page one", async () => {
+    const big: unknown[] = Array.from({ length: 100 }, (_, i) => [i + 1, `row-${i + 1}`]);
+    const { transport, calls } = routedTransport({
+      "datastudio.sources.list": sources,
+      "datastudio.sqlite.schema": schema,
+      "datastudio.sqlite.table": ok({ schema: { columns: [
+        { name: "id", type: "INTEGER", not_null: true, primary_key: true },
+        { name: "name", type: "TEXT", not_null: false, primary_key: false },
+      ], count: 150 } }),
+      "datastudio.sqlite.rows": [
+        ok({ result: { columns: ["id", "name"], rows: big, total: 100 } }),
+        ok({ result: { columns: ["id", "name"], rows: [[101, "row-101"]], total: 1 } }),
+        ok({ result: { columns: ["id", "name"], rows: [[1, "row-1"]], total: 100 } }),
+        ok({ result: { columns: ["id", "name"], rows: [[1, "row-1"]], total: 100 } }),
+      ],
+    });
+    show(transport);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^ningo\.db/ }));
+    await screen.findByText("Objects (3)");
+    fireEvent.click(screen.getByRole("button", { name: "table: chat_profiles" }));
+    await screen.findByText('"row-1"');
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText('"row-101"');
+
+    // sorting asks the orchestrator for a fresh ordering, back on page one
+    const nameHeader = screen.getByRole("columnheader", { name: "name" });
+    expect(nameHeader.getAttribute("aria-sort")).toBe("none");
+    fireEvent.click(within(nameHeader).getByRole("button"));
+    await waitFor(() => expect(calls.filter((c) => c.type === "datastudio.sqlite.rows")).toHaveLength(3));
+    expect(calls.filter((c) => c.type === "datastudio.sqlite.rows").map((c) => c.payload)).toEqual([
+      { path: "/data/ningo.db", table: "chat_profiles", limit: 100, offset: 0 },
+      { path: "/data/ningo.db", table: "chat_profiles", limit: 100, offset: 100 },
+      { path: "/data/ningo.db", table: "chat_profiles", limit: 100, offset: 0, sort_column: "name", sort_dir: "asc" },
+    ]);
+    expect(screen.getByRole("columnheader", { name: "name" }).getAttribute("aria-sort")).toBe("ascending");
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+
+    // clicking again flips to descending
+    fireEvent.click(within(screen.getByRole("columnheader", { name: "name" })).getByRole("button"));
+    await waitFor(() => expect(calls.filter((c) => c.type === "datastudio.sqlite.rows")).toHaveLength(4));
+    expect(calls.filter((c) => c.type === "datastudio.sqlite.rows").at(-1)?.payload).toEqual({
+      path: "/data/ningo.db",
+      table: "chat_profiles",
+      limit: 100,
+      offset: 0,
+      sort_column: "name",
+      sort_dir: "desc",
+    });
+    expect(screen.getByRole("columnheader", { name: "name" }).getAttribute("aria-sort")).toBe("descending");
   });
 
   it("reports the issues the diagnostics run finds", async () => {

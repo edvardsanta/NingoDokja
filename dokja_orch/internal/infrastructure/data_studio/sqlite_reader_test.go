@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -62,13 +63,61 @@ func TestSQLiteReaderReadsSchemaAndRows(t *testing.T) {
 		t.Errorf("expected 2 columns, got %d", len(ts.Columns))
 	}
 
-	rows, err := r.TableRows(db, "users", 10, 0)
+	rows, err := r.TableRows(db, "users", 10, 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(rows.Rows) != 2 {
 		t.Errorf("expected 2 data rows, got %d", len(rows.Rows))
 	}
+}
+
+func TestSQLiteReaderSortsRowsByColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sorted.db")
+	if err := createSQLiteDB(path, `
+		CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+		INSERT INTO users (name) VALUES ('Bob'), ('Ada'), ('Cid');
+	`); err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+
+	r := NewSQLiteReader()
+	db, err := r.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	asc, err := r.TableRows(db, "users", 10, 0, &SortSpec{Column: "name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rowsColumn(asc, 1); !reflect.DeepEqual(got, []any{"Ada", "Bob", "Cid"}) {
+		t.Errorf("asc by name: %v", got)
+	}
+
+	desc, err := r.TableRows(db, "users", 10, 0, &SortSpec{Column: "name", Desc: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rowsColumn(desc, 1); !reflect.DeepEqual(got, []any{"Cid", "Bob", "Ada"}) {
+		t.Errorf("desc by name: %v", got)
+	}
+
+	if _, err := r.TableRows(db, "users", 10, 0, &SortSpec{Column: "missing"}); err == nil {
+		t.Error("sorting by an unknown column should fail")
+	}
+	if _, err := r.TableRows(db, "users", 10, 0, &SortSpec{Column: `name" LIMIT 1; --`}); err == nil {
+		t.Error("a crafted column name should fail validation, not reach SQL")
+	}
+}
+
+func rowsColumn(result *QueryResult, index int) []any {
+	values := make([]any, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		values = append(values, row[index])
+	}
+	return values
 }
 
 func TestSQLiteReaderRejectsWriteQueries(t *testing.T) {

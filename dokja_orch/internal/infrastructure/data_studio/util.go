@@ -7,8 +7,21 @@ import (
 	"strings"
 )
 
+// SortSpec orders table rows by one column. Readers validate the column
+// against the live schema before it reaches SQL, so the screen never
+// interpolates an identifier unchecked.
+type SortSpec struct {
+	Column string
+	Desc   bool
+}
+
 func normalizeSQL(q string) string {
 	return strings.ToLower(strings.TrimSpace(q))
+}
+
+// quoteSQLiteIdent escapes an identifier for SQLite double quoting.
+func quoteSQLiteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
 func isSelectOnly(q string) bool {

@@ -11,19 +11,20 @@ architecture intact: `Interface → Orchestrator → Infrastructure`.
 ## Scope
 
 - Discover and list data sources in the checkout directory.
-- Open SQLite databases in read-only mode and inspect schema, tables and rows.
+- Open SQLite databases in read-only mode and inspect schema, tables and rows,
+  with paging and sortable columns.
 - List configured PostgreSQL connections (DSNs come from the orchestrator's
-  environment; credentials are never sent to the screen).
+  environment; credentials are never sent to the screen) and browse schemas,
+  tables and rows, and run bounded read-only SELECTs.
 - Read JSON configuration files as structured values.
-- Read and edit Markdown documentation files, including persona files.
+- Read Markdown documentation files, including persona files.
 - Run diagnostics that report missing or unreadable sources.
 - Search and filter within the currently opened resource.
 
 Out of scope for the first version:
 
-- PostgreSQL query execution (connections are listed and schema is browsable;
-  live query execution needs a running server and is not yet wired).
-- Writing to SQLite or JSON files.
+- Writing to SQLite, Postgres or JSON files.
+- Editing Markdown files.
 - Global search across all sources.
 - Automatic backups before edits.
 
@@ -76,18 +77,19 @@ from environment variables.
 
 | Action | Direction | Purpose |
 | --- | --- | --- |
-| `datastudio.sources` | read | List all discovered sources and Postgres connections. |
+| `datastudio.sources.list` | read | List all discovered sources and Postgres connections. |
 | `datastudio.sqlite.schema` | read | Schema objects of a SQLite database. |
 | `datastudio.sqlite.table` | read | Columns and row count for one SQLite table. |
-| `datastudio.sqlite.rows` | read | Paginated rows from a SQLite table. |
+| `datastudio.sqlite.rows` | read | Paginated rows from a SQLite table; optional `sort_column`/`sort_dir`, validated against the live schema. |
 | `datastudio.sqlite.query` | read | Run a bounded, allow-listed SELECT. |
 | `datastudio.json.read` | read | Read and parse a JSON file. |
 | `datastudio.markdown.read` | read | Read a Markdown or persona file. |
-| `datastudio.markdown.write` | change | Save a Markdown file after presence confirmation. |
 | `datastudio.postgres.schemas` | read | List schemas for a configured Postgres connection. |
 | `datastudio.postgres.tables` | read | List tables/views inside a schema. |
 | `datastudio.postgres.table` | read | Columns and row count for one Postgres table. |
-| `datastudio.diagnostics` | read | Report accessibility problems for known sources. |
+| `datastudio.postgres.rows` | read | Paginated rows from a Postgres table; same optional ordering as SQLite. |
+| `datastudio.postgres.query` | read | Run a bounded, read-only SELECT. |
+| `datastudio.diagnostics.run` | read | Report accessibility problems for known sources. |
 
 All actions go through the existing orchestrator envelope and obey the desktop's
 allow-list and presence checks for changes.

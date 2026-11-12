@@ -6,7 +6,7 @@ import { Pending, Problem } from "./card_frame.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 import { Button, Notice } from "./ui.js";
 import { useCard } from "./use_card.js";
-import type { Source, SourceKind, QueryResult, Diagnostics } from "./data_studio_model.js";
+import type { Source, SourceKind, QueryResult, Diagnostics, RowSort } from "./data_studio_model.js";
 import {
   listSources,
   readSQLiteSchema,
@@ -268,18 +268,32 @@ const PAGE_SIZE = 100;
 
 // PagedTable renders one page of a table's rows with next/previous navigation.
 // `total` is the table's row count from its structure read; without it the
-// pager simply disables the next button on a short page.
-function PagedTable({ load, total }: { load: (limit: number, offset: number) => Promise<QueryResult>; total: number | null }) {
+// pager simply disables the next button on a short page. Column headers sort
+// the whole table through the orchestrator, so changing the sort re-reads
+// page one instead of reordering only the visible rows.
+function PagedTable({ load, total }: { load: (limit: number, offset: number, sort?: RowSort) => Promise<QueryResult>; total: number | null }) {
   const t = useTranslate();
   const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<RowSort | null>(null);
   const fetchPage = useCallback(async () => {
     try {
-      return { ok: true as const, data: await load(PAGE_SIZE, page * PAGE_SIZE) };
+      return { ok: true as const, data: await load(PAGE_SIZE, page * PAGE_SIZE, sort ?? undefined) };
     } catch (error) {
       return { ok: false as const, error: { code: "orchestrator" as const, message: String(error) } };
     }
-  }, [load, page]);
+  }, [load, page, sort]);
   const { state, reload } = useCard(fetchPage);
+
+  // Cycle: unsorted -> ascending -> descending -> unsorted. Sorting always
+  // lands back on the first page.
+  const toggleSort = (column: string) => {
+    setSort((current) => {
+      if (current?.column !== column) return { column, desc: false };
+      if (!current.desc) return { column, desc: true };
+      return null;
+    });
+    setPage(0);
+  };
 
   const pages = total !== null && total > 0 ? Math.ceil(total / PAGE_SIZE) : null;
   const atEnd = state.phase === "ready" && (state.data.rows.length < PAGE_SIZE || (pages !== null && page + 1 >= pages));
@@ -298,7 +312,7 @@ function PagedTable({ load, total }: { load: (limit: number, offset: number) => 
           {state.data.rows.length === 0 ? (
             <Notice boxed tone="unchecked">{t("data_studio_no_rows")}</Notice>
           ) : (
-            <ResultTable result={state.data} />
+            <ResultTable result={state.data} sort={sort} onSort={toggleSort} />
           )}
           <div className="pager">
             <Button size="compact" disabled={page === 0} onClick={() => setPage(page - 1)}>{t("data_studio_page_previous")}</Button>
@@ -330,7 +344,7 @@ function SQLiteTableDetail({ path, table, transport }: { path: string; table: st
   }, [transport, path, table]);
 
   const { state, reload } = useCard(load);
-  const loadRows = useCallback((limit: number, offset: number) => readSQLiteRows(transport, path, table, limit, offset), [transport, path, table]);
+  const loadRows = useCallback((limit: number, offset: number, sort?: RowSort) => readSQLiteRows(transport, path, table, limit, offset, sort), [transport, path, table]);
 
   const runQuery = async () => {
     setQueryError(null);
@@ -511,7 +525,7 @@ function PostgresTableDetail({ id, schema, table, transport }: { id: string; sch
       .catch((err) => { if (alive) setError(String(err)); });
     return () => { alive = false; };
   }, [transport, id, schema, table]);
-  const loadRows = useCallback((limit: number, offset: number) => readPostgresRows(transport, id, schema, table, limit, offset), [transport, id, schema, table]);
+  const loadRows = useCallback((limit: number, offset: number, sort?: RowSort) => readPostgresRows(transport, id, schema, table, limit, offset, sort), [transport, id, schema, table]);
 
   const runQuery = async () => {
     setQueryError(null);
@@ -573,12 +587,22 @@ function PostgresTableDetail({ id, schema, table, transport }: { id: string; sch
   );
 }
 
-function ResultTable({ result }: { result: QueryResult }) {
+function ResultTable({ result, sort, onSort }: { result: QueryResult; sort?: RowSort | null; onSort?: (column: string) => void }) {
+  const t = useTranslate();
   return (
     <table className="result-table">
       <thead>
         <tr>
-          {result.columns.map((col) => <th key={col}>{col}</th>)}
+          {result.columns.map((col) => (
+            <th key={col} aria-sort={sort?.column === col ? (sort.desc ? "descending" : "ascending") : onSort ? "none" : undefined}>
+              {onSort ? (
+                <button type="button" className="sort-header" onClick={() => onSort(col)} title={t("data_studio_sort_by", { column: col })}>
+                  {col}
+                  <span className="sort-arrow" aria-hidden="true">{sort?.column === col ? (sort.desc ? "▼" : "▲") : "↕"}</span>
+                </button>
+              ) : col}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
