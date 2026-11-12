@@ -1,0 +1,21 @@
+{
+  "plugin_api": 1,
+  "id": "technical-benchmarks",
+  "name": "Ningo Dokja technical evidence",
+  "version": "1",
+  "runtime": "subprocess",
+  "provides": [
+    "price.technical.v1"
+  ],
+  "enabled": false,
+  "command": [
+    "python3",
+    "-I",
+    "-B",
+    "run.py"
+  ],
+  "limits": {
+    "timeout_ms": 20000,
+    "output_bytes": 1048576
+  }
+}
