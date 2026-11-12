@@ -1,0 +1,10 @@
+{
+  "sources": [{
+    "url": "https://bench.example/gpu-tests",
+    "caption": "Example raster benchmark",
+    "headers": ["Graphics Card", "1080p Ultra"],
+    "model_column": 0,
+    "condition_terms": ["test system", "geometric mean"],
+    "metrics": [{"column": 1, "unit": "fps", "pattern": "([0-9]+(?:\\.[0-9]+)?)", "higher_is_better": true}]
+  }]
+}
