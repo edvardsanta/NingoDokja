@@ -129,6 +129,27 @@ func (r *PostgresReader) TableSchema(db *sql.DB, schema, table string) (*Postgre
 	return &PostgresSchema{Columns: cols, Count: count}, nil
 }
 
+// TableRows returns one page of a table or view, ordered by the primary key
+// when one exists so paging stays deterministic.
+func (r *PostgresReader) TableRows(ctx context.Context, db *sql.DB, schema, table string, limit, offset int) (*QueryResult, error) {
+	query := fmt.Sprintf("SELECT * FROM %s.%s", quoteIdent(schema), quoteIdent(table))
+	rows, err := db.Query(`SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = $1::regclass AND i.indisprimary ORDER BY a.attnum`, fmt.Sprintf("%s.%s", schema, table))
+	if err == nil {
+		var cols []string
+		for rows.Next() {
+			var c string
+			if err := rows.Scan(&c); err == nil {
+				cols = append(cols, quoteIdent(c))
+			}
+		}
+		rows.Close()
+		if len(cols) > 0 {
+			query += " ORDER BY " + strings.Join(cols, ", ")
+		}
+	}
+	return r.Query(ctx, db, query, limit, offset)
+}
+
 // Query runs a SELECT with a timeout and row limit.
 func (r *PostgresReader) Query(ctx context.Context, db *sql.DB, query string, limit, offset int) (*QueryResult, error) {
 	normalized := normalizeSQL(query)

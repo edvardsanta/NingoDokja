@@ -36,15 +36,19 @@ const expectChips = async () => {
 
 const query = ok({ result: { columns: ["id", "name"], rows: [[1, "Ada"], [2, "Bob"]], total: 2 } });
 
+const sqliteRows = ok({ result: { columns: ["id", "name"], rows: [[1, "Ada"]], total: 1 } });
+const postgresRows = ok({ result: { columns: ["merchant"], rows: [["loja-a"]], total: 1 } });
+
 const show = (transport: Parameters<typeof DataStudioCard>[0]["transport"]) =>
   render(<I18nProvider locale="en"><DataStudioCard transport={transport} /></I18nProvider>);
 
 describe("the data studio", () => {
-  it("lists the sources by kind as it opens and reads a database on selection", async () => {
+  it("opens a table on its rows, with structure one tab away, and fills the query box from it", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.sqlite.schema": schema,
       "datastudio.sqlite.table": table,
+      "datastudio.sqlite.rows": sqliteRows,
     });
     show(transport);
 
@@ -54,12 +58,22 @@ describe("the data studio", () => {
     await screen.findByText("Objects (3)");
     fireEvent.click(screen.getByRole("button", { name: "table: chat_profiles" }));
 
-    await screen.findByText("Count: 2");
+    // the table opens on its rows, no SQL written
+    await screen.findByText('"Ada"');
     expect(calls.map((c) => [c.type, c.payload])).toEqual([
       ["datastudio.sources.list", {}],
       ["datastudio.sqlite.schema", { path: "/data/ningo.db" }],
       ["datastudio.sqlite.table", { path: "/data/ningo.db", table: "chat_profiles" }],
+      ["datastudio.sqlite.rows", { path: "/data/ningo.db", table: "chat_profiles", limit: 100, offset: 0 }],
     ]);
+
+    // structure holds the columns
+    fireEvent.click(screen.getByRole("tab", { name: /Structure \(2\)/ }));
+    await screen.findByText("INTEGER");
+
+    // the shortcut fills the query box with a SELECT for this table
+    fireEvent.click(screen.getByRole("button", { name: "Open in query" }));
+    expect(screen.getByRole("textbox")).toHaveProperty("value", 'SELECT * FROM "chat_profiles"');
   });
 
   it("runs the typed query and shows the rows it gets back", async () => {
@@ -80,7 +94,7 @@ describe("the data studio", () => {
     ]);
   });
 
-  it("loads a JSON config and a persona file on demand", async () => {
+  it("loads a JSON config and a persona file as soon as they are picked", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.json.read": ok({ content: { ningo: { profile: "arrogant" } } }),
@@ -89,11 +103,9 @@ describe("the data studio", () => {
     show(transport);
 
     fireEvent.click(await screen.findByRole("button", { name: /^owner\.json/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Load" }));
     await screen.findByText(/"profile": "arrogant"/);
 
     fireEvent.click(screen.getByRole("button", { name: /^warm\.md/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Load" }));
     await screen.findByText("# warm context");
 
     expect(calls.map((c) => c.type)).toEqual([
@@ -101,6 +113,36 @@ describe("the data studio", () => {
       "datastudio.json.read",
       "datastudio.markdown.read",
     ]);
+  });
+
+  it("pages through table rows with previous and next", async () => {
+    const big: unknown[] = Array.from({ length: 100 }, (_, i) => [i + 1, `row-${i + 1}`]);
+    const { transport, calls } = routedTransport({
+      "datastudio.sources.list": sources,
+      "datastudio.sqlite.schema": schema,
+      "datastudio.sqlite.table": ok({ schema: { columns: [
+        { name: "id", type: "INTEGER", not_null: true, primary_key: true },
+        { name: "name", type: "TEXT", not_null: false, primary_key: false },
+      ], count: 150 } }),
+      "datastudio.sqlite.rows": [
+        ok({ result: { columns: ["id", "name"], rows: big, total: 100 } }),
+        ok({ result: { columns: ["id", "name"], rows: [[101, "row-101"]], total: 1 } }),
+      ],
+    });
+    show(transport);
+
+    fireEvent.click(await screen.findByRole("button", { name: /^ningo\.db/ }));
+    await screen.findByText("Objects (3)");
+    fireEvent.click(screen.getByRole("button", { name: "table: chat_profiles" }));
+
+    await screen.findByText('"row-1"');
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Previous" })).toHaveProperty("disabled", true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText('"row-101"');
+    expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+    expect(calls.filter((c) => c.type === "datastudio.sqlite.rows").map((c) => c.payload?.offset)).toEqual([0, 100]);
   });
 
   it("reports the issues the diagnostics run finds", async () => {
@@ -137,7 +179,7 @@ describe("the data studio", () => {
     expect(calls.filter((c) => c.type === "datastudio.sources.list")).toHaveLength(2);
   });
 
-  it("connects to PostgreSQL on demand, schemas then tables then columns, never showing the DSN", async () => {
+  it("connects to PostgreSQL on demand, schemas then tables opening on rows, never showing the DSN", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.postgres.schemas": ok({ schemas: ["public", "dokja_price"] }),
@@ -149,6 +191,7 @@ describe("the data studio", () => {
         { name: "id", type: "bigint", not_null: true, primary_key: true },
         { name: "cents", type: "integer", not_null: true, primary_key: false },
       ], count: 42 } }),
+      "datastudio.postgres.rows": postgresRows,
     });
     show(transport);
 
@@ -164,12 +207,14 @@ describe("the data studio", () => {
     await screen.findByText("table: observations");
     fireEvent.click(screen.getByRole("button", { name: "table: observations" }));
     await screen.findByText("Count: 42");
+    await screen.findByText('"loja-a"');
 
     expect(calls.map((c) => [c.type, c.payload])).toEqual([
       ["datastudio.sources.list", {}],
       ["datastudio.postgres.schemas", { connection_id: "postgres:1" }],
       ["datastudio.postgres.tables", { connection_id: "postgres:1", schema: "dokja_price" }],
       ["datastudio.postgres.table", { connection_id: "postgres:1", schema: "dokja_price", table: "observations" }],
+      ["datastudio.postgres.rows", { connection_id: "postgres:1", schema: "dokja_price", table: "observations", limit: 100, offset: 0 }],
     ]);
   });
 

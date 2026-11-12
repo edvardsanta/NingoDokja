@@ -1161,6 +1161,16 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       },
     })),
   },
+  "datastudio.sqlite.rows": {
+    payload: (raw) => {
+      const base = dataStudioPath(raw);
+      const table = text(raw.table).slice(0, 200);
+      return base && table ? { ...base, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      result: queryResultOf(body.result),
+    })),
+  },
   "datastudio.sqlite.query": {
     payload: (raw) => {
       const base = dataStudioPath(raw);
@@ -1199,6 +1209,17 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
         columns: isRecord(body.schema) && Array.isArray(body.schema.columns) ? body.schema.columns.filter(isRecord).slice(0, 200) : [],
         count: clampInt(isRecord(body.schema) ? body.schema.count : undefined, 0, Number.MAX_SAFE_INTEGER, 0),
       },
+    })),
+  },
+  "datastudio.postgres.rows": {
+    payload: (raw) => {
+      const base = postgresRef(raw);
+      const schema = text(raw.schema).slice(0, 200);
+      const table = text(raw.table).slice(0, 200);
+      return base && schema && table ? { ...base, schema, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      result: queryResultOf(body.result),
     })),
   },
   "datastudio.postgres.query": {

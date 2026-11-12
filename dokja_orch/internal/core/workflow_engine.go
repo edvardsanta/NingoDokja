@@ -287,6 +287,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "read-sqlite-schema"
 		case "datastudio.sqlite.table":
 			return "read-sqlite-table"
+		case "datastudio.sqlite.rows":
+			return "read-sqlite-rows"
 		case "datastudio.sqlite.query":
 			return "query-sqlite"
 		case "datastudio.postgres.schemas":
@@ -295,6 +297,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "list-postgres-tables"
 		case "datastudio.postgres.table":
 			return "read-postgres-table"
+		case "datastudio.postgres.rows":
+			return "read-postgres-rows"
 		case "datastudio.postgres.query":
 			return "query-postgres"
 		case "datastudio.json.read":
