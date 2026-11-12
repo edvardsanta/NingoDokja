@@ -82,3 +82,36 @@ export async function runDiagnostics(transport: Transport): Promise<Diagnostics>
   const result = reply.result as Diagnostics | undefined;
   return result ?? { sources: 0, issues: [] };
 }
+
+export async function listPostgresSchemas(transport: Transport, id: string): Promise<string[]> {
+  const reply = await transport.request("datastudio.postgres.schemas", { id });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { schemas: string[] } | undefined;
+  return result?.schemas ?? [];
+}
+
+export async function listPostgresTables(transport: Transport, id: string, schema: string): Promise<{ name: string; type: string }[]> {
+  const reply = await transport.request("datastudio.postgres.tables", { id, schema });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { tables: { name: string; type: string }[] } | undefined;
+  return result?.tables ?? [];
+}
+
+export async function readPostgresTable(transport: Transport, id: string, schema: string, table: string): Promise<TableSchema> {
+  const reply = await transport.request("datastudio.postgres.table", { id, schema, table });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { schema: TableSchema } | undefined;
+  return result?.schema ?? { columns: [], count: 0 };
+}
+
+// The screen never sees credentials: it only gets what the masked DSN shows.
+export function maskedDSN(dsn: string): string {
+  try {
+    const url = new URL(dsn);
+    const host = url.hostname + (url.port ? `:${url.port}` : "");
+    const database = url.pathname.replace(/^\//, "");
+    return database ? `${host}/${database}` : host;
+  } catch {
+    return "(configured)";
+  }
+}
