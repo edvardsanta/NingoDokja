@@ -4,6 +4,7 @@ package feeds
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -54,6 +55,13 @@ func TestTechnicalCollectorExample(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 is unavailable")
 	}
+	// Register subprocess inputs with Go's test cache, which cannot observe Python's file reads.
+	for _, name := range []string{"run.py", "test_collector.py"} {
+		if _, err := os.ReadFile(filepath.Join("..", "plugins.example", "technical-benchmarks", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	command := exec.Command("python3", "-m", "unittest", "discover", "-s", filepath.Join("..", "plugins.example", "technical-benchmarks"), "-p", "test_*.py")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("collector tests: %v\n%s", err, output)

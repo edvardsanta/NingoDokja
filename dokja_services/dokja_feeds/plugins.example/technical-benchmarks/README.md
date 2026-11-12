@@ -21,6 +21,9 @@ For example, a cell `75.2% (87.4)` can use
 `[0-9]+(?:\.[0-9]+)?%\s*\(([0-9]+(?:\.[0-9]+)?)\)` to retain the measured
 parenthesized value, provided the publisher explicitly defines that value's unit.
 `higher_is_better` defaults to true; set false for latency or elapsed time.
+Excerpts include only the model and metric columns by default. Optional
+`excerpt_columns` can add technical context such as power settings or architecture;
+leave MSRP and foreign store prices out of benchmark evidence.
 
 `condition_terms` selects original paragraphs/list items describing the test
 system, software, aggregation or procedure. Choose specific phrases from the

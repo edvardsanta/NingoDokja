@@ -161,5 +161,21 @@ class ConsistencyTests(unittest.TestCase):
         self.assertEqual(result["evidence"], [])
 
 
+class ExcerptTests(unittest.TestCase):
+    def test_benchmark_excerpts_do_not_mix_foreign_prices_with_local_offers(self):
+        body = BODY.replace("<th>1080p</th>", "<th>1080p</th><th>MSRP</th>").replace(
+            "70.0</td>", "70.0</td><td>$269.99</td>"
+        )
+        config = settings()
+        config["sources"][0]["headers"] = ["GPU", "1080p", "MSRP"]
+        result = collector.collect(
+            [{"product": "ref", "title": "RX 7600"}], config, lambda _: body
+        )
+        source = result["evidence"][0]["technical_sources"][0]
+        self.assertIn("1080p: 70.0", source["excerpt"])
+        self.assertNotIn("269.99", source["excerpt"])
+        self.assertNotIn("MSRP", source["excerpt"])
+
+
 if __name__ == "__main__":
     unittest.main()

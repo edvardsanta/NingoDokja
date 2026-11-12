@@ -236,6 +236,19 @@ def collect(products, settings, fetcher=fetch, now=None):
             headers, *rows = table["rows"]
             if headers != config["headers"]:
                 raise ValueError("table headers changed")
+            excerpt_columns = config.get(
+                "excerpt_columns",
+                sorted(
+                    {
+                        config["model_column"],
+                        *[m["column"] for m in config.get("metrics", [])],
+                    }
+                ),
+            )
+            if not all(
+                type(i) is int and 0 <= i < len(headers) for i in excerpt_columns
+            ):
+                raise ValueError("invalid excerpt columns")
             context = [
                 b
                 for b in page.blocks
@@ -298,7 +311,10 @@ def collect(products, settings, fetcher=fetch, now=None):
                     + " "
                     + table["caption"]
                     + ": "
-                    + "; ".join(f"{h}: {c}" for h, c in zip(headers, row))
+                    + "; ".join(
+                        f"{h}: {c}"
+                        for h, c in ((headers[i], row[i]) for i in excerpt_columns)
+                    )
                 )
                 source["workload"] = compact(
                     source["workload"] + " " + table["caption"], 120
