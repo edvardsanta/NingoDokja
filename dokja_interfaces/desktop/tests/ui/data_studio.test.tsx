@@ -43,7 +43,7 @@ const show = (transport: Parameters<typeof DataStudioCard>[0]["transport"]) =>
   render(<I18nProvider locale="en"><DataStudioCard transport={transport} /></I18nProvider>);
 
 describe("the data studio", () => {
-  it("opens a table on its rows, with structure one tab away, and fills the query box from it", async () => {
+  it("opens a table on its rows, with structure one tab away and its SQL pre-filled", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.sqlite.schema": schema,
@@ -71,27 +71,37 @@ describe("the data studio", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Structure \(2\)/ }));
     await screen.findByText("INTEGER");
 
-    // the shortcut fills the query box with a SELECT for this table
-    fireEvent.click(screen.getByRole("button", { name: "Open in query" }));
+    // the query box starts with a SELECT for this table
     expect(screen.getByRole("textbox")).toHaveProperty("value", 'SELECT * FROM "chat_profiles"');
   });
 
-  it("runs the typed query and shows the rows it gets back", async () => {
+  it("running the pre-filled query replaces the rows; back to table restores them", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.sqlite.schema": schema,
+      "datastudio.sqlite.table": table,
+      "datastudio.sqlite.rows": sqliteRows,
       "datastudio.sqlite.query": query,
     });
     show(transport);
 
     fireEvent.click(await screen.findByRole("button", { name: /^ningo\.db/ }));
-    fireEvent.click(await screen.findByRole("button", { name: "Run" }));
-
+    await screen.findByText("Objects (3)");
+    fireEvent.click(screen.getByRole("button", { name: "table: chat_profiles" }));
     await screen.findByText('"Ada"');
-    expect(screen.getByText('"Bob"')).toBeTruthy();
+
+    // one result area: running the query swaps the paged rows for the query rows
+    expect(screen.getByText("Page 1 of 1")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    await screen.findByText('"Bob"');
+    expect(screen.queryByText("Page 1 of 1")).toBeNull();
     expect(calls.filter((c) => c.type === "datastudio.sqlite.query")).toEqual([
-      { type: "datastudio.sqlite.query", payload: { path: "/data/ningo.db", query: "SELECT * FROM ", limit: 100, offset: 0 }, options: undefined },
+      { type: "datastudio.sqlite.query", payload: { path: "/data/ningo.db", query: 'SELECT * FROM "chat_profiles"', limit: 100, offset: 0 }, options: undefined },
     ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to table" }));
+    await screen.findByText("Page 1 of 1");
+    expect(screen.queryByText('"Bob"')).toBeNull();
   });
 
   it("loads a JSON config and a persona file as soon as they are picked", async () => {
@@ -231,33 +241,42 @@ describe("the data studio", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
 
-  it("runs a PostgreSQL query from the card and shows the rows", async () => {
+  it("runs a PostgreSQL query from the table and replaces its rows", async () => {
     const { transport, calls } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.postgres.schemas": ok({ schemas: ["dokja_price"] }),
-      "datastudio.postgres.query": ok({ result: { columns: ["merchant", "cents"], rows: [["loja-a", 1990]], total: 1 } }),
+      "datastudio.postgres.tables": ok({ tables: [{ name: "offers", type: "table" }] }),
+      "datastudio.postgres.table": ok({ schema: { columns: [{ name: "merchant", type: "text", not_null: true, primary_key: false }], count: 9 } }),
+      "datastudio.postgres.rows": postgresRows,
+      "datastudio.postgres.query": ok({ result: { columns: ["merchant", "cents"], rows: [["loja-b", 1990]], total: 1 } }),
     });
     show(transport);
 
     fireEvent.click(await screen.findByRole("button", { name: "price_history" }));
     fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
     await screen.findByText("Schemas (1)");
+    fireEvent.click(screen.getByRole("button", { name: "dokja_price" }));
+    fireEvent.click(await screen.findByRole("button", { name: "table: offers" }));
+    await screen.findByText('"loja-a"');
 
     const box = screen.getByRole("textbox");
-    fireEvent.change(box, { target: { value: "SELECT merchant, cents FROM dokja_price.offers" } });
+    fireEvent.change(box, { target: { value: "SELECT merchant, cents FROM dokja_price.offers WHERE cents < 3000" } });
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
-    await screen.findByText('"loja-a"');
-    screen.getByText("1990");
+    await screen.findByText('"loja-b"');
+    expect(screen.queryByText('"loja-a"')).toBeNull();
     expect(calls.filter((c) => c.type === "datastudio.postgres.query")).toEqual([
-      { type: "datastudio.postgres.query", payload: { connection_id: "postgres:1", query: "SELECT merchant, cents FROM dokja_price.offers", limit: 100, offset: 0 }, options: undefined },
+      { type: "datastudio.postgres.query", payload: { connection_id: "postgres:1", query: "SELECT merchant, cents FROM dokja_price.offers WHERE cents < 3000", limit: 100, offset: 0 }, options: undefined },
     ]);
   });
 
-  it("announces a PostgreSQL query error without dropping the schema list", async () => {
+  it("announces a PostgreSQL query error without dropping the table rows", async () => {
     const { transport } = routedTransport({
       "datastudio.sources.list": sources,
       "datastudio.postgres.schemas": ok({ schemas: ["dokja_price"] }),
+      "datastudio.postgres.tables": ok({ tables: [{ name: "offers", type: "table" }] }),
+      "datastudio.postgres.table": ok({ schema: { columns: [{ name: "merchant", type: "text", not_null: true, primary_key: false }], count: 9 } }),
+      "datastudio.postgres.rows": postgresRows,
       "datastudio.postgres.query": failure("orchestrator", "only SELECT statements are allowed"),
     });
     show(transport);
@@ -265,11 +284,17 @@ describe("the data studio", () => {
     fireEvent.click(await screen.findByRole("button", { name: "price_history" }));
     fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
     await screen.findByText("Schemas (1)");
+    fireEvent.click(screen.getByRole("button", { name: "dokja_price" }));
+    fireEvent.click(await screen.findByRole("button", { name: "table: offers" }));
+    await screen.findByText('"loja-a"');
+
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "DELETE FROM dokja_price.offers" } });
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     await screen.findByRole("alert");
     expect(screen.getByText(/only SELECT statements/)).toBeTruthy();
-    expect(screen.getByText("Schemas (1)")).toBeTruthy();
+    expect(screen.getByText('"loja-a"')).toBeTruthy();
   });
 
   it("reads nothing before the operator asks, and only reads", async () => {

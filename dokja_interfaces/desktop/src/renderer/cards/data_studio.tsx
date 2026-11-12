@@ -208,8 +208,6 @@ function SourceDetail({ source, transport, onRefresh }: { source: Source; transp
 function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport: Transport; onRefresh?: () => void }) {
   const t = useTranslate();
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [query, setQuery] = useState("SELECT * FROM ");
-  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -221,19 +219,6 @@ function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport:
   }, [transport, path]);
 
   const { state, reload } = useCard(load);
-
-  const fillQuery = (sql: string) => {
-    setQuery(sql);
-  };
-
-  const runQuery = async () => {
-    try {
-      const result = await querySQLite(transport, path, query);
-      setQueryResult(result);
-    } catch (error) {
-      setQueryResult({ columns: [], rows: [], total: 0 });
-    }
-  };
 
   return (
     <div>
@@ -260,13 +245,7 @@ function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport:
               ))}
             </ul>
           </details>
-          {selectedTable && <SQLiteTableDetail path={path} table={selectedTable} transport={transport} onQuery={fillQuery} />}
-          <div className="query-box">
-            <label>{t("data_studio_query")}</label>
-            <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={3} />
-            <Button onClick={runQuery}>{t("data_studio_run")}</Button>
-          </div>
-          {queryResult && <ResultTable result={queryResult} />}
+          {selectedTable && <SQLiteTableDetail key={selectedTable} path={path} table={selectedTable} transport={transport} />}
         </>
       )}
     </div>
@@ -320,9 +299,15 @@ function PagedTable({ load, total }: { load: (limit: number, offset: number) => 
   );
 }
 
-function SQLiteTableDetail({ path, table, transport, onQuery }: { path: string; table: string; transport: Transport; onQuery: (sql: string) => void }) {
+function SQLiteTableDetail({ path, table, transport }: { path: string; table: string; transport: Transport }) {
   const t = useTranslate();
   const [tab, setTab] = useState<"rows" | "structure">("rows");
+  // One result area: the paged rows of the table, replaced by the query result
+  // when the owner runs the (pre-filled) SQL, restored with "back to table".
+  const [query, setQuery] = useState(`SELECT * FROM "${table}"`);
+  const [custom, setCustom] = useState<QueryResult | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const schema = await readSQLiteTable(transport, path, table);
@@ -334,6 +319,16 @@ function SQLiteTableDetail({ path, table, transport, onQuery }: { path: string; 
 
   const { state, reload } = useCard(load);
   const loadRows = useCallback((limit: number, offset: number) => readSQLiteRows(transport, path, table, limit, offset), [transport, path, table]);
+
+  const runQuery = async () => {
+    setQueryError(null);
+    try {
+      setCustom(await querySQLite(transport, path, query));
+    } catch (error) {
+      setCustom(null);
+      setQueryError(String(error));
+    }
+  };
 
   return (
     <div className="table-detail">
@@ -350,11 +345,25 @@ function SQLiteTableDetail({ path, table, transport, onQuery }: { path: string; 
           <div className="tab-bar" role="tablist" aria-label={t("data_studio_table_views", { table })}>
             <Button variant={tab === "rows" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "rows"} onClick={() => setTab("rows")}>{t("data_studio_tab_rows")}</Button>
             <Button variant={tab === "structure" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "structure"} onClick={() => setTab("structure")}>{t("data_studio_tab_structure")} ({state.data.columns.length})</Button>
-            <Button variant="quiet" size="compact" onClick={() => onQuery(`SELECT * FROM "${table}"`)}>{t("data_studio_open_in_query")}</Button>
           </div>
-          <p className="row-count">{t("data_studio_count")}: {state.data.count}</p>
+          <div className="query-box">
+            <label>{t("data_studio_query")}</label>
+            <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={2} />
+            <div className="query-actions">
+              <Button onClick={runQuery}>{t("data_studio_run")}</Button>
+              {custom && <Button variant="quiet" size="compact" onClick={() => setCustom(null)}>{t("data_studio_back_to_table")}</Button>}
+            </div>
+          </div>
+          {queryError && <Notice tone="problem" boxed announce="assertive">{queryError}</Notice>}
           {tab === "rows" ? (
-            <PagedTable load={loadRows} total={state.data.count} />
+            custom ? (
+              <ResultTable result={custom} />
+            ) : (
+              <>
+                <p className="row-count">{t("data_studio_count")}: {state.data.count}</p>
+                <PagedTable load={loadRows} total={state.data.count} />
+              </>
+            )
           ) : (
             <table>
               <thead>
@@ -388,9 +397,6 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
   const [schemas, setSchemas] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSchema, setSelectedSchema] = useState<string | null>(null);
-  const [query, setQuery] = useState("SELECT * FROM ");
-  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
-  const [queryError, setQueryError] = useState<string | null>(null);
 
   const load = async () => {
     setError(null);
@@ -399,16 +405,6 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
     } catch (err) {
       setError(String(err));
       setSchemas(null);
-    }
-  };
-
-  const runQuery = async () => {
-    setQueryError(null);
-    try {
-      setQueryResult(await queryPostgres(transport, source.id, query));
-    } catch (err) {
-      setQueryResult(null);
-      setQueryError(String(err));
     }
   };
 
@@ -437,7 +433,7 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
                     {schema}
                   </Button>
                   {selectedSchema === schema && (
-                    <PostgresTables id={source.id} schema={schema} transport={transport} onQuery={setQuery} />
+                    <PostgresTables id={source.id} schema={schema} transport={transport} />
                   )}
                 </li>
               ))}
@@ -445,20 +441,11 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
           </details>
         )
       )}
-      {schemas !== null && schemas.length > 0 && (
-        <div className="query-box">
-          <label>{t("data_studio_query")}</label>
-          <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={3} />
-          <Button onClick={runQuery}>{t("data_studio_run")}</Button>
-        </div>
-      )}
-      {queryError && <Notice tone="problem" boxed announce="assertive">{queryError}</Notice>}
-      {queryResult && <ResultTable result={queryResult} />}
     </div>
   );
 }
 
-function PostgresTables({ id, schema, transport, onQuery }: { id: string; schema: string; transport: Transport; onQuery: (sql: string) => void }) {
+function PostgresTables({ id, schema, transport }: { id: string; schema: string; transport: Transport }) {
   const t = useTranslate();
   const [tables, setTables] = useState<{ name: string; type: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -486,7 +473,7 @@ function PostgresTables({ id, schema, transport, onQuery }: { id: string; schema
               {table.type}: {table.name}
             </Button>
             {selectedTable === table.name && (
-              <PostgresTableDetail id={id} schema={schema} table={table.name} transport={transport} onQuery={onQuery} />
+              <PostgresTableDetail key={`${schema}.${table.name}`} id={id} schema={schema} table={table.name} transport={transport} />
             )}
           </li>
         ))}
@@ -495,9 +482,12 @@ function PostgresTables({ id, schema, transport, onQuery }: { id: string; schema
   );
 }
 
-function PostgresTableDetail({ id, schema, table, transport, onQuery }: { id: string; schema: string; table: string; transport: Transport; onQuery: (sql: string) => void }) {
+function PostgresTableDetail({ id, schema, table, transport }: { id: string; schema: string; table: string; transport: Transport }) {
   const t = useTranslate();
   const [tab, setTab] = useState<"rows" | "structure">("rows");
+  const [query, setQuery] = useState(`SELECT * FROM "${schema}"."${table}"`);
+  const [custom, setCustom] = useState<QueryResult | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ columns: { name: string; type: string; not_null: boolean; primary_key: boolean }[]; count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -511,6 +501,16 @@ function PostgresTableDetail({ id, schema, table, transport, onQuery }: { id: st
   }, [transport, id, schema, table]);
   const loadRows = useCallback((limit: number, offset: number) => readPostgresRows(transport, id, schema, table, limit, offset), [transport, id, schema, table]);
 
+  const runQuery = async () => {
+    setQueryError(null);
+    try {
+      setCustom(await queryPostgres(transport, id, query));
+    } catch (err) {
+      setCustom(null);
+      setQueryError(String(err));
+    }
+  };
+
   if (error) return <Notice tone="problem" boxed announce="assertive">{error}</Notice>;
   if (detail === null) return <Pending />;
   return (
@@ -518,11 +518,25 @@ function PostgresTableDetail({ id, schema, table, transport, onQuery }: { id: st
       <div className="tab-bar" role="tablist" aria-label={t("data_studio_table_views", { table })}>
         <Button variant={tab === "rows" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "rows"} onClick={() => setTab("rows")}>{t("data_studio_tab_rows")}</Button>
         <Button variant={tab === "structure" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "structure"} onClick={() => setTab("structure")}>{t("data_studio_tab_structure")} ({detail.columns.length})</Button>
-        <Button variant="quiet" size="compact" onClick={() => onQuery(`SELECT * FROM "${schema}"."${table}"`)}>{t("data_studio_open_in_query")}</Button>
       </div>
-      <p className="row-count">{t("data_studio_count")}: {detail.count}</p>
+      <div className="query-box">
+        <label>{t("data_studio_query")}</label>
+        <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={2} />
+        <div className="query-actions">
+          <Button onClick={runQuery}>{t("data_studio_run")}</Button>
+          {custom && <Button variant="quiet" size="compact" onClick={() => setCustom(null)}>{t("data_studio_back_to_table")}</Button>}
+        </div>
+      </div>
+      {queryError && <Notice tone="problem" boxed announce="assertive">{queryError}</Notice>}
       {tab === "rows" ? (
-        <PagedTable load={loadRows} total={detail.count} />
+        custom ? (
+          <ResultTable result={custom} />
+        ) : (
+          <>
+            <p className="row-count">{t("data_studio_count")}: {detail.count}</p>
+            <PagedTable load={loadRows} total={detail.count} />
+          </>
+        )
       ) : (
         <table>
           <thead>

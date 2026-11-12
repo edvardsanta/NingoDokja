@@ -931,11 +931,11 @@
   "data_studio_tab_rows": "Rows",
   "data_studio_tab_structure": "Structure",
   "data_studio_table_views": "Views of {table}",
-  "data_studio_open_in_query": "Open in query",
   "data_studio_no_rows": "This table has no rows.",
   "data_studio_page_previous": "Previous",
   "data_studio_page_next": "Next",
   "data_studio_page_of": "Page {page} of {pages}",
   "data_studio_pick_source": "Explore a data source",
-  "data_studio_pick_source_hint": "Pick a database, connection or file in the tree on the left. Tables open on their rows; switch to Structure for columns and types."
+  "data_studio_pick_source_hint": "Pick a database, connection or file in the tree on the left. Tables open on their rows; switch to Structure for columns and types.",
+  "data_studio_back_to_table": "Back to table"
 }
