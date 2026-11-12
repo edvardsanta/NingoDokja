@@ -9,4 +9,4 @@ pnpm install --offline --frozen-lockfile --store-dir /opt/pnpm-store
 if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
-exec pnpm dev:watch
+exec node --import tsx ./main.ts

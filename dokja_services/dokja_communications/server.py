@@ -270,14 +270,26 @@ def handler_for(adapter, access_token):
     return Handler
 
 
-def stop(_signum, _frame):
-    # The container engine stops a module with SIGTERM. Leaving cleanly keeps exit
-    # code 0, so a deliberate stop is not mistaken for a crash.
-    raise SystemExit(0)
+def serve(server):
+    # Signals only request a stop: raising from a signal handler can interrupt
+    # threading._shutdown and produce an ignored SystemExit traceback.
+    stopping = False
+
+    def stop(_signum, _frame):
+        nonlocal stopping
+        stopping = True
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(signum, stop)
+    server.timeout = 0.2
+    try:
+        while not stopping:
+            server.handle_request()
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, stop)
     adapter = Adapter(
         os.getenv("DISCORD_BOT_TOKEN", ""),
         os.getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID", ""),
@@ -288,4 +300,4 @@ if __name__ == "__main__":
         (os.getenv("COMMUNICATIONS_BIND", "127.0.0.1"), 8084),
         handler_for(adapter, os.getenv("DOKJA_COMMUNICATIONS_TOKEN", "")),
     )
-    server.serve_forever()
+    serve(server)
