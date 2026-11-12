@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	store "read_books/dokja_store"
+	"read_books/internal/clients"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -683,6 +684,59 @@ func sendHandler(screener MemeScreener, marker MemeMarker) (*SystemDomainHandler
 		WithSafeOnlyChannels("hook-chan").
 		WithMemeTools(screener, marker)
 	return handler, deliverer
+}
+
+type fakeDiscordPostStore struct {
+	recorded []string
+}
+
+func (f *fakeDiscordPostStore) RecordDiscordPost(mediaURL, guildID, channelID, messageID string) error {
+	f.recorded = append(f.recorded, strings.Join([]string{mediaURL, guildID, channelID, messageID}, "|"))
+	return nil
+}
+
+// receiptDiscordDeliverer reports the Discord message it created, like the interface client.
+type receiptDiscordDeliverer struct {
+	fakeDiscordDeliverer
+	receipt clients.DiscordDeliveryReceipt
+}
+
+func (f *receiptDiscordDeliverer) DeliverWithReceipt(ctx context.Context, channelID, content, attachmentURL string, data []byte, contentType string) (clients.DiscordDeliveryReceipt, error) {
+	if len(data) == 0 {
+		if err := f.Deliver(ctx, channelID, content, attachmentURL); err != nil {
+			return clients.DiscordDeliveryReceipt{}, err
+		}
+	} else if err := f.DeliverAttachment(ctx, channelID, content, data, contentType, attachmentURL); err != nil {
+		return clients.DiscordDeliveryReceipt{}, err
+	}
+	return f.receipt, nil
+}
+
+// A delivered attachment is recorded against its Discord message, so a later
+// citation can link Ningo's own post.
+func TestAdminSendRecordsTheDiscordPostForCitations(t *testing.T) {
+	deliverer := &receiptDiscordDeliverer{receipt: clients.DiscordDeliveryReceipt{GuildID: "guild-1", ChannelID: "open-chan", MessageID: "msg-1"}}
+	posts := &fakeDiscordPostStore{}
+	handler := NewSystemDomainHandler(nil, nil, nil, deliverer, "open-chan").WithDiscordPosts(posts)
+
+	if _, err := sendImage(handler, map[string]any{"channel_ids": []any{"open-chan"}, "content": "x", "mark_sent": true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(posts.recorded) != 1 || posts.recorded[0] != "https://example.com/a.png|guild-1|open-chan|msg-1" {
+		t.Fatalf("expected the delivery recorded, got %#v", posts.recorded)
+	}
+}
+
+// A deliverer without a receipt (or a reply without a guild) records nothing.
+func TestAdminSendWithoutAReceiptRecordsNothing(t *testing.T) {
+	posts := &fakeDiscordPostStore{}
+	handler := NewSystemDomainHandler(nil, nil, nil, &fakeDiscordDeliverer{}, "open-chan").WithDiscordPosts(posts)
+	if _, err := sendImage(handler, map[string]any{"channel_ids": []any{"open-chan"}, "content": "x", "mark_sent": true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(posts.recorded) != 0 {
+		t.Fatalf("no receipt, no record: %#v", posts.recorded)
+	}
 }
 
 func sendImage(handler *SystemDomainHandler, payload map[string]any) (map[string]any, error) {

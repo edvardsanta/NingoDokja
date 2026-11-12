@@ -5,6 +5,7 @@ import (
 	"errors"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -72,6 +73,32 @@ func TestOnlyRelevantHitsReachThePromptAndTheReplyCitesThem(t *testing.T) {
 	}
 	if strings.Contains(reply, "Cake") {
 		t.Fatalf("an irrelevant hit must not be cited: %q", reply)
+	}
+}
+
+type fakeDiscordPosts map[string]store.DiscordPost
+
+func (f fakeDiscordPosts) LatestDiscordPost(mediaURL string) (store.DiscordPost, bool, error) {
+	post, ok := f[mediaURL]
+	return post, ok, nil
+}
+
+// Ningo's own Discord post of a cited meme is the link, when the delivery was recorded.
+func TestCitationsLinkNingosOwnDiscordPostWhenRecorded(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult(
+		map[string]any{"source_id": "meme-hashtag:abc", "title": "#PedroGames", "heading": "", "text": "totem no fortnite", "relevant": true, "source_ref": "https://memes.example/x.mp4"},
+	)}
+	handler, generator := chatWith(searcher, nil)
+	handler.WithDiscordPosts(fakeDiscordPosts{"https://memes.example/x.mp4": {GuildID: "guild-1", ChannelID: "chan-1", MessageID: "msg-9"}})
+	generator.result = map[string]any{"reply": "model reply [1]"}
+
+	result, err := handler.Handle(context.Background(), chatEvent("o que o Pedro jogou?"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, _ := result["reply"].(string)
+	if !strings.Contains(reply, "📚 [1] #PedroGames <https://discord.com/channels/guild-1/chan-1/msg-9>") {
+		t.Fatalf("expected the recorded Discord permalink, got %q", reply)
 	}
 }
 
@@ -285,7 +312,7 @@ func TestExcerptsOfOneDocumentHaveDistinctReferences(t *testing.T) {
 	if len(sources) != 3 || sources[0].Number != 1 || sources[1].Number != 2 || sources[2].Number != 3 {
 		t.Fatalf("%#v", sources)
 	}
-	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources))
+	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources), nil)
 	if !strings.HasSuffix(reply, "\n\n📚 [1] The case · [2] The case") {
 		t.Fatal(reply)
 	}
@@ -294,24 +321,36 @@ func TestExcerptsOfOneDocumentHaveDistinctReferences(t *testing.T) {
 	}
 }
 
-// A meme citation names the channel hashtag and links the meme itself: the
-// document's source_ref is the direct link a reader can open. Non-http
-// references (folder:, file:) stay unlinked.
+// A meme citation names the channel hashtag and links the meme itself: Ningo's own
+// Discord post wins when it was recorded; otherwise the document's source_ref is the
+// direct link. Non-http references (folder:, file:) stay unlinked.
 func TestCitationsLinkTheDocumentsOwnPage(t *testing.T) {
 	sources := []knowledgeSource{
 		{Number: 1, SourceID: "meme-hashtag:abc", Title: "#PedroGames", Reference: "https://memes.example/videos/x.mp4"},
 		{Number: 2, SourceID: "note:case", Title: "The case", Reference: "folder:notes/case.md"},
 		{Number: 3, SourceID: "note:plain", Title: "Plain"},
 	}
-	reply := citeSources("Corre [1], detalhe [2], e [3].", sources)
-	if !strings.Contains(reply, "[1] #PedroGames <https://memes.example/videos/x.mp4>") {
+	permalink := func(mediaURL string) string {
+		if mediaURL == "https://memes.example/videos/x.mp4" {
+			return "https://discord.com/channels/guild-1/chan-1/msg-1"
+		}
+		return ""
+	}
+	reply := citeSources("Corre [1], detalhe [2], e [3].", sources, permalink)
+	if !strings.Contains(reply, "[1] #PedroGames <https://discord.com/channels/guild-1/chan-1/msg-1>") {
 		t.Fatal(reply)
 	}
 	if !strings.Contains(reply, "[2] The case · [3] Plain") {
 		t.Fatal(reply)
 	}
-	if strings.Contains(reply, "folder:") {
-		t.Fatal("non-http references stay unlinked", reply)
+	if strings.Contains(reply, "folder:") || strings.Contains(reply, "memes.example") {
+		t.Fatal("fallbacks must not appear when the permalink wins", reply)
+	}
+
+	// Without a recorded post, the document's own page is the link.
+	reply = citeSources("Corre [1].", sources[:1], nil)
+	if !strings.Contains(reply, "[1] #PedroGames <https://memes.example/videos/x.mp4>") {
+		t.Fatal(reply)
 	}
 }
 

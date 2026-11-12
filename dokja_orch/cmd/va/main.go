@@ -84,6 +84,10 @@ func main() {
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
 	var profiles handlers.ChatProfiles
+	// discordPosts records which Discord message carries each posted media URL, so
+	// citations can link Ningo's own post. Nil when the shared database is absent.
+	var discordPostStore handlers.DiscordPostStore
+	var discordPostReader handlers.DiscordPostReader
 	// The owner's conversations live in a file of their own beside the shared database, opened by
 	// the orchestrator alone. Without it, conversations are not kept and chat goes on as before.
 	var archive *conversation.Archive
@@ -96,6 +100,8 @@ func main() {
 		} else {
 			defer db.Close()
 			profiles = db
+			discordPostStore = db
+			discordPostReader = db
 		}
 		kept, err := conversations.Open(conversations.PathBeside(path))
 		if err != nil {
@@ -267,7 +273,7 @@ func main() {
 			memeClient,
 			clients.NewDiscordInterfaceClient(""),
 			os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
-		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(hashtagWorkflow).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).
+		).WithSafeOnlyChannels(os.Getenv("DISCORD_SAFE_ONLY_CHANNEL_IDS")).WithMemeTools(memeClient, memeClient).WithHashtagSuggestions(hashtagWorkflow).WithMemeAttachments(memeClient).WithControls(controls).WithProfiles(profiles).WithHashtagExperience(hashtagExperience).WithDiscordPosts(discordPostStore).
 			// Step 06: suggestions run as a typed task with a frozen shadow prediction. Removing
 			// this line returns to the earlier path above.
 			WithHashtagTask(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience).
@@ -280,7 +286,7 @@ func main() {
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
 		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions).WithMemory(quizRuns),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
