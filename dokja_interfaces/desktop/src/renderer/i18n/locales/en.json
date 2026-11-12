@@ -909,7 +909,6 @@
   "data_studio_title": "Data Studio",
   "data_studio_sqlite": "SQLite",
   "data_studio_diagnostics": "Diagnostics",
-  "data_studio_count_sources": "{sqlite} SQLite, {postgres} PostgreSQL, {json} JSON, {markdown} Markdown, {persona} persona",
   "data_studio_no_sources": "No sources found.",
   "data_studio_no_issues": "No issues found.",
   "data_studio_table": "Table",
@@ -924,5 +923,11 @@
   "data_studio_col_not_null": "Not null",
   "data_studio_col_pk": "PK",
   "data_studio_yes": "yes",
-  "data_studio_no": "no"
+  "data_studio_no": "no",
+  "data_studio_postgres": "PostgreSQL",
+  "data_studio_connect": "Connect",
+  "data_studio_schemas": "Schemas",
+  "data_studio_no_schemas": "No schemas found.",
+  "data_studio_no_tables": "No tables or views in this schema.",
+  "data_studio_persona": "persona"
 }

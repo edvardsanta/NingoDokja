@@ -909,7 +909,6 @@
   "data_studio_title": "Estúdio de dados",
   "data_studio_sqlite": "Bancos SQLite",
   "data_studio_diagnostics": "Diagnóstico",
-  "data_studio_count_sources": "{sqlite} SQLite, {postgres} PostgreSQL, {json} JSON, {markdown} Markdown, {persona} personalidade",
   "data_studio_no_sources": "Nenhuma fonte encontrada.",
   "data_studio_no_issues": "Nenhum problema encontrado.",
   "data_studio_table": "Tabela",
@@ -924,5 +923,11 @@
   "data_studio_col_not_null": "Não nulo",
   "data_studio_col_pk": "PK",
   "data_studio_yes": "sim",
-  "data_studio_no": "não"
+  "data_studio_no": "não",
+  "data_studio_postgres": "PostgreSQL",
+  "data_studio_connect": "Conectar",
+  "data_studio_schemas": "Schemas",
+  "data_studio_no_schemas": "Nenhum schema encontrado.",
+  "data_studio_no_tables": "Nenhuma tabela ou view neste schema.",
+  "data_studio_persona": "personalidade"
 }

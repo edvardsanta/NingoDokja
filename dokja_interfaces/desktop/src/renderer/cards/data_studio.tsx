@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { Transport } from "../../shared/transport.js";
 import { useTranslate } from "../i18n/context.js";
@@ -15,6 +15,10 @@ import {
   readJSONFile,
   readMarkdownFile,
   runDiagnostics,
+  listPostgresSchemas,
+  listPostgresTables,
+  readPostgresTable,
+  maskedDSN,
 } from "./data_studio_model.js";
 
 const KIND_ORDER: SourceKind[] = ["sqlite", "postgres", "json", "markdown", "persona"];
@@ -82,6 +86,9 @@ export function DataStudioCard({ transport }: { transport: Transport }) {
                           onClick={() => setSelected(source)}
                         >
                           {source.name}
+                          {source.size > 0 && kind !== "postgres" && (
+                            <span className="source-size"> {formatSize(source.size)}</span>
+                          )}
                         </Button>
                       </li>
                     ))}
@@ -111,18 +118,32 @@ function OverviewCounts({ sources, transport }: { sources: Source[]; transport: 
     return c;
   }, [sources]);
 
+  const chips: { kind: SourceKind; label: string }[] = [
+    { kind: "sqlite", label: "SQLite" },
+    { kind: "postgres", label: "PostgreSQL" },
+    { kind: "json", label: "JSON" },
+    { kind: "markdown", label: "Markdown" },
+    { kind: "persona", label: t("data_studio_persona") },
+  ];
+
   return (
     <div className="data-studio-overview">
-      <p>{t("data_studio_count_sources", {
-        sqlite: String(counts.sqlite),
-        postgres: String(counts.postgres),
-        json: String(counts.json),
-        markdown: String(counts.markdown),
-        persona: String(counts.persona),
-      })}</p>
+      <div className="count-chips" role="list">
+        {chips.map(({ kind, label }) => (
+          <span key={kind} role="listitem" className="count-chip" data-kind={kind} aria-label={`${counts[kind]} ${label}`}>
+            <strong>{counts[kind]}</strong> {label}
+          </span>
+        ))}
+      </div>
       <DiagnosticsButton transport={transport} />
     </div>
   );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${bytes} B`;
 }
 
 function DiagnosticsButton({ transport }: { transport: Transport }) {
@@ -166,6 +187,8 @@ function SourceDetail({ source, transport, onRefresh }: { source: Source; transp
   switch (source.kind) {
     case "sqlite":
       return <SQLiteDetail path={source.path!} transport={transport} onRefresh={onRefresh} />;
+    case "postgres":
+      return <PostgresDetail source={source} transport={transport} />;
     case "json":
       return <JSONDetail path={source.path!} transport={transport} />;
     case "markdown":
@@ -292,8 +315,138 @@ function SQLiteTableDetail({ path, table, transport }: { path: string; table: st
   );
 }
 
-function ResultTable({ result }: { result: QueryResult }) {
+function PostgresDetail({ source, transport }: { source: Source; transport: Transport }) {
+  const t = useTranslate();
+  const [schemas, setSchemas] = useState<string[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSchema, setSelectedSchema] = useState<string | null>(null);
+
+  const load = async () => {
+    setError(null);
+    try {
+      setSchemas(await listPostgresSchemas(transport, source.id));
+    } catch (err) {
+      setError(String(err));
+      setSchemas(null);
+    }
+  };
+
   return (
+    <div>
+      <h3>{t("data_studio_postgres")}: {source.name}</h3>
+      <p className="read-only-badge">{t("data_studio_read_only")}</p>
+      <p className="postgres-dsn">{maskedDSN(source.dsn ?? "")}</p>
+      {schemas === null && !error && <Button onClick={load}>{t("data_studio_connect")}</Button>}
+      {error && (
+        <>
+          <Notice tone="problem" boxed announce="assertive">{error}</Notice>
+          <Button onClick={load}>{t("retry")}</Button>
+        </>
+      )}
+      {schemas !== null && (
+        schemas.length === 0 ? (
+          <Notice boxed tone="unchecked">{t("data_studio_no_schemas")}</Notice>
+        ) : (
+          <details open className="schema-list">
+            <summary>{t("data_studio_schemas")} ({schemas.length})</summary>
+            <ul>
+              {schemas.map((schema) => (
+                <li key={schema}>
+                  <Button variant={selectedSchema === schema ? "primary" : "quiet"} size="compact" onClick={() => setSelectedSchema(schema === selectedSchema ? null : schema)}>
+                    {schema}
+                  </Button>
+                  {selectedSchema === schema && (
+                    <PostgresTables id={source.id} schema={schema} transport={transport} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )
+      )}
+    </div>
+  );
+}
+
+function PostgresTables({ id, schema, transport }: { id: string; schema: string; transport: Transport }) {
+  const t = useTranslate();
+  const [tables, setTables] = useState<{ name: string; type: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    listPostgresTables(transport, id, schema)
+      .then((list) => { if (alive) setTables(list); })
+      .catch((err) => { if (alive) setError(String(err)); });
+    return () => { alive = false; };
+  }, [transport, id, schema]);
+
+  if (error) return <Notice tone="problem" boxed announce="assertive">{error}</Notice>;
+  if (tables === null) return <Pending />;
+  if (tables.length === 0) return <Notice boxed tone="unchecked">{t("data_studio_no_tables")}</Notice>;
+
+  return (
+    <div className="postgres-tables">
+      <ul>
+        {tables.map((table) => (
+          <li key={table.name}>
+            <Button variant={selectedTable === table.name ? "primary" : "quiet"} size="compact" onClick={() => setSelectedTable(table.name === selectedTable ? null : table.name)}>
+              {table.type}: {table.name}
+            </Button>
+            {selectedTable === table.name && (
+              <PostgresTableColumns id={id} schema={schema} table={table.name} transport={transport} />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PostgresTableColumns({ id, schema, table, transport }: { id: string; schema: string; table: string; transport: Transport }) {
+  const t = useTranslate();
+  const [detail, setDetail] = useState<{ columns: { name: string; type: string; not_null: boolean; primary_key: boolean }[]; count: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setError(null);
+    readPostgresTable(transport, id, schema, table)
+      .then((schemaDetail) => { if (alive) setDetail(schemaDetail); })
+      .catch((err) => { if (alive) setError(String(err)); });
+    return () => { alive = false; };
+  }, [transport, id, schema, table]);
+
+  if (error) return <Notice tone="problem" boxed>{error}</Notice>;
+  if (detail === null) return <Pending />;
+  return (
+    <div className="table-detail">
+      <p>{t("data_studio_count")}: {detail.count}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>{t("data_studio_columns")}</th>
+            <th>{t("data_studio_col_type")}</th>
+            <th>{t("data_studio_col_not_null")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {detail.columns.map((col) => (
+            <tr key={col.name}>
+              <td>{col.name}</td>
+              <td>{col.type}</td>
+              <td>{col.not_null ? t("data_studio_yes") : t("data_studio_no")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ResultTable({ result }: { result: QueryResult }) {  return (
     <table className="result-table">
       <thead>
         <tr>

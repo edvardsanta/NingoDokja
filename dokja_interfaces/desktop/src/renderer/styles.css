@@ -3720,6 +3720,54 @@ button.cfg-toggle:focus-visible {
 
 .data-studio-overview {
   margin-block-end: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.count-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.count-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.count-chip strong {
+  color: var(--action-primary);
+}
+
+.source-size {
+  opacity: 0.65;
+  font-size: 0.85em;
+}
+
+.postgres-dsn {
+  margin-block: 0.25rem 0.75rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.postgres-tables {
+  margin: 0.25rem 0 0.5rem 0.75rem;
+}
+
+.postgres-tables ul {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0 0 0 0.75rem;
+  display: grid;
+  gap: 0.125rem;
 }
 
 .source-group {

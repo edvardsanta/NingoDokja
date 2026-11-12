@@ -49,7 +49,9 @@ describe("the catalogs", () => {
     // product names
     "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme",
     // PK is the database abbreviation in both languages
-    "data_studio_col_pk"]);
+    "data_studio_col_pk",
+    // database terms: the product name and the SQL word are the same in Portuguese
+    "data_studio_postgres", "data_studio_schemas"]);
 
   it("translate every message, so none was left in English", () => {
     const same = Object.keys(en).filter(
