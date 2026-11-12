@@ -104,6 +104,13 @@ export async function readPostgresTable(transport: Transport, id: string, schema
   return result?.schema ?? { columns: [], count: 0 };
 }
 
+export async function queryPostgres(transport: Transport, id: string, query: string, limit = 100, offset = 0): Promise<QueryResult> {
+  const reply = await transport.request("datastudio.postgres.query", { connection_id: id, query, limit, offset });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { result: QueryResult } | undefined;
+  return result?.result ?? { columns: [], rows: [], total: 0 };
+}
+
 // The screen never sees credentials. The shell masks the DSN to host:port/database
 // before it reaches the renderer; this stays as the defense in depth for anything
 // that slips through, and passes already-masked values straight on.

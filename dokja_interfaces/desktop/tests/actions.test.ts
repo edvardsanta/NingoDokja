@@ -872,3 +872,18 @@ test("datastudio postgres actions carry only the connection_id the screen chose"
     { connection_id: "postgres:1", schema: "dokja_price", table: "offers" },
   );
 });
+
+test("datastudio.postgres.query runs a bounded read with the chosen connection", () => {
+  const action = ACTIONS["datastudio.postgres.query"];
+  assert.deepEqual(
+    action.payload({ connection_id: "postgres:1", query: "SELECT * FROM dokja_price.offers", limit: 50, offset: 10 }),
+    { connection_id: "postgres:1", query: "SELECT * FROM dokja_price.offers", limit: 50, offset: 10 },
+  );
+  assert.equal(action.payload({ query: "SELECT 1" }), undefined);
+  assert.equal(action.payload({ connection_id: "postgres:1" }), undefined);
+  assert.deepEqual(action.payload({ connection_id: "postgres:1", query: "SELECT 1", limit: 99999, offset: -1 }), { connection_id: "postgres:1", query: "SELECT 1", limit: 500, offset: 0 });
+  assert.deepEqual(
+    action.project(compactOf("data-studio", { result: { columns: ["id"], rows: [[7]], total: 1 } })),
+    { result: { columns: ["id"], rows: [[7]], total: 1 } },
+  );
+});
