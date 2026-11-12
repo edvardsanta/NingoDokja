@@ -74,6 +74,11 @@ keywords = ["http"]
     '''^https://github\.com/akitaonrails/ai-memory$''',
     # The scheme named in a sentence ("starts with http:// or https://."), with no address after it.
     '''^https?://\.$''',
+    # Discord message permalinks the citation feature renders and tests: the host is
+    # Discord's official domain and the ids are runtime data. Path segments must be
+    # %s or start with a letter, so a real numeric id (blocked by dokja-discord-id)
+    # can never match.
+    '''^https://discord\.com/channels/(%s|[a-z][a-z0-9-]*)/(%s|[a-z][a-z0-9-]*)/(%s|[a-z][a-z0-9-]*)/?$''',
   ]
 
   [[rules.allowlists]]
