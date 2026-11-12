@@ -380,6 +380,7 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		}
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
+		messages = fitChatPrompt(messages)
 		var emitted int
 		stream := func(text string) {
 			callback := core.VoiceSpeech(ctx)
@@ -408,12 +409,20 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		}
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
+		messages = fitChatPrompt(messages)
 		if preview := core.ReplyPreview(ctx); preview != nil && webData == nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, preview)
 			}
 		}
-		return generator.GenerateMessages(ctx, messages)
+		result, err := generator.GenerateMessages(ctx, messages)
+		if promptSizeRefused(err) {
+			// One retry with half the history, in case the assembled prompt still overshot.
+			if halved, ok := halveChatHistory(messages); ok {
+				result, err = generator.GenerateMessages(ctx, halved)
+			}
+		}
+		return result, err
 	}
 	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
 		return nil, fmt.Errorf("web reading requires a conversation generator")
