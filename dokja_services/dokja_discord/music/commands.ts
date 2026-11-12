@@ -11,7 +11,7 @@ type Dispatch = (eventType: string, request: { content: string; userId: string; 
 
 type MusicResult = { text: string; state?: QueueState; presented: boolean };
 
-export type MusicFeature = { commands: DiscordSlashCommand[]; buttons: DiscordButtonAction[] };
+export type MusicFeature = { dispose?(): void; commands: DiscordSlashCommand[]; buttons: DiscordButtonAction[] };
 
 // The step the panel's volume buttons take, in percent.
 const VOLUME_STEP = 10;
@@ -29,6 +29,7 @@ export function createMusic(params: {
   // the language people are answered in (DOKJA_DISCORD_LOCALE)
   locale?: string;
 }): MusicFeature {
+  let disposed = false;
   const { voice } = params;
   const locale = params.locale ?? "pt-BR";
   const dispatch: Dispatch = params.dispatch ?? ((eventType, request) =>
@@ -51,7 +52,7 @@ export function createMusic(params: {
   const showPanel = (guildId: string, onlyIfBuried = false): Promise<boolean> => {
     const previous = panelUpdates.get(guildId) ?? Promise.resolve(false);
     const update = previous.catch(() => false).then(async () => {
-      if (!voice) return false;
+      if (disposed || !voice) return false;
       const state = lastState.get(guildId);
       if (!state || (onlyIfBuried && !state.nowPlaying)) return false;
       const origin = lastCommand.get(guildId);
@@ -97,7 +98,7 @@ export function createMusic(params: {
 
   const panelRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
   const watchPanel = (guildId: string) => {
-    if (!voice?.panelIsLatest || !voice.deleteMessage || panelRefreshes.has(guildId)) return;
+    if (disposed || !voice?.panelIsLatest || !voice.deleteMessage || panelRefreshes.has(guildId)) return;
     const timer = setTimeout(async () => {
       panelRefreshes.delete(guildId);
       if (!lastState.get(guildId)?.nowPlaying) return;
@@ -109,6 +110,7 @@ export function createMusic(params: {
   };
 
   const apply = async (guildId: string, userId: string, music: unknown) => {
+    if (disposed) return false;
     const state = parseQueueState(music);
     if (!state || !voice) return false;
     const previous = lastState.get(guildId);
@@ -263,6 +265,13 @@ export function createMusic(params: {
     String(Math.min(100, Math.max(0, (lastState.get(guildId)?.volume ?? 100) + step)));
 
   return {
+    dispose() {
+      disposed = true;
+      for (const timer of panelRefreshes.values()) clearTimeout(timer);
+      panelRefreshes.clear();
+      lastState.clear();
+      lastCommand.clear();
+    },
     commands: [
       command("play", "Play a song in your voice channel: a few words or a link.", "music.play", [
         { name: "song", description: "A few words (song and artist) or a link", type: ApplicationCommandOptionType.String, required: true },

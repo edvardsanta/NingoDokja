@@ -50,7 +50,12 @@ type DeliveryServerOptions = {
 
 export function startDiscordDeliveryServer(options: DeliveryServerOptions) {
   const apiBaseUrl = env("DOKJA_DISCORD_API_BASE_URL", "https://discord.com/api/v10").replace(/\/$/, "");
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const lifetime = new AbortController();
+  const upstreamFetch = options.fetchImpl ?? fetch;
+  const fetchImpl: typeof fetch = (input, init) => upstreamFetch(input, {
+    ...init,
+    signal: init?.signal ? AbortSignal.any([lifetime.signal, init.signal]) : lifetime.signal,
+  });
 
   const server = createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/status" && options.status) {
@@ -89,6 +94,8 @@ export function startDiscordDeliveryServer(options: DeliveryServerOptions) {
       } satisfies DiscordDeliveryResponse));
     }
   });
+
+  server.once("close", () => lifetime.abort());
 
   server.listen(options.port, "0.0.0.0", () => {
     options.log?.(JSON.stringify({ delivery: "listening", port: options.port }));

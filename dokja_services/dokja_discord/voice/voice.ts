@@ -101,6 +101,7 @@ type SpeakParams = {
 };
 
 export type DiscordVoiceController = {
+  dispose?(): Promise<void>;
   attachClient(client?: unknown, botUserId?: string): void;
   playRadio(params: { guildId?: string; userId: string; streamUrl: string }): Promise<string>;
   speakText(params: SpeakParams): Promise<string>;
@@ -144,20 +145,16 @@ export function createDiscordVoiceController(options: {
 }): DiscordVoiceController {
   const sessions = new Map<string, VoiceSession>();
   const musics = new Map<string, MusicSession>();
-  // A restart of the adapter must not leave yt-dlp or ffmpeg running.
-  process.once("exit", () => {
-    for (const music of musics.values()) {
-      music.stream?.stop();
-      music.prepared?.stream.stop();
-    }
-  });
   const ffmpegPath = options.ffmpegPath ?? "ffmpeg";
   const readyTimeoutMs = options.readyTimeoutMs ?? 30_000;
 
+  const lifetime = new AbortController();
+  let disposed = false;
   let voiceClient: DiscordJsClient | undefined;
   let voiceClientReady: Promise<DiscordJsClient> | undefined;
 
   const ensureVoiceClient = async (): Promise<DiscordJsClient> => {
+    if (disposed) throw new Error("Voice controller is closed");
     if (voiceClientReady) {
       return await voiceClientReady;
     }
@@ -195,9 +192,13 @@ export function createDiscordVoiceController(options: {
       options.error?.("[dokja-discord] discord.js voice client error", error);
     });
 
+    voiceClient = client;
     voiceClientReady = (async () => {
       await client.login(options.token);
-      voiceClient = client;
+      if (disposed) {
+        await client.destroy();
+        throw new Error("Voice controller is closed");
+      }
       return client;
     })();
 
@@ -287,7 +288,8 @@ export function createDiscordVoiceController(options: {
       if (voiceChannel.type !== ChannelType.GuildVoice && voiceChannel.type !== ChannelType.GuildStageVoice) {
         throw new Error("Music plays only in voice channels.");
       }
-      session = await ensureVoiceSession({ sessions, guildId, voiceChannel, readyTimeoutMs, log: options.log, error: options.error });
+      session = await ensureVoiceSession({ signal: lifetime.signal, sessions, guildId, voiceChannel, readyTimeoutMs, log: options.log, error: options.error });
+      lifetime.signal.throwIfAborted();
       sessions.set(guildId, session);
     }
     if (session.stream !== undefined && (session.stream as RadioStreamSession).sourceUrl) {
@@ -362,6 +364,7 @@ export function createDiscordVoiceController(options: {
     writeFileSync(tempPath, wavBytes);
 
     const session = await ensureVoiceSession({
+      signal: lifetime.signal,
       sessions,
       guildId,
       voiceChannel,
@@ -428,6 +431,7 @@ export function createDiscordVoiceController(options: {
       throw new Error("Joined the voice channel, but speech playback did not start.");
     }
 
+    lifetime.signal.throwIfAborted();
     sessions.set(guildId, session);
     options.log?.(
       "[dokja-discord] speech started",
@@ -445,8 +449,27 @@ export function createDiscordVoiceController(options: {
   }
 
   return {
+    async dispose() {
+      if (disposed) return;
+      disposed = true;
+      lifetime.abort();
+      for (const timer of aloneTimers.values()) clearTimeout(timer);
+      aloneTimers.clear();
+      for (const music of musics.values()) {
+        music.onEnded = () => {};
+        music.onGone = () => {};
+        stopTrack(music);
+        dropPrepared(music);
+      }
+      musics.clear();
+      for (const session of sessions.values()) stopGuildSession(session);
+      sessions.clear();
+      await voiceClient?.destroy();
+    },
     attachClient(_client?: unknown) {
-      void ensureVoiceClient();
+      void ensureVoiceClient().catch((error) => {
+        if (!disposed) options.error?.("Voice startup failed", error);
+      });
     },
     async playRadio({ guildId, userId, streamUrl }) {
       if (!guildId) {
@@ -472,6 +495,7 @@ export function createDiscordVoiceController(options: {
       }
 
       const session = await ensureVoiceSession({
+        signal: lifetime.signal,
         sessions,
         guildId,
         voiceChannel,
@@ -510,6 +534,7 @@ export function createDiscordVoiceController(options: {
         throw new Error("Joined the voice channel, but the radio stream did not start playing.");
       }
 
+      lifetime.signal.throwIfAborted();
       sessions.set(guildId, session);
       options.log?.(
         "[dokja-discord] radio started",
@@ -663,6 +688,7 @@ export function createDiscordVoiceController(options: {
       }
 
       const session = await ensureVoiceSession({
+        signal: lifetime.signal,
         sessions,
         guildId,
         voiceChannel,
@@ -689,6 +715,7 @@ export function createDiscordVoiceController(options: {
         error: options.error,
         onTurn, onObservation, onHeard, onStopped,
       });
+      lifetime.signal.throwIfAborted();
       sessions.set(guildId, session);
 
       options.log?.(
@@ -927,6 +954,7 @@ export function createListeningSession(params: {
 }
 
 async function ensureVoiceSession(params: {
+  signal?: AbortSignal;
   sessions: Map<string, VoiceSession>;
   guildId: string;
   voiceChannel: GuildBasedChannel;
@@ -934,6 +962,7 @@ async function ensureVoiceSession(params: {
   log?: (...args: unknown[]) => void;
   error?: (...args: unknown[]) => void;
 }): Promise<VoiceSession> {
+  params.signal?.throwIfAborted();
   const existing = params.sessions.get(params.guildId);
   if (
     existing &&
@@ -962,6 +991,12 @@ async function ensureVoiceSession(params: {
     adapterCreator: params.voiceChannel.guild.voiceAdapterCreator,
     selfDeaf: false,
   });
+
+  const cancel = () => {
+    if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+  };
+  params.signal?.addEventListener("abort", cancel, { once: true });
+  connection.once(VoiceConnectionStatus.Destroyed, () => params.signal?.removeEventListener("abort", cancel));
 
   connection.on("debug", (message) => {
     params.log?.(
@@ -994,7 +1029,7 @@ async function ensureVoiceSession(params: {
         error: message,
       }),
     );
-    connection.destroy();
+    if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
     throw new Error(
       `Joined <#${params.voiceChannel.id}>, but the Discord voice transport never became ready. Check bot voice permissions and host networking and try again.`,
     );

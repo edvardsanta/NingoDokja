@@ -249,22 +249,47 @@ class HTTPAccessTests(unittest.TestCase):
 
 
 class ShutdownTests(unittest.TestCase):
-    def test_a_stop_signal_ends_the_server_cleanly(self):
-        server = Path(__file__).with_name("server.py")
-        env = {**os.environ, "COMMUNICATIONS_BIND": "127.0.0.1"}
-        process = subprocess.Popen([sys.executable, str(server)], env=env)
+    def test_repeated_signals_during_cleanup_exit_without_traceback(self):
+        script = """
+import signal
+import time
+from http.server import ThreadingHTTPServer
+from server import serve, handler_for
+from unittest.mock import Mock
+
+class Server(ThreadingHTTPServer):
+    def server_close(self):
+        print("closing", flush=True)
+        time.sleep(0.3)
+        super().server_close()
+
+server = Server(("127.0.0.1", 0), handler_for(Mock(), ""))
+print(server.server_address[1], flush=True)
+serve(server)
+"""
+        process = subprocess.Popen(
+            [sys.executable, "-u", "-c", script],
+            cwd=Path(__file__).parent,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         try:
-            for _ in range(50):
-                try:
-                    urlopen("http://127.0.0.1:8084/health", timeout=1).close()
-                    break
-                except OSError:
-                    time.sleep(0.1)
+            port = int(process.stdout.readline())
+            urlopen(f"http://127.0.0.1:{port}/health", timeout=2).close()
             process.send_signal(signal.SIGTERM)
-            self.assertEqual(process.wait(timeout=5), 0)
+            self.assertEqual(process.stdout.readline().strip(), "closing")
+            process.send_signal(signal.SIGTERM)
+            process.send_signal(signal.SIGINT)
+            _, stderr = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertNotIn("Traceback", stderr)
+            self.assertNotIn("SystemExit", stderr)
         finally:
-            process.kill()
-            process.wait()
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+
 
 if __name__ == "__main__":
     unittest.main()

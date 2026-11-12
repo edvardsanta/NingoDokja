@@ -41,6 +41,8 @@ import { trackGatewayState, type GatewayStateTracker } from "./gateway_state.js"
 
 type StartDiscordJsRuntimeParams = {
   token: string;
+  signal?: AbortSignal;
+  onClientCreated?: (client: Client) => void;
   applicationId?: string;
   devGuildIds?: string[];
   log?: (...args: unknown[]) => void;
@@ -66,11 +68,14 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
     ],
   });
 
+  params.onClientCreated?.(client);
+
   const buttons = params.buttons ?? [];
   const selects = params.selects ?? [];
   const modals = params.modals ?? [];
 
   client.on(Events.ClientReady, async (readyClient) => {
+    if (params.signal?.aborted) return;
     const applicationId =
       params.applicationId?.trim() ||
       readyClient.application?.id ||
@@ -94,11 +99,13 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
         }),
       );
     }
+    if (params.signal?.aborted) return;
     await params.onReady?.(client, { botUserId: readyClient.user.id });
   });
 
   client.on(Events.MessageCreate, async (message) => {
     try {
+      if (params.signal?.aborted) return;
       await params.onMessage(await toMessageContext(message, client.user?.id));
     } catch (error) {
       params.error?.("[dokja-discord] message listener failed", error);
@@ -106,6 +113,7 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    if (params.signal?.aborted) return;
     try {
       if (interaction.isChatInputCommand()) {
         const command = params.commands.find((entry) => entry.name === interaction.commandName);
@@ -155,7 +163,7 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
     trackGatewayState(client, params.gateway);
   }
 
-  await client.login(params.token);
+  if (!params.signal?.aborted) await client.login(params.token);
 }
 
 type CommandRest = { put(route: `/${string}`, options: { body: unknown }): Promise<unknown> };

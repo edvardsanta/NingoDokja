@@ -1,3 +1,4 @@
+import { closeDeliveryServer, type Shutdown } from "./runtime/shutdown.js";
 import type { DiscordInterfaceConfig } from "./config.js";
 import { createMusic } from "./music/commands.js";
 import { createCommands } from "./commands/commands.js";
@@ -8,7 +9,7 @@ import { startDiscordJsRuntime } from "./runtime/discordjs_runtime.js";
 import { createGatewayState, discordStatusReply } from "./runtime/gateway_state.js";
 import { createDiscordVoiceController } from "./voice/voice.js";
 
-export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig): Promise<void> {
+export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig, shutdown: Shutdown): Promise<void> {
   const runtime = {
     log: (...args: unknown[]) => console.log("[dokja-discord]", ...args),
     error: (...args: unknown[]) => console.error("[dokja-discord]", ...args),
@@ -24,6 +25,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     log: runtime.log,
     error: runtime.error,
   });
+  shutdown.add(() => voice.dispose?.());
   const MUSIC_COMMANDS = new Set(["play", "queue"]);
   // One music feature: its commands and its panel buttons share the queue they play.
   const music = createMusic({
@@ -32,6 +34,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     voice,
     locale: cfg.locale,
   });
+  shutdown.add(() => music.dispose?.());
   const allCommands = createCommands(cfg.orchestratorEndpoint, cfg.orchestratorTimeoutMs, voice, {
     logVoiceConversation: cfg.mode === "full",
     locale: cfg.locale,
@@ -67,7 +70,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
   );
 
   if (cfg.mode === "full") {
-    startDiscordDeliveryServer({
+    const server = startDiscordDeliveryServer({
       token,
       port: cfg.deliveryPort,
       webhooks: cfg.deliveryWebhooks,
@@ -75,6 +78,7 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
       log: runtime.log,
       error: runtime.error,
     });
+    shutdown.add(() => closeDeliveryServer(server));
   }
 
   const interactions = cfg.mode === "full"
@@ -87,6 +91,8 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig):
     : { buttons: [], selects: [], modals: [] };
 
   await startDiscordJsRuntime({
+    signal: shutdown.signal,
+    onClientCreated: (client) => shutdown.add(() => client.destroy()),
     token,
     applicationId: cfg.applicationId,
     devGuildIds: cfg.allowedGuildIds,
