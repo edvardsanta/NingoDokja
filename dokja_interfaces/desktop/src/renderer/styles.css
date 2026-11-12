@@ -3933,3 +3933,25 @@ button.cfg-toggle:focus-visible {
   top: 0;
   background: var(--panel);
 }
+
+/* Sortable column header: keeps the table's dense look, adds a clear target. */
+.sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sort-header:hover {
+  color: var(--accent, #7ee2ff);
+}
+
+.sort-arrow {
+  font-size: 0.7em;
+  opacity: 0.7;
+}

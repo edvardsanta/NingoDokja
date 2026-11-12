@@ -1165,7 +1165,9 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => {
       const base = dataStudioPath(raw);
       const table = text(raw.table).slice(0, 200);
-      return base && table ? { ...base, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+      if (!base || !table) return undefined;
+      const sort = dataStudioSort(raw);
+      return { ...base, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0), ...(sort ?? {}) };
     },
     project: (result) => inDomain(result, "data-studio", (body) => ({
       result: queryResultOf(body.result),
@@ -1216,7 +1218,9 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       const base = postgresRef(raw);
       const schema = text(raw.schema).slice(0, 200);
       const table = text(raw.table).slice(0, 200);
-      return base && schema && table ? { ...base, schema, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+      if (!base || !schema || !table) return undefined;
+      const sort = dataStudioSort(raw);
+      return { ...base, schema, table, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0), ...(sort ?? {}) };
     },
     project: (result) => inDomain(result, "data-studio", (body) => ({
       result: queryResultOf(body.result),
@@ -1262,6 +1266,14 @@ function dataStudioPath(raw: Record<string, unknown>): { path: string } | undefi
 function postgresRef(raw: Record<string, unknown>): { connection_id: string } | undefined {
   const id = text(raw.connection_id);
   return id !== "" && id.length <= 200 ? { connection_id: id } : undefined;
+}
+
+// Optional ordering for a rows page. The orchestrator validates the column
+// against the live schema; the shell only bounds its shape.
+function dataStudioSort(raw: Record<string, unknown>): { sort_column: string; sort_dir: string } | undefined {
+  const column = text(raw.sort_column).slice(0, 200);
+  if (column === "") return undefined;
+  return { sort_column: column, sort_dir: text(raw.sort_dir) === "desc" ? "desc" : "asc" };
 }
 
 // A postgres:// DSN carries user and password; only host:port/database may reach the screen.

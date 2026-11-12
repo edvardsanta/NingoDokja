@@ -168,12 +168,16 @@ func (h *DataStudioHandler) sqliteRows(ctx context.Context, payload map[string]a
 	if limit < 1 || limit > 500 || offset < 0 {
 		return nil, fmt.Errorf("limit must be 1..500 and offset non-negative")
 	}
+	sort, err := sortArg(payload)
+	if err != nil {
+		return nil, err
+	}
 	db, err := h.sqlite.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := h.sqlite.TableRows(db, table, limit, offset)
+	rows, err := h.sqlite.TableRows(db, table, limit, offset, sort)
 	if err != nil {
 		return nil, err
 	}
@@ -287,12 +291,16 @@ func (h *DataStudioHandler) postgresRows(ctx context.Context, payload map[string
 	if limit < 1 || limit > 500 || offset < 0 {
 		return nil, fmt.Errorf("limit must be 1..500 and offset non-negative")
 	}
+	sort, err := sortArg(payload)
+	if err != nil {
+		return nil, err
+	}
 	db, err := h.postgres.Open(dsn)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := h.postgres.TableRows(ctx, db, schema, table, limit, offset)
+	rows, err := h.postgres.TableRows(ctx, db, schema, table, limit, offset, sort)
 	if err != nil {
 		return nil, err
 	}
@@ -438,4 +446,25 @@ func intArg(v any, fallback int) int {
 	default:
 		return fallback
 	}
+}
+
+// sortArg reads the optional sort_column/sort_dir pair from a rows payload.
+// The column is only a name here; the readers validate it against the live
+// schema before it reaches SQL.
+func sortArg(payload map[string]any) (*datastudio.SortSpec, error) {
+	column, _ := payload["sort_column"].(string)
+	if column == "" {
+		return nil, nil
+	}
+	desc := false
+	if dir, ok := payload["sort_dir"].(string); ok && dir != "" {
+		switch strings.ToLower(dir) {
+		case "asc":
+		case "desc":
+			desc = true
+		default:
+			return nil, fmt.Errorf("sort_dir must be asc or desc")
+		}
+	}
+	return &datastudio.SortSpec{Column: column, Desc: desc}, nil
 }

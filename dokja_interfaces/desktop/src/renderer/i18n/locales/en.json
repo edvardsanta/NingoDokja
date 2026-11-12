@@ -940,5 +940,6 @@
   "data_studio_back_to_table": "Back to table",
   "data_studio_filter_placeholder": "Filter sources by name",
   "data_studio_filter_label": "Filter sources",
-  "data_studio_filter_empty": "No source matches the filter."
+  "data_studio_filter_empty": "No source matches the filter.",
+  "data_studio_sort_by": "Sort by {column}"
 }

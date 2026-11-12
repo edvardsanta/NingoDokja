@@ -130,9 +130,25 @@ func (r *PostgresReader) TableSchema(db *sql.DB, schema, table string) (*Postgre
 }
 
 // TableRows returns one page of a table or view, ordered by the primary key
-// when one exists so paging stays deterministic.
-func (r *PostgresReader) TableRows(ctx context.Context, db *sql.DB, schema, table string, limit, offset int) (*QueryResult, error) {
+// when one exists so paging stays deterministic. A sort spec overrides the
+// ordering with one validated column.
+func (r *PostgresReader) TableRows(ctx context.Context, db *sql.DB, schema, table string, limit, offset int, sort *SortSpec) (*QueryResult, error) {
 	query := fmt.Sprintf("SELECT * FROM %s.%s", quoteIdent(schema), quoteIdent(table))
+	if sort != nil {
+		exists, err := r.columnExists(ctx, db, schema, table, sort.Column)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("unknown sort column %q", sort.Column)
+		}
+		direction := "ASC"
+		if sort.Desc {
+			direction = "DESC"
+		}
+		query += fmt.Sprintf(" ORDER BY %s %s", quoteIdent(sort.Column), direction)
+		return r.Query(ctx, db, query, limit, offset)
+	}
 	rows, err := db.Query(`SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = $1::regclass AND i.indisprimary ORDER BY a.attnum`, fmt.Sprintf("%s.%s", schema, table))
 	if err == nil {
 		var cols []string
@@ -148,6 +164,18 @@ func (r *PostgresReader) TableRows(ctx context.Context, db *sql.DB, schema, tabl
 		}
 	}
 	return r.Query(ctx, db, query, limit, offset)
+}
+
+// columnExists reports whether the table has a column with that exact name.
+func (r *PostgresReader) columnExists(ctx context.Context, db *sql.DB, schema, table, column string) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3`,
+		schema, table, column).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("check column: %w", err)
+	}
+	return count > 0, nil
 }
 
 // Query runs a SELECT with a timeout and row limit.

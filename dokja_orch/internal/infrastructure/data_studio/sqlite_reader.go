@@ -168,16 +168,44 @@ func (r *SQLiteReader) Query(db *sql.DB, query string, limit, offset int) (*Quer
 	}, nil
 }
 
-// TableRows returns a paginated, ordered preview of a table.
-func (r *SQLiteReader) TableRows(db *sql.DB, table string, limit, offset int) (*QueryResult, error) {
+// TableRows returns a paginated, ordered preview of a table. With a sort spec
+// the rows order by that column; otherwise a stable rowid order keeps paging
+// deterministic when rowid exists.
+func (r *SQLiteReader) TableRows(db *sql.DB, table string, limit, offset int, sort *SortSpec) (*QueryResult, error) {
 	query := fmt.Sprintf("SELECT * FROM %q", table)
-	// Add a stable order only when rowid exists to keep pagination deterministic.
-	var hasRowID bool
-	if err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info(%q) WHERE name = 'rowid'", table)).Scan(&hasRowID); err == nil && hasRowID {
-		query += " ORDER BY rowid"
+	switch {
+	case sort != nil:
+		exists, err := r.columnExists(db, table, sort.Column)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("unknown sort column %q", sort.Column)
+		}
+		direction := "ASC"
+		if sort.Desc {
+			direction = "DESC"
+		}
+		query += fmt.Sprintf(" ORDER BY %s %s", quoteSQLiteIdent(sort.Column), direction)
+	default:
+		// Add a stable order only when rowid exists to keep pagination deterministic.
+		var hasRowID bool
+		if err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info(%q) WHERE name = 'rowid'", table)).Scan(&hasRowID); err == nil && hasRowID {
+			query += " ORDER BY rowid"
+		}
 	}
 	query += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
 	return r.Query(db, query, 0, 0)
+}
+
+// columnExists reports whether the table has a column with that exact name.
+func (r *SQLiteReader) columnExists(db *sql.DB, table, column string) (bool, error) {
+	var count int
+	err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_xinfo(%q) WHERE name = %q", table, column)).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("check column: %w", err)
+	}
+	return count > 0, nil
 }
 
 // FileName returns the base name of the database path.
