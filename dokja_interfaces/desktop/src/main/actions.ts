@@ -1134,8 +1134,10 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   // discovered sources, never typed by the screen: the orchestrator validates them again.
   "datastudio.sources.list": {
     payload: noPayload,
+    // Postgres DSNs carry credentials: the screen gets host:port/database only.
     project: (result) => inDomain(result, "data-studio", (body) => ({
-      sources: Array.isArray(body.sources) ? body.sources.filter(isRecord).slice(0, 200) : [],
+      sources: (Array.isArray(body.sources) ? body.sources.filter(isRecord).slice(0, 200) : [])
+        .map((source) => (typeof source.dsn === "string" ? { ...source, dsn: maskPostgresDSN(source.dsn) } : source)),
     })),
   },
   "datastudio.sqlite.schema": {
@@ -1229,6 +1231,18 @@ function dataStudioPath(raw: Record<string, unknown>): { path: string } | undefi
 function postgresRef(raw: Record<string, unknown>): { connection_id: string } | undefined {
   const id = text(raw.connection_id);
   return id !== "" && id.length <= 200 ? { connection_id: id } : undefined;
+}
+
+// A postgres:// DSN carries user and password; only host:port/database may reach the screen.
+function maskPostgresDSN(dsn: string): string {
+  try {
+    const url = new URL(dsn);
+    const host = url.hostname + (url.port ? `:${url.port}` : "");
+    const database = url.pathname.replace(/^\//, "");
+    return database ? `${host}/${database}` : host;
+  } catch {
+    return "(configured)";
+  }
 }
 
 function queryResultOf(raw: unknown): { columns: string[]; rows: unknown[][]; total: number } {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	datastudio "read_books/internal/infrastructure/data_studio"
 	"read_books/internal/core"
@@ -29,14 +31,26 @@ type DataStudioHandler struct {
 }
 
 // NewDataStudioHandler creates the handler. postgresDSNs maps a display name to a DSN.
+// Names that share one DSN (different env vars pointing at the same server and
+// database) collapse into a single connection, so the studio never lists the
+// same schemas twice under two labels.
 func NewDataStudioHandler(baseDir string, postgresDSNs map[string]string) *DataStudioHandler {
+	namesByDSN := make(map[string][]string, len(postgresDSNs))
+	for name := range postgresDSNs {
+		namesByDSN[postgresDSNs[name]] = append(namesByDSN[postgresDSNs[name]], name)
+	}
+	dsns := make([]string, 0, len(namesByDSN))
+	for dsn := range namesByDSN {
+		dsns = append(dsns, dsn)
+	}
+	sort.Strings(dsns)
 	var conns []datastudio.PostgresConnection
-	id := 0
-	for name, dsn := range postgresDSNs {
-		id++
+	for id, dsn := range dsns {
+		names := namesByDSN[dsn]
+		sort.Strings(names)
 		conns = append(conns, datastudio.PostgresConnection{
-			ID:   fmt.Sprintf("postgres:%d", id),
-			Name: name,
+			ID:   fmt.Sprintf("postgres:%d", id+1),
+			Name: strings.Join(names, " · "),
 			DSN:  dsn,
 		})
 	}
