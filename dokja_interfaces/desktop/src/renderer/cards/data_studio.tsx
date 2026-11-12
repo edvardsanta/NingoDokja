@@ -18,6 +18,7 @@ import {
   listPostgresSchemas,
   listPostgresTables,
   readPostgresTable,
+  queryPostgres,
   maskedDSN,
 } from "./data_studio_model.js";
 
@@ -320,6 +321,9 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
   const [schemas, setSchemas] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSchema, setSelectedSchema] = useState<string | null>(null);
+  const [query, setQuery] = useState("SELECT * FROM ");
+  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   const load = async () => {
     setError(null);
@@ -328,6 +332,16 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
     } catch (err) {
       setError(String(err));
       setSchemas(null);
+    }
+  };
+
+  const runQuery = async () => {
+    setQueryError(null);
+    try {
+      setQueryResult(await queryPostgres(transport, source.id, query));
+    } catch (err) {
+      setQueryResult(null);
+      setQueryError(String(err));
     }
   };
 
@@ -364,6 +378,15 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
           </details>
         )
       )}
+      {schemas !== null && schemas.length > 0 && (
+        <div className="query-box">
+          <label>{t("data_studio_query")}</label>
+          <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={3} />
+          <Button onClick={runQuery}>{t("data_studio_run")}</Button>
+        </div>
+      )}
+      {queryError && <Notice tone="problem" boxed announce="assertive">{queryError}</Notice>}
+      {queryResult && <ResultTable result={queryResult} />}
     </div>
   );
 }

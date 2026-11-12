@@ -1201,6 +1201,16 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
       },
     })),
   },
+  "datastudio.postgres.query": {
+    payload: (raw) => {
+      const base = postgresRef(raw);
+      const query = text(raw.query).slice(0, 4000);
+      return base && query ? { ...base, query, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      result: queryResultOf(body.result),
+    })),
+  },
   "datastudio.json.read": {
     payload: (raw) => dataStudioPath(raw),
     project: (result) => inDomain(result, "data-studio", (body) => ({ content: body.content ?? null })),

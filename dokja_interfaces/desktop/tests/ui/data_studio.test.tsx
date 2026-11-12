@@ -186,6 +186,47 @@ describe("the data studio", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
 
+  it("runs a PostgreSQL query from the card and shows the rows", async () => {
+    const { transport, calls } = routedTransport({
+      "datastudio.sources.list": sources,
+      "datastudio.postgres.schemas": ok({ schemas: ["dokja_price"] }),
+      "datastudio.postgres.query": ok({ result: { columns: ["merchant", "cents"], rows: [["loja-a", 1990]], total: 1 } }),
+    });
+    show(transport);
+
+    fireEvent.click(await screen.findByRole("button", { name: "price_history" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await screen.findByText("Schemas (1)");
+
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "SELECT merchant, cents FROM dokja_price.offers" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await screen.findByText('"loja-a"');
+    screen.getByText("1990");
+    expect(calls.filter((c) => c.type === "datastudio.postgres.query")).toEqual([
+      { type: "datastudio.postgres.query", payload: { connection_id: "postgres:1", query: "SELECT merchant, cents FROM dokja_price.offers", limit: 100, offset: 0 }, options: undefined },
+    ]);
+  });
+
+  it("announces a PostgreSQL query error without dropping the schema list", async () => {
+    const { transport } = routedTransport({
+      "datastudio.sources.list": sources,
+      "datastudio.postgres.schemas": ok({ schemas: ["dokja_price"] }),
+      "datastudio.postgres.query": failure("orchestrator", "only SELECT statements are allowed"),
+    });
+    show(transport);
+
+    fireEvent.click(await screen.findByRole("button", { name: "price_history" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await screen.findByText("Schemas (1)");
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByText(/only SELECT statements/)).toBeTruthy();
+    expect(screen.getByText("Schemas (1)")).toBeTruthy();
+  });
+
   it("reads nothing before the operator asks, and only reads", async () => {
     const { transport, calls } = routedTransport({ "datastudio.sources.list": sources });
     show(transport);

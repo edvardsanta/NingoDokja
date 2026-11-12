@@ -100,6 +100,7 @@ export const ACTION_TYPES = [
   "datastudio.postgres.schemas",
   "datastudio.postgres.tables",
   "datastudio.postgres.table",
+  "datastudio.postgres.query",
   "datastudio.json.read",
   "datastudio.markdown.read",
   "datastudio.diagnostics.run",
