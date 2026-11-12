@@ -303,4 +303,17 @@ describe("the data studio", () => {
     await expectChips();
     await waitFor(() => expect(calls).toHaveLength(1));
   });
+
+  it("filters the source tree by name and says when nothing matches", async () => {
+    const { transport } = routedTransport({ "datastudio.sources.list": sources });
+    show(transport);
+
+    const filter = await screen.findByRole("searchbox", { name: "Filter sources" });
+    fireEvent.change(filter, { target: { value: "warm" } });
+    await screen.findByRole("button", { name: /^warm\.md/ });
+    expect(screen.queryByRole("button", { name: /^ningo\.db/ })).toBeNull();
+
+    fireEvent.change(filter, { target: { value: "nada-disso" } });
+    await screen.findByText("No source matches the filter.");
+  });
 });

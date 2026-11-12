@@ -3813,6 +3813,27 @@ button.cfg-toggle:focus-visible {
   white-space: nowrap;
 }
 
+/* A long value (JSON in a settings row, a URL) shows its start and hides the
+   rest with an ellipsis; the full text is on the cell's title and stays
+   selectable for the native copy shortcut. */
+.result-table td {
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.source-filter {
+  box-sizing: border-box;
+  width: 100%;
+  margin-block-end: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--edge);
+  background: var(--static);
+  color: var(--ink);
+  font: inherit;
+}
+
 .read-only-badge {
   display: inline-block;
   padding: 0.1rem 0.5rem;

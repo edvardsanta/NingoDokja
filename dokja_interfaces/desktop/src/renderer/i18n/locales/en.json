@@ -937,5 +937,8 @@
   "data_studio_page_of": "Page {page} of {pages}",
   "data_studio_pick_source": "Explore a data source",
   "data_studio_pick_source_hint": "Pick a database, connection or file in the tree on the left. Tables open on their rows; switch to Structure for columns and types.",
-  "data_studio_back_to_table": "Back to table"
+  "data_studio_back_to_table": "Back to table",
+  "data_studio_filter_placeholder": "Filter sources by name",
+  "data_studio_filter_label": "Filter sources",
+  "data_studio_filter_empty": "No source matches the filter."
 }

@@ -937,5 +937,8 @@
   "data_studio_page_of": "Página {page} de {pages}",
   "data_studio_pick_source": "Explore uma fonte de dados",
   "data_studio_pick_source_hint": "Escolha um banco, conexão ou arquivo na árvore ao lado. Tabelas abrem nas linhas; troque para Estrutura para ver colunas e tipos.",
-  "data_studio_back_to_table": "Voltar à tabela"
+  "data_studio_back_to_table": "Voltar à tabela",
+  "data_studio_filter_placeholder": "Filtrar fontes por nome",
+  "data_studio_filter_label": "Filtrar fontes",
+  "data_studio_filter_empty": "Nenhuma fonte corresponde ao filtro."
 }
