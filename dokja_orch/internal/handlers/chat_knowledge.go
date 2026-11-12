@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/logger"
 	"regexp"
@@ -325,7 +326,7 @@ func citeSources(reply string, sources []knowledgeSource) string {
 		if source.Web {
 			lines = append(lines, webSourceLabel(source))
 		} else {
-			lines = append(lines, fmt.Sprintf("[%d] %s", source.Number, source.Title))
+			lines = append(lines, knowledgeSourceLabel(source))
 		}
 	}
 	citation := "📚 " + strings.Join(lines, " · ")
@@ -333,6 +334,20 @@ func citeSources(reply string, sources []knowledgeSource) string {
 		return citation
 	}
 	return strings.TrimSpace(reply) + "\n\n" + citation
+}
+
+// knowledgeSourceLabel renders [N] title, adding the document's own link when it
+// is a plain http(s) reference (a meme's original page, an article). Other
+// schemes (folder:, file:) stay unlinked, and angle brackets keep source-owned
+// punctuation out of Markdown syntax, as in webSourceLabel.
+func knowledgeSourceLabel(source knowledgeSource) string {
+	label := fmt.Sprintf("[%d] %s", source.Number, source.Title)
+	u, err := url.Parse(source.Reference)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return label
+	}
+	address := strings.NewReplacer("<", "%3C", ">", "%3E").Replace(u.String())
+	return fmt.Sprintf("%s <%s>", label, address)
 }
 
 // turnSources keeps every cited passage with its exact location and original version.
