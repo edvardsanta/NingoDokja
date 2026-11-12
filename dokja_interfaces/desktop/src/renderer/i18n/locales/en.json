@@ -909,7 +909,6 @@
   "data_studio_title": "Data Studio",
   "data_studio_sqlite": "SQLite",
   "data_studio_diagnostics": "Diagnostics",
-  "data_studio_no_sources": "No sources found.",
   "data_studio_no_issues": "No issues found.",
   "data_studio_table": "Table",
   "data_studio_query": "Query",
@@ -918,7 +917,6 @@
   "data_studio_objects": "Objects",
   "data_studio_columns": "Columns",
   "data_studio_count": "Count",
-  "data_studio_load": "Load",
   "data_studio_col_type": "Type",
   "data_studio_col_not_null": "Not null",
   "data_studio_col_pk": "PK",
@@ -929,5 +927,15 @@
   "data_studio_schemas": "Schemas",
   "data_studio_no_schemas": "No schemas found.",
   "data_studio_no_tables": "No tables or views in this schema.",
-  "data_studio_persona": "persona"
+  "data_studio_persona": "persona",
+  "data_studio_tab_rows": "Rows",
+  "data_studio_tab_structure": "Structure",
+  "data_studio_table_views": "Views of {table}",
+  "data_studio_open_in_query": "Open in query",
+  "data_studio_no_rows": "This table has no rows.",
+  "data_studio_page_previous": "Previous",
+  "data_studio_page_next": "Next",
+  "data_studio_page_of": "Page {page} of {pages}",
+  "data_studio_pick_source": "Explore a data source",
+  "data_studio_pick_source_hint": "Pick a database, connection or file in the tree on the left. Tables open on their rows; switch to Structure for columns and types."
 }

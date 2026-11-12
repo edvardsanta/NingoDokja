@@ -909,7 +909,6 @@
   "data_studio_title": "Estúdio de dados",
   "data_studio_sqlite": "Bancos SQLite",
   "data_studio_diagnostics": "Diagnóstico",
-  "data_studio_no_sources": "Nenhuma fonte encontrada.",
   "data_studio_no_issues": "Nenhum problema encontrado.",
   "data_studio_table": "Tabela",
   "data_studio_query": "Consulta",
@@ -918,7 +917,6 @@
   "data_studio_objects": "Objetos",
   "data_studio_columns": "Colunas",
   "data_studio_count": "Quantidade",
-  "data_studio_load": "Carregar",
   "data_studio_col_type": "Tipo",
   "data_studio_col_not_null": "Não nulo",
   "data_studio_col_pk": "PK",
@@ -929,5 +927,15 @@
   "data_studio_schemas": "Schemas",
   "data_studio_no_schemas": "Nenhum schema encontrado.",
   "data_studio_no_tables": "Nenhuma tabela ou view neste schema.",
-  "data_studio_persona": "personalidade"
+  "data_studio_persona": "personalidade",
+  "data_studio_tab_rows": "Dados",
+  "data_studio_tab_structure": "Estrutura",
+  "data_studio_table_views": "Visões de {table}",
+  "data_studio_open_in_query": "Abrir na consulta",
+  "data_studio_no_rows": "Esta tabela não tem linhas.",
+  "data_studio_page_previous": "Anterior",
+  "data_studio_page_next": "Próxima",
+  "data_studio_page_of": "Página {page} de {pages}",
+  "data_studio_pick_source": "Explore uma fonte de dados",
+  "data_studio_pick_source_hint": "Escolha um banco, conexão ou arquivo na árvore ao lado. Tabelas abrem nas linhas; troque para Estrutura para ver colunas e tipos."
 }

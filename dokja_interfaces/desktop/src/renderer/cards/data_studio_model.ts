@@ -55,6 +55,13 @@ export async function readSQLiteTable(transport: Transport, path: string, table:
   return result?.schema ?? { columns: [], count: 0 };
 }
 
+export async function readSQLiteRows(transport: Transport, path: string, table: string, limit = 100, offset = 0): Promise<QueryResult> {
+  const reply = await transport.request("datastudio.sqlite.rows", { path, table, limit, offset });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { result: QueryResult } | undefined;
+  return result?.result ?? { columns: [], rows: [], total: 0 };
+}
+
 export async function querySQLite(transport: Transport, path: string, query: string, limit = 100, offset = 0): Promise<QueryResult> {
   const reply = await transport.request("datastudio.sqlite.query", { path, query, limit, offset });
   if (!reply.ok) throw new Error(reply.error.message);
@@ -102,6 +109,13 @@ export async function readPostgresTable(transport: Transport, id: string, schema
   if (!reply.ok) throw new Error(reply.error.message);
   const result = reply.result as { schema: TableSchema } | undefined;
   return result?.schema ?? { columns: [], count: 0 };
+}
+
+export async function readPostgresRows(transport: Transport, id: string, schema: string, table: string, limit = 100, offset = 0): Promise<QueryResult> {
+  const reply = await transport.request("datastudio.postgres.rows", { connection_id: id, schema, table, limit, offset });
+  if (!reply.ok) throw new Error(reply.error.message);
+  const result = reply.result as { result: QueryResult } | undefined;
+  return result?.result ?? { columns: [], rows: [], total: 0 };
 }
 
 export async function queryPostgres(transport: Transport, id: string, query: string, limit = 100, offset = 0): Promise<QueryResult> {

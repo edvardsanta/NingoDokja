@@ -11,6 +11,7 @@ import {
   listSources,
   readSQLiteSchema,
   readSQLiteTable,
+  readSQLiteRows,
   querySQLite,
   readJSONFile,
   readMarkdownFile,
@@ -18,6 +19,7 @@ import {
   listPostgresSchemas,
   listPostgresTables,
   readPostgresTable,
+  readPostgresRows,
   queryPostgres,
   maskedDSN,
 } from "./data_studio_model.js";
@@ -103,7 +105,10 @@ export function DataStudioCard({ transport }: { transport: Transport }) {
           {selected ? (
             <SourceDetail source={selected} transport={transport} onRefresh={poll} />
           ) : (
-            <Notice boxed tone="unchecked">{t("data_studio_no_sources")}</Notice>
+            <div className="detail-empty">
+              <h3>{t("data_studio_pick_source")}</h3>
+              <p>{t("data_studio_pick_source_hint")}</p>
+            </div>
           )}
         </section>
       </div>
@@ -217,6 +222,10 @@ function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport:
 
   const { state, reload } = useCard(load);
 
+  const fillQuery = (sql: string) => {
+    setQuery(sql);
+  };
+
   const runQuery = async () => {
     try {
       const result = await querySQLite(transport, path, query);
@@ -251,7 +260,7 @@ function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport:
               ))}
             </ul>
           </details>
-          {selectedTable && <SQLiteTableDetail path={path} table={selectedTable} transport={transport} />}
+          {selectedTable && <SQLiteTableDetail path={path} table={selectedTable} transport={transport} onQuery={fillQuery} />}
           <div className="query-box">
             <label>{t("data_studio_query")}</label>
             <textarea value={query} onChange={(e) => setQuery(e.target.value)} rows={3} />
@@ -264,8 +273,56 @@ function SQLiteDetail({ path, transport, onRefresh }: { path: string; transport:
   );
 }
 
-function SQLiteTableDetail({ path, table, transport }: { path: string; table: string; transport: Transport }) {
+const PAGE_SIZE = 100;
+
+// PagedTable renders one page of a table's rows with next/previous navigation.
+// `total` is the table's row count from its structure read; without it the
+// pager simply disables the next button on a short page.
+function PagedTable({ load, total }: { load: (limit: number, offset: number) => Promise<QueryResult>; total: number | null }) {
   const t = useTranslate();
+  const [page, setPage] = useState(0);
+  const fetchPage = useCallback(async () => {
+    try {
+      return { ok: true as const, data: await load(PAGE_SIZE, page * PAGE_SIZE) };
+    } catch (error) {
+      return { ok: false as const, error: { code: "orchestrator" as const, message: String(error) } };
+    }
+  }, [load, page]);
+  const { state, reload } = useCard(fetchPage);
+
+  const pages = total !== null && total > 0 ? Math.ceil(total / PAGE_SIZE) : null;
+  const atEnd = state.phase === "ready" && (state.data.rows.length < PAGE_SIZE || (pages !== null && page + 1 >= pages));
+
+  return (
+    <div>
+      {state.phase === "loading" && <Pending />}
+      {state.phase === "error" && (
+        <>
+          <Problem error={state.error} />
+          <Button onClick={reload}>{t("retry")}</Button>
+        </>
+      )}
+      {state.phase === "ready" && (
+        <>
+          {state.data.rows.length === 0 ? (
+            <Notice boxed tone="unchecked">{t("data_studio_no_rows")}</Notice>
+          ) : (
+            <ResultTable result={state.data} />
+          )}
+          <div className="pager">
+            <Button size="compact" disabled={page === 0} onClick={() => setPage(page - 1)}>{t("data_studio_page_previous")}</Button>
+            <span>{t("data_studio_page_of", { page: String(page + 1), pages: pages !== null ? String(pages) : "?" })}</span>
+            <Button size="compact" disabled={atEnd} onClick={() => setPage(page + 1)}>{t("data_studio_page_next")}</Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SQLiteTableDetail({ path, table, transport, onQuery }: { path: string; table: string; transport: Transport; onQuery: (sql: string) => void }) {
+  const t = useTranslate();
+  const [tab, setTab] = useState<"rows" | "structure">("rows");
   const load = useCallback(async () => {
     try {
       const schema = await readSQLiteTable(transport, path, table);
@@ -276,6 +333,7 @@ function SQLiteTableDetail({ path, table, transport }: { path: string; table: st
   }, [transport, path, table]);
 
   const { state, reload } = useCard(load);
+  const loadRows = useCallback((limit: number, offset: number) => readSQLiteRows(transport, path, table, limit, offset), [transport, path, table]);
 
   return (
     <div className="table-detail">
@@ -289,27 +347,36 @@ function SQLiteTableDetail({ path, table, transport }: { path: string; table: st
       )}
       {state.phase === "ready" && (
         <>
-          <p>{t("data_studio_count")}: {state.data.count}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>{t("data_studio_columns")}</th>
-                <th>{t("data_studio_col_type")}</th>
-                <th>{t("data_studio_col_not_null")}</th>
-                <th>{t("data_studio_col_pk")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.data.columns.map((col) => (
-                <tr key={col.name}>
-                  <td>{col.name}</td>
-                  <td>{col.type}</td>
-                  <td>{col.not_null ? t("data_studio_yes") : t("data_studio_no")}</td>
-                  <td>{col.primary_key ? t("data_studio_yes") : t("data_studio_no")}</td>
+          <div className="tab-bar" role="tablist" aria-label={t("data_studio_table_views", { table })}>
+            <Button variant={tab === "rows" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "rows"} onClick={() => setTab("rows")}>{t("data_studio_tab_rows")}</Button>
+            <Button variant={tab === "structure" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "structure"} onClick={() => setTab("structure")}>{t("data_studio_tab_structure")} ({state.data.columns.length})</Button>
+            <Button variant="quiet" size="compact" onClick={() => onQuery(`SELECT * FROM "${table}"`)}>{t("data_studio_open_in_query")}</Button>
+          </div>
+          <p className="row-count">{t("data_studio_count")}: {state.data.count}</p>
+          {tab === "rows" ? (
+            <PagedTable load={loadRows} total={state.data.count} />
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("data_studio_columns")}</th>
+                  <th>{t("data_studio_col_type")}</th>
+                  <th>{t("data_studio_col_not_null")}</th>
+                  <th>{t("data_studio_col_pk")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {state.data.columns.map((col) => (
+                  <tr key={col.name}>
+                    <td>{col.name}</td>
+                    <td>{col.type}</td>
+                    <td>{col.not_null ? t("data_studio_yes") : t("data_studio_no")}</td>
+                    <td>{col.primary_key ? t("data_studio_yes") : t("data_studio_no")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </>
       )}
     </div>
@@ -370,7 +437,7 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
                     {schema}
                   </Button>
                   {selectedSchema === schema && (
-                    <PostgresTables id={source.id} schema={schema} transport={transport} />
+                    <PostgresTables id={source.id} schema={schema} transport={transport} onQuery={setQuery} />
                   )}
                 </li>
               ))}
@@ -391,7 +458,7 @@ function PostgresDetail({ source, transport }: { source: Source; transport: Tran
   );
 }
 
-function PostgresTables({ id, schema, transport }: { id: string; schema: string; transport: Transport }) {
+function PostgresTables({ id, schema, transport, onQuery }: { id: string; schema: string; transport: Transport; onQuery: (sql: string) => void }) {
   const t = useTranslate();
   const [tables, setTables] = useState<{ name: string; type: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -419,7 +486,7 @@ function PostgresTables({ id, schema, transport }: { id: string; schema: string;
               {table.type}: {table.name}
             </Button>
             {selectedTable === table.name && (
-              <PostgresTableColumns id={id} schema={schema} table={table.name} transport={transport} />
+              <PostgresTableDetail id={id} schema={schema} table={table.name} transport={transport} onQuery={onQuery} />
             )}
           </li>
         ))}
@@ -428,8 +495,9 @@ function PostgresTables({ id, schema, transport }: { id: string; schema: string;
   );
 }
 
-function PostgresTableColumns({ id, schema, table, transport }: { id: string; schema: string; table: string; transport: Transport }) {
+function PostgresTableDetail({ id, schema, table, transport, onQuery }: { id: string; schema: string; table: string; transport: Transport; onQuery: (sql: string) => void }) {
   const t = useTranslate();
+  const [tab, setTab] = useState<"rows" | "structure">("rows");
   const [detail, setDetail] = useState<{ columns: { name: string; type: string; not_null: boolean; primary_key: boolean }[]; count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -441,30 +509,40 @@ function PostgresTableColumns({ id, schema, table, transport }: { id: string; sc
       .catch((err) => { if (alive) setError(String(err)); });
     return () => { alive = false; };
   }, [transport, id, schema, table]);
+  const loadRows = useCallback((limit: number, offset: number) => readPostgresRows(transport, id, schema, table, limit, offset), [transport, id, schema, table]);
 
-  if (error) return <Notice tone="problem" boxed>{error}</Notice>;
+  if (error) return <Notice tone="problem" boxed announce="assertive">{error}</Notice>;
   if (detail === null) return <Pending />;
   return (
     <div className="table-detail">
-      <p>{t("data_studio_count")}: {detail.count}</p>
-      <table>
-        <thead>
-          <tr>
-            <th>{t("data_studio_columns")}</th>
-            <th>{t("data_studio_col_type")}</th>
-            <th>{t("data_studio_col_not_null")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {detail.columns.map((col) => (
-            <tr key={col.name}>
-              <td>{col.name}</td>
-              <td>{col.type}</td>
-              <td>{col.not_null ? t("data_studio_yes") : t("data_studio_no")}</td>
+      <div className="tab-bar" role="tablist" aria-label={t("data_studio_table_views", { table })}>
+        <Button variant={tab === "rows" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "rows"} onClick={() => setTab("rows")}>{t("data_studio_tab_rows")}</Button>
+        <Button variant={tab === "structure" ? "primary" : "quiet"} size="compact" role="tab" aria-selected={tab === "structure"} onClick={() => setTab("structure")}>{t("data_studio_tab_structure")} ({detail.columns.length})</Button>
+        <Button variant="quiet" size="compact" onClick={() => onQuery(`SELECT * FROM "${schema}"."${table}"`)}>{t("data_studio_open_in_query")}</Button>
+      </div>
+      <p className="row-count">{t("data_studio_count")}: {detail.count}</p>
+      {tab === "rows" ? (
+        <PagedTable load={loadRows} total={detail.count} />
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{t("data_studio_columns")}</th>
+              <th>{t("data_studio_col_type")}</th>
+              <th>{t("data_studio_col_not_null")}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {detail.columns.map((col) => (
+              <tr key={col.name}>
+                <td>{col.name}</td>
+                <td>{col.type}</td>
+                <td>{col.not_null ? t("data_studio_yes") : t("data_studio_no")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -488,48 +566,50 @@ function ResultTable({ result }: { result: QueryResult }) {  return (
 }
 
 function JSONDetail({ path, transport }: { path: string; transport: Transport }) {
-  const t = useTranslate();
   const [content, setContent] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    try {
-      setContent(await readJSONFile(transport, path));
-      setError(null);
-    } catch (err) {
-      setError(String(err));
-    }
-  };
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    readJSONFile(transport, path)
+      .then((value) => { if (alive) setContent(value); })
+      .catch((err) => { if (alive) setError(String(err)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [transport, path]);
 
   return (
     <div>
-      <h3>JSON: {path}</h3>
-      <Button onClick={load}>{t("data_studio_load")}</Button>
-      {error && <Notice tone="problem" boxed>{error}</Notice>}
+      {loading && <Pending />}
+      {error && <Notice tone="problem" boxed announce="assertive">{error}</Notice>}
       {content !== null && <pre className="json-viewer">{JSON.stringify(content, null, 2)}</pre>}
     </div>
   );
 }
 
 function MarkdownDetail({ path, transport }: { path: string; transport: Transport }) {
-  const t = useTranslate();
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    try {
-      setContent(await readMarkdownFile(transport, path));
-      setError(null);
-    } catch (err) {
-      setError(String(err));
-    }
-  };
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    readMarkdownFile(transport, path)
+      .then((text) => { if (alive) setContent(text); })
+      .catch((err) => { if (alive) setError(String(err)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [transport, path]);
 
   return (
     <div>
-      <h3>Markdown: {path}</h3>
-      <Button onClick={load}>{t("data_studio_load")}</Button>
-      {error && <Notice tone="problem" boxed>{error}</Notice>}
+      {loading && <Pending />}
+      {error && <Notice tone="problem" boxed announce="assertive">{error}</Notice>}
       {content !== null && <pre className="markdown-viewer">{content}</pre>}
     </div>
   );

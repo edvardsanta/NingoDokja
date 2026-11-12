@@ -77,6 +77,8 @@ func (h *DataStudioHandler) Handle(ctx context.Context, event core.Event, workfl
 		return h.sqliteSchema(ctx, event.Payload)
 	case "datastudio.sqlite.table":
 		return h.sqliteTable(ctx, event.Payload)
+	case "datastudio.sqlite.rows":
+		return h.sqliteRows(ctx, event.Payload)
 	case "datastudio.sqlite.query":
 		return h.sqliteQuery(ctx, event.Payload)
 	case "datastudio.postgres.schemas":
@@ -85,6 +87,8 @@ func (h *DataStudioHandler) Handle(ctx context.Context, event core.Event, workfl
 		return h.postgresTables(ctx, event.Payload)
 	case "datastudio.postgres.table":
 		return h.postgresTable(ctx, event.Payload)
+	case "datastudio.postgres.rows":
+		return h.postgresRows(ctx, event.Payload)
 	case "datastudio.postgres.query":
 		return h.postgresQuery(ctx, event.Payload)
 	case "datastudio.json.read":
@@ -147,6 +151,33 @@ func (h *DataStudioHandler) sqliteTable(ctx context.Context, payload map[string]
 		return nil, err
 	}
 	return map[string]any{"schema": schema}, nil
+}
+
+// sqliteRows pages through one table or view without the screen writing SQL.
+func (h *DataStudioHandler) sqliteRows(ctx context.Context, payload map[string]any) (map[string]any, error) {
+	path, err := h.validPath(payload)
+	if err != nil {
+		return nil, err
+	}
+	table, ok := payload["table"].(string)
+	if !ok || table == "" {
+		return nil, fmt.Errorf("table name is required")
+	}
+	limit := intArg(payload["limit"], 100)
+	offset := intArg(payload["offset"], 0)
+	if limit < 1 || limit > 500 || offset < 0 {
+		return nil, fmt.Errorf("limit must be 1..500 and offset non-negative")
+	}
+	db, err := h.sqlite.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	rows, err := h.sqlite.TableRows(db, table, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"result": rows}, nil
 }
 
 func (h *DataStudioHandler) sqliteQuery(ctx context.Context, payload map[string]any) (map[string]any, error) {
@@ -235,6 +266,37 @@ func (h *DataStudioHandler) postgresTable(ctx context.Context, payload map[strin
 		return nil, err
 	}
 	return map[string]any{"schema": info}, nil
+}
+
+// postgresRows pages through one table or view without the screen writing SQL.
+func (h *DataStudioHandler) postgresRows(ctx context.Context, payload map[string]any) (map[string]any, error) {
+	dsn, err := h.postgresDSN(payload)
+	if err != nil {
+		return nil, err
+	}
+	schema, ok := payload["schema"].(string)
+	if !ok || schema == "" {
+		return nil, fmt.Errorf("schema is required")
+	}
+	table, ok := payload["table"].(string)
+	if !ok || table == "" {
+		return nil, fmt.Errorf("table name is required")
+	}
+	limit := intArg(payload["limit"], 100)
+	offset := intArg(payload["offset"], 0)
+	if limit < 1 || limit > 500 || offset < 0 {
+		return nil, fmt.Errorf("limit must be 1..500 and offset non-negative")
+	}
+	db, err := h.postgres.Open(dsn)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	rows, err := h.postgres.TableRows(ctx, db, schema, table, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"result": rows}, nil
 }
 
 func (h *DataStudioHandler) postgresQuery(ctx context.Context, payload map[string]any) (map[string]any, error) {

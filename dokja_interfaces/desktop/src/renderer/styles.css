@@ -3852,3 +3852,57 @@ button.cfg-toggle:focus-visible {
   margin: 0.25rem 0 0;
   padding-left: 1.25rem;
 }
+
+/* A table's two views sit on one line: the rows it holds, and the columns that
+   shape them, plus a shortcut that drops the table into the query box. */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  margin-block: 0.35rem;
+}
+
+.row-count {
+  margin-block: 0.25rem;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-block-start: 0.5rem;
+}
+
+.pager span {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+.detail-empty {
+  display: grid;
+  place-content: center;
+  gap: 0.5rem;
+  min-height: 16rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.detail-empty h3 {
+  margin: 0;
+}
+
+.detail-empty p {
+  margin: 0;
+  max-width: 32rem;
+  opacity: 0.75;
+}
+
+/* The result table keeps its header visible while the body scrolls. */
+.result-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
