@@ -37,6 +37,7 @@ const KIND_LABELS: Record<SourceKind, string> = {
 export function DataStudioCard({ transport }: { transport: Transport }) {
   const t = useTranslate();
   const [selected, setSelected] = useState<Source | null>(null);
+  const [filter, setFilter] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -51,17 +52,19 @@ export function DataStudioCard({ transport }: { transport: Transport }) {
 
   const grouped = useMemo(() => {
     if (state.phase !== "ready") return [] as [SourceKind, Source[]][];
+    const needle = filter.trim().toLowerCase();
     const map = new Map<SourceKind, Source[]>();
     for (const kind of KIND_ORDER) {
       map.set(kind, []);
     }
     for (const source of state.data) {
+      if (needle && !source.name.toLowerCase().includes(needle)) continue;
       const list = map.get(source.kind) ?? [];
       list.push(source);
       map.set(source.kind, list);
     }
     return KIND_ORDER.map((kind) => [kind, map.get(kind) ?? []] as [SourceKind, Source[]]).filter(([, list]) => list.length > 0);
-  }, [state]);
+  }, [state, filter]);
 
   return (
     <WorkspacePanel trail={[t("data_studio_title")]}>
@@ -77,6 +80,15 @@ export function DataStudioCard({ transport }: { transport: Transport }) {
           {state.phase === "ready" && (
             <>
               <OverviewCounts sources={state.data} transport={transport} />
+              <input
+                className="source-filter"
+                type="search"
+                value={filter}
+                placeholder={t("data_studio_filter_placeholder")}
+                aria-label={t("data_studio_filter_label")}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+              {grouped.length === 0 && <Notice boxed tone="unchecked">{t("data_studio_filter_empty")}</Notice>}
               {grouped.map(([kind, sources]) => (
                 <details key={kind} open className="source-group">
                   <summary>{KIND_LABELS[kind]} ({sources.length})</summary>
@@ -561,7 +573,8 @@ function PostgresTableDetail({ id, schema, table, transport }: { id: string; sch
   );
 }
 
-function ResultTable({ result }: { result: QueryResult }) {  return (
+function ResultTable({ result }: { result: QueryResult }) {
+  return (
     <table className="result-table">
       <thead>
         <tr>
@@ -571,7 +584,12 @@ function ResultTable({ result }: { result: QueryResult }) {  return (
       <tbody>
         {result.rows.map((row, i) => (
           <tr key={i}>
-            {row.map((cell, j) => <td key={j}>{JSON.stringify(cell)}</td>)}
+            {row.map((cell, j) => {
+              const text = JSON.stringify(cell) ?? "";
+              // The full value stays on the title so a truncated cell can still be
+              // read whole; the text stays selectable for the native copy shortcut.
+              return <td key={j} title={text}>{text}</td>;
+            })}
           </tr>
         ))}
       </tbody>
