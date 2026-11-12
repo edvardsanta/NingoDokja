@@ -386,3 +386,16 @@ test("comparison cards show workload context and collected technical references"
  assert.match(card.description!,/1080p gaming/);assert.match(card.description!,/Example CPU/);
  assert.match(card.fields!.find(f=>f.name==="Fontes técnicas coletadas")!.value,/https:\/\/bench.example\/review/);
 });
+
+test("measured model comparisons show source dates and numeric differences in both locales",()=>{
+ for(const [locale,label,dateLabel,value]of [["pt-BR","Teste do modelo","atualizado em","100 → opção 110"],["en","Model benchmark","updated","100 → option 110"]]){
+  const comparison={...compared,alternatives:[{product:"peer",title:"GPU Example",price_cents:110000,benchmark_comparisons:[{test:"Native 1080p",reference_value:100,candidate_value:110,difference_basis_points:1000,unit:"fps"}]}],technical_sources:[{title:"Example test lab",url:"https://bench.example/report",published_at:"2025-01-01",updated_at:"2026-02-01T00:00:00Z",observed_at:"2026-11-11T00:00:00Z"}]};
+  const card=embedsOf(buildCompareReply(comparison,locale))[0];const all=card.fields!.map(f=>f.value).join("\n");
+  assert.ok(all.includes(label));assert.ok(all.includes(value));assert.ok(all.includes("+10%"));assert.ok(all.includes(`${dateLabel} 2026-02-01`));assert.ok(!all.includes("2026-11-11"));
+ }
+});
+
+test("benchmark formatting preserves subsecond measurements",()=>{
+ const card=embedsOf(buildCompareReply({...compared,alternatives:[{product:"peer",title:"GPU Example",benchmark_comparisons:[{test:"Render time",reference_value:0.004,candidate_value:0.002,difference_basis_points:-5000,unit:"seconds"}]}]},"en"))[0];
+ assert.match(card.fields!.map(f=>f.value).join("\n"),/0\.004 → option 0\.002 s/);
+});

@@ -45,6 +45,13 @@ const messages: Record<string, Catalog> = {
     compare_header: "⚖️ {title}",
     compare_offers: "Preços nas lojas",
     compare_sources: "Fontes técnicas coletadas",
+    compare_unit_score: "pontos",
+    compare_unit_percent_index: "índice (%)",
+    compare_unit_seconds: "s",
+    compare_benchmark: "Teste do modelo — {test}: referência {reference} → opção {candidate} {unit} ({difference}%)",
+    compare_source_published: "publicado em {date}",
+    compare_source_updated: "atualizado em {date}",
+    compare_source_collected: "coletado em {date}",
     compare_no_sources: "Sem fontes técnicas coletadas; a análise do modelo é uma estimativa.",
     compare_context: "Uso: {use} · Equipamento atual: {equipment}",
     compare_unspecified: "não informado",
@@ -122,6 +129,13 @@ const messages: Record<string, Catalog> = {
     compare_header: "⚖️ {title}",
     compare_offers: "Store prices",
     compare_sources: "Collected technical sources",
+    compare_unit_score: "points",
+    compare_unit_percent_index: "index (%)",
+    compare_unit_seconds: "s",
+    compare_benchmark: "Model benchmark — {test}: reference {reference} → option {candidate} {unit} ({difference}%)",
+    compare_source_published: "published {date}",
+    compare_source_updated: "updated {date}",
+    compare_source_collected: "collected {date}",
     compare_no_sources: "No collected technical sources; the model analysis is an estimate.",
     compare_context: "Use: {use} · Current equipment: {equipment}",
     compare_unspecified: "not provided",
@@ -426,7 +440,11 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
     const role = alternative.selection_reason === "alternative" ? "" : alternative.selection_reason === "advantage" && review?.advantage
       ? review.advantage.slice(0, 60) : roleKey in words ? text(words, roleKey) : "";
     const above = alternative.over_budget === true ? text(words, "compare_above_budget") : "";
-    return [`• ${name}${price}`, [role || modelNote || classification, ...reasons, above].filter(Boolean).join(" · "), explanation].filter(Boolean).join("\n");
+    const metrics=Array.isArray(alternative.benchmark_comparisons)?alternative.benchmark_comparisons:[];
+    const metric=metrics[0] as Record<string,unknown>|undefined;
+    const number=(value:number)=>value.toLocaleString(locale,{maximumSignificantDigits:5});
+    const benchmark=metric&&typeof metric.reference_value==="number"&&typeof metric.candidate_value==="number"&&typeof metric.difference_basis_points==="number" ? text(words,"compare_benchmark",{test:shortExplanation(String(metric.test??""),75),reference:number(metric.reference_value),candidate:number(metric.candidate_value),unit: ["score","percent_index","seconds"].includes(String(metric.unit))?text(words,`compare_unit_${metric.unit}`):String(metric.unit??""),difference:(metric.difference_basis_points>0?"+":"")+number(metric.difference_basis_points/100)}):"";
+    return [`• ${name}${price}`, [role || modelNote || classification, ...reasons, above].filter(Boolean).join(" · "), benchmark, explanation].filter(Boolean).join("\n");
   });
   const fields: NonNullable<DiscordEmbedSpec["fields"]> = [];
   if (offers.length > 0) {
@@ -459,7 +477,8 @@ export function buildCompareReply(compare: unknown, locale = "pt-BR"): DiscordRe
   const sourceLines=[...new Map(sources.map(s=>[String(s.url),s])).values()].slice(0,5).flatMap(s=>{
     const address=safeUrl(s.url);if(!address||address.length>300)return [];
     const title=String(s.title??"").replace(/[\[\]*_`]/g,"").slice(0,100);
-    return [`• [${title}](${address})${s.workload?` · ${String(s.workload).slice(0,100)}`:""}${s.observed_at?` · ${String(s.observed_at).slice(0,10)}`:""}`];
+    const sourceDate=s.updated_at?text(words,"compare_source_updated",{date:String(s.updated_at).slice(0,10)}):s.published_at?text(words,"compare_source_published",{date:String(s.published_at).slice(0,10)}):s.observed_at?text(words,"compare_source_collected",{date:String(s.observed_at).slice(0,10)}):"";
+    return [`• [${title}](${address})${s.workload?` · ${String(s.workload).slice(0,100)}`:""}${sourceDate?` · ${sourceDate}`:""}`];
   });
   if(sourceLines.length)fields.push(...comparisonFields(text(words,"compare_sources"),sourceLines,words,700));
   else if(alternatives.some(a=>a.model_assessment))notes.push(text(words,"compare_no_sources"));
