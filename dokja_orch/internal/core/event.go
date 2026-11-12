@@ -39,6 +39,8 @@ const (
 	DomainPrice Domain = "price"
 	// Online questionnaires Ningo takes himself through an owner's quiz runner.
 	DomainQuiz Domain = "quiz"
+	// Read-only administrative inspection of the data and files Ningo uses.
+	DomainDataStudio Domain = "data-studio"
 )
 
 type Event struct {

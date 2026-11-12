@@ -92,6 +92,17 @@ export const ACTION_TYPES = [
   "knowledge.classify",
   "knowledge.delete",
   "knowledge.reindex",
+  // The Data Studio only reads through the orchestrator: sources, schemas, rows and files.
+  "datastudio.sources.list",
+  "datastudio.sqlite.schema",
+  "datastudio.sqlite.table",
+  "datastudio.sqlite.query",
+  "datastudio.postgres.schemas",
+  "datastudio.postgres.tables",
+  "datastudio.postgres.table",
+  "datastudio.json.read",
+  "datastudio.markdown.read",
+  "datastudio.diagnostics.run",
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];
