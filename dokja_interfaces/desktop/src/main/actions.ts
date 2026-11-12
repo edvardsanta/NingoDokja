@@ -1130,4 +1130,112 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => ({ limit: clampInt(raw.limit, 1, 64, 32) }),
     project: (result) => inDomain(result, "knowledge", reindexResult),
   },
+  // The Data Studio reads the checkout's data through the orchestrator. Paths come from the
+  // discovered sources, never typed by the screen: the orchestrator validates them again.
+  "datastudio.sources.list": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      sources: Array.isArray(body.sources) ? body.sources.filter(isRecord).slice(0, 200) : [],
+    })),
+  },
+  "datastudio.sqlite.schema": {
+    payload: (raw) => dataStudioPath(raw),
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      schema: {
+        objects: isRecord(body.schema) && Array.isArray(body.schema.objects) ? body.schema.objects.filter(isRecord).slice(0, 500) : [],
+      },
+    })),
+  },
+  "datastudio.sqlite.table": {
+    payload: (raw) => {
+      const base = dataStudioPath(raw);
+      const table = text(raw.table).slice(0, 200);
+      return base && table ? { ...base, table } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      schema: {
+        columns: isRecord(body.schema) && Array.isArray(body.schema.columns) ? body.schema.columns.filter(isRecord).slice(0, 200) : [],
+        count: clampInt(isRecord(body.schema) ? body.schema.count : undefined, 0, Number.MAX_SAFE_INTEGER, 0),
+      },
+    })),
+  },
+  "datastudio.sqlite.query": {
+    payload: (raw) => {
+      const base = dataStudioPath(raw);
+      const query = text(raw.query).slice(0, 4000);
+      return base && query ? { ...base, query, limit: clampInt(raw.limit, 1, 500, 100), offset: clampInt(raw.offset, 0, 1_000_000, 0) } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      result: queryResultOf(body.result),
+    })),
+  },
+  "datastudio.postgres.schemas": {
+    payload: (raw) => postgresRef(raw),
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      schemas: Array.isArray(body.schemas) ? body.schemas.filter((s): s is string => typeof s === "string").slice(0, 200) : [],
+    })),
+  },
+  "datastudio.postgres.tables": {
+    payload: (raw) => {
+      const base = postgresRef(raw);
+      const schema = text(raw.schema).slice(0, 200);
+      return base && schema ? { ...base, schema } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      tables: Array.isArray(body.tables) ? body.tables.filter(isRecord).slice(0, 500) : [],
+    })),
+  },
+  "datastudio.postgres.table": {
+    payload: (raw) => {
+      const base = postgresRef(raw);
+      const schema = text(raw.schema).slice(0, 200);
+      const table = text(raw.table).slice(0, 200);
+      return base && schema && table ? { ...base, schema, table } : undefined;
+    },
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      schema: {
+        columns: isRecord(body.schema) && Array.isArray(body.schema.columns) ? body.schema.columns.filter(isRecord).slice(0, 200) : [],
+        count: clampInt(isRecord(body.schema) ? body.schema.count : undefined, 0, Number.MAX_SAFE_INTEGER, 0),
+      },
+    })),
+  },
+  "datastudio.json.read": {
+    payload: (raw) => dataStudioPath(raw),
+    project: (result) => inDomain(result, "data-studio", (body) => ({ content: body.content ?? null })),
+  },
+  "datastudio.markdown.read": {
+    payload: (raw) => dataStudioPath(raw),
+    project: (result) => inDomain(result, "data-studio", (body) => ({ content: text(body.content).slice(0, MAX_MARKDOWN_CHARS) })),
+  },
+  "datastudio.diagnostics.run": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "data-studio", (body) => ({
+      sources: clampInt(body.sources, 0, 100_000, 0),
+      issues: Array.isArray(body.issues) ? body.issues.filter(isRecord).slice(0, 200) : [],
+    })),
+  },
 };
+
+// A path the Data Studio asks for must be one the orchestrator already discovered: absolute,
+// inside the checkout, and not absurdly long. The orchestrator validates it again on its side.
+const MAX_DATA_STUDIO_PATH = 4096;
+const MAX_MARKDOWN_CHARS = 8 * 1024 * 1024;
+
+function dataStudioPath(raw: Record<string, unknown>): { path: string } | undefined {
+  const path = text(raw.path);
+  return path !== "" && path.length <= MAX_DATA_STUDIO_PATH && path.startsWith("/") ? { path } : undefined;
+}
+
+function postgresRef(raw: Record<string, unknown>): { id: string } | undefined {
+  const id = text(raw.id);
+  return id !== "" && id.length <= 200 ? { id } : undefined;
+}
+
+function queryResultOf(raw: unknown): { columns: string[]; rows: unknown[][]; total: number } {
+  if (!isRecord(raw)) return { columns: [], rows: [], total: 0 };
+  return {
+    columns: Array.isArray(raw.columns) ? raw.columns.filter((c): c is string => typeof c === "string").slice(0, 200) : [],
+    rows: Array.isArray(raw.rows) ? raw.rows.filter(Array.isArray).slice(0, 500) : [],
+    total: clampInt(raw.total, 0, Number.MAX_SAFE_INTEGER, 0),
+  };
+}

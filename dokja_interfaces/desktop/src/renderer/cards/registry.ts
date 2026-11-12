@@ -5,6 +5,7 @@ import type { Transport } from "../../shared/transport.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { AssistantCard } from "./assistant.js";
 import { CommunicationsCard } from "./communications.js";
+import { DataStudioCard } from "./data_studio.js";
 import { HealthCard } from "./health.js";
 import { KnowledgeWorkspace } from "./knowledge_workspace.js";
 import { MemoryCard } from "./memory.js";
@@ -32,6 +33,7 @@ export const CARDS: readonly CardEntry[] = [
   { kind: "knowledge", labelId: "nav_library", Card: KnowledgeWorkspace, services: ["knowledge", "feeds"] },
   { kind: "memory", labelId: "nav_notebook", Card: MemoryCard, services: ["memory"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
+  { kind: "data_studio", labelId: "nav_data_studio", Card: DataStudioCard },
   { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },
 ];
 

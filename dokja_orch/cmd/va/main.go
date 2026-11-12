@@ -246,6 +246,19 @@ func main() {
 	_, closeSourceJournal := configureSourceJournal(context.Background(),
 		os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"), os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"))
 	defer closeSourceJournal()
+
+	// The Data Studio inspects the checkout's data files read-only, through the
+	// orchestrator, so interfaces never touch storage directly. Its root is the
+	// checkout directory, derived from where the shared database lives.
+	dataStudioBaseDir := filepath.Dir(filepath.Dir(sharedPath))
+	dataStudioPostgres := map[string]string{}
+	if dsn := os.Getenv("DOKJA_PRICE_POSTGRES_DSN"); dsn != "" {
+		dataStudioPostgres["price_history"] = dsn
+	}
+	if dsn := os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"); dsn != "" {
+		dataStudioPostgres["source_journal"] = dsn
+	}
+
 	service := core.DefaultService(
 		communicationsHandler,
 		handlers.NewSystemDomainHandler(
@@ -286,6 +299,7 @@ func main() {
 		handlers.NewMemoryDomainHandler(memoryClient),
 		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
+		handlers.NewDataStudioHandler(dataStudioBaseDir, dataStudioPostgres),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")

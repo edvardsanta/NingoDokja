@@ -279,6 +279,33 @@ func actionFor(domain Domain, eventType string) string {
 			return "observe-conversation"
 		}
 		return "manage-conversation"
+	case DomainDataStudio:
+		switch eventType {
+		case "datastudio.sources.list":
+			return "list-data-sources"
+		case "datastudio.sqlite.schema":
+			return "read-sqlite-schema"
+		case "datastudio.sqlite.table":
+			return "read-sqlite-table"
+		case "datastudio.sqlite.query":
+			return "query-sqlite"
+		case "datastudio.postgres.schemas":
+			return "list-postgres-schemas"
+		case "datastudio.postgres.tables":
+			return "list-postgres-tables"
+		case "datastudio.postgres.table":
+			return "read-postgres-table"
+		case "datastudio.postgres.query":
+			return "query-postgres"
+		case "datastudio.json.read":
+			return "read-json-config"
+		case "datastudio.markdown.read":
+			return "read-markdown-file"
+		case "datastudio.diagnostics.run":
+			return "run-data-diagnostics"
+		default:
+			return "handle-data-studio-event"
+		}
 	default:
 		return "handle-event"
 	}

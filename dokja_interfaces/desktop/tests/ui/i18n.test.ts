@@ -47,7 +47,9 @@ describe("the catalogs", () => {
     // a price range is two prices and a dash; PIX is the name of the payment system
     "prices_range", "price_source_pix",
     // product names
-    "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme"]);
+    "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme",
+    // PK is the database abbreviation in both languages
+    "data_studio_col_pk"]);
 
   it("translate every message, so none was left in English", () => {
     const same = Object.keys(en).filter(

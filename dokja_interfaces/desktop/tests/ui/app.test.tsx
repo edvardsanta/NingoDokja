@@ -55,6 +55,7 @@ describe("the screen", () => {
       "Biblioteca",
       "Caderno",
       "Mensagens",
+      "Estúdio de dados",
       "Sistema",
     ]);
     expect(selectedTab()).toBe("Conversa");

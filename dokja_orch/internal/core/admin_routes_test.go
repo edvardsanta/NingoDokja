@@ -47,6 +47,11 @@ func TestAdminEventsAreRoutedAndPlanned(t *testing.T) {
 		{"scheduler.jobs.announce", "admin", DomainSystem, "record-job-announce"},
 		{"chat.profiles.list", "admin", DomainSystem, "list-chat-profiles"},
 		{"chat.profile.use", "admin", DomainSystem, "use-chat-profile"},
+		{"datastudio.sources.list", "data-studio", DomainDataStudio, "list-data-sources"},
+		{"datastudio.sqlite.schema", "data-studio", DomainDataStudio, "read-sqlite-schema"},
+		{"datastudio.sqlite.query", "data-studio", DomainDataStudio, "query-sqlite"},
+		{"datastudio.json.read", "data-studio", DomainDataStudio, "read-json-config"},
+		{"datastudio.markdown.read", "data-studio", DomainDataStudio, "read-markdown-file"},
 	}
 
 	for _, tc := range cases {
