@@ -312,7 +312,8 @@ func citedSources(reply string, sources []knowledgeSource) []knowledgeSource {
 
 // citeSources lists the passages cited by the reply. Numbers remain distinct even
 // when their document titles are equal. The archive carries each passage location.
-func citeSources(reply string, sources []knowledgeSource) string {
+// permalink resolves the Discord message that carried a media URL, when recorded.
+func citeSources(reply string, sources []knowledgeSource, permalink func(string) string) string {
 	if len(sources) == 0 {
 		return reply
 	}
@@ -326,7 +327,7 @@ func citeSources(reply string, sources []knowledgeSource) string {
 		if source.Web {
 			lines = append(lines, webSourceLabel(source))
 		} else {
-			lines = append(lines, knowledgeSourceLabel(source))
+			lines = append(lines, knowledgeSourceLabel(source, permalink))
 		}
 	}
 	citation := "📚 " + strings.Join(lines, " · ")
@@ -336,12 +337,17 @@ func citeSources(reply string, sources []knowledgeSource) string {
 	return strings.TrimSpace(reply) + "\n\n" + citation
 }
 
-// knowledgeSourceLabel renders [N] title, adding the document's own link when it
-// is a plain http(s) reference (a meme's original page, an article). Other
-// schemes (folder:, file:) stay unlinked, and angle brackets keep source-owned
-// punctuation out of Markdown syntax, as in webSourceLabel.
-func knowledgeSourceLabel(source knowledgeSource) string {
+// knowledgeSourceLabel renders [N] title. Ningo's own Discord post of the media
+// wins; otherwise the document's own http(s) page is linked (a meme's origin, an
+// article). Other schemes (folder:, file:) stay unlinked, and angle brackets keep
+// source-owned punctuation out of Markdown syntax, as in webSourceLabel.
+func knowledgeSourceLabel(source knowledgeSource, permalink func(string) string) string {
 	label := fmt.Sprintf("[%d] %s", source.Number, source.Title)
+	if permalink != nil {
+		if link := permalink(source.Reference); link != "" {
+			return fmt.Sprintf("%s <%s>", label, link)
+		}
+	}
 	u, err := url.Parse(source.Reference)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return label

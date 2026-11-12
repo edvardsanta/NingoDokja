@@ -40,7 +40,7 @@ func TestConfigurationPersistsWithoutChangingProfilesOrSchema(t *testing.T) {
 	}
 	var version int
 	db.db.QueryRow("PRAGMA user_version").Scan(&version)
-	if version != 1 {
+	if version != 2 {
 		t.Fatal("schema version changed", version)
 	}
 }

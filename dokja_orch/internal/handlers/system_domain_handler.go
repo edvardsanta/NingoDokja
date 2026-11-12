@@ -8,6 +8,7 @@ import (
 	memorydomain "read_books/dokja_domain/dokja_memory"
 	moderation "read_books/dokja_domain/dokja_moderation"
 	store "read_books/dokja_store"
+	"read_books/internal/clients"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"slices"
@@ -48,6 +49,18 @@ type MemeHashtagSuggester interface {
 
 type DiscordMessageDeliverer = communications.ChannelSender
 
+// DiscordPostStore remembers which Discord message carried a posted media URL, so a
+// citation can link Ningo's own message instead of the source page.
+type DiscordPostStore interface {
+	RecordDiscordPost(mediaURL, guildID, channelID, messageID string) error
+}
+
+// discordReceiptDeliverer is implemented by deliverers that report the Discord
+// message a delivery created (the interface client does).
+type discordReceiptDeliverer interface {
+	DeliverWithReceipt(ctx context.Context, channelID, content, attachmentURL string, data []byte, contentType string) (clients.DiscordDeliveryReceipt, error)
+}
+
 // MemeAttachmentFetcher downloads a pooled meme's raw bytes when the origin host blocks
 // a plain HTTP client (Cloudflare and similar bot checks) but the meme service's own
 // client can get through.
@@ -79,6 +92,7 @@ type SystemDomainHandler struct {
 	interfaceProbes  map[string]InterfaceProbe
 	links            map[string]InterfaceLinker
 	whatsapp         WhatsAppSender
+	discordPosts     DiscordPostStore
 }
 
 func NewSystemDomainHandler(
@@ -163,6 +177,12 @@ func sortedKeys(set map[string]struct{}) []string {
 func (h *SystemDomainHandler) WithMemeTools(screener MemeScreener, marker MemeMarker) *SystemDomainHandler {
 	h.memeScreen = screener
 	h.memeMarker = marker
+	return h
+}
+
+// WithDiscordPosts records which Discord message carries each posted media URL.
+func (h *SystemDomainHandler) WithDiscordPosts(store DiscordPostStore) *SystemDomainHandler {
+	h.discordPosts = store
 	return h
 }
 
@@ -380,7 +400,7 @@ func (h *SystemDomainHandler) handleScheduledMemeDispatch(ctx context.Context, e
 				))
 				continue
 			}
-			if err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
+			if _, err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
 				logger.Info(fmt.Sprintf(
 					"system handler meme delivery failed event_id=%s channel_id=%s error=%v",
 					event.EventID,
@@ -493,19 +513,36 @@ func (h *SystemDomainHandler) noteHashtagAttempt(url string, attempt *HashtagAtt
 // configured (WithMemeAttachments), it fetches the attachment there first, since some
 // hosts (Cloudflare and similar) block a plain HTTP client; a failed fetch falls back to
 // sending the attachment by URL, same as when the feature is not enabled at all.
-func (h *SystemDomainHandler) deliverAttachment(ctx context.Context, channelID, content, attachmentURL string) error {
-	if attachmentURL == "" || h.memeAttachments == nil || !h.serviceEnabled("meme") {
-		return h.discord.Deliver(ctx, channelID, content, attachmentURL)
+// A delivered attachment is recorded against its Discord message so citations can link it.
+func (h *SystemDomainHandler) deliverAttachment(ctx context.Context, channelID, content, attachmentURL string) (clients.DiscordDeliveryReceipt, error) {
+	var data []byte
+	var contentType string
+	if attachmentURL != "" && h.memeAttachments != nil && h.serviceEnabled("meme") {
+		fetched, fetchedType, err := h.memeAttachments.FetchAttachment(ctx, attachmentURL)
+		if err != nil {
+			logger.Info(fmt.Sprintf(
+				"system handler attachment fetch fell back to url url=%s error=%v",
+				attachmentURL, err,
+			))
+		} else {
+			data, contentType = fetched, fetchedType
+		}
 	}
-	data, contentType, err := h.memeAttachments.FetchAttachment(ctx, attachmentURL)
-	if err != nil {
-		logger.Info(fmt.Sprintf(
-			"system handler attachment fetch fell back to url url=%s error=%v",
-			attachmentURL, err,
-		))
-		return h.discord.Deliver(ctx, channelID, content, attachmentURL)
+	var receipt clients.DiscordDeliveryReceipt
+	var err error
+	if sender, ok := h.discord.(discordReceiptDeliverer); ok {
+		receipt, err = sender.DeliverWithReceipt(ctx, channelID, content, attachmentURL, data, contentType)
+	} else if len(data) == 0 {
+		err = h.discord.Deliver(ctx, channelID, content, attachmentURL)
+	} else {
+		err = h.discord.DeliverAttachment(ctx, channelID, content, data, contentType, attachmentURL)
 	}
-	return h.discord.DeliverAttachment(ctx, channelID, content, data, contentType, attachmentURL)
+	if err == nil && attachmentURL != "" && receipt.GuildID != "" && receipt.MessageID != "" && h.discordPosts != nil {
+		if recordErr := h.discordPosts.RecordDiscordPost(attachmentURL, receipt.GuildID, receipt.ChannelID, receipt.MessageID); recordErr != nil {
+			logger.Info(fmt.Sprintf("system handler could not record the discord post: %v", recordErr))
+		}
+	}
+	return receipt, err
 }
 
 // handleDiscordSend posts an admin-supplied message to configured channels. It only
@@ -566,7 +603,7 @@ func (h *SystemDomainHandler) handleDiscordSend(ctx context.Context, event core.
 			skipped = append(skipped, channelID)
 			continue
 		}
-		if err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
+		if _, err := h.deliverAttachment(ctx, channelID, content, attachmentURL); err != nil {
 			errs = append(errs, fmt.Errorf("send to channel %s: %w", channelID, err))
 			continue
 		}

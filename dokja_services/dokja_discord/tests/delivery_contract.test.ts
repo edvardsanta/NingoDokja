@@ -20,7 +20,7 @@ test("delivery contract accepts content-only payload", async () => {
           throw new Error(`unexpected fetch ${url}`);
         }
         discordBody = String(init?.body ?? "");
-        return new Response(JSON.stringify({ id: "discord-message-1" }), { status: 200 });
+        return new Response(JSON.stringify({ id: "discord-message-1", guild_id: "guild-1" }), { status: 200 });
       },
     },
   );
@@ -30,6 +30,7 @@ test("delivery contract accepts content-only payload", async () => {
   assert.equal(result.payload.status, "ok");
   assert.equal(result.payload.channel_id, "channel-1");
   assert.equal(result.payload.message_id, "discord-message-1");
+  assert.equal(result.payload.guild_id, "guild-1");
   assert.equal(result.payload.has_attachment, false);
 });
 
@@ -53,7 +54,7 @@ test("delivery contract accepts attachment-only payload", async () => {
           });
         }
         if (url.includes("/channels/")) {
-          return new Response(JSON.stringify({ id: "discord-message-2" }), { status: 200 });
+          return new Response(JSON.stringify({ id: "discord-message-2", guild_id: "guild-1" }), { status: 200 });
         }
         throw new Error(`unexpected fetch ${url}`);
       },
@@ -65,6 +66,7 @@ test("delivery contract accepts attachment-only payload", async () => {
   assert.equal(result.payload.status, "ok");
   assert.equal(result.payload.channel_id, "channel-2");
   assert.equal(result.payload.message_id, "discord-message-2");
+  assert.equal(result.payload.guild_id, "guild-1");
   assert.equal(result.payload.has_attachment, true);
 });
 
@@ -97,7 +99,7 @@ test("delivery routes mapped channels through the webhook without bot auth", asy
       webhooks: { "channel-9": "https://discord.test/api/webhooks/1/abc" },
       fetchImpl: async (input, init) => {
         calls.push({ url: String(input), headers: init?.headers });
-        return new Response(JSON.stringify({ id: "webhook-message-1" }), { status: 200 });
+        return new Response(JSON.stringify({ id: "webhook-message-1", guild_id: "guild-9" }), { status: 200 });
       },
     },
   );
@@ -107,6 +109,7 @@ test("delivery routes mapped channels through the webhook without bot auth", asy
   assert.equal(calls[0]?.url, "https://discord.test/api/webhooks/1/abc?wait=true");
   assert.equal(JSON.stringify(calls[0]?.headers).includes("Bot"), false);
   assert.equal(result.payload.message_id, "webhook-message-1");
+  assert.equal(result.payload.guild_id, "guild-9");
 });
 
 test("delivery sends attachments through the webhook", async () => {

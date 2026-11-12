@@ -223,7 +223,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	// The transcript keeps what the owner was shown, citations included.
 	sources = citedSources(raw, sources)
 	h.focus.remember(reading, turn.Content, sources)
-	reply := withKeptLine(citeSources(raw, sources), keptLine)
+	reply := withKeptLine(citeSources(raw, sources, h.discordPermalink), keptLine)
 	if webData != nil && !webData.FailureOnly {
 		if status := webReadingStatus(event, webData); status != "" {
 			reply += "\n\n" + status

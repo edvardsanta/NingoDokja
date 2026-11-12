@@ -23,6 +23,8 @@ export type DiscordDeliveryResponse = {
   status: "ok" | "error";
   channel_id?: string;
   message_id?: string;
+  // Present when Discord reports it (guild channels); DM channels have none.
+  guild_id?: string;
   has_attachment?: boolean;
   message?: string;
 };
@@ -181,6 +183,7 @@ export async function handleDiscordDeliveryRequest(
       status: "ok",
       channel_id: channelId,
       message_id: message.id ?? "",
+      ...(message.guild_id ? { guild_id: message.guild_id } : {}),
       has_attachment: attachmentUrl.length > 0,
     },
   };
@@ -267,13 +270,13 @@ function parseDeliveryRequest(body: Record<string, unknown>): DiscordDeliveryReq
   };
 }
 
-async function readDiscordMessage(response: Response): Promise<{ id?: string }> {
+async function readDiscordMessage(response: Response): Promise<{ id?: string; guild_id?: string }> {
   const raw = await response.text();
   if (!raw) {
     return {};
   }
   try {
-    return JSON.parse(raw) as { id?: string };
+    return JSON.parse(raw) as { id?: string; guild_id?: string };
   } catch {
     return {};
   }

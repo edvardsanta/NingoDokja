@@ -8,6 +8,7 @@ import (
 	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
@@ -66,6 +67,33 @@ type ChatDomainHandler struct {
 	sends *core.OrderedQueue
 	// running lets another request stop a send of an archived conversation.
 	running *core.RunningSends
+	// discordPosts resolves the Discord message that carried a cited media URL.
+	discordPosts DiscordPostReader
+}
+
+// DiscordPostReader resolves the Discord message that carried a media URL, so a
+// citation can link Ningo's own post instead of the source page.
+type DiscordPostReader interface {
+	LatestDiscordPost(mediaURL string) (store.DiscordPost, bool, error)
+}
+
+// WithDiscordPosts lets citations link the Discord message where Ningo posted the media.
+func (h *ChatDomainHandler) WithDiscordPosts(reader DiscordPostReader) *ChatDomainHandler {
+	h.discordPosts = reader
+	return h
+}
+
+// discordPermalink returns the link of the message where Ningo posted this media,
+// when the delivery was recorded. It only opens for people who can see the channel.
+func (h *ChatDomainHandler) discordPermalink(mediaURL string) string {
+	if h.discordPosts == nil || mediaURL == "" {
+		return ""
+	}
+	post, ok, err := h.discordPosts.LatestDiscordPost(mediaURL)
+	if err != nil || !ok {
+		return ""
+	}
+	return post.Permalink()
 }
 
 func (h *ChatDomainHandler) WithVoiceGenerator(generator VoiceChatStreamingGenerator) *ChatDomainHandler {
@@ -282,7 +310,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	sources = citedSources(rawReply, sources)
 	h.focus.remember(turn, content, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
-	reply := withKeptLine(citeSources(presentation.text, sources), keptLine)
+	reply := withKeptLine(citeSources(presentation.text, sources, h.discordPermalink), keptLine)
 	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil && !data.FailureOnly {
 		if status := webReadingStatus(event, data); status != "" {
 			reply = strings.TrimSpace(reply) + "\n\n" + status

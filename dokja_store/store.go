@@ -39,6 +39,17 @@ var migrations = []string{
 		value      TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	);`,
+	// 2: Discord messages Ningo posted, keyed by the attached media URL, so a
+	// later citation can link the message itself instead of the source page.
+	`CREATE TABLE discord_posts (
+		media_url  TEXT NOT NULL,
+		guild_id   TEXT NOT NULL,
+		channel_id TEXT NOT NULL,
+		message_id TEXT NOT NULL,
+		posted_at  TEXT NOT NULL,
+		PRIMARY KEY (media_url, channel_id, message_id)
+	);
+	CREATE INDEX discord_posts_by_url ON discord_posts(media_url, posted_at);`,
 }
 
 // Open creates the database if needed (readable by its owner only, since it holds API
