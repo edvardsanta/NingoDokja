@@ -84,21 +84,21 @@ export async function runDiagnostics(transport: Transport): Promise<Diagnostics>
 }
 
 export async function listPostgresSchemas(transport: Transport, id: string): Promise<string[]> {
-  const reply = await transport.request("datastudio.postgres.schemas", { id });
+  const reply = await transport.request("datastudio.postgres.schemas", { connection_id: id });
   if (!reply.ok) throw new Error(reply.error.message);
   const result = reply.result as { schemas: string[] } | undefined;
   return result?.schemas ?? [];
 }
 
 export async function listPostgresTables(transport: Transport, id: string, schema: string): Promise<{ name: string; type: string }[]> {
-  const reply = await transport.request("datastudio.postgres.tables", { id, schema });
+  const reply = await transport.request("datastudio.postgres.tables", { connection_id: id, schema });
   if (!reply.ok) throw new Error(reply.error.message);
   const result = reply.result as { tables: { name: string; type: string }[] } | undefined;
   return result?.tables ?? [];
 }
 
 export async function readPostgresTable(transport: Transport, id: string, schema: string, table: string): Promise<TableSchema> {
-  const reply = await transport.request("datastudio.postgres.table", { id, schema, table });
+  const reply = await transport.request("datastudio.postgres.table", { connection_id: id, schema, table });
   if (!reply.ok) throw new Error(reply.error.message);
   const result = reply.result as { schema: TableSchema } | undefined;
   return result?.schema ?? { columns: [], count: 0 };

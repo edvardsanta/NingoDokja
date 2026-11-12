@@ -1226,9 +1226,9 @@ function dataStudioPath(raw: Record<string, unknown>): { path: string } | undefi
   return path !== "" && path.length <= MAX_DATA_STUDIO_PATH && path.startsWith("/") ? { path } : undefined;
 }
 
-function postgresRef(raw: Record<string, unknown>): { id: string } | undefined {
-  const id = text(raw.id);
-  return id !== "" && id.length <= 200 ? { id } : undefined;
+function postgresRef(raw: Record<string, unknown>): { connection_id: string } | undefined {
+  const id = text(raw.connection_id);
+  return id !== "" && id.length <= 200 ? { connection_id: id } : undefined;
 }
 
 function queryResultOf(raw: unknown): { columns: string[]; rows: unknown[][]; total: number } {
