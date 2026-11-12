@@ -104,8 +104,11 @@ export async function readPostgresTable(transport: Transport, id: string, schema
   return result?.schema ?? { columns: [], count: 0 };
 }
 
-// The screen never sees credentials: it only gets what the masked DSN shows.
+// The screen never sees credentials. The shell masks the DSN to host:port/database
+// before it reaches the renderer; this stays as the defense in depth for anything
+// that slips through, and passes already-masked values straight on.
 export function maskedDSN(dsn: string): string {
+  if (!dsn.includes("://") && !dsn.includes("@")) return dsn;
   try {
     const url = new URL(dsn);
     const host = url.hostname + (url.port ? `:${url.port}` : "");

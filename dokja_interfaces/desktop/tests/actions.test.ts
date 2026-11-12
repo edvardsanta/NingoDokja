@@ -846,3 +846,29 @@ test("price.watches preserves long categories so removal uses the stored value",
   );
   assert.deepEqual(ACTIONS["price.unwatch"].payload({ category }), { category, brand: "" });
 });
+
+test("datastudio.sources.list masks postgres DSNs before they reach the screen", () => {
+  const projected = ACTIONS["datastudio.sources.list"].project(compactOf("data-studio", {
+    sources: [
+      { id: "postgres:1", kind: "postgres", name: "price_history · source_journal", dsn: "postgres://ningo:secret@dokja-postgres:5432/dokja" },
+      { id: "json:/repo/owner.json", kind: "json", name: "owner.json", path: "/repo/owner.json", size: 100 },
+    ],
+  }));
+  assert.deepEqual(projected, {
+    sources: [
+      { id: "postgres:1", kind: "postgres", name: "price_history · source_journal", dsn: "dokja-postgres:5432/dokja" },
+      { id: "json:/repo/owner.json", kind: "json", name: "owner.json", path: "/repo/owner.json", size: 100 },
+    ],
+  });
+  assert.ok(!JSON.stringify(projected).includes("secret"));
+});
+
+test("datastudio postgres actions carry only the connection_id the screen chose", () => {
+  assert.deepEqual(ACTIONS["datastudio.postgres.schemas"].payload({ connection_id: "postgres:1", extra: 1 }), { connection_id: "postgres:1" });
+  assert.equal(ACTIONS["datastudio.postgres.schemas"].payload({ id: "postgres:1" }), undefined);
+  assert.deepEqual(ACTIONS["datastudio.postgres.tables"].payload({ connection_id: "postgres:1", schema: "dokja_price" }), { connection_id: "postgres:1", schema: "dokja_price" });
+  assert.deepEqual(
+    ACTIONS["datastudio.postgres.table"].payload({ connection_id: "postgres:1", schema: "dokja_price", table: "offers" }),
+    { connection_id: "postgres:1", schema: "dokja_price", table: "offers" },
+  );
+});
