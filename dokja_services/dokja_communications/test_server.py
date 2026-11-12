@@ -263,7 +263,7 @@ class Server(ThreadingHTTPServer):
         time.sleep(0.3)
         super().server_close()
 
-server = Server(("127.0.0.1", 0), handler_for(Mock(), ""))
+server = Server(("localhost", 0), handler_for(Mock(), ""))
 print(server.server_address[1], flush=True)
 serve(server)
 """
@@ -276,7 +276,7 @@ serve(server)
         )
         try:
             port = int(process.stdout.readline())
-            urlopen(f"http://127.0.0.1:{port}/health", timeout=2).close()
+            urlopen(f"http://localhost:{port}/health", timeout=2).close()
             process.send_signal(signal.SIGTERM)
             self.assertEqual(process.stdout.readline().strip(), "closing")
             process.send_signal(signal.SIGTERM)
