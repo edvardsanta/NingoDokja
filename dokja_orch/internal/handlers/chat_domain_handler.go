@@ -69,6 +69,9 @@ type ChatDomainHandler struct {
 	running *core.RunningSends
 	// discordPosts resolves the Discord message that carried a cited media URL.
 	discordPosts DiscordPostReader
+	// speakers notes the WhatsApp sessions of recognized people, for the owner's Profiles.
+	speakers      SpeakerSessions
+	notedSpeakers sync.Map
 }
 
 // DiscordPostReader resolves the Discord message that carried a media URL, so a

@@ -22,6 +22,7 @@ import (
 	chatsessions "read_books/internal/infrastructure/chat_sessions"
 	competitorcache "read_books/internal/infrastructure/competitor_cache"
 	"read_books/internal/infrastructure/conversations"
+	"read_books/internal/infrastructure/profiles"
 	quizruns "read_books/internal/infrastructure/quiz_runs"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
@@ -80,6 +81,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer chatSessions.Close()
+	// The owner's Profiles: inferred readings of how Ningo deals with each person. Without the file the
+	// screen reports them unavailable and nothing else changes.
+	var profileBook handlers.ProfileBook
+	if book, err := profiles.Open(profiles.PathBeside(sharedPath)); err != nil {
+		logger.Error("open profile storage; profiles are disabled", err)
+	} else {
+		defer book.Close()
+		profileBook = book
+	}
 
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
@@ -299,11 +309,12 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}).WithArchive(archive).WithAnswerExperience(handlers.NewChatAnswerExperience(memoryClient, memoryEnabled)).WithFacts(facts).WithRunningSends(runningSends),
+		}).WithArchive(archive).WithAnswerExperience(handlers.NewChatAnswerExperience(memoryClient, memoryEnabled)).WithFacts(facts).WithRunningSends(runningSends).WithSpeakerSessions(profileBook),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience).
 			WithTagEvaluation(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
-		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
+		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()).
+			WithProfiles(ownerConfig.Owner.Profile.Name, ownerConfig.Owner.Accounts.Discord.UserID, ownerConfig.Ningo.People, chatSessions, profileBook, clients.NewChatProviderClient("")),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 		handlers.NewDataStudioHandler(dataStudioBaseDir, dataStudioPostgres),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))

@@ -118,3 +118,26 @@ func TestCorruptSnapshotsAndFutureSchemasFailExplicitly(t *testing.T) {
 		t.Fatal("future schema modified")
 	}
 }
+
+func TestAllGivesEverySessionWithItsScopeAndSkipsADamagedOne(t *testing.T) {
+	path := PathBeside(filepath.Join(t.TempDir(), "shared.db"))
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	later := fixture()
+	later.LastSeenAt = later.LastSeenAt.Add(time.Hour)
+	for key, snapshot := range map[string]chat.SessionSnapshot{"scope-b": later, "scope-a": fixture(), "scope-broken": fixture()} {
+		if err = s.Save(t.Context(), key, snapshot); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err = s.db.Exec(`UPDATE chat_sessions SET messages_json='{' WHERE scope_key='scope-broken'`); err != nil {
+		t.Fatal(err)
+	}
+	all, err := s.All(t.Context())
+	if err != nil || len(all) != 2 || all[0].Key != "scope-a" || all[1].Key != "scope-b" || !reflect.DeepEqual(all[0].SessionSnapshot, fixture()) {
+		t.Fatal("sessions were not listed oldest first without the damaged one", all, err)
+	}
+}

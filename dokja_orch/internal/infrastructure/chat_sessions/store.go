@@ -100,6 +100,34 @@ func (s *Store) Load(ctx context.Context, key string) (chat.SessionSnapshot, boo
 	return snapshot, true, nil
 }
 
+// All gives every stored session with its scope, for reading history across sessions. A row that no
+// longer reads is skipped: one damaged session must not hide the others.
+func (s *Store) All(ctx context.Context) ([]chat.KeyedSession, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT scope_key,session_id,last_seen_at,summary,messages_json FROM chat_sessions ORDER BY last_seen_at`)
+	if err != nil {
+		return nil, fmt.Errorf("read chat sessions: %w", err)
+	}
+	defer rows.Close()
+	found := []chat.KeyedSession{}
+	for rows.Next() {
+		var session chat.KeyedSession
+		var seen int64
+		var raw string
+		if err := rows.Scan(&session.Key, &session.ID, &seen, &session.Summary, &raw); err != nil {
+			return nil, fmt.Errorf("read chat sessions: %w", err)
+		}
+		if len(raw) > chat.MaxSessionBytes || !utf8.ValidString(raw) || json.Unmarshal([]byte(raw), &session.Messages) != nil {
+			continue
+		}
+		session.LastSeenAt = time.Unix(0, seen).UTC()
+		if chat.ValidateSession(session.SessionSnapshot) != nil {
+			continue
+		}
+		found = append(found, session)
+	}
+	return found, rows.Err()
+}
+
 func (s *Store) Save(ctx context.Context, key string, snapshot chat.SessionSnapshot) error {
 	if key == "" || len(key) > 1024 {
 		return fmt.Errorf("invalid chat session scope")

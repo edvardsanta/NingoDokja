@@ -22,6 +22,7 @@ type ConversationDomainHandler struct {
 	facts    *conversation.Facts
 	running  *core.RunningSends
 	verdicts *memorydomain.Domain
+	profiles *profileSource
 }
 
 func NewConversationDomainHandler(archive *conversation.Archive) *ConversationDomainHandler {
@@ -155,6 +156,10 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 			return nil, archiveError(err)
 		}
 		return map[string]any{"fact_id": id, "deleted": true}, nil
+	case "conversation.profiles":
+		return h.listProfiles(ctx)
+	case "conversation.profile_generate":
+		return h.generateProfile(ctx, payloadString(payload, "person"))
 	default:
 		return nil, fmt.Errorf("unsupported conversation action %q", event.Type)
 	}
