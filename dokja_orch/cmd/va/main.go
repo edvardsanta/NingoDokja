@@ -80,6 +80,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer chatSessions.Close()
+	// The owner's Profiles: inferred readings of how Ningo deals with each person. Without the file the
+	// screen reports them unavailable and nothing else changes.
+	profileBook, closeProfiles := configureProfiles(os.Getenv("DOKJA_PROFILES_POSTGRES_DSN"), sharedPath)
+	defer closeProfiles()
 
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
@@ -299,11 +303,12 @@ func main() {
 				return nil, fmt.Errorf("reading sources are disabled")
 			}
 			return digestdomain.New(feedsClient).RecentReferences(ctx, question, limit)
-		}).WithArchive(archive).WithAnswerExperience(handlers.NewChatAnswerExperience(memoryClient, memoryEnabled)).WithFacts(facts).WithRunningSends(runningSends),
+		}).WithArchive(archive).WithAnswerExperience(handlers.NewChatAnswerExperience(memoryClient, memoryEnabled)).WithFacts(facts).WithRunningSends(runningSends).WithSpeakerSessions(profileBook),
 		handlers.NewMemeDomainHandler(memeClient).WithHashtagWorkflow(hashtagWorkflow).WithHashtagExperience(hashtagExperience).
 			WithTagEvaluation(handlers.NewHashtagTask(hashtagWorkflow, memoryClient, memoryEnabled), hashtagExperience),
 		handlers.NewMemoryDomainHandler(memoryClient),
-		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()),
+		handlers.NewConversationDomainHandler(archive).WithAnswerFeedback(memoryClient).WithFacts(facts).WithRunningSends(runningSends).WithRealtime(conversation.NewConversationContextEngine()).
+			WithProfiles(ownerConfig.Owner.Profile.Name, ownerConfig.Owner.Accounts.Discord.UserID, ownerConfig.Ningo.People, chatSessions, profileBook, clients.NewChatProviderClient("")),
 		handlers.NewLoggingDomainHandler(core.DomainAutomation),
 		handlers.NewDataStudioHandler(dataStudioBaseDir, dataStudioPostgres),
 	).WithControls(controls).WithCommunicationsToken(os.Getenv("DOKJA_COMMUNICATIONS_TOKEN"))

@@ -36,6 +36,10 @@ export const ACTION_TYPES = [
   // What known people asked Ningo to keep: reading it is a read, deleting asks in the shell's window.
   "conversation.facts",
   "conversation.fact_delete",
+  // How Ningo deals with each person: reading is a read; inferring one again costs a model call and
+  // replaces the last reading, so it is a change on a real press, never asked in a window.
+  "conversation.profiles",
+  "conversation.profile_generate",
   "runtime.set",
   "runtime.providers",
   "runtime.tasks.profiles",
@@ -129,6 +133,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "conversation.rename",
   "conversation.delete",
   "conversation.fact_delete",
+  "conversation.profile_generate",
   "communications.send",
   "meme.hashtag.tag",
   "meme.pool.refresh",

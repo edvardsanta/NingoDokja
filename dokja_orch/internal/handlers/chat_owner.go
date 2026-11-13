@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"context"
+
 	chat "read_books/dokja_domain/dokja_chat"
 	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
+	"read_books/internal/logger"
 )
 
 // WithOwnerProfile gives the handler the operator-configured owner profile, so the owner is known by
@@ -34,6 +37,39 @@ func (h *ChatDomainHandler) WithVisions(visions string) *ChatDomainHandler {
 func (h *ChatDomainHandler) WithWarmth(manner string) *ChatDomainHandler {
 	h.warm = manner
 	return h
+}
+
+// SpeakerSessions remembers which stored session belongs to a person the application recognized.
+type SpeakerSessions interface {
+	NoteSession(ctx context.Context, key, person string) error
+}
+
+// WithSpeakerSessions notes, for the owner's Profiles, the WhatsApp sessions of the people the
+// application recognized by number. A WhatsApp session holds one sender's messages and nothing in
+// it says who that is, so without the note its exchanges could not be found again. Discord needs
+// none: its history carries each account's alias.
+func (h *ChatDomainHandler) WithSpeakerSessions(sessions SpeakerSessions) *ChatDomainHandler {
+	h.speakers = sessions
+	return h
+}
+
+// noteSpeaker records the session's person once per process; the store keeps it across restarts.
+func (h *ChatDomainHandler) noteSpeaker(event core.Event, person string) {
+	key := chatSessionBaseKey(event)
+	if h.speakers == nil || key == "" || event.Source != core.SourceWhatsApp {
+		return
+	}
+	if noted, _ := h.notedSpeakers.LoadOrStore(key, person); noted == person {
+		if _, loaded := h.notedSpeakers.Load(key + "\x00done"); loaded {
+			return
+		}
+	}
+	h.notedSpeakers.Store(key, person)
+	if err := h.speakers.NoteSession(context.Background(), key, person); err != nil {
+		logger.Error("note a recognized speaker's session", err)
+		return
+	}
+	h.notedSpeakers.Store(key+"\x00done", true)
 }
 
 // privateFactsAllowed is where the owner allowed the private facts: their own WhatsApp chat and the
@@ -73,6 +109,7 @@ func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
 		people = append(people, chat.KnownPerson{Name: person.Name, About: person.About})
 		if person.WhatsApp != "" && communications.SameNumber(person.WhatsApp, numbers) {
 			event.Context["known_speaker"] = person.Name
+			h.noteSpeaker(event, conversation.PersonKey(person.Name))
 			if person.Warm && h.warm != "" {
 				event.Context["warm_manner"] = h.warm
 			}
@@ -136,6 +173,9 @@ func (h *ChatDomainHandler) withOwnerInterface(event core.Event) core.Event {
 		delete(event.Context, "owner_profile")
 	}
 	channel, owner := ownerChannel(event)
+	if owner && (channel == chat.OwnerByWhatsApp || channel == chat.OwnerByWhatsAppGroup) {
+		h.noteSpeaker(event, conversation.OwnerPerson)
+	}
 	if !owner || channel == chat.OwnerByDiscord {
 		return event
 	}

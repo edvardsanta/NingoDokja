@@ -347,6 +347,13 @@ export function createFakeTransport(delayMs = 400): Transport {
   // The demo's conversation archive, kept as the orchestrator keeps it: by its own opaque ids.
   const archive = new Map<string, { readingId: string; turns: ArchivedTurn[] }>();
   let keptFacts = [{ id: "f".repeat(32), owner: true, person: "", content: "Prefers tea to coffee.", place: "private", createdAt: "2026-10-30T12:00:00Z" }];
+  // The demo's profiles: counted from nothing, so the screen shows both of its states.
+  const demoPeople = [
+    { person: "owner", name: "You", realName: "", owner: true, turns: 42, voiceTurns: 6, answered: 31, medianReply: 180 },
+    { person: "person:Ana", name: "Ana", realName: "", owner: false, turns: 18, voiceTurns: 0, answered: 12, medianReply: 220 },
+    { person: "person:Rui", name: "Rui", realName: "Ricardo", owner: false, turns: 2, voiceTurns: 0, answered: 1, medianReply: 90 },
+  ];
+  const demoProfiles = new Map<string, { summary: string; tone: string; topics: string[]; patterns: string[]; exchanges: number; generatedAt: string; provider: string; model: string }>();
   let conversation = [{ id: "100", author: "A reader", bot: false, content: "What have you been reading?", timestamp: new Date().toISOString(), edited: false, replyTo: "", attachments: [] as string[] }];
   return {
     onChatPreview(listener) {
@@ -376,6 +383,16 @@ export function createFakeTransport(delayMs = 400): Transport {
         }
         case "conversation.facts":
           return ok({ facts: keptFacts });
+        case "conversation.profiles":
+          return ok({ profiles: demoPeople.map((person) => ({ ...person, profile: demoProfiles.get(person.person) })), minExchanges: 3, inference: true });
+        case "conversation.profile_generate": {
+          const person = demoPeople.find((item) => item.person === payload?.person);
+          if (!person) return { ok: false, error: { code: "orchestrator", message: "unknown person" } };
+          if (person.answered < 3) return { ok: false, error: { code: "orchestrator", message: "invalid conversation request" } };
+          const profile = { summary: `Ningo answers ${person.name} in a dry, short way.`, tone: "dry", topics: ["books"], patterns: ["keeps replies short"], exchanges: person.answered, generatedAt: new Date().toISOString(), provider: "demo", model: "demo/small" };
+          demoProfiles.set(person.person, profile);
+          return ok({ profile: { ...person, profile } });
+        }
         case "conversation.fact_delete":
           keptFacts = keptFacts.filter((fact) => fact.id !== payload?.fact_id);
           return ok({ deleted: true });
