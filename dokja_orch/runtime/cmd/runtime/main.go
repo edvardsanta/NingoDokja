@@ -31,6 +31,9 @@ const (
 	replacementCheckEvery = 5 * time.Second
 	replacementDrain      = 30 * time.Second
 	signalDrain           = 3 * time.Second
+	// Host workers are checked this often, so a reboot or a container started
+	// outside the controller leaves a worker down for at most this long.
+	hostWorkerCheckEvery = 15 * time.Second
 )
 
 // errReplaced ends run with every listener and lock released, for main to start the new file.
@@ -167,6 +170,7 @@ func run(executable string) error {
 	defer stop()
 	stopping, finish := context.WithCancel(signals)
 	defer finish()
+	go backend.SuperviseHostWorkers(stopping, hostWorkerCheckEvery)
 	var replaced atomic.Bool
 	if watch, err := orchestration.WatchExecutable(executable); err != nil {
 		log.Print("cannot watch the runtime daemon executable")

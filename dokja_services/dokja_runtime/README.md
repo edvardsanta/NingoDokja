@@ -144,6 +144,14 @@ owns them. After a controller restart, an existing worker remains externally
 owned; stopping the module does not terminate it. A replaced controller counts as a
 restart here.
 
+The controller also checks its configured workers every 15 seconds. While a module's
+container runs and a worker's socket does not answer, it starts that worker again.
+This covers a host reboot, a crashed worker, and a container started outside the
+controller (for example with `podman compose up`). A module whose container is stopped
+is left alone, and a worker that already answers is never replaced. A worker that
+cannot start is logged once until it starts again. Because a crashed worker can leave
+its socket file behind, a worker must replace a stale socket when it starts.
+
 This configuration launches owner-supplied executable code, like installing a
 Feeds plugin. No file means no host workers. Invalid configuration or startup
 failure is reported through the existing module error. Container configuration

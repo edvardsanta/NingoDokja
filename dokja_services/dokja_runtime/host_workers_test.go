@@ -17,6 +17,8 @@ func TestHostWorkerHelper(t *testing.T) {
 	if len(os.Args) < 3 || os.Args[len(os.Args)-2] != "host-worker-helper" {
 		return
 	}
+	// Like a real worker, replace the socket a crashed predecessor left behind.
+	os.Remove(os.Args[len(os.Args)-1])
 	l, err := net.Listen("unix", os.Args[len(os.Args)-1])
 	if err != nil {
 		os.Exit(1)
@@ -152,5 +154,77 @@ func TestHostWorkerExitMarksModuleFailed(t *testing.T) {
 	h.status(states)
 	if !states["dokja-feeds"].Failed {
 		t.Fatal("worker exit hidden from module status")
+	}
+}
+
+func supervisedCompose(h *hostWorkers, running bool) *Compose {
+	state := `{"Status":"exited","ExitCode":0}`
+	if running {
+		state = `{"Status":"running","Running":true}`
+	}
+	return &Compose{hostWorkers: h,
+		Run: func(context.Context, ...string) ([]byte, error) { return []byte("aaaaaaaaaaaa"), nil },
+		Inspect: func(context.Context, ...string) ([]byte, error) {
+			return []byte(`[{"Id":"aaaaaaaaaaaa","Config":{"Labels":{"com.docker.compose.service":"dokja-feeds"}},"State":` + state + `}]`), nil
+		}}
+}
+
+func TestSupervisionStartsMissingWorkerWhileModuleRuns(t *testing.T) {
+	// A reboot or a container started outside the controller leaves no worker.
+	h, _ := workerFixture(t)
+	supervisedCompose(h, true).reviveHostWorkers(context.Background(), map[string]bool{})
+	if h.processes["reader"] == nil || !workerSocketReady(filepath.Join(h.root, "worker.sock")) {
+		t.Fatal("worker not started for a running module")
+	}
+}
+
+func TestSupervisionRestartsCrashedWorker(t *testing.T) {
+	h, _ := workerFixture(t)
+	if err := h.start(context.Background(), "feeds"); err != nil {
+		t.Fatal(err)
+	}
+	crashed := h.processes["reader"]
+	stopHostProcess(crashed)
+	supervisedCompose(h, true).reviveHostWorkers(context.Background(), map[string]bool{})
+	if p := h.processes["reader"]; p == nil || p == crashed || !workerSocketReady(filepath.Join(h.root, "worker.sock")) {
+		t.Fatal("crashed worker not restarted")
+	}
+}
+
+func TestSupervisionLeavesStoppedModuleAndExternalWorkerAlone(t *testing.T) {
+	h, _ := workerFixture(t)
+	supervisedCompose(h, false).reviveHostWorkers(context.Background(), map[string]bool{})
+	if len(h.processes) != 0 {
+		t.Fatal("worker started for a stopped module")
+	}
+	listener, err := net.Listen("unix", filepath.Join(h.root, "worker.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	supervisedCompose(h, true).reviveHostWorkers(context.Background(), map[string]bool{})
+	if len(h.processes) != 0 {
+		t.Fatal("supervision replaced an answering external worker")
+	}
+}
+
+func TestSupervisionRecordsFailureAndStopsWithContext(t *testing.T) {
+	h, spec := workerFixture(t)
+	spec.Command = []string{"missing-host-worker-binary"}
+	writeWorkerFixture(t, h.root, spec)
+	failing := map[string]bool{}
+	c := supervisedCompose(h, true)
+	c.reviveHostWorkers(context.Background(), failing)
+	if !failing["feeds"] {
+		t.Fatal("failed restart not recorded")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { c.SuperviseHostWorkers(ctx, time.Millisecond); close(done) }()
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("supervision outlived its context")
 	}
 }
