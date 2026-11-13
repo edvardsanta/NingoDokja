@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	chat "read_books/dokja_domain/dokja_chat"
@@ -124,7 +125,12 @@ func (h *ChatDomainHandler) captureMacroContext(ctx context.Context, event core.
 	for _, source := range sources {
 		evidence = append(evidence, chat.IdeaEvidence{Text: boundWebText(source.Text, 2400), URL: source.Reference, Label: boundWebText(source.Title+" · "+source.Heading, 200)})
 	}
-	data, _ := json.Marshal(map[string]any{"question": boundWebText(question, 8000), "answer": boundWebText(answer, 8000), "evidence": evidence})
+	participants := h.macroParticipants(event)
+	listed := make([]map[string]string, 0, len(participants))
+	for _, participant := range participants {
+		listed = append(listed, map[string]string{"label": participant.Label(), "known_as": participant.KnownAs, "real_name": participant.RealName})
+	}
+	data, _ := json.Marshal(map[string]any{"participants": listed, "question": boundWebText(question, 8000), "answer": boundWebText(answer, 8000), "evidence": evidence})
 	extraction, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	messages := []map[string]string{{"role": "system", "content": chat.DiscussionIdeasPrompt}, {"role": "user", "content": string(data)}}
@@ -138,7 +144,7 @@ func (h *ChatDomainHandler) captureMacroContext(ctx context.Context, event core.
 	if err != nil || extraction.Err() != nil {
 		return "extraction_failed"
 	}
-	ideas, err := chat.ParseDiscussionIdeas(chatReplyFromResult(result), evidence)
+	ideas, err := chat.ParseDiscussionIdeasFor(chatReplyFromResult(result), evidence, participants)
 	if err != nil {
 		return "extraction_failed"
 	}
@@ -148,7 +154,7 @@ func (h *ChatDomainHandler) captureMacroContext(ctx context.Context, event core.
 	records := make([]map[string]any, 0, len(ideas))
 	for _, idea := range ideas {
 		ref := evidence[idea.Evidence]
-		records = append(records, map[string]any{"kind": idea.Kind, "origin": string(event.Source), "text": idea.Text, "quote": idea.Quote, "url": ref.URL, "label": ref.Label})
+		records = append(records, map[string]any{"kind": idea.Kind, "origin": string(event.Source), "text": idea.Text, "speaker": idea.Speaker, "quote": idea.Quote, "url": ref.URL, "label": ref.Label})
 	}
 	eventID := event.EventID
 	if eventID == "" {
@@ -223,4 +229,48 @@ func contextUsed(live int, macro string) map[string]any {
 		macro = macroSkippedPrefix + "not_generated"
 	}
 	return map[string]any{"live_messages": max(live, 0), "macro": macro}
+}
+
+// macroParticipants names the people speaking in this turn for the extraction, so an idea can say
+// "Nick (Alex)" instead of "the user". A person is named from what the application verified: the
+// gateway's account id matched against the private configuration, the number WhatsApp reported, or
+// the owner's own interface. Display names are what people chose and are passed as such. Account
+// ids and numbers never leave this function.
+func (h *ChatDomainHandler) macroParticipants(event core.Event) []chat.ExtractionParticipant {
+	name := func(value string) string { return boundWebText(strings.TrimSpace(value), 100) }
+	var people []chat.ExtractionParticipant
+	seen := map[string]bool{}
+	add := func(p chat.ExtractionParticipant) {
+		p.Name, p.KnownAs, p.RealName = name(p.Name), name(p.KnownAs), name(p.RealName)
+		if p.Label() == "" || seen[p.Label()] {
+			return
+		}
+		seen[p.Label()] = true
+		people = append(people, p)
+	}
+	if turns, ok := event.Context["voice_turns"].([]chat.VoiceTurn); ok {
+		for _, turn := range turns {
+			known := h.knownDiscordName(turn.UserID)
+			add(chat.ExtractionParticipant{Name: turn.UserName, KnownAs: known.Name, RealName: known.RealName})
+		}
+		return people
+	}
+	if event.Source == core.SourceDiscord {
+		display := event.User.Name
+		if display == event.User.ID {
+			display = ""
+		}
+		known := h.knownDiscordName(event.User.ID)
+		if _, owner := ownerChannel(event); owner && known.Name == "" {
+			known.Name = h.ownerProfile.Name
+		}
+		add(chat.ExtractionParticipant{Name: display, KnownAs: known.Name, RealName: known.RealName})
+		return people
+	}
+	if speaker, _ := event.Context["known_speaker"].(string); speaker != "" {
+		add(chat.ExtractionParticipant{KnownAs: speaker})
+	} else if _, owner := ownerChannel(event); owner {
+		add(chat.ExtractionParticipant{KnownAs: h.ownerProfile.Name})
+	}
+	return people
 }

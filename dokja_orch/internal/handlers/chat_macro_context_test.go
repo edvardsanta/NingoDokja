@@ -47,6 +47,8 @@ func (s *macroTestStore) Dispatch(_ context.Context, kind string, payload map[st
 type macroTestModel struct {
 	messages   []map[string]string
 	extraction string
+	// extractionInput is the data the last extraction was given.
+	extractionInput string
 }
 
 func (g *macroTestModel) Generate(context.Context, string) (map[string]any, error) {
@@ -54,6 +56,7 @@ func (g *macroTestModel) Generate(context.Context, string) (map[string]any, erro
 }
 func (g *macroTestModel) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	if len(messages) > 0 && messages[0]["content"] == chat.DiscussionIdeasPrompt {
+		g.extractionInput = messages[1]["content"]
 		return map[string]any{"reply": g.extraction}, nil
 	}
 	g.messages = messages
@@ -235,5 +238,44 @@ func TestWithoutAMacroContextTheTurnSaysWhyItReadNone(t *testing.T) {
 	}
 	if got := contextUsed(-1, ""); got["live_messages"] != 0 || got["macro"] != "skipped:not_generated" {
 		t.Fatal(got)
+	}
+}
+
+func TestTheExtractionKnowsWhoSpokeAndStoresWhoAnIdeaIsAbout(t *testing.T) {
+	durable := &macroTestStore{documents: map[string]any{}, ideas: map[string]any{}}
+	const quote = "We keep the profiles in PostgreSQL."
+	model := &macroTestModel{extraction: `{"ideas":[{"kind":"decision","text":"Nick (Alex) decided to keep the profiles in PostgreSQL.","speaker":"Nick (Alex)","quote":"keep the profiles in PostgreSQL","evidence":0},` +
+		`{"kind":"preference","text":"Misattributed.","speaker":"Somebody Invented","quote":"keep the profiles in PostgreSQL","evidence":0}]}`}
+	h := NewChatDomainHandler(model).WithMacroContext(durable, nil).WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", RealName: "Alex", Discord: samAccount}}})
+	event := channelEvent(samAccount, "some-handle", quote)
+	if got := h.captureMacroContext(t.Context(), event, "session", quote, "Noted.", nil); got != "saved" {
+		t.Fatal(got)
+	}
+	for _, want := range []string{`"label":"Nick (Alex)"`, `"known_as":"Nick"`, `"real_name":"Alex"`} {
+		if !strings.Contains(model.extractionInput, want) {
+			t.Fatalf("the extraction was not told %s: %s", want, model.extractionInput)
+		}
+	}
+	if strings.Contains(model.extractionInput, samAccount) {
+		t.Fatal("an account id reached the extraction")
+	}
+	stored := durable.ideas[macroScope(event)].([]map[string]any)
+	if len(stored) != 2 || stored[0]["speaker"] != "Nick (Alex)" || stored[1]["speaker"] != "" || stored[0]["kind"] != "decision" {
+		t.Fatal("the speaker was not kept, or an invented one was trusted", stored)
+	}
+}
+
+func TestVoiceExtractionNamesEverySpeakerOnceAndAnUnknownByTheirDisplayName(t *testing.T) {
+	h := NewChatDomainHandler(&macroTestModel{}).WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", RealName: "Alex", Discord: samAccount}}})
+	event := chatEvent("x")
+	event.Context = map[string]any{"voice_turns": []chat.VoiceTurn{
+		{UserID: samAccount, UserName: "handle", Text: "a"}, {UserID: otherAccount, UserName: "Stranger", Text: "b"}, {UserID: samAccount, UserName: "handle", Text: "c"},
+	}}
+	people := h.macroParticipants(event)
+	if len(people) != 2 || people[0].Label() != "Nick (Alex)" || people[1].Label() != "Stranger" {
+		t.Fatal(people)
+	}
+	if len(h.macroParticipants(chatEvent("hello"))) != 0 && chatEvent("hello").User.Name == "" {
+		t.Fatal("an unnamed speaker was invented")
 	}
 }

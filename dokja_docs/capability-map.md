@@ -180,7 +180,9 @@ Knowledge routing/workflow/handler/client contracts; source text remains untrust
 No global document import, historical backfill, channel-history retrieval or OCR
 is added. See the production runbook's conversation cache and macro context section. A turn sends
 its live context (the session history) always and asks the macro context only when the Chat
-domain's recall rule says the live context cannot carry it; the reply reports which it was. Regression
+domain's recall rule says the live context cannot carry it; the reply reports which it was. What
+is kept into the macro context is selective (decisions, preferences, corrections, unresolved
+questions) and attributed to the people the owner listed, by name and real name. Regression
 coverage includes attachment-only messages, admission before fetch, malicious
 document evidence, citation sanitation, follow-ups, channel isolation and real
 PDF parser fixtures. An opt-in Feeds test can exercise a public PDF URL.
