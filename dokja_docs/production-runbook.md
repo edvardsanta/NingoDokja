@@ -1709,6 +1709,43 @@ Saving recreates orchestrator and feeds together. Blank or invalid environment
 values use 25 MiB. HTML/text reading retains its 2 MiB limit; extracted text,
 page, source and time budgets remain unchanged.
 
+## PostgreSQL backups
+
+The `dokja` database holds what cannot be rebuilt from the SQLite files: the price history
+(`dokja_price`), the macro context (`dokja_knowledge.discussion_*`), the source journal and, when
+`DOKJA_PROFILES_POSTGRES_DSN` is set, the profiles. It lives in a container volume, and recreating
+the volume deletes it: the price history was lost that way and came back only because a dump
+happened to exist. `make backup` takes one on purpose.
+
+`make backup` (or `scripts/backup-postgres.sh`) runs `pg_dump` in the database container, writes
+`.dokja/backups/postgres/dokja-YYYYmmdd-HHMMSS.dump` (directory mode `0700`, file `0600`, ignored by
+git), checks that `pg_restore --list` can read it, and only then moves it into place; a failed or
+empty dump keeps nothing. It keeps the newest `KEEP` dumps (default 14) and removes older ones of its
+own name only. `KEEP=30 make backup` changes that, and `make backup` uses the same compose files as
+`make up`, overlays included.
+
+The dump is in `pg_dump`'s custom format, so one schema can come back without the others. A
+restore into an empty database, for example just the price history:
+
+```sh
+psql -d <database> -c 'CREATE SCHEMA dokja_price'
+pg_restore --no-owner -n dokja_price -d <database> .dokja/backups/postgres/dokja-YYYYmmdd-HHMMSS.dump
+```
+
+`pg_restore -n` restores what is inside the schema, not the schema itself, so create it first. Then
+restart the orchestrator, which only opens an initialized namespace at startup. Check the row
+counts against what the dump lists with `pg_restore --list`.
+
+Nothing schedules it. To take one every day at 03:30, add to the owner's crontab (adjust the path):
+
+```cron
+30 3 * * * cd /path/to/repo && make backup >> .dokja/backups/postgres/backup.log 2>&1
+```
+
+A dump holds the owner's conversations' macro context and prices, so keep the directory private and
+copy it off the machine if the machine itself is the risk: a backup on the same disk does not
+survive the disk. SQLite files are not covered; use SQLite's online backup for them.
+
 ## Optional development GPU for the local Ollama
 
 By default `dokja-ollama` gets no GPU device and runs on the CPU. That serves the embeddings well
