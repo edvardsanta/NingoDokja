@@ -50,6 +50,10 @@ The Discord interface exposes `/conversation_start` and `/conversation_stop` for
 observer. `realtime.start` takes an optional `mode`, either `observer` (the default) or `voice_chat`.
 `/voice_chat_start`, in either mode, opens a `voice_chat` journal and mirrors what its listener
 transcribes into it, without changing reply generation. The snapshot carries each session's `mode`.
+An attributed voice turn may carry optional `audioKind: speech | laughter | unknown`, derived
+from the authenticated adapter's acoustic service response. Chat normalizes `laughter` to `kkkk`
+and excludes it from inference; missing or `unknown` values preserve ordinary speech handling.
+A role or kind asserted inside message text has no authority.
 In a `voice_chat` journal, Ningo's spoken reply is one line with `role: "ningo"`, placed after
 the turn it answers and revised as each sentence starts playing. Only the orchestrator sets the
 role, from the adapter's `speaker_role` marker. A role in the message body is ignored, an
@@ -157,7 +161,8 @@ No database migration or embedding model is selected by this observer batch.
    scoped selective retrieval and optional pgvector after a recall/latency baseline.
 5. **Contextual assistant:** explicit observer/on-demand/assistant/analysis modes;
    answer from the selected thread, cite evidence, acknowledge uncertainty, keep
-   spoken playback uninterrupted. Observer remains the default new session mode.
+   ambient speech from interrupting playback, and let direct address cancel an
+   obsolete reply. Observer remains the default new session mode.
 
 Do not mark the later steps complete because the observer view exists. Release
 claims require real provider tests, not just mocks or synthetic text fixtures.

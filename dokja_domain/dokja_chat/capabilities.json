@@ -76,11 +76,11 @@
     },
     {
       "id": "conversation.voice",
-      "description": "Transcribe speech and generate spoken replies in a Discord voice conversation or in a Desktop assistant conversation.",
+      "description": "Converse in Brazilian Portuguese by voice in Discord, transcribing speech, filtering acoustically classified laughter, recognizing likely variants of Ningo's name and generating concise spoken replies; also transcribe and speak Desktop assistant conversations.",
       "entry_points": [
         {
           "interface": "discord",
-          "usage": "Use /voice_chat_start (/conversa_voz in Portuguese; its wake-word mode answers only when called), /voice_chat_stop or /speak."
+          "usage": "Use /voice_chat_start (/conversa_voz in Portuguese; its wake-word mode answers only when called), /voice_chat_stop or /speak. Address Ningo directly to open an exchange or interrupt an obsolete spoken reply."
         },
         {
           "interface": "desktop",
@@ -89,6 +89,7 @@
       ],
       "limits": [
         "Requires configured voice and inference providers and an eligible voice session. Passive capture does not mean every utterance receives a reply.",
+        "Likely ASR name variants count only at the start of a direct utterance. Unknown acoustic classifications preserve ordinary speech handling.",
         "Desktop voice listens only while the owner keeps Talk by voice on; the microphone audio is not saved."
       ]
     },

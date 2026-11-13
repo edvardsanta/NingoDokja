@@ -4,6 +4,7 @@ import os
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -18,10 +19,12 @@ from fastapi import (
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from acoustic_classifier import LAUGHTER, UNKNOWN, TransformersAudioClassifier
 from audio_utils import wav_bytes_to_mono_16k
-from speech_activity import SpeechDetector
-from piper_tts_service import PiperTTSService
+from laughter import with_laughter
 from openwakeword_service import OpenWakeWordService
+from piper_tts_service import PiperTTSService
+from speech_activity import SpeechDetector
 from streaming import (
     DEFAULT_AUDIO_CHUNK_BYTES,
     DEFAULT_MIN_BUFFER_CHARS,
@@ -32,10 +35,10 @@ from streaming import (
     pop_streamable_segment,
 )
 from stub_stt_service import StubSTTService
-from stub_wakeword_service import StubWakewordService
 from stub_tts_service import StubTTSService
-from whisper_cpp_stt_service import WhisperCppSTTService
+from stub_wakeword_service import StubWakewordService
 from transformers_stt_service import TransformersSTTService, decode_audio_b64
+from whisper_cpp_stt_service import WhisperCppSTTService
 
 logger = logging.getLogger("dokja_voice.http")
 
@@ -129,7 +132,9 @@ def ollama_chat_stream(messages: list[dict[str, str]], model: str) -> Iterator[s
                     return
                 message = frame.get("message", {})
                 if not isinstance(message, dict):
-                    yield json.dumps({"error": "invalid local voice chat message"}) + "\n"
+                    yield json.dumps(
+                        {"error": "invalid local voice chat message"}
+                    ) + "\n"
                     return
                 if message.get("tool_calls"):
                     message = {"error": "voice model returned an unsupported tool call"}
@@ -191,7 +196,25 @@ def create_app() -> FastAPI:
             default_language=os.getenv("DOKJA_VOICE_DEFAULT_LANGUAGE", "pt-BR"),
         )
 
-    wakeword_provider = os.getenv("DOKJA_VOICE_WAKEWORD_PROVIDER", "stub").strip().lower()
+    classifier_default = "disabled" if stt_provider == "stub" else "transformers"
+    classifier_provider = (
+        os.getenv("DOKJA_VOICE_ACOUSTIC_CLASSIFIER", "").strip() or classifier_default
+    ).lower()
+    classifier_model = ""
+    if classifier_provider == "transformers":
+        classifier_model = os.getenv(
+            "DOKJA_VOICE_ACOUSTIC_MODEL",
+            "MIT/ast-finetuned-audioset-10-10-0.4593",
+        )
+    acoustic_classifier = TransformersAudioClassifier(
+        model_name=classifier_model,
+        model_cache_dir=os.getenv("DOKJA_VOICE_MODEL_CACHE_DIR"),
+        device=os.getenv("DOKJA_VOICE_ACOUSTIC_DEVICE", "cpu"),
+    )
+
+    wakeword_provider = (
+        os.getenv("DOKJA_VOICE_WAKEWORD_PROVIDER", "stub").strip().lower()
+    )
     if wakeword_provider == "openwakeword":
         wakeword_service = OpenWakeWordService(
             model_path=os.getenv("DOKJA_VOICE_WAKEWORD_MODEL", ""),
@@ -208,11 +231,16 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health(request: Request) -> dict:
-        logger.info("received health request remote=%s", request.client.host if request.client else "")
+        logger.info(
+            "received health request remote=%s",
+            request.client.host if request.client else "",
+        )
         return {
             "status": "ok",
             "tts_provider": tts_provider,
             "stt_provider": stt_provider,
+            "acoustic_classifier": classifier_provider,
+            "acoustic_device": str(acoustic_classifier.device),
             "wakeword_provider": wakeword_provider,
             "voice_chat_model": os.getenv("DOKJA_VOICE_CHAT_MODEL", "").strip(),
         }
@@ -221,17 +249,23 @@ def create_app() -> FastAPI:
     async def chat_stream(payload: VoiceChatRequest) -> StreamingResponse:
         model = os.getenv("DOKJA_VOICE_CHAT_MODEL", "").strip()
         if not model:
-            raise HTTPException(status_code=503, detail="local voice chat model is not configured")
+            raise HTTPException(
+                status_code=503, detail="local voice chat model is not configured"
+            )
         messages: list[dict[str, str]] = []
         total_chars = 0
         for message in payload.messages:
             role = message.get("role", "")
             content = message.get("content", "")
             if role not in {"system", "user", "assistant"} or not content.strip():
-                raise HTTPException(status_code=400, detail="invalid voice chat message")
+                raise HTTPException(
+                    status_code=400, detail="invalid voice chat message"
+                )
             total_chars += len(content)
             if total_chars > 65536:
-                raise HTTPException(status_code=413, detail="voice chat context is too large")
+                raise HTTPException(
+                    status_code=413, detail="voice chat context is too large"
+                )
             messages.append({"role": role, "content": content})
 
         return StreamingResponse(
@@ -250,7 +284,10 @@ def create_app() -> FastAPI:
         )
 
         if payload.format != "wav":
-            raise HTTPException(status_code=400, detail="only wav format is supported in the initial scaffold")
+            raise HTTPException(
+                status_code=400,
+                detail="only wav format is supported in the initial scaffold",
+            )
 
         try:
             audio = tts_service.synthesize(
@@ -287,18 +324,30 @@ def create_app() -> FastAPI:
 
         try:
             audio_bytes = decode_audio_b64(payload.audio_bytes_b64)
-            text = stt_service.transcribe(
-                audio_bytes=audio_bytes,
-                audio_format=payload.audio_format,
-                language=payload.language,
-            )
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                classification = executor.submit(
+                    acoustic_classifier.classify, audio_bytes
+                )
+                text = stt_service.transcribe(
+                    audio_bytes=audio_bytes,
+                    audio_format=payload.audio_format,
+                    language=payload.language,
+                )
+                try:
+                    audio_kind = classification.result()
+                except Exception:
+                    logger.exception("acoustic classification failed")
+                    audio_kind = UNKNOWN
         except Exception as exc:
             logger.exception("stt request failed")
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        if with_laughter(text) == "kkkk":
+            audio_kind = LAUGHTER
         return {
             "status": "ok",
             "text": text,
+            "audioKind": audio_kind,
             "audio_format": payload.audio_format,
             "language": payload.language,
         }
@@ -354,7 +403,13 @@ def create_app() -> FastAPI:
                 "protocol": "dokja.voice.tts.v1",
                 "transport": "websocket",
                 "input": ["start", "text", "flush", "close"],
-                "output": ["audio_format", "segment_start", "segment_end", "done", "error"],
+                "output": [
+                    "audio_format",
+                    "segment_start",
+                    "segment_end",
+                    "done",
+                    "error",
+                ],
             }
         )
 
@@ -393,19 +448,35 @@ def create_app() -> FastAPI:
                 if message_type == "text":
                     payload = TTSStreamTextRequest(**message)
                     state.pending_text += f" {payload.text}"
-                    await _drain_ready_segments(websocket, tts_service, state, force=False)
+                    await _drain_ready_segments(
+                        websocket, tts_service, state, force=False
+                    )
                     continue
 
                 if message_type == "flush":
                     _ = TTSStreamControlRequest(**message)
-                    await _drain_ready_segments(websocket, tts_service, state, force=True)
-                    await websocket.send_json({"type": "done", "pending_text_chars": len(state.pending_text.strip())})
+                    await _drain_ready_segments(
+                        websocket, tts_service, state, force=True
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "done",
+                            "pending_text_chars": len(state.pending_text.strip()),
+                        }
+                    )
                     continue
 
                 if message_type == "close":
                     _ = TTSStreamControlRequest(**message)
-                    await _drain_ready_segments(websocket, tts_service, state, force=True)
-                    await websocket.send_json({"type": "done", "pending_text_chars": len(state.pending_text.strip())})
+                    await _drain_ready_segments(
+                        websocket, tts_service, state, force=True
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "done",
+                            "pending_text_chars": len(state.pending_text.strip()),
+                        }
+                    )
                     await websocket.close()
                     return
 
@@ -478,7 +549,9 @@ async def _stream_segment(
             await websocket.send_bytes(build_wav_header(pcm_format))
         state.audio_format_sent = True
 
-    await websocket.send_json({"type": "segment_start", "text_chars": len(text_segment)})
+    await websocket.send_json(
+        {"type": "segment_start", "text_chars": len(text_segment)}
+    )
     for chunk in chunk_bytes(pcm_bytes, state.chunk_bytes):
         await websocket.send_bytes(chunk)
     await websocket.send_json({"type": "segment_end", "text_chars": len(text_segment)})

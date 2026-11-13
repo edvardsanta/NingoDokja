@@ -47,7 +47,7 @@ func TestBackchannelsDoNotTakeTheFloorOrRefreshEngagement(t *testing.T) {
 	p.now = func() time.Time { return now }
 	p.Decide("room", []VoiceTurn{{UserID: "a", Text: "Ningo, explain this"}})
 	now = now.Add(25 * time.Second)
-	for _, text := range []string{"uhum", "ok", "aham", "sim", "Ningo, obrigado!", "thanks"} {
+	for _, text := range []string{"uhum", "ok", "aham", "sim", "Ningo, obrigado!", "E aí", "thanks"} {
 		if decision := p.Decide("room", []VoiceTurn{{UserID: "a", Text: text}}); decision.Respond {
 			t.Fatal("backchannel requested an interruption", text)
 		}
@@ -55,6 +55,31 @@ func TestBackchannelsDoNotTakeTheFloorOrRefreshEngagement(t *testing.T) {
 	now = now.Add(6 * time.Second)
 	if p.Decide("room", []VoiceTurn{{UserID: "a", Text: "another thought"}}).Respond {
 		t.Fatal("acknowledgment extended the active exchange")
+	}
+}
+
+func TestVoiceAddressVariantsOpenOnlyDirectUtterances(t *testing.T) {
+	for _, tc := range []struct {
+		text      string
+		addressed bool
+	}{{"Lingo, você fala português?", true}, {"Níngu, olha isso", true}, {"Unigo, responde", true}, {"Oi, Lingo, tudo bem?", true}, {"Eu quis dizer Lingo, seu nome", false}, {"Falamos de lingo em inglês", false}} {
+		if got := VoiceAddressed(tc.text); got != tc.addressed {
+			t.Fatalf("VoiceAddressed(%q)=%t", tc.text, got)
+		}
+		p := NewVoicePolicy()
+		decision := p.Decide("room", []VoiceTurn{{UserID: "a", Text: tc.text, AudioKind: VoiceAudioSpeech}})
+		if decision.Respond != tc.addressed {
+			t.Fatalf("voice address %q: %+v", tc.text, decision)
+		}
+	}
+}
+
+func TestLaughterNeverTakesTheFloorEvenDuringAnExchange(t *testing.T) {
+	p := NewVoicePolicy()
+	p.Decide("room", []VoiceTurn{{UserID: "a", Text: "Ningo, explica isso"}})
+	decision := p.Decide("room", []VoiceTurn{{UserID: "a", Text: "E aí, Ningo", AudioKind: VoiceAudioLaughter}})
+	if decision.Respond || decision.Reason != "laughter" {
+		t.Fatalf("laughter requested inference: %+v", decision)
 	}
 }
 
@@ -69,14 +94,20 @@ func TestVoicePolicyRequestsDetailOnlyWhenExplicit(t *testing.T) {
 			t.Fatal(tc, result)
 		}
 	}
-	if reply := ConciseSpokenReply("The value is 3.14. Another sentence. Third sentence. Fourth sentence.", false); reply != "The value is 3.14. Another sentence. Third sentence." {
+	if reply := ConciseSpokenReply("The value is 3.14. Another sentence. Third sentence. Fourth sentence.", VoiceDecision{}); reply != "The value is 3.14. Another sentence." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply("First. Second. Third. Fourth.", true); reply != "First. Second. Third. Fourth." {
+	if reply := ConciseSpokenReply("First. Second. Third. Fourth.", VoiceDecision{Detailed: true}); reply != "First. Second. Third. Fourth." {
 		t.Fatal(reply)
 	}
-	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), false); len(strings.Fields(reply)) != 90 {
+	if reply := ConciseSpokenReply(strings.Repeat("word ", 100), VoiceDecision{}); len(strings.Fields(reply)) != 45 {
 		t.Fatal("long spoken default was not bounded")
+	}
+	if reply := ConciseSpokenReply("Uma reação. Outra frase.", VoiceDecision{Brief: true}); reply != "Uma reação." {
+		t.Fatal("brief voice reaction was not concise", reply)
+	}
+	if reply := ConciseSpokenReply(strings.Repeat("word ", 40), VoiceDecision{Brief: true}); len(strings.Fields(reply)) != 25 {
+		t.Fatal("long brief reaction was not bounded")
 	}
 }
 

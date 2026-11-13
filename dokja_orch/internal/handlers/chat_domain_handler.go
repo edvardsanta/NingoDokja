@@ -194,6 +194,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		logger.Info(fmt.Sprintf("voice eligibility event_id=%s respond=%t reason=%s listener_opened=%t turns=%d", event.EventID, voiceDecision.Respond, voiceDecision.Reason, opened, len(voiceTurns)))
 		event.Context = cloneChatContext(event.Context)
 		event.Context["voice_detailed"] = voiceDecision.Detailed
+		event.Context["voice_brief"] = voiceDecision.Brief
 		// Eligibility is reported without acquiring the history lock. Passive
 		// context never starts inference; playback remains owned by the adapter.
 		core.ReportVoiceDecision(ctx, voiceDecision.Respond)
@@ -298,7 +299,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	rawReply := chatReplyFromResult(result)
 	if _, voice := event.Context["voice_turns"]; voice {
 		logger.Info(fmt.Sprintf("voice generation event_id=%s raw_chars=%d silence_marker=%t", event.EventID, len(rawReply), strings.TrimSpace(rawReply) == "[SILENT]"))
-		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision.Detailed)
+		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision)
 		h.voicePolicy.CompleteReply(chatSessionBaseKey(event), voiceDecision, rawReply)
 	}
 	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
@@ -392,6 +393,10 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
 		messages = fitChatPrompt(messages)
+		decision := chat.VoiceDecision{
+			Detailed: boolFromContext(event.Context, "voice_detailed"),
+			Brief:    boolFromContext(event.Context, "voice_brief"),
+		}
 		var emitted int
 		stream := func(text string) {
 			callback := core.VoiceSpeech(ctx)
@@ -399,9 +404,9 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 				return
 			}
 			complete := strings.Join(completeVoiceSentences(text), " ")
-			sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, boolFromContext(event.Context, "voice_detailed")))
+			sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, decision))
 			for emitted < len(sentences) {
-				if emitted >= chat.VoiceDefaultMaxSentences && !boolFromContext(event.Context, "voice_detailed") {
+				if emitted >= chat.VoiceSentenceLimit(decision) && !decision.Detailed {
 					return
 				}
 				callback(sentences[emitted])

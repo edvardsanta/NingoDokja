@@ -33,10 +33,15 @@ this ephemeral MVP. Nothing is imported into Knowledge or durable Memory.
 Stopping or restarting the orchestrator loses these observer journals. This is
 an explicit privacy-first MVP boundary, not durable conversation storage.
 
-`/voice_chat_start`, in either mode, keeps its behavior, and Ningo still answers. It
-also mirrors each transcribed segment into a journal with `mode: "voice_chat"`, so the
-Desktop Realtime view shows a voice chat live. The journal is deleted on `/voice_chat_stop`.
-Use the observer start/stop commands for silent channel transcription (`mode: "observer"`).
+`/voice_chat_start`, in either mode, keeps its behavior, and Ningo still answers in
+natural Brazilian Portuguese. Quick spoken reactions use one sentence and ordinary
+answers at most two. Likely ASR variants of Ningo's name open direct exchanges, while
+acoustically classified laughter is mirrored as `kkkk` without inference. A new direct
+address cancels obsolete generation and playback; ambient speech and laughter do not
+interrupt. Each transcribed segment is mirrored into a journal with `mode: "voice_chat"`,
+so the Desktop Realtime view shows a voice chat live. The journal is deleted on
+`/voice_chat_stop`. Use the observer start/stop commands for silent channel
+transcription (`mode: "observer"`).
 
 ## Current limits
 

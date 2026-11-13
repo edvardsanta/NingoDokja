@@ -78,3 +78,19 @@ test("a voice chat copies each transcribed segment to its mirror and still answe
   assert.equal(replies.length,1,"the segment still reaches Ningo");assert.equal(replies[0].turns[0].text,"teste de som");
  }finally{listener.stop();globalThis.fetch=previous;}
 });
+
+
+test("acoustic laughter is mirrored as kkkk and keeps its kind for the reply policy",async()=>{
+ const previous=globalThis.fetch;const speaking=new EventEmitter();let stream!:PassThrough;
+ const heard:any[]=[];const replies:VoiceTurnContext[]=[];
+ globalThis.fetch=async()=>new Response('{"status":"ok","voice":{"text":"E aí","audioKind":"laughter"}}');
+ const session:any={channelId:"room",player:{stop(){},pause(){},unpause(){}},stream:{stop(){}},connection:{receiver:{speaking,subscribe(){return stream=new PassThrough();}}}};
+ const listener=createListeningSession({session,guildId:"g",userId:"a",originChannelId:"text",orchestratorEndpoint:"http://orch",
+  participant(id){return{userId:id,userName:"Scholar"};},decoderFactory:()=>new PassThrough(),activationMode:"always",logTranscripts:false,
+  async onTurn(_,turn){replies.push(turn!);},onHeard(value){heard.push(value);}});
+ try{
+  speaking.emit("start","a");stream.end(pcm(57600));await delay(120);
+  assert.equal(heard[0].text,"kkkk");assert.equal(heard[0].audioKind,"laughter");
+  assert.equal(replies[0].turns[0].text,"kkkk");assert.equal(replies[0].turns[0].audioKind,"laughter");
+ }finally{listener.stop();globalThis.fetch=previous;}
+});

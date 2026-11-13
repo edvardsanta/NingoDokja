@@ -7,11 +7,11 @@ test("voice reply speaks complete local sentences before the final frame",async(
  const previous=globalThis.fetch;
  globalThis.fetch=async(url,init)=>{
   assert.equal(String(url),"http://orch/orchestrator/voice/chat/stream");
-  const body=JSON.parse(String(init?.body));assert.equal(body.payload.userId,"second");assert.equal(body.payload.voiceChannelId,"room");assert.equal(body.payload.channelId,"text");assert.equal(body.payload.voiceTurns.length,2);assert.equal(body.payload.startSession,undefined);
+  const body=JSON.parse(String(init?.body));assert.equal(body.payload.userId,"second");assert.equal(body.payload.voiceChannelId,"room");assert.equal(body.payload.channelId,"text");assert.equal(body.payload.voiceTurns.length,2);assert.equal(body.payload.voiceTurns[1].audioKind,"speech");assert.equal(body.payload.startSession,undefined);
   return new Response('{"heartbeat":true}\n{"accepted":true}\n{"speech":"hello."}\n{"status":"ok","reply":"hello."}\n');
  };
  const spoken:string[]=[];
- try{assert.equal(await conversationReply("http://orch/orchestrator",1000,{guildId:"g",originChannelId:"text",turn:{userId:"second",channelId:"room",signal:new AbortController().signal,turns:[{userId:"first",text:"hi",sequence:0},{userId:"second",text:"hello",sequence:1}]},onSpeech:async text=>{spoken.push(text);}}),"");assert.deepEqual(spoken,["hello."]);}finally{globalThis.fetch=previous;}
+ try{assert.equal(await conversationReply("http://orch/orchestrator",1000,{guildId:"g",originChannelId:"text",turn:{userId:"second",channelId:"room",signal:new AbortController().signal,turns:[{userId:"first",text:"hi",sequence:0},{userId:"second",text:"hello",sequence:1,audioKind:"speech"}]},onSpeech:async text=>{spoken.push(text);}}),"");assert.deepEqual(spoken,["hello."]);}finally{globalThis.fetch=previous;}
 });
 
 test("cancelled voice requests never dispatch and incomplete streams never become speech",async()=>{

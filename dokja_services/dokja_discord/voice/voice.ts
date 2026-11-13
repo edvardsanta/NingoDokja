@@ -34,7 +34,7 @@ import { createTrackStream, type TrackStream } from "./track_stream.js";
 import { ensureConnectionReady, watchConnectionLoss } from "./connection_ready.js";
 import { toMessageReply } from "../runtime/discordjs_runtime.js";
 import type { DiscordReply } from "../types.js";
-import { LiveConversation, type VoiceTurnContext } from "./live_conversation.js";
+import { LiveConversation, type VoiceAudioKind, type VoiceTurnContext } from "./live_conversation.js";
 import { voiceAudioRequest } from "./orchestrated_audio.js";
 import { SpeechActivity } from "./speech_activity.js";
 import { playSpeechQueue } from "./speech_queue.js";
@@ -87,7 +87,7 @@ type ListeningSession = {
   stop(): void;
 };
 
-export type VoiceObservation = { userId: string; userName?: string; channelId: string; sequence: number; text: string; startedAt: string; endedAt: string };
+export type VoiceObservation = { userId: string; userName?: string; channelId: string; sequence: number; text: string; startedAt: string; endedAt: string; audioKind?: VoiceAudioKind };
 
 type SpeakParams = {
   guildId?: string;
@@ -380,8 +380,8 @@ export function createDiscordVoiceController(options: {
 
     if (signal?.aborted) { stream.stop(); signal.throwIfAborted(); }
     replaceSessionStream(session, stream);
-    // Only explicit session cancellation stops playback. Human speech keeps
-    // accumulating for the next turn while this reply finishes.
+    // Ambient speech accumulates for the next turn. A direct address aborts the
+    // request and stops this stream so an obsolete reply never finishes aloud.
     const abortPlayback = () => {
       if (session.stream === stream) {
         trace?.mark("playback_cancelled", sentenceId);
@@ -855,19 +855,21 @@ export function createListeningSession(params: {
           }, lifetime.signal);
           // A speaker who left or moved rooms is never presented as still present.
           if (!stopped && params.participant(speakingUserId)) {
-            const text = String(result.text ?? "").trim();
+            const reportedKind = result.audioKind;
+            const audioKind: VoiceAudioKind = reportedKind === "laughter" || reportedKind === "speech" || reportedKind === "unknown" ? reportedKind : "unknown";
+            const text = audioKind === "laughter" ? "kkkk" : String(result.text ?? "").trim();
             if (params.onObservation && text) {
               await params.onObservation({ userId: participant.userId, userName: participant.userName, channelId: params.session.channelId,
-                sequence: seq, text, startedAt: captureStart, endedAt });
+                sequence: seq, text, startedAt: captureStart, endedAt, audioKind });
               conversation.finish(seq, undefined, "observed");
             } else if (!params.onObservation) {
               if (text) {
                 try {
                   params.onHeard?.({ userId: participant.userId, userName: participant.userName, channelId: params.session.channelId,
-                    sequence: seq, text, startedAt: captureStart, endedAt });
+                    sequence: seq, text, startedAt: captureStart, endedAt, audioKind });
                 } catch (error) { params.error?.("[dokja-discord] voice transcript mirror failed", error); }
               }
-              conversation.finish(seq, { ...participant, text });
+              conversation.finish(seq, { ...participant, text, audioKind });
             }
           }
         } catch (error) {
