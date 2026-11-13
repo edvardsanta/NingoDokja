@@ -258,7 +258,7 @@ its verified account (a hash of the session and the account id), so a person's e
 by account and never by a typed name; a WhatsApp session counts as a person's only after the chat
 handler noted it while recognizing them by number. The counts are computed; the profile text is
 inferred by the analysis task from that person's latest answered exchanges and kept, one per
-person, in the `dokja_profiles` PostgreSQL schema when `DOKJA_PROFILES_POSTGRES_DSN` is set
+person (a measure of how much three readings of the same exchanges agree can be kept beside it), in the `dokja_profiles` PostgreSQL schema when `DOKJA_PROFILES_POSTGRES_DSN` is set
 (explicit `profiles-init`, opened at startup) and otherwise in `dokja_profiles.db`. It is a reading
 made on request, not read back by any conversation.
 

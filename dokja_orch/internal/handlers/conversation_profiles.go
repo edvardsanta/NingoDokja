@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	chat "read_books/dokja_domain/dokja_chat"
@@ -158,52 +159,117 @@ func (h *ConversationDomainHandler) listProfiles(ctx context.Context) (map[strin
 	return map[string]any{"profiles": views, "min_exchanges": conversation.MinProfileExchanges, "inference": p.generator != nil}, nil
 }
 
-// generateProfile infers one person's profile again and keeps it in place of the last.
-func (h *ConversationDomainHandler) generateProfile(ctx context.Context, person string) (map[string]any, error) {
-	p := h.profiles
-	if p == nil || p.generator == nil {
-		return nil, conversation.ErrUnavailable
-	}
-	var subject *profileSubject
+// subjectOf finds the person a profile is asked for, among those the owner listed.
+func (p *profileSource) subjectOf(person string) *profileSubject {
 	for i := range p.subjects {
 		if p.subjects[i].key == person {
-			subject = &p.subjects[i]
+			return &p.subjects[i]
 		}
 	}
-	if subject == nil {
-		return nil, conversation.ErrNotFound
-	}
-	exchanges, err := p.exchanges(ctx)
-	if err != nil {
-		logger.Error("read exchanges for a profile", err)
-		return nil, conversation.ErrUnavailable
-	}
-	messages, used := conversation.ProfileMessages(subject.name, subject.realName, exchanges[subject.key])
-	if used < conversation.MinProfileExchanges {
-		return nil, conversation.ErrInvalid
-	}
+	return nil
+}
+
+// infer asks the analysis task for one reading of the exchanges already gathered. It never keeps it.
+// The error is worded for the owner: providers and attempts stay in the log.
+func (p *profileSource) infer(ctx context.Context, subject *profileSubject, messages []map[string]string, used int) (conversation.Profile, error) {
+	failed := fmt.Errorf("the profile could not be inferred: no model gave a usable answer")
 	result, err := p.generator.GenerateTaskJSON(ctx, "analysis", conversation.ProfileSchema(), messages, func(reply map[string]any) error {
 		text, _ := reply["reply"].(string)
 		_, err := conversation.ParseProfile(text)
 		return err
 	})
 	if err != nil {
-		// The cause names providers and attempts; the owner's interface only needs to know it failed.
 		logger.Error("infer a profile", err)
-		return nil, fmt.Errorf("the profile could not be inferred: no model gave a usable answer")
+		return conversation.Profile{}, failed
 	}
 	text, _ := result["reply"].(string)
 	profile, err := conversation.ParseProfile(text)
 	if err != nil {
-		return nil, fmt.Errorf("the profile could not be inferred: no model gave a usable answer")
+		return conversation.Profile{}, failed
 	}
 	profile.Person, profile.Exchanges, profile.GeneratedAt = subject.key, used, p.now()
 	profile.Provider, profile.Model = answeringModel(result["attempts"])
-	if err := p.book.SaveProfile(ctx, profile); err != nil {
+	return profile, nil
+}
+
+// prepare finds the subject and builds the request from their answered exchanges.
+func (h *ConversationDomainHandler) prepare(ctx context.Context, person string) (*profileSubject, []conversation.Exchange, []map[string]string, int, error) {
+	p := h.profiles
+	if p == nil || p.generator == nil {
+		return nil, nil, nil, 0, conversation.ErrUnavailable
+	}
+	subject := p.subjectOf(person)
+	if subject == nil {
+		return nil, nil, nil, 0, conversation.ErrNotFound
+	}
+	exchanges, err := p.exchanges(ctx)
+	if err != nil {
+		logger.Error("read exchanges for a profile", err)
+		return nil, nil, nil, 0, conversation.ErrUnavailable
+	}
+	messages, used := conversation.ProfileMessages(subject.name, subject.realName, exchanges[subject.key])
+	if used < conversation.MinProfileExchanges {
+		return nil, nil, nil, 0, conversation.ErrInvalid
+	}
+	return subject, exchanges[subject.key], messages, used, nil
+}
+
+// generateProfile infers one person's profile again and keeps it in place of the last. A profile
+// inferred alone has no stability: it was not measured against anything.
+func (h *ConversationDomainHandler) generateProfile(ctx context.Context, person string) (map[string]any, error) {
+	subject, exchanges, messages, used, err := h.prepare(ctx, person)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := h.profiles.infer(ctx, subject, messages, used)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.profiles.book.SaveProfile(ctx, profile); err != nil {
 		logger.Error("keep a profile", err)
 		return nil, conversation.ErrUnavailable
 	}
-	return map[string]any{"profile": profileView(*subject, exchanges[subject.key], map[string]conversation.Profile{subject.key: profile})}, nil
+	return map[string]any{"profile": profileView(*subject, exchanges, map[string]conversation.Profile{subject.key: profile})}, nil
+}
+
+// measureProfile infers the same person's profile several times at once from the same exchanges and
+// says how much the readings agree, which a single reading hides. The first successful reading is
+// kept as the profile, with the measure beside it. At least two readings must succeed; fewer keep
+// the previous profile and say so.
+func (h *ConversationDomainHandler) measureProfile(ctx context.Context, person string) (map[string]any, error) {
+	subject, exchanges, messages, used, err := h.prepare(ctx, person)
+	if err != nil {
+		return nil, err
+	}
+	p := h.profiles
+	readings := make([]conversation.Profile, conversation.MaxStabilitySamples)
+	failures := make([]error, conversation.MaxStabilitySamples)
+	var wait sync.WaitGroup
+	for i := range readings {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			readings[i], failures[i] = p.infer(ctx, subject, messages, used)
+		}()
+	}
+	wait.Wait()
+	good := readings[:0:0]
+	for i, reading := range readings {
+		if failures[i] == nil {
+			good = append(good, reading)
+		}
+	}
+	if len(good) < conversation.MinStabilitySamples {
+		return nil, fmt.Errorf("the profile could not be measured: fewer than %d readings came back", conversation.MinStabilitySamples)
+	}
+	stability := conversation.MeasureStability(good)
+	kept := good[0]
+	kept.Stability = &stability
+	if err := p.book.SaveProfile(ctx, kept); err != nil {
+		logger.Error("keep a measured profile", err)
+		return nil, conversation.ErrUnavailable
+	}
+	return map[string]any{"profile": profileView(*subject, exchanges, map[string]conversation.Profile{subject.key: kept})}, nil
 }
 
 // answeringModel reads which provider and model answered from the task's attempts, without tying
@@ -246,6 +312,12 @@ func profileView(subject profileSubject, exchanges []conversation.Exchange, kept
 			"summary": profile.Summary, "tone": profile.Tone, "topics": profile.Topics, "patterns": profile.Patterns,
 			"exchanges": profile.Exchanges, "generated_at": profile.GeneratedAt.Format(time.RFC3339Nano),
 			"provider": profile.Provider, "model": profile.Model,
+		}
+		if profile.Stability != nil {
+			view["profile"].(map[string]any)["stability"] = map[string]any{
+				"samples": profile.Stability.Samples, "tone": profile.Stability.Tone, "summary": profile.Stability.Summary,
+				"topics": profile.Stability.Topics, "patterns": profile.Stability.Patterns,
+			}
 		}
 	}
 	return view

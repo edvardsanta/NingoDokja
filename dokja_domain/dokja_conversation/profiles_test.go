@@ -72,3 +72,48 @@ func TestParseProfileBoundsTheAnswerAndRequiresASummary(t *testing.T) {
 		t.Fatal("the schema must be closed")
 	}
 }
+
+func TestStabilityIsCountedFromWhatReadingsShare(t *testing.T) {
+	same := Profile{Summary: "Ningo teases the person about games and answers in short dry replies.", Tone: "Dry", Topics: []string{"games", "chess"}, Patterns: []string{"keeps replies short"}}
+	again := same
+	again.Tone = " dry "
+	identical := MeasureStability([]Profile{same, again})
+	if identical.Samples != 2 || identical.Tone != 1 || identical.Summary != 1 || identical.Topics != 1 || identical.Patterns != 1 {
+		t.Fatalf("identical readings must be fully stable: %+v", identical)
+	}
+	other := Profile{Summary: "Formal explanations about taxation and accounting procedures.", Tone: "earnest", Topics: []string{"taxes"}, Patterns: []string{"cites official sources"}}
+	apart := MeasureStability([]Profile{same, other})
+	// A summary can share a connecting word ("about") without sharing a subject, so it is near, not at, zero.
+	if apart.Tone != 0.5 || apart.Summary >= 0.2 || apart.Topics != 0 || apart.Patterns != 0 {
+		t.Fatalf("readings about different things must share nothing: %+v", apart)
+	}
+	partial := same
+	partial.Topics = []string{"games", "music"}
+	mixed := MeasureStability([]Profile{same, partial})
+	if mixed.Topics <= 0 || mixed.Topics >= 1 {
+		t.Fatalf("overlapping topics must be partly stable: %+v", mixed)
+	}
+	// Three readings: the tone is the share naming the most common one.
+	third := same
+	third.Tone = "teasing"
+	if got := MeasureStability([]Profile{same, again, third}); got.Tone != 0.67 || got.Samples != 3 {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestStabilityNeedsTwoReadingsAndTreatsEmptyListsAsAgreeing(t *testing.T) {
+	if got := MeasureStability([]Profile{{Summary: "only one"}}); got != (Stability{Samples: 1}) {
+		t.Fatalf("one reading measures nothing: %+v", got)
+	}
+	if got := MeasureStability(nil); got != (Stability{}) {
+		t.Fatalf("%+v", got)
+	}
+	empty := MeasureStability([]Profile{{Summary: "alpha beta gamma"}, {Summary: "alpha beta gamma"}})
+	if empty.Topics != 1 || empty.Patterns != 1 {
+		t.Fatalf("two readings with no topics agree about having none: %+v", empty)
+	}
+	lopsided := MeasureStability([]Profile{{Summary: "alpha beta", Topics: []string{"games"}}, {Summary: "alpha beta"}})
+	if lopsided.Topics != 0 {
+		t.Fatalf("one with topics and one without do not agree: %+v", lopsided)
+	}
+}

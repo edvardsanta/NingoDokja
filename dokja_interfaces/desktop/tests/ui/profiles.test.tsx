@@ -51,6 +51,37 @@ describe("the profiles panel", () => {
     await screen.findByText("Direct with the owner.");
   });
 
+  it("shows how much independent readings agreed, as figures that say what low means", async () => {
+    const measured = { ...ANA, profile: { ...READING, stability: { samples: 3, tone: 0.67, summary: 0.52, topics: 0.4, patterns: 0.25 } } };
+    const { transport } = routedTransport({ "conversation.profiles": ok({ profiles: [OWNER, measured, RUI], minExchanges: 3, inference: true }) });
+    show(transport);
+    const ana = await screen.findByRole("region", { name: "Ana" });
+    within(ana).getByText(/across 3 readings of the same exchanges: tone 67% · summary 52% · topics 40% · patterns 25%\. Low means the model changed its mind\./);
+    expect(within(screen.getByRole("region", { name: "Boss" })).queryByText(/Stability/)).toBeNull();
+  });
+
+  it("measures one person on a press, with a long deadline, and reads the list again", async () => {
+    const measured = { ...OWNER, profile: { ...READING, stability: { samples: 3, tone: 1, summary: 0.8, topics: 0.5, patterns: 0.5 } } };
+    const { transport, calls } = routedTransport({
+      "conversation.profiles": [LIST(), ok({ profiles: [measured, ANA, RUI], minExchanges: 3, inference: true })],
+      "conversation.profile_stability": ok({ profile: measured }),
+    });
+    show(transport);
+    fireEvent.click(await screen.findByRole("button", { name: "Measure the stability of the profile of Boss" }));
+    await act(async () => { await Promise.resolve(); });
+    const call = calls.find((item) => item.type === "conversation.profile_stability");
+    expect(call?.payload).toEqual({ person: "owner" });
+    expect(call?.options?.timeoutMs).toBeGreaterThan(90_000);
+    await screen.findByText(/tone 100% · summary 80%/);
+  });
+
+  it("offers no measure to someone with too few answered exchanges", async () => {
+    const { transport } = routedTransport({ "conversation.profiles": LIST() });
+    show(transport);
+    const rui = await screen.findByRole("region", { name: "Rui" });
+    expect((within(rui).getByRole("button", { name: "Measure the stability of the profile of Rui" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("keeps the old reading and tells why when inferring fails", async () => {
     const { transport } = routedTransport({ "conversation.profiles": LIST() });
     show(transport);

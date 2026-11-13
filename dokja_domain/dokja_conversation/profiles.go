@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -69,6 +71,9 @@ type Profile struct {
 	GeneratedAt time.Time `json:"generated_at"`
 	Provider    string    `json:"provider"`
 	Model       string    `json:"model"`
+	// Stability is how much independent readings of the same exchanges agreed, when the owner asked
+	// for it. It belongs to the reading it was measured with and is dropped when one is inferred alone.
+	Stability *Stability `json:"stability,omitempty"`
 }
 
 // ProfileStore keeps the latest profile of each person. It decides nothing.
@@ -173,4 +178,98 @@ func clip(text string, limit int) string {
 		return text
 	}
 	return string([]rune(text)[:limit])
+}
+
+// Readings measured against each other: at least two, at most MaxStabilitySamples.
+const (
+	MinStabilitySamples = 2
+	MaxStabilitySamples = 3
+)
+
+// Stability says how much independent readings of the same exchanges agree, each from 0 (nothing in
+// common) to 1 (the same). It is counted from the texts, not judged: a low figure is how much the
+// model changed its mind, which is exactly what a single reading hides.
+type Stability struct {
+	Samples int `json:"samples"`
+	// Tone is the share of readings that name the most common tone.
+	Tone float64 `json:"tone"`
+	// Summary, Topics and Patterns are the mean overlap, over every pair of readings, of the content
+	// words each uses: a paraphrase of the same thing still shares most of its words, a different
+	// subject shares few.
+	Summary  float64 `json:"summary"`
+	Topics   float64 `json:"topics"`
+	Patterns float64 `json:"patterns"`
+}
+
+// MeasureStability compares readings of the same exchanges. Fewer than two measure nothing.
+func MeasureStability(readings []Profile) Stability {
+	stability := Stability{Samples: len(readings)}
+	if len(readings) < MinStabilitySamples {
+		return stability
+	}
+	tones := map[string]int{}
+	most := 0
+	for _, reading := range readings {
+		tone := strings.ToLower(strings.Join(strings.Fields(reading.Tone), " "))
+		tones[tone]++
+		most = max(most, tones[tone])
+	}
+	stability.Tone = ratio(float64(most), float64(len(readings)))
+	words := func(pick func(Profile) string) []map[string]bool {
+		sets := make([]map[string]bool, len(readings))
+		for i, reading := range readings {
+			sets[i] = contentWordSet(pick(reading))
+		}
+		return sets
+	}
+	stability.Summary = meanOverlap(words(func(p Profile) string { return p.Summary }))
+	stability.Topics = meanOverlap(words(func(p Profile) string { return strings.Join(p.Topics, " ") }))
+	stability.Patterns = meanOverlap(words(func(p Profile) string { return strings.Join(p.Patterns, " ") }))
+	return stability
+}
+
+func ratio(part, whole float64) float64 {
+	if whole == 0 {
+		return 0
+	}
+	return math.Round(part/whole*100) / 100
+}
+
+// meanOverlap is the mean Jaccard similarity over every pair. Two readings that both say nothing
+// agree; one that says nothing against one that says something does not.
+func meanOverlap(sets []map[string]bool) float64 {
+	total, pairs := 0.0, 0
+	for i := range sets {
+		for j := i + 1; j < len(sets); j++ {
+			union := len(sets[i])
+			common := 0
+			for word := range sets[j] {
+				if sets[i][word] {
+					common++
+				} else {
+					union++
+				}
+			}
+			switch {
+			case union == 0:
+				total++
+			default:
+				total += float64(common) / float64(union)
+			}
+			pairs++
+		}
+	}
+	return ratio(total, float64(pairs))
+}
+
+// contentWordSet keeps the distinct lowercase words of four letters or more: short words are the
+// glue of a sentence and say nothing about its subject.
+func contentWordSet(text string) map[string]bool {
+	set := map[string]bool{}
+	for _, word := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if utf8.RuneCountInString(word) >= 4 {
+			set[word] = true
+		}
+	}
+	return set
 }

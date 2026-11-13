@@ -160,6 +160,8 @@ func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event
 		return h.listProfiles(ctx)
 	case "conversation.profile_generate":
 		return h.generateProfile(ctx, payloadString(payload, "person"))
+	case "conversation.profile_stability":
+		return h.measureProfile(ctx, payloadString(payload, "person"))
 	default:
 		return nil, fmt.Errorf("unsupported conversation action %q", event.Type)
 	}

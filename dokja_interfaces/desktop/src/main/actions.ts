@@ -28,6 +28,7 @@ import type {
   PersonProfile,
   PersonProfiles,
   ProfileGenerated,
+  ProfileStability,
   ProfileText,
   ConversationRead,
   ConversationStarted,
@@ -426,10 +427,19 @@ const MAX_PROFILE_ITEMS = 6;
 // "owner", or a person the owner listed, by the name in the private configuration.
 const PROFILE_PERSON = /^(owner|person:[^\p{Cc}]{1,128})$/u;
 
+function profileStability(raw: unknown): ProfileStability | undefined {
+  if (!isRecord(raw)) return undefined;
+  const share = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0);
+  const samples = clampInt(raw.samples, 0, 10, 0);
+  return samples >= 2 ? { samples, tone: share(raw.tone), summary: share(raw.summary), topics: share(raw.topics), patterns: share(raw.patterns) } : undefined;
+}
+
 function profileText(raw: unknown): ProfileText | undefined {
   if (!isRecord(raw) || text(raw.summary) === "") return undefined;
   const list = (value: unknown) => words(value).slice(0, MAX_PROFILE_ITEMS).map((item) => shorten(item, 240));
+  const stability = profileStability(raw.stability);
   return {
+    ...(stability ? { stability } : {}),
     summary: text(raw.summary).slice(0, 900), tone: shorten(text(raw.tone), 240), topics: list(raw.topics), patterns: list(raw.patterns),
     exchanges: count(raw.exchanges), generatedAt: shorten(text(raw.generated_at)), provider: shorten(text(raw.provider), 80), model: shorten(text(raw.model), 120),
   };
@@ -1019,6 +1029,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "conversation.facts": { payload: noPayload, project: (result) => inDomain(result, "conversation", keptFacts) },
   "conversation.fact_delete": { payload: factDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
   "conversation.profiles": { payload: noPayload, project: (result) => inDomain(result, "conversation", personProfiles) },
+  "conversation.profile_stability": { payload: profileGeneratePayload, project: (result) => inDomain(result, "conversation", profileGenerated) },
   "conversation.profile_generate": { payload: profileGeneratePayload, project: (result) => inDomain(result, "conversation", profileGenerated) },
   "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },

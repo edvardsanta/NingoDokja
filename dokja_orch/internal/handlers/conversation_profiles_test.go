@@ -65,8 +65,14 @@ func (b *fakeBook) PersonSessions(context.Context) (map[string]string, error) {
 }
 
 type fakeProfileModel struct {
-	reply    string
+	reply string
+	// replies, when set, answers each call with the next one in turn (the calls may run at once).
+	replies []string
+	// failing marks the calls, by their order, that fail.
+	failing  map[int]bool
 	err      error
+	mu       sync.Mutex
+	calls    int
 	requests [][]map[string]string
 }
 
@@ -74,11 +80,23 @@ func (f *fakeProfileModel) GenerateTaskJSON(_ context.Context, profile string, _
 	if profile != "analysis" {
 		return nil, errors.New("unexpected profile " + profile)
 	}
+	f.mu.Lock()
+	call := f.calls
+	f.calls++
 	f.requests = append(f.requests, messages)
-	if f.err != nil {
-		return nil, f.err
+	reply := f.reply
+	if len(f.replies) > 0 {
+		reply = f.replies[call%len(f.replies)]
 	}
-	result := map[string]any{"reply": f.reply, "attempts": []map[string]any{{"provider": "local", "model": "m1", "outcome": "success"}}}
+	failed := f.err != nil || f.failing[call]
+	f.mu.Unlock()
+	if failed {
+		if f.err != nil {
+			return nil, f.err
+		}
+		return nil, errors.New("provider failed")
+	}
+	result := map[string]any{"reply": reply, "attempts": []map[string]any{{"provider": "local", "model": "m1", "outcome": "success"}}}
 	if err := accept(result); err != nil {
 		return nil, err
 	}
@@ -292,5 +310,108 @@ func TestRecognizedWhatsAppSpeakersHaveTheirSessionNotedOnce(t *testing.T) {
 	handler.withOwnerInterface(stranger)
 	if speakers.calls[chatSessionBaseKey(stranger)] != 0 {
 		t.Fatal("a stranger's session was attributed to someone")
+	}
+}
+
+const (
+	readingA = `{"summary":"Ningo teases Nick about games with short dry replies.","tone":"dry","topics":["games","chess"],"patterns":["keeps replies short"]}`
+	readingB = `{"summary":"Formal explanations about taxation and accounting.","tone":"earnest","topics":["taxes"],"patterns":["cites official sources"]}`
+)
+
+func TestMeasuringAProfileReadsTheSamePersonSeveralTimesAndKeepsTheFirstWithItsStability(t *testing.T) {
+	model := &fakeProfileModel{reply: readingA}
+	handler, book := profilesFixture(t, model)
+	result, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model.calls != conversation.MaxStabilitySamples {
+		t.Fatalf("%d readings were asked for", model.calls)
+	}
+	for _, request := range model.requests {
+		if request[1]["content"] != model.requests[0][1]["content"] {
+			t.Fatal("the readings were not made from the same exchanges")
+		}
+	}
+	profile := result["profile"].(map[string]any)["profile"].(map[string]any)
+	stability := profile["stability"].(map[string]any)
+	if stability["samples"] != 3 || stability["tone"] != 1.0 || stability["summary"] != 1.0 || stability["topics"] != 1.0 || stability["patterns"] != 1.0 {
+		t.Fatal("identical readings must be fully stable", stability)
+	}
+	if kept, _ := book.AllProfiles(t.Context()); len(kept) != 1 || kept[0].Stability == nil || kept[0].Stability.Samples != 3 {
+		t.Fatal("the measured profile was not kept with its stability", kept)
+	}
+}
+
+func TestReadingsThatDifferAreReportedAsUnstable(t *testing.T) {
+	model := &fakeProfileModel{replies: []string{readingA, readingB, readingA}}
+	handler, _ := profilesFixture(t, model)
+	result, err := profileCall(t, handler, core.SourceCLI, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stability := result["profile"].(map[string]any)["profile"].(map[string]any)["stability"].(map[string]any)
+	if stability["tone"].(float64) >= 1 || stability["topics"].(float64) >= 1 || stability["summary"].(float64) >= 0.8 {
+		t.Fatal("readings that differ were reported as stable", stability)
+	}
+}
+
+func TestAMeasureNeedsTwoReadingsAndNeverReplacesTheProfileWithLess(t *testing.T) {
+	model := &fakeProfileModel{reply: readingA}
+	handler, book := profilesFixture(t, model)
+	if _, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_generate", map[string]any{"person": conversation.PersonKey("Nick")}); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := book.AllProfiles(t.Context())
+
+	failing := &fakeProfileModel{reply: readingB, failing: map[int]bool{0: true, 1: true}}
+	handler.profiles.generator = failing
+	_, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err == nil || !strings.Contains(err.Error(), "could not be measured") || strings.Contains(err.Error(), "provider failed") {
+		t.Fatal("one reading is not a measure, and the cause stays in the log", err)
+	}
+	after, _ := book.AllProfiles(t.Context())
+	if len(after) != 1 || after[0].Summary != before[0].Summary || after[0].Stability != nil {
+		t.Fatal("a failed measure replaced the profile", after)
+	}
+
+	// Two of three is enough.
+	two := &fakeProfileModel{reply: readingA, failing: map[int]bool{1: true}}
+	handler.profiles.generator = two
+	result, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err != nil || result["profile"].(map[string]any)["profile"].(map[string]any)["stability"].(map[string]any)["samples"] != 2 {
+		t.Fatal("two readings must be enough", result, err)
+	}
+}
+
+func TestInferringAloneDropsAStabilityItWasNotMeasuredWith(t *testing.T) {
+	model := &fakeProfileModel{reply: readingA}
+	handler, book := profilesFixture(t, model)
+	person := map[string]any{"person": conversation.PersonKey("Nick")}
+	if _, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", person); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_generate", person); err != nil {
+		t.Fatal(err)
+	}
+	if kept, _ := book.AllProfiles(t.Context()); len(kept) != 1 || kept[0].Stability != nil {
+		t.Fatal("a profile inferred alone kept a stability measured with another", kept)
+	}
+}
+
+func TestAMeasureIsRefusedLikeAnInferenceWhenItCannotBeMade(t *testing.T) {
+	handler, _ := profilesFixture(t, &fakeProfileModel{reply: readingA})
+	if _, err := profileCall(t, handler, core.SourceDiscord, "conversation.profile_stability", map[string]any{"person": "owner"}); err == nil {
+		t.Fatal("a channel reached the measure")
+	}
+	if _, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Kim")}); !errors.Is(err, conversation.ErrInvalid) {
+		t.Fatal("too few exchanges were measured", err)
+	}
+	if _, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": "person:Nobody"}); !errors.Is(err, conversation.ErrNotFound) {
+		t.Fatal("an unlisted person was measured", err)
+	}
+	bare := NewConversationDomainHandler(archiveFor(t))
+	if _, err := profileCall(t, bare, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": "owner"}); !errors.Is(err, conversation.ErrUnavailable) {
+		t.Fatal(err)
 	}
 }
