@@ -940,3 +940,15 @@ test("conversation.profile_stability is a change, asked like an inference, and i
   const single = ACTIONS["conversation.profiles"].project(compactOf("conversation", { profiles: [{ person: "owner", name: "You", profile: { summary: "S", stability: { samples: 1, tone: 1 } } }] })) as { profiles: Array<{ profile?: { stability?: unknown } }> };
   assert.equal(single.profiles[0]!.profile?.stability, undefined);
 });
+
+test("a chat reply carries only what the orchestrator says the turn read, in a closed vocabulary", () => {
+  const turn = { id: "a".repeat(32), seq: 2, send_id: "send-1", content: "q", reply: "r", state: "completed", attempts: 1 };
+  const project = (context: unknown) => ACTIONS["message.created"].project(compactOf("chat", { reply: "r", replayed: false, turn, ...(context === undefined ? {} : { context }) })) as { context?: { liveMessages: number; macro: string; reason: string } };
+  assert.deepEqual(project({ live_messages: 6, macro: "recalled" }).context, { liveMessages: 6, macro: "recalled", reason: "" });
+  assert.deepEqual(project({ live_messages: 2, macro: "skipped:live_context_covers_it", extra: "x" }).context, { liveMessages: 2, macro: "skipped", reason: "live_context_covers_it" });
+  assert.deepEqual(project({ live_messages: 0, macro: "nothing_found" }).context, { liveMessages: 0, macro: "nothing_found", reason: "" });
+  assert.deepEqual(project({ live_messages: -4, macro: "unavailable" }).context, { liveMessages: 0, macro: "unavailable", reason: "" });
+  for (const bad of [undefined, null, "recalled", { macro: "a very strange status" }, { macro: "skipped:Bad Reason" }, { macro: 7 }]) {
+    assert.equal("context" in project(bad), false, JSON.stringify(bad));
+  }
+});

@@ -964,5 +964,13 @@
   "profiles_measure_named": "Medir a estabilidade do perfil de {name}",
   "profiles_measure_hint": "Lê as mesmas trocas três vezes ao mesmo tempo e mostra o quanto as leituras concordam.",
   "profiles_stability": "Estabilidade",
-  "profiles_stability_figures": "em {samples} leituras das mesmas trocas: tom {tone} · resumo {summary} · temas {topics} · padrões {patterns}. Baixa quer dizer que o modelo mudou de ideia."
+  "profiles_stability_figures": "em {samples} leituras das mesmas trocas: tom {tone} · resumo {summary} · temas {topics} · padrões {patterns}. Baixa quer dizer que o modelo mudou de ideia.",
+  "reply_context": "Leu: {live} mensagens anteriores desta conversa · memória de discussões anteriores: {macro}",
+  "reply_context_recalled": "consultada",
+  "reply_context_nothing_found": "consultada, nada encontrado",
+  "reply_context_unavailable": "necessária, mas indisponível",
+  "reply_context_skipped": "não precisou",
+  "reply_context_skipped_short_follow_up": "não precisou, pergunta curta de continuação",
+  "reply_context_skipped_live_context_covers_it": "não precisou, a conversa já cobre o assunto",
+  "reply_context_skipped_empty_question": "não precisou, pergunta vazia"
 }

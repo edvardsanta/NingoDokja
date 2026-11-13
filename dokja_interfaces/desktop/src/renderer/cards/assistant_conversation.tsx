@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { Transport } from "../../shared/transport.js";
-import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState } from "../../shared/replies.js";
+import type { ArchivedConversation, ArchivedTurn, ArchivedTurnState, ReplyContext } from "../../shared/replies.js";
 import { isRecord } from "../../shared/records.js";
 import type { MessageId, Translate } from "../i18n/i18n.js";
 import type { TransportError } from "../../shared/transport.js";
@@ -13,6 +13,7 @@ import { Drawer } from "./drawer.js";
 import { AnswerVerdictBar } from "./answer_verdict.js";
 import { ReplyBody } from "./reply_sources.js";
 import type { ReplySource } from "./reply_sources_model.js";
+import { ReplyContextLine } from "./reply_context.js";
 import { Button, Notice } from "./ui.js";
 
 // A send as the screen shows it, named by its send id. The archive's turn is the truth whenever the
@@ -29,6 +30,9 @@ export type Turn = {
   // what the runtime reported answering, which may differ from what is selected now
   answeredBy?: string;
   sources?: readonly ReplySource[];
+  // what the answer read besides the question, as the orchestrator told when it answered; the
+  // archive does not keep it, so a conversation reopened later has none
+  context?: ReplyContext;
 };
 
 export type Conversation = {
@@ -137,6 +141,8 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
   const [loading, setLoading] = useState(opened !== undefined || restore);
   const [loadError, setLoadError] = useState<TransportError>();
   const rechecks = useRef(0);
+  // What each answer read, by send, kept for as long as the conversation is on screen.
+  const contexts = useRef(new Map<string, ReplyContext>());
   // A panel that was replaced (another conversation, a new one) reads nothing more.
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
@@ -187,7 +193,10 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
       if (sendId) settle(sendId, (turn) => (turn.state === "pending" ? { ...turn, state: "unknown" } : turn));
       return false;
     }
-    const archived = (read.result.turns as ArchivedTurn[]).map(fromArchive);
+    const archived = (read.result.turns as ArchivedTurn[]).map(fromArchive).map((turn) => {
+      const context = contexts.current.get(turn.sendId);
+      return context ? { ...turn, context } : turn;
+    });
     setTurns((previous) => mergedTurns(previous, archived));
     return true;
   };
@@ -250,7 +259,9 @@ export function useConversation(transport: Transport, reading?: Reading, opened?
       const answer = await transport.request("message.created", { conversation_id: id.current, ...payload }, { timeoutMs: 120_000 });
       const turn = answer.ok && isRecord(answer.result) && isRecord(answer.result.turn) ? (answer.result.turn as unknown as ArchivedTurn) : undefined;
       if (turn) {
-        settle(sendId, () => fromArchive(turn));
+        const context = answer.ok && isRecord(answer.result) && isRecord(answer.result.context) ? (answer.result.context as unknown as ReplyContext) : undefined;
+        if (context) contexts.current.set(sendId, context);
+        settle(sendId, () => ({ ...fromArchive(turn), ...(context ? { context } : {}) }));
         // Another interface (the phone) may have added turns meanwhile; the archive's order is kept.
         await readBack();
         return turn.state === "completed" && turn.reply ? turn.reply : undefined;
@@ -360,7 +371,7 @@ export function Transcript({ conversation, transport }: { conversation: Conversa
     {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
       <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
-      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}{conversation.judgeable && conversation.id && turn.id && turn.seq !== undefined && <AnswerVerdictBar transport={transport} conversationId={conversation.id} turnId={turn.id} seq={turn.seq}/>}</li>] : []),
+      ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}{turn.context && <ReplyContextLine context={turn.context}/>}{conversation.judgeable && conversation.id && turn.id && turn.seq !== undefined && <AnswerVerdictBar transport={transport} conversationId={conversation.id} turnId={turn.id} seq={turn.seq}/>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>
     {reading?.id && <Drawer title={reading.title || t("assistant_source_untitled")} onClose={() => setReading(undefined)}>
