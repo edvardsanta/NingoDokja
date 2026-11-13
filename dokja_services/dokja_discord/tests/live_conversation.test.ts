@@ -102,3 +102,86 @@ test("later recognition cannot erase a scheduled finalized reply", async () => {
  await delay(30);assert.equal(prepared,true);
  live.finish(later);live.stop();
 });
+
+// An answer made for what was said is not spoken once the room has moved on; the batch is asked again
+// with what was said since, so the reply covers the present and not the point people left.
+test("an answer is not spoken when the room moved on, and is asked again with what was said since", async () => {
+  const dispatches: VoiceTurnContext[] = [];
+  const spoken: string[] = [];
+  let release!: () => void;
+  const live = new LiveConversation({ channelId: "room", settleMs: 1, interrupt() {},
+    async onTurn(_, turn) {
+      dispatches.push(turn);
+      if (dispatches.length === 1) await new Promise<void>(resolve => release = resolve); // the model is still thinking
+      await turn.waitForFloor?.();
+      spoken.push(turn.turns.map(t => t.text).join(" | "));
+    }, onError(error) { throw error; } });
+  live.finish(live.begin(), { userId: "a", text: "Ningo, olha essa promoção de HD" }); await delay(5);
+  // While the model thinks, the conversation changes subject.
+  live.finish(live.begin(), { userId: "b", text: "a marca de vídeo pode ser que baixe o preço das placas" });
+  live.finish(live.begin(), { userId: "b", text: "mas as ações caíram e o preço não vai baixar de um dia para o outro" });
+  release(); await delay(20);
+  assert.equal(dispatches.length, 2, "the batch was asked again");
+  assert.deepEqual(spoken, ["Ningo, olha essa promoção de HD | a marca de vídeo pode ser que baixe o preço das placas | mas as ações caíram e o preço não vai baixar de um dia para o outro"],
+    "only the answer for the whole conversation was spoken, never the one for the old point alone");
+  assert.equal(dispatches[0].signal.aborted, true);
+  live.stop();
+});
+
+test("filler and stray words do not make an answer stale", async () => {
+  const batches: string[] = []; const aborted: boolean[] = []; let release!: () => void;
+  const live = new LiveConversation({ channelId: "room", settleMs: 1, interrupt() {},
+    async onTurn(_, turn) {
+      batches.push(turn.turns.map(t => t.text).join(" | "));
+      if (batches.length === 1) await new Promise<void>(r => release = r);
+      await turn.waitForFloor?.(); aborted.push(turn.signal.aborted);
+    }, onError(error) { throw error; } });
+  live.finish(live.begin(), { userId: "a", text: "Ningo, olha essa promoção de HD" }); await delay(5);
+  live.finish(live.begin(), { userId: "b", text: "Obrigado." });
+  live.finish(live.begin(), { userId: "b", text: "Obrigado." });
+  live.finish(live.begin(), { userId: "b", text: "uhum" });
+  release(); await delay(20);
+  // The first answer was spoken as it was; the filler is only the start of the next batch.
+  assert.equal(batches[0], "Ningo, olha essa promoção de HD");
+  assert.equal(aborted[0], false, "filler made the first answer stale");
+  assert.deepEqual(batches.slice(1), ["Obrigado. | Obrigado. | uhum"]); live.stop();
+});
+
+test("an answer that has begun is never replaced, even if the room keeps talking", async () => {
+  let context: VoiceTurnContext | undefined; let dispatches = 0; let proceed!: () => void;
+  const live = new LiveConversation({ channelId: "room", settleMs: 1, interrupt() {},
+    async onTurn(_, turn) { dispatches++; context = turn; await turn.waitForFloor?.(); await new Promise<void>(r => proceed = r); },
+    onError(error) { throw error; } });
+  live.finish(live.begin(), { userId: "a", text: "Ningo, olha essa promoção de HD" }); await delay(5);
+  // The floor was granted and the answer is being spoken.
+  live.finish(live.begin(), { userId: "b", text: "outra coisa completamente diferente sobre carros e motores" });
+  live.finish(live.begin(), { userId: "b", text: "e mais uma frase longa sobre o tempo e a chuva de ontem" });
+  await context!.waitForFloor!(); await delay(5);
+  assert.equal(context!.signal.aborted, false); assert.equal(dispatches, 1);
+  proceed(); await delay(5); live.stop();
+});
+
+test("a batch is asked again at most twice, then answered whatever the room did", async () => {
+  const outcomes: string[] = []; let dispatches = 0;
+  const live = new LiveConversation({ channelId: "room", settleMs: 1, interrupt() {},
+    async onTurn(_, turn) {
+      dispatches++;
+      // While the first three requests are made, the room keeps saying something that matters.
+      if (dispatches <= 3) live.finish(live.begin(), { userId: "b", text: `uma frase nova bem longa numero ${dispatches} sobre outro assunto` });
+      try { await turn.waitForFloor?.(); outcomes.push("spoke"); } catch { outcomes.push("asked again"); }
+    }, onError(error) { throw error; } });
+  live.finish(live.begin(), { userId: "a", text: "Ningo, olha essa promoção de HD" }); await delay(80);
+  assert.deepEqual(outcomes.slice(0, 3), ["asked again", "asked again", "spoke"], "two repeats and then the answer, though the room never stopped");
+  live.stop();
+});
+
+test("an answer is not stale when the new speech was already in the batch", async () => {
+  let dispatches = 0; let spoken = 0;
+  const live = new LiveConversation({ channelId: "room", settleMs: 1, interrupt() {},
+    async onTurn(_, turn) { dispatches++; await turn.waitForFloor?.(); spoken++; }, onError(error) { throw error; } });
+  const first = live.begin(), second = live.begin();
+  live.finish(first, { userId: "a", text: "Ningo, olha essa promoção de HD" });
+  live.finish(second, { userId: "b", text: "a marca de vídeo pode ser que baixe o preço das placas" });
+  await delay(20);
+  assert.equal(dispatches, 1); assert.equal(spoken, 1); live.stop();
+});
