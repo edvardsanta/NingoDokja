@@ -799,18 +799,25 @@ DOKJA_VOICE_PROVIDER=piper
 DOKJA_VOICE_PIPER_MODEL=/workspace/.dokja/models/voice/pt_BR-faber-medium.onnx
 DOKJA_VOICE_STT_PROVIDER=transformers
 DOKJA_VOICE_STT_MODEL=openai/whisper-tiny
+DOKJA_VOICE_ACOUSTIC_CLASSIFIER=transformers
+DOKJA_VOICE_ACOUSTIC_MODEL=MIT/ast-finetuned-audioset-10-10-0.4593
 DOKJA_VOICE_MODEL_CACHE_DIR=/workspace/.dokja/models/voice/whisper
 ```
 
 Download the Piper ONNX model and its matching `.onnx.json` into the configured
-directory before restarting. Whisper downloads into its persistent cache on first
-load, which requires network access. Models under `.dokja/` stay out of Git.
+directory before restarting. Whisper and the acoustic event model download into
+the persistent cache on first use, which requires network access. Models under
+`.dokja/` stay out of Git. Set `DOKJA_VOICE_ACOUSTIC_CLASSIFIER=disabled` to omit
+acoustic laughter classification; stub STT disables it by default.
 Recreate only the voice service with
 `docker compose -f docker-compose.lite.yml up -d --no-deps --force-recreate dokja-voice`.
-Query its `/health` endpoint and verify `tts_provider=piper` and
-`stt_provider=transformers`, then test synthesis and transcription. Finally, join
-a Discord voice channel and use `/voice_chat_start` to verify actual playback
-and microphone reception. Ordinary text replies do not automatically play aloud.
+Query its `/health` endpoint and verify `tts_provider=piper`,
+`stt_provider=transformers` and `acoustic_classifier=transformers`, then test
+synthesis and transcription. Finally, join a Discord voice channel and use
+`/voice_chat_start` to verify actual playback and microphone reception. Test both
+a real greeting and a laugh: only the laugh should become `kkkk` and stay without
+a reply. A new direct address should interrupt obsolete playback. Ordinary text
+replies do not automatically play aloud.
 
 Group conversations now capture every human in the connected voice channel,
 with independent audio streams and stable participant aliases in shared room
@@ -833,7 +840,8 @@ The Chat domain records incidental speech without generating replies or running
 model summaries. Starting `/voice_chat_start` opens the exchange for the person who invoked it,
 so an immediate `teste` works without a second wake phrase. The starter remains
 engaged for the listener session, including after long pauses. Calling `Ningo` or
-`Dokja` opens or reopens a conversational exchange.
+`Dokja` opens or reopens a conversational exchange; likely ASR variants `Lingo`,
+`Níngu` and `Unigo` also count at the start of a direct utterance.
 Other addressed speakers can follow up without repeating the name for 30 seconds;
 that window includes estimated playback duration. Another participant can join
 with a clear question or continuation during a 12-second handoff window.
@@ -842,15 +850,18 @@ inference or extend engagement. Engagement is transient; listener metadata
 reestablishes the starter after an orchestrator restart. This eligibility grants
 no account authority.
 
-Ningo finishes each spoken reply while continuing to capture human speech.
-Speech heard during generation or playback is combined into the next room turn.
-It does not pause playback, cancel inference, or start overlapping replies.
-`/voice_chat_stop`, explicit session shutdown and transport loss still cancel
-outstanding work. Voice uses the complete shared Ningo persona with a spoken
-presentation. Default replies allow up to three sentences and 90 words;
-explicit requests for detail allow a longer explanation. A long explanation is
-synthesized sentence by sentence with one sentence prepared ahead, so the first
-can play before synthesis of the whole answer finishes.
+Ningo continues to capture human speech during generation and playback. Before
+playback starts, substantive new speech makes the prepared answer stale and sends
+the combined batch back for another answer, at most twice. A new direct address
+cancels obsolete inference and playback immediately. Other ambient speech is
+combined into the next room turn without interrupting an answer already playing.
+Laughter and acknowledgments do not interrupt. `/voice_chat_stop`, explicit session shutdown
+and transport loss still cancel outstanding work. Voice uses the complete shared
+Ningo persona with a natural Brazilian Portuguese spoken presentation. Quick
+reactions use one sentence and at most 25 words; ordinary replies allow two
+sentences and 45 words. Explicit requests for detail allow a longer explanation.
+A long explanation is synthesized sentence by sentence with one sentence prepared
+ahead, so the first can play before synthesis of the whole answer finishes.
 
 Only accepted reply text becomes audio. The current CLI adapters expose previews
 that are not validated speech segments, so they still wait for the final reply.

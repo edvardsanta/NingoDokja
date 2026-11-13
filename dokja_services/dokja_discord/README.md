@@ -203,25 +203,24 @@ older-generation and different-tier options from the main alternatives.
 ## Live group voice
 
 Join a server voice channel and run `/voice_chat_start` once. Ningo listens to
-all human participants, retaining their attribution and recent room context.
-Starting the command opens your exchange immediately, so you can say `teste`.
-Call `Ningo` or `Dokja` to reopen it after a pause; follow-ups need no name for
-30 seconds after estimated playback. Other participants can join with a clear
-question or continuation during a short handoff window. Incidental conversation
-and acknowledgments are stored without model replies.
+all human participants, retaining their attribution and recent room context, and
+answers in natural Brazilian Portuguese. Starting the command opens your exchange
+immediately, so you can say `teste`. Call `Ningo` or `Dokja` to reopen it after a
+pause; likely ASR variants such as `Lingo`, `Níngu` and `Unigo` also work at the
+start of a direct utterance. Follow-ups need no name for 30 seconds after estimated
+playback. Other participants can join with a clear question or continuation during
+a short handoff window. Incidental conversation, laughter and acknowledgments are
+stored without model replies; acoustic laughter is mirrored as `kkkk`.
 
-Ningo finishes speaking while continuing to listen. Speech heard during an answer
-is combined into the next turn; it never cuts off the current answer. One exception,
-before the answer has begun: a reply is made for what was said when it was dispatched,
-and can be spoken seconds later, once the room is quiet. If, in between, the room said
-something that matters (three or more words in a turn, six or more together; filler
-such as a lone "Obrigado." or "uhum" does not count), the reply would answer a point
-people have left, so it is not spoken: the old turns go back in front of the new ones
-and the whole is asked again. A batch is asked again at most twice, so a room that never
-stops talking is still answered. Spoken
-replies default to one short sentence. Ask for detail to get a longer explanation,
-which plays sentence by sentence with the next sentence prepared ahead.
-`/voice_chat_stop` cancels playback and outstanding work.
+Ningo keeps listening during an answer. Before playback starts, substantive new
+speech (three or more words in a turn, six or more together; filler such as a lone
+"Obrigado." or "uhum" does not count) makes the prepared reply stale: the old turns
+go back in front of the new ones and the whole is asked again, at most twice. A new
+direct address cancels obsolete generation and playback immediately. Other ambient
+speech is combined into the next turn without cutting off an answer already playing.
+Quick reactions use one sentence and ordinary replies at most two. Ask for detail to
+get a longer explanation, which plays sentence by sentence with the next sentence
+prepared ahead. `/voice_chat_stop` cancels playback and outstanding work.
 
 What participants say is also shown live in the owner's Desktop **Realtime**
 view. `/voice_chat_start`, in either mode, opens the same ephemeral journal that

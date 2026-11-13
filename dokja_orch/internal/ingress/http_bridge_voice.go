@@ -30,6 +30,12 @@ func (i *HTTPBridgeIngress) handleVoiceChatStream(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(BridgeResponse{Status: "error", Error: "invalid voice listener"})
 	}
 	last := request.Payload.VoiceTurns[len(request.Payload.VoiceTurns)-1]
+	for index := len(request.Payload.VoiceTurns) - 1; index >= 0; index-- {
+		if request.Payload.VoiceTurns[index].AudioKind != chat.VoiceAudioLaughter {
+			last = request.Payload.VoiceTurns[index]
+			break
+		}
+	}
 	request.Payload.UserID, request.Payload.UserName, request.Payload.Content = last.UserID, last.UserName, last.Text
 	event := bridgeEventFromRequest(request)
 	// Speech is always conversation: recognized words must not invoke text commands.

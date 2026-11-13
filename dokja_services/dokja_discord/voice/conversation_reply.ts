@@ -16,7 +16,7 @@ export async function conversationReply(endpoint: string, timeoutMs: number, inp
     content: turn.turns[turn.turns.length - 1].text, messageId: turn.trace?.id ?? randomUUID(),
     sessionKey: `discord-voice:${input.guildId}:${turn.channelId}`,
   });
-  body.payload.voiceTurns = turn.turns.map(({userId,userName,text})=>({userId,userName,text}));
+  body.payload.voiceTurns = turn.turns.map(({userId,userName,text,audioKind})=>({userId,userName,text,audioKind}));
   body.payload.voiceChannelId = turn.channelId;
   body.payload.voiceSessionId = input.voiceSessionId;
   body.payload.voiceStartedBy = input.voiceStartedBy;

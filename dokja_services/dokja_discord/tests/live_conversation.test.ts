@@ -13,7 +13,7 @@ test("overlapping participants are observed in capture order after recognition c
   assert.deepEqual(turns[0].turns.map(t=>t.userId),["a","b"]); live.stop();
 });
 
-test("new speech never interrupts an answer and is combined into the next turn", async () => {
+test("ambient speech never interrupts an answer and is combined into the next turn", async () => {
   const turns:VoiceTurnContext[]=[];let interrupted=0;let finishFirst!:()=>void;
   const live=new LiveConversation({channelId:"room",settleMs:1,interrupt(){interrupted++;},
     async onTurn(_,turn){turns.push(turn);turn.decide?.(true);await turn.waitForFloor?.();if(turns.length===1)await new Promise<void>(resolve=>finishFirst=resolve);},
@@ -184,4 +184,31 @@ test("an answer is not stale when the new speech was already in the batch", asyn
   live.finish(second, { userId: "b", text: "a marca de vídeo pode ser que baixe o preço das placas" });
   await delay(20);
   assert.equal(dispatches, 1); assert.equal(spoken, 1); live.stop();
+});
+
+test("a direct name variant supersedes the obsolete reply and its playback",async()=>{
+ const turns:VoiceTurnContext[]=[];let interrupted=0;
+ const live=new LiveConversation({channelId:"room",settleMs:1,interrupt(){interrupted++;},
+  async onTurn(_,turn){turns.push(turn);turn.decide?.(true);if(turns.length===1)await new Promise<void>(resolve=>turn.signal.addEventListener("abort",()=>resolve(),{once:true}));},
+  onError(error){throw error;}});
+ live.finish(live.begin(),{userId:"a",text:"Ningo, explica isso"});await delay(5);
+ const firstSignal=turns[0].signal;
+ live.finish(live.begin(),{userId:"a",text:"Lingo, relaxa"});await delay(10);
+ assert.equal(firstSignal.aborted,true);assert.equal(interrupted,1);
+ assert.equal(turns.length,2);assert.equal(turns[1].turns[0].text,"Lingo, relaxa");
+ live.stop();assert.equal(interrupted,2);
+});
+
+test("laughter, acknowledgments and a name mentioned later do not interrupt",async()=>{
+ const turns:VoiceTurnContext[]=[];let interrupted=0;let release!:()=>void;
+ const live=new LiveConversation({channelId:"room",settleMs:1,interrupt(){interrupted++;},
+  async onTurn(_,turn){turns.push(turn);if(turns.length===1)await new Promise<void>(resolve=>release=resolve);},
+  onError(error){throw error;}});
+ live.finish(live.begin(),{userId:"a",text:"Ningo, explica isso"});await delay(5);
+ const firstSignal=turns[0].signal;
+ live.finish(live.begin(),{userId:"b",text:"E aí, Ningo",audioKind:"laughter"});
+ live.finish(live.begin(),{userId:"b",text:"Eu quis dizer Lingo, seu nome"});
+ live.finish(live.begin(),{userId:"b",text:"Ningo, obrigado"});await delay(10);
+ assert.equal(firstSignal.aborted,false);assert.equal(interrupted,0);assert.equal(turns.length,1);
+ release();await delay(5);assert.equal(turns.length,2);live.stop();
 });

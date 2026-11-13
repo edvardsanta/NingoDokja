@@ -1,9 +1,25 @@
 import { VoiceLatencyTrace, type VoiceTiming } from "./latency_trace.js";
-// Continuous capture with one response/playback per room. Speech heard while
-// Ningo answers is collected for the next turn; it never cuts off his answer.
-// One exception, before the answer has begun: an answer made for what was said is
-// worth less once the room has moved on, so it is not spoken. See movedOn().
-export type VoiceTurn = { userId: string; userName?: string; text: string; sequence: number };
+// Continuous capture with one response/playback per room. Ambient speech is
+// collected for the next turn; a new direct address supersedes the old reply.
+// Before playback, substantive new speech can also make a prepared answer stale. See movedOn().
+export type VoiceAudioKind = "speech" | "laughter" | "unknown";
+
+const acknowledgments = new Set(["", "ok", "okay", "aham", "uhum", "hum", "hmm", "sim", "certo", "beleza", "entendi", "ta", "ta bom", "legal", "valeu", "obrigado", "obrigada", "e ai", "eai", "thanks", "thank you", "yes", "yeah", "right", "sure", "got it", "kkk", "kkkk", "haha"]);
+function normalizedVoiceText(text: string): string {
+  return text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").match(/[\p{L}\p{N}]+/gu)?.join(" ") ?? "";
+}
+// This mirrors the domain's address detector only for playback cancellation;
+// the orchestrator still decides whether the new turn deserves a response.
+function voiceAddressed(text: string): boolean {
+  const normalized = normalizedVoiceText(text);
+  return /(?:^| )(ningo|dokja)(?: |$)/u.test(normalized) || /^(?:e ai |oi |ola |hey )?(lingo|ningu|unigo)(?: |$)/u.test(normalized);
+}
+function interruptionRequested(turn: Omit<VoiceTurn, "sequence">): boolean {
+  if (turn.audioKind === "laughter" || !voiceAddressed(turn.text)) return false;
+  const withoutName = normalizedVoiceText(turn.text).replace(/(?:^| )(ningo|dokja|lingo|ningu|unigo)(?= |$)/gu, " ").replace(/\s+/g, " ").trim();
+  return !acknowledgments.has(withoutName);
+}
+export type VoiceTurn = { userId: string; userName?: string; text: string; sequence: number; audioKind?: VoiceAudioKind };
 export type VoiceTurnContext = {
   userId: string;
   userName?: string;
@@ -92,6 +108,10 @@ export class LiveConversation {
         this.options.onError(new Error("Voice conversation context capacity reached"));
       }
       this.pending.set(sequence, { ...turn, text: turn.text.trim(), sequence });
+      if (this.request && interruptionRequested(turn)) {
+        this.request.abort();
+        this.options.interrupt();
+      }
     }
     this.schedule();
     for (const wake of [...this.floorWaiters]) wake();

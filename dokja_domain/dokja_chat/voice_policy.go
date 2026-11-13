@@ -13,8 +13,10 @@ const VoiceKnowledgeLookupBudget = 100 * time.Millisecond
 
 const VoiceFollowupWindow = 30 * time.Second
 const VoiceHandoffWindow = 12 * time.Second
-const VoiceDefaultMaxSentences = 3
-const VoiceDefaultMaxWords = 90
+const VoiceBriefMaxSentences = 1
+const VoiceBriefMaxWords = 25
+const VoiceDefaultMaxSentences = 2
+const VoiceDefaultMaxWords = 45
 
 // VoiceDecision is conversational eligibility, independent of account authority.
 type VoiceDecision struct {
@@ -22,6 +24,7 @@ type VoiceDecision struct {
 	Respond     bool   `json:"respond"`
 	RequesterID string `json:"-"`
 	Detailed    bool   `json:"detailed"`
+	Brief       bool   `json:"brief"`
 }
 
 type voiceRoom struct {
@@ -42,6 +45,8 @@ func NewVoicePolicy() *VoicePolicy {
 }
 
 var addressedVoice = regexp.MustCompile(`(^|[^\pL\pN])(ningo|dokja)([^\pL\pN]|$)`)
+var addressedVoiceVariant = regexp.MustCompile(`^(?:e ai |oi |ola |hey )?(lingo|ningu|unigo)([^\pL\pN]|$)`)
+var voiceName = regexp.MustCompile(`(^|[^\pL\pN])(ningo|dokja|lingo|ningu|unigo)([^\pL\pN]|$)`)
 var voiceWords = regexp.MustCompile(`[\pL\pN]+`)
 var normalizeVoiceAccents = strings.NewReplacer("á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a", "é", "e", "ê", "e", "è", "e", "í", "i", "ì", "i", "ó", "o", "ô", "o", "õ", "o", "ö", "o", "ú", "u", "ü", "u", "ç", "c")
 
@@ -49,14 +54,20 @@ func normalizedVoice(text string) string {
 	return strings.Join(voiceWords.FindAllString(normalizeVoiceAccents.Replace(strings.ToLower(text)), -1), " ")
 }
 
+// VoiceAddressed accepts likely ASR variants only at the start of an utterance.
+func VoiceAddressed(text string) bool {
+	normalized := normalizeVoiceAccents.Replace(strings.ToLower(text))
+	return addressedVoice.MatchString(normalized) || addressedVoiceVariant.MatchString(normalizedVoice(text))
+}
+
 // Backchannels remain context, but do not take the floor or extend engagement.
 func VoiceBackchannel(text string) bool {
-	if name := normalizedVoice(text); name == "ningo" || name == "dokja" {
+	if name := normalizedVoice(text); name == "ningo" || name == "dokja" || name == "lingo" || name == "ningu" || name == "unigo" {
 		return false
 	}
-	text = addressedVoice.ReplaceAllString(normalizeVoiceAccents.Replace(strings.ToLower(text)), " ")
+	text = voiceName.ReplaceAllString(normalizeVoiceAccents.Replace(strings.ToLower(text)), " ")
 	switch normalizedVoice(text) {
-	case "", "ok", "okay", "aham", "uhum", "hum", "hmm", "sim", "certo", "beleza", "entendi", "ta", "tá bom", "ta bom", "legal", "valeu", "obrigado", "obrigada", "thanks", "thank you", "yes", "yeah", "right", "sure", "got it", "kkk", "kkkk", "haha":
+	case "", "ok", "okay", "aham", "uhum", "hum", "hmm", "sim", "certo", "beleza", "entendi", "ta", "tá bom", "ta bom", "legal", "valeu", "obrigado", "obrigada", "e ai", "eai", "thanks", "thank you", "yes", "yeah", "right", "sure", "got it", "kkk", "kkkk", "haha":
 		return true
 	}
 	return false
@@ -81,6 +92,22 @@ func voiceDetailed(text string) bool {
 		}
 	}
 	return false
+}
+
+func voiceBrief(text string) bool {
+	if strings.Contains(text, "?") || voiceDetailed(text) {
+		return false
+	}
+	normalized := normalizedVoice(text)
+	if len(strings.Fields(normalized)) > 16 {
+		return false
+	}
+	for _, phrase := range []string{"explica", "explique", "analisa", "analyse", "resume", "resuma", "argumenta", "argumente", "defende", "defenda", "desenvolve", "desenvolva", "por que", "porque", "como ", "explain", "analyze", "summarize", "argument", "observation"} {
+		if strings.Contains(normalized, phrase) {
+			return false
+		}
+	}
+	return true
 }
 
 // Decide opens an exchange on direct address, keeps that speaker engaged, and
@@ -140,13 +167,19 @@ func (p *VoicePolicy) Decide(scope string, turns []VoiceTurn) VoiceDecision {
 	decision := VoiceDecision{Reason: "passive"}
 	for _, turn := range turns {
 		text := strings.TrimSpace(turn.Text)
+		if turn.AudioKind == VoiceAudioLaughter {
+			if !decision.Respond {
+				decision.Reason = "laughter"
+			}
+			continue
+		}
 		if VoiceBackchannel(text) {
 			if !decision.Respond {
 				decision.Reason = "backchannel"
 			}
 			continue
 		}
-		addressed := addressedVoice.MatchString(normalizeVoiceAccents.Replace(strings.ToLower(text)))
+		addressed := VoiceAddressed(text)
 
 		listenerStarter := room.listenerID != "" && room.listenerStarter == turn.UserID
 		if !listenerStarter && !addressed && !now.Before(room.engaged[turn.UserID]) && !(now.Before(room.handoffUntil) && voiceFollowup(text)) {
@@ -159,6 +192,7 @@ func (p *VoicePolicy) Decide(scope string, turns []VoiceTurn) VoiceDecision {
 		}
 		decision.RequesterID = turn.UserID
 		decision.Detailed = voiceDetailed(text)
+		decision.Brief = voiceBrief(text)
 		if len(room.engaged) < 64 || !room.engaged[turn.UserID].IsZero() {
 			room.engaged[turn.UserID] = now.Add(VoiceFollowupWindow)
 		}
@@ -188,27 +222,38 @@ func (p *VoicePolicy) CompleteReply(scope string, decision VoiceDecision, reply 
 	room.handoffUntil = now.Add(duration + VoiceHandoffWindow)
 }
 
+func VoiceSentenceLimit(decision VoiceDecision) int {
+	if decision.Brief {
+		return VoiceBriefMaxSentences
+	}
+	return VoiceDefaultMaxSentences
+}
+
 // ConciseSpokenReply enforces the spoken default without trimming an explicitly
 // requested explanation. Keep decimals inside a sentence and avoid mid-word cuts.
-func ConciseSpokenReply(reply string, detailed bool) string {
+func ConciseSpokenReply(reply string, decision VoiceDecision) string {
 	reply = SpokenReply(reply)
-	if detailed || reply == "" {
+	if decision.Detailed || reply == "" {
 		return reply
+	}
+	maxWords := VoiceDefaultMaxWords
+	if decision.Brief {
+		maxWords = VoiceBriefMaxWords
 	}
 	runes := []rune(strings.TrimSpace(reply))
 	sentences := 0
 	for i, r := range runes {
 		if (r == '.' || r == '!' || r == '?') && (i+1 == len(runes) || unicode.IsSpace(runes[i+1])) {
 			sentences++
-			if sentences == VoiceDefaultMaxSentences {
+			if sentences == VoiceSentenceLimit(decision) {
 				reply = string(runes[:i+1])
 				break
 			}
 		}
 	}
 	words := strings.Fields(reply)
-	if len(words) > VoiceDefaultMaxWords {
-		return strings.Join(words[:VoiceDefaultMaxWords], " ") + "."
+	if len(words) > maxWords {
+		return strings.Join(words[:maxWords], " ") + "."
 	}
 	return reply
 }

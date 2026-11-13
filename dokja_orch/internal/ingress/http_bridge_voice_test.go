@@ -161,3 +161,23 @@ func TestVoiceBridgeEnforcesInboundPolicyBeforeInference(t *testing.T) {
 		t.Fatal("ineligible voice reached inference")
 	}
 }
+
+func TestVoiceBridgeKeepsLastSpeechAsTheRequestWhenLaughterFollows(t *testing.T) {
+	probe := voiceProbe{events: make(chan core.Event, 1)}
+	body := strings.Replace(voiceTurnBody,
+		`{"userId":"member","userName":"Owner","text":"meme fetch"}`,
+		`{"userId":"member","userName":"Owner","text":"meme fetch"},{"userId":"other","text":"E aí","audioKind":"laughter"}`, 1)
+	response, err := voiceApp(probe).Test(voiceRequest(body, "Bearer fixture-credential"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	event := <-probe.events
+	if event.User.ID != "member" || event.Payload["content"] == "E aí" {
+		t.Fatal("trailing laughter replaced the actual request", event)
+	}
+	transcript, _ := event.Context["content"].(string)
+	if !strings.Contains(transcript, "kkkk") || strings.Contains(transcript, "E aí") {
+		t.Fatal("laughter was not normalized in the room transcript", transcript)
+	}
+}

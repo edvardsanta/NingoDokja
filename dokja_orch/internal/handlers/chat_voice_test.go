@@ -32,10 +32,10 @@ func TestAddressedVoiceUsesDedicatedGeneratorAndStreamsOnlyUsableShortSpeech(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if voice.calls != 1 || !reflect.DeepEqual(spoken, []string{"A primeira resposta chegou.", "E a conversa continua.", "Agora cabe um argumento."}) {
+	if voice.calls != 1 || !reflect.DeepEqual(spoken, []string{"A primeira resposta chegou."}) {
 		t.Fatalf("voice calls=%d streamed=%q", voice.calls, spoken)
 	}
-	if result["reply"] != "A primeira resposta chegou. E a conversa continua. Agora cabe um argumento." {
+	if result["reply"] != "A primeira resposta chegou." {
 		t.Fatalf("spoken final reply was not concise: %#v", result["reply"])
 	}
 }
@@ -66,6 +66,9 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	}
 	if strings.Contains(personaForEvent(event), discordReplyPresentation) || !strings.Contains(personaForEvent(event), "live Discord voice") {
 		t.Fatal("voice got text formatting instructions")
+	}
+	if !strings.Contains(personaForEvent(event), "Always speak natural Brazilian Portuguese") {
+		t.Fatal("voice lost its explicit pt-BR presentation")
 	}
 	if !strings.Contains(personaForEvent(event), chatPersona) {
 		t.Fatal("voice lost Ningo's shared personality and conversational judgment")
@@ -141,5 +144,22 @@ func TestVoiceReplyKeepsKnowledgeThatArrivesWithinBudget(t *testing.T) {
 	}
 	if searcher.calls != 1 || !strings.Contains(contextText, "Synthetic timely evidence") {
 		t.Fatal("timely optional reference missing from voice context")
+	}
+}
+
+func TestOrdinaryVoiceQuestionStreamsAtMostTwoSentences(t *testing.T) {
+	voice := &voiceStreamGenerator{}
+	var spoken []string
+	handler := NewChatDomainHandler(&plainGenerator{}).WithVoiceGenerator(voice)
+	event := chatEvent("Ningo, por que o céu é azul?")
+	event.Context = map[string]any{"session_key": "voice-room", "voice_turns": []chat.VoiceTurn{{UserID: "member", Text: "Ningo, por que o céu é azul?"}}}
+	ctx := core.WithVoiceSpeech(t.Context(), func(text string) { spoken = append(spoken, text) })
+	result, err := handler.Handle(ctx, event, chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []string{"A primeira resposta chegou.", "E a conversa continua."}
+	if !reflect.DeepEqual(spoken, expected) || result["reply"] != strings.Join(expected, " ") {
+		t.Fatalf("ordinary reply was not bounded to two sentences: spoken=%q result=%#v", spoken, result)
 	}
 }

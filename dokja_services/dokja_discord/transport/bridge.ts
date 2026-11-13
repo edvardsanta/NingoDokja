@@ -8,7 +8,7 @@ export type BridgeRequest = {
   payload: {
     realtime?: Record<string, unknown>;
     voice?: Record<string, unknown>;
-    voiceTurns?: Array<{ userId: string; userName?: string; text: string }>;
+    voiceTurns?: Array<{ userId: string; userName?: string; text: string; audioKind?: "speech" | "laughter" | "unknown" }>;
     voiceChannelId?: string;
     voiceSessionId?: string;
     voiceStartedBy?: string;

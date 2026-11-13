@@ -56,6 +56,7 @@ Example response:
 {
   "status": "ok",
   "text": "transcribed text",
+  "audioKind": "speech",
   "audio_format": "wav",
   "language": "pt-BR"
 }
@@ -78,6 +79,8 @@ Example response:
 - `DOKJA_VOICE_DEFAULT_VOICE`
 - `DOKJA_VOICE_DEFAULT_LANGUAGE`
 - `DOKJA_VOICE_PIPER_MODEL`
+- `DOKJA_VOICE_ACOUSTIC_CLASSIFIER`
+- `DOKJA_VOICE_ACOUSTIC_MODEL`
 
 ## Notes
 
@@ -253,12 +256,22 @@ The overlay starts the server with `--no-language-probabilities`. Without it,
 `verbose_json` runs an extra language-detection pass that doubles the time per
 segment (about 1.5 s to 3 s with large-v3-turbo on an RX 6600).
 
-A laugh is written `kkkk`, the way the group writes it. A segment made only of laugh
-syllables ("Hehehe", "ha ha", "ahahah", "kkk", "rsrs", "huehue") or a sound tag
-(`*laughs*`, "(risos)") becomes `kkkk`, once per laugh. Words such as "E aí" or "Ah!"
-are never rewritten. This is a text rule (`laughter.py`) and applies to both STT
-providers. A Whisper prompt asking for `kkkk` was tested and rejected: it turned pure
-noise into "Kkkk" and made real laughs loop.
+Acoustic classification runs alongside transcription for real STT providers. The lazy-loaded
+`MIT/ast-finetuned-audioset-10-10-0.4593` model returns `audioKind: speech`, `laughter` or
+`unknown`; only a confident laughter result with a margin over speech suppresses a reply. A
+classifier failure preserves the transcript as `unknown`. The first classified segment pays the
+model download/load cost and later segments reuse the loaded model. Set
+`DOKJA_VOICE_ACOUSTIC_CLASSIFIER=disabled` to omit this work, or
+`DOKJA_VOICE_ACOUSTIC_MODEL` to select another compatible audio-event model. Stub STT defaults
+to `disabled`. Health reports the selected classifier.
+
+A text-only laugh is still written `kkkk`, the way the group writes it. A segment made only of
+laugh syllables ("Hehehe", "ha ha", "ahahah", "kkk", "rsrs", "huehue") or a sound tag
+(`*laughs*`, "(risos)") becomes `kkkk`, once per laugh. The text rule alone never rewrites words
+such as "E aí" or "Ah!"; an acoustic laughter result makes that distinction from the audio and
+normalizes the mirrored transcript to `kkkk`. A Whisper prompt asking for `kkkk` was tested and
+rejected: it turned pure noise into "Kkkk" and made real laughs loop. Model and threshold quality
+still require validation with consented real-room laughter and greetings.
 
 Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
 if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects

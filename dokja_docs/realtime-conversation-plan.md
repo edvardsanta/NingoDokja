@@ -14,10 +14,12 @@ history into the model.
 1. Listen while people speak and while Ningo speaks. Preserve speaker attribution.
 2. Answer when addressed; keep follow-ups open. The listener starter can continue
    without repeating Ningo's name. Evaluate spoken name variants with recordings.
-3. Finish a spoken answer. Incoming speech, coughs, keyboard noise and backchannels
-   must never cancel playback. Explicit stop and transport loss remain exceptions.
-4. Speak one useful sentence early; ordinarily finish in two or three short
-   sentences. Preserve the full chat persona, reasoning and conversational depth.
+3. Let a new direct address supersede an obsolete answer. Ambient speech, laughter,
+   coughs, keyboard noise and backchannels must not cancel playback. Explicit stop
+   and transport loss remain cancellation cases too.
+4. Speak one useful sentence early; use one sentence for quick reactions and
+   ordinarily finish ordinary answers in two. Preserve the full chat persona,
+   reasoning and conversational depth.
 5. Keep topic state, decisions, corrections and open questions across turns.
    Compact model context without deleting its underlying evidence.
 6. Reuse the existing PostgreSQL installation and pgvector capability. A new
@@ -36,7 +38,7 @@ music command until voice action authorization has its own reviewed contract.
 | --- | --- | --- |
 | PostgreSQL | `docker-compose.postgres.yml` supplies PostgreSQL 17 with pgvector; `dokja_services/dokja_knowledge/postgres_store.py` implements the Knowledge backend | Reuse infrastructure, provision a separately owned conversation schema; verify live server/extension versions before migration |
 | Knowledge | `knowledge-postgres.md` describes `dokja_knowledge`, exact vector search and explicit backend selection | Do not turn room transcripts into Knowledge documents implicitly |
-| Voice capture | Discord `voice/live_conversation.ts` keeps recognition ordering, bounded pending turns and uninterrupted playback | Separate continuous observation from response scheduling; avoid waiting for every speaker's ASR to finish forever |
+| Voice capture | Discord `voice/live_conversation.ts` keeps recognition ordering and bounded pending turns; direct address cancels obsolete replies | Separate continuous observation from response scheduling; avoid waiting for every speaker's ASR to finish forever |
 | Context | `chat_domain_handler.go` passes a nil summarizer for voice; `chat_sessions` stores bounded SQLite snapshots | Add durable attributed turns and asynchronous, versioned compaction |
 | Archive | `dokja_conversation` and `infrastructure/conversations` implement owner-only desktop/CLI archives in a separate SQLite file | Add explicit Discord scope policy; never bypass the existing owner-only archive checks |
 | Eligibility | `voice_policy.go` owns engagement, starter continuity and backchannels | Preserve behavior; add auditable topic/addressing decisions and evaluation |
@@ -576,18 +578,16 @@ A regression fixture covers colored output.
 Response preparation no longer waits for all later captures and recognitions.
 It still waits for earlier unfinished captures before the latest pending sequence,
 keeps one response/playback owner, and waits for a quiet floor before first audio.
-Later activity cannot erase an already scheduled finalized response. Speech never
-cancels playback. This overlaps generation with later speech, without claiming
-that any newly arriving correction is already included in the prepared answer;
-those turns remain queued for the next exchange. Freshness/revision validation
-from R1/R2 is still pending.
+Later ambient activity cannot erase an already scheduled finalized response. A new
+direct address cancels obsolete generation and playback; laughter, backchannels
+and indirect name mentions do not. Generation still overlaps later speech, without
+claiming that a newly arriving correction is already included in the prepared answer.
 
 Regression tests cover preparation during later speech, quiet-floor playback,
 later recognition not cancelling dispatch, earlier recognition preserving order,
-and uninterrupted answers. Six targeted Discord test files and three offline
-report tests pass. Hot reload restarts the Discord listener after source changes;
-restart the listener command before comparing live behavior. Post-change live
-latency has not yet been measured.
+ambient answers and direct-address cancellation. Hot reload restarts the Discord
+listener after source changes; restart the listener command before comparing live
+behavior. Post-change live latency has not yet been measured.
 
 ### Audio quality and GPU provider trial — 2026-10-29
 
