@@ -209,6 +209,7 @@ def create_app() -> FastAPI:
     acoustic_classifier = TransformersAudioClassifier(
         model_name=classifier_model,
         model_cache_dir=os.getenv("DOKJA_VOICE_MODEL_CACHE_DIR"),
+        device=os.getenv("DOKJA_VOICE_ACOUSTIC_DEVICE", "cpu"),
     )
 
     wakeword_provider = (
@@ -239,6 +240,7 @@ def create_app() -> FastAPI:
             "tts_provider": tts_provider,
             "stt_provider": stt_provider,
             "acoustic_classifier": classifier_provider,
+            "acoustic_device": str(acoustic_classifier.device),
             "wakeword_provider": wakeword_provider,
             "voice_chat_model": os.getenv("DOKJA_VOICE_CHAT_MODEL", "").strip(),
         }

@@ -801,6 +801,7 @@ DOKJA_VOICE_STT_PROVIDER=transformers
 DOKJA_VOICE_STT_MODEL=openai/whisper-tiny
 DOKJA_VOICE_ACOUSTIC_CLASSIFIER=transformers
 DOKJA_VOICE_ACOUSTIC_MODEL=MIT/ast-finetuned-audioset-10-10-0.4593
+DOKJA_VOICE_ACOUSTIC_DEVICE=cpu
 DOKJA_VOICE_MODEL_CACHE_DIR=/workspace/.dokja/models/voice/whisper
 ```
 
@@ -1811,14 +1812,30 @@ For a prepared local model and compatible GPU, outside `make`:
 docker compose -f docker-compose.lite.yml -f docker-compose.voice-gpu.yml up -d --build dokja-voice
 ```
 
+The same overlay builds `dokja_services/dokja_voice/Dockerfile.rocm` with the
+ROCm 6.3 PyTorch wheel, exposes `/dev/kfd` and the configured render node, and
+sets `DOKJA_VOICE_ACOUSTIC_DEVICE=rocm`. Whisper.cpp continues to use Vulkan;
+the acoustic classifier uses ROCm through PyTorch's `cuda` API. Both must be
+validated independently. The ROCm wheel alone is about 5 GB, before its unpacked
+runtime and model caches; ensure the container storage has enough free space.
+The base dev/lite setting remains `cpu`; `auto` selects an available accelerator,
+and an explicit `rocm` request fails instead of silently falling back to CPU.
+Check `/health` for `stt_provider=whisper_cpp` and `acoustic_device=cuda`.
+The ROCm wheel lists `gfx1030` but not the RX 6600's `gfx1032`. For that card,
+`HSA_OVERRIDE_GFX_VERSION=10.3.0` selects the compatibility path and is the
+overlay's default. Leave it empty on an architecture supported natively by the
+wheel. Without the override, a simple tensor operation fails with `invalid device
+function`; with it, the operation and the acoustic model both completed in the
+development RX 6600 validation. This does not establish support for other GPUs.
+
 The GPU process can reach only its dedicated internal network shared with voice;
 it has no published port, app-network access, writable model mount or persistent
 provider logs. Its internal health port is 8085. The voice API keeps port 8081
 and its existing STT response shape. GPU device exposure requires a compatible
 host driver/runtime and is not inferred from the presence of a graphics card.
-The stock Transformers image is CPU-only even on such a host. No host driver
-changes, privileged container, HSA override or undocumented GPU compatibility
-claim is introduced here.
+The base Transformers image remains CPU-only; only the ROCm overlay replaces
+that wheel. No host driver changes, privileged container or undocumented GPU
+compatibility claim is introduced here.
 
 The overlay is opt-in and is not a production deployment. The production base
 currently does not define a voice service; deployers must review their actual

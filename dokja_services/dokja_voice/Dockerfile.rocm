@@ -1,0 +1,17 @@
+FROM python:3.13-slim
+
+WORKDIR /workspace
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg libdrm2 libnuma1 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY dokja_services/dokja_voice/requirements.txt /tmp/dokja_voice_requirements.txt
+
+RUN sed '/^--extra-index-url /d; /^torch==/d' /tmp/dokja_voice_requirements.txt > /tmp/dokja_voice_rocm_base.txt \
+  && pip install --no-cache-dir -r /tmp/dokja_voice_rocm_base.txt \
+  && pip install --no-cache-dir fastapi uvicorn \
+  && pip install --no-cache-dir --index-url "$(sed -n 's|^--extra-index-url \(.*\)/cpu|\1/rocm6.3|p' /tmp/dokja_voice_requirements.txt)" torch==2.8.0
+
+COPY dokja_services/dokja_voice/requirements-vad.txt /tmp/dokja_voice_vad_requirements.txt
+RUN pip install --no-cache-dir -r /tmp/dokja_voice_vad_requirements.txt

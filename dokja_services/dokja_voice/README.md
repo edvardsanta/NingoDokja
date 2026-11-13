@@ -81,6 +81,7 @@ Example response:
 - `DOKJA_VOICE_PIPER_MODEL`
 - `DOKJA_VOICE_ACOUSTIC_CLASSIFIER`
 - `DOKJA_VOICE_ACOUSTIC_MODEL`
+- `DOKJA_VOICE_ACOUSTIC_DEVICE`
 
 ## Notes
 
@@ -263,7 +264,10 @@ classifier failure preserves the transcript as `unknown`. The first classified s
 model download/load cost and later segments reuse the loaded model. Set
 `DOKJA_VOICE_ACOUSTIC_CLASSIFIER=disabled` to omit this work, or
 `DOKJA_VOICE_ACOUSTIC_MODEL` to select another compatible audio-event model. Stub STT defaults
-to `disabled`. Health reports the selected classifier.
+to `disabled`. Health reports the selected classifier and device.
+`DOKJA_VOICE_ACOUSTIC_DEVICE=cpu` is the default; `auto` selects an available accelerator and
+`rocm` requires one, failing at startup instead of silently using CPU. PyTorch exposes ROCm
+through its `cuda` API, so health reports `acoustic_device: cuda` when ROCm is active.
 
 A text-only laugh is still written `kkkk`, the way the group writes it. A segment made only of
 laugh syllables ("Hehehe", "ha ha", "ahahah", "kkk", "rsrs", "huehue") or a sound tag
@@ -276,8 +280,13 @@ still require validation with consented real-room laughter and greetings.
 Set `DOKJA_VOICE_CPP_MODEL_FILE` to an existing multilingual GGML model file and,
 if needed, `DOKJA_VOICE_RENDER_DEVICE` to its host render node. The overlay selects
 `DOKJA_VOICE_STT_PROVIDER=whisper_cpp` and the internal
-`DOKJA_VOICE_CPP_ENDPOINT`. Apply it with the dev or lite base and rebuild voice
-for its pinned resampling dependency. Base stacks retain their existing defaults;
+`DOKJA_VOICE_CPP_ENDPOINT`. The same overlay builds `Dockerfile.rocm` with the
+ROCm 6.3 PyTorch wheel, exposes `/dev/kfd` plus the render node, and sets
+`DOKJA_VOICE_ACOUSTIC_DEVICE=rocm`, so both Whisper.cpp/Vulkan and the acoustic
+classifier can use a compatible AMD GPU. On an RX 6600 (`gfx1032`), the wheel exposes
+`gfx1030` but not `gfx1032`, so the overlay defaults `HSA_OVERRIDE_GFX_VERSION=10.3.0`.
+Leave that variable empty for an architecture supported natively by the wheel.
+Base stacks retain their existing defaults;
 production voice deployments must provision/review their own provider topology.
 Do not apply this optional overlay directly to a production base that has no
 voice service definition.

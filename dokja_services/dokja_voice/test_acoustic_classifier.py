@@ -2,7 +2,7 @@ import io
 import unittest
 import wave
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
@@ -12,6 +12,7 @@ from acoustic_classifier import (
     SPEECH,
     UNKNOWN,
     TransformersAudioClassifier,
+    _inputs_to_device,
     kind_from_scores,
 )
 
@@ -55,6 +56,31 @@ class AcousticClassifierTests(unittest.TestCase):
         classifier = TransformersAudioClassifier("")
         self.assertEqual(classifier.classify(wav_bytes()), UNKNOWN)
         self.assertEqual(classifier.classify(b""), UNKNOWN)
+
+    def test_rocm_requires_an_available_accelerator(self):
+        with patch("acoustic_classifier.torch.cuda.is_available", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "accelerator.*unavailable"):
+                TransformersAudioClassifier("fixture-model", device="rocm")
+        with patch("acoustic_classifier.torch.cuda.is_available", return_value=True):
+            classifier = TransformersAudioClassifier("fixture-model", device="rocm")
+            self.assertEqual(str(classifier.device), "cuda")
+
+    def test_rocm_loads_the_model_and_inputs_on_the_selected_device(self):
+        model = Mock()
+        with patch(
+            "acoustic_classifier.torch.cuda.is_available", return_value=True
+        ), patch("acoustic_classifier.AutoFeatureExtractor.from_pretrained"), patch(
+            "acoustic_classifier.AutoModelForAudioClassification.from_pretrained",
+            return_value=model,
+        ):
+            classifier = TransformersAudioClassifier("fixture-model", device="rocm")
+            classifier._load()
+        model.to.assert_called_once_with(torch.device("cuda"))
+        tensor = Mock(spec=torch.Tensor)
+        tensor.to.return_value = tensor
+        inputs = _inputs_to_device({"input_values": tensor}, classifier.device)
+        self.assertEqual(inputs["input_values"], tensor)
+        tensor.to.assert_called_once_with(torch.device("cuda"))
 
 
 if __name__ == "__main__":

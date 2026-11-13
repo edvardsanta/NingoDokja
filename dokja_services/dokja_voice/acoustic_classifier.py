@@ -42,10 +42,40 @@ def kind_from_scores(scores: dict[str, float]) -> str:
     return UNKNOWN
 
 
+def _resolve_device(requested: str) -> torch.device:
+    normalized = requested.strip().lower() or "cpu"
+    if normalized == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if normalized == "cpu":
+        return torch.device("cpu")
+    if normalized in {"cuda", "rocm", "gpu"}:
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "acoustic classifier accelerator was requested but is unavailable"
+            )
+        return torch.device("cuda")
+    raise ValueError("DOKJA_VOICE_ACOUSTIC_DEVICE supports cpu, auto or rocm")
+
+
+def _inputs_to_device(inputs: dict, device: torch.device) -> dict:
+    return {
+        key: value.to(device) if isinstance(value, torch.Tensor) else value
+        for key, value in inputs.items()
+    }
+
+
 class TransformersAudioClassifier:
-    def __init__(self, model_name: str, model_cache_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        model_cache_dir: str | None = None,
+        device: str = "cpu",
+    ) -> None:
         self.model_name = model_name.strip()
         self.model_cache_dir = model_cache_dir.strip() if model_cache_dir else None
+        self.device = (
+            _resolve_device(device) if self.model_name else torch.device("cpu")
+        )
         self._lock = threading.Lock()
         self._processor = None
         self._model = None
@@ -60,6 +90,7 @@ class TransformersAudioClassifier:
             self._load()
             samples = pcm.astype(np.float32) / 32768.0
             inputs = self._processor(samples, sampling_rate=16000, return_tensors="pt")
+            inputs = _inputs_to_device(inputs, self.device)
             with torch.no_grad():
                 logits = self._model(**inputs).logits
             probabilities = torch.sigmoid(logits)[0].tolist()
@@ -80,7 +111,10 @@ class TransformersAudioClassifier:
         self._model = AutoModelForAudioClassification.from_pretrained(
             self.model_name, cache_dir=self.model_cache_dir
         )
+        self._model.to(self.device)
         self._model.eval()
         logging.getLogger("dokja_voice.acoustic").info(
-            "acoustic classifier loaded model=%s", self.model_name
+            "acoustic classifier loaded model=%s device=%s",
+            self.model_name,
+            self.device,
         )

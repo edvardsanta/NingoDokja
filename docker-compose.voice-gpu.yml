@@ -25,9 +25,17 @@ services:
       retries: 12
       start_period: 30s
   dokja-voice:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_voice/Dockerfile.rocm
+    devices:
+      - /dev/kfd:/dev/kfd
+      - ${DOKJA_VOICE_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
     environment:
       DOKJA_VOICE_STT_PROVIDER: whisper_cpp
       DOKJA_VOICE_CPP_ENDPOINT: http://dokja-whisper-gpu:8085/inference
+      DOKJA_VOICE_ACOUSTIC_DEVICE: ${DOKJA_VOICE_ACOUSTIC_DEVICE:-rocm}
+      HSA_OVERRIDE_GFX_VERSION: ${HSA_OVERRIDE_GFX_VERSION:-10.3.0}
     networks:
       - dokja-net
       - dokja-stt-net
