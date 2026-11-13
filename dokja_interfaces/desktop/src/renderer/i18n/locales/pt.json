@@ -959,5 +959,13 @@
   "profiles_topics": "Temas",
   "profiles_patterns": "Padrões",
   "profiles_provenance": "Inferido em {when} a partir de {count} trocas por {model}. Uma leitura, não um fato.",
-  "profiles_provenance_unnamed": "Inferido em {when} a partir de {count} trocas. Uma leitura, não um fato."
+  "profiles_provenance_unnamed": "Inferido em {when} a partir de {count} trocas. Uma leitura, não um fato.",
+  "reply_context": "Leu: {live} mensagens anteriores desta conversa · memória de discussões anteriores: {macro}",
+  "reply_context_recalled": "consultada",
+  "reply_context_nothing_found": "consultada, nada encontrado",
+  "reply_context_unavailable": "necessária, mas indisponível",
+  "reply_context_skipped": "não precisou",
+  "reply_context_skipped_short_follow_up": "não precisou, pergunta curta de continuação",
+  "reply_context_skipped_live_context_covers_it": "não precisou, a conversa já cobre o assunto",
+  "reply_context_skipped_empty_question": "não precisou, pergunta vazia"
 }

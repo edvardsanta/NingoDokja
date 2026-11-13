@@ -863,6 +863,34 @@ describe("the sources of a reply", () => {
     expect(list().parentElement).toBe(reply);
   });
 
+  it("says what the answer read, and keeps saying it after the archive is read back", async () => {
+    const { transport } = routedTransport({
+      "conversation.start": startedConversation(),
+      "message.created": async (payload) => archivedAnswer("It stays in PostgreSQL.", payload, 1, { liveMessages: 0, macro: "recalled", reason: "" }),
+    });
+    await renderTalk(transport);
+
+    fireEvent.change(field(), { target: { value: "where do the profiles live?" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("It stays in PostgreSQL.");
+    await screen.findByText("Read: 0 earlier messages of this conversation · memory of earlier discussions: recalled");
+  });
+
+  it("keeps what the answer read when the archive's own copy of the turn replaces it", async () => {
+    let sent = "";
+    const { transport } = routedTransport({
+      "conversation.start": startedConversation(),
+      "message.created": async (payload) => { sent = String(payload?.send_id); return archivedAnswer("Settled.", payload, 1, { liveMessages: 4, macro: "skipped", reason: "short_follow_up" }); },
+      "conversation.read": async () => readOf(1, archivedTurn({ seq: 1, content: "and then?", reply: "Settled.", sendId: sent })),
+    });
+    await renderTalk(transport);
+
+    fireEvent.change(field(), { target: { value: "and then?" } });
+    fireEvent.keyDown(field(), { key: "Enter" });
+    await screen.findByText("Settled.");
+    await screen.findByText(/Read: 4 earlier messages .* not needed, a short follow-up/);
+  });
+
   it("shows the same list when the conversation is reopened from the archive", async () => {
     const { transport } = routedTransport({
       "conversation.list": listed(kept(3, 1)),
