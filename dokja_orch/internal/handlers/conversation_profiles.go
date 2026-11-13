@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	chat "read_books/dokja_domain/dokja_chat"
@@ -40,6 +39,8 @@ type profileSource struct {
 	book      ProfileBook
 	generator taskJSONGenerator
 	now       func() time.Time
+	// softLimit is how long a measure goes on asking for a third reading once it has two.
+	softLimit time.Duration
 }
 
 // WithProfiles lets the owner's interfaces see how Ningo deals with each person: the owner and the
@@ -61,7 +62,7 @@ func (h *ConversationDomainHandler) WithProfiles(ownerName, ownerDiscord string,
 		seen[key] = true
 		subjects = append(subjects, profileSubject{key: key, name: person.Name, realName: person.RealName, discord: person.Discord})
 	}
-	h.profiles = &profileSource{subjects: subjects, sessions: sessions, book: book, generator: generator, now: func() time.Time { return time.Now().UTC() }}
+	h.profiles = &profileSource{subjects: subjects, sessions: sessions, book: book, generator: generator, now: func() time.Time { return time.Now().UTC() }, softLimit: measureSoftLimit}
 	return h
 }
 
@@ -232,35 +233,46 @@ func (h *ConversationDomainHandler) generateProfile(ctx context.Context, person 
 	return map[string]any{"profile": profileView(*subject, exchanges, map[string]conversation.Profile{subject.key: profile})}, nil
 }
 
-// measureProfile infers the same person's profile several times at once from the same exchanges and
-// says how much the readings agree, which a single reading hides. The first successful reading is
-// kept as the profile, with the measure beside it. At least two readings must succeed; fewer keep
-// the previous profile and say so.
+// How long a measure may take in all, and how long it goes on asking for a third reading it does
+// not need once two are in hand. The desktop waits a little longer than the whole.
+const (
+	measureOverall   = 110 * time.Second
+	measureSoftLimit = 55 * time.Second
+)
+
+// measureProfile infers the same person's profile several times from the same exchanges, one after
+// the other, and says how much the readings agree, which a single reading hides. The first
+// successful reading is kept as the profile, with the measure beside it. At least two readings must
+// succeed; fewer keep the previous profile and say so.
+//
+// They run one at a time on purpose. Asked at once, they share the same few models: each reading
+// gets a third of the time, a provider that fails puts the others in cooldown, and a slow model
+// answers one and times out on the rest. One at a time, each gets the whole of its time.
 func (h *ConversationDomainHandler) measureProfile(ctx context.Context, person string) (map[string]any, error) {
 	subject, exchanges, messages, used, err := h.prepare(ctx, person)
 	if err != nil {
 		return nil, err
 	}
 	p := h.profiles
-	readings := make([]conversation.Profile, conversation.MaxStabilitySamples)
-	failures := make([]error, conversation.MaxStabilitySamples)
-	var wait sync.WaitGroup
-	for i := range readings {
-		wait.Add(1)
-		go func() {
-			defer wait.Done()
-			readings[i], failures[i] = p.infer(ctx, subject, messages, used)
-		}()
-	}
-	wait.Wait()
-	good := readings[:0:0]
-	for i, reading := range readings {
-		if failures[i] == nil {
+	ctx, cancel := context.WithTimeout(ctx, measureOverall)
+	defer cancel()
+	started := time.Now()
+	var good []conversation.Profile
+	for attempt := 0; attempt < conversation.MaxStabilitySamples && ctx.Err() == nil; attempt++ {
+		// Too few attempts are left to reach two readings: asking more would only make the owner wait.
+		if len(good)+conversation.MaxStabilitySamples-attempt < conversation.MinStabilitySamples {
+			break
+		}
+		// Two readings are enough to measure; a third is worth only the time that is left.
+		if len(good) >= conversation.MinStabilitySamples && time.Since(started) > p.softLimit {
+			break
+		}
+		if reading, err := p.infer(ctx, subject, messages, used); err == nil {
 			good = append(good, reading)
 		}
 	}
 	if len(good) < conversation.MinStabilitySamples {
-		return nil, fmt.Errorf("the profile could not be measured: fewer than %d readings came back", conversation.MinStabilitySamples)
+		return nil, fmt.Errorf("the profile could not be measured: only %d reading(s) came back and at least %d are needed; the analysis models may be slow or unavailable, see the Runtime task diagnostics", len(good), conversation.MinStabilitySamples)
 	}
 	stability := conversation.MeasureStability(good)
 	kept := good[0]
