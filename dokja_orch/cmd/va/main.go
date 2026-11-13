@@ -22,7 +22,6 @@ import (
 	chatsessions "read_books/internal/infrastructure/chat_sessions"
 	competitorcache "read_books/internal/infrastructure/competitor_cache"
 	"read_books/internal/infrastructure/conversations"
-	"read_books/internal/infrastructure/profiles"
 	quizruns "read_books/internal/infrastructure/quiz_runs"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
@@ -83,13 +82,8 @@ func main() {
 	defer chatSessions.Close()
 	// The owner's Profiles: inferred readings of how Ningo deals with each person. Without the file the
 	// screen reports them unavailable and nothing else changes.
-	var profileBook handlers.ProfileBook
-	if book, err := profiles.Open(profiles.PathBeside(sharedPath)); err != nil {
-		logger.Error("open profile storage; profiles are disabled", err)
-	} else {
-		defer book.Close()
-		profileBook = book
-	}
+	profileBook, closeProfiles := configureProfiles(os.Getenv("DOKJA_PROFILES_POSTGRES_DSN"), sharedPath)
+	defer closeProfiles()
 
 	// Archived profiles remain readable for compatibility; live chat selection
 	// belongs to the host runtime provider configuration.
