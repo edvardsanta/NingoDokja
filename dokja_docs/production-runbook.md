@@ -1763,6 +1763,19 @@ spending an extraction call. No background retry or historical backfill is added
 only successfully processed new turns contribute. This adds bounded model and
 storage latency to each turn; no extra model is installed or selected.
 
+A turn reads two kinds of context. The **live context** is the session's history and summary in
+the SQLite files: it is always sent. The **macro context** is asked for only when the live context
+cannot carry the turn, decided by a deterministic rule in the Chat domain (`DecideMacroRecall`),
+never by a model call: a question that asks for the past ("lembra", "last time", "we discussed")
+recalls; a session with no live context (new or expired) recalls, since the durable store is then
+the only continuity; a short follow-up does not; and otherwise it recalls only when fewer than half
+of the question's content words appear in the live context. A turn that skips it saves the lookup
+(bounded at three seconds), the prompt space and the repetition of what the live context already
+says. Chat results expose `context`: `live_messages` (messages before the question) and `macro`,
+one of `recalled`, `nothing_found`, `unavailable` (needed but off, out of scope for the place or
+failing), or `skipped:<reason>` (`short_follow_up`, `live_context_covers_it`, `empty_question`).
+The reason is also logged per turn. Capture after the turn is unchanged.
+
 Recall ranks at most eight entries by PostgreSQL keyword relevance, then recency.
 Verified private owner interfaces share `owner:private`; shared channels and
 other users retain their conversation scope. Readings additionally require the
