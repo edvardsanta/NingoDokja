@@ -51,13 +51,15 @@ type ChatDomainHandler struct {
 	answers          *ChatAnswerExperience
 	facts            *conversation.Facts
 	ownerProfile     chat.OwnerProfile
-	incoming         *IncomingContentWorkflow
-	web              *webConversationReading
-	macro            *macroContext
-	ningo            chat.NingoFacts
-	visions          string
-	quizRuns         QuizRunReader
-	warm             string
+	// ownerDiscord is the owner's numeric Discord account id, so a turn can name the owner by account.
+	ownerDiscord string
+	incoming     *IncomingContentWorkflow
+	web          *webConversationReading
+	macro        *macroContext
+	ningo        chat.NingoFacts
+	visions      string
+	quizRuns     QuizRunReader
+	warm         string
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strings"
 
 	chat "read_books/dokja_domain/dokja_chat"
 	communications "read_books/dokja_domain/dokja_communications"
@@ -120,14 +121,36 @@ func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
 	}
 }
 
+// WithOwnerDiscordAccount tells the handler which Discord account is the owner's, so the owner is
+// named in a shared channel or a voice room like the people the owner listed. Until then only the
+// current speaker is known to be the owner, by the gateway's flag, and in a conversation of several
+// people the owner's earlier words carry nothing but a display name that may change.
+func (h *ChatDomainHandler) WithOwnerDiscordAccount(id string) *ChatDomainHandler {
+	h.ownerDiscord = id
+	return h
+}
+
+// ownerCallName is what Ningo calls the owner: the first word of the configured name. The whole name
+// is the owner's own legal name; a first name is what a conversation among friends needs.
+func ownerCallName(profile chat.OwnerProfile) string {
+	if words := strings.Fields(profile.Name); len(words) > 0 {
+		return words[0]
+	}
+	return ""
+}
+
 // knownDiscordName is the name the owner gave a Discord account in their private configuration: what
 // to call the person and, for a nickname, their real name. It matches the gateway's numeric account
 // id and nothing else: a display name, a handle or a message claiming to be someone never matches.
 // Only names are returned, so About, Warm and kept facts stay where privateFactsAllowed puts them,
-// and the id itself never reaches the model.
+// and the id itself never reaches the model. The owner's own account is named too, by the first word
+// of the configured profile name.
 func (h *ChatDomainHandler) knownDiscordName(userID string) chat.KnownName {
 	if userID == "" {
 		return chat.KnownName{}
+	}
+	if h.ownerDiscord != "" && userID == h.ownerDiscord {
+		return chat.KnownName{Name: ownerCallName(h.ownerProfile)}
 	}
 	for _, person := range h.ningo.People {
 		if person.Discord == userID {

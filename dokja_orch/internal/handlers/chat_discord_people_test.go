@@ -13,6 +13,7 @@ const (
 	samAccount   = "111111111111111111"
 	nickAccount  = "444444444444444444"
 	otherAccount = "999999999999999999"
+	ownerAccount = "666666666666666666"
 )
 
 func discordPeopleHandler() (*ChatDomainHandler, *compactionGenerator) {
@@ -163,5 +164,78 @@ func TestANicknameArrivesWithTheRealNameOnDiscord(t *testing.T) {
 	transcript := handler.sessions.items[chatSessionBaseKey(voice)].messages[0].Content
 	if !strings.Contains(transcript, `"known_as":"Nick"`) || !strings.Contains(transcript, `"real_name":"Alex"`) {
 		t.Fatal("voice lost the real name", transcript)
+	}
+}
+
+func ownerHandler() *ChatDomainHandler {
+	return NewChatDomainHandler(&compactionGenerator{summary: "unused"}).
+		WithOwnerProfile(chat.OwnerProfile{Name: "Alex Example Person"}).
+		WithOwnerDiscordAccount(ownerAccount).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Sam", Discord: samAccount}}})
+}
+
+// In a room of several people only the last speaker is flagged as the owner, so the owner's earlier
+// words carried a display name that may be anything. The owner is named by account like anyone listed.
+func TestTheOwnerIsNamedByAccountEvenWhenAnotherPersonSpokeLast(t *testing.T) {
+	handler := ownerHandler()
+	event := chatEvent("second")
+	event.Context = map[string]any{"guild_id": "guild", "entry_kind": "command", "session_key": "discord-voice:guild:room", "voice_turns": []chat.VoiceTurn{
+		{UserID: ownerAccount, UserName: "a-display-name-that-changes", Text: "Ningo, look at this"},
+		{UserID: otherAccount, UserName: "Stranger", Text: "I disagree with that"},
+	}}
+	event.User = core.EventUser{ID: otherAccount, Name: "Stranger"}
+	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	transcript := handler.sessions.items[chatSessionBaseKey(event)].messages[0].Content
+	if strings.Count(transcript, `"known_as":"Alex"`) != 1 || strings.Contains(transcript, "Example Person") || strings.Contains(transcript, ownerAccount) {
+		t.Fatal("the owner was not named by first name only, once, without the account", transcript)
+	}
+	if strings.Contains(transcript, `"known_as":"Stranger"`) || strings.Count(transcript, "known_as") != 1 {
+		t.Fatal("someone who is not the owner was named", transcript)
+	}
+}
+
+func TestTheOwnerIsNamedInAChannelTooAndOnlyByAccount(t *testing.T) {
+	handler := ownerHandler()
+	owner := channelEvent(ownerAccount, "whatever", "hello")
+	if _, err := handler.Handle(t.Context(), owner, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if turn := lastUserMessage(t, handler, owner); !strings.Contains(turn, `"known_as":"Alex"`) || !strings.Contains(turn, `"display_name":"whatever"`) {
+		t.Fatal("the owner's channel turn was not named beside the display name", turn)
+	}
+	// Someone who takes the owner's name or first name as a display name is not the owner.
+	impostor := channelEvent(otherAccount, "Alex Example Person", "I am Alex")
+	impostor.Channel = core.EventChannel{ID: "another-channel"}
+	if _, err := handler.Handle(t.Context(), impostor, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if turn := lastUserMessage(t, handler, impostor); strings.Contains(turn, "known_as") {
+		t.Fatal("a display name earned the owner's name", turn)
+	}
+}
+
+func TestTheOwnerIsNotNamedWithoutAnAccountOrAName(t *testing.T) {
+	cases := map[string]*ChatDomainHandler{
+		"no account configured": NewChatDomainHandler(&compactionGenerator{}).WithOwnerProfile(chat.OwnerProfile{Name: "Alex Example"}),
+		"no name configured":    NewChatDomainHandler(&compactionGenerator{}).WithOwnerDiscordAccount(ownerAccount),
+	}
+	for name, handler := range cases {
+		if got := handler.knownDiscordName(ownerAccount); got != (chat.KnownName{}) {
+			t.Fatalf("%s: %+v", name, got)
+		}
+	}
+	if got := ownerHandler().knownDiscordName(""); got != (chat.KnownName{}) {
+		t.Fatal("an empty account matched the owner", got)
+	}
+}
+
+func TestTheMacroExtractionNamesTheOwnerByFirstName(t *testing.T) {
+	handler := ownerHandler()
+	event := channelEvent(ownerAccount, "whatever", "hello")
+	people := handler.macroParticipants(event)
+	if len(people) != 1 || people[0].Label() != "Alex" {
+		t.Fatal(people)
 	}
 }
