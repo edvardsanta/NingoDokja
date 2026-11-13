@@ -248,6 +248,14 @@ and pending raw history, then continue with a bounded recent projection and a
 one-minute retry cooldown. They never silently discard history or claim successful
 compaction.
 Per-session generation is serialized, while unrelated sessions remain independent.
+The desktop's **Profiles** (`conversation.profiles`, `conversation.profile_generate`, owner interfaces
+only) read those stored sessions per person: a Discord channel or voice message carries the alias of
+its verified account (a hash of the session and the account id), so a person's exchanges are found
+by account and never by a typed name; a WhatsApp session counts as a person's only after the chat
+handler noted it while recognizing them by number. The counts are computed; the profile text is
+inferred by the analysis task from that person's latest answered exchanges and kept, one per
+person, in `dokja_profiles.db`. It is a reading made on request, not read back by any conversation.
+
 The orchestrator stores non-archived session snapshots in `dokja_chat_sessions.db`
 beside `DOKJA_DB_FILE`, or under `.dokja/` when unset. The separate versioned
 SQLite file stores the last valid summary and unsummarized user/assistant turns,

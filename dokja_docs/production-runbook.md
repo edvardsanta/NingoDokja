@@ -357,6 +357,13 @@ The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`
   read the newest three so he remembers them; how he brings them up is set in the private
   `.dokja/visions.md`. Created with mode `0600` on the first start of a build that has it;
   an older build ignores it. Include it in backups.
+- `/data/dokja_profiles.db`, beside `DOKJA_DB_FILE`, with no new variable: the latest inferred
+  profile of each person (the desktop's **Profiles**: how Ningo deals with the owner and with each
+  person in `ningo.people`), and which WhatsApp sessions belong to a person the application
+  recognized by number. A profile is a model's reading of past exchanges, made only when the owner
+  presses **Infer profile**, and it never feeds a conversation. Created with mode `0600` on the
+  first start of a build that has it; an older build ignores it. If it cannot be opened the
+  orchestrator starts without Profiles. Include it in backups.
 - `/data/dokja_conversations.db`, beside `DOKJA_DB_FILE` and named from it, so there is no new
   variable: the owner's conversations with Ningo, as written by the desktop and the CLI.
   - Only the orchestrator opens it; it is created on the first start of a build that keeps
