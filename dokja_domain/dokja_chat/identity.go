@@ -30,9 +30,17 @@ type NingoFacts struct {
 // KnownPerson is someone Ningo knows. WhatsApp recognizes them by the number and never reaches the
 // model; Name and About do. Warm makes Ningo gentle and familiar on that person's own turns; the flag
 // shapes the turn's tone and is never listed to the model as a fact about anyone.
+//
+// Discord is the person's numeric account id. Discord turns match on it alone, never on a display
+// name or handle, and only Name comes of it: About, Warm and kept facts stay on WhatsApp. Like the
+// number, the id never reaches the model.
 type KnownPerson struct {
-	Name     string   `json:"name"`
-	WhatsApp string   `json:"whatsapp,omitempty"`
+	Name     string `json:"name"`
+	WhatsApp string `json:"whatsapp,omitempty"`
+	Discord  string `json:"discord,omitempty"`
+	// RealName is who the person is when Name is what Ningo calls them (a nickname). Only Discord
+	// turns carry it, beside Name, so Ningo knows a nickname and a real name are one person.
+	RealName string   `json:"real_name,omitempty"`
 	About    []string `json:"about,omitempty"`
 	Warm     bool     `json:"warm,omitempty"`
 }
