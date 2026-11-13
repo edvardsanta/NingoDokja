@@ -83,6 +83,23 @@ func (h *ChatDomainHandler) attachPrivateFacts(event core.Event) {
 	}
 }
 
+// knownDiscordName is the name the owner gave a Discord account in their private configuration: what
+// to call the person and, for a nickname, their real name. It matches the gateway's numeric account
+// id and nothing else: a display name, a handle or a message claiming to be someone never matches.
+// Only names are returned, so About, Warm and kept facts stay where privateFactsAllowed puts them,
+// and the id itself never reaches the model.
+func (h *ChatDomainHandler) knownDiscordName(userID string) chat.KnownName {
+	if userID == "" {
+		return chat.KnownName{}
+	}
+	for _, person := range h.ningo.People {
+		if person.Discord == userID {
+			return chat.KnownName{Name: person.Name, RealName: person.RealName}
+		}
+	}
+	return chat.KnownName{}
+}
+
 // ownerChannel says whether the turn's speaker is the owner, and how that is known. Discord relies on
 // the gateway's verification; the owner's interfaces are the owner's by the same rule that lets them
 // keep conversations.

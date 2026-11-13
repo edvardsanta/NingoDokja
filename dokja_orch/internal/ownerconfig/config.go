@@ -89,10 +89,39 @@ func Load(path string) (Config, error) {
 		return Config{}, err
 	}
 	id := config.Owner.Accounts.Discord.UserID
-	if len(id) < 17 || len(id) > 20 || strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+	if !validDiscordID(id) {
 		return Config{}, fmt.Errorf("owner Discord user_id must contain 17 to 20 ASCII digits")
 	}
+	if err := validDiscordPeople(config.Ningo.People, id); err != nil {
+		return Config{}, err
+	}
 	return config, nil
+}
+
+func validDiscordID(id string) bool {
+	return len(id) >= 17 && len(id) <= 20 && strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' }) < 0
+}
+
+// validDiscordPeople checks the Discord accounts of known people. An account names one person: it may
+// not repeat, and it may not be the owner's, who is recognized by the gateway and not by this list.
+func validDiscordPeople(people []chat.KnownPerson, ownerID string) error {
+	seen := map[string]bool{}
+	for _, person := range people {
+		if person.Discord == "" {
+			continue
+		}
+		if !validDiscordID(person.Discord) {
+			return fmt.Errorf("ningo people discord must be 17 to 20 ASCII digits")
+		}
+		if person.Discord == ownerID {
+			return fmt.Errorf("ningo people discord must not be the owner's account")
+		}
+		if seen[person.Discord] {
+			return fmt.Errorf("ningo people discord accounts must be unique")
+		}
+		seen[person.Discord] = true
+	}
+	return nil
 }
 
 func validText(value string, limit int) bool {
@@ -119,6 +148,9 @@ func validNingo(facts chat.NingoFacts) error {
 	for _, person := range facts.People {
 		if !validText(person.Name, 128) {
 			return fmt.Errorf("ningo people need a single-line name of at most 128 bytes")
+		}
+		if person.RealName != "" && !validText(person.RealName, 128) {
+			return fmt.Errorf("ningo people real_name must be single-line text of at most 128 bytes")
 		}
 		if person.WhatsApp != "" && !whatsappNumber.MatchString(person.WhatsApp) {
 			return fmt.Errorf("ningo people whatsapp must be 7 to 15 digits")

@@ -222,7 +222,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	}
 	turnContent := withReplyContext(event, content)
 	if turns, ok := event.Context["voice_turns"].([]chat.VoiceTurn); ok {
-		turnContent, err = chat.VoiceTranscript(chatSessionBaseKey(event), turns)
+		turnContent, err = chat.VoiceTranscriptAs(chatSessionBaseKey(event), turns, h.knownDiscordName)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +231,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		if name == event.User.ID {
 			name = ""
 		}
-		turnContent = chat.ParticipantMessage(scope, event.User.ID, name, turnContent)
+		turnContent = chat.KnownParticipantMessage(scope, event.User.ID, name, h.knownDiscordName(event.User.ID), turnContent)
 	}
 	summarize := h.summarizeContext
 	if voice {
