@@ -12,8 +12,10 @@ import { WorkspacePanel } from "./workspace_panel.js";
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 
 // Inferring one profile asks a model to read dozens of exchanges; the orchestrator allows its
-// analysis task up to ninety seconds, so wait a little longer than that.
-const INFERENCE_TIMEOUT_MS = 100_000;
+// analysis task up to ninety seconds, so wait a little longer than that. A measure asks for up to
+// three readings one after another and stops at 110 seconds, so it waits just past that, still under
+// the shell's own cap of two minutes.
+const INFERENCE_TIMEOUT_MS = 115_000;
 
 async function loadProfiles(transport: Transport): Promise<LoadResult<PersonProfiles>> {
   const answer = await transport.request("conversation.profiles", {});

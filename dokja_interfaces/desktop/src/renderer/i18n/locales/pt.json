@@ -962,7 +962,7 @@
   "profiles_provenance_unnamed": "Inferido em {when} a partir de {count} trocas. Uma leitura, não um fato.",
   "profiles_measure": "Medir estabilidade",
   "profiles_measure_named": "Medir a estabilidade do perfil de {name}",
-  "profiles_measure_hint": "Lê as mesmas trocas três vezes ao mesmo tempo e mostra o quanto as leituras concordam.",
+  "profiles_measure_hint": "Lê as mesmas trocas até três vezes, uma depois da outra, e mostra o quanto as leituras concordam. Pode levar um ou dois minutos.",
   "profiles_stability": "Estabilidade",
   "profiles_stability_figures": "em {samples} leituras das mesmas trocas: tom {tone} · resumo {summary} · temas {topics} · padrões {patterns}. Baixa quer dizer que o modelo mudou de ideia.",
   "reply_context": "Leu: {live} mensagens anteriores desta conversa · memória de discussões anteriores: {macro}",
