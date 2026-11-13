@@ -1709,6 +1709,29 @@ Saving recreates orchestrator and feeds together. Blank or invalid environment
 values use 25 MiB. HTML/text reading retains its 2 MiB limit; extracted text,
 page, source and time budgets remain unchanged.
 
+## Optional development GPU for the local Ollama
+
+By default `dokja-ollama` gets no GPU device and runs on the CPU. That serves the embeddings well
+enough, but a chat-sized local model (the analysis tasks' last fallback, for example `qwen3.5:2b`)
+cannot finish inside the task's 45-second budget on a CPU, so it times out and the task falls
+through to nothing. `docker-compose.ollama-gpu.yml` passes the host render node to it:
+`DOKJA_OLLAMA_RENDER_DEVICE` defaults to `/dev/dri/renderD128`. Ollama then finds a
+Vulkan-capable GPU on its own (on the development machine it reports "AMD Radeon RX 6600 (RADV
+NAVI23)", 8 GiB); nothing else is configured and no model is replaced.
+
+`make start`, `make up`, `make status` and `make logs` apply the overlay whenever the env file
+sets `DOKJA_OLLAMA_RENDER_DEVICE` and add `dokja-ollama` to the services they start. Use
+`OLLAMA_GPU=0` to leave it out, or `OLLAMA_GPU=1` to require it with the default render node. A
+stack recreated without the overlay silently returns to the CPU. Outside `make`:
+
+```sh
+docker compose -f docker-compose.lite.yml -f docker-compose.ollama-gpu.yml up -d dokja-ollama
+```
+
+Check it with `ollama ps` inside the container: the `PROCESSOR` column reads `100% GPU` instead of
+`100% CPU`. The voice GPU overlay uses the same render node; both fit in 8 GiB. Device exposure
+needs a compatible host driver and is not inferred from the presence of a graphics card.
+
 ## Optional development GPU speech recognition
 
 `docker-compose.voice-gpu.yml` extends the dev/lite voice service with an

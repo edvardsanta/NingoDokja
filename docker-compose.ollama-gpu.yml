@@ -1,0 +1,9 @@
+# Optional overlay for the dev/lite stacks: runs the local Ollama (embeddings and the local analysis
+# model) on the host GPU instead of the CPU. Without it Ollama has no GPU device and everything it
+# serves runs on the CPU, which for a chat-sized model is far too slow for the analysis tasks'
+# 45-second budget. Ollama finds a Vulkan-capable GPU on its own once it can see the render node.
+# The render node is shared with docker-compose.voice-gpu.yml; the two fit in 8 GB together.
+services:
+  dokja-ollama:
+    devices:
+      - ${DOKJA_OLLAMA_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
