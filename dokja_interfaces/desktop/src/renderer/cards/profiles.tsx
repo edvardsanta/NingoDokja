@@ -9,6 +9,8 @@ import { Button } from "./ui.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { WorkspacePanel } from "./workspace_panel.js";
 
+const percent = (share: number) => `${Math.round(share * 100)}%`;
+
 // Inferring one profile asks a model to read dozens of exchanges; the orchestrator allows its
 // analysis task up to ninety seconds, so wait a little longer than that.
 const INFERENCE_TIMEOUT_MS = 100_000;
@@ -31,8 +33,8 @@ function List({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function Person({ person, min, inference, working, onGenerate }: {
-  person: PersonProfile; min: number; inference: boolean; working: boolean; onGenerate: (person: PersonProfile) => void;
+function Person({ person, min, inference, working, onGenerate, onMeasure }: {
+  person: PersonProfile; min: number; inference: boolean; working: boolean; onGenerate: (person: PersonProfile) => void; onMeasure: (person: PersonProfile) => void;
 }) {
   const t = useTranslate();
   const times = useTimes();
@@ -52,6 +54,15 @@ function Person({ person, min, inference, working, onGenerate }: {
           {reading.tone && <p><strong>{t("profiles_tone")}:</strong> {reading.tone}</p>}
           <List label={t("profiles_topics")} items={reading.topics} />
           <List label={t("profiles_patterns")} items={reading.patterns} />
+          {reading.stability && (
+            <p className="profile-stability">
+              <strong>{t("profiles_stability")}:</strong>{" "}
+              {t("profiles_stability_figures", {
+                samples: reading.stability.samples, tone: percent(reading.stability.tone), summary: percent(reading.stability.summary),
+                topics: percent(reading.stability.topics), patterns: percent(reading.stability.patterns),
+              })}
+            </p>
+          )}
           <p className="detail">
             {reading.model
               ? t("profiles_provenance", { when: times.day(reading.generatedAt), count: reading.exchanges, model: reading.model })
@@ -65,6 +76,10 @@ function Person({ person, min, inference, working, onGenerate }: {
         title={!inference ? t("profiles_no_inference") : !enough ? t("profiles_need", { min, answered: person.answered }) : undefined}
         onClick={() => onGenerate(person)}>
         {working ? t("profiles_working") : reading ? t("profiles_again") : t("profiles_generate")}
+      </Button>
+      <Button variant="quiet" size="compact" disabled={working || !enough || !inference} aria-label={t("profiles_measure_named", { name })}
+        title={t("profiles_measure_hint")} onClick={() => onMeasure(person)}>
+        {t("profiles_measure")}
       </Button>
     </section>
   );
@@ -80,10 +95,10 @@ export function ProfilesPanel({ transport }: { transport: Transport }) {
   const [working, setWorking] = useState<string>();
   const [problem, setProblem] = useState<TransportError>();
 
-  const generate = async (person: PersonProfile) => {
+  const run = async (type: "conversation.profile_generate" | "conversation.profile_stability", person: PersonProfile) => {
     if (working) return;
     setWorking(person.person); setProblem(undefined);
-    const answer = await transport.request("conversation.profile_generate", { person: person.person }, { timeoutMs: INFERENCE_TIMEOUT_MS });
+    const answer = await transport.request(type, { person: person.person }, { timeoutMs: INFERENCE_TIMEOUT_MS });
     setWorking(undefined);
     if (answer.ok) poll();
     else if (answer.error.code !== "cancelled") setProblem(answer.error);
@@ -97,7 +112,8 @@ export function ProfilesPanel({ transport }: { transport: Transport }) {
         {data.profiles.length === 0 && <p className="detail">{t("profiles_empty")}</p>}
         {data.profiles.map((person) => (
           <Person key={person.person} person={person} min={data.minExchanges} inference={data.inference}
-            working={working === person.person} onGenerate={(chosen) => void generate(chosen)} />
+            working={working === person.person} onGenerate={(chosen) => void run("conversation.profile_generate", chosen)}
+            onMeasure={(chosen) => void run("conversation.profile_stability", chosen)} />
         ))}
       </>}
     </CardFrame>

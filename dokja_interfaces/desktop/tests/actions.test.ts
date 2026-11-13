@@ -927,3 +927,16 @@ test("conversation.profile_generate is a change on a real press that names only 
   assert.equal(generated.profile.profile.summary, "S");
   assert.throws(() => action.project({ domain: "conversation", result: { profile: { person: "nobody" } } }));
 });
+
+test("conversation.profile_stability is a change, asked like an inference, and its measure stays within 0 and 1", () => {
+  const action = ACTIONS["conversation.profile_stability"];
+  assert.equal(isWriteAction("conversation.profile_stability"), true);
+  assert.equal(needsConfirmation("conversation.profile_stability"), false);
+  assert.deepEqual(action.payload({ person: "person:Nick", samples: 50 }), { person: "person:Nick" });
+  for (const person of ["", "Nick", "person:", 7, undefined]) assert.equal(action.payload({ person }), undefined, String(person));
+  const projected = action.project({ domain: "conversation", result: { profile: { person: "person:Nick", name: "Nick", answered: 5, profile: {
+    summary: "S", exchanges: 5, stability: { samples: 3, tone: 0.67, summary: 2, topics: -1, patterns: "x", extra: "drop" } } } } }) as { profile: { profile: { stability?: Record<string, number> } } };
+  assert.deepEqual(projected.profile.profile.stability, { samples: 3, tone: 0.67, summary: 1, topics: 0, patterns: 0 });
+  const single = ACTIONS["conversation.profiles"].project(compactOf("conversation", { profiles: [{ person: "owner", name: "You", profile: { summary: "S", stability: { samples: 1, tone: 1 } } }] })) as { profiles: Array<{ profile?: { stability?: unknown } }> };
+  assert.equal(single.profiles[0]!.profile?.stability, undefined);
+});

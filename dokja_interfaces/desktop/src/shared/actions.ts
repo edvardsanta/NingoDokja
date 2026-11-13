@@ -40,6 +40,9 @@ export const ACTION_TYPES = [
   // replaces the last reading, so it is a change on a real press, never asked in a window.
   "conversation.profiles",
   "conversation.profile_generate",
+  // Reading the same exchanges three times at once to see how much the readings agree: a change like
+  // the one above, and three model calls.
+  "conversation.profile_stability",
   "runtime.set",
   "runtime.providers",
   "runtime.tasks.profiles",
@@ -134,6 +137,7 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "conversation.delete",
   "conversation.fact_delete",
   "conversation.profile_generate",
+  "conversation.profile_stability",
   "communications.send",
   "meme.hashtag.tag",
   "meme.pool.refresh",

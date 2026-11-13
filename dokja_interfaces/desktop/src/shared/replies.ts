@@ -400,7 +400,12 @@ export type ProfileText = {
   generatedAt: string;
   provider: string;
   model: string;
+  // How much independent readings of the same exchanges agreed, each from 0 to 1, when the owner
+  // asked for it. Counted from the texts, not judged: it is how much the model changed its mind.
+  stability?: ProfileStability;
 };
+
+export type ProfileStability = { samples: number; tone: number; summary: number; topics: number; patterns: number };
 
 export type PersonProfile = {
   // "owner" or "person:<name>": what a profile is asked for by.
