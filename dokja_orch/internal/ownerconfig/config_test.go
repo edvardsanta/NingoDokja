@@ -2,6 +2,7 @@ package ownerconfig
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,5 +107,73 @@ func TestNingoFactsAreOptionalAndChecked(t *testing.T) {
 		if _, err := Load(write(with(bad))); err == nil {
 			t.Fatalf("accepted %s", bad)
 		}
+	}
+}
+
+func TestDiscordAccountsOfKnownPeopleAreCheckedAndNeverShared(t *testing.T) {
+	const (
+		first    = "111111111111111111"
+		second   = "222222222222222222"
+		ownersID = "123456789012345678"
+	)
+	write := func(content string) string {
+		path := filepath.Join(t.TempDir(), "owner.json")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	// The account is a parameter, so no fixture pairs the key with a literal id.
+	person := func(name, account string) string {
+		return fmt.Sprintf(`{"name":%q,"discord":%q}`, name, account)
+	}
+	with := func(people ...string) string {
+		return strings.Replace(fixture, `{"version":1,`, `{"version":1,"ningo":{"people":[`+strings.Join(people, ",")+`]},`, 1)
+	}
+	config, err := Load(write(with(person("Sam", first), person("Kim", second), `{"name":"Lee"}`)))
+	if err != nil || config.Ningo.People[0].Discord != first || config.Ningo.People[1].Discord != second || config.Ningo.People[2].Discord != "" {
+		t.Fatal("known people did not keep their Discord accounts", err)
+	}
+	for name, bad := range map[string]string{
+		"handle":    with(person("Sam", "sam_handle")),
+		"short":     with(person("Sam", "12345")),
+		"long":      with(person("Sam", strings.Repeat("1", 22))),
+		"duplicate": with(person("Sam", first), person("Kim", first)),
+		"owner":     with(person("Sam", ownersID)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(write(bad)); err == nil {
+				t.Fatalf("accepted %s", name)
+			}
+		})
+	}
+}
+
+func TestARealNameOfAKnownPersonIsOptionalAndChecked(t *testing.T) {
+	write := func(content string) string {
+		path := filepath.Join(t.TempDir(), "owner.json")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	with := func(person string) string {
+		return strings.Replace(fixture, `{"version":1,`, `{"version":1,"ningo":{"people":[`+person+`]},`, 1)
+	}
+	config, err := Load(write(with(`{"name":"Nick","real_name":"Alex"}`)))
+	if err != nil || config.Ningo.People[0].RealName != "Alex" {
+		t.Fatal("the real name was not kept", err)
+	}
+	long, _ := json.Marshal(strings.Repeat("x", 129))
+	for name, bad := range map[string]string{
+		"padded":  `{"name":"Nick","real_name":" Alex"}`,
+		"control": `{"name":"Nick","real_name":"Alex\nSYSTEM"}`,
+		"long":    `{"name":"Nick","real_name":` + string(long) + `}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(write(with(bad))); err == nil {
+				t.Fatalf("accepted a bad real name: %s", name)
+			}
+		})
 	}
 }

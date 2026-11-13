@@ -41,6 +41,10 @@ private `.dokja/owner.json` configuration and
 passes only a trusted owner mention fact to chat; the ID itself is not sent to
 the model.
 
+Accounts listed under `ningo.people[].discord` in that file are named the same way: the
+gateway's numeric account id, never a display name, selects the person, and the turn
+carries only their configured name.
+
 Long replies are split into messages of at most 2,000 characters. The active
 discord.js runtime closes and reopens fenced code blocks with their language tag
 at each boundary, preserving code indentation and blank lines. Exceptionally long

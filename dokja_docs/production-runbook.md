@@ -174,11 +174,24 @@ SQLite data remains in its existing named volume. Restart the orchestrator after
 editing the profile; no deployment is performed automatically.
 
 The optional `ningo` section holds private facts: `named_by` (who chose the name),
-`groups` (WhatsApp group ids) and `people` (`name`, `whatsapp` as digits, `about`).
+`groups` (WhatsApp group ids) and `people` (`name`, `whatsapp` as digits, `discord` as
+the numeric account id, `real_name`, `about`).
 They stay here because personal data does not belong in the public repository. They
 reach a conversation only in the linked account's self-chat and the listed groups,
 never on Discord or the local interfaces. A person's number recognizes them in those
-places and never reaches the model. A person with `"warm": true` gets the manner
+places and never reaches the model.
+
+The one thing a person's `discord` account does is name them on Discord. In a shared
+channel or voice room the application matches the gateway's account id, and nothing
+else, against `discord`; on a match the turn carries `known_as` with the `name`, beside
+the display name and marked as granting no authority. When `name` is a nickname Ningo
+should keep using, `real_name` says who the person is: the turn then carries both, so
+Ningo calls them by the nickname and still links a hashtag or topic named after them. A display name, a handle or a
+message saying "I am Sam" never matches. `about`, `warm` and kept facts stay on
+WhatsApp, and the id never reaches the model. An account may appear once and may not be
+the owner's. Private Discord conversations are not named. The file is read at startup,
+and a build older than this field rejects it, so deploy the new build before restarting
+with `discord` entries in place. A person with `"warm": true` gets the manner
 described in `.dokja/warm.md` on their own recognized turns instead of the
 arrogant voice; the flag never reaches the model as a fact, other speakers keep
 the usual voice, and without that file nothing changes (see "Ningo's warm
