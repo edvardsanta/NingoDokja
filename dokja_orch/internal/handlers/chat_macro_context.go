@@ -262,7 +262,7 @@ func (h *ChatDomainHandler) macroParticipants(event core.Event) []chat.Extractio
 		}
 		known := h.knownDiscordName(event.User.ID)
 		if _, owner := ownerChannel(event); owner && known.Name == "" {
-			known.Name = h.ownerProfile.Name
+			known.Name = ownerCallName(h.ownerProfile)
 		}
 		add(chat.ExtractionParticipant{Name: display, KnownAs: known.Name, RealName: known.RealName})
 		return people
