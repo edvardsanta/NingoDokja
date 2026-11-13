@@ -74,6 +74,9 @@ type fakeProfileModel struct {
 	mu       sync.Mutex
 	calls    int
 	requests [][]map[string]string
+	// running and overlapped notice a second call made while another is still being answered.
+	running    int
+	overlapped bool
 }
 
 func (f *fakeProfileModel) GenerateTaskJSON(_ context.Context, profile string, _ map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
@@ -84,12 +87,18 @@ func (f *fakeProfileModel) GenerateTaskJSON(_ context.Context, profile string, _
 	call := f.calls
 	f.calls++
 	f.requests = append(f.requests, messages)
+	f.running++
+	if f.running > 1 {
+		f.overlapped = true
+	}
 	reply := f.reply
 	if len(f.replies) > 0 {
 		reply = f.replies[call%len(f.replies)]
 	}
 	failed := f.err != nil || f.failing[call]
 	f.mu.Unlock()
+	defer func() { f.mu.Lock(); f.running--; f.mu.Unlock() }()
+	time.Sleep(2 * time.Millisecond)
 	if failed {
 		if f.err != nil {
 			return nil, f.err
@@ -328,6 +337,9 @@ func TestMeasuringAProfileReadsTheSamePersonSeveralTimesAndKeepsTheFirstWithItsS
 	if model.calls != conversation.MaxStabilitySamples {
 		t.Fatalf("%d readings were asked for", model.calls)
 	}
+	if model.overlapped {
+		t.Fatal("the readings were asked at once, so they share the models and the time")
+	}
 	for _, request := range model.requests {
 		if request[1]["content"] != model.requests[0][1]["content"] {
 			t.Fatal("the readings were not made from the same exchanges")
@@ -413,5 +425,30 @@ func TestAMeasureIsRefusedLikeAnInferenceWhenItCannotBeMade(t *testing.T) {
 	bare := NewConversationDomainHandler(archiveFor(t))
 	if _, err := profileCall(t, bare, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": "owner"}); !errors.Is(err, conversation.ErrUnavailable) {
 		t.Fatal(err)
+	}
+}
+
+func TestAMeasureStopsAskingWhenTwoReadingsAreInHandAndTheTimeIsSpent(t *testing.T) {
+	model := &fakeProfileModel{reply: readingA}
+	handler, _ := profilesFixture(t, model)
+	handler.profiles.softLimit = time.Nanosecond
+	result, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err != nil || model.calls != 2 {
+		t.Fatalf("two readings were enough once the time was spent: calls=%d err=%v", model.calls, err)
+	}
+	if samples := result["profile"].(map[string]any)["profile"].(map[string]any)["stability"].(map[string]any)["samples"]; samples != 2 {
+		t.Fatal(samples)
+	}
+}
+
+func TestAMeasureGivesUpAsSoonAsTwoReadingsCannotBeReached(t *testing.T) {
+	model := &fakeProfileModel{reply: readingA, failing: map[int]bool{0: true, 1: true, 2: true}}
+	handler, _ := profilesFixture(t, model)
+	_, err := profileCall(t, handler, core.SourceDesktop, "conversation.profile_stability", map[string]any{"person": conversation.PersonKey("Nick")})
+	if err == nil || !strings.Contains(err.Error(), "only 0 reading(s) came back") || !strings.Contains(err.Error(), "Runtime task diagnostics") {
+		t.Fatal("the error must say how many came back and where to look", err)
+	}
+	if model.calls != 2 {
+		t.Fatalf("a third reading was asked for although two could no longer be reached: %d calls", model.calls)
 	}
 }
