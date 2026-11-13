@@ -14,6 +14,7 @@ import { POST_REFUSALS, type PostRefusal } from "../shared/posts.js";
 import type { PostStore } from "./post_store.js";
 import type {
   ArchivedChatReply,
+  ReplyContext,
   ArchivedConversation,
   ArchivedTurn,
   AnswerFeedback,
@@ -287,11 +288,24 @@ function archivedConversation(value: unknown): ArchivedConversation {
   };
 }
 
+// What the turn read: the orchestrator's own words ("recalled", "skipped:short_follow_up"), kept to
+// the ones it uses so nothing else reaches the screen.
+const MACRO_STATUS = /^(recalled|nothing_found|unavailable|skipped(?::([a-z_]{1,40}))?)$/;
+
+function replyContext(raw: unknown): ReplyContext | undefined {
+  if (!isRecord(raw)) return undefined;
+  const found = MACRO_STATUS.exec(text(raw.macro));
+  if (!found) return undefined;
+  const macro = found[1]!.startsWith("skipped") ? "skipped" : (found[1] as ReplyContext["macro"]);
+  return { liveMessages: clampInt(raw.live_messages, 0, 100_000, 0), macro, reason: found[2] ?? "" };
+}
+
 function chatReply(result: unknown): ArchivedChatReply | Off {
   return inDomain(result, "chat", (body) => {
     const turn = archivedTurn(body.turn);
     if (!turn) throw new Error("unexpected chat reply");
-    return { reply: shorten(text(body.reply), MAX_TURN_REPLY_CHARS), replayed: body.replayed === true, turn };
+    const context = replyContext(body.context);
+    return { reply: shorten(text(body.reply), MAX_TURN_REPLY_CHARS), replayed: body.replayed === true, turn, ...(context ? { context } : {}) };
   });
 }
 

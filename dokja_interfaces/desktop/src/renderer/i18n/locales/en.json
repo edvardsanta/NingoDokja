@@ -959,5 +959,13 @@
   "profiles_topics": "Topics",
   "profiles_patterns": "Patterns",
   "profiles_provenance": "Inferred {when} from {count} exchanges by {model}. A reading, not a fact.",
-  "profiles_provenance_unnamed": "Inferred {when} from {count} exchanges. A reading, not a fact."
+  "profiles_provenance_unnamed": "Inferred {when} from {count} exchanges. A reading, not a fact.",
+  "reply_context": "Read: {live} earlier messages of this conversation · memory of earlier discussions: {macro}",
+  "reply_context_recalled": "recalled",
+  "reply_context_nothing_found": "asked, nothing found",
+  "reply_context_unavailable": "needed but unavailable",
+  "reply_context_skipped": "not needed",
+  "reply_context_skipped_short_follow_up": "not needed, a short follow-up",
+  "reply_context_skipped_live_context_covers_it": "not needed, the conversation already covers it",
+  "reply_context_skipped_empty_question": "not needed, an empty question"
 }

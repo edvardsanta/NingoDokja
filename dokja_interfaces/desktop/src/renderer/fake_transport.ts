@@ -429,7 +429,7 @@ export function createFakeTransport(delayMs = 400): Transport {
             { number: 1, id: documents[0]?.id ?? "note:attention", title: "A very long title about the quiet economics of attention in the age of endless feeds, part one", reference: "https://www.example.com/attention", excerpt: "Attention is the one budget nobody balances. Every feed is a claim on it, and the claims never expire." },
             { number: 2, id: "note:reading", title: "Notes · on reading slowly", reference: "", excerpt: "To read slowly is to disagree with the page while it is still speaking." },
           ] } : {});
-          return ok({ reply, replayed: false, turn: structuredClone(turn) });
+          return ok({ reply, replayed: false, turn: structuredClone(turn), context: { liveMessages: held.turns.length - 1, macro: held.turns.length > 1 ? "skipped" : "nothing_found", reason: held.turns.length > 1 ? "live_context_covers_it" : "" } });
         }
         case "runtime.logs": return ok({module:payload?.module,text:"[demo] Module output appears here."});
         case "runtime.modules":return ok({modules:structuredClone(modules),busy:false,error:""});

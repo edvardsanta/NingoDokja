@@ -129,8 +129,8 @@ export const archivedTurn = (turn: TurnFixture = {}) => ({
 });
 
 // The orchestrator's answer to an archived send: the turn it settled, under the send's own id and text.
-export const archivedAnswer = (reply: string, payload?: Record<string, unknown>, seq = 1): TransportResult =>
-  ok({ reply, replayed: false, turn: archivedTurn({ seq, reply, content: String(payload?.content ?? ""), sendId: String(payload?.send_id ?? "send-0001") }) });
+export const archivedAnswer = (reply: string, payload?: Record<string, unknown>, seq = 1, context?: Record<string, unknown>): TransportResult =>
+  ok({ reply, replayed: false, turn: archivedTurn({ seq, reply, content: String(payload?.content ?? ""), sendId: String(payload?.send_id ?? "send-0001") }), ...(context ? { context } : {}) });
 
 // A route that answers each archived send with the next reply, numbered in order.
 export function answering(...replies: string[]) {

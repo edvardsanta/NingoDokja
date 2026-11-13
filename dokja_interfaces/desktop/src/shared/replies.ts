@@ -379,7 +379,16 @@ export type ArchivedConversation = {
 
 // The answer to an archived send: the turn as the archive now holds it, and whether the same send
 // was answered before (a replay, never asked again).
-export type ArchivedChatReply = { off?: false; reply: string; replayed: boolean; turn: ArchivedTurn };
+export type ArchivedChatReply = { off?: false; reply: string; replayed: boolean; turn: ArchivedTurn; context?: ReplyContext };
+
+// What a reply read besides the question. The live context is the conversation's own history, always
+// sent; the macro context is what Ningo kept from earlier discussions, asked only when the live one
+// could not carry the turn. `skipped` says it was not needed, and why (the reason is a code).
+export type ReplyContext = {
+  liveMessages: number;
+  macro: "recalled" | "nothing_found" | "unavailable" | "skipped";
+  reason: string;
+};
 
 export type ConversationStarted = { off?: false; conversation: ArchivedConversation };
 
