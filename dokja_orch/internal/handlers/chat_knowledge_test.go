@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
 	store "read_books/dokja_store"
@@ -97,8 +98,12 @@ func TestCitationsLinkNingosOwnDiscordPostWhenRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 	reply, _ := result["reply"].(string)
-	if !strings.Contains(reply, "📚 [1] #PedroGames <https://discord.com/channels/guild-1/chan-1/msg-9>") {
-		t.Fatalf("expected the recorded Discord permalink, got %q", reply)
+	if !strings.Contains(reply, "📚 [1] #PedroGames <https://memes.example/x.mp4> <https://discord.com/channels/guild-1/chan-1/msg-9>") {
+		t.Fatalf("expected the original meme and the recorded Discord permalink, got %q", reply)
+	}
+	// chan-1 is not a numeric id, so it never becomes a channel mention.
+	if strings.Contains(reply, "<#") {
+		t.Fatalf("a malformed channel id became a mention: %q", reply)
 	}
 }
 
@@ -312,7 +317,7 @@ func TestExcerptsOfOneDocumentHaveDistinctReferences(t *testing.T) {
 	if len(sources) != 3 || sources[0].Number != 1 || sources[1].Number != 2 || sources[2].Number != 3 {
 		t.Fatalf("%#v", sources)
 	}
-	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources), nil)
+	reply := citeSources("It weighs on him [1], and more [2].", citedSources("It weighs on him [1], and more [2].", sources), nil, true)
 	if !strings.HasSuffix(reply, "\n\n📚 [1] The case · [2] The case") {
 		t.Fatal(reply)
 	}
@@ -321,34 +326,34 @@ func TestExcerptsOfOneDocumentHaveDistinctReferences(t *testing.T) {
 	}
 }
 
-// A meme citation names the channel hashtag and links the meme itself: Ningo's own
-// Discord post wins when it was recorded; otherwise the document's source_ref is the
-// direct link. Non-http references (folder:, file:) stay unlinked.
+// A meme citation names the hashtag and links the original meme, the document's source_ref, and
+// also Ningo's own Discord post when it was recorded. Non-http references (folder:, file:) stay
+// unlinked.
 func TestCitationsLinkTheDocumentsOwnPage(t *testing.T) {
 	sources := []knowledgeSource{
 		{Number: 1, SourceID: "meme-hashtag:abc", Title: "#PedroGames", Reference: "https://memes.example/videos/x.mp4"},
 		{Number: 2, SourceID: "note:case", Title: "The case", Reference: "folder:notes/case.md"},
 		{Number: 3, SourceID: "note:plain", Title: "Plain"},
 	}
-	permalink := func(mediaURL string) string {
+	posts := func(mediaURL string) (store.DiscordPost, bool) {
 		if mediaURL == "https://memes.example/videos/x.mp4" {
-			return "https://discord.com/channels/guild-1/chan-1/msg-1"
+			return store.DiscordPost{GuildID: "guild-1", ChannelID: "chan-1", MessageID: "msg-1"}, true
 		}
-		return ""
+		return store.DiscordPost{}, false
 	}
-	reply := citeSources("Corre [1], detalhe [2], e [3].", sources, permalink)
-	if !strings.Contains(reply, "[1] #PedroGames <https://discord.com/channels/guild-1/chan-1/msg-1>") {
+	reply := citeSources("Corre [1], detalhe [2], e [3].", sources, posts, true)
+	if !strings.Contains(reply, "[1] #PedroGames <https://memes.example/videos/x.mp4> <https://discord.com/channels/guild-1/chan-1/msg-1>") {
 		t.Fatal(reply)
 	}
 	if !strings.Contains(reply, "[2] The case · [3] Plain") {
 		t.Fatal(reply)
 	}
-	if strings.Contains(reply, "folder:") || strings.Contains(reply, "memes.example") {
-		t.Fatal("fallbacks must not appear when the permalink wins", reply)
+	if strings.Contains(reply, "folder:") {
+		t.Fatal("a non-http reference must stay unlinked", reply)
 	}
 
-	// Without a recorded post, the document's own page is the link.
-	reply = citeSources("Corre [1].", sources[:1], nil)
+	// Without a recorded post, the original meme alone is the link.
+	reply = citeSources("Corre [1].", sources[:1], nil, true)
 	if !strings.Contains(reply, "[1] #PedroGames <https://memes.example/videos/x.mp4>") {
 		t.Fatal(reply)
 	}
@@ -468,5 +473,75 @@ func TestCitedQuoteMustExistInTheReferencedPassage(t *testing.T) {
 	reply = handler.verifyQuotes(context.Background(), "“The institution of marriage supports children.” [1]", sources, knowledgeTurn{planned: true, text: true})
 	if !strings.Contains(reply, "institution") {
 		t.Fatal(reply)
+	}
+}
+
+// Placeholder ids: numeric, as real ones are, and never a real server. The expected links are built
+// from the post, so no literal address with numeric ids sits in the source.
+var channelPost = store.DiscordPost{GuildID: strings.Repeat("1", 18), ChannelID: strings.Repeat("2", 18), MessageID: strings.Repeat("3", 18)}
+
+// On Discord a cited meme gives the original meme, the channel where Ningo posted it as a mention
+// that opens the channel, and the link to the message itself.
+func TestCitationNamesTheChannelWhereNingoPostedTheMemeOnDiscord(t *testing.T) {
+	sources := []knowledgeSource{
+		{Number: 1, SourceID: "meme-hashtag:abc", Title: "#PedroGames", Reference: "https://memes.example/videos/x.mp4"},
+		{Number: 2, SourceID: "meme-hashtag:def", Title: "#KimGames", Reference: "https://memes.example/videos/y.mp4"},
+	}
+	posts := func(mediaURL string) (store.DiscordPost, bool) {
+		if mediaURL == "https://memes.example/videos/x.mp4" {
+			return channelPost, true
+		}
+		return store.DiscordPost{}, false
+	}
+	reply := citeSources("Veja [1] e [2].", sources, posts, true)
+	want := fmt.Sprintf("[1] #PedroGames <https://memes.example/videos/x.mp4> <#%s> <%s>", channelPost.ChannelID, channelPost.Permalink())
+	if !strings.Contains(reply, want) {
+		t.Fatal("the channel mention and the message link were not both given", reply)
+	}
+	// A meme whose post was not recorded keeps its own page as the link and invents no channel.
+	if !strings.Contains(reply, "[2] #KimGames <https://memes.example/videos/y.mp4>") || strings.Count(reply, "<#") != 1 {
+		t.Fatal("an unrecorded post got a channel", reply)
+	}
+}
+
+// The owner's own interfaces cannot render a channel mention, so they only get the link.
+func TestCitationOutsideDiscordKeepsOnlyTheMessageLink(t *testing.T) {
+	sources := []knowledgeSource{{Number: 1, SourceID: "meme-hashtag:abc", Title: "#PedroGames", Reference: "https://memes.example/videos/x.mp4"}}
+	posts := func(string) (store.DiscordPost, bool) { return channelPost, true }
+	reply := citeSources("Veja [1].", sources, posts, false)
+	if strings.Contains(reply, "<#") || !strings.Contains(reply, fmt.Sprintf("[1] #PedroGames <https://memes.example/videos/x.mp4> <%s>", channelPost.Permalink())) {
+		t.Fatal("a channel mention leaked outside Discord", reply)
+	}
+}
+
+// Only a numeric id may become a mention, whatever the store holds.
+func TestCitationNeverBuildsAMentionFromANonNumericChannel(t *testing.T) {
+	sources := []knowledgeSource{{Number: 1, SourceID: "meme-hashtag:abc", Title: "#PedroGames", Reference: "https://memes.example/videos/x.mp4"}}
+	for _, channel := range []string{"", "20>0", "200 @everyone", "abc"} {
+		post := channelPost
+		post.ChannelID = channel
+		posts := func(string) (store.DiscordPost, bool) { return post, true }
+		if reply := citeSources("Veja [1].", sources, posts, true); strings.Contains(reply, "<#") {
+			t.Fatalf("channel %q became a mention: %s", channel, reply)
+		}
+	}
+}
+
+// Through the handler, a recorded post on a Discord turn carries the channel mention.
+func TestDiscordTurnCitesTheRecordedChannel(t *testing.T) {
+	searcher := &fakeSearcher{result: knowledgeResult(
+		map[string]any{"source_id": "meme-hashtag:abc", "title": "#PedroGames", "heading": "", "text": "totem no fortnite", "relevant": true, "source_ref": "https://memes.example/x.mp4"},
+	)}
+	handler, generator := chatWith(searcher, nil)
+	handler.WithDiscordPosts(fakeDiscordPosts{"https://memes.example/x.mp4": channelPost})
+	generator.result = map[string]any{"reply": "model reply [1]"}
+
+	result, err := handler.Handle(context.Background(), chatEvent("o que o Pedro jogou?"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("📚 [1] #PedroGames <https://memes.example/x.mp4> <#%s> <%s>", channelPost.ChannelID, channelPost.Permalink())
+	if reply, _ := result["reply"].(string); !strings.Contains(reply, want) {
+		t.Fatalf("expected the channel mention and the message link, got %q", reply)
 	}
 }
