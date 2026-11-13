@@ -211,7 +211,14 @@ question or continuation during a short handoff window. Incidental conversation
 and acknowledgments are stored without model replies.
 
 Ningo finishes speaking while continuing to listen. Speech heard during an answer
-is combined into the next turn; it never cuts off the current answer. Spoken
+is combined into the next turn; it never cuts off the current answer. One exception,
+before the answer has begun: a reply is made for what was said when it was dispatched,
+and can be spoken seconds later, once the room is quiet. If, in between, the room said
+something that matters (three or more words in a turn, six or more together; filler
+such as a lone "Obrigado." or "uhum" does not count), the reply would answer a point
+people have left, so it is not spoken: the old turns go back in front of the new ones
+and the whole is asked again. A batch is asked again at most twice, so a room that never
+stops talking is still answered. Spoken
 replies default to one short sentence. Ask for detail to get a longer explanation,
 which plays sentence by sentence with the next sentence prepared ahead.
 `/voice_chat_stop` cancels playback and outstanding work.
