@@ -242,6 +242,9 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
+    # Loopback only: a voice service running on the host (make voice-host) reaches Ollama here.
+    ports:
+      - "127.0.0.1:${DOKJA_OLLAMA_HOST_PORT:-11434}:11434"
     volumes:
       - ${OLLAMA_MODELS_DIR:-${HOME}/.ollama}:/root/.ollama
     healthcheck:
@@ -383,7 +386,7 @@ services:
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DOKJA_ORCH_HTTP_ENDPOINT: http://dokja-orchestrator:8091/orchestrator
       DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
-      DOKJA_VOICE_HTTP_ENDPOINT: http://dokja-voice:8081
+      DOKJA_VOICE_HTTP_ENDPOINT: ${DOKJA_VOICE_HTTP_ENDPOINT:-}
       DOKJA_DISCORD_DELIVERY_PORT: 8092
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DISCORD_ALLOWED_CHANNELS: ${DISCORD_ALLOWED_CHANNELS:-}

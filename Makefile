@@ -28,7 +28,7 @@ VOICE_SERVICES = dokja-voice $(if $(VOICE_GPU_ON),dokja-whisper-gpu,)
 RUN_SERVICES = $(SERVICES) $(if $(VOICE_ON),$(VOICE_SERVICES),) $(if $(OLLAMA_GPU_ON),dokja-ollama,)
 COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-compose.postgres.yml $(VOICE_GPU_FILES) $(OLLAMA_GPU_FILES)
 
-.PHONY: help start desktop desktop-install up voice status logs backup
+.PHONY: help start desktop desktop-install up voice voice-host voice-host-setup status logs backup
 
 help:
 	@echo "make start           Start/restart local services, then open Desktop"
@@ -39,6 +39,8 @@ help:
 	@echo "make logs            Follow application service logs"
 	@echo "make backup          Dump PostgreSQL to .dokja/backups/postgres (KEEP=14 dumps)"
 	@echo "make voice           Build and start only dokja-voice (opt-in; large image)"
+	@echo "make voice-host     Run dokja-voice on the host with ROCm torch, outside a container"
+	@echo "make voice-host-setup  Create the host virtualenv (large download)"
 	@echo "Voice is off by default: add VOICE=1 to make start/up/status/logs to include it"
 	@echo "GPU transcription: with VOICE=1, on when ENV_FILE sets DOKJA_VOICE_CPP_MODEL_FILE (VOICE_GPU=0 to disable)"
 	@echo "GPU for local Ollama: on when ENV_FILE sets DOKJA_OLLAMA_RENDER_DEVICE (OLLAMA_GPU=0 to disable)"
@@ -69,6 +71,14 @@ up:
 # Starts only the voice service(s), without their dependencies or the rest of the stack.
 voice:
 	$(MAKE) --no-print-directory voice-up VOICE=1
+
+# dokja-voice as a host process (scripts/voice-host.sh): reads DOKJA_VOICE_* from ENV_FILE and
+# listens on 0.0.0.0:8081 so the containers can reach it. Keep that port closed to your network.
+voice-host:
+	ENV_FILE="$(ENV_FILE)" scripts/voice-host.sh
+
+voice-host-setup:
+	ENV_FILE="$(ENV_FILE)" scripts/voice-host.sh setup
 
 .PHONY: voice-up
 voice-up:

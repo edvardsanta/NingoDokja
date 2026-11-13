@@ -1796,6 +1796,36 @@ Check it with `ollama ps` inside the container: the `PROCESSOR` column reads `10
 `100% CPU`. The voice GPU overlay uses the same render node; both fit in 8 GiB. Device exposure
 needs a compatible host driver and is not inferred from the presence of a graphics card.
 
+## Optional voice on the host (ROCm torch, no container)
+
+The ROCm image is several GB and does not fit a small container storage partition. `dokja-voice`
+is a plain `uvicorn` app, so it can run as a host process instead, reaching the GPU directly.
+
+```sh
+make voice-host-setup   # once: a virtualenv in .dokja/voice-venv with torch ROCm (a download of about 5 GB)
+make voice-host         # run it in the foreground
+```
+
+`scripts/voice-host.sh` reads only the `DOKJA_VOICE_*` keys of the env file (never the rest, which
+holds tokens) and maps `/workspace` paths to the checkout. It defaults the acoustic classifier to
+`rocm`, sets `HSA_OVERRIDE_GFX_VERSION=10.3.0` unless already set, and calls Ollama at
+`http://127.0.0.1:11434` (`DOKJA_OLLAMA_HOST_PORT` changes the port; the lite stack now publishes
+Ollama on that loopback port). `uv cache clean` returns the download cache after setup.
+
+Point the containers at it by setting this in the env file, then recreate the orchestrator and Discord:
+
+```sh
+DOKJA_VOICE_HTTP_ENDPOINT=http://host.containers.internal:8081
+```
+
+A container cannot reach a host loopback address, so the service listens on `0.0.0.0` (override with
+`VOICE_BIND`). It has no authentication and serves speech, transcription and chat, so **keep port
+8081 closed to your network**. With firewalld, the default zone already rejects ports that are not
+listed; check with `firewall-cmd --list-all` and test from another device on the network:
+`http://<host-ip>:8081/health` must time out. A container still reaches it through
+`host.containers.internal`. `make start` and `make up` do not start it; run `make voice-host`
+yourself.
+
 ## Optional development GPU speech recognition
 
 `docker-compose.voice-gpu.yml` extends the dev/lite voice service with an
