@@ -13,8 +13,15 @@ VOICE_GPU ?= auto
 VOICE_GPU_MODEL := $(shell sed -n 's/^DOKJA_VOICE_CPP_MODEL_FILE=//p' "$(ENV_FILE)" 2>/dev/null | tail -n 1 | tr -d "\"'")
 VOICE_GPU_ON := $(if $(filter 1,$(VOICE_GPU)),1,$(if $(filter auto,$(VOICE_GPU)),$(if $(VOICE_GPU_MODEL),1,),))
 VOICE_GPU_FILES := $(if $(VOICE_GPU_ON),-f docker-compose.voice-gpu.yml,)
-RUN_SERVICES = $(SERVICES) $(if $(VOICE_GPU_ON),dokja-whisper-gpu,)
-COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-compose.postgres.yml $(VOICE_GPU_FILES)
+# The local Ollama on the GPU (docker-compose.ollama-gpu.yml) is on whenever ENV_FILE sets
+# DOKJA_OLLAMA_RENDER_DEVICE; without it Ollama runs on the CPU. OLLAMA_GPU=0 turns the overlay off;
+# OLLAMA_GPU=1 requires it, with the default render node.
+OLLAMA_GPU ?= auto
+OLLAMA_GPU_DEVICE := $(shell sed -n 's/^DOKJA_OLLAMA_RENDER_DEVICE=//p' "$(ENV_FILE)" 2>/dev/null | tail -n 1 | tr -d "\"'")
+OLLAMA_GPU_ON := $(if $(filter 1,$(OLLAMA_GPU)),1,$(if $(filter auto,$(OLLAMA_GPU)),$(if $(OLLAMA_GPU_DEVICE),1,),))
+OLLAMA_GPU_FILES := $(if $(OLLAMA_GPU_ON),-f docker-compose.ollama-gpu.yml,)
+RUN_SERVICES = $(SERVICES) $(if $(VOICE_GPU_ON),dokja-whisper-gpu,) $(if $(OLLAMA_GPU_ON),dokja-ollama,)
+COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-compose.postgres.yml $(VOICE_GPU_FILES) $(OLLAMA_GPU_FILES)
 
 .PHONY: help start desktop desktop-install up status logs
 
@@ -26,6 +33,7 @@ help:
 	@echo "make status          Show container states"
 	@echo "make logs            Follow application service logs"
 	@echo "GPU transcription: on when ENV_FILE sets DOKJA_VOICE_CPP_MODEL_FILE (VOICE_GPU=0 to disable)"
+	@echo "GPU for local Ollama: on when ENV_FILE sets DOKJA_OLLAMA_RENDER_DEVICE (OLLAMA_GPU=0 to disable)"
 
 # Keep startup ordered even when make is invoked with -j.
 start: up
