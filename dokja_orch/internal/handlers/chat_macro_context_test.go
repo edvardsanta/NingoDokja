@@ -16,6 +16,7 @@ type macroTestStore struct {
 	documents map[string]any
 	ideas     map[string]any
 	fail      bool
+	recalls   int
 }
 
 func (s *macroTestStore) Dispatch(_ context.Context, kind string, payload map[string]any) (map[string]any, error) {
@@ -31,6 +32,10 @@ func (s *macroTestStore) Dispatch(_ context.Context, kind string, payload map[st
 	case "knowledge.context.load":
 		return map[string]any{"documents": s.documents[key]}, nil
 	case "knowledge.context.recall":
+		// The capture probes the backend without a question; only a search for a question is a recall.
+		if payload["query"] != nil {
+			s.recalls++
+		}
 		return map[string]any{"ideas": s.ideas[scope]}, nil
 	case "knowledge.context.remember":
 		s.ideas[scope] = payload["ideas"]
@@ -146,5 +151,89 @@ func TestOwnerMacroContextRequiresAPositivelyPrivateChannel(t *testing.T) {
 	event.Context = nil
 	if macroScope(event) != "owner:private" {
 		t.Fatal("local owner interface did not share macro context")
+	}
+}
+
+func contextOf(t *testing.T, result map[string]any) (int, string) {
+	t.Helper()
+	used, ok := result["context"].(map[string]any)
+	if !ok {
+		t.Fatal("the reply does not say what context the turn read", result["context"])
+	}
+	return used["live_messages"].(int), used["macro"].(string)
+}
+
+// The live context (the session's history) is always sent. The macro context (the durable store) is
+// asked only when the live context cannot carry the turn, and the reply says which it was.
+func TestMacroContextIsRecalledOnlyWhenTheLiveContextCannotCarryTheTurn(t *testing.T) {
+	durable := &macroTestStore{documents: map[string]any{}, ideas: map[string]any{}}
+	model := &macroTestModel{extraction: `{"ideas":[]}`}
+	h := NewChatDomainHandler(model).WithMacroContext(durable, nil)
+	first := chatEvent("How should the macro context vectors be indexed in PostgreSQL?")
+	durable.ideas[macroScope(first)] = []any{map[string]any{"text": "Index the vectors with HNSW"}}
+	asked := func(text string) (map[string]any, string) {
+		event := chatEvent(text)
+		result, err := h.Handle(t.Context(), event, chatStep)
+		if err != nil {
+			t.Fatal(err)
+		}
+		messages, _ := json.Marshal(model.messages)
+		return result, string(messages)
+	}
+
+	// A new session has no live context: the durable store is the only continuity.
+	result, sent := asked("How should the macro context vectors be indexed in PostgreSQL?")
+	if live, macro := contextOf(t, result); live != 0 || macro != "recalled" || durable.recalls == 0 || !strings.Contains(sent, "UNTRUSTED_MACRO_CONTEXT") || !strings.Contains(sent, "HNSW") {
+		t.Fatal("a new session did not read the macro context", live, macro, durable.recalls)
+	}
+	recalls := durable.recalls
+
+	// The live context already talks about it: nothing is asked, nothing is repeated to the model.
+	result, sent = asked("Which index suits the macro context vectors in PostgreSQL?")
+	if live, macro := contextOf(t, result); live < 2 || macro != "skipped:live_context_covers_it" || durable.recalls != recalls || strings.Contains(sent, "UNTRUSTED_MACRO_CONTEXT") {
+		t.Fatal("a covered follow-up asked the macro context", live, macro, durable.recalls)
+	}
+	result, _ = asked("e depois?")
+	if _, macro := contextOf(t, result); macro != "skipped:short_follow_up" || durable.recalls != recalls {
+		t.Fatal("a short follow-up asked the macro context", macro)
+	}
+
+	// Asking for the past reaches into the durable store even with a live context.
+	result, sent = asked("Lembra o que a gente decidiu sobre o cache?")
+	if _, macro := contextOf(t, result); macro != "recalled" || durable.recalls != recalls+1 || !strings.Contains(sent, "HNSW") {
+		t.Fatal("a question about the past did not read the macro context", macro, durable.recalls)
+	}
+
+	// A store that cannot be asked does not fail the turn, and the reply says it was needed and missing.
+	durable.fail = true
+	result, _ = asked("Lembra o que a gente decidiu sobre os backups?")
+	if _, macro := contextOf(t, result); macro != "unavailable" || result["reply"] == "" {
+		t.Fatal("an unavailable macro context failed the turn or went unreported", macro)
+	}
+}
+
+func TestAnEmptyMacroContextIsReportedAsNothingFoundNotAsSkipped(t *testing.T) {
+	durable := &macroTestStore{documents: map[string]any{}, ideas: map[string]any{}}
+	h := NewChatDomainHandler(&macroTestModel{extraction: `{"ideas":[]}`}).WithMacroContext(durable, nil)
+	result, err := h.Handle(t.Context(), chatEvent("What do the durable ideas say about backups?"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, macro := contextOf(t, result); macro != "nothing_found" || durable.recalls == 0 {
+		t.Fatal(macro, durable.recalls)
+	}
+}
+
+func TestWithoutAMacroContextTheTurnSaysWhyItReadNone(t *testing.T) {
+	h := NewChatDomainHandler(&macroTestModel{extraction: `{"ideas":[]}`})
+	result, err := h.Handle(t.Context(), chatEvent("Remember what we discussed about backups"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, macro := contextOf(t, result); macro != "unavailable" {
+		t.Fatal("a needed but unconfigured macro context must be reported", macro)
+	}
+	if got := contextUsed(-1, ""); got["live_messages"] != 0 || got["macro"] != "skipped:not_generated" {
+		t.Fatal(got)
 	}
 }

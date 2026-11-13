@@ -182,6 +182,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	var sources []knowledgeSource
 	var result map[string]any
 	var keptLine string
+	var macro, macroStatus string
 	var reading knowledgeTurn
 	var webData *webTurnData
 	if identity := ownerIdentityReply(event, turn.Content); identity != "" {
@@ -202,7 +203,8 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 		if webData != nil && webData.FailureOnly {
 			result = map[string]any{"reply": webReadingStatus(event, webData)}
 		} else {
-			result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference)
+			macro, macroStatus = h.recallMacro(ctx, event, turn.Content, history)
+			result, err = h.generateReply(ctx, event, turn.Content, history, sources, reference, macro)
 		}
 	}
 	if err != nil {
@@ -249,6 +251,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	contextCapture := h.captureMacroContext(ctx, event, held.ID, turn.Content, raw, sources)
 	response := map[string]any{
 		"macro_context": contextCapture,
+		"context":       contextUsed(len(history)-1, macroStatus),
 		"action":        workflow.Action, "reply": reply, "raw": result,
 		"conversation_id": held.ID, "turn": turnView(done),
 	}
