@@ -23,7 +23,7 @@ OLLAMA_GPU_FILES := $(if $(OLLAMA_GPU_ON),-f docker-compose.ollama-gpu.yml,)
 RUN_SERVICES = $(SERVICES) $(if $(VOICE_GPU_ON),dokja-whisper-gpu,) $(if $(OLLAMA_GPU_ON),dokja-ollama,)
 COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-compose.postgres.yml $(VOICE_GPU_FILES) $(OLLAMA_GPU_FILES)
 
-.PHONY: help start desktop desktop-install up status logs
+.PHONY: help start desktop desktop-install up status logs backup
 
 help:
 	@echo "make start           Start/restart local services, then open Desktop"
@@ -32,6 +32,7 @@ help:
 	@echo "make up              Start local services, including PostgreSQL"
 	@echo "make status          Show container states"
 	@echo "make logs            Follow application service logs"
+	@echo "make backup          Dump PostgreSQL to .dokja/backups/postgres (KEEP=14 dumps)"
 	@echo "GPU transcription: on when ENV_FILE sets DOKJA_VOICE_CPP_MODEL_FILE (VOICE_GPU=0 to disable)"
 	@echo "GPU for local Ollama: on when ENV_FILE sets DOKJA_OLLAMA_RENDER_DEVICE (OLLAMA_GPU=0 to disable)"
 
@@ -63,3 +64,8 @@ status:
 
 logs:
 	$(COMPOSE_CMD) logs --tail=100 -f $(SERVICES)
+
+# The dump keeps the newest KEEP files in .dokja/backups/postgres. The compose command is passed
+# without its double quotes because the script splits it into words; keep paths free of spaces.
+backup:
+	COMPOSE_CMD='$(subst ",,$(COMPOSE_CMD))' $(if $(KEEP),KEEP=$(KEEP) ,)scripts/backup-postgres.sh
