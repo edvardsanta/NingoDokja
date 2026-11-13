@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	conversation "read_books/dokja_domain/dokja_conversation"
+	store "read_books/dokja_store"
 	"read_books/internal/logger"
 	"regexp"
 	"strconv"
@@ -310,10 +311,15 @@ func citedSources(reply string, sources []knowledgeSource) []knowledgeSource {
 	return out
 }
 
+// postLookup resolves the Discord message where Ningo posted a media URL, when the delivery was
+// recorded.
+type postLookup func(mediaURL string) (store.DiscordPost, bool)
+
 // citeSources lists the passages cited by the reply. Numbers remain distinct even
 // when their document titles are equal. The archive carries each passage location.
-// permalink resolves the Discord message that carried a media URL, when recorded.
-func citeSources(reply string, sources []knowledgeSource, permalink func(string) string) string {
+// posts resolves the Discord message that carried a media URL, when recorded; onDiscord says the
+// reply is read on Discord, the only place a channel mention renders.
+func citeSources(reply string, sources []knowledgeSource, posts postLookup, onDiscord bool) string {
 	if len(sources) == 0 {
 		return reply
 	}
@@ -327,7 +333,7 @@ func citeSources(reply string, sources []knowledgeSource, permalink func(string)
 		if source.Web {
 			lines = append(lines, webSourceLabel(source))
 		} else {
-			lines = append(lines, knowledgeSourceLabel(source, permalink))
+			lines = append(lines, knowledgeSourceLabel(source, posts, onDiscord))
 		}
 	}
 	citation := "📚 " + strings.Join(lines, " · ")
@@ -337,23 +343,30 @@ func citeSources(reply string, sources []knowledgeSource, permalink func(string)
 	return strings.TrimSpace(reply) + "\n\n" + citation
 }
 
-// knowledgeSourceLabel renders [N] title. Ningo's own Discord post of the media
-// wins; otherwise the document's own http(s) page is linked (a meme's origin, an
-// article). Other schemes (folder:, file:) stay unlinked, and angle brackets keep
-// source-owned punctuation out of Markdown syntax, as in webSourceLabel.
-func knowledgeSourceLabel(source knowledgeSource, permalink func(string) string) string {
+// knowledgeSourceLabel renders [N] title, then the document's own http(s) page (a meme's origin,
+// an article), then, when Ningo posted the media and the delivery was recorded, the channel and the
+// message. The channel is a mention that opens it, so it only appears on Discord. Other schemes
+// (folder:, file:) stay unlinked, and angle brackets keep source-owned punctuation out of Markdown
+// syntax, as in webSourceLabel.
+func knowledgeSourceLabel(source knowledgeSource, posts postLookup, onDiscord bool) string {
 	label := fmt.Sprintf("[%d] %s", source.Number, source.Title)
-	if permalink != nil {
-		if link := permalink(source.Reference); link != "" {
-			return fmt.Sprintf("%s <%s>", label, link)
+	if u, err := url.Parse(source.Reference); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		label += fmt.Sprintf(" <%s>", strings.NewReplacer("<", "%3C", ">", "%3E").Replace(u.String()))
+	}
+	if posts != nil {
+		if post, ok := posts(source.Reference); ok {
+			if onDiscord && isDiscordID(post.ChannelID) {
+				label += fmt.Sprintf(" <#%s>", post.ChannelID)
+			}
+			label += fmt.Sprintf(" <%s>", post.Permalink())
 		}
 	}
-	u, err := url.Parse(source.Reference)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return label
-	}
-	address := strings.NewReplacer("<", "%3C", ">", "%3E").Replace(u.String())
-	return fmt.Sprintf("%s <%s>", label, address)
+	return label
+}
+
+// isDiscordID keeps anything but a numeric Discord id out of a channel mention.
+func isDiscordID(id string) bool {
+	return id != "" && strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' }) < 0
 }
 
 // turnSources keeps every cited passage with its exact location and original version.

@@ -83,17 +83,17 @@ func (h *ChatDomainHandler) WithDiscordPosts(reader DiscordPostReader) *ChatDoma
 	return h
 }
 
-// discordPermalink returns the link of the message where Ningo posted this media,
-// when the delivery was recorded. It only opens for people who can see the channel.
-func (h *ChatDomainHandler) discordPermalink(mediaURL string) string {
+// discordPost returns the Discord message where Ningo posted this media, when the delivery was
+// recorded. Its link only opens for people who can see the channel.
+func (h *ChatDomainHandler) discordPost(mediaURL string) (store.DiscordPost, bool) {
 	if h.discordPosts == nil || mediaURL == "" {
-		return ""
+		return store.DiscordPost{}, false
 	}
 	post, ok, err := h.discordPosts.LatestDiscordPost(mediaURL)
 	if err != nil || !ok {
-		return ""
+		return store.DiscordPost{}, false
 	}
-	return post.Permalink()
+	return post, true
 }
 
 func (h *ChatDomainHandler) WithVoiceGenerator(generator VoiceChatStreamingGenerator) *ChatDomainHandler {
@@ -310,7 +310,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	sources = citedSources(rawReply, sources)
 	h.focus.remember(turn, content, sources)
 	presentation := h.presentMath(ctx, event, rawReply)
-	reply := withKeptLine(citeSources(presentation.text, sources, h.discordPermalink), keptLine)
+	reply := withKeptLine(citeSources(presentation.text, sources, h.discordPost, event.Source == core.SourceDiscord), keptLine)
 	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil && !data.FailureOnly {
 		if status := webReadingStatus(event, data); status != "" {
 			reply = strings.TrimSpace(reply) + "\n\n" + status
