@@ -363,7 +363,9 @@ The orchestrator and scheduler share the `dokja-data` volume, mounted at `/data`
   recognized by number. A profile is a model's reading of past exchanges, made only when the owner
   presses **Infer profile**, and it never feeds a conversation. Created with mode `0600` on the
   first start of a build that has it; an older build ignores it. If it cannot be opened the
-  orchestrator starts without Profiles. Include it in backups.
+  orchestrator starts without Profiles. Include it in backups. With
+  `DOKJA_PROFILES_POSTGRES_DSN` set (see "Optional profiles store") the same data lives in
+  PostgreSQL instead and this file is not used.
 - `/data/dokja_conversations.db`, beside `DOKJA_DB_FILE` and named from it, so there is no new
   variable: the owner's conversations with Ningo, as written by the desktop and the CLI.
   - Only the orchestrator opens it; it is created on the first start of a build that keeps
@@ -1639,6 +1641,25 @@ no longer pass it; an orchestrator still started with it logs that it is ignored
 Remove it from `.env` and `.env.prod` on the next approved rollout. The
 `knowledge.application.supervision.*` request types are refused. Journal data
 and schema are unchanged.
+
+## Optional profiles store
+
+`DOKJA_PROFILES_POSTGRES_DSN` names the PostgreSQL database that keeps the desktop's Profiles
+(the inferred reading of how Ningo deals with each person, and which WhatsApp sessions belong to a
+recognized person), following [ADR 0014](decisions/0014-application-postgres-adoption.md). It is
+optional and unset by default; only the orchestrator and the `profiles-init` command read it.
+Unset, they live in `dokja_profiles.db` beside `DOKJA_DB_FILE`.
+
+The dev, lite and prod stacks project the DSN into the orchestrator. Keep it in `.env` or
+`.env.prod`, never in a committed file. Initialize the `dokja_profiles` namespace once with the
+explicit `profiles-init` command before restarting the orchestrator; production images include
+`/app/profiles-init`, and dev/lite can run `go run ./cmd/profiles-init` from `dokja_orch` with the
+DSN set. The command is idempotent, and startup only opens an initialized namespace and never
+creates tables. Choosing PostgreSQL does not copy what the SQLite file holds, and there is no
+fallback: an invalid DSN, an unavailable database or an unsupported schema logs a sanitized message
+and disables Profiles, so there are never two copies. Profiles are regenerable (the owner presses
+**Infer profile** again); only the WhatsApp session notes would need to be learned again as the
+people write.
 
 ## Optional price history store
 
