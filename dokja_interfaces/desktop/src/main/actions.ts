@@ -24,6 +24,10 @@ import type {
   ConversationList,
   KeptFact,
   KeptFacts,
+  PersonProfile,
+  PersonProfiles,
+  ProfileGenerated,
+  ProfileText,
   ConversationRead,
   ConversationStarted,
   DeleteResult,
@@ -401,6 +405,49 @@ function keptFact(raw: unknown): KeptFact | undefined {
 function keptFacts(body: Record<string, unknown>): KeptFacts {
   const items = Array.isArray(body.facts) ? body.facts.slice(0, MAX_FACTS_READ) : [];
   return { facts: items.map(keptFact).filter((fact): fact is KeptFact => fact !== undefined) };
+}
+
+const MAX_PROFILES_READ = 50;
+const MAX_PROFILE_ITEMS = 6;
+// "owner", or a person the owner listed, by the name in the private configuration.
+const PROFILE_PERSON = /^(owner|person:[^\p{Cc}]{1,128})$/u;
+
+function profileText(raw: unknown): ProfileText | undefined {
+  if (!isRecord(raw) || text(raw.summary) === "") return undefined;
+  const list = (value: unknown) => words(value).slice(0, MAX_PROFILE_ITEMS).map((item) => shorten(item, 240));
+  return {
+    summary: text(raw.summary).slice(0, 900), tone: shorten(text(raw.tone), 240), topics: list(raw.topics), patterns: list(raw.patterns),
+    exchanges: count(raw.exchanges), generatedAt: shorten(text(raw.generated_at)), provider: shorten(text(raw.provider), 80), model: shorten(text(raw.model), 120),
+  };
+}
+
+function personProfile(raw: unknown): PersonProfile | undefined {
+  if (!isRecord(raw) || !PROFILE_PERSON.test(text(raw.person))) return undefined;
+  const profile = profileText(raw.profile);
+  return {
+    person: text(raw.person), name: shorten(text(raw.name), 128), realName: shorten(text(raw.real_name), 128), owner: raw.owner === true,
+    turns: count(raw.turns), voiceTurns: count(raw.voice_turns), answered: count(raw.answered), medianReply: count(raw.median_reply),
+    ...(profile ? { profile } : {}),
+  };
+}
+
+function personProfiles(body: Record<string, unknown>): PersonProfiles {
+  const items = Array.isArray(body.profiles) ? body.profiles.slice(0, MAX_PROFILES_READ) : [];
+  return {
+    profiles: items.map(personProfile).filter((item): item is PersonProfile => item !== undefined),
+    minExchanges: clampInt(body.min_exchanges, 1, 1000, 3), inference: body.inference === true,
+  };
+}
+
+function profileGenerated(body: Record<string, unknown>): ProfileGenerated {
+  const profile = personProfile(body.profile);
+  if (!profile) throw new Error("unexpected profile reply");
+  return { profile };
+}
+
+function profileGeneratePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const person = text(raw.person);
+  return PROFILE_PERSON.test(person) ? { person } : undefined;
 }
 
 function factDeletePayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -957,6 +1004,8 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
   "conversation.delete": { payload: conversationDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
   "conversation.facts": { payload: noPayload, project: (result) => inDomain(result, "conversation", keptFacts) },
   "conversation.fact_delete": { payload: factDeletePayload, project: (result) => inDomain(result, "conversation", (body): DeleteResult => ({ deleted: body.deleted === true })) },
+  "conversation.profiles": { payload: noPayload, project: (result) => inDomain(result, "conversation", personProfiles) },
+  "conversation.profile_generate": { payload: profileGeneratePayload, project: (result) => inDomain(result, "conversation", profileGenerated) },
   "conversation.read": { payload: conversationReadPayload, project: (result) => inDomain(result, "conversation", conversationRead) },
   "runtime.set": { payload: runtimeSet, project: (result) => inDomain(result,"runtime",runtimeSnapshot) },
   "runtime.providers.configure": { payload: runtimeProviderConfigure, project: (result) => inDomain(result,"runtime",runtimeProviderSaved) },

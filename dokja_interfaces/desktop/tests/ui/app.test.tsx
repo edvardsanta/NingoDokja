@@ -54,6 +54,7 @@ describe("the screen", () => {
       "Tempo real",
       "Biblioteca",
       "Caderno",
+      "Perfis",
       "Mensagens",
       "Estúdio de dados",
       "Sistema",

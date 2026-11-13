@@ -388,6 +388,37 @@ export type KeptFact = { id: string; owner: boolean; person: string; content: st
 
 export type KeptFacts = { off?: false; facts: KeptFact[] };
 
+// How Ningo deals with one person, inferred by a model from the exchanges the two already had. It is
+// a reading, not a fact: it says when it was written, from how many exchanges and by which model, and
+// asking again may give another one. The counts beside it are counted, not inferred.
+export type ProfileText = {
+  summary: string;
+  tone: string;
+  topics: string[];
+  patterns: string[];
+  exchanges: number;
+  generatedAt: string;
+  provider: string;
+  model: string;
+};
+
+export type PersonProfile = {
+  // "owner" or "person:<name>": what a profile is asked for by.
+  person: string;
+  name: string;
+  realName: string;
+  owner: boolean;
+  turns: number;
+  voiceTurns: number;
+  answered: number;
+  medianReply: number;
+  profile?: ProfileText;
+};
+
+export type PersonProfiles = { off?: false; profiles: PersonProfile[]; minExchanges: number; inference: boolean };
+
+export type ProfileGenerated = { off?: false; profile: PersonProfile };
+
 export type ConversationList = { off?: false; conversations: ArchivedConversation[]; next: string };
 
 export type ConversationRead = { off?: false; conversation: ArchivedConversation; turns: ArchivedTurn[] };

@@ -887,3 +887,43 @@ test("datastudio.postgres.query runs a bounded read with the chosen connection",
     { result: { columns: ["id"], rows: [[7]], total: 1 } },
   );
 });
+
+test("conversation.profiles is a read that keeps only bounded, typed fields of each person", () => {
+  assert.equal(isWriteAction("conversation.profiles"), false);
+  const long = "x".repeat(2000);
+  const projected = ACTIONS["conversation.profiles"].project(compactOf("conversation", {
+    min_exchanges: 3, inference: true,
+    profiles: [
+      { person: "owner", name: "You", real_name: "", owner: true, turns: 5, voice_turns: 1, answered: 4, median_reply: 120, account: "secret",
+        profile: { summary: long, tone: "dry", topics: ["a", "", 7, "b", "c", "d", "e", "f", "g"], patterns: ["p"], exchanges: 4, generated_at: "2026-11-13T10:00:00Z", provider: "local", model: "m1", prompt: "secret" } },
+      { person: "person:Nick", name: "Nick", real_name: "Sam", turns: 2, voice_turns: 0, answered: 1, median_reply: 10 },
+      { person: "someone with no key", name: "Nobody" },
+      { person: "person:", name: "empty" },
+      "not a record",
+    ],
+  })) as { profiles: Array<Record<string, any>>; minExchanges: number; inference: boolean };
+  assert.equal(projected.minExchanges, 3);
+  assert.equal(projected.inference, true);
+  assert.deepEqual(projected.profiles.map((item) => item.person), ["owner", "person:Nick"]);
+  const owner = projected.profiles[0]!;
+  assert.equal(owner.owner, true);
+  assert.equal(owner.profile.summary.length, 900);
+  assert.deepEqual(owner.profile.topics, ["a", "b", "c", "d", "e", "f"]);
+  assert.equal(owner.profile.model, "m1");
+  assert.equal("account" in owner || "prompt" in owner.profile, false);
+  assert.equal(projected.profiles[1]!.realName, "Sam");
+  assert.equal("profile" in projected.profiles[1]!, false);
+  assert.deepEqual(ACTIONS["conversation.profiles"].project({ domain: "conversation", result: { skipped: true, reason: "paused" } }), { off: true, reason: "paused" });
+});
+
+test("conversation.profile_generate is a change on a real press that names only a listed kind of person", () => {
+  const action = ACTIONS["conversation.profile_generate"];
+  assert.equal(isWriteAction("conversation.profile_generate"), true);
+  assert.equal(needsConfirmation("conversation.profile_generate"), false);
+  assert.deepEqual(action.payload({ person: " owner ", extra: 1 }), { person: "owner" });
+  assert.deepEqual(action.payload({ person: "person:Nick" }), { person: "person:Nick" });
+  for (const person of ["", "Nick", "person:", `person:${"x".repeat(129)}`, "person:a\nb", 7, undefined]) assert.equal(action.payload({ person }), undefined, String(person));
+  const generated = action.project({ domain: "conversation", result: { profile: { person: "person:Nick", name: "Nick", answered: 3, profile: { summary: "S", exchanges: 3 } } } }) as { profile: { profile: { summary: string } } };
+  assert.equal(generated.profile.profile.summary, "S");
+  assert.throws(() => action.project({ domain: "conversation", result: { profile: { person: "nobody" } } }));
+});
