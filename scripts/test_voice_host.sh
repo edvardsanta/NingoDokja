@@ -28,6 +28,7 @@ grep -qx "DOKJA_VOICE_STT_MODEL=openai/whisper-tiny" <<<"$out" || fail "quotes a
 grep -qx "DOKJA_VOICE_HOST=0.0.0.0" <<<"$out" || fail "the default bind is not 0.0.0.0"
 grep -qx "DOKJA_VOICE_ACOUSTIC_DEVICE=rocm" <<<"$out" || fail "the classifier does not default to rocm"
 grep -qx "HSA_OVERRIDE_GFX_VERSION=10.3.0" <<<"$out" || fail "the GFX override is missing"
+grep -qx "DOKJA_VOICE_CHAT_OLLAMA_URL=http://127.0.0.1:11434" <<<"$out" || fail "the default Ollama address is wrong"
 grep -q "^args=main.py" <<<"$out" || fail "main.py is not started"
 ! grep -q "must-not-leak" <<<"$out" || fail "a key outside DOKJA_VOICE_* reached the service"
 

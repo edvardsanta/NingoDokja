@@ -6,7 +6,7 @@
 #
 # Why: the ROCm image does not fit the container storage of a small machine, and a host process
 # reaches the GPU directly. The containers (orchestrator, Discord) call it over HTTP, so point
-# DOKJA_VOICE_HTTP_ENDPOINT at http://host.containers.internal:8081 in the env file.
+# DOKJA_VOICE_HTTP_ENDPOINT at host.containers.internal, port 8081, in the env file.
 #
 # Only the DOKJA_VOICE_* keys of the env file are read, never the rest of it: it holds tokens.
 # A path under /workspace (the container mount) is mapped to this checkout.
@@ -26,14 +26,17 @@ venv="${VOICE_VENV:-$root/.dokja/voice-venv}"
 service="$root/dokja_services/dokja_voice"
 
 setup() {
-  command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/" >&2; exit 1; }
-  local rocm="${VOICE_ROCM:-rocm6.3}" base
+  command -v uv >/dev/null || { echo "uv is required (the astral uv installer)" >&2; exit 1; }
+  local rocm="${VOICE_ROCM:-rocm6.3}" base index
+  # The wheel index is the one requirements.txt already names for CPU torch, with the ROCm suffix.
+  index="$(sed -n "s|^--extra-index-url \(.*\)/cpu\$|\1/$rocm|p" "$service/requirements.txt")"
+  [ -n "$index" ] || { echo "No --extra-index-url ending in /cpu in $service/requirements.txt" >&2; exit 1; }
   base="$(mktemp)"
   trap 'rm -f "$base"' RETURN
   sed '/^--extra-index-url /d; /^torch==/d' "$service/requirements.txt" > "$base"
   uv venv --python "${VOICE_PYTHON:-3.13}" "$venv"
   uv pip install --python "$venv/bin/python" -r "$base" fastapi uvicorn -r "$service/requirements-vad.txt"
-  uv pip install --python "$venv/bin/python" --index-url "https://download.pytorch.org/whl/$rocm" torch==2.8.0
+  uv pip install --python "$venv/bin/python" --index-url "$index" torch==2.8.0
   echo "Done. uv keeps the downloaded wheels in its cache; 'uv cache clean' gives that space back."
 }
 
@@ -64,7 +67,9 @@ load_env
 export DOKJA_VOICE_HOST="${VOICE_BIND:-0.0.0.0}"
 export DOKJA_VOICE_PORT="${DOKJA_VOICE_PORT:-8081}"
 export DOKJA_VOICE_ACOUSTIC_DEVICE="${DOKJA_VOICE_ACOUSTIC_DEVICE:-rocm}"
-export DOKJA_VOICE_CHAT_OLLAMA_URL="${DOKJA_VOICE_CHAT_OLLAMA_URL:-http://127.0.0.1:${DOKJA_OLLAMA_HOST_PORT:-11434}}"
+ollama_port="${DOKJA_OLLAMA_HOST_PORT:-11434}"
+ollama_url="http://127.0.0.1:${ollama_port}"
+export DOKJA_VOICE_CHAT_OLLAMA_URL="${DOKJA_VOICE_CHAT_OLLAMA_URL:-$ollama_url}"
 # The same override the GPU compose overlay sets for the RX 6000 series.
 export HSA_OVERRIDE_GFX_VERSION="${HSA_OVERRIDE_GFX_VERSION:-10.3.0}"
 
