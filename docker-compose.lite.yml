@@ -393,7 +393,6 @@ services:
       - ./:/workspace
     depends_on:
       - dokja-orchestrator
-      - dokja-voice
     networks:
       - dokja-net
 
