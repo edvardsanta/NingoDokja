@@ -30,6 +30,14 @@ Desktop startup. `make up` starts missing services without the explicit reload.
 Restarting applications clears their volatile state, including active voice
 sessions and cached readings. Image/dependency changes still require a rebuild.
 
+`dokja-voice` is opt-in in these targets, because its image is large (the ROCm
+build alone needs several GB of container storage). `make start`, `make up`,
+`make status` and `make logs` leave it, and its GPU overlays, out unless
+`VOICE=1` is given (for example `make start VOICE=1`). `make voice` builds and
+starts only the voice service, without its dependencies. No other service in the
+lite stack depends on it, so the rest runs without it and voice requests fail
+until it is started.
+
 Development and lite orchestrator images download and verify Go dependencies
 during the image build. Their module cache lives under `/go/pkg/mod`, outside the
 `/workspace` source mount, so a recreated container can compile the mounted code
@@ -1800,9 +1808,9 @@ at startup. `DOKJA_VOICE_CPP_MODEL_FILE` names the existing host model file and
 setting for separately provisioned providers. A blank endpoint is invalid when
 this provider is selected, rather than a reason to run a stub.
 
-`make start`, `make up`, `make status` and `make logs` apply this overlay
+With `VOICE=1`, `make start`, `make up`, `make status` and `make logs` apply this overlay
 whenever the env file sets `DOKJA_VOICE_CPP_MODEL_FILE`, and add `dokja-whisper-gpu`
-to the started and restarted services. A stack recreated without the overlay
+to the started and restarted services. Without `VOICE=1` the overlay is never applied. A stack recreated without the overlay
 silently falls back to `DOKJA_VOICE_STT_PROVIDER` and its CPU model.
 Use `VOICE_GPU=0` to leave it out, or `VOICE_GPU=1` to require it.
 
