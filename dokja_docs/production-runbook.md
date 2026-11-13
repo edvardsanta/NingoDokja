@@ -181,6 +181,13 @@ reach a conversation only in the linked account's self-chat and the listed group
 never on Discord or the local interfaces. A person's number recognizes them in those
 places and never reaches the model.
 
+The owner's own account is named the same way: the turn of the account in `owner.accounts.discord`
+carries `known_as` with the first word of `owner.profile.name` (never the whole name, never the id),
+beside whatever display name the owner has that day. Without it only the speaker the gateway flags as
+the owner is known to be the owner, and in a room of several people (a voice batch flags only its last
+speaker) the owner's earlier words are just a display name. A person's `discord` account may not be
+the owner's.
+
 The one thing a person's `discord` account does is name them on Discord. In a shared
 channel or voice room the application matches the gateway's account id, and nothing
 else, against `discord`; on a match the turn carries `known_as` with the `name`, beside
