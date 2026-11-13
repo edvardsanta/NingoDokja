@@ -1780,7 +1780,19 @@ chat keeps working with SQLite history and volatile readings. Inspect
 `knowledge.status.context_storage_backend` (`postgres` or `unconfigured`).
 
 Normal and archived chat turns attempt one bounded automatic extraction using
-the configured chat model (up to three entries, eight seconds). Every entry must
+the configured chat model (up to three entries, eight seconds). The prompt asks for little: a
+decision, a stated preference or standing fact, a correction that changes how to answer next time,
+an unresolved question or a conclusion (`decision`, `preference`, `correction`, `question`, `idea`,
+`summary`), and not jokes, banter, one-off disputes or remarks about the assistant; `{"ideas":[]}`
+is the expected answer for most turns. The extraction is told who is speaking, by label: a person
+the owner listed is `known_as` (with `real_name` beside it for a nickname, e.g. "Nick (Alex)"),
+matched from the verified account id, the number WhatsApp reported or the owner's own interface;
+anyone else by the display name they chose. Account ids and numbers never reach the extraction. An
+idea is written about a person by that label and stores it as `speaker` only when it is exactly one
+of the labels it was given; any other value is dropped. Existing entries keep their old wording.
+`go run ./cmd/macro-eval -limit 12` (in `dokja_orch`) compares what the previous and the current
+prompt keep on the same recent Discord exchanges. It sends excerpts of the stored conversations to
+the configured chat provider and writes nothing. Every entry must
 quote supplied source text or the user's current message verbatim. Stored entries
 remain `extracted_unverified`, carry event/session/time/source provenance, and
 never become instructions or independently verified facts. Extraction/write
