@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -43,6 +44,37 @@ func insideRoot(path string) bool {
 }
 
 func (h *hostWorkers) specs(module string) ([]hostWorkerSpec, error) {
+	all, err := h.configured()
+	if err != nil {
+		return nil, err
+	}
+	var selected []hostWorkerSpec
+	for _, spec := range all {
+		if spec.Module == module {
+			selected = append(selected, spec)
+		}
+	}
+	return selected, nil
+}
+
+// modules lists, once each, the modules that have configured host workers.
+func (h *hostWorkers) modules() ([]string, error) {
+	all, err := h.configured()
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var names []string
+	for _, spec := range all {
+		if !seen[spec.Module] {
+			seen[spec.Module] = true
+			names = append(names, spec.Module)
+		}
+	}
+	return names, nil
+}
+
+func (h *hostWorkers) configured() ([]hostWorkerSpec, error) {
 	raw, err := os.ReadFile(filepath.Join(h.root, ".dokja", "host-workers.json"))
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -55,7 +87,6 @@ func (h *hostWorkers) specs(module string) ([]hostWorkerSpec, error) {
 		return nil, fmt.Errorf("invalid local host worker configuration")
 	}
 	seen := map[string]bool{}
-	var selected []hostWorkerSpec
 	for _, spec := range specs {
 		m, ok := domain.Lookup(spec.Module)
 		if !ok || m.Internal || spec.ID == "" || len(spec.ID) > 64 || seen[spec.ID] || !insideRoot(spec.Directory) || !insideRoot(spec.ReadySocket) || len(spec.Command) == 0 || len(spec.Command) > 16 {
@@ -67,11 +98,8 @@ func (h *hostWorkers) specs(module string) ([]hostWorkerSpec, error) {
 			}
 		}
 		seen[spec.ID] = true
-		if spec.Module == module {
-			selected = append(selected, spec)
-		}
 	}
-	return selected, nil
+	return specs, nil
 }
 
 func workerSocketReady(path string) bool {
@@ -178,5 +206,54 @@ func (h *hostWorkers) status(containers map[string]domain.Container) {
 			containers[m.Service] = state
 		default:
 		}
+	}
+}
+
+// SuperviseHostWorkers keeps configured host workers alive while their module runs.
+// A worker can be gone although its container runs: the host rebooted, the worker
+// crashed, or the container was started outside this controller. Each check restarts
+// such workers; a module whose container is stopped is left alone, and a worker that
+// already answers is never touched. It returns when ctx ends.
+func (c *Compose) SuperviseHostWorkers(ctx context.Context, every time.Duration) {
+	if c.hostWorkers == nil || every <= 0 {
+		return
+	}
+	failing := map[string]bool{}
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		c.reviveHostWorkers(ctx, failing)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// reviveHostWorkers runs one supervision check. Failures are logged once per streak,
+// without the worker's output, so a broken worker does not flood the controller log.
+func (c *Compose) reviveHostWorkers(ctx context.Context, failing map[string]bool) {
+	names, err := c.hostWorkers.modules()
+	if err != nil || len(names) == 0 {
+		return
+	}
+	containers, err := c.Status(ctx)
+	if err != nil {
+		return
+	}
+	for _, name := range names {
+		m, ok := domain.Lookup(name)
+		if !ok || !containers[m.Service].Running {
+			continue
+		}
+		if err := c.hostWorkers.start(ctx, name); err != nil {
+			if !failing[name] {
+				log.Printf("cannot restart host workers for module %s: %v", name, err)
+			}
+			failing[name] = true
+			continue
+		}
+		failing[name] = false
 	}
 }
