@@ -165,6 +165,8 @@ export type DigestStatus = {
 export type DigestItem = {
   previewText?: string;
   mediaUrl?: string;
+  // "media" for a meme a source collected: it is tagged, not read or saved as a document
+  kind?: "media";
   id: string;
   title: string;
   summary: string;

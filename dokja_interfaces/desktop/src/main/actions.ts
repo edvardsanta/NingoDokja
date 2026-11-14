@@ -785,6 +785,7 @@ function digestPage(body: Record<string, unknown>): DigestPage {
       published: text(item.published),
       ...(typeof item.body === "string" && item.body.trim() ? { previewText: item.body.trim().slice(0, 100_000) } : {}),
       ...(webAddress(text(item.media_url)) ? { mediaUrl: webAddress(text(item.media_url)) } : {}),
+      ...(text(item.kind) === "media" ? { kind: "media" as const } : {}),
       ...readingPrompts(item.prompts),
       };
     }),
@@ -1119,6 +1120,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => ({
       limit: clampInt(raw.limit, 1, 50, 8),
       offset: clampInt(raw.offset, 0, 1000, 0),
+      ...(raw.kind === "media" || raw.kind === "reading" ? { kind: raw.kind } : {}),
       ...Object.fromEntries(["source", "query", "from", "to"].filter(key => typeof raw[key] === "string" && (raw[key] as string).trim()).map(key => [key, (raw[key] as string).trim().slice(0, key === "source" || key === "query" ? 200 : 10)])),
     }),
     project: (result) => inDomain(result, "digest", digestPage),

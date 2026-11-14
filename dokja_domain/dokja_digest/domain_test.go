@@ -516,18 +516,45 @@ func TestPriceObservationsAreNeitherShownNorCited(t *testing.T) {
 	}
 }
 
-func TestMemesAreNeitherShownNorCitedAsReading(t *testing.T) {
-	article := entry("article", "Alpha", "An article about storage", 1, "https://example.com/article")
+func memeAndArticle(t *testing.T) map[string]any {
+	t.Helper()
+	article := entry("article", "Alpha", "An article about storage", 2, "https://example.com/article")
 	meme := entry("meme-1", "Memes", "A collected meme", 1, "https://example.com/meme")
 	meme["kind"] = "media"
 	meme["media_url"] = "https://example.com/meme.mp4"
-	reply := itemsReply(t, article, meme)
+	return itemsReply(t, article, meme)
+}
 
-	expectTitles(t, readDigest(t, reply, nil), "An article about storage")
+func TestMemesAreListedWithTheirKindAndArticlesCarryNone(t *testing.T) {
+	got := readDigest(t, memeAndArticle(t), nil)
+	expectTitles(t, got, "A collected meme", "An article about storage")
+	rows := got["items"].([]map[string]any)
+	if rows[0]["kind"] != "media" || rows[0]["media_url"] != "https://example.com/meme.mp4" {
+		t.Fatalf("a meme says what it is and keeps its media: %#v", rows[0])
+	}
+	if _, has := rows[1]["kind"]; has {
+		t.Fatalf("an article carries no kind: %#v", rows[1])
+	}
+}
 
-	domain := New(&fakeService{reply: reply}).WithClock(func() time.Time { return now })
+func TestTheDigestCanBeNarrowedToMemesOrToReading(t *testing.T) {
+	reply := memeAndArticle(t)
+	expectTitles(t, readDigest(t, reply, map[string]any{"kind": "media"}), "A collected meme")
+	expectTitles(t, readDigest(t, reply, map[string]any{"kind": "reading"}), "An article about storage")
+	expectTitles(t, readDigest(t, reply, map[string]any{"kind": "all"}), "A collected meme", "An article about storage")
+	service := &fakeService{reply: reply}
+	if _, err := New(service).Handle(context.Background(), Request{Action: ActionReadDigest, Event: Event{Payload: map[string]any{"kind": "price"}}}); err == nil {
+		t.Fatal("an unknown kind is refused, not ignored")
+	}
+}
+
+func TestMemesAreNeverCitedAsReadingInAConversation(t *testing.T) {
+	domain := New(&fakeService{reply: memeAndArticle(t)}).WithClock(func() time.Time { return now })
 	if _, err := domain.Reference(context.Background(), "meme-1"); err == nil {
 		t.Fatal("a meme resolved as a reading")
+	}
+	if _, err := domain.Reference(context.Background(), "article"); err != nil {
+		t.Fatal(err)
 	}
 	recent, err := domain.RecentReferences(context.Background(), "What did Memes publish?", 8)
 	if err != nil {

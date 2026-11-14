@@ -57,6 +57,7 @@ function parseItem(value: unknown): DigestItem | undefined {
     published: text(value.published),
     ...(text(value.previewText) ? { previewText: text(value.previewText) } : {}),
     ...(text(value.mediaUrl) ? { mediaUrl: text(value.mediaUrl) } : {}),
+    ...(text(value.kind) === "media" ? { kind: "media" as const } : {}),
     ...prompts(value.prompts),
   };
 }

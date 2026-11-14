@@ -587,7 +587,17 @@ tags, which are knowledge of a kind of their own (`meme_hashtag`); its Facts vie
 people asked Ningo to keep, and its Pending view holds what people proposed and waits for the
 owner's approval. The Notebook keeps only experiences: what Ningo tried, the verdicts on it
 and how the predictions fare. Messages is still where a meme is sent and tagged, and reads the
-same tags from the Library. Only the desktop's presentation changed: facts still live beside the
+same tags from the Library.
+
+The Library's Readings view is the inbox: what the plugins that feed Ningo brought and the owner
+has not yet decided to keep. Each kind of item has its own way to be decided. An article or a link
+is saved to the Library (read and extracted as before) or discussed in Talk. A meme (an item of
+kind `media`) is tagged, with the same `meme.hashtag.tag` action the meme tray in Messages uses, so
+one meme has one tag whichever way it was reached; it says "In the Library as #Tag" once it has
+one, and it is neither saved as a document (a video would go through the document reader) nor
+cited as a reading in a conversation. Price observations stay out of the inbox. The digest takes
+a `kind` (`media`, `reading` or all) so the inbox narrows to the memes or to the articles; sending
+a meme to a channel is still done in Messages. Only the desktop's presentation changed: facts still live beside the
 conversation archive, with their person and place, and proposals in the shared database.
 
 ### Cross-document application preparation

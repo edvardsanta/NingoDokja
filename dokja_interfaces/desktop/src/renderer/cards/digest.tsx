@@ -24,6 +24,8 @@ import { Button, Notice, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
 import { usePreview } from "./use_preview.js";
 import { useDiscuss } from "../discussion_context.js";
+import { MemeTagBox } from "./meme_tag_box.js";
+import { parseDocuments } from "./knowledge_documents.js";
 import { useWorkspaceRefresh } from "./workspace_panel.js";
 
 const TIMEOUT_MS = 20_000;
@@ -41,8 +43,13 @@ export async function loadDigestStatus(transport: Transport): Promise<LoadResult
 }
 
 // The page is the first `shown` items of the digest: a longer page holds the shorter one.
-type ReadingFilters = { source: string; query: string; from: string; to: string };
-const EMPTY_FILTERS: ReadingFilters = { source: "", query: "", from: "", to: "" };
+type ReadingFilters = { source: string; query: string; from: string; to: string; kind: "" | "reading" | "media" };
+const EMPTY_FILTERS: ReadingFilters = { source: "", query: "", from: "", to: "", kind: "" };
+const KINDS = [
+  ["", "reading_kind_all"],
+  ["reading", "reading_kind_reading"],
+  ["media", "reading_kind_media"],
+] as const;
 
 export async function loadDigestPage(transport: Transport, shown: number, filters?: ReadingFilters): Promise<LoadResult<DigestPage | Off>> {
   const answer = await transport.request("digest.items", { limit: shown, offset: 0, ...Object.fromEntries(Object.entries(filters ?? {}).filter(([, value]) => value !== "")) }, { timeoutMs: TIMEOUT_MS });
@@ -155,6 +162,13 @@ function Reading({ transport, sources, strip }: { transport: Transport; sources:
   const [datesOpen, setDatesOpen] = useState(false);
   useEffect(() => { if (filters.from || filters.to) setDatesOpen(true); }, [filters.from, filters.to]);
 
+  const memeTags = useMemeTags(transport);
+  const chooseKind = (kind: ReadingFilters["kind"]) => {
+    setDraft((previous) => ({ ...previous, kind }));
+    setFilters((previous) => ({ ...previous, kind }));
+    setShown(SHOW_STEP);
+  };
+
   const { state, reload, poll, refreshing } = useCard(load);
   // The panel's refresh reads this page again where it stands: how many were shown and the filters
   // stay, and the page stays on screen until the new one lands.
@@ -189,10 +203,18 @@ function Reading({ transport, sources, strip }: { transport: Transport; sources:
         </div>
         {invalidDates && <Notice announce="assertive">{t("reading_invalid_dates")}</Notice>}
       </form>
+      <div className="reading-kinds" role="group" aria-label={t("reading_kind_label")}>
+        {KINDS.map(([id, label]) => (
+          <Button key={id} extra="chip-toggle" aria-pressed={filters.kind === id} onClick={() => chooseKind(id)}>
+            {filters.kind === id && <span aria-hidden="true">✓ </span>}
+            {t(label)}
+          </Button>
+        ))}
+      </div>
       {strip}
       {page && !page.off && <>
-        {(filters.source || filters.query || filters.from || filters.to) && <Notice announce="polite">{t("reading_matches", { count: page.total })}</Notice>}
-        <DigestList page={page} transport={transport} filtered={!!(filters.source || filters.query || filters.from || filters.to)} />
+        {(filters.source || filters.query || filters.from || filters.to || filters.kind) && <Notice announce="polite">{t("reading_matches", { count: page.total })}</Notice>}
+        <DigestList page={page} transport={transport} memeTags={memeTags} filtered={!!(filters.source || filters.query || filters.from || filters.to || filters.kind)} />
       </>}
       {loading && <Pending />}
       {state.phase === "error" && (
@@ -219,7 +241,7 @@ function Reading({ transport, sources, strip }: { transport: Transport; sources:
   );
 }
 
-function DigestList({ page, transport, filtered }: { page: DigestPage; transport: Transport; filtered: boolean }) {
+function DigestList({ page, transport, filtered, memeTags }: { page: DigestPage; transport: Transport; filtered: boolean; memeTags: MemeTags }) {
   const t = useTranslate();
   const discuss = useDiscuss();
   const { ago } = useTimes();
@@ -232,7 +254,7 @@ function DigestList({ page, transport, filtered }: { page: DigestPage; transport
       {page.items.map((item, index) => {
         const when = item.published === "" ? "" : ago(item.published);
         const meta = [item.source, when].filter((part) => part !== "").join(", ");
-        return <ReadingItem key={`${index}-${item.id}`} item={item} meta={meta} transport={transport}
+        return <ReadingItem key={`${index}-${item.id}`} item={item} meta={meta} transport={transport} memeTags={memeTags}
           onDiscuss={() => discuss({ id: item.id, title: item.title, source: item.source, ...(item.prompts ? { prompts: item.prompts } : {}) })} />;
       })}
     </ul>
@@ -242,9 +264,23 @@ function DigestList({ page, transport, filtered }: { page: DigestPage; transport
 // One reading: what it is, then what can be done with it on one line. Discussing it with Ningo is the
 // thing to do (the discussion happens in Talk, the one place with a composer); keeping it in the Library
 // is quieter; the preview opens in place. What saving said stays under the reading.
-function ReadingItem({ item, meta, transport, onDiscuss }: { item: DigestItem; meta: string; transport: Transport; onDiscuss: () => void }) {
+function ReadingItem({ item, meta, transport, onDiscuss, memeTags }: { item: DigestItem; meta: string; transport: Transport; onDiscuss: () => void; memeTags: MemeTags }) {
   const t = useTranslate();
   const save = useSaveReading(transport, item.id, item.title);
+  // A meme is not read or saved as a document: it is tagged, and the tag is what the Library keeps.
+  if (item.kind === "media") {
+    return (
+      <li data-kind="media">
+        <p className="digest-title">{item.title} <span className="chip">{t("reading_meme_badge")}</span></p>
+        {meta !== "" && <p className="detail">{meta}</p>}
+        {item.mediaUrl
+          ? <MemeTagBox transport={transport} url={item.mediaUrl} title={item.title} known={memeTags.tags.get(item.mediaUrl)}
+              onTagged={(tag) => memeTags.remember(item.mediaUrl!, tag)} />
+          : <p className="detail">{t("reading_meme_no_media")}</p>}
+        <div className="digest-actions"><ReadingPreview item={item} transport={transport} /></div>
+      </li>
+    );
+  }
   return (
     <li>
       <p className="digest-title">{item.title}</p>
@@ -260,6 +296,25 @@ function ReadingItem({ item, meta, transport, onDiscuss }: { item: DigestItem; m
       {item.id && save.feedback}
     </li>
   );
+}
+
+// The tags the Library already keeps for memes, by the meme's address, so a meme in the readings says
+// it is already there. A tag made from here is remembered at once.
+type MemeTags = { tags: ReadonlyMap<string, string>; remember: (url: string, tag: string) => void };
+
+function useMemeTags(transport: Transport): MemeTags {
+  const [tags, setTags] = useState<ReadonlyMap<string, string>>(new Map());
+  useEffect(() => {
+    let current = true;
+    void transport.request("knowledge.list", { limit: 100, offset: 0, kind: "meme_hashtag" }, { timeoutMs: TIMEOUT_MS }).then((answer) => {
+      const page = answer.ok ? parseDocuments(answer.result) : undefined;
+      if (!current || !page || page.off) return;
+      setTags(new Map(page.documents.filter((document) => document.reference !== "").map((document) => [document.reference, document.title])));
+    });
+    return () => { current = false; };
+  }, [transport]);
+  const remember = useCallback((url: string, tag: string) => setTags((previous) => new Map(previous).set(url, tag)), []);
+  return { tags, remember };
 }
 
 function ReadingPreview({ item, transport }: { item: DigestItem; transport: Transport }) {
