@@ -652,6 +652,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.cmdConversationOpen(msg.conversationID)
 
+	case conversationFeedbackMsg:
+		m.busy = false
+		m.conversations.judging = false
+		if msg.unsupported {
+			m.setNotice(tr("feedback_unsupported"), true)
+			return m, nil
+		}
+		if msg.err != nil {
+			m.setNotice(tr("answer_verdict_failed"), true)
+			return m, nil
+		}
+		found, _ := msg.answer["found"].(bool)
+		resolved, _ := msg.answer["resolved"].(bool)
+		verdict, _ := msg.answer["verdict"].(string)
+		switch {
+		case !found:
+			m.setNotice(tr("answer_verdict_old"), true)
+		case resolved:
+			m.setNotice(tr("answer_verdict_saved", answerVerdictLabel(verdict)), false)
+		default:
+			m.setNotice(tr("answer_verdict_stands", answerVerdictLabel(verdict)), false)
+		}
+		return m, nil
+
 	case memoryListMsg:
 		m.busy = false
 		list := msg.list

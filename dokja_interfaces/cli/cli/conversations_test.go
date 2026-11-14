@@ -341,3 +341,79 @@ func TestStopAsksNothingOfAnOrchestratorThatCannotStop(t *testing.T) {
 		}
 	}
 }
+
+func TestFeedbackFindsTheNewestCompletedAnswerEvenAfterAFailure(t *testing.T) {
+	turn, ok := judgeable([]archivedTurn{
+		{ID: "older", Seq: 2, State: "completed"},
+		{ID: "newer", Seq: 4, State: "completed"},
+		{ID: "later", Seq: 5, State: "failed"},
+	})
+	if !ok || turn.ID != "newer" || turn.Seq != 4 {
+		t.Fatal(turn, ok)
+	}
+	if _, ok := judgeable([]archivedTurn{{ID: "pending", State: "pending"}}); ok {
+		t.Fatal("an unanswered turn is not an answer")
+	}
+}
+
+func TestFeedbackNamesTheTurnTheArchiveShowedAndPrintsItsResult(t *testing.T) {
+	held := conversationID("e")
+	archive := &scriptedArchive{answers: map[string]string{
+		"conversation.read": fmt.Sprintf(`{"conversation":{"id":"%s","title":"Judged"},"turns":[
+			{"id":"older","seq":3,"state":"completed"},
+			{"id":"newer","seq":5,"state":"completed"},
+			{"id":"later","seq":6,"state":"failed","reason":"model failed"}
+		]}`, held),
+		"conversation.capabilities": `{"view":1,"operations":{"feedback":"supported"}}`,
+		"conversation.feedback":     `{"turn_id":"newer","found":true,"resolved":true,"verdict":"useful"}`,
+	}}
+	var out bytes.Buffer
+	if err := sendFeedback(archive.ask, &out, held, "useful"); err != nil {
+		t.Fatal(err)
+	}
+	if len(archive.asked) != 3 || archive.asked[0] != "conversation.read" || archive.asked[1] != "conversation.capabilities" || archive.asked[2] != "conversation.feedback" {
+		t.Fatal(archive.asked)
+	}
+	last := archive.payload[len(archive.payload)-1]
+	if last["conversation_id"] != held || last["turn_id"] != "newer" || last["seq"] != 5 || last["verdict"] != "useful" {
+		t.Fatal(last)
+	}
+	if !strings.Contains(out.String(), "Answer marked useful.") {
+		t.Fatal(out.String())
+	}
+}
+
+func TestFeedbackReportsAnEarlierVerdictOrAnOldAnswer(t *testing.T) {
+	held := conversationID("e")
+	for answer, want := range map[string]string{
+		`{"turn_id":"newer","found":true,"resolved":false,"verdict":"wrong"}`: "An earlier verdict stands: wrong.",
+		`{"turn_id":"newer","found":false,"resolved":false}`:                  "older than verdicts",
+	} {
+		archive := &scriptedArchive{answers: map[string]string{
+			"conversation.read":         fmt.Sprintf(`{"conversation":{"id":"%s"},"turns":[{"id":"newer","seq":5,"state":"completed"}]}`, held),
+			"conversation.capabilities": `{"view":1,"operations":{"feedback":"supported"}}`,
+			"conversation.feedback":     answer,
+		}}
+		var out bytes.Buffer
+		if err := sendFeedback(archive.ask, &out, held, "useful"); err != nil {
+			t.Fatal(answer, err)
+		}
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("%s missing %q", out.String(), want)
+		}
+	}
+}
+
+func TestFeedbackAsksNothingWithoutSupport(t *testing.T) {
+	held := conversationID("e")
+	archive := &scriptedArchive{answers: map[string]string{
+		"conversation.read":         fmt.Sprintf(`{"conversation":{"id":"%s"},"turns":[{"id":"newer","seq":5,"state":"completed"}]}`, held),
+		"conversation.capabilities": `{"view":1,"operations":{"feedback":"unsupported"}}`,
+	}}
+	if err := sendFeedback(archive.ask, &bytes.Buffer{}, held, "wrong"); !errors.Is(err, ErrFeedbackUnsupported) {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(archive.asked, " "), "conversation.feedback") {
+		t.Fatal("an unsupported verdict reached the orchestrator", archive.asked)
+	}
+}

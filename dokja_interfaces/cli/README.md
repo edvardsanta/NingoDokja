@@ -62,6 +62,8 @@ go run ./cmd/dokja-cli conversations rename 1a2b3c4d Justice and power
 go run ./cmd/dokja-cli conversations delete 1a2b3c4d
 go run ./cmd/dokja-cli conversations retry 1a2b3c4d
 go run ./cmd/dokja-cli conversations stop 1a2b3c4d
+go run ./cmd/dokja-cli conversations feedback 1a2b3c4d useful
+go run ./cmd/dokja-cli conversations feedback 1a2b3c4d wrong
 go run ./cmd/dokja-cli chat --continue And from the terminal?
 go run ./cmd/dokja-cli chat --conversation 1a2b3c4d
 go run ./cmd/dokja-cli chat --new A new topic
@@ -74,6 +76,11 @@ general conversation, as the phone does, and without a message opens the REPL th
 `conversations stop` first reads `conversation.capabilities`. When the orchestrator says it
 cannot stop a reply, the command says so and asks nothing; an older orchestrator without the
 report is asked to stop as before.
+
+`conversations feedback <id> <useful|wrong>` judges the newest completed answer shown in that
+conversation. It first requires the orchestrator's `feedback: supported` capability, then sends
+only the archive turn identity and verdict. The first verdict stands; an answer older than the
+feature is reported as such.
 
 Administrative commands:
 

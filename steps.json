@@ -684,6 +684,11 @@
               "name": "answer_feedback_outcome",
               "status": "passed",
               "detail": "Owner decision 2026-11-08: answer feedback before preparation in Talk. Completed archived answers record chat.answer memory experiences with frozen predicted_p/baseline_p; conversation.feedback resolves useful=accepted, wrong=replaced, first verdict stands, no verdict expires unscored. dokja_memory and dokja_orch go vet and go test -race passed; desktop pnpm typecheck, pnpm test (321 Node, 530 UI after rebasing onto the removal; 2 known flaky UI tests failed once in an earlier full run and passed in isolation and on rerun), pnpm build, full Electron e2e 51 passed. Live: real dokja-memory with a scratch DB and a stubbed model (3 experiences across replays, verdicts kept, first verdict stands, chat.answer scored 2). No real chat provider run. See dokja_docs/answer-feedback.md."
+            },
+            {
+              "name": "answer_feedback_cli_tui",
+              "status": "passed",
+              "detail": "CLI conversations feedback and TUI u/w verdicts judge the newest completed answer from the archive read, require the pinned capability report's feedback: supported before writing, and surface resolved, first-verdict, older-answer and unsupported results. CLI and TUI go test -race suites passed. See dokja_docs/answer-feedback.md."
             }
           ]
         },
@@ -704,7 +709,7 @@
           "evidence": []
         }
       ],
-      "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: CLI/TUI verdicts, then prepare focused sources inside Talk (knowledge-apply-review.md step 3); 08.3 reads the chat.answer scorecard once enough verdicts exist."
+      "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: prepare focused sources inside Talk (knowledge-apply-review.md step 3), treating owner-supplied documents and links from Discord/WhatsApp as knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
     },
     {
       "id": "09",
@@ -2472,5 +2477,5 @@
     }
   ],
   "next_step": null,
-  "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: CLI/TUI verdicts, then prepare focused sources inside Talk (knowledge-apply-review.md step 3); 08.3 reads the chat.answer scorecard once enough verdicts exist."
+  "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: prepare focused sources inside Talk (knowledge-apply-review.md step 3), treating owner-supplied documents and links from Discord/WhatsApp as knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
 }

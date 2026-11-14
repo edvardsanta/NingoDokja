@@ -353,6 +353,77 @@ func retryable(turns []archivedTurn) (archivedTurn, bool) {
 // ErrStopUnsupported is the orchestrator saying it cannot stop a send at all.
 var ErrStopUnsupported = errors.New("this orchestrator cannot stop a reply")
 
+// ErrFeedbackUnsupported is the orchestrator saying it does not keep answer verdicts.
+var ErrFeedbackUnsupported = errors.New("this orchestrator does not keep answer verdicts")
+
+// FeedbackSupported asks the orchestrator what it does with conversations and answers true only
+// when this build says answer verdicts are supported. An older orchestrator, a failed report or a
+// report in a newer view is not read as support.
+func FeedbackSupported(ask func(eventType string, payload map[string]any) (map[string]any, error)) bool {
+	report, err := ask("conversation.capabilities", map[string]any{})
+	if err != nil {
+		return false
+	}
+	operations, _ := report["operations"].(map[string]any)
+	return reportView(report["view"]) == 1 && operations["feedback"] == "supported"
+}
+
+// judgeable finds the newest completed answer. A later failed or interrupted turn does not erase
+// an earlier answer the owner may still want to judge.
+func judgeable(turns []archivedTurn) (archivedTurn, bool) {
+	for index := len(turns) - 1; index >= 0; index-- {
+		if turns[index].State == "completed" {
+			return turns[index], true
+		}
+	}
+	return archivedTurn{}, false
+}
+
+func printFeedback(out io.Writer, answer map[string]any) {
+	found, _ := answer["found"].(bool)
+	resolved, _ := answer["resolved"].(bool)
+	verdict, _ := answer["verdict"].(string)
+	switch {
+	case !found:
+		fmt.Fprintln(out, "That answer is older than verdicts; nothing was recorded.")
+	case resolved:
+		fmt.Fprintf(out, "Answer marked %s.\n", verdict)
+	default:
+		fmt.Fprintf(out, "An earlier verdict stands: %s.\n", verdict)
+	}
+}
+
+// sendFeedback judges the newest completed answer of a conversation. The turn comes from the
+// archive read the CLI just showed, so the request can only name an answer the owner saw here.
+func sendFeedback(ask archiveRequest, out io.Writer, reference, verdict string) error {
+	if verdict != "useful" && verdict != "wrong" {
+		return fmt.Errorf("verdict must be useful or wrong")
+	}
+	id, err := matchConversation(ask, reference)
+	if err != nil {
+		return err
+	}
+	held, err := readConversation(ask, id, defaultTurnsRead)
+	if err != nil {
+		return err
+	}
+	turn, ok := judgeable(held.Turns)
+	if !ok {
+		return fmt.Errorf("this conversation has no completed answer to judge")
+	}
+	if !FeedbackSupported(ask) {
+		return ErrFeedbackUnsupported
+	}
+	answer, err := ask("conversation.feedback", map[string]any{
+		"conversation_id": id, "turn_id": turn.ID, "seq": turn.Seq, "verdict": verdict,
+	})
+	if err != nil {
+		return err
+	}
+	printFeedback(out, answer)
+	return nil
+}
+
 // StopUnsupported asks the orchestrator what it does with conversations and answers true only when it
 // says it cannot stop a send. An older orchestrator, which has no report, or a report that cannot be
 // read leaves it unknown, and the stop is asked as before: its own answer then says what happened.
@@ -502,7 +573,16 @@ func (a *App) newConversationsCommand(ctx context.Context) *cobra.Command {
 		},
 	}
 
-	command.AddCommand(list, read, rename, remove, retry, stop)
+	feedback := &cobra.Command{
+		Use:   "feedback <id> <useful|wrong>",
+		Short: "Judge the newest completed answer in a conversation",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return sendFeedback(a.archiveRequester(ctx), cmd.OutOrStdout(), args[0], args[1])
+		},
+	}
+
+	command.AddCommand(list, read, rename, remove, retry, stop, feedback)
 	return command
 }
 
