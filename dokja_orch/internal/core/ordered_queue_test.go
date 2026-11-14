@@ -109,8 +109,8 @@ func TestOrderedQueueForgetsFinishedLanes(t *testing.T) {
 	ticket := admitAt(t, q, "done", 1)
 	ticket.Release()
 	ticket.Release()
-	if len(q.lanes) != 0 {
-		t.Fatal("finished lanes must be dropped", q.lanes)
+	if q.Lanes().Len() != 0 {
+		t.Fatal("finished lanes must be dropped")
 	}
 }
 
