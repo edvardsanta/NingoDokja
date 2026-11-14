@@ -92,7 +92,7 @@ func (s *postReaderStub) Dispatch(ctx context.Context, kind string, payload map[
 				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(len(s.file))}, nil
 			}
 			if s.large {
-				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(50_000_000)}, nil
+				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(150_000_000)}, nil
 			}
 			return map[string]any{}, nil
 		case "media":

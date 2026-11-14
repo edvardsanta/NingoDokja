@@ -24,10 +24,12 @@ const (
 	memeKindLink      = "link"
 	// maxMemeReadings bounds the readings of media that run at once, and memeReadingBudget one of them:
 	// a post reader downloads for up to about a minute and a half before the text is read.
-	maxMemeReadings = 2
-	// maxMemeFileBytes is the largest file read for its text: the perception provider refuses a
-	// download over twenty million bytes, so a bigger one is not worth carrying.
-	maxMemeFileBytes  = 20_000_000
+	maxMemeReadings = 1
+	// maxMemeFileBytes is the largest file read for its text. It is what the chain carries today: Feeds
+	// refuses a post file over a hundred million bytes, and the reader on the host downloads no more. The
+	// file is held whole while it is read, so one reading runs at a time; nobody waits for it, and the
+	// video itself is not kept, only its link and the text read from it.
+	maxMemeFileBytes  = 100_000_000
 	memeReadingBudget = 4 * time.Minute
 )
 
