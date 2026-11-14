@@ -105,6 +105,17 @@ type memeHarness struct {
 	knowledge *proposalsKnowledgeStub
 	text      *memeTextStub
 	db        *store.DB
+	// jobs are the readings the handler left for the background; a test runs them when it chooses.
+	jobs *[]func()
+}
+
+// drain runs the background readings that were left, the way the goroutines would have.
+func (m memeHarness) drain() {
+	for len(*m.jobs) > 0 {
+		job := (*m.jobs)[0]
+		*m.jobs = (*m.jobs)[1:]
+		job()
+	}
 }
 
 func newMemeHarness(t *testing.T, web *postReaderStub, fetch memeFetchStub, posts memePostsStub) memeHarness {
@@ -116,8 +127,10 @@ func newMemeHarness(t *testing.T, web *postReaderStub, fetch memeFetchStub, post
 	t.Cleanup(func() { db.Close() })
 	knowledge := &proposalsKnowledgeStub{}
 	text := &memeTextStub{text: map[string]string{signedClip: "GAME OVER", "https://example.com/clip.mp4": "FROM A LINK", "https://memes.example/a.mp4": "THE ORIGINAL"}}
-	h := NewKnowledgeProposalsHandler(db, knowledge, web, &fakeReader{}).WithMemeTags(text, fetch, posts, friends)
-	return memeHarness{h: h, knowledge: knowledge, text: text, db: db}
+	jobs := &[]func(){}
+	h := NewKnowledgeProposalsHandler(db, knowledge, web, &fakeReader{}).WithMemeTags(text, fetch, posts, friends).
+		WithBackground(func(work func()) { *jobs = append(*jobs, work) })
+	return memeHarness{h: h, knowledge: knowledge, text: text, db: db, jobs: jobs}
 }
 
 func tagPost(user, content string, media []chat.WebAttachment, replyTo map[string]any) core.Event {
@@ -147,6 +160,7 @@ func propose(t *testing.T, m memeHarness, event core.Event) map[string]any {
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.drain()
 	if answer["reply"] != "" {
 		t.Fatalf("a proposal must never be answered: %v", answer)
 	}
@@ -219,9 +233,7 @@ func TestTheOwnersOwnTagIsStoredAtOnceAsTheirsWithNoApproval(t *testing.T) {
 	event := tagPost("user-owner", "#SomeGames", video, nil)
 	event.User.Name = "Eduardo"
 	event.Context["is_owner"] = true
-	if answer := propose(t, m, event); answer["meme_tag"] != "stored" {
-		t.Fatalf("the owner does not approve their own tag: %v", answer)
-	}
+	propose(t, m, event)
 	if len(m.pending(t)) != 0 {
 		t.Fatal("nothing is left in the queue for the owner to approve")
 	}
@@ -293,10 +305,19 @@ func TestAPageLinkIsKeptAsItsLinkAndItsMediaIsReadFromBytesWhenTheOwnerApproves(
 	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": loopback}}}, file: "VIDEO BYTES"}
 	m := newMemeHarness(t, web, memeFetchStub{}, nil)
 	m.text.dataText = map[string]string{"VIDEO BYTES": "FROM THE POST"}
-	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	// held at once, with nothing read: the reading is left for the background
+	if _, err := m.h.Handle(context.Background(), tagPost("user-sam", page+" #IagoGames", nil, nil), coreStep("propose-meme-tag")); err != nil {
+		t.Fatal(err)
+	}
 	held := m.pending(t)
 	if media := held[0]["payload"].(map[string]any)["media"].(map[string]any); media["kind"] != "link" || media["text"] != nil || len(m.text.asked) != 0 || len(m.text.data) != 0 {
-		t.Fatalf("a page is kept as its link and nothing is read yet: %v asked=%v", media, m.text.asked)
+		t.Fatalf("a page is kept as its link and nothing is read at intake: %v asked=%v", media, m.text.asked)
+	}
+	// the background reads its media from the bytes and keeps the text in the proposal
+	m.drain()
+	read := m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)
+	if read["text"] != "FROM THE POST" || len(m.text.data) != 1 {
+		t.Fatalf("the text is read ahead of the owner's decision: %v", read)
 	}
 	approved, err := m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": held[0]["id"]}), coreStep("approve-knowledge-proposal"))
 	if err != nil || approved["approved"] != true {
@@ -349,8 +370,10 @@ func TestATextReaderThatOnlyOpensAddressesKeepsTheAddressPath(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	knowledge := &proposalsKnowledgeStub{}
-	h := NewKnowledgeProposalsHandler(db, knowledge, web, &fakeReader{}).WithMemeTags(urlOnlyTextStub{text: map[string]string{"https://example.com/resolved.mp4": "FROM THE ADDRESS"}}, memeFetchStub{}, nil, friends)
-	m := memeHarness{h: h, knowledge: knowledge, text: &memeTextStub{}, db: db}
+	jobs := &[]func(){}
+	h := NewKnowledgeProposalsHandler(db, knowledge, web, &fakeReader{}).WithMemeTags(urlOnlyTextStub{text: map[string]string{"https://example.com/resolved.mp4": "FROM THE ADDRESS"}}, memeFetchStub{}, nil, friends).
+		WithBackground(func(work func()) { *jobs = append(*jobs, work) })
+	m := memeHarness{h: h, knowledge: knowledge, text: &memeTextStub{}, db: db, jobs: jobs}
 	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
 	approved, _ := h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": m.pending(t)[0]["id"]}), coreStep("approve-knowledge-proposal"))
 	if approved["approved"] != true || knowledge.payloads[0]["body"] != "FROM THE ADDRESS" {
@@ -453,4 +476,65 @@ func TestAMemeTagProposalBoundsItsPayload(t *testing.T) {
 		}
 	}
 	_ = fmt.Sprint
+}
+
+func TestTheIntakeAnswersAtOnceAndTheReadingFinishesAfterwardsWithoutWaitingOnIt(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	answer, err := m.h.Handle(context.Background(), tagPost("user-sam", "#SomeGames", video, nil), coreStep("propose-meme-tag"))
+	if err != nil || answer["meme_tag"] != "held" || answer["reply"] != "" {
+		t.Fatalf("%v %v", answer, err)
+	}
+	if len(*m.jobs) != 1 || len(m.text.asked) != 0 {
+		t.Fatalf("nothing is read before the intake answers: jobs=%d asked=%v", len(*m.jobs), m.text.asked)
+	}
+	media := m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)
+	if media["text"] != nil || media["media_url"] != signedClip {
+		t.Fatalf("the proposal is visible at once, before its text: %v", media)
+	}
+	m.drain()
+	if got := m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)["text"]; got != "GAME OVER" {
+		t.Fatalf("the text arrives afterwards: %v", got)
+	}
+}
+
+func TestAnApprovalBeforeTheReadingFinishesIsNotUndoneByIt(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	if _, err := m.h.Handle(context.Background(), tagPost("user-sam", "#SomeGames", video, nil), coreStep("propose-meme-tag")); err != nil {
+		t.Fatal(err)
+	}
+	approved, _ := m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": m.pending(t)[0]["id"]}), coreStep("approve-knowledge-proposal"))
+	if approved["approved"] != true {
+		t.Fatalf("the owner does not wait for the background: %v", approved)
+	}
+	m.drain()
+	if len(m.pending(t)) != 0 || len(m.knowledge.payloads) != 1 {
+		t.Fatalf("a decided proposal is left alone by a late reading: pending=%v stored=%d", m.pending(t), len(m.knowledge.payloads))
+	}
+}
+
+func TestTheOwnersTagIsStoredByTheBackgroundOnceItsTextIsRead(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	event := tagPost("user-owner", "#SomeGames", video, nil)
+	event.User.Name = "Eduardo"
+	event.Context["is_owner"] = true
+	if _, err := m.h.Handle(context.Background(), event, coreStep("propose-meme-tag")); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.knowledge.payloads) != 0 {
+		t.Fatal("nothing is stored before the text is read")
+	}
+	m.drain()
+	if len(m.pending(t)) != 0 || len(m.knowledge.payloads) != 1 {
+		t.Fatalf("the owner's tag is theirs once read, with nothing left to approve: pending=%v", m.pending(t))
+	}
+}
+
+func TestOnlyAFewMediaReadingsRunAtOnce(t *testing.T) {
+	if maxMemeReadings < 1 || maxMemeReadings > 4 {
+		t.Fatal("a busy channel must not pile downloads on the host")
+	}
+	h := NewKnowledgeProposalsHandler(nil, &proposalsKnowledgeStub{}, &postReaderStub{}, &fakeReader{})
+	if cap(h.memeWork) != maxMemeReadings {
+		t.Fatal(cap(h.memeWork))
+	}
 }

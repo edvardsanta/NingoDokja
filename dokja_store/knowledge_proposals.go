@@ -44,6 +44,21 @@ func (d *DB) AddProposal(p KnowledgeProposal) error {
 	return err
 }
 
+// UpdateProposalPayload replaces the payload of a proposal that is still pending, and says whether
+// there was one. What reads a proposal's media in the background writes its result here; a proposal
+// decided meanwhile is gone, and the write finds nothing.
+func (d *DB) UpdateProposalPayload(id, payload string) (bool, error) {
+	if id == "" || payload == "" {
+		return false, fmt.Errorf("proposal id and payload are required")
+	}
+	result, err := d.db.Exec(`UPDATE knowledge_proposals SET payload = ? WHERE id = ?`, payload, id)
+	if err != nil {
+		return false, err
+	}
+	changed, err := result.RowsAffected()
+	return changed > 0, err
+}
+
 // ListProposals returns every pending proposal, oldest first.
 func (d *DB) ListProposals() ([]KnowledgeProposal, error) {
 	rows, err := d.db.Query(

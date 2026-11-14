@@ -103,3 +103,30 @@ func filepathFor(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(t.TempDir(), "dokja.db")
 }
+
+func TestAPendingProposalsPayloadCanBeReplacedAndADecidedOneIsNotBroughtBack(t *testing.T) {
+	db := open(t)
+	row := KnowledgeProposal{ID: "proposal:a:b", Kind: "meme_hashtag", Payload: `{"a":1}`, ProposedBy: "sam", ProposedAt: "2026-11-14T12:00:00Z"}
+	if err := db.AddProposal(row); err != nil {
+		t.Fatal(err)
+	}
+	if updated, err := db.UpdateProposalPayload(row.ID, `{"a":2}`); err != nil || !updated {
+		t.Fatalf("a pending proposal is updated: %v %v", updated, err)
+	}
+	got, _, _ := db.GetProposal(row.ID)
+	if got.Payload != `{"a":2}` || got.ProposedBy != "sam" {
+		t.Fatalf("only the payload changes: %+v", got)
+	}
+	if err := db.DeleteProposal(row.ID); err != nil {
+		t.Fatal(err)
+	}
+	if updated, err := db.UpdateProposalPayload(row.ID, `{"a":3}`); err != nil || updated {
+		t.Fatalf("a proposal decided meanwhile is not written back: %v %v", updated, err)
+	}
+	if _, found, _ := db.GetProposal(row.ID); found {
+		t.Fatal("it must stay gone")
+	}
+	if _, err := db.UpdateProposalPayload("", "{}"); err == nil {
+		t.Fatal("an id is required")
+	}
+}
