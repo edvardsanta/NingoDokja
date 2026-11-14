@@ -774,7 +774,12 @@ During development, a Python reload briefly reloads speech models; changes to
 Discord code restart its listener, so run `/voice_chat_start` again afterward.
 
 Voice chat defaults to the saved Runtime text provider/model
-(`DOKJA_VOICE_CHAT_PROVIDER=runtime`). The local voice path is experimental and
+(`DOKJA_VOICE_CHAT_PROVIDER=runtime`). A spoken reply is spoken as it is written: when the
+provider shows its text before the end (Ollama and Codex do; Claude Code and Kimi do not, today), each
+sentence goes to speech once it is whole, bounded like the final reply, so the first sentence is heard while the
+model writes the next. A provider that gives no partial text is spoken once its whole reply is ready, which adds
+its full generation time to the first sound. The voice timing report (`scripts/voice_latency_report.py`) shows the
+difference. The local voice path is experimental and
 requires explicitly setting `DOKJA_VOICE_CHAT_PROVIDER=ollama` on the orchestrator.
 That path uses the dedicated local Ollama model configured by
 `DOKJA_VOICE_CHAT_MODEL` (default `qwen3.5:2b` in dev and lite). Install it in

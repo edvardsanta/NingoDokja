@@ -398,27 +398,7 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
 		messages = fitChatPrompt(messages)
-		decision := chat.VoiceDecision{
-			Detailed: boolFromContext(event.Context, "voice_detailed"),
-			Brief:    boolFromContext(event.Context, "voice_brief"),
-		}
-		var emitted int
-		stream := func(text string) {
-			callback := core.VoiceSpeech(ctx)
-			if callback == nil {
-				return
-			}
-			complete := strings.Join(completeVoiceSentences(text), " ")
-			sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, decision))
-			for emitted < len(sentences) {
-				if emitted >= chat.VoiceSentenceLimit(decision) && !decision.Detailed {
-					return
-				}
-				callback(sentences[emitted])
-				emitted++
-			}
-		}
-		return h.voiceGenerator.GenerateVoiceMessagesStream(ctx, messages, stream)
+		return h.voiceGenerator.GenerateVoiceMessagesStream(ctx, messages, voiceSpeechStreamer(ctx, event))
 	}
 	if generator, ok := h.generator.(ChatConversationGenerator); ok {
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
@@ -431,6 +411,14 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
 		messages = fitChatPrompt(messages)
+		// A spoken turn is spoken as it is written: each sentence goes to speech once it is whole, so
+		// the room hears the first one while the model is still on the next. A provider that gives no
+		// text before the end (Claude Code, Kimi) never calls this, and its reply is returned whole.
+		if voice && core.VoiceSpeech(ctx) != nil && webData == nil {
+			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
+				return streaming.GenerateMessagesStream(ctx, messages, voiceSpeechStreamer(ctx, event))
+			}
+		}
 		if preview := core.ReplyPreview(ctx); preview != nil && webData == nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, preview)
@@ -463,6 +451,32 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		persona += "\n\n" + ownerNote
 	}
 	return h.generator.Generate(ctx, persona+"\n\n"+content)
+}
+
+// voiceSpeechStreamer turns the text a model has written so far (each call repeats everything so far)
+// into whole spoken sentences, once each. It applies the same bound as the final reply, so what is
+// spoken early always opens that reply, which is how the voice client avoids saying it twice.
+func voiceSpeechStreamer(ctx context.Context, event core.Event) func(string) {
+	decision := chat.VoiceDecision{
+		Detailed: boolFromContext(event.Context, "voice_detailed"),
+		Brief:    boolFromContext(event.Context, "voice_brief"),
+	}
+	var emitted int
+	return func(text string) {
+		callback := core.VoiceSpeech(ctx)
+		if callback == nil {
+			return
+		}
+		complete := strings.Join(completeVoiceSentences(text), " ")
+		sentences := completeVoiceSentences(chat.ConciseSpokenReply(complete, decision))
+		for emitted < len(sentences) {
+			if emitted >= chat.VoiceSentenceLimit(decision) && !decision.Detailed {
+				return
+			}
+			callback(sentences[emitted])
+			emitted++
+		}
+	}
 }
 
 func completeVoiceSentences(text string) []string {
