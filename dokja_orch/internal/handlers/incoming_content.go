@@ -97,6 +97,7 @@ func (h *ChatDomainHandler) handleIncomingContent(ctx context.Context, event cor
 	if strings.TrimSpace(text.String()) == "" {
 		return contentRefusal("document_unreadable"), nil
 	}
+	h.knowledgePersist.persistExtractedReading(ctx, event, plan.Document.Filename, extracted, plan.Document.DataB64, documents)
 	locale, _ := event.Payload["locale"].(string)
 	summary, partial := chat.DocumentSummaryMessages(plan.Document.Filename, text.String(), content, locale)
 	messages := make([]map[string]string, 0, len(summary))

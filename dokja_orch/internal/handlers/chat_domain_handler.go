@@ -50,6 +50,7 @@ type ChatDomainHandler struct {
 	knowledgeEnabled   func() bool
 	sourcePreparer     ApplicationSourcePreparer
 	sourceJournalStore application.JournalStore
+	knowledgePersist   *knowledgePersistence
 	archive            *conversation.Archive
 	answers            *ChatAnswerExperience
 	facts              *conversation.Facts
