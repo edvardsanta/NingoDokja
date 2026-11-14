@@ -195,6 +195,25 @@
         "A failed run posts no result and no link is ever made up. For a site without a runner, people can paste the questions in chat and you answer them there.",
         "Your past runs, with the label, link and your answers, are given to you in a separate record when available."
       ]
+    },
+    {
+      "id": "conversation.manage",
+      "description": "Start, list, continue, rename and delete the owner's archived conversations, which are shared across interfaces.",
+      "entry_points": [
+        {
+          "interface": "whatsapp",
+          "usage": "Only in the linked account's self-chat (\"message yourself\"), the owner sends /new (/nova), /conversations (/conversas), /open N (/abrir N), /rename title (/renomear título), /delete N (/apagar N, then /yes or /sim to confirm) or /help (/ajuda). Contacts and groups have no commands: they write plain text."
+        },
+        {
+          "interface": "desktop",
+          "usage": "In Talk, the Conversations drawer lists the kept conversations to open, rename or delete, and starts a new one."
+        }
+      ],
+      "limits": [
+        "WhatsApp commands work only in the owner's self-chat; in any other chat, never claim they exist or that you ran one. Do not say WhatsApp has no commands: say they exist for the owner's self-chat.",
+        "A command is not a conversation turn and is not sent to you. Deleting removes the conversation from every interface and cannot be undone.",
+        "The WhatsApp commands show only general conversations, not the discussions attached to a reading."
+      ]
     }
   ]
 }
