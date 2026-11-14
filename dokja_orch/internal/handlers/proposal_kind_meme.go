@@ -219,10 +219,11 @@ func personLabel(person chat.KnownPerson, id string) string {
 	return name
 }
 
-// ProposeMemeTag reads a tag proposed in a meme channel and holds it for the owner. It answers
-// nothing, in every case: a known person's proposal is held, and so is the owner's own, which they
-// then decide in the desktop like any other; anyone else's is kept nowhere. The channel never
-// learns what became of it.
+// ProposeMemeTag reads a tag posted in a meme channel. It answers nothing, in every case. A known
+// person's tag is held for the owner to decide in the desktop; anyone else's is kept nowhere. The
+// owner's own tag needs no approval: it is stored at once, as theirs, the way their tagging in the
+// desktop is, and is held only when no text can be read from the meme, so they can give it there.
+// The channel never learns what became of it.
 func (h *KnowledgeProposalsHandler) ProposeMemeTag(ctx context.Context, event core.Event) (map[string]any, error) {
 	silent := map[string]any{"reply": "", "meme_tag": "ignored"}
 	if h == nil || h.store == nil {
@@ -248,6 +249,9 @@ func (h *KnowledgeProposalsHandler) ProposeMemeTag(ctx context.Context, event co
 	if meme.ref == "" {
 		return silent, nil
 	}
+	if owner, _ := event.Context["is_owner"].(bool); owner && h.storeOwnersTag(ctx, post.Hashtag, meme) {
+		return map[string]any{"reply": "", "meme_tag": "stored"}, nil
+	}
 	sentBy, messageID := proposer, resultString(event.Context, "message_id")
 	if post.Form == knowledgedomain.MemeTagReply {
 		sentBy, messageID = personLabel(chat.KnownPerson{Name: resultString(replyTo, "author_name")}, resultString(replyTo, "author_id")), resultString(replyTo, "message_id")
@@ -263,6 +267,30 @@ func (h *KnowledgeProposalsHandler) ProposeMemeTag(ctx context.Context, event co
 	}
 	logger.Info(fmt.Sprintf("meme tag proposal held id=%s duplicate=%t", id, duplicate))
 	return map[string]any{"reply": "", "meme_tag": "held"}, nil
+}
+
+// storeOwnersTag stores the owner's own tag as a Knowledge example of theirs, through the same path
+// their tagging in the desktop uses, and says whether it did. It does not when the text of the meme
+// cannot be read, and the tag is then held so the owner can supply it.
+func (h *KnowledgeProposalsHandler) storeOwnersTag(ctx context.Context, tag string, meme memeProposal) bool {
+	example, err := knowledgedomain.PrepareHashtagExample(meme.ref, tag)
+	if err != nil {
+		return false
+	}
+	text := strings.TrimSpace(payloadString(meme.media, "text"))
+	if text == "" {
+		var refused string
+		if text, refused = h.readMemeText(ctx, meme.ref, meme.media); refused != "" {
+			logger.Info(fmt.Sprintf("owner meme tag is held for the text: %s", refused))
+			return false
+		}
+	}
+	if _, err := h.knowledge.StoreHashtagExampleWithProvenance(ctx, example, text, knowledgedomain.Provenance{Origin: knowledgedomain.OriginOwner}); err != nil {
+		logger.Info(fmt.Sprintf("owner meme tag was not stored, held instead: %v", err))
+		return false
+	}
+	logger.Info("owner meme tag stored")
+	return true
 }
 
 // memeProposal is the meme a post names: the address that identifies it, and what is kept of it.

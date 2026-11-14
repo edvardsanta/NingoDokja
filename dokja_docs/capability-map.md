@@ -565,8 +565,9 @@ allowed servers and channels. The router sends it to intake instead of chat, so 
 never answered. A webhook's post, which is how Ningo posts a meme, is ignored by the
 adapter.
 
-Only a known person's post or the owner's own is held (`NingoFacts.People`); a
-stranger's is kept nowhere. The proposal is a
+Only a known person's post is held (`NingoFacts.People`); a stranger's is kept
+nowhere. The owner's own tag needs no approval: it is stored at once with `origin: owner`,
+and is held only when no text can be read from the meme, so they can give it in the desktop. The proposal is a
 `meme_hashtag` kind keyed by the same identity as the stored example
 (`meme-hashtag:` plus the hash of the address without what makes a link expire). A
 reply to one of Ningo's memes names the meme its delivery was recorded under

@@ -182,17 +182,39 @@ func TestOnlyAKnownPersonsOrTheOwnersPostIsHeld(t *testing.T) {
 	}
 }
 
-func TestTheOwnersOwnTagPostIsHeldToo(t *testing.T) {
+func TestTheOwnersOwnTagIsStoredAtOnceAsTheirsWithNoApproval(t *testing.T) {
 	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
 	event := tagPost("user-owner", "#SomeGames", video, nil)
 	event.User.Name = "Eduardo"
 	event.Context["is_owner"] = true
+	if answer := propose(t, m, event); answer["meme_tag"] != "stored" {
+		t.Fatalf("the owner does not approve their own tag: %v", answer)
+	}
+	if len(m.pending(t)) != 0 {
+		t.Fatal("nothing is left in the queue for the owner to approve")
+	}
+	stored := m.knowledge.payloads[0]
+	if stored["source_id"] != knowledgedomain.HashtagKnowledgeID(stableClip) || stored["title"] != "#SomeGames" || stored["body"] != "GAME OVER" {
+		t.Fatalf("it is the same example the desktop's tagging stores: %v", stored)
+	}
+	provenance := stored["metadata"].(map[string]any)["provenance"].(knowledgedomain.Provenance)
+	if provenance.Origin != knowledgedomain.OriginOwner || provenance.ProposedBy != "" {
+		t.Fatalf("it is the owner's own record: %+v", provenance)
+	}
+}
+
+func TestTheOwnersTagIsHeldOnlyWhenNoTextCanBeReadFromTheMeme(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	m.text.text[signedClip] = ""
+	event := tagPost("user-owner", "#SomeGames", video, nil)
+	event.User.Name = "Eduardo"
+	event.Context["is_owner"] = true
 	if answer := propose(t, m, event); answer["meme_tag"] != "held" {
-		t.Fatalf("the owner's post is a proposal like anyone's: %v", answer)
+		t.Fatalf("without text the owner is asked for it in the desktop: %v", answer)
 	}
 	held := m.pending(t)
-	if len(held) != 1 || held[0]["proposed_by"] != "Eduardo <user-owner>" {
-		t.Fatalf("the proposal names the owner as they appear: %v", held)
+	if len(held) != 1 || held[0]["proposed_by"] != "Eduardo <user-owner>" || len(m.knowledge.payloads) != 0 {
+		t.Fatalf("%v", held)
 	}
 }
 
