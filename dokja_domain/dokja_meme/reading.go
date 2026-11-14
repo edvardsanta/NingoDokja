@@ -102,6 +102,14 @@ func (s *ReadingService) Screen(ctx context.Context, url, caption string) (map[s
 func (s *ReadingService) ReadText(ctx context.Context, url string) (map[string]any, error) {
 	return s.reading.Invoke(ctx, "media.perceive.v1", "read-text", map[string]any{"url": url})
 }
+
+// ReadTextData reads the text of a picture or a video the caller already holds, for media that has
+// no address a perception provider can open (a file a post reader keeps on the host).
+func (s *ReadingService) ReadTextData(ctx context.Context, data []byte, contentType string) (map[string]any, error) {
+	return s.reading.Invoke(ctx, "media.perceive.v1", "read-text", map[string]any{
+		"data_b64": base64.StdEncoding.EncodeToString(data), "content_type": contentType,
+	})
+}
 func (s *ReadingService) MarkSent(ctx context.Context, url string) error {
 	result, err := s.library(ctx, "mark-sent", map[string]any{"url": url})
 	if err != nil {

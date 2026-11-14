@@ -23,6 +23,7 @@ type proposalStore interface {
 	AddProposal(store.KnowledgeProposal) error
 	ListProposals() ([]store.KnowledgeProposal, error)
 	GetProposal(id string) (store.KnowledgeProposal, bool, error)
+	UpdateProposalPayload(id, payload string) (bool, error)
 	DeleteProposal(id string) error
 	CountProposalsBy(proposedBy string) (int, error)
 }
@@ -69,6 +70,10 @@ type KnowledgeProposalsHandler struct {
 	memeFetch memeAttachmentFetcher
 	memePosts discordPostMedia
 	people    []chat.KnownPerson
+	// background runs the slow reading of a meme's media after the proposal is held; memeWork bounds
+	// how many readings run at once, so a busy channel cannot pile downloads on the host.
+	background func(func())
+	memeWork   chan struct{}
 }
 
 func NewKnowledgeProposalsHandler(db proposalStore, knowledge knowledgedomain.Service, web digest.Service, reader DocumentReader) *KnowledgeProposalsHandler {
@@ -82,7 +87,10 @@ func NewKnowledgeProposalsHandler(db proposalStore, knowledge knowledgedomain.Se
 			logger.Error("register a knowledge proposal kind; its proposals are refused", err)
 		}
 	}
-	return &KnowledgeProposalsHandler{store: db, knowledge: knowledgedomain.New(knowledge), web: web, reader: reader, now: time.Now}
+	return &KnowledgeProposalsHandler{
+		store: db, knowledge: knowledgedomain.New(knowledge), web: web, reader: reader, now: time.Now,
+		background: func(work func()) { go work() }, memeWork: make(chan struct{}, maxMemeReadings),
+	}
 }
 
 func proposalWorkflowFor(kind string) (proposalKindWorkflow, bool) {
