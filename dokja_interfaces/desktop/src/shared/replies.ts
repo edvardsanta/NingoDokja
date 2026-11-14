@@ -436,3 +436,30 @@ export type ProfileGenerated = { off?: false; profile: PersonProfile };
 export type ConversationList = { off?: false; conversations: ArchivedConversation[]; next: string };
 
 export type ConversationRead = { off?: false; conversation: ArchivedConversation; turns: ArchivedTurn[] };
+
+// One pending proposal for what Ningo learns: what it is, who proposed and who
+// sent it, where, and the stored record its decision would affect.
+export type KnowledgeProposalSource = { channelId: string; messageId: string; permalink: string };
+export type KnowledgeProposalCurrent = { origin: string; title: string };
+export type KnowledgeProposal = {
+  id: string;
+  kind: string;
+  payload: Record<string, unknown>;
+  proposedBy: string;
+  sentBy: string;
+  source: KnowledgeProposalSource;
+  proposedAt: string;
+  current?: KnowledgeProposalCurrent;
+};
+export type KnowledgeProposals = { proposals: KnowledgeProposal[] };
+
+// The owner's decision on one proposal. approved is true on approve and on
+// reject; reason carries a fixed refusal cause when an approval was refused
+// and the proposal stays pending.
+export type ProposalDecision = {
+  proposalId: string;
+  approved: boolean;
+  reason?: string;
+  replacedOrigin?: string;
+  stored?: number;
+};

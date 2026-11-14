@@ -10,6 +10,7 @@ import { HealthCard } from "./health.js";
 import { KnowledgeWorkspace } from "./knowledge_workspace.js";
 import { MemoryCard } from "./memory.js";
 import { ProfilesCard } from "./profiles.js";
+import { ProposalsCard } from "./proposals.js";
 
 export type CardEntry = {
   kind: string;
@@ -35,6 +36,7 @@ export const CARDS: readonly CardEntry[] = [
   { kind: "memory", labelId: "nav_notebook", Card: MemoryCard, services: ["memory"] },
   { kind: "profiles", labelId: "nav_profiles", Card: ProfilesCard, services: ["chat"] },
   { kind: "communications", labelId: "nav_messages", Card: CommunicationsCard, services: ["discord", "whatsapp"] },
+  { kind: "proposals", labelId: "nav_proposals", Card: ProposalsCard, services: ["knowledge"] },
   { kind: "data_studio", labelId: "nav_data_studio", Card: DataStudioCard },
   { kind: "health", labelId: "nav_system", Card: HealthCard, foot: true },
 ];
