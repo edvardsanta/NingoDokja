@@ -56,6 +56,7 @@ describe("the screen", () => {
       "Caderno",
       "Perfis",
       "Mensagens",
+      "Propostas",
       "Estúdio de dados",
       "Sistema",
     ]);

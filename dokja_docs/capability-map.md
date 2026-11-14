@@ -537,6 +537,21 @@ Sources: [handler](../dokja_orch/internal/handlers/book_domain_handler.go),
 [client](../dokja_orch/internal/clients/book_service_client.go),
 [service](../dokja_services/dokja_book/book_summary_service.py).
 
+### Knowledge proposals
+
+Submissions for what Ningo learns that do not come from the owner are held as
+pending proposals in the owner's local database, outside every store retrieval
+reads: a kind and its validated payload, who proposed and sent the material, and
+where. Pending is invisible to chat retrieval, citations and delivery, and it
+is never announced. The owner decides in the Desktop: approval runs the kind's
+own ingestion path and stores the record with its provenance (`owner`,
+`group`, `api`; owner over approved group over source API per item), removing
+the proposal; rejection deletes it, keeping nothing. The owner's own readings
+still store directly. A kind supplies only its payload rules and approval step;
+web links and files are wired, and the meme tag builds on the same mechanism
+([ADR 0016](decisions/0016-knowledge-proposals.md),
+[meme tag plan](meme-tag-proposals-plan.md)).
+
 ### Cross-document application preparation
 
 `knowledge.application.prepare` is an opt-in, read-only task through the existing

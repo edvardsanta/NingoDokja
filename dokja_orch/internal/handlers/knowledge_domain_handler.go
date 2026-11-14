@@ -13,6 +13,7 @@ type KnowledgeDomainHandler struct {
 	domain           *knowledgedomain.Domain
 	reading          *ReadingTask
 	intake           *IntakeTask
+	proposals        *KnowledgeProposalsHandler
 	proposer         knowledgedomain.ApplicationProposer
 	measuredProposer knowledgedomain.ApplicationProposer
 	reviewer         knowledgedomain.ApplicationReviewer
@@ -32,6 +33,13 @@ func (h *KnowledgeDomainHandler) WithReading(task *ReadingTask) *KnowledgeDomain
 // WithIntake serves knowledge.intake.run. Without it, the event is refused.
 func (h *KnowledgeDomainHandler) WithIntake(task *IntakeTask) *KnowledgeDomainHandler {
 	h.intake = task
+	return h
+}
+
+// WithProposals serves knowledge.proposal.* through the shared database. Without
+// it, those events are refused; every other knowledge event is unchanged.
+func (h *KnowledgeDomainHandler) WithProposals(handler *KnowledgeProposalsHandler) *KnowledgeDomainHandler {
+	h.proposals = handler
 	return h
 }
 
@@ -98,6 +106,13 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 	}
 	if workflow.Action == knowledgedomain.ActionIntakeKnowledge && h.intake != nil {
 		return h.intake.Start(event)
+	}
+	switch workflow.Action {
+	case "propose-knowledge", "list-knowledge-proposals", "approve-knowledge-proposal", "reject-knowledge-proposal":
+		if h.proposals == nil {
+			return nil, fmt.Errorf("knowledge proposals are not configured")
+		}
+		return h.proposals.Handle(ctx, event, workflow)
 	}
 	if workflow.Action == knowledgedomain.ActionReadKnowledge && h.reading != nil {
 		return h.reading.Read(ctx, event)

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	chat "read_books/dokja_domain/dokja_chat"
+	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
 )
 
@@ -132,5 +133,99 @@ func TestStrangerIncomingDocumentIsNotPersistedToKnowledge(t *testing.T) {
 	}
 	if len(knowledge.payloads) != 0 {
 		t.Fatalf("someone else's document became the owner's knowledge: %v", fmt.Sprint(knowledge.payloads))
+	}
+}
+
+type recordedProposal struct {
+	kind    string
+	payload map[string]any
+	source  knowledgedomain.ProposalSource
+	by      string
+}
+
+type recordingProposer struct {
+	calls []recordedProposal
+}
+
+func (r *recordingProposer) Propose(_ context.Context, kind string, payload map[string]any, source knowledgedomain.ProposalSource, proposedBy, sentBy string) (string, bool, error) {
+	r.calls = append(r.calls, recordedProposal{kind: kind, payload: payload, source: source, by: proposedBy})
+	return "proposal:test", false, nil
+}
+
+// A known person's link is held pending, never stored: the reply the turn had is
+// unchanged and nothing reaches retrieval before the owner decides.
+func TestKnownPersonWebLinkIsHeldAsAProposal(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&fakeChatGenerator{result: map[string]any{"reply": "The estimate requires assumptions. [1]"}}).
+		WithWebReading(&webReadingService{}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", RealName: "Sam", Discord: "sam-id"}}})
+	event := chatEvent("Explain https://example.com/news")
+	event.User.ID = "sam-id"
+	event.Context = map[string]any{"is_owner": false, "guild_id": "guild", "message_id": "m9"}
+	result, err := h.Handle(context.Background(), event, chatStep)
+	if err != nil || result["reply"] == "" {
+		t.Fatalf("the turn was changed: %v %+v", err, result)
+	}
+	if len(knowledge.payloads) != 0 {
+		t.Fatalf("a pending proposal reached the store: %v", knowledge.payloads)
+	}
+	if len(proposer.calls) != 1 {
+		t.Fatalf("the known person's link was not held: %+v", proposer.calls)
+	}
+	call := proposer.calls[0]
+	if call.kind != "web_article" || call.payload["url"] != "https://example.com/news" {
+		t.Fatalf("the proposal lost the link: %+v", call)
+	}
+	if call.by != "Sam <sam-id>" || call.source.ChannelID != "c1" || call.source.MessageID != "m9" ||
+		!strings.Contains(call.source.Permalink, "/guild/c1/m9") {
+		t.Fatalf("the proposal lost its trace: %+v", call)
+	}
+}
+
+func TestStrangerWebLinkIsNeitherStoredNorProposed(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&fakeChatGenerator{result: map[string]any{"reply": "reading [1]"}}).
+		WithWebReading(&webReadingService{}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", Discord: "sam-id"}}})
+	event := chatEvent("Explain https://example.com/news")
+	event.User.ID = "someone-else"
+	if _, err := h.Handle(context.Background(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(proposer.calls) != 0 || len(knowledge.payloads) != 0 {
+		t.Fatalf("a stranger's link was kept: proposals=%d stored=%d", len(proposer.calls), len(knowledge.payloads))
+	}
+}
+
+func TestKnownPersonDocumentIsHeldAsAProposal(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&incomingTestGenerator{}).
+		WithIncomingContent(NewIncomingContentWorkflow(&incomingTestReader{}, nil, func() bool { return true })).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Tiago", WhatsApp: "55-999"}}})
+	event := core.Event{Source: core.SourceWhatsApp, User: core.EventUser{ID: "55-999"},
+		Payload: map[string]any{"content": "focus on results", "locale": "en",
+			"document": &chat.IncomingDocument{Filename: "memo.pdf", DataB64: base64.StdEncoding.EncodeToString([]byte("file"))}}}
+	reply, err := h.Handle(t.Context(), event, core.WorkflowStep{Action: chat.ActionReadIncomingContent})
+	if err != nil || reply["reply"] != "summary" {
+		t.Fatalf("document turn failed: %v %+v", err, reply)
+	}
+	if len(knowledge.payloads) != 0 {
+		t.Fatalf("a pending document reached the store: %v", knowledge.payloads)
+	}
+	if len(proposer.calls) != 1 || proposer.calls[0].kind != "document" ||
+		proposer.calls[0].payload["filename"] != "memo.pdf" || proposer.calls[0].payload["content_b64"] == "" {
+		t.Fatalf("the known person's document was not held: %+v", proposer.calls)
+	}
+	if proposer.calls[0].by != "Tiago <55-999>" {
+		t.Fatalf("the proposal lost its proposer: %+v", proposer.calls[0])
 	}
 }

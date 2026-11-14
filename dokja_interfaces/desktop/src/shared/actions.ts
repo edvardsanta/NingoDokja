@@ -99,6 +99,12 @@ export const ACTION_TYPES = [
   "knowledge.classify",
   "knowledge.delete",
   "knowledge.reindex",
+  // What people proposed for Ningo to learn: the owner's queue. Reading it is a
+  // read; approving stores it, rejecting forgets it, and a rejection asks in the
+  // shell's window because nothing of it is kept.
+  "knowledge.proposals.list",
+  "knowledge.proposal.approve",
+  "knowledge.proposal.reject",
   // The Data Studio only reads through the orchestrator: sources, schemas, rows and files.
   "datastudio.sources.list",
   "datastudio.sqlite.schema",
@@ -150,6 +156,8 @@ export const WRITE_ACTION_TYPES: readonly ActionType[] = [
   "knowledge.ingest",
   "knowledge.delete",
   "knowledge.reindex",
+  "knowledge.proposal.approve",
+  "knowledge.proposal.reject",
 ];
 
 // The ones that cannot be undone: the shell asks the person first, in a window of its own.
@@ -159,6 +167,7 @@ export const CONFIRMED_ACTION_TYPES: readonly ActionType[] = [
   "communications.send",
   "communications.link.reset",
   "knowledge.delete",
+  "knowledge.proposal.reject",
   "runtime.models.pull",
   "runtime.models.remove",
 ];

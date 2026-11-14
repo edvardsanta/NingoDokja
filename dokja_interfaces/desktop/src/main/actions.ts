@@ -52,6 +52,8 @@ import type {
   ClassificationChoice,
   KnowledgeSearch,
   KnowledgeStatus,
+  KnowledgeProposals,
+  ProposalDecision,
   MemePage,
   MemeHashtagSuggestion,
   MemeHashtagTag,
@@ -1210,6 +1212,20 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     payload: (raw) => ({ limit: clampInt(raw.limit, 1, 64, 32) }),
     project: (result) => inDomain(result, "knowledge", reindexResult),
   },
+
+  "knowledge.proposals.list": {
+    payload: noPayload,
+    project: (result) => inDomain(result, "knowledge", knowledgeProposals),
+  },
+  "knowledge.proposal.approve": {
+    payload: proposalDecisionPayload,
+    project: (result) => inDomain(result, "knowledge", proposalDecision),
+  },
+  "knowledge.proposal.reject": {
+    payload: proposalDecisionPayload,
+    project: (result) => inDomain(result, "knowledge", proposalDecision),
+  },
+
   // The Data Studio reads the checkout's data through the orchestrator. Paths come from the
   // discovered sources, never typed by the screen: the orchestrator validates them again.
   "datastudio.sources.list": {
@@ -1332,6 +1348,61 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
     })),
   },
 };
+
+// The proposals queue is the owner's own: every pending submission with who
+// proposed and sent it, where, and the stored record its decision would affect.
+const PROPOSAL_ID = /^proposal:[A-Za-z0-9._:-]{1,240}$/;
+const MAX_TAG_EDIT_CHARS = 60;
+
+function knowledgeProposals(body: Record<string, unknown>): KnowledgeProposals {
+  return {
+    proposals: records(body.proposals, (proposal) => {
+      const source = isRecord(proposal.source) ? proposal.source : {};
+      const current = isRecord(proposal.current) ? proposal.current : undefined;
+      return {
+        id: text(proposal.id),
+        kind: shorten(text(proposal.kind), 40),
+        payload: isRecord(proposal.payload) ? proposal.payload : {},
+        proposedBy: shorten(text(proposal.proposed_by), 300),
+        sentBy: shorten(text(proposal.sent_by), 300),
+        source: {
+          channelId: shorten(text(source.channel_id), 80),
+          messageId: shorten(text(source.message_id), 80),
+          permalink: shorten(text(source.permalink), 400),
+        },
+        proposedAt: text(proposal.proposed_at),
+        ...(current
+          ? { current: { origin: shorten(text(current.origin), 20), title: shorten(text(current.title), 300) } }
+          : {}),
+      };
+    }),
+  };
+}
+
+function proposalDecision(body: Record<string, unknown>): ProposalDecision {
+  const decision: ProposalDecision = {
+    proposalId: text(body.proposal_id),
+    approved: body.approved === true || body.rejected === true,
+  };
+  const reason = shorten(text(body.reason), 80);
+  if (reason) decision.reason = reason;
+  const replaced = shorten(text(body.replaced_origin), 20);
+  if (replaced) decision.replacedOrigin = replaced;
+  if (typeof body.stored === "number" && Number.isFinite(body.stored)) decision.stored = Math.trunc(body.stored);
+  return decision;
+}
+
+function proposalDecisionPayload(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  const id = text(raw.proposal_id);
+  if (!PROPOSAL_ID.test(id)) return undefined;
+  if (isRecord(raw.edit)) {
+    const tag = text(raw.edit.tag).trim();
+    if (tag === "" || tag.length > MAX_TAG_EDIT_CHARS) return undefined;
+    return { proposal_id: id, edit: { tag } };
+  }
+  return { proposal_id: id };
+}
+
 
 // A path the Data Studio asks for must be one the orchestrator already discovered: absolute,
 // inside the checkout, and not absurdly long. The orchestrator validates it again on its side.

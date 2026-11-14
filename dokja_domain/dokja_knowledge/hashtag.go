@@ -48,17 +48,36 @@ func HashtagKnowledgeID(sourceURL string) string {
 }
 
 func (d *Domain) StoreHashtagExample(ctx context.Context, example HashtagExample, text string) (map[string]any, error) {
+	return d.storeHashtagExample(ctx, example, text, nil)
+}
+
+// StoreHashtagExampleWithProvenance stores what an approved proposal proposed:
+// the example carries where it came from, so precedence and audits can tell it
+// from the owner's own labels.
+func (d *Domain) StoreHashtagExampleWithProvenance(ctx context.Context, example HashtagExample, text string, provenance Provenance) (map[string]any, error) {
+	return d.storeHashtagExample(ctx, example, text, &provenance)
+}
+
+func (d *Domain) storeHashtagExample(ctx context.Context, example HashtagExample, text string, provenance *Provenance) (map[string]any, error) {
 	// A zero value is not a prepared example and cannot reach storage.
 	if example.sourceURL == "" {
 		return nil, fmt.Errorf("meme hashtag tag requires a url")
 	}
+	payload := map[string]any{
+		"source_id": HashtagKnowledgeID(example.sourceURL), "source_ref": example.sourceURL,
+		"kind": HashtagKnowledgeKind, "title": example.hashtag, "body": text,
+		"tags": []string{"meme-hashtag"},
+	}
+	if provenance != nil {
+		metadata, err := WithProvenance(nil, *provenance)
+		if err != nil {
+			return nil, err
+		}
+		payload["metadata"] = metadata
+	}
 	answer, err := d.Handle(ctx, Request{
 		Action: ActionIngestKnowledge,
-		Event: Event{Source: "orchestrator", Type: "knowledge.ingest", Payload: map[string]any{
-			"source_id": HashtagKnowledgeID(example.sourceURL), "source_ref": example.sourceURL,
-			"kind": HashtagKnowledgeKind, "title": example.hashtag, "body": text,
-			"tags": []string{"meme-hashtag"},
-		}},
+		Event:  Event{Source: "orchestrator", Type: "knowledge.ingest", Payload: payload},
 	})
 	if err != nil {
 		return nil, err

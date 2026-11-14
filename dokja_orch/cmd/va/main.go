@@ -92,6 +92,7 @@ func main() {
 	// citations can link Ningo's own post. Nil when the shared database is absent.
 	var discordPostStore handlers.DiscordPostStore
 	var discordPostReader handlers.DiscordPostReader
+	var sharedDB *store.DB
 	// The owner's conversations live in a file of their own beside the shared database, opened by
 	// the orchestrator alone. Without it, conversations are not kept and chat goes on as before.
 	var archive *conversation.Archive
@@ -103,6 +104,7 @@ func main() {
 			logger.Error("open shared database; chat profiles are disabled", err)
 		} else {
 			defer db.Close()
+			sharedDB = db
 			profiles = db
 			discordPostStore = db
 			discordPostReader = db
@@ -230,6 +232,11 @@ func main() {
 		feedsClient, knowledgeClient, knowledgedomain.ParseIntakeSources(os.Getenv("DOKJA_KNOWLEDGE_INTAKE_SOURCES")),
 		func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	))
+	// What people propose for Ningo to learn is held pending in the shared
+	// database until the owner decides it in the Desktop; approval stores it
+	// through the same ingestion path the kind already had.
+	proposalsHandler := handlers.NewKnowledgeProposalsHandler(sharedDB, knowledgeClient, feedsClient, feedsClient)
+	knowledgeHandler.WithProposals(proposalsHandler)
 	// Price history is kept in PostgreSQL when DOKJA_PRICE_POSTGRES_DSN names an initialized
 	// namespace, and in memory otherwise (ADR 0015).
 	priceRepository, closePriceHistory := configurePriceHistory(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
@@ -293,7 +300,7 @@ func main() {
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
-		).WithApplicationSourcePreparer(knowledgeHandler).WithSourceReadJournal(sourceJournalStore).WithKnowledgePersistence(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
+		).WithApplicationSourcePreparer(knowledgeHandler).WithSourceReadJournal(sourceJournalStore).WithKnowledgePersistence(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithKnowledgeProposals(proposalsHandler).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
 			if controls != nil && !controls.ServiceEnabled("feeds") {
 				return digestdomain.Reference{}, fmt.Errorf("reading sources are disabled")
 			}

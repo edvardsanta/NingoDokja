@@ -229,6 +229,20 @@ func TestBriefsNeverAskForWhatTheLibraryHolds(t *testing.T) {
 	}
 }
 
+// A single retrieved passage is not the inventory: the general brief must stop a
+// "you have exactly one record of this kind" reading of what retrieval happened to return.
+func TestGeneralBriefNeverClaimsCompletenessFromExcerpts(t *testing.T) {
+	for _, line := range []string{
+		"never a view of the whole",
+		"never draw a count, a total or an",
+		"how much of something exists",
+	} {
+		if !strings.Contains(knowledgeReferenceBrief, line) {
+			t.Fatalf("knowledgeReferenceBrief lost its completeness rule %q:\n%s", line, knowledgeReferenceBrief)
+		}
+	}
+}
+
 func TestAShortAnswerContinuesARequestForText(t *testing.T) {
 	handler := focusHandler(&documentBase{})
 	citedBook(handler, "can you get me 5 quotes")

@@ -35,6 +35,9 @@ type DefiningMetadata struct {
 	Entities   []Entity           `json:"entities,omitempty"`
 	DateAnchor string             `json:"date_anchor,omitempty"`
 	Reading    *ReadingProvenance `json:"reading,omitempty"`
+	// Provenance is assigned by Knowledge when the record is stored; it never
+	// comes from user metadata. Absent on records stored before it existed.
+	Provenance *Provenance `json:"provenance,omitempty"`
 }
 
 func decodeMetadata(raw any) (MetadataInput, error) {
@@ -102,6 +105,47 @@ func resolvedMetadata(raw any, defaults ClassificationValues, reading *ReadingPr
 		return nil, err
 	}
 	return result, nil
+}
+
+// resolveIngestMetadata validates an ingest payload's metadata: the user-asserted
+// fields go through the usual decode, and provenance — which only Knowledge assigns —
+// is validated on its own and attached to the resolved metadata.
+func resolveIngestMetadata(raw any) (map[string]any, error) {
+	userRaw := raw
+	var assigned *Provenance
+	if object, ok := raw.(map[string]any); ok {
+		if rawProvenance, exists := object["provenance"]; exists {
+			data, err := json.Marshal(rawProvenance)
+			if err != nil {
+				return nil, fmt.Errorf("metadata provenance is invalid")
+			}
+			var provenance Provenance
+			if err := json.Unmarshal(data, &provenance); err != nil {
+				return nil, fmt.Errorf("metadata provenance is invalid")
+			}
+			assigned = &provenance
+			user := make(map[string]any, len(object))
+			for key, value := range object {
+				user[key] = value
+			}
+			delete(user, "provenance")
+			userRaw = user
+		}
+	}
+	if _, err := decodeMetadata(userRaw); err != nil {
+		return nil, err
+	}
+	metadata, err := resolvedMetadata(userRaw, ClassificationValues{}, nil)
+	if err != nil {
+		return nil, err
+	}
+	if assigned != nil {
+		metadata, err = WithProvenance(metadata, *assigned)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return metadata, nil
 }
 
 // Source defaults describe structure only. A PDF says nothing about either axis.

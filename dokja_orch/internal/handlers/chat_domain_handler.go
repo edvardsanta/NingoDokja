@@ -51,6 +51,7 @@ type ChatDomainHandler struct {
 	sourcePreparer     ApplicationSourcePreparer
 	sourceJournalStore application.JournalStore
 	knowledgePersist   *knowledgePersistence
+	knowledgeProposer  knowledgeProposer
 	archive            *conversation.Archive
 	answers            *ChatAnswerExperience
 	facts              *conversation.Facts

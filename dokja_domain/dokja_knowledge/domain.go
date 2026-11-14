@@ -150,10 +150,7 @@ func (d *Domain) Handle(ctx context.Context, request Request) (map[string]any, e
 			return nil, err
 		}
 		if raw, exists := payload["metadata"]; exists {
-			if _, err := decodeMetadata(raw); err != nil {
-				return nil, err
-			}
-			metadata, err := resolvedMetadata(raw, ClassificationValues{}, nil)
+			metadata, err := resolveIngestMetadata(raw)
 			if err != nil {
 				return nil, err
 			}

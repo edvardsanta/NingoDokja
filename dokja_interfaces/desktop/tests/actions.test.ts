@@ -952,3 +952,71 @@ test("a chat reply carries only what the orchestrator says the turn read, in a c
     assert.equal("context" in project(bad), false, JSON.stringify(bad));
   }
 });
+
+test("knowledge.proposals.list keeps the queue with its trace and current record", () => {
+  const project = ACTIONS["knowledge.proposals.list"].project;
+  const projected = project({
+    domain: "knowledge",
+    result: {
+      proposals: [{
+        id: "proposal:web_article:web:abc",
+        kind: "web_article",
+        payload: { url: "https://example.com/a" },
+        proposed_by: "sam <1>",
+        sent_by: "sam <1>",
+        source: { channel_id: "c1", message_id: "m1", permalink: "https://example.com/ch/1/m1" },
+        proposed_at: "2026-11-14T12:00:00Z",
+        current: { origin: "owner", title: "The law" },
+      }],
+    },
+  });
+
+  assert.deepEqual(projected, {
+    proposals: [{
+      id: "proposal:web_article:web:abc",
+      kind: "web_article",
+      payload: { url: "https://example.com/a" },
+      proposedBy: "sam <1>",
+      sentBy: "sam <1>",
+      source: { channelId: "c1", messageId: "m1", permalink: "https://example.com/ch/1/m1" },
+      proposedAt: "2026-11-14T12:00:00Z",
+      current: { origin: "owner", title: "The law" },
+    }],
+  });
+});
+
+test("knowledge.proposal decisions validate the id and a bounded tag edit", () => {
+  const approve = ACTIONS["knowledge.proposal.approve"].payload;
+  const reject = ACTIONS["knowledge.proposal.reject"].payload;
+  assert.deepEqual(approve({ proposal_id: "proposal:web_article:web:abc" }), { proposal_id: "proposal:web_article:web:abc" });
+  assert.deepEqual(approve({ proposal_id: "proposal:meme_hashtag:meme-hashtag:x", edit: { tag: "Games" } }),
+    { proposal_id: "proposal:meme_hashtag:meme-hashtag:x", edit: { tag: "Games" } });
+  for (const bad of [
+    { proposal_id: "not-a-proposal" },
+    { proposal_id: "proposal:web_article:web:abc", edit: { tag: "   " } },
+    { proposal_id: "proposal:web_article:web:abc", edit: { tag: "x".repeat(61) } },
+    { proposal_id: "proposal:web_article:web:abc", edit: { url: "https://example.com/other" } },
+  ]) {
+    assert.equal(approve(bad), undefined, JSON.stringify(bad));
+    assert.equal(reject(bad), undefined, JSON.stringify(bad));
+  }
+});
+
+test("knowledge.proposal decisions project the outcome, including a kept-pending refusal", () => {
+  const project = ACTIONS["knowledge.proposal.approve"].project;
+  assert.deepEqual(project({ domain: "knowledge", result: { proposal_id: "proposal:web_article:web:abc", approved: true, stored: 1, replaced_origin: "owner" } }),
+    { proposalId: "proposal:web_article:web:abc", approved: true, stored: 1, replacedOrigin: "owner" });
+  assert.deepEqual(project({ domain: "knowledge", result: { proposal_id: "proposal:web_article:web:abc", approved: false, reason: "blocked" } }),
+    { proposalId: "proposal:web_article:web:abc", approved: false, reason: "blocked" });
+  const reject = ACTIONS["knowledge.proposal.reject"].project;
+  assert.deepEqual(reject({ domain: "knowledge", result: { proposal_id: "proposal:web_article:web:abc", rejected: true } }),
+    { proposalId: "proposal:web_article:web:abc", approved: true });
+});
+
+test("knowledge.proposal decisions are owner gestures, and a rejection asks first", () => {
+  assert.equal(isWriteAction("knowledge.proposal.approve"), true);
+  assert.equal(isWriteAction("knowledge.proposal.reject"), true);
+  assert.equal(isWriteAction("knowledge.proposals.list"), false);
+  assert.equal(needsConfirmation("knowledge.proposal.reject"), true);
+  assert.equal(needsConfirmation("knowledge.proposal.approve"), false);
+});

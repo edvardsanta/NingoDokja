@@ -6,14 +6,30 @@ from datetime import date
 FORMS = {"book", "article", "note", "conversation", "meme"}
 KINDS = {"news", "reference", "research", "narrative"}
 ORIGINS = {"user", "classifier", "source_default", "user_required"}
+RECORD_ORIGINS = {"owner", "group", "api"}
 FIELDS = {"form", "content_kind", "form_choice", "kind_choice", "topics", "entities",
-          "date_anchor", "reading", "classifier"}
+          "date_anchor", "reading", "classifier", "provenance"}
+PROVENANCE_KEYS = {"origin", "proposed_by", "sent_by", "proposed_channel",
+                   "proposed_permalink", "proposed_at"}
+
+
+def _encode_provenance(value):
+    if not isinstance(value, dict) or set(value) - PROVENANCE_KEYS:
+        raise ValueError("metadata provenance has unsupported fields")
+    origin = value.get("origin")
+    if not isinstance(origin, str) or origin not in RECORD_ORIGINS:
+        raise ValueError("metadata provenance origin is unsupported")
+    for key, item in value.items():
+        if key != "origin" and (not isinstance(item, str) or not item.strip()):
+            raise ValueError(f"metadata provenance {key} must be a nonempty string")
 
 
 def encode_metadata(value):
     """Canonical JSON for an explicit metadata object, including {} to clear it."""
     if not isinstance(value, dict) or set(value) - FIELDS:
         raise ValueError("metadata must be an object with supported fields")
+    if "provenance" in value:
+        _encode_provenance(value["provenance"])
     for key, allowed in (("form", FORMS), ("content_kind", KINDS)):
         if key in value and value[key] is not None and (not isinstance(value[key], str) or value[key] not in allowed):
             raise ValueError(f"metadata {key} is unsupported")
