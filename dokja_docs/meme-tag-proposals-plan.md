@@ -22,6 +22,13 @@ the owner approved; "As built" lists where the implementation settled a question
   the link to the source message. A small image is kept as base64.
 - **The owner's own tag** now stores `origin: owner`, so retagging a meme a group label
   described replaces it (a test against the real service pins this).
+- **Reading is in the background.** The intake only holds the proposal and answers at once. A
+  background reading (at most two at a time, four minutes each) takes the text of the meme and a
+  small picture and writes them into the proposal, so the owner's approval finds them ready. For a
+  page link such as a short video, the post reader hands the media over with its bytes and the text
+  is read from them: the reader's own address is on the host's loopback and is not reachable from
+  the container where perception runs. The owner's own tag is stored by that reading once its text
+  is there.
 - **Still open:** the safety screening of a proposed meme before the owner's preview, a
   per-meme duplicate check beyond the pending one, and what happens when the poster edits or
   deletes the message.
