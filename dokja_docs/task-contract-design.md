@@ -119,6 +119,24 @@ consumer proves them with its own regressions before claiming the contract.
   necessary with automatic retries or delegated work (`10.5`) and is defined
   there, per TaskRef.
 
+### 6. Provider centralization (owner boundary, 2026-11-14)
+
+Chat providers are **centralized and must not exist in services**. A provider
+is an external adapter that helps create Ningo — it plugs into the central
+Runtime binding ([ADR 0011](decisions/0011-inference-provider-boundaries.md)),
+and no domain or service holds a provider client of its own. Consequences for
+this contract:
+
+- Execution always crosses one central Runtime boundary. Execution end,
+  cancellation and unknown-effect settlement are measured at that boundary; a
+  provider's native session, thread or run id never becomes task, attempt or
+  transcript identity (already required by the identity map).
+- Provider selection, availability and reported provenance are Runtime facts
+  projected into the task scope; domains consume them, they do not discover or
+  bind providers.
+- A task contract regression must never require a provider inside a service:
+  deterministic adapters at the Runtime boundary supply the settlement cases.
+
 ## Implementation batches
 
 **`10.6-d` — core lanes.** `TaskLanes` as the ordered-queue generalization,
