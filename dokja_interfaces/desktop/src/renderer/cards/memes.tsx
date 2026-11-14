@@ -70,7 +70,8 @@ export function MemePicker({
   const selectedMeme = memes.find((meme) => meme.url === selected);
   const loadCreatedTags = useCallback(async () => {
     const [knowledge, memory] = await Promise.all([
-      transport.request("knowledge.list", { limit: 100, offset: 0 }, { timeoutMs: 15_000 }),
+      // only the memes' tags: the Library holds more than a hundred documents of other kinds
+      transport.request("knowledge.list", { limit: 100, offset: 0, kind: "meme_hashtag" }, { timeoutMs: 15_000 }),
       transport.request("memory.list", { state: "resolved", limit: 100, offset: 0 }, { timeoutMs: 15_000 }),
     ]);
     const knowledgeTags = knowledge.ok && isRecord(knowledge.result) && Array.isArray(knowledge.result.documents)

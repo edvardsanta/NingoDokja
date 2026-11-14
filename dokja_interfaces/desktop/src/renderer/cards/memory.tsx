@@ -13,7 +13,6 @@ import {
   type ScoreView,
 } from "./memory_model.js";
 import { MemoryExperiencesPanel, WaitingVerdictsPanel } from "./memory_experiences.js";
-import { KeptFactsPanel } from "./kept_facts.js";
 import { useCard, type LoadResult } from "./use_card.js";
 import { Notice } from "./ui.js";
 
@@ -47,17 +46,17 @@ export function MemoryCard({ transport }: { transport: Transport }) {
   const judged = useCallback(() => { setVerdicts((value) => value + 1); poll(); }, [poll]);
   const memory = state.phase === "ready" && !state.data.off ? state.data : undefined;
 
-  // What asks something of the owner comes first, what he keeps next, the record after it and the
-  // numbers last. The facts stand outside the memory's frame, so they outlive a stopped service.
+  // What asks something of the owner comes first, the record after it and the numbers last. The
+  // Notebook is what Ningo did and how it went; what he knows, facts included, is in the Library.
   return (
     <WorkspacePanel trail={[t("nav_notebook")]}>
+      <p className="detail kept-about">{t("memory_about")}</p>
       <CardFrame title={t("memory_title")} state={state} onReload={reload}>
         {(view) => view.off ? <OffNotice reason={view.reason} /> : <>
           <MemoryOpening status={view.status} />
           <WaitingVerdictsPanel transport={transport} onChanged={judged} revision={verdicts} />
         </>}
       </CardFrame>
-      <KeptFactsPanel transport={transport} />
       {memory && <>
         <MemoryExperiencesPanel transport={transport} onChanged={judged} revision={verdicts} initial="resolved" />
         <MemoryBody view={memory} />

@@ -127,15 +127,21 @@ describe("document management in the knowledge card", () => {
 });
 
 describe("what the Library lists", () => {
-  it("lists what came from outside, and what Ningo keeps for himself on request, from the first page", async () => {
+  it("lists everything Ningo knows, and narrows to the documents or to the memes' tags on request", async () => {
     const { transport, calls } = routedTransport({ "knowledge.list": ok(page()) });
     render(wrap(<KnowledgeDocumentsPanel transport={transport} revision={0} onChanged={() => {}} />));
     await screen.findByText("Title note:0");
-    const toggle = screen.getByRole("button", { name: "Show what Ningo keeps for himself" });
-    expect(toggle.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Everything" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Documents" }));
     await waitFor(() => expect(calls).toHaveLength(2));
-    expect(calls.map((call) => call.payload)).toEqual([{ limit: 20, offset: 0, external: true }, { limit: 20, offset: 0 }]);
+    expect(screen.getByRole("button", { name: "Documents" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Memes and tags" }));
+    await waitFor(() => expect(calls).toHaveLength(3));
+    expect(calls.map((call) => call.payload)).toEqual([
+      { limit: 20, offset: 0 },
+      { limit: 20, offset: 0, external: true },
+      { limit: 20, offset: 0, kind: "meme_hashtag" },
+    ]);
     // the id is the operator's: in the tooltip, not in the row
     const detail = screen.getAllByText("note")[0];
     expect(detail?.getAttribute("title")).toBe("note:0");

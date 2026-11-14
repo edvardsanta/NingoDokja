@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ProposalsCard } from "../../src/renderer/cards/proposals.js";
+import { ProposalsPanel } from "../../src/renderer/cards/proposals.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
 import type { Transport } from "../../src/shared/transport.js";
 import { failure, ok, routedTransport } from "./support.js";
@@ -42,7 +42,7 @@ const page = {
   payload: { tag: "#Games", url: "https://example.com/shorts/abc", media: { kind: "link" } },
 };
 
-const view = (transport: Transport) => <I18nProvider locale="en"><ProposalsCard transport={transport} /></I18nProvider>;
+const view = (transport: Transport) => <I18nProvider locale="en"><ProposalsPanel transport={transport} /></I18nProvider>;
 
 describe("proposals", () => {
   it("lists what is pending with its trace and empties after an approval", async () => {

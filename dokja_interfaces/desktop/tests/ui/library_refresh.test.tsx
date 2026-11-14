@@ -70,8 +70,8 @@ describe("refreshing the Library", () => {
     await screen.findByText("Title note:0");
     fireEvent.click(screen.getByRole("button", { name: "Next documents" }));
     await screen.findByText("Title note:20");
-    fireEvent.click(screen.getByRole("button", { name: "Show what Ningo keeps for himself" }));
-    await waitFor(() => expect(calls.filter((call) => call.type === "knowledge.list").at(-1)?.payload).toEqual({ limit: 20, offset: 0 }));
+    fireEvent.click(screen.getByRole("button", { name: "Memes and tags" }));
+    await waitFor(() => expect(calls.filter((call) => call.type === "knowledge.list").at(-1)?.payload).toEqual({ limit: 20, offset: 0, kind: "meme_hashtag" }));
     fireEvent.click(screen.getByRole("button", { name: "Next documents" }));
     await screen.findByText("Title note:20");
     await settled();
@@ -81,8 +81,8 @@ describe("refreshing the Library", () => {
     await settled();
 
     // read again at the page and with the filter the owner had chosen, and not sent back to the start
-    expect(calls.filter((call) => call.type === "knowledge.list").at(-1)?.payload).toEqual({ limit: 20, offset: 20 });
-    expect(screen.getByRole("button", { name: "Show what Ningo keeps for himself" }).getAttribute("aria-pressed")).toBe("true");
+    expect(calls.filter((call) => call.type === "knowledge.list").at(-1)?.payload).toEqual({ limit: 20, offset: 20, kind: "meme_hashtag" });
+    expect(screen.getByRole("button", { name: "Memes and tags" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("Title note:20")).toBeTruthy();
   });
 });

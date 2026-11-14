@@ -173,7 +173,7 @@ describe("the pager", () => {
 });
 
 describe("what the count includes that the list leaves out", () => {
-  it("explains the difference while the filter is off, and not once it is on or when there is none", async () => {
+  it("shows everything first, and explains the difference only while it shows just the documents", async () => {
     const { transport, calls } = routedTransport({
       "knowledge.status": ok({ ...KNOWLEDGE_STATUS, documents: 25 }),
       "knowledge.list": (payload) => Promise.resolve(payload?.external === true ? listing(many(0, 3), 23) : listing(many(0, 3), 25)),
@@ -181,15 +181,18 @@ describe("what the count includes that the list leaves out", () => {
     renderCard(transport);
 
     await screen.findByText("25 documents in 52 passages");
-    screen.getByText("Hidden: 2 that Ningo keeps for himself.");
-    // the note is outside the button: the button keeps its name
-    const filter = screen.getByRole("button", { name: "Show what Ningo keeps for himself" });
-    expect(filter.getAttribute("aria-pressed")).toBe("false");
-    fireEvent.click(filter);
-    await waitFor(() => expect(filter.getAttribute("aria-pressed")).toBe("true"));
-    await waitFor(() => expect(screen.queryByText(/^Hidden:/)).toBeNull());
+    expect(screen.queryByText(/^Not shown here:/)).toBeNull();
+    const everything = screen.getByRole("button", { name: "Everything" });
+    expect(everything.getAttribute("aria-pressed")).toBe("true");
+    // the note is outside the buttons: they keep their names
+    const documents = screen.getByRole("button", { name: "Documents" });
+    fireEvent.click(documents);
+    await waitFor(() => expect(documents.getAttribute("aria-pressed")).toBe("true"));
+    await screen.findByText("Not shown here: 2 memes and tags, in Everything or Memes and tags.");
     // pressed shows a mark as well as a color
-    expect(filter.textContent).toContain("✓");
+    expect(documents.textContent).toContain("✓");
+    fireEvent.click(everything);
+    await waitFor(() => expect(screen.queryByText(/^Not shown here:/)).toBeNull());
     expect(calls.filter((call) => call.type === "knowledge.list").at(-1)?.payload).toEqual({ limit: 20, offset: 0 });
   });
 
@@ -200,19 +203,22 @@ describe("what the count includes that the list leaves out", () => {
     expect(screen.queryByText(/^Hidden:/)).toBeNull();
   });
 
-  it("says nothing was brought in when only what Ningo keeps is there, and lets the owner reveal it", async () => {
+  it("says nothing was brought in when only memes' tags are there, and lets the owner see them", async () => {
     const { transport } = routedTransport({
       "knowledge.status": ok({ ...KNOWLEDGE_STATUS, documents: 4 }),
       "knowledge.list": (payload) => Promise.resolve(payload?.external === true ? listing([], 0) : listing(many(0, 4), 4)),
     });
     renderCard(transport);
 
+    // everything is shown by default, so the tags are there from the start
+    await screen.findByText("Title note:0");
+    fireEvent.click(screen.getByRole("button", { name: "Documents" }));
     await screen.findByText("The shelf is empty. I can't judge what I haven't read.");
-    screen.getByText("Hidden: 4 that Ningo keeps for himself.");
+    screen.getByText("Not shown here: 4 memes and tags, in Everything or Memes and tags.");
     // no counts, but the search stays: it can match what is kept
     expect(screen.queryByText(/documents in \d+ passages/)).toBeNull();
     expect(screen.getByRole("searchbox")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Show what Ningo keeps for himself" }));
+    fireEvent.click(screen.getByRole("button", { name: "Memes and tags" }));
     await screen.findByText("Title note:0");
     expect(screen.queryByText("The shelf is empty. I can't judge what I haven't read.")).toBeNull();
   });
@@ -229,7 +235,7 @@ describe("the line under the search", () => {
 
     await screen.findByText("6 documents in 52 passages");
     const line = view.container.querySelector(".library-line") as HTMLElement;
-    for (const part of ["6 documents in 52 passages", "Similarity on", "10 passages are not indexed yet.", "Show what Ningo keeps for himself"]) {
+    for (const part of ["6 documents in 52 passages", "Similarity on", "10 passages are not indexed yet.", "Everything", "Documents", "Memes and tags"]) {
       expect(within(line).getByText(part)).toBeTruthy();
     }
     fireEvent.click(within(line).getByRole("button", { name: "Index pending passages" }));
