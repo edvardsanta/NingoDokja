@@ -227,6 +227,11 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		reference = recentReadingReference(items)
 	}
 	turnContent := withReplyContext(event, content)
+	if event.Source == core.SourceDiscord {
+		// A tag is only an account id: name it, from the owner's configuration when the id is known.
+		mentions, _ := event.Context["mentioned_users"].([]chat.Mention)
+		turnContent = chat.ResolveMentions(chatSessionBaseKey(event), turnContent, mentions, h.knownDiscordName)
+	}
 	if turns, ok := event.Context["voice_turns"].([]chat.VoiceTurn); ok {
 		turnContent, err = chat.VoiceTranscriptAs(chatSessionBaseKey(event), turns, h.knownDiscordName)
 		if err != nil {

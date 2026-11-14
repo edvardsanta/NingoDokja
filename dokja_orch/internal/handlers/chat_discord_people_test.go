@@ -239,3 +239,39 @@ func TestTheMacroExtractionNamesTheOwnerByFirstName(t *testing.T) {
 		t.Fatal(people)
 	}
 }
+
+func TestATaggedKnownAccountReachesTheTurnByTheNameTheOwnerGaveIt(t *testing.T) {
+	handler, generator := discordPeopleHandler()
+	event := channelEvent(otherAccount, "visitor", "noivo já? <@"+samAccount+"> e <@!"+nickAccount+">")
+	event.Context["mentioned_users"] = []chat.Mention{{ID: samAccount, Name: "gamer123"}, {ID: nickAccount, Name: "x"}}
+	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	turn := lastUserMessage(t, handler, event)
+	if !strings.Contains(turn, "noivo já? @Sam e @Nick") {
+		t.Fatal("tags were not replaced by the configured names", turn)
+	}
+	prompt, _ := json.Marshal(generator.replies)
+	for _, leaked := range []string{samAccount, nickAccount, "gamer123", "<@"} {
+		if strings.Contains(turn, leaked) || strings.Contains(string(prompt), leaked) {
+			t.Fatalf("%q reached the model", leaked)
+		}
+	}
+}
+
+func TestATaggedUnknownAccountIsNamedByItsDisplayNameOrAlias(t *testing.T) {
+	handler, _ := discordPeopleHandler()
+	event := channelEvent(otherAccount, "visitor", "oi <@777777777777777777> e <@888888888888888888>")
+	event.Context["mentioned_users"] = []chat.Mention{{ID: "777777777777777777", Name: "Draco"}}
+	if _, err := handler.Handle(t.Context(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	turn := lastUserMessage(t, handler, event)
+	alias := chat.ParticipantAlias(chatSessionBaseKey(event), "888888888888888888")
+	if !strings.Contains(turn, "oi @Draco e @"+alias) {
+		t.Fatal("unknown tags were not named", turn)
+	}
+	if strings.Contains(turn, "777777777777777777") || strings.Contains(turn, "888888888888888888") {
+		t.Fatal("an account id stayed in the turn", turn)
+	}
+}
