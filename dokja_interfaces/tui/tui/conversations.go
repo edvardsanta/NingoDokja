@@ -77,6 +77,8 @@ type conversationsView struct {
 	sending *runningTurn
 	// stopping holds a second stop back while the first is on its way.
 	stopping bool
+	// judging holds a second verdict back while the first is on its way.
+	judging bool
 }
 
 // runningTurn names a send as the orchestrator knows it. A first message has none until the
@@ -208,6 +210,17 @@ func retryableTurn(turns []conversationTurn) (conversationTurn, bool) {
 	return conversationTurn{}, false
 }
 
+// judgeableTurn finds the newest completed answer. A later failed or interrupted turn does not
+// erase an earlier answer the owner may still want to judge.
+func judgeableTurn(turns []conversationTurn) (conversationTurn, bool) {
+	for index := len(turns) - 1; index >= 0; index-- {
+		if turns[index].State == "completed" {
+			return turns[index], true
+		}
+	}
+	return conversationTurn{}, false
+}
+
 // stoppableTurn is the send a stop reaches: the one this screen waits on, or else one still on its way
 // from another interface. Only the latest turn can be, as in the desktop.
 func (c *conversationsView) stoppableTurn() (runningTurn, bool) {
@@ -244,6 +257,47 @@ func (m *Model) cmdConversationStop() tea.Cmd {
 		}
 		_, err := m.request("conversation.stop", map[string]any{"conversation_id": target.conversationID, "send_id": target.sendID})
 		return conversationStopMsg{err: err, waited: waited, conversationID: target.conversationID}
+	}
+}
+
+type conversationFeedbackMsg struct {
+	unsupported    bool
+	err            error
+	conversationID string
+	turnID         string
+	verdict        string
+	answer         map[string]any
+}
+
+// cmdConversationFeedback judges the newest completed answer of the open conversation. It asks for
+// the capability first, like Talk, so an older orchestrator never receives a verdict it cannot keep.
+func (m *Model) cmdConversationFeedback(verdict string) tea.Cmd {
+	view := &m.conversations
+	if view.open == nil || view.open.row.ID == "" {
+		m.setNotice(tr("nothing_to_judge"), true)
+		return nil
+	}
+	turn, ok := judgeableTurn(view.open.turns)
+	if !ok {
+		m.setNotice(tr("nothing_to_judge"), true)
+		return nil
+	}
+	if view.judging {
+		return nil
+	}
+	if !m.begin(tr("judging_the_answer")) {
+		return nil
+	}
+	view.judging = true
+	id := view.open.row.ID
+	return func() tea.Msg {
+		if !cli.FeedbackSupported(m.request) {
+			return conversationFeedbackMsg{unsupported: true, conversationID: id, turnID: turn.ID, verdict: verdict}
+		}
+		answer, err := m.request("conversation.feedback", map[string]any{
+			"conversation_id": id, "turn_id": turn.ID, "seq": turn.Seq, "verdict": verdict,
+		})
+		return conversationFeedbackMsg{answer: answer, err: err, conversationID: id, turnID: turn.ID, verdict: verdict}
 	}
 }
 
@@ -531,6 +585,10 @@ func (m *Model) keyConversationOpen(key string) (tea.Model, tea.Cmd) {
 		return m, m.cmdConversationTurn(view.open.row.ID, "", turn.SendID, map[string]any{"retry_turn_id": turn.ID})
 	case "s":
 		return m, m.cmdConversationStop()
+	case "u":
+		return m, m.cmdConversationFeedback("useful")
+	case "w":
+		return m, m.cmdConversationFeedback("wrong")
 	}
 	return m, nil
 }
@@ -670,6 +728,13 @@ func firstOf(text, fallback string) string {
 		return text
 	}
 	return fallback
+}
+
+func answerVerdictLabel(verdict string) string {
+	if verdict == "wrong" {
+		return tr("answer_verdict_wrong")
+	}
+	return tr("answer_verdict_useful")
 }
 
 func (m *Model) viewConversationOpen() string {

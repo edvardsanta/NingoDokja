@@ -83,7 +83,11 @@ Interface → message.created → Orchestrator
 - **Trigger.** Only turns with a focused document (or documents the person
   names). A turn without focus behaves exactly as today. One preparation per
   turn; a focus that does not change reuses the pins of the last turn when
-  the text version still matches, so it reads nothing again.
+  the text version still matches, so it reads nothing again. The owner can
+  supply those documents or links from Desktop, Discord or WhatsApp; the
+  preparation keeps that origin and reading identity as provenance. Content
+  sent by another person in a shared place is not owner knowledge merely
+  because Ningo saw it.
 - **Budget.** Preparation runs inside the chat turn's deadline. Its 15 s
   workflow deadline becomes the smaller of that and what remains of the turn.
   A source that cannot be read in time is left out and the answer says so;

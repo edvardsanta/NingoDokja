@@ -1,8 +1,12 @@
 # Answer feedback
 
-Status: implemented for Desktop Talk, 2026-11-08. CLI and TUI do not offer it yet.
+Status: implemented for Desktop Talk (2026-11-08), CLI and TUI (2026-11-14).
+Desktop buttons and the TUI `u`/`w` keys are offered only when
+`conversation.capabilities` reports `feedback: supported`; the CLI asks the same report
+before sending a verdict.
 
-The owner can judge an answer in Talk as **useful** or **wrong**. That verdict is the
+The owner can judge an answer in Desktop Talk, the CLI or the TUI as **useful** or
+**wrong**. That verdict is the
 outcome step `08.3` learns from: until it existed, Ningo recorded what it did but never
 whether it helped. It reuses the experience memory loop that music and hashtag suggestions
 already use, rather than a new store. The order was the owner's decision, and the
@@ -23,12 +27,15 @@ already use, rather than a new store. The order was the owner's decision, and th
    holds. Failed, stopped, voice and channel answers record nothing: groups have no verdict
    to give, and their questions are other people's. Memory being slow or down never delays
    or fails the reply; the record is skipped and logged without the question.
-2. **Verdict.** `conversation.feedback`, a change that needs a real press on the Desktop:
+2. **Verdict.** `conversation.feedback`, an owner-initiated change: a real Desktop or TUI
+   press, or the explicit CLI command `conversations feedback <id> <useful|wrong>`:
 
    ```json
    { "conversation_id": "<id>", "turn_id": "<id>", "seq": 3, "verdict": "useful" }
    ```
 
+   Desktop and TUI offer it only for a completed answer they are showing; the CLI reads the
+   conversation, chooses the newest completed answer, and asks the capability report first.
    The orchestrator reads the turn back from the caller's conversation and accepts a
    verdict only for a completed answer. It derives the ref from the turn, never from the
    request, and resolves it: `useful` is `accepted` and `wrong` is `replaced`. The reply is
@@ -41,8 +48,9 @@ already use, rather than a new store. The order was the owner's decision, and th
    from hashtag suggestions. `memory.stats` accepts `chat.answer` or the default
    `hashtag.suggest`, and nothing else.
 
-`conversation.capabilities` names `feedback` when memory is wired. Talk offers the buttons
-only on an explicit `supported`, since an older orchestrator would refuse the request.
+`conversation.capabilities` names `feedback` when memory is wired. Desktop and TUI offer
+verdict controls only on an explicit `supported`; the CLI asks the same report before it
+sends, since an older orchestrator would refuse the request.
 
 ## Privacy
 
@@ -63,6 +71,12 @@ file is created readable by its owner only. The questions are never logged.
 - Desktop: shell payload and press gating (the screen cannot name an outcome or a ref),
   Talk buttons only with `feedback: supported`, the first verdict shown, an older answer,
   and the separate Notebook score.
+- CLI: `conversations feedback` chooses the newest completed answer from the archive read,
+  refuses unknown verdicts and unsupported orchestrators, sends the archive turn identity,
+  and prints resolved, conflicting and older-answer replies.
+- TUI: `u`/`w` are offered only inside an open conversation with a completed answer, ask
+  the capability report first, hold duplicate presses while one verdict is in flight, and
+  localize saved, conflicting, older-answer and unsupported results.
 - Live, against a real `dokja-memory` process with a scratch database (embeddings off): an
   archived handler with a stubbed model answered 3 sends and 3 replays, and memory held 3
   experiences. Useful and wrong were kept, a second verdict reported the first, and the
@@ -71,8 +85,8 @@ file is created readable by its owner only. The questions are never logged.
 
 ## Not yet
 
-- CLI and TUI verdicts.
-- Showing an earlier verdict when a conversation is reopened; Talk learns it only when a
-  button is pressed.
+- Showing an earlier verdict when a conversation is reopened; Talk and the TUI learn it
+  only when a verdict is submitted, and the CLI prints the standing verdict after a
+  conflicting request.
 - Using the score: `08.3` decides what an answer prediction that beats its baseline should
   change.

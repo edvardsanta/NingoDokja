@@ -571,3 +571,82 @@ func TestStoppingAsksNothingOfAnOrchestratorThatCannotStop(t *testing.T) {
 		t.Fatal("a stop that was never asked is not left pending")
 	}
 }
+
+func TestUsefulJudgesTheNewestCompletedAnswer(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	older := turnFixture("older", "completed", "Antes", "Sim.", "")
+	older["seq"] = 3.0
+	newer := turnFixture("newer", "completed", "Agora", "Talvez.", "")
+	newer["seq"] = 5.0
+	later := turnFixture("later", "failed", "Depois", "", "model failed")
+	later["seq"] = 6.0
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{older, newer, later},
+	}
+	fake.responses["conversation.capabilities"] = map[string]any{"view": 1, "operations": map[string]any{"feedback": "supported"}}
+	fake.responses["conversation.feedback"] = map[string]any{"turn_id": "newer", "found": true, "resolved": true, "verdict": "useful"}
+	press(m, "5", "enter", "u")
+	got := fake.last("conversation.feedback").payload
+	if got["conversation_id"] != firstConversation || got["turn_id"] != "newer" || got["seq"] != 5 || got["verdict"] != "useful" {
+		t.Fatal(got)
+	}
+	if !strings.Contains(m.notice, "Resposta marcada como útil") {
+		t.Fatal(m.notice)
+	}
+}
+
+func TestTheFirstVerdictStandsWhenTheOwnerChangesTheirMind(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	answered := turnFixture("t1", "completed", "Por quê?", "Porque sim.", "")
+	answered["seq"] = 2.0
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{answered},
+	}
+	fake.responses["conversation.capabilities"] = map[string]any{"view": 1, "operations": map[string]any{"feedback": "supported"}}
+	fake.responses["conversation.feedback"] = map[string]any{"turn_id": "t1", "found": true, "resolved": false, "verdict": "wrong"}
+	press(m, "5", "enter", "u")
+	if got := fake.last("conversation.feedback").payload; got["verdict"] != "useful" {
+		t.Fatal(got)
+	}
+	if !strings.Contains(m.notice, "Já existe um veredito: errada. Ele foi mantido.") {
+		t.Fatal(m.notice)
+	}
+}
+
+func TestAnAnswerOlderThanVerdictsSaysSo(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	answered := turnFixture("t1", "completed", "Antes", "Resposta.", "")
+	answered["seq"] = 2.0
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Antiga", 4),
+		"turns":        []any{answered},
+	}
+	fake.responses["conversation.capabilities"] = map[string]any{"view": 1, "operations": map[string]any{"feedback": "supported"}}
+	fake.responses["conversation.feedback"] = map[string]any{"turn_id": "t1", "found": false, "resolved": false}
+	press(m, "5", "enter", "w")
+	if !strings.Contains(m.notice, "anterior aos vereditos") {
+		t.Fatal(m.notice)
+	}
+}
+
+func TestFeedbackAsksNothingWithoutSupportOrACompletedAnswer(t *testing.T) {
+	m, fake := conversationsTUI(t)
+	fake.responses["conversation.capabilities"] = map[string]any{"view": 1, "operations": map[string]any{"feedback": "unsupported"}}
+	press(m, "5", "enter", "u")
+	if fake.count("conversation.feedback") != 0 || !strings.Contains(m.notice, "não guarda vereditos") {
+		t.Fatal(fake.calls, m.notice)
+	}
+
+	failed := turnFixture("t1", "failed", "Oi", "", "model failed")
+	fake.responses["conversation.read"] = map[string]any{
+		"conversation": conversationFixture(firstConversation, "general", "Justiça", 4),
+		"turns":        []any{failed},
+	}
+	m.conversations.open.turns = []conversationTurn{parseConversationTurn(failed)}
+	press(m, "u")
+	if fake.count("conversation.capabilities") != 1 || fake.count("conversation.feedback") != 0 || !strings.Contains(m.notice, "Não há resposta completa") {
+		t.Fatal(fake.calls, m.notice)
+	}
+}
