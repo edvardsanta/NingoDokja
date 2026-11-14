@@ -27,7 +27,8 @@ _SPEECH_LABELS = {
 }
 
 
-def kind_from_scores(scores: dict[str, float]) -> str:
+def laughter_and_speech(scores: dict[str, float]) -> tuple[float, float]:
+    """The summed laughter and speech scores of one clip."""
     normalized = {label.strip().lower(): score for label, score in scores.items()}
     laughter = sum(
         score for label, score in normalized.items() if label in _LAUGHTER_LABELS
@@ -35,6 +36,11 @@ def kind_from_scores(scores: dict[str, float]) -> str:
     speech = sum(
         score for label, score in normalized.items() if label in _SPEECH_LABELS
     )
+    return laughter, speech
+
+
+def kind_from_scores(scores: dict[str, float]) -> str:
+    laughter, speech = laughter_and_speech(scores)
     if laughter >= 0.65 and laughter >= speech * 1.25:
         return LAUGHTER
     if speech >= 0.35 and speech >= laughter * 1.25:
@@ -100,7 +106,20 @@ class TransformersAudioClassifier:
             for index, score in enumerate(probabilities)
             if index in labels
         }
-        return kind_from_scores(scores)
+        kind = kind_from_scores(scores)
+        laughter, speech = laughter_and_speech(scores)
+        top_label, top_score = max(scores.items(), key=lambda item: item[1])
+        # Only numbers and a label, never audio or text: this is what tuning the thresholds needs.
+        logging.getLogger("dokja_voice.acoustic").info(
+            "acoustic classified kind=%s laughter=%.2f speech=%.2f top=%s:%.2f seconds=%.2f",
+            kind,
+            laughter,
+            speech,
+            top_label,
+            top_score,
+            pcm.size / 16000,
+        )
+        return kind
 
     def _load(self) -> None:
         if self._model is not None:
