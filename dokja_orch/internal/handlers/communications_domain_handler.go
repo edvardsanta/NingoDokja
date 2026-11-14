@@ -121,6 +121,7 @@ func inboundIntent(event core.Event) (communications.InboundIntent, bool) {
 			if !ok {
 				return communications.InboundIntent{}, false
 			}
+			r.MemeTagPost, _ = event.Context["meme_tag_post"].(bool)
 		}
 	case "whatsapp":
 		var ok bool
