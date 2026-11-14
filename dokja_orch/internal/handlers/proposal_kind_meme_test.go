@@ -69,15 +69,28 @@ type postReaderStub struct {
 	// file is what the reader's "media" action hands over; large makes it a file too big to travel.
 	file  string
 	large bool
+	// held makes Feeds keep the file and hand it over by token, in pieces of four bytes
+	held    bool
+	chunkOK *bool
 }
 
 func (s *postReaderStub) Dispatch(ctx context.Context, kind string, payload map[string]any) (map[string]any, error) {
 	switch kind {
 	case "feeds.status":
 		return map[string]any{"providers": []any{map[string]any{"id": "reader", "enabled": true, "provides": []any{"social.resolve.v1"}}}}, nil
+	case "feeds.media.read":
+		if s.chunkOK != nil && !*s.chunkOK {
+			return nil, errors.New("piece unavailable")
+		}
+		offset := int(payload["offset"].(int64))
+		end := min(offset+4, len(s.file))
+		return map[string]any{"data_b64": base64.StdEncoding.EncodeToString([]byte(s.file[offset:end])), "content_type": "video/mp4", "size": float64(len(s.file))}, nil
 	case "feeds.invoke":
 		switch payload["action"] {
 		case "media_file":
+			if s.held {
+				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(len(s.file))}, nil
+			}
 			if s.large {
 				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(50_000_000)}, nil
 			}
@@ -536,5 +549,68 @@ func TestOnlyAFewMediaReadingsRunAtOnce(t *testing.T) {
 	h := NewKnowledgeProposalsHandler(nil, &proposalsKnowledgeStub{}, &postReaderStub{}, &fakeReader{})
 	if cap(h.memeWork) != maxMemeReadings {
 		t.Fatal(cap(h.memeWork))
+	}
+}
+
+func TestAFileFeedsHoldsIsReadInPiecesAndNotMistakenForOneTooLarge(t *testing.T) {
+	page := "https://example.com/shorts/abc"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "http://127.0.0.1:8791/media/0123456789abcdef.mp4"}}}, file: "VIDEO BYTES", held: true}
+	m := newMemeHarness(t, web, memeFetchStub{}, nil)
+	m.text.dataText = map[string]string{"VIDEO BYTES": "FROM THE PIECES"}
+	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	media := m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)
+	if media["text"] != "FROM THE PIECES" || media["reading"] != "done" || len(m.text.data) != 1 || m.text.data[0] != "VIDEO BYTES|video/mp4" {
+		t.Fatalf("a file held by token is assembled from its pieces and read whole: %v data=%v", media, m.text.data)
+	}
+}
+
+func TestAPieceThatCannotBeReadIsUnreachableNotTooLarge(t *testing.T) {
+	broken := false
+	page := "https://example.com/shorts/abc"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "http://127.0.0.1:8791/media/0123456789abcdef.mp4"}}}, file: "VIDEO BYTES", held: true, chunkOK: &broken}
+	m := newMemeHarness(t, web, memeFetchStub{}, nil)
+	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	media := m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)
+	if media["reading"] != "failed" || media["reason"] != "media_unreachable" {
+		t.Fatalf("%v", media)
+	}
+}
+
+func TestTheQueueSaysHowTheReadingOfAMemeStands(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	if _, err := m.h.Handle(context.Background(), tagPost("user-sam", "#SomeGames", video, nil), coreStep("propose-meme-tag")); err != nil {
+		t.Fatal(err)
+	}
+	media := func() map[string]any { return m.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any) }
+	if media()["reading"] != "pending" {
+		t.Fatalf("the proposal says its text is being read: %v", media())
+	}
+	m.drain()
+	if media()["reading"] != "done" || media()["reason"] != nil {
+		t.Fatalf("%v", media())
+	}
+
+	failing := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	failing.text.text[signedClip] = ""
+	propose(t, failing, tagPost("user-sam", "#SomeGames", video, nil))
+	got := failing.pending(t)[0]["payload"].(map[string]any)["media"].(map[string]any)
+	if got["reading"] != "failed" || got["reason"] != "no_text" {
+		t.Fatalf("a reading that found nothing says why, in a fixed word: %v", got)
+	}
+}
+
+func TestOnlyAKnownReadingStatusAndAFixedReasonAreKept(t *testing.T) {
+	proposal, err := knowledgedomain.ValidateProposal("meme_hashtag", map[string]any{"url": stableClip, "tag": "#SomeGames",
+		"media": map[string]any{"reading": "failed", "reason": "Error: connection refused to 10.0.0.1"}}, "sam", "sam")
+	if err != nil {
+		t.Fatal(err)
+	}
+	media := proposal.Payload["media"].(map[string]any)
+	if media["reading"] != "failed" || media["reason"] != nil {
+		t.Fatalf("a provider's words are never kept as a reason: %v", media)
+	}
+	other, _ := knowledgedomain.ValidateProposal("meme_hashtag", map[string]any{"url": stableClip, "tag": "#SomeGames", "media": map[string]any{"reading": "whatever"}}, "sam", "sam")
+	if other.Payload["media"].(map[string]any)["reading"] != nil {
+		t.Fatal("an unknown status is dropped")
 	}
 }
