@@ -115,8 +115,10 @@ type policy struct {
 	maxAge    time.Duration
 	source    string
 	query     string
-	from      time.Time
-	until     time.Time
+	// kind narrows the digest to the memes ("media") or to what is reading ("reading"); empty is both
+	kind  string
+	from  time.Time
+	until time.Time
 }
 
 func policyFrom(payload map[string]any) (policy, error) {
@@ -146,6 +148,15 @@ func policyFrom(payload map[string]any) (policy, error) {
 		}
 	}
 	chosen.query = strings.ToLower(chosen.query)
+	if raw, present := payload["kind"]; present && raw != "" {
+		value, _ := raw.(string)
+		if value != kindMedia && value != kindReading && value != "all" {
+			return policy{}, fmt.Errorf("kind must be media, reading or all")
+		}
+		if value != "all" {
+			chosen.kind = value
+		}
+	}
 	for name, target := range map[string]*time.Time{"from": &chosen.from, "to": &chosen.until} {
 		if raw, present := payload[name]; present && raw != "" {
 			value, ok := raw.(string)
@@ -251,7 +262,7 @@ func (d *Domain) RecentReferences(ctx context.Context, question string, limit in
 	}
 	// The digest already defines ordering and duplicate handling. Use a generous
 	// freshness window so an infrequently updated source still has recent items.
-	ordered := compose(items, policy{limit: len(items), perSource: len(items), maxAge: 100 * 365 * 24 * time.Hour}, d.now()).items
+	ordered := compose(items, policy{limit: len(items), perSource: len(items), kind: kindReading, maxAge: 100 * 365 * 24 * time.Hour}, d.now()).items
 	result := make([]Reference, 0, limit)
 	for _, item := range ordered {
 		bound := func(s string, n int) string {
@@ -292,7 +303,7 @@ func (d *Domain) Reference(ctx context.Context, id string) (Reference, error) {
 		return Reference{}, err
 	}
 	for _, item := range items {
-		if item.id != id {
+		if item.id != id || item.kind == kindMedia {
 			continue
 		}
 		bound := func(s string, n int) string {

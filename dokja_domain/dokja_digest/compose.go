@@ -20,6 +20,7 @@ type item struct {
 	summary   string
 	body      string
 	mediaURL  string
+	kind      string
 	url       string
 	source    string
 	published time.Time // the zero time when unknown
@@ -29,10 +30,17 @@ type item struct {
 
 // hiddenKinds are item kinds that are data for another domain, not reading. Price
 // observations (kind "price") belong to the Price domain: a row of prices is neither worth
-// showing in the digest nor worth citing in a conversation. Media observations (kind "media",
-// the memes a source collects) belong to the meme pool: they are picked and tagged where memes
-// are sent, and saving one as a document would send a video through the document reader.
-var hiddenKinds = map[string]bool{"price": true, "media": true}
+// showing in the digest nor worth citing in a conversation.
+var hiddenKinds = map[string]bool{"price": true}
+
+// The kinds of item a reader of the digest can ask for. Media observations (kind "media", the memes a
+// source collects) are listed, since they arrive from the same plugins, but they are not reading: they
+// are tagged, not saved as documents (a video would go through the document reader), and a
+// conversation never cites them.
+const (
+	kindMedia   = "media"
+	kindReading = "reading"
+)
 
 // itemsFrom reads the items of a feeds.items reply. An entry that is not an object with a title
 // is skipped: the service already cleans what plugins print, and one bad entry must not hide
@@ -67,6 +75,7 @@ func itemsFrom(reply map[string]any) ([]item, error) {
 			summary:   text(fields, "summary"),
 			body:      text(fields, "body"),
 			mediaURL:  text(fields, "media_url"),
+			kind:      text(fields, "kind"),
 			url:       text(fields, "url"),
 			source:    text(fields, "source"),
 			published: published,
@@ -119,6 +128,9 @@ func compose(items []item, chosen policy, now time.Time) digest {
 	fresh := make([]item, 0, len(items))
 	for _, candidate := range items {
 		if chosen.source != "" && candidate.plugin != chosen.source && candidate.source != chosen.source {
+			continue
+		}
+		if chosen.kind == kindMedia && candidate.kind != kindMedia || chosen.kind == kindReading && candidate.kind == kindMedia {
 			continue
 		}
 		if chosen.query != "" && !strings.Contains(strings.ToLower(candidate.title+"\n"+candidate.summary+"\n"+candidate.body+"\n"+candidate.source), chosen.query) {
@@ -261,6 +273,9 @@ func (d digest) reply(updated string) map[string]any {
 		}
 		if shown.mediaURL != "" {
 			row["media_url"] = shown.mediaURL
+		}
+		if shown.kind == kindMedia {
+			row["kind"] = kindMedia
 		}
 		if shown.body != "" {
 			row["body"] = shown.body
