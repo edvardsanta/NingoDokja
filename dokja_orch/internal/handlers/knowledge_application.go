@@ -37,17 +37,23 @@ type PreparedKnowledgeSource struct {
 
 // PrepareFocusedSource runs the existing one-source preparation workflow for a Talk focus. It is
 // intentionally narrow: no caller authority, outcome, applicability or conclusion enters here.
-func (h *KnowledgeDomainHandler) PrepareFocusedSource(ctx context.Context, sourceID, goal string) (PreparedKnowledgeSource, error) {
+// textVersion is the caller's version pin for the read; journaled preparations require one and
+// record it as the selection's evidence, while the validated version still comes from the read.
+func (h *KnowledgeDomainHandler) PrepareFocusedSource(ctx context.Context, sourceID, goal, textVersion string) (PreparedKnowledgeSource, error) {
 	goal = strings.TrimSpace(goal)
 	if h == nil || h.domain == nil || sourceID == "" || goal == "" {
 		return PreparedKnowledgeSource{}, fmt.Errorf("focused source preparation is incomplete")
+	}
+	selection := map[string]any{"source_id": sourceID}
+	if textVersion != "" {
+		selection["text_version"] = textVersion
 	}
 	event := core.Event{
 		EventID: uuid.NewString(), Source: core.SourceOrchestrator, Type: knowledge.ActionPrepareApplication,
 		Payload: map[string]any{
 			"contract": knowledge.ApplicationContract,
 			"goal":     goal,
-			"sources":  []any{map[string]any{"source_id": sourceID}},
+			"sources":  []any{selection},
 		},
 	}
 	output, err := h.prepareApplication(ctx, event)

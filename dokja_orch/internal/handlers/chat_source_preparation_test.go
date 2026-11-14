@@ -8,15 +8,15 @@ import (
 )
 
 type focusedSourcePreparer struct {
-	calls          int
-	sourceID, goal string
-	version        string
-	err            error
+	calls               int
+	sourceID, goal, pin string
+	version             string
+	err                 error
 }
 
-func (p *focusedSourcePreparer) PrepareFocusedSource(_ context.Context, sourceID, goal string) (PreparedKnowledgeSource, error) {
+func (p *focusedSourcePreparer) PrepareFocusedSource(_ context.Context, sourceID, goal, textVersion string) (PreparedKnowledgeSource, error) {
 	p.calls++
-	p.sourceID, p.goal = sourceID, goal
+	p.sourceID, p.goal, p.pin = sourceID, goal, textVersion
 	if p.err != nil {
 		return PreparedKnowledgeSource{}, p.err
 	}

@@ -112,6 +112,7 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 				data.Failures = append(data.Failures, webFailure{link.URL, "unreadable"})
 				continue
 			}
+			h.knowledgePersist.persistWebReading(readCtx, event, document)
 			saved.documents = append(saved.documents, document)
 		}
 	}

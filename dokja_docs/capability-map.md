@@ -404,7 +404,14 @@ from both in turn, until three replies pass without it. A focused source with a 
 observed version runs the one-source `knowledge.application.prepare` workflow and stamps its
 validated `text_version` on cited passages and archived turn sources; unchanged pins are reused
 without another whole-source read. Owner-supplied Discord/WhatsApp web readings carry bounded
-passage-derived text versions with their provenance. The reply comes from the session, so it survives a restart, and it
+passage-derived text versions with their provenance. When a focused turn has a version
+candidate (the last cited pin or the version the hits now observe), the preparation runs under
+a per-turn source-read journal and records the pinned read before any IO, settled with the
+validated outcome; without a candidate it stays unjournaled, and a journal failure never
+blocks the turn. Owner-supplied web documents and WhatsApp self-chat files also persist as
+durable Knowledge under the citation's stable `web:<hash>` identity, owner-only (verified
+Discord owner or WhatsApp self-chat) and best effort: a stranger's message is read for the
+reply but never becomes the owner's knowledge. The reply comes from the session, so it survives a restart, and it
 only guides the search: it is never evidence. The focus lives in the orchestrator's memory. When it
 is gone, a short follow-up or a request for the text that finds nothing searches everything with the
 previous reply, and a reply that cites the document brings the focus back. A
@@ -548,8 +555,9 @@ proves source validation only. The Desktop Apply view, its native source supervi
 and operator routes were removed on 2026-11-08 because no flow consumed them; the
 [Apply review](knowledge-apply-review.md) moves preparation into the Talk workflow.
 The PostgreSQL journal stays, configured by its DSN alone, and startup recovery still
-interrupts reads an earlier process left unsettled. Preparation inside Talk, actual
-method outcomes and learned episode reuse remain pending in `08.2`.
+interrupts reads an earlier process left unsettled. Focused Talk preparation now writes those
+receipts when a version candidate exists, and owner-supplied readings persist as durable
+Knowledge. Actual method outcomes and learned episode reuse remain pending in `08.2`.
 See [preparation](knowledge-application.md), [assessment/evaluation inputs](knowledge-applicability.md)
 [provider proposal bounds](knowledge-provider-proposals.md), and
 [measured inference](inference-token-budgets.md). The separate

@@ -8,6 +8,7 @@ import (
 	communications "read_books/dokja_domain/dokja_communications"
 	conversation "read_books/dokja_domain/dokja_conversation"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	application "read_books/dokja_domain/dokja_memory/application"
 	store "read_books/dokja_store"
 	"read_books/internal/core"
 	"read_books/internal/logger"
@@ -45,13 +46,15 @@ type ChatDomainHandler struct {
 	voicePolicy    *chat.VoicePolicy
 	focus          *chatFocus
 
-	knowledge        KnowledgeSearcher
-	knowledgeEnabled func() bool
-	sourcePreparer   ApplicationSourcePreparer
-	archive          *conversation.Archive
-	answers          *ChatAnswerExperience
-	facts            *conversation.Facts
-	ownerProfile     chat.OwnerProfile
+	knowledge          KnowledgeSearcher
+	knowledgeEnabled   func() bool
+	sourcePreparer     ApplicationSourcePreparer
+	sourceJournalStore application.JournalStore
+	knowledgePersist   *knowledgePersistence
+	archive            *conversation.Archive
+	answers            *ChatAnswerExperience
+	facts              *conversation.Facts
+	ownerProfile       chat.OwnerProfile
 	// ownerDiscord is the owner's numeric Discord account id, so a turn can name the owner by account.
 	ownerDiscord string
 	incoming     *IncomingContentWorkflow

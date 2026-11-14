@@ -57,7 +57,7 @@ func prepareThroughOrchestrator(ctx context.Context, store *applicationStore, ev
 }
 func TestPrepareFocusedSourceReturnsValidatedVersionAndTask(t *testing.T) {
 	store := &applicationStore{documents: map[string]string{"guide": "bounded guide"}}
-	prepared, err := NewKnowledgeDomainHandler(store).PrepareFocusedSource(context.Background(), "guide", "Explain the guide")
+	prepared, err := NewKnowledgeDomainHandler(store).PrepareFocusedSource(context.Background(), "guide", "Explain the guide", "")
 	if err != nil {
 		t.Fatal(err)
 	}

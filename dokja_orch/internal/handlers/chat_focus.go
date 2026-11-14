@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"read_books/dokja_domain/dokja_memory/application"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"regexp"
@@ -205,7 +206,28 @@ func (h *ChatDomainHandler) pinFocusedSources(ctx context.Context, question stri
 	if version == "" && h.sourcePreparer != nil && len(sources) > 0 {
 		prepareCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
 		defer cancel()
-		prepared, err := h.sourcePreparer.PrepareFocusedSource(prepareCtx, document, strings.TrimSpace(question))
+		candidate := observed
+		if candidate == "" {
+			// Revalidate the conversation's last pin against the text Knowledge searched.
+			candidate = turn.focus.TextVersion
+		}
+		if h.sourceJournalStore != nil && candidate != "" {
+			// A journaled read requires every source pinned before any IO, so the candidate
+			// enters as the selection's evidence; a journal failure never blocks the turn.
+			binding := SourceReadJournal{
+				Scope: "talk:" + turn.key, ApplicationRef: "chat:" + turn.key,
+				StateRevision: 1, PlanRevision: 1,
+				Store: h.sourceJournalStore, Clock: time.Now,
+				Authorize: talkFocusedSourceAuthorize(document),
+			}
+			journaled, err := WithSourceReadJournal(prepareCtx, binding)
+			if err != nil {
+				logger.Info(fmt.Sprintf("focused source journal disabled: %v", err))
+			} else {
+				prepareCtx = journaled
+			}
+		}
+		prepared, err := h.sourcePreparer.PrepareFocusedSource(prepareCtx, document, strings.TrimSpace(question), candidate)
 		if err != nil {
 			logger.Info(fmt.Sprintf("focused source preparation skipped: %v", err))
 		} else {
@@ -221,6 +243,19 @@ func (h *ChatDomainHandler) pinFocusedSources(ctx context.Context, question stri
 		}
 	}
 	return sources
+}
+
+// talkFocusedSourceAuthorize admits exactly one pinned read of the focused document for a Talk
+// turn: no other capability, source or unpinned read passes. It returns an opaque decision
+// reference, never a credential, and checks the permission the journal presents rather than
+// anything the conversation claims.
+func talkFocusedSourceAuthorize(document string) func(context.Context, SourceReadPermission) (string, error) {
+	return func(_ context.Context, permission SourceReadPermission) (string, error) {
+		if permission.Capability != sourceReadCapability || permission.Source.SourceID != document || permission.Source.TextVersion == "" {
+			return "", application.ErrJournalDenied
+		}
+		return "decision:talk-focused-source", nil
+	}
 }
 
 func focusedSourceVersion(sources []knowledgeSource, document string) string {
