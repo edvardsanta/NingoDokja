@@ -7,8 +7,8 @@ the owner approved; "As built" lists where the implementation settled a question
 ## As built
 
 - **Who proposes:** a known person (`NingoFacts.People`), as ADR 0016 and issues #427 and
-  #428 record. A stranger's post is kept nowhere, and the owner's own tags go through the
-  desktop. Widening this to every member is one rule in `ProposeMemeTag`.
+  #428 record. A stranger's post is kept nowhere. The owner's own post is held too, and
+  they decide it in the desktop like any other. Widening this to every member is one rule in `ProposeMemeTag`.
 - **The reply:** a plain reply naming a tag (`#Tag`) to the message that carries the meme,
   not a slash command, so no Discord command is added.
 - **The meme channel** is the configured list of meme channels
