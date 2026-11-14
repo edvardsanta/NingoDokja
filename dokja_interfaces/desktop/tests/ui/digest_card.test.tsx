@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { DigestCard } from "../../src/renderer/cards/digest.js";
 import { WorkspacePanel } from "../../src/renderer/cards/workspace_panel.js";
 import { I18nProvider } from "../../src/renderer/i18n/context.js";
-import type { DigestStatus } from "../../src/shared/replies.js";
+import type { DigestItem, DigestStatus } from "../../src/shared/replies.js";
 import type { Locale } from "../../src/shared/locale.js";
 import type { Transport, TransportResult } from "../../src/shared/transport.js";
 import {
@@ -57,7 +57,8 @@ describe("the digest card", () => {
     // an entry with nothing but a title shows only that
     const second = document.querySelectorAll(".digest li")[1] as HTMLElement;
     expect(second.querySelectorAll("p")).toHaveLength(1);
-    expect(calls.map((call) => call.type)).toEqual(["digest.status", "digest.items"]);
+    // the memes' tags are asked once, to say which memes are already in the Library
+    expect(calls.map((call) => call.type)).toEqual(["digest.status", "knowledge.list", "digest.items"]);
     expect(itemCalls(calls)).toEqual([{ limit: 8, offset: 0 }]);
   });
 
@@ -165,6 +166,7 @@ describe("the digest card", () => {
       const transport: Transport = {
         async request(type, payload) {
           if (type === "digest.status") return ok(DIGEST_STATUS);
+          if (type === "knowledge.list") return ok({ documents: [], total: 0, offset: 0 });
           const limit = Number(payload?.limit);
           calls.push(limit);
           return ok(digestPage(Array.from({ length: limit }, (_, i) => digestItem(i + 1)), { total: 80, more: 80 - limit }));
@@ -297,8 +299,9 @@ describe("the digest card", () => {
     await screen.findByText("Entry 2");
     // the first pair is the opening; the refresh asks for both again, in whichever order the
     // sections' effects run (the readings are below the card and run first)
-    expect(calls.slice(0, 2).map((call) => call.type)).toEqual(["digest.status", "digest.items"]);
-    expect(calls.slice(2).map((call) => call.type).toSorted()).toEqual(["digest.items", "digest.status"]);
+    const asked = calls.map((call) => call.type).filter((type) => type !== "knowledge.list");
+    expect(asked.slice(0, 2)).toEqual(["digest.status", "digest.items"]);
+    expect(asked.slice(2).toSorted()).toEqual(["digest.items", "digest.status"]);
     expect(titles()).toEqual(["Entry 2"]);
   });
 
@@ -518,3 +521,82 @@ it("offers a retry when a reading media preview fails", async () => {
   await screen.findByAltText("Entry 1");
   expect(attempts).toBe(2);
 });
+
+describe("the readings as an inbox: memes are tagged, articles are saved", () => {
+  const meme = (number: number, overrides: Partial<DigestItem> = {}) =>
+    digestItem(number, { kind: "media", mediaUrl: `https://media.example/meme-${number}.mp4`, summary: "", ...overrides });
+
+  it("gives a meme a tag form and no save or discussion, and an article the opposite", async () => {
+    const { transport } = routedTransport({
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([digestItem(1), meme(2)])),
+      "knowledge.list": ok({ documents: [], total: 0, offset: 0 }),
+    });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    const [article, funny] = [...document.querySelectorAll(".digest li")] as HTMLElement[];
+    expect(within(article!).getByRole("button", { name: /Save to the Library/ })).toBeTruthy();
+    expect(within(article!).queryByRole("textbox")).toBeNull();
+    expect(within(funny!).getByText("Meme")).toBeTruthy();
+    expect(within(funny!).getByRole("textbox", { name: "Meme hashtag: Entry 2" })).toBeTruthy();
+    // a video is not a document: it is not offered to the document reader, and it is not discussed as a reading
+    expect(within(funny!).queryByRole("button", { name: /Save to the Library/ })).toBeNull();
+    expect(within(funny!).queryByRole("button", { name: /Continue/ })).toBeNull();
+  });
+
+  it("tags a meme by its address, says it is in the Library, and asks for its text when none can be read", async () => {
+    let attempts = 0;
+    const { transport, calls } = routedTransport({
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([meme(2)])),
+      "knowledge.list": ok({ documents: [], total: 0, offset: 0 }),
+      "meme.hashtag.tag": (payload) => {
+        attempts += 1;
+        return Promise.resolve(attempts === 1 ? failure("orchestrator", "no text found in media; provide explicit text") : ok({ hashtag: String(payload?.hashtag) }));
+      },
+    });
+    renderCard(transport);
+    await screen.findByText("Entry 2");
+    fireEvent.change(screen.getByRole("textbox", { name: "Meme hashtag: Entry 2" }), { target: { value: "#SomeGames" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag: Entry 2" }));
+    // the first try found no text, so the meme's text is asked for
+    fireEvent.change(await screen.findByRole("textbox", { name: "The meme's text" }), { target: { value: "words on it" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create tag: Entry 2" }));
+    await screen.findByText("In the Library as #SomeGames");
+    const tagged = calls.filter((call) => call.type === "meme.hashtag.tag").map((call) => call.payload);
+    expect(tagged).toEqual([
+      { url: "https://media.example/meme-2.mp4", hashtag: "#SomeGames" },
+      { url: "https://media.example/meme-2.mp4", hashtag: "#SomeGames", text: "words on it" },
+    ]);
+  });
+
+  it("says a meme is already in the Library, with its tag, from what the Library keeps", async () => {
+    const { transport } = routedTransport({
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([meme(2), meme(3)])),
+      "knowledge.list": ok({ documents: [{ id: "meme-hashtag:x", title: "#OldTag", kind: "meme_hashtag", reference: "https://media.example/meme-2.mp4", tags: [], chunks: 1, embedded: 1, updatedAt: "" }], total: 1, offset: 0 }),
+    });
+    renderCard(transport);
+    await screen.findByText("In the Library as #OldTag");
+    expect(screen.getAllByText(/In the Library as/)).toHaveLength(1);
+  });
+
+  it("narrows the inbox to the memes or to the articles, asking the digest for that kind", async () => {
+    const { transport, calls } = routedTransport({
+      "digest.status": ok(DIGEST_STATUS),
+      "digest.items": ok(digestPage([digestItem(1)])),
+      "knowledge.list": ok({ documents: [], total: 0, offset: 0 }),
+    });
+    renderCard(transport);
+    await screen.findByText("Entry 1");
+    expect(screen.getByRole("button", { name: "Everything" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Memes" }));
+    await waitFor(() => expect(itemCalls(calls).at(-1)).toMatchObject({ kind: "media" }));
+    expect(screen.getByRole("button", { name: "Memes" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Articles" }));
+    await waitFor(() => expect(itemCalls(calls).at(-1)).toMatchObject({ kind: "reading" }));
+    fireEvent.click(screen.getByRole("button", { name: "Everything" }));
+    await waitFor(() => expect(itemCalls(calls).at(-1)).not.toHaveProperty("kind"));
+  });
+});
+

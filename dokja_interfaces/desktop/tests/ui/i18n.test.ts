@@ -46,6 +46,8 @@ describe("the catalogs", () => {
   const SAME_IN_BOTH = new Set(["kind_memes", "add_file_chosen", "communications_whatsapp_label", "communications_who_bot", "assistant_name", "nav_assistant", "system_view_status", "models_pull_progress", "post_entry_link",
     // a price range is two prices and a dash; PIX is the name of the payment system
     "prices_range", "price_source_pix",
+    // meme is the word in both languages
+    "reading_kind_media", "reading_meme_badge",
     // product names
     "name_chat_ai", "name_feeds", "name_whatsapp", "name_discord", "name_meme",
     // PK is the database abbreviation in both languages

@@ -366,7 +366,9 @@ test("knowledge.list asks for a document's text only one document at a time", ()
   // a page of documents never carries their texts, and only a real true asks for one
   assert.deepEqual(payload({ limit: 20, offset: 0, include_text: true }), { limit: 20, offset: 0 });
   assert.deepEqual(payload({ limit: 1, offset: 0, include_text: "yes" }), { limit: 1, offset: 0 });
-  assert.deepEqual(payload({ limit: 1, offset: 0, include_text: true, kind: "meme_hashtag", extra: "x" }), { limit: 1, offset: 0, include_text: true });
+  // only a known kind is passed on (the memes' tags have a filter of their own in the Library); anything else is dropped
+  assert.deepEqual(payload({ limit: 1, offset: 0, include_text: true, kind: "meme_hashtag", extra: "x" }), { limit: 1, offset: 0, include_text: true, kind: "meme_hashtag" });
+  assert.deepEqual(payload({ limit: 1, offset: 0, kind: "article", extra: "x" }), { limit: 1, offset: 0 });
 });
 
 test("knowledge.list keeps a document's text, cut when it is too long, and leaves out what it does not show", () => {
@@ -1029,3 +1031,22 @@ test("knowledge.proposal decisions are owner gestures, and a rejection asks firs
   assert.equal(needsConfirmation("knowledge.proposal.reject"), true);
   assert.equal(needsConfirmation("knowledge.proposal.approve"), false);
 });
+
+test("digest.items passes only a known kind and projects a meme as one", () => {
+  const payload = ACTIONS["digest.items"].payload;
+  assert.deepEqual(payload({ limit: 8, kind: "media" }), { limit: 8, offset: 0, kind: "media" });
+  assert.deepEqual(payload({ limit: 8, kind: "reading" }), { limit: 8, offset: 0, kind: "reading" });
+  assert.deepEqual(payload({ limit: 8, kind: "price" }), { limit: 8, offset: 0 });
+  assert.deepEqual(payload({ limit: 8 }), { limit: 8, offset: 0 });
+  const project = ACTIONS["digest.items"].project;
+  const projected = project(compactOf("digest", { items: [
+    { id: "a", title: "An article", summary: "", source: "S", published: "" },
+    { id: "m", title: "A meme", summary: "", source: "S", published: "", kind: "media", media_url: "https://media.example/m.mp4" },
+    { id: "p", title: "Odd", summary: "", source: "S", published: "", kind: "anything" },
+  ], total: 3, offset: 0, more: 0, updated: "" })) as { items: Array<Record<string, unknown>> };
+  assert.equal(projected.items[0]!.kind, undefined);
+  assert.equal(projected.items[1]!.kind, "media");
+  assert.equal(projected.items[1]!.mediaUrl, "https://media.example/m.mp4");
+  assert.equal(projected.items[2]!.kind, undefined);
+});
+
