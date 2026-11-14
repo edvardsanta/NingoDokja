@@ -61,6 +61,8 @@ type knowledgeFocus struct {
 	SourceID string
 	// Subject is what the user asked when the document came up, which a follow-up leaves unsaid.
 	Subject string
+	// TextVersion is the last validated source version the conversation cited.
+	TextVersion string
 	// wantsText is whether the last turn was about the text: "which topic?" is answered in one word.
 	wantsText bool
 	idle      int
@@ -130,6 +132,7 @@ func (h *ChatDomainHandler) lookupForTurn(ctx context.Context, question, anchor 
 		return nil
 	}
 	sources := h.lookupFocused(ctx, question, turn)
+	sources = h.pinFocusedSources(ctx, question, turn, sources)
 	if len(sources) == 0 && turn.text {
 		sources = h.lookupText(ctx, question, anchor)
 	}
@@ -180,6 +183,53 @@ func (h *ChatDomainHandler) lookupFocused(ctx context.Context, question string, 
 		return selectSources(own, chunks, chars, !turn.text)
 	}
 	return selectSources(map[string]any{"hits": interleaveHits(own, guided)}, chunks, chars, !turn.text)
+}
+
+// pinFocusedSources stamps the focused document's passages with one validated text version. The
+// newest version observed by Knowledge wins; preparation is best effort and never blocks the turn.
+func (h *ChatDomainHandler) pinFocusedSources(ctx context.Context, question string, turn knowledgeTurn, sources []knowledgeSource) []knowledgeSource {
+	if turn.focus == nil {
+		return sources
+	}
+	document := documentOf(turn.focus.SourceID)
+	version := turn.focus.TextVersion
+	observed := focusedSourceVersion(sources, document)
+	switch {
+	case version != "" && (observed == "" || observed == version):
+		// The last pin still describes the text Knowledge searched.
+	case version != "" && observed != version:
+		version = ""
+	case version == "" && observed != "" && h.sourcePreparer == nil:
+		version = observed
+	}
+	if version == "" && h.sourcePreparer != nil && len(sources) > 0 {
+		prepareCtx, cancel := context.WithTimeout(ctx, knowledgeLookupBudget)
+		defer cancel()
+		prepared, err := h.sourcePreparer.PrepareFocusedSource(prepareCtx, document, strings.TrimSpace(question))
+		if err != nil {
+			logger.Info(fmt.Sprintf("focused source preparation skipped: %v", err))
+		} else {
+			version, _ = prepared.Source["text_version"].(string)
+		}
+	}
+	if version == "" {
+		return sources
+	}
+	for index := range sources {
+		if documentOf(sources[index].SourceID) == document {
+			sources[index].TextVersion = version
+		}
+	}
+	return sources
+}
+
+func focusedSourceVersion(sources []knowledgeSource, document string) string {
+	for _, source := range sources {
+		if documentOf(source.SourceID) == document && source.TextVersion != "" {
+			return source.TextVersion
+		}
+	}
+	return ""
 }
 
 // interleaveHits alternates two searches, each hit once. A question with its own subject is found
@@ -299,6 +349,9 @@ func (f *chatFocus) remember(turn knowledgeTurn, question string, cited []knowle
 	document := documentOf(cited[0].SourceID)
 	if !had || focus.SourceID != document {
 		focus = knowledgeFocus{SourceID: document, Subject: strings.TrimSpace(question)}
+	}
+	if version := cited[0].TextVersion; version != "" {
+		focus.TextVersion = version
 	}
 	focus.idle, focus.wantsText = 0, turn.text
 	if !had && len(f.items) >= knowledgeFocusSessions {

@@ -394,7 +394,11 @@ deployment currently has an active blocking policy.
 Chat turns and archived conversations read documents the same way. A document a reply cites becomes
 the conversation's focus: follow-ups search inside it twice, on their own words and with the start
 of Ningo's previous reply, or the question that brought it up when there is none yet, and take hits
-from both in turn, until three replies pass without it. The reply comes from the session, so it survives a restart, and it
+from both in turn, until three replies pass without it. A focused source with a new or changed
+observed version runs the one-source `knowledge.application.prepare` workflow and stamps its
+validated `text_version` on cited passages and archived turn sources; unchanged pins are reused
+without another whole-source read. Owner-supplied Discord/WhatsApp web readings carry bounded
+passage-derived text versions with their provenance. The reply comes from the session, so it survives a restart, and it
 only guides the search: it is never evidence. The focus lives in the orchestrator's memory. When it
 is gone, a short follow-up or a request for the text that finds nothing searches everything with the
 previous reply, and a reply that cites the document brings the focus back. A

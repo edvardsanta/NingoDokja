@@ -104,6 +104,8 @@ type knowledgeSource struct {
 	Title       string
 	Heading     string
 	Text        string
+	// TextVersion pins the exact source text this passage came from, when preparation validated it.
+	TextVersion string
 	// Reference is where the document came from, when it says.
 	Reference string
 	// Register says how to talk about the document, from its classification; often empty.
@@ -141,6 +143,18 @@ func placeInDocument(title, heading string) string {
 func (h *ChatDomainHandler) WithKnowledge(searcher KnowledgeSearcher, enabled func() bool) *ChatDomainHandler {
 	h.knowledge = searcher
 	h.knowledgeEnabled = enabled
+	return h
+}
+
+// ApplicationSourcePreparer validates and pins one focused whole source for Talk. The chat
+// handler treats it as best effort: a failed preparation never blocks the ordinary search.
+type ApplicationSourcePreparer interface {
+	PrepareFocusedSource(ctx context.Context, sourceID, goal string) (PreparedKnowledgeSource, error)
+}
+
+// WithApplicationSourcePreparer lets focused Talk turns cite a validated source version.
+func (h *ChatDomainHandler) WithApplicationSourcePreparer(preparer ApplicationSourcePreparer) *ChatDomainHandler {
+	h.sourcePreparer = preparer
 	return h
 }
 
@@ -217,23 +231,26 @@ func selectSources(result map[string]any, maxChunks, maxChars int, onlyRelevant 
 		budget -= utf8.RuneCountInString(text)
 		id := firstString(hit, "source_id")
 		var locator *conversation.PassageLocator
+		var textVersion string
 		if raw, ok := hit["locator"].(map[string]any); ok && raw["version"] != nil {
 			data, _ := json.Marshal(raw)
 			var loc conversation.PassageLocator
 			if json.Unmarshal(data, &loc) == nil {
 				loc.End = loc.Start + utf8.RuneCountInString(text)
 				locator = &loc
+				textVersion = loc.Version
 			}
 		}
 		sources = append(sources, knowledgeSource{
-			Number:    len(sources) + 1,
-			Locator:   locator,
-			SourceID:  id,
-			Title:     firstString(hit, "title"),
-			Heading:   firstString(hit, "heading"),
-			Text:      text,
-			Reference: firstString(hit, "source_ref"),
-			Register:  registerOf(hit),
+			Number:      len(sources) + 1,
+			Locator:     locator,
+			SourceID:    id,
+			Title:       firstString(hit, "title"),
+			Heading:     firstString(hit, "heading"),
+			Text:        text,
+			TextVersion: textVersion,
+			Reference:   firstString(hit, "source_ref"),
+			Register:    registerOf(hit),
 		})
 		if len(sources) == maxChunks {
 			break
@@ -381,6 +398,7 @@ func turnSources(sources []knowledgeSource) []conversation.TurnSource {
 		kept = append(kept, conversation.TurnSource{
 			Number: source.Number, SourceID: source.SourceID, Title: source.Title,
 			Reference: source.Reference, Excerpt: source.Text, Locator: source.Locator,
+			TextVersion: source.TextVersion,
 		})
 	}
 	return kept
@@ -389,7 +407,7 @@ func turnSources(sources []knowledgeSource) []conversation.TurnSource {
 func sourcesForResult(sources []knowledgeSource) []map[string]any {
 	out := make([]map[string]any, 0, len(sources))
 	for _, source := range sources {
-		out = append(out, map[string]any{"number": source.Number, "source_id": source.SourceID, "title": source.Title, "heading": source.Heading, "excerpt": source.Text, "locator": source.Locator})
+		out = append(out, map[string]any{"number": source.Number, "source_id": source.SourceID, "title": source.Title, "heading": source.Heading, "excerpt": source.Text, "locator": source.Locator, "text_version": source.TextVersion})
 	}
 	return out
 }

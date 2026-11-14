@@ -119,12 +119,13 @@ type Turn struct {
 
 // TurnSource is one passage a reply cites, with its document and original location.
 type TurnSource struct {
-	Number    int             `json:"number"`
-	SourceID  string          `json:"source_id"`
-	Title     string          `json:"title"`
-	Reference string          `json:"reference,omitempty"`
-	Excerpt   string          `json:"excerpt,omitempty"`
-	Locator   *PassageLocator `json:"locator,omitempty"`
+	Number      int             `json:"number"`
+	SourceID    string          `json:"source_id"`
+	Title       string          `json:"title"`
+	Reference   string          `json:"reference,omitempty"`
+	Excerpt     string          `json:"excerpt,omitempty"`
+	Locator     *PassageLocator `json:"locator,omitempty"`
+	TextVersion string          `json:"text_version,omitempty"`
 }
 
 // PassageLocator binds a retrieved span to an immutable PDF or EPUB version.

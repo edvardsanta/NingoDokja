@@ -689,6 +689,11 @@
               "name": "answer_feedback_cli_tui",
               "status": "passed",
               "detail": "CLI conversations feedback and TUI u/w verdicts judge the newest completed answer from the archive read, require the pinned capability report's feedback: supported before writing, and surface resolved, first-verdict, older-answer and unsupported results. CLI and TUI go test -race suites passed. See dokja_docs/answer-feedback.md."
+            },
+            {
+              "name": "talk_source_version_pins",
+              "status": "passed",
+              "detail": "Focused Talk sources run the existing one-source knowledge.application.prepare workflow when a pin is missing or the observed version changed, stamp text_version on cited passages, reuse an unchanged pin without another whole-source read, and keep the pin in archived TurnSource. Owner-supplied Discord and WhatsApp web readings carry bounded passage-derived text_version values. Orchestrator, chat-domain and conversation-domain suites passed. The native PostgreSQL source-read journal is not wired to this Talk path yet; see dokja_docs/knowledge-apply-review.md."
             }
           ]
         },
@@ -709,7 +714,7 @@
           "evidence": []
         }
       ],
-      "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: prepare focused sources inside Talk (knowledge-apply-review.md step 3), treating owner-supplied documents and links from Discord/WhatsApp as knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
+      "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md), and focused Talk citations now carry validated text_version pins. Next: wire the native PostgreSQL source-read journal to the Talk preparation path and persist eligible owner-supplied Discord/WhatsApp documents and links as Knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
     },
     {
       "id": "09",
@@ -2477,5 +2482,5 @@
     }
   ],
   "next_step": null,
-  "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md). Next: prepare focused sources inside Talk (knowledge-apply-review.md step 3), treating owner-supplied documents and links from Discord/WhatsApp as knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
+  "next_action": "08.2/08.3: answer feedback is the outcome signal (dokja_docs/answer-feedback.md), and focused Talk citations now carry validated text_version pins. Next: wire the native PostgreSQL source-read journal to the Talk preparation path and persist eligible owner-supplied Discord/WhatsApp documents and links as Knowledge sources with provenance; 08.3 reads the chat.answer scorecard once enough verdicts exist."
 }

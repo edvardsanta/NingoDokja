@@ -55,6 +55,21 @@ func prepareThroughOrchestrator(ctx context.Context, store *applicationStore, ev
 	}
 	return output, nil
 }
+func TestPrepareFocusedSourceReturnsValidatedVersionAndTask(t *testing.T) {
+	store := &applicationStore{documents: map[string]string{"guide": "bounded guide"}}
+	prepared, err := NewKnowledgeDomainHandler(store).PrepareFocusedSource(context.Background(), "guide", "Explain the guide")
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := sourceReadDigestText("bounded guide")
+	if prepared.Source["source_id"] != "guide" || prepared.Source["text_version"] != version || prepared.Source["text"] != "bounded guide" {
+		t.Fatalf("unexpected prepared source: %v", prepared.Source)
+	}
+	if prepared.Task.TaskID == "" || prepared.Task.AttemptID == "" || prepared.Task.Status != core.TaskCompleted || len(store.calls) != 1 {
+		t.Fatalf("preparation did not run one validated workspace read: %+v calls=%v", prepared.Task, store.calls)
+	}
+}
+
 func TestPrepareApplicationReadsBothDocumentsThroughApplicationPorts(t *testing.T) {
 	store := &applicationStore{documents: map[string]string{"guide": "Retry idempotent operations with backoff.", "api": "POST is idempotent only with a stable request key."}}
 	output, err := prepareThroughOrchestrator(context.Background(), store, applicationEvent())

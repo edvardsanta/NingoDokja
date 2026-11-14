@@ -101,6 +101,7 @@ type WebDocument struct {
 	Published   string       `json:"published"`
 	RetrievedAt string       `json:"retrieved_at"`
 	Partial     bool         `json:"partial"`
+	TextVersion string       `json:"text_version,omitempty"`
 	Passages    []WebPassage `json:"passages"`
 }
 
