@@ -9,6 +9,24 @@
       {
         "id": "knowledge.saved",
         "usage": "Use the Knowledge commands."
+      },
+      {
+        "id": "conversation.manage",
+        "usage": "Use `chat --new`, `chat --continue` or `chat --conversation <id>` to write in an archived conversation, and `conversations list`, `read`, `rename`, `delete`, `retry` or `stop` to manage them."
+      }
+    ],
+    "tui": [
+      {
+        "id": "conversation.text",
+        "usage": "In the Conversas tab, press enter to open a conversation and write to it."
+      },
+      {
+        "id": "conversation.manage",
+        "usage": "In the Conversas tab: n starts a conversation, e renames, d deletes after a confirmation, m reads earlier turns and R sends the last unanswered turn again."
+      },
+      {
+        "id": "memes.examples",
+        "usage": "In the Memes tab, press h to teach a hashtag from the selected meme, g to suggest one, l to list tagged memes and u to remove an example after a confirmation."
       }
     ],
     "desktop": [
