@@ -995,11 +995,20 @@ test("knowledge.proposal decisions validate the id and a bounded tag edit", () =
     { proposal_id: "not-a-proposal" },
     { proposal_id: "proposal:web_article:web:abc", edit: { tag: "   " } },
     { proposal_id: "proposal:web_article:web:abc", edit: { tag: "x".repeat(61) } },
+    { proposal_id: "proposal:web_article:web:abc", edit: { text: "x".repeat(8001) } },
+    { proposal_id: "proposal:web_article:web:abc", edit: {} },
     { proposal_id: "proposal:web_article:web:abc", edit: { url: "https://example.com/other" } },
   ]) {
     assert.equal(approve(bad), undefined, JSON.stringify(bad));
     assert.equal(reject(bad), undefined, JSON.stringify(bad));
   }
+});
+
+test("a meme proposal's approval may carry the owner's text next to a corrected tag", () => {
+  const approve = ACTIONS["knowledge.proposal.approve"].payload;
+  const id = "proposal:meme_hashtag:meme-hashtag:x";
+  assert.deepEqual(approve({ proposal_id: id, edit: { text: " words on the meme " } }), { proposal_id: id, edit: { text: "words on the meme" } });
+  assert.deepEqual(approve({ proposal_id: id, edit: { tag: "Games", text: "words" } }), { proposal_id: id, edit: { tag: "Games", text: "words" } });
 });
 
 test("knowledge.proposal decisions project the outcome, including a kept-pending refusal", () => {

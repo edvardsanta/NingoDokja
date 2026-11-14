@@ -26,6 +26,22 @@ const tag = {
   proposedAt: "2026-11-14T13:00:00Z",
 };
 
+const picture = {
+  ...tag,
+  id: "proposal:meme_hashtag:meme-hashtag:y",
+  payload: { tag: "#Games", url: "https://media.example/meme.png", media: { kind: "file", text: "GAME OVER", image_b64: "aGk=", content_type: "image/png" } },
+};
+const unread = {
+  ...tag,
+  id: "proposal:meme_hashtag:meme-hashtag:z",
+  payload: { tag: "#Games", url: "https://media.example/clip.mp4", media: { kind: "file" } },
+};
+const page = {
+  ...tag,
+  id: "proposal:meme_hashtag:meme-hashtag:w",
+  payload: { tag: "#Games", url: "https://example.com/shorts/abc", media: { kind: "link" } },
+};
+
 const view = (transport: Transport) => <I18nProvider locale="en"><ProposalsCard transport={transport} /></I18nProvider>;
 
 describe("proposals", () => {
@@ -83,5 +99,45 @@ describe("proposals", () => {
     const { transport } = routedTransport({ "knowledge.proposals.list": failure("orchestrator", "knowledge proposals are not configured") });
     render(view(transport));
     await screen.findByText("The orchestrator answered with an error: knowledge proposals are not configured");
+  });
+
+  it("shows the kept picture and the text read from a proposed meme, and nothing is sent for them", async () => {
+    const { transport, calls } = routedTransport({
+      "knowledge.proposals.list": [ok({ proposals: [picture] }), ok({ proposals: [] })],
+      "knowledge.proposal.approve": ok({ proposalId: picture.id, approved: true, stored: 1 }),
+    });
+    render(view(transport));
+    await screen.findByText("text read from the meme: GAME OVER");
+    expect(screen.getByRole("img", { name: "the meme" }).getAttribute("src")).toBe("data:image/png;base64,aGk=");
+    expect(screen.queryByRole("textbox", { name: "text of the meme, if none was read" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(calls.find((call) => call.type === "knowledge.proposal.approve")?.payload).toEqual({ proposal_id: picture.id }));
+  });
+
+  it("asks for the text of a meme none could be read from, and sends it with the approval", async () => {
+    const { transport, calls } = routedTransport({
+      "knowledge.proposals.list": [ok({ proposals: [unread] }), ok({ proposals: [] })],
+      "knowledge.proposal.approve": ok({ proposalId: unread.id, approved: true, stored: 1 }),
+    });
+    render(view(transport));
+    await screen.findByText("#Games");
+    expect(screen.queryByRole("img")).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "text of the meme, if none was read" }), { target: { value: "words on it" } });
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(calls.find((call) => call.type === "knowledge.proposal.approve")?.payload).toEqual({ proposal_id: unread.id, edit: { text: "words on it" } }));
+  });
+
+  it("says a page link is read when it is approved", async () => {
+    const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [page] }) });
+    render(view(transport));
+    await screen.findByText("a page link: the text is read when you approve it");
+  });
+
+  it("refuses a picture that is not an image data type, so a payload cannot smuggle another scheme", async () => {
+    const hostile = { ...picture, id: "proposal:meme_hashtag:meme-hashtag:h", payload: { tag: "#Games", url: "https://media.example/x", media: { image_b64: "aGk=", content_type: "text/html" } } };
+    const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [hostile] }) });
+    render(view(transport));
+    await screen.findByText("#Games");
+    expect(screen.queryByRole("img")).toBeNull();
   });
 });

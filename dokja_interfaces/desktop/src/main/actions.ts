@@ -1347,6 +1347,7 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
 // proposed and sent it, where, and the stored record its decision would affect.
 const PROPOSAL_ID = /^proposal:[A-Za-z0-9._:-]{1,240}$/;
 const MAX_TAG_EDIT_CHARS = 60;
+const MAX_TEXT_EDIT_CHARS = 8000;
 
 function knowledgeProposals(body: Record<string, unknown>): KnowledgeProposals {
   return {
@@ -1390,9 +1391,11 @@ function proposalDecisionPayload(raw: Record<string, unknown>): Record<string, u
   const id = text(raw.proposal_id);
   if (!PROPOSAL_ID.test(id)) return undefined;
   if (isRecord(raw.edit)) {
+    // The owner may correct the tag, and give the text of a meme when none could be read from it.
     const tag = text(raw.edit.tag).trim();
-    if (tag === "" || tag.length > MAX_TAG_EDIT_CHARS) return undefined;
-    return { proposal_id: id, edit: { tag } };
+    const body = text(raw.edit.text).trim();
+    if ((tag === "" && body === "") || tag.length > MAX_TAG_EDIT_CHARS || body.length > MAX_TEXT_EDIT_CHARS) return undefined;
+    return { proposal_id: id, edit: { ...(tag !== "" ? { tag } : {}), ...(body !== "" ? { text: body } : {}) } };
   }
   return { proposal_id: id };
 }
