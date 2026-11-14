@@ -250,10 +250,10 @@ func main() {
 			WithCompetitorQueryCache(competitorCache).
 			WithCompetitorEquivalenceCache(competitorCache)
 	}
-	// The journal keeps source-read receipts in PostgreSQL. Nothing writes to it until preparation
-	// runs inside a workflow (dokja_docs/knowledge-apply-review.md); startup still settles what an
-	// earlier process left unsettled.
-	_, closeSourceJournal := configureSourceJournal(context.Background(),
+	// The journal keeps source-read receipts in PostgreSQL. Focused Talk source preparation
+	// records one pinned read per turn when a version candidate exists; startup settles what
+	// an earlier process left unsettled.
+	sourceJournalStore, closeSourceJournal := configureSourceJournal(context.Background(),
 		os.Getenv("DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN"), os.Getenv("DOKJA_SOURCE_SUPERVISION_TOKEN"))
 	defer closeSourceJournal()
 
@@ -293,7 +293,7 @@ func main() {
 		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
-		).WithApplicationSourcePreparer(knowledgeHandler).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
+		).WithApplicationSourcePreparer(knowledgeHandler).WithSourceReadJournal(sourceJournalStore).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
 			if controls != nil && !controls.ServiceEnabled("feeds") {
 				return digestdomain.Reference{}, fmt.Errorf("reading sources are disabled")
 			}

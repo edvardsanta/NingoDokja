@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	conversation "read_books/dokja_domain/dokja_conversation"
+	application "read_books/dokja_domain/dokja_memory/application"
 	store "read_books/dokja_store"
 	"read_books/internal/logger"
 	"regexp"
@@ -148,13 +149,21 @@ func (h *ChatDomainHandler) WithKnowledge(searcher KnowledgeSearcher, enabled fu
 
 // ApplicationSourcePreparer validates and pins one focused whole source for Talk. The chat
 // handler treats it as best effort: a failed preparation never blocks the ordinary search.
+// textVersion is the caller's pin for the read; empty means the read carries no journal pin.
 type ApplicationSourcePreparer interface {
-	PrepareFocusedSource(ctx context.Context, sourceID, goal string) (PreparedKnowledgeSource, error)
+	PrepareFocusedSource(ctx context.Context, sourceID, goal, textVersion string) (PreparedKnowledgeSource, error)
 }
 
 // WithApplicationSourcePreparer lets focused Talk turns cite a validated source version.
 func (h *ChatDomainHandler) WithApplicationSourcePreparer(preparer ApplicationSourcePreparer) *ChatDomainHandler {
 	h.sourcePreparer = preparer
+	return h
+}
+
+// WithSourceReadJournal records focused source reads in the application journal. The store may
+// be nil: preparation then stays unjournaled, and a journal failure never blocks the turn.
+func (h *ChatDomainHandler) WithSourceReadJournal(store application.JournalStore) *ChatDomainHandler {
+	h.sourceJournalStore = store
 	return h
 }
 
