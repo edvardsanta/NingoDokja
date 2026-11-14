@@ -577,6 +577,18 @@ example path of the owner's tagging and stores `origin: group` with the proposer
 sender and the channel; the owner's own tag stores `origin: owner`, so tagging the same
 meme again replaces a group label.
 
+### Library and Notebook
+
+The Library is everything Ningo knows, in one place, and the Notebook is what he did and
+how it went (ADR 0010's split between Knowledge and Memory, applied to the desktop). The
+Library lists everything by default and narrows to the documents brought in or to the memes'
+tags, which are knowledge of a kind of their own (`meme_hashtag`); its Facts view holds what
+people asked Ningo to keep, and its Pending view holds what people proposed and waits for the
+owner's approval. The Notebook keeps only experiences: what Ningo tried, the verdicts on it
+and how the predictions fare. Messages is still where a meme is sent and tagged, and reads the
+same tags from the Library. Only the desktop's presentation changed: facts still live beside the
+conversation archive, with their person and place, and proposals in the shared database.
+
 ### Cross-document application preparation
 
 `knowledge.application.prepare` is an opt-in, read-only task through the existing

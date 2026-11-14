@@ -48,7 +48,7 @@
       },
       {
         "id": "knowledge.saved",
-        "usage": "Use the Knowledge workspace to add and inspect content."
+        "usage": "Use the Library to add and inspect everything Ningo knows: documents, the memes' tags, facts, and what people proposed that waits for the owner's approval."
       },
       {
         "id": "memes.examples",
@@ -56,7 +56,7 @@
       },
       {
         "id": "memory.facts",
-        "usage": "Inspect and delete kept facts in Notebook."
+        "usage": "Inspect and delete kept facts in the Library, in its Facts view."
       },
       {
         "id": "messages.delivery",
