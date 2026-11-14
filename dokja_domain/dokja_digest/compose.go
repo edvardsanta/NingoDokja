@@ -29,8 +29,10 @@ type item struct {
 
 // hiddenKinds are item kinds that are data for another domain, not reading. Price
 // observations (kind "price") belong to the Price domain: a row of prices is neither worth
-// showing in the digest nor worth citing in a conversation.
-var hiddenKinds = map[string]bool{"price": true}
+// showing in the digest nor worth citing in a conversation. Media observations (kind "media",
+// the memes a source collects) belong to the meme pool: they are picked and tagged where memes
+// are sent, and saving one as a document would send a video through the document reader.
+var hiddenKinds = map[string]bool{"price": true, "media": true}
 
 // itemsFrom reads the items of a feeds.items reply. An entry that is not an object with a title
 // is skipped: the service already cleans what plugins print, and one bad entry must not hide

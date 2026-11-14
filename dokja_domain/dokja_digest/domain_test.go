@@ -515,3 +515,33 @@ func TestPriceObservationsAreNeitherShownNorCited(t *testing.T) {
 		}
 	}
 }
+
+func TestMemesAreNeitherShownNorCitedAsReading(t *testing.T) {
+	article := entry("article", "Alpha", "An article about storage", 1, "https://example.com/article")
+	meme := entry("meme-1", "Memes", "A collected meme", 1, "https://example.com/meme")
+	meme["kind"] = "media"
+	meme["media_url"] = "https://example.com/meme.mp4"
+	reply := itemsReply(t, article, meme)
+
+	expectTitles(t, readDigest(t, reply, nil), "An article about storage")
+
+	domain := New(&fakeService{reply: reply}).WithClock(func() time.Time { return now })
+	if _, err := domain.Reference(context.Background(), "meme-1"); err == nil {
+		t.Fatal("a meme resolved as a reading")
+	}
+	recent, err := domain.RecentReferences(context.Background(), "What did Memes publish?", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reference := range recent {
+		if reference.ID == "meme-1" {
+			t.Fatalf("a meme was cited as a reading: %#v", recent)
+		}
+	}
+}
+
+func TestAnArticleWithAPreviewImageStaysAReading(t *testing.T) {
+	article := entry("article", "Alpha", "An article with a picture", 1, "https://example.com/article")
+	article["media_url"] = "https://example.com/cover.jpg"
+	expectTitles(t, readDigest(t, itemsReply(t, article), nil), "An article with a picture")
+}
