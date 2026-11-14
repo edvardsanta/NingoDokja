@@ -188,8 +188,8 @@ document evidence, citation sanitation, follow-ups, channel isolation and real
 PDF parser fixtures. An opt-in Feeds test can exercise a public PDF URL.
 
 The Chat domain's versioned [capabilities.json](../dokja_domain/dokja_chat/capabilities.json)
-provides static product self-knowledge: supported features, interface entry points
-and limits. It is embedded at build time and added to each generated turn's system
+provides static product self-knowledge: the features available in each interface
+(cli, desktop, discord, whatsapp) and how to use them, plus each feature's limits. It is embedded at build time and added to each generated turn's system
 context across text, voice, streaming and plain fallback, including after history
 compaction. Music playback, editable panel comments and listening memory are
 explicit; the catalog states that current listens do not train recommendations

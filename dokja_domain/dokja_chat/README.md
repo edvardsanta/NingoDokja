@@ -53,7 +53,8 @@ the interface. Unsupported expressions or unavailable rendering preserve text.
 Run `go test ./...` inside this module.
 
 `capabilities.json` is a versioned, public catalog of implemented product
-abilities, their interface entry points and practical limits. The Go package
+abilities grouped by interface (how to use each one there), with each
+ability's description and practical limits kept once. The Go package
 embeds it at build time and supplies a compact `CapabilityContext()` independently
 of conversational history. Update the catalog with feature changes and rebuild
 the orchestrator to apply it; it contains no private accounts, credentials or
