@@ -45,3 +45,22 @@ test("invalid page fragments do not produce a visible page locator", () => {
     assert.equal(formatCitations(`📚 [1] Report.pdf <https://example.com/report.pdf#${fragment}>`), `📚\n[1] [Report.pdf](https://example.com/report.pdf#${fragment})`);
   }
 });
+
+test("a posted meme keeps its page, its channel mention and its message link apart", () => {
+  const message = "https://discord.com/channels/111/222/333";
+  assert.equal(formatCitations(`Answer [1].\n\n📚 [1] #hashtag <https://example.com/meme> <#222> <${message}>`),
+    `Answer [1].\n\n📚\n[1] [#hashtag](https://example.com/meme) <#222> [↗](${message})`);
+  assert.equal(formatCitations(`📚 [1] #hashtag <https://example.com/meme> <${message}>`), `📚\n[1] [#hashtag](https://example.com/meme) [↗](${message})`);
+});
+
+test("a posted meme without a page links its title to the message", () => {
+  const message = "https://discord.com/channels/111/222/333";
+  assert.equal(formatCitations(`📚 [1] #hashtag <#222> <${message}>`), `📚\n[1] [#hashtag](${message}) <#222>`);
+  assert.equal(formatCitations(`📚 [1] #hashtag <${message}>`), `📚\n[1] [#hashtag](${message})`);
+});
+
+test("a posted meme's title cannot break the link or mention anyone, and other sources stay as they were", () => {
+  const message = "https://discord.com/channels/111/222/333";
+  assert.equal(formatCitations(`📚 [1] #a [b] @everyone <https://example.com/m> <#222> <${message}> · [2] Guide · Setup <https://example.com/guide>`),
+    `📚\n[1] [#a \\[b\\] ＠everyone](https://example.com/m) <#222> [↗](${message})\n[2] [Guide](https://example.com/guide)`);
+});
