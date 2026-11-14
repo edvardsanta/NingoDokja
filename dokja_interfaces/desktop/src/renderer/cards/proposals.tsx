@@ -47,7 +47,7 @@ function textOf(value: unknown): string {
 
 // What was kept of a meme: the picture when it is small enough to have been kept, and the text read
 // from it. A video is not copied: its link is the source message, which the owner can open.
-function memeMedia(proposal: KnowledgeProposal): { image: string; text: string; link: boolean } {
+function memeMedia(proposal: KnowledgeProposal): { image: string; text: string; link: boolean; reading: string; reason: string } {
   const media = isRecord(proposal.payload.media) ? proposal.payload.media : {};
   const encoded = textOf(media.image_b64);
   const contentType = textOf(media.content_type);
@@ -55,7 +55,24 @@ function memeMedia(proposal: KnowledgeProposal): { image: string; text: string; 
     image: encoded !== "" && /^image\/[a-z0-9.+-]+$/i.test(contentType) ? `data:${contentType};base64,${encoded}` : "",
     text: textOf(media.text),
     link: textOf(media.kind) === "link",
+    // how the background reading of the media stands: reading, done or failed, and why it failed
+    reading: textOf(media.reading),
+    reason: textOf(media.reason),
   };
+}
+
+// What the owner is told about a meme whose text is not there: still being read, why it could not be
+// read, or, for a proposal that was held before the reading was kept track of, that it waits for the
+// approval. The reasons are fixed words; a reason this screen does not know shows as it is.
+function readingNote(meme: { link: boolean; reading: string; reason: string }, t: ReturnType<typeof useTranslate>): string {
+  if (meme.reading === "pending") return t("proposals_meme_reading");
+  if (meme.reading === "failed") {
+    if (meme.reason === "media_unreachable") return t("proposals_meme_failed_unreachable");
+    if (meme.reason === "no_text") return t("proposals_meme_failed_no_text");
+    if (meme.reason === "media_too_large") return t("proposals_meme_failed_too_large");
+    return t("proposals_meme_failed", { reason: meme.reason || "?" });
+  }
+  return meme.link ? t("proposals_meme_link_note") : "";
 }
 
 function ProposalItem({ proposal, busy, edit, onEdit, textEdit, onTextEdit, onDecide }: {
@@ -88,7 +105,7 @@ function ProposalItem({ proposal, busy, edit, onEdit, textEdit, onTextEdit, onDe
       </p>
       {meme?.image && <img className="proposal-preview" src={meme.image} alt={t("proposals_meme_preview")} />}
       {meme?.text && <p className="detail proposal-text">{t("proposals_meme_text", { text: meme.text })}</p>}
-      {meme?.link && !meme.text && <p className="detail">{t("proposals_meme_link_note")}</p>}
+      {meme && !meme.text && <p className="detail" role="status">{readingNote(meme, t)}</p>}
       <p className="detail">
         {who}
         {proposal.source.channelId && ` ${t("proposals_channel", { channel: proposal.source.channelId })}`}

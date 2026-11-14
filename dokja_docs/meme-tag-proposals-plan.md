@@ -29,6 +29,11 @@ the owner approved; "As built" lists where the implementation settled a question
   is read from them: the reader's own address is on the host's loopback and is not reachable from
   the container where perception runs. The owner's own tag is stored by that reading once its text
   is there.
+- **Size.** A file is read up to a hundred million bytes, which is what Feeds carries and what the
+  reader on the host downloads; one reading runs at a time, because the file is held whole. The video
+  is not kept: only its link and the text read from it. Reading larger files would need the provider
+  to read the file where Feeds spools it, without carrying its bytes, and a meme limit of its own
+  apart from the one WhatsApp delivery shares.
 - **Still open:** the safety screening of a proposed meme before the owner's preview, a
   per-meme duplicate check beyond the pending one, and what happens when the poster edits or
   deletes the message.

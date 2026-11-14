@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,9 +24,17 @@ const (
 	memeKindLink      = "link"
 	// maxMemeReadings bounds the readings of media that run at once, and memeReadingBudget one of them:
 	// a post reader downloads for up to about a minute and a half before the text is read.
-	maxMemeReadings   = 2
+	maxMemeReadings = 1
+	// maxMemeFileBytes is the largest file read for its text. It is what the chain carries today: Feeds
+	// refuses a post file over a hundred million bytes, and the reader on the host downloads no more. The
+	// file is held whole while it is read, so one reading runs at a time; nobody waits for it, and the
+	// video itself is not kept, only its link and the text read from it.
+	maxMemeFileBytes  = 100_000_000
 	memeReadingBudget = 4 * time.Minute
 )
+
+// memeReadingReason is the shape of a fixed reason a reading failed with.
+var memeReadingReason = regexp.MustCompile(`^[a-z][a-z_]{0,39}$`)
 
 // memeAttachmentFetcher downloads a posted file through the meme service, which owns that access.
 type memeAttachmentFetcher interface {
@@ -79,6 +88,13 @@ func memeTagKindRules() knowledgedomain.ProposalKindRules {
 					return nil, fmt.Errorf("a meme picture must be a bounded base64 image")
 				}
 				kept["image_b64"], kept["content_type"] = encoded, contentType
+			}
+			// how the background reading of the media stands, so the owner can tell it from a silence
+			if reading := payloadString(media, "reading"); reading == "pending" || reading == "done" || reading == "failed" {
+				kept["reading"] = reading
+				if reason := payloadString(media, "reason"); reading == "failed" && memeReadingReason.MatchString(reason) {
+					kept["reason"] = reason
+				}
 			}
 			if mime := strings.TrimSpace(payloadString(media, "mime")); mime != "" && len(mime) <= 100 {
 				kept["mime"] = mime
@@ -195,20 +211,52 @@ func (h *KnowledgeProposalsHandler) readPostText(ctx context.Context, link strin
 	files, _ := answer["media"].([]digest.DeliveryMedia)
 	tooLarge := false
 	for _, file := range files {
-		if file.DataB64 == "" {
-			tooLarge = tooLarge || file.MediaToken != ""
+		data, contentType := []byte(nil), file.ContentType
+		switch {
+		case file.DataB64 != "":
+			decoded, err := base64.StdEncoding.Strict().DecodeString(file.DataB64)
+			if err != nil {
+				continue
+			}
+			data = decoded
+		case file.MediaToken != "":
+			// Feeds holds the file and hands it over in pieces, whatever its size
+			if file.Size > maxMemeFileBytes {
+				tooLarge = true
+				continue
+			}
+			held, err := h.mediaInPieces(ctx, file.MediaToken, file.Size)
+			if err != nil {
+				return "", "media_unreachable"
+			}
+			data = held
+		}
+		if len(data) == 0 {
 			continue
 		}
-		data, err := base64.StdEncoding.Strict().DecodeString(file.DataB64)
-		if err != nil || len(data) == 0 {
-			continue
-		}
-		return memeTextFrom(reader.ReadTextData(ctx, data, file.ContentType))
+		return memeTextFrom(reader.ReadTextData(ctx, data, contentType))
 	}
 	if tooLarge {
 		return "", "media_too_large"
 	}
 	return "", "no_media"
+}
+
+// mediaInPieces reads a file Feeds holds, piece by piece, up to the size it declared.
+func (h *KnowledgeProposalsHandler) mediaInPieces(ctx context.Context, token string, size int64) ([]byte, error) {
+	reader := digest.New(h.web)
+	held := make([]byte, 0, size)
+	for int64(len(held)) < size {
+		piece, err := reader.MediaChunk(ctx, token, int64(len(held)))
+		if err != nil {
+			return nil, err
+		}
+		if piece.Size != size || int64(len(held))+int64(len(piece.Data)) > maxMemeFileBytes {
+			return nil, fmt.Errorf("media piece does not fit the file")
+		}
+		held = append(held, piece.Data...)
+	}
+	return held, nil
 }
 
 // resolvePost asks the post readers for the media of a link and returns the first picture or video.
@@ -362,10 +410,14 @@ func (h *KnowledgeProposalsHandler) readMemeProposal(id string, owner bool) {
 	}
 	if payloadString(kept, "text") == "" {
 		if text, refused := h.readMemeText(ctx, ref, kept); refused == "" {
-			kept["text"] = text
+			kept["text"], kept["reading"] = text, "done"
+			delete(kept, "reason")
 		} else {
+			kept["reading"], kept["reason"] = "failed", refused
 			logger.Info(fmt.Sprintf("meme proposal %s: its text could not be read in the background: %s", id, refused))
 		}
+	} else {
+		kept["reading"] = "done"
 	}
 	if payloadString(kept, "image_b64") == "" && payloadString(kept, "kind") == memeKindFile && h.memeFetch != nil && strings.HasPrefix(payloadString(kept, "mime"), "image/") {
 		if data, fetchedType, err := h.memeFetch.FetchAttachment(ctx, payloadString(kept, "media_url")); err == nil && len(data) > 0 && len(data) <= maxMemeImageBytes && strings.HasPrefix(fetchedType, "image/") {
@@ -424,7 +476,7 @@ func (h *KnowledgeProposalsHandler) memeFrom(event core.Event, post knowledgedom
 	if post.Form == knowledgedomain.MemeTagReply {
 		if h.memePosts != nil {
 			if recorded, found, err := h.memePosts.DiscordPostMedia(event.Channel.ID, resultString(replyTo, "message_id")); err == nil && found {
-				return memeProposal{ref: recorded, media: map[string]any{"kind": memeKindFile, "media_url": recorded}}
+				return memeProposal{ref: recorded, media: map[string]any{"kind": memeKindFile, "media_url": recorded, "reading": "pending"}}
 			}
 		}
 		attachments, _ = replyTo["media_attachments"].([]chat.WebAttachment)
@@ -438,7 +490,7 @@ func (h *KnowledgeProposalsHandler) memeFrom(event core.Event, post knowledgedom
 	for _, attachment := range attachments {
 		if strings.HasPrefix(attachment.ContentType, "image/") || strings.HasPrefix(attachment.ContentType, "video/") {
 			return memeProposal{ref: knowledgedomain.StableMediaRef(attachment.URL), media: map[string]any{
-				"kind": memeKindFile, "media_url": attachment.URL, "mime": attachment.ContentType,
+				"kind": memeKindFile, "media_url": attachment.URL, "mime": attachment.ContentType, "reading": "pending",
 			}}
 		}
 	}
@@ -451,7 +503,7 @@ func (h *KnowledgeProposalsHandler) memeFrom(event core.Event, post knowledgedom
 // linkMeme keeps a link: a file as it is read, a page only as its link for the post reader to resolve.
 func linkMeme(link string) memeProposal {
 	if knowledgedomain.LinkIsMediaFile(link) {
-		return memeProposal{ref: knowledgedomain.StableMediaRef(link), media: map[string]any{"kind": memeKindFile, "media_url": link}}
+		return memeProposal{ref: knowledgedomain.StableMediaRef(link), media: map[string]any{"kind": memeKindFile, "media_url": link, "reading": "pending"}}
 	}
-	return memeProposal{ref: knowledgedomain.StableMediaRef(link), media: map[string]any{"kind": memeKindLink}}
+	return memeProposal{ref: knowledgedomain.StableMediaRef(link), media: map[string]any{"kind": memeKindLink, "reading": "pending"}}
 }

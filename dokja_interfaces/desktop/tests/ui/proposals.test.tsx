@@ -130,7 +130,7 @@ describe("proposals", () => {
   it("says a page link is read when it is approved", async () => {
     const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [page] }) });
     render(view(transport));
-    await screen.findByText("a page link: the text is read when you approve it");
+    await screen.findByText("Not read yet: the text is read when you approve it.");
   });
 
   it("refuses a picture that is not an image data type, so a payload cannot smuggle another scheme", async () => {
@@ -139,5 +139,36 @@ describe("proposals", () => {
     render(view(transport));
     await screen.findByText("#Games");
     expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("says the text of a meme is being read, so a silence is not mistaken for a failure", async () => {
+    const reading = { ...unread, id: "proposal:meme_hashtag:meme-hashtag:r", payload: { tag: "#Games", url: "https://media.example/clip.mp4", media: { kind: "file", reading: "pending" } } };
+    const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [reading] }) });
+    render(view(transport));
+    await screen.findByText("Reading the text of the meme in the background…");
+  });
+
+  it("says why the text of a meme could not be read, in words, and asks for it", async () => {
+    const failed = (reason: string) => ({ ...unread, id: `proposal:meme_hashtag:meme-hashtag:${reason}`, payload: { tag: "#Games", url: "https://media.example/clip.mp4", media: { kind: "file", reading: "failed", reason } } });
+    for (const [reason, said] of [
+      ["media_unreachable", "The meme could not be downloaded, so its text was not read. Type it below if it matters."],
+      ["no_text", "The meme has no text to read. Type it below if it matters."],
+      ["media_too_large", "The meme is too large to read. Type its text below if it matters."],
+      ["login_required", "The text could not be read (login_required). Type it below if it matters."],
+    ] as const) {
+      const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [failed(reason)] }) });
+      const shown = render(view(transport));
+      await screen.findByText(said);
+      expect(screen.getByRole("textbox", { name: "text of the meme, if none was read" })).toBeTruthy();
+      shown.unmount();
+    }
+  });
+
+  it("says nothing about the reading once the text is there", async () => {
+    const done = { ...picture, id: "proposal:meme_hashtag:meme-hashtag:d", payload: { ...picture.payload, media: { ...(picture.payload.media as object), reading: "done" } } };
+    const { transport } = routedTransport({ "knowledge.proposals.list": ok({ proposals: [done] }) });
+    render(view(transport));
+    await screen.findByText("text read from the meme: GAME OVER");
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
