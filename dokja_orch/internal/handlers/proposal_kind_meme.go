@@ -26,6 +26,13 @@ type memeAttachmentFetcher interface {
 	FetchAttachment(ctx context.Context, url string) (data []byte, contentType string, err error)
 }
 
+// memeDataTextReader reads the text of media the caller holds as bytes. A post reader's file lives on
+// the host, behind a loopback address the perception provider in its container cannot open, so the
+// bytes travel instead of the address. A reader that cannot do it leaves the address path as it was.
+type memeDataTextReader interface {
+	ReadTextData(ctx context.Context, data []byte, contentType string) (map[string]any, error)
+}
+
 // discordPostMedia says which meme Ningo posted as a Discord message, when the delivery was recorded.
 type discordPostMedia interface {
 	DiscordPostMedia(channelID, messageID string) (mediaURL string, found bool, err error)
@@ -126,15 +133,19 @@ func (h *KnowledgeProposalsHandler) approveMemeTag(ctx context.Context, proposal
 	return outcome, nil
 }
 
-// readMemeText reads the text of a meme that has none kept. A page that is not a file is resolved
-// through the post readers first, and its first picture or video is read; a refusal keeps the
-// proposal pending with a fixed reason and never shows the reader's own words.
+// readMemeText reads the text of a meme that has none kept. A page that is not a file is read through
+// the post readers, and its media is read from the bytes they hand over. A refusal keeps the proposal
+// pending with a fixed reason and never shows the reader's own words: "media_unreachable" says the
+// meme could not be fetched, which is not the same as "no_text", the meme having none to read.
 func (h *KnowledgeProposalsHandler) readMemeText(ctx context.Context, ref string, media map[string]any) (string, string) {
 	if h.memeText == nil {
 		return "", "no_text"
 	}
 	source := ref
 	if payloadString(media, "kind") == memeKindLink {
+		if reader, ok := h.memeText.(memeDataTextReader); ok {
+			return h.readPostText(ctx, ref, reader)
+		}
 		resolved, refused := h.resolvePost(ctx, ref)
 		if refused != "" {
 			return "", refused
@@ -144,14 +155,51 @@ func (h *KnowledgeProposalsHandler) readMemeText(ctx context.Context, ref string
 		source = address
 	}
 	answer, err := h.memeText.ReadText(ctx, source)
+	return memeTextFrom(answer, err)
+}
+
+// memeTextFrom turns what a text read answered into the text or a fixed reason.
+func memeTextFrom(answer map[string]any, err error) (string, string) {
 	if err != nil {
-		return "", "no_text"
+		if strings.Contains(strings.ToLower(err.Error()), "no text") {
+			return "", "no_text"
+		}
+		return "", "media_unreachable"
 	}
 	text := strings.TrimSpace(stringValue(answer, "text"))
 	if text == "" {
 		return "", "no_text"
 	}
 	return text, ""
+}
+
+// readPostText asks the post readers for the link's media with its bytes and reads the text of the
+// first file that comes whole. A file too large to travel inline is not read.
+func (h *KnowledgeProposalsHandler) readPostText(ctx context.Context, link string, reader memeDataTextReader) (string, string) {
+	answer, err := digest.New(h.web).Handle(ctx, digest.Request{Action: digest.ActionReadLinkDelivery, Event: digest.Event{Payload: map[string]any{"url": link}}})
+	if err != nil {
+		return "", "failed"
+	}
+	if reason := resultString(answer, "refused"); reason != "" {
+		return "", reason
+	}
+	files, _ := answer["media"].([]digest.DeliveryMedia)
+	tooLarge := false
+	for _, file := range files {
+		if file.DataB64 == "" {
+			tooLarge = tooLarge || file.MediaToken != ""
+			continue
+		}
+		data, err := base64.StdEncoding.Strict().DecodeString(file.DataB64)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		return memeTextFrom(reader.ReadTextData(ctx, data, file.ContentType))
+	}
+	if tooLarge {
+		return "", "media_too_large"
+	}
+	return "", "no_media"
 }
 
 // resolvePost asks the post readers for the media of a link and returns the first picture or video.

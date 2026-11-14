@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -16,12 +17,31 @@ import (
 
 // memeTextStub reads text by address and remembers what it was asked.
 type memeTextStub struct {
-	text  map[string]string
-	asked []string
+	text     map[string]string
+	asked    []string
+	dataText map[string]string
+	data     []string
+	dataErr  error
 }
 
 func (s *memeTextStub) ReadText(_ context.Context, url string) (map[string]any, error) {
 	s.asked = append(s.asked, url)
+	return map[string]any{"text": s.text[url]}, nil
+}
+
+// ReadTextData reads media handed over as bytes: the text is looked up by what the bytes say.
+func (s *memeTextStub) ReadTextData(_ context.Context, data []byte, contentType string) (map[string]any, error) {
+	s.data = append(s.data, string(data)+"|"+contentType)
+	if s.dataErr != nil {
+		return nil, s.dataErr
+	}
+	return map[string]any{"text": s.dataText[string(data)]}, nil
+}
+
+// urlOnlyTextStub is a text reader that only opens addresses, like the legacy meme service.
+type urlOnlyTextStub struct{ text map[string]string }
+
+func (s urlOnlyTextStub) ReadText(_ context.Context, url string) (map[string]any, error) {
 	return map[string]any{"text": s.text[url]}, nil
 }
 
@@ -46,6 +66,9 @@ type postReaderStub struct {
 	webReadingService
 	post    map[string]any
 	refused string
+	// file is what the reader's "media" action hands over; large makes it a file too big to travel.
+	file  string
+	large bool
 }
 
 func (s *postReaderStub) Dispatch(ctx context.Context, kind string, payload map[string]any) (map[string]any, error) {
@@ -53,6 +76,15 @@ func (s *postReaderStub) Dispatch(ctx context.Context, kind string, payload map[
 	case "feeds.status":
 		return map[string]any{"providers": []any{map[string]any{"id": "reader", "enabled": true, "provides": []any{"social.resolve.v1"}}}}, nil
 	case "feeds.invoke":
+		switch payload["action"] {
+		case "media_file":
+			if s.large {
+				return map[string]any{"media_token": "token", "content_type": "video/mp4", "size": float64(50_000_000)}, nil
+			}
+			return map[string]any{}, nil
+		case "media":
+			return map[string]any{"data_b64": base64.StdEncoding.EncodeToString([]byte(s.file)), "content_type": "video/mp4"}, nil
+		}
 		if s.refused != "" {
 			return map[string]any{"handled": true, "refused": s.refused}, nil
 		}
@@ -254,14 +286,16 @@ func TestAReplyToAMemberPostUsesItsAttachmentOrLink(t *testing.T) {
 	}
 }
 
-func TestAPageLinkIsKeptAsItsLinkAndResolvedWhenTheOwnerApproves(t *testing.T) {
+func TestAPageLinkIsKeptAsItsLinkAndItsMediaIsReadFromBytesWhenTheOwnerApproves(t *testing.T) {
 	page := "https://example.com/shorts/abc"
-	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "https://example.com/resolved.mp4"}}}}
+	// the reader answers with an address on the host's loopback, which a container cannot open
+	loopback := "http://127.0.0.1:8791/media/0123456789abcdef.mp4"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": loopback}}}, file: "VIDEO BYTES"}
 	m := newMemeHarness(t, web, memeFetchStub{}, nil)
-	m.text.text["https://example.com/resolved.mp4"] = "FROM THE POST"
+	m.text.dataText = map[string]string{"VIDEO BYTES": "FROM THE POST"}
 	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
 	held := m.pending(t)
-	if media := held[0]["payload"].(map[string]any)["media"].(map[string]any); media["kind"] != "link" || media["text"] != nil || len(m.text.asked) != 0 {
+	if media := held[0]["payload"].(map[string]any)["media"].(map[string]any); media["kind"] != "link" || media["text"] != nil || len(m.text.asked) != 0 || len(m.text.data) != 0 {
 		t.Fatalf("a page is kept as its link and nothing is read yet: %v asked=%v", media, m.text.asked)
 	}
 	approved, err := m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": held[0]["id"]}), coreStep("approve-knowledge-proposal"))
@@ -269,7 +303,58 @@ func TestAPageLinkIsKeptAsItsLinkAndResolvedWhenTheOwnerApproves(t *testing.T) {
 		t.Fatalf("%v %v", approved, err)
 	}
 	if got := m.knowledge.payloads[0]["body"]; got != "FROM THE POST" {
-		t.Fatalf("the text comes from the media the post reader found: %v", got)
+		t.Fatalf("the text comes from the media the post reader handed over: %v", got)
+	}
+	if len(m.text.asked) != 0 || len(m.text.data) != 1 || m.text.data[0] != "VIDEO BYTES|video/mp4" {
+		t.Fatalf("the loopback address must never reach the text reader, only the bytes: asked=%v data=%v", m.text.asked, m.text.data)
+	}
+}
+
+func TestAMemeThatCannotBeFetchedIsNotSaidToHaveNoText(t *testing.T) {
+	page := "https://example.com/shorts/abc"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "http://127.0.0.1:8791/media/0123456789abcdef.mp4"}}}, file: "VIDEO BYTES"}
+	m := newMemeHarness(t, web, memeFetchStub{}, nil)
+	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	id := m.pending(t)[0]["id"]
+
+	m.text.dataErr = errors.New("download failed: connection refused")
+	answer, _ := m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": id}), coreStep("approve-knowledge-proposal"))
+	if answer["reason"] != "media_unreachable" || strings.Contains(fmt.Sprint(answer), "refused") {
+		t.Fatalf("a failed fetch is its own reason and never shows the provider's words: %v", answer)
+	}
+	m.text.dataErr = errors.New("no text found in media; provide explicit text")
+	answer, _ = m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": id}), coreStep("approve-knowledge-proposal"))
+	if answer["reason"] != "no_text" || len(m.pending(t)) != 1 {
+		t.Fatalf("media with no text to read says so, and stays pending: %v", answer)
+	}
+}
+
+func TestAFileTooLargeToTravelIsNamedAndNotRead(t *testing.T) {
+	page := "https://example.com/shorts/abc"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "http://127.0.0.1:8791/media/0123456789abcdef.mp4"}}}, large: true}
+	m := newMemeHarness(t, web, memeFetchStub{}, nil)
+	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	answer, _ := m.h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": m.pending(t)[0]["id"]}), coreStep("approve-knowledge-proposal"))
+	if answer["reason"] != "media_too_large" || len(m.text.data) != 0 {
+		t.Fatalf("%v %v", answer, m.text.data)
+	}
+}
+
+func TestATextReaderThatOnlyOpensAddressesKeepsTheAddressPath(t *testing.T) {
+	page := "https://example.com/shorts/abc"
+	web := &postReaderStub{post: map[string]any{"url": page, "media": []any{map[string]any{"kind": "video", "url": "https://example.com/resolved.mp4"}}}}
+	db, err := store.Open(filepath.Join(t.TempDir(), "dokja.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	knowledge := &proposalsKnowledgeStub{}
+	h := NewKnowledgeProposalsHandler(db, knowledge, web, &fakeReader{}).WithMemeTags(urlOnlyTextStub{text: map[string]string{"https://example.com/resolved.mp4": "FROM THE ADDRESS"}}, memeFetchStub{}, nil, friends)
+	m := memeHarness{h: h, knowledge: knowledge, text: &memeTextStub{}, db: db}
+	propose(t, m, tagPost("user-sam", page+" #IagoGames", nil, nil))
+	approved, _ := h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": m.pending(t)[0]["id"]}), coreStep("approve-knowledge-proposal"))
+	if approved["approved"] != true || knowledge.payloads[0]["body"] != "FROM THE ADDRESS" {
+		t.Fatalf("%v", approved)
 	}
 }
 
