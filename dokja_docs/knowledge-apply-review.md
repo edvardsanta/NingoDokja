@@ -164,11 +164,14 @@ readable, and recovery keeps settling them.
    answer in Talk as useful or wrong, through the existing experience memory. See
    [answer feedback](answer-feedback.md).
 4. **Prepare in Talk.** The version-pin slice is implemented for focused
-   Knowledge sources and owner-supplied Discord/WhatsApp links. The remaining
-   journal slice must attach the native source-read journal to this workflow,
-   settle a Stop during a read as `interrupted` for that turn only, and add the
-   no-focus, unchanged-version, changed-version, over-budget and Stop regressions
-   against the real journal port.
+   Knowledge sources and owner-supplied Discord/WhatsApp links. The journal
+   slice is implemented too: a focused turn with a version candidate binds one
+   per-turn source-read journal, the pinned read is recorded before any IO and
+   settled with its validated outcome, a Stop during a read stays `interrupted`
+   for that turn, and no-focus, unchanged-version, no-candidate and
+   journal-failure regressions run against the journal port. Owner-supplied
+   readings also persist as durable Knowledge, owner-only and best effort.
+   08.3 stays open until verdict volume exists.
 
 ## Owner decision (2026-11-08)
 
