@@ -210,3 +210,20 @@ func TestTheSelfChatCannotPickAnotherConversation(t *testing.T) {
 		t.Fatal("the interface's own fields must not choose the conversation", turns)
 	}
 }
+
+func TestATurnRecordsWhereTheOwnerWroteIt(t *testing.T) {
+	archive := archiveFor(t)
+	model := &scriptedModel{answers: []map[string]any{{"reply": "One."}, {"reply": "Two."}}}
+	handler := NewChatDomainHandler(model).WithArchive(archive)
+	if _, err := handler.Handle(context.Background(), whatsappTurn("From the phone", "MSG1", true), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+	items := listed(t, archive)
+	if _, err := handler.Handle(context.Background(), ownerTurn(map[string]any{"content": "From the desktop", "conversation_id": items[0].ID, "send_id": "send-0002"}), archiveStep); err != nil {
+		t.Fatal(err)
+	}
+	turns, err := archive.Turns(context.Background(), conversation.OwnerScope, items[0].ID, 0, 10)
+	if err != nil || len(turns) != 2 || turns[0].Origin != "whatsapp" || turns[1].Origin != "desktop" {
+		t.Fatal(turns, err)
+	}
+}

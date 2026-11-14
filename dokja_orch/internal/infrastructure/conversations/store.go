@@ -74,6 +74,7 @@ var migrations = []string{
 	);
 	CREATE INDEX facts_of_person ON facts(person, created_at);`,
 	`ALTER TABLE turns ADD COLUMN sources TEXT NOT NULL DEFAULT '';`,
+	`ALTER TABLE turns ADD COLUMN origin TEXT NOT NULL DEFAULT '';`,
 }
 
 type Store struct{ db *sql.DB }
@@ -261,7 +262,7 @@ func scanTurn(row interface{ Scan(...any) error }) (conversation.Turn, error) {
 	var created, finished int64
 	var sources string
 	err := row.Scan(&t.ID, &t.ConversationID, &t.Seq, &t.SendID, &t.Content, &t.Reply, &state, &t.Reason, &t.Attempts,
-		&t.Provenance.SelectedProvider, &t.Provenance.SelectedModel, &t.Provenance.ObservedProvider, &t.Provenance.ObservedModel, &created, &finished, &sources)
+		&t.Provenance.SelectedProvider, &t.Provenance.SelectedModel, &t.Provenance.ObservedProvider, &t.Provenance.ObservedModel, &created, &finished, &sources, &t.Origin)
 	if err != nil {
 		return t, err
 	}
@@ -291,7 +292,7 @@ func (s *Store) BeginTurn(ctx context.Context, scope conversation.Scope, t conve
 	if exists == 0 {
 		return conversation.Turn{}, false, conversation.ErrNotFound
 	}
-	earlier, err := scanTurn(tx.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns WHERE conversation_id = ? AND send_id = ?`, t.ConversationID, t.SendID))
+	earlier, err := scanTurn(tx.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources, origin FROM turns WHERE conversation_id = ? AND send_id = ?`, t.ConversationID, t.SendID))
 	if err == nil {
 		// One send ID names one message; other text under it is an interface's mistake, not a retry.
 		if earlier.Content != t.Content {
@@ -305,9 +306,9 @@ func (s *Store) BeginTurn(ctx context.Context, scope conversation.Scope, t conve
 	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq), 0) + 1 FROM turns WHERE conversation_id = ?`, t.ConversationID).Scan(&t.Seq); err != nil {
 		return conversation.Turn{}, false, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO turns (id, conversation_id, seq, send_id, content, state, selected_provider, selected_model, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.ConversationID, t.Seq, t.SendID, t.Content, string(t.State), t.Provenance.SelectedProvider, t.Provenance.SelectedModel, t.CreatedAt.UnixNano()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO turns (id, conversation_id, seq, send_id, content, state, selected_provider, selected_model, created_at, origin)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.ConversationID, t.Seq, t.SendID, t.Content, string(t.State), t.Provenance.SelectedProvider, t.Provenance.SelectedModel, t.CreatedAt.UnixNano(), t.Origin); err != nil {
 		return conversation.Turn{}, false, fmt.Errorf("store turn: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE conversations SET turns = turns + 1, revision = revision + 1, updated_at = ? WHERE id = ?`, t.CreatedAt.UnixNano(), t.ConversationID); err != nil {
@@ -381,7 +382,7 @@ func (s *Store) retryTurn(ctx context.Context, scope conversation.Scope, turnID 
 // reread gives back the turn after a conditional update: ErrNotFound when the scope has no such
 // turn, and the stored turn with ErrConflict when the update's condition did not hold.
 func (s *Store) reread(ctx context.Context, scope conversation.Scope, turnID string, result sql.Result) (conversation.Turn, error) {
-	stored, err := scanTurn(s.db.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns
+	stored, err := scanTurn(s.db.QueryRowContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources, origin FROM turns
 		WHERE id = ? AND conversation_id IN (SELECT id FROM conversations WHERE scope = ?)`, turnID, string(scope)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return conversation.Turn{}, conversation.ErrNotFound
@@ -403,7 +404,7 @@ func (s *Store) Turns(ctx context.Context, scope conversation.Scope, conversatio
 	if beforeSeq <= 0 {
 		beforeSeq = math.MaxInt
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources FROM turns
+	rows, err := s.db.QueryContext(ctx, `SELECT id, conversation_id, seq, send_id, content, reply, state, reason, attempts, selected_provider, selected_model, observed_provider, observed_model, created_at, finished_at, sources, origin FROM turns
 		WHERE conversation_id = ? AND seq < ? ORDER BY seq DESC LIMIT ?`, conversationID, beforeSeq, limit)
 	if err != nil {
 		return nil, fmt.Errorf("read turns: %w", err)

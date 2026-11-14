@@ -92,6 +92,6 @@ func (h *ChatDomainHandler) handleSelfChat(ctx context.Context, event core.Event
 	locale, _ := event.Payload["locale"].(string)
 	event.Payload = map[string]any{"content": content, "locale": locale}
 	return h.answerArchived(ctx, event, workflow, archivedSend{
-		scope: scope, conversationID: held.ID, sendID: selfChatSendID(event), admitted: unlock, quietPending: true,
+		scope: scope, conversationID: held.ID, sendID: selfChatSendID(event), origin: string(event.Source), admitted: unlock, quietPending: true,
 	})
 }
