@@ -34,6 +34,12 @@ summaries. Server message discussions share a guild/channel scope, while DMs and
 commands retain separate scopes. Participant aliases and escaped display names
 preserve attribution without adding raw account IDs to the participant label.
 
+A user tag in a Discord message (`<@id>`) is only an account id, so `ResolveMentions` replaces it before
+the text reaches the model: a person listed in the owner's configuration by their Discord id is called by
+the configured name, anyone else by the display name the gateway reported (cleaned to one short line of
+plain text), and a tag with neither by the participant alias. The id never stays in the text, and the name
+grants no authority.
+
 Generation can supply a fenced `math` block with single-line `latex:` and `text:`
 fields. The readable text is always retained. Expressions over 80 bytes, multiple
 fractions/roots, sums and integrals may receive a PNG; `image: true` requests an

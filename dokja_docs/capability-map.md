@@ -344,7 +344,10 @@ receive profile facts as private application context. See the
 Accounts listed as `ningo.people[].discord` are named in shared Discord channels and voice
 rooms: the application matches the gateway's account id, adds `known_as` with the configured name
 to that participant's turn (with `real_name` when the name is a nickname) and nothing else (no facts,
-no warmth, no id), and a display name or message never earns it.
+no warmth, no id), and a display name or message never earns it. A user tag in a message (`<@id>`) is resolved the same way: the Discord adapter sends the gateway's
+names for the tagged accounts (`mentionedUsers`, optional, at most 20), and the chat domain replaces each tag
+with the configured name for a known id, otherwise the display name, otherwise the participant alias, so the
+model sees who was tagged and never an account id.
 
 The owner and the people that file lists with a WhatsApp number (a Discord account only names them, see above) can ask Ningo to keep something ("guarde isso: ...",
 "o que você sabe sobre mim?", "esquece 2", and their English forms). The phrases are answered
