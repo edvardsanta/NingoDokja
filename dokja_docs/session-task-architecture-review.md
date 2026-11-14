@@ -8,7 +8,10 @@ This source-based review adjusts planning; it changes no runtime contract.
 Implementation follow-up: [identity/lifecycle compatibility baseline](task-lifecycle-compatibility.md)
 records the first `10.6-a` batch. It preserves existing identities and adds an
 atomic archive attempt check; the general task/dispatch/settlement contract
-remains pending.
+remains pending. The proposed general contract — logical identity, keyed lanes
+and the per-consumer settlement matrix — is specified in
+[task contract design](task-contract-design.md), awaiting owner review before
+its `10.6-d`/`10.6-e` batches.
 
 ## 1. Transferable patterns and current evidence
 
