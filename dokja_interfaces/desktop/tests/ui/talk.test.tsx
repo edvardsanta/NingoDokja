@@ -290,6 +290,20 @@ describe("the kept conversations", () => {
     expect(calls.find((call) => call.type === "conversation.read")?.payload).toEqual({ conversation_id: archiveId(3) });
   });
 
+  it("says which messages were written in WhatsApp, and says nothing for the desktop's own", async () => {
+    const { transport } = routedTransport({
+      "conversation.list": ok({ conversations: [kept(3, 2)], next: "" }),
+      "conversation.read": readOf(3,
+        archivedTurn({ seq: 1, content: "From the phone", reply: "Phone answer.", sendId: "wa-00000001", origin: "whatsapp" }),
+        archivedTurn({ seq: 2, content: "From here", reply: "Desktop answer.", sendId: "send-0002", origin: "desktop" })),
+    });
+    renderTalk(transport);
+    await screen.findByText("From the phone");
+    expect(screen.getAllByText("Sent from WhatsApp; the reply went there too")).toHaveLength(1);
+    const own = screen.getByText("From here").closest("li");
+    expect(own?.querySelector(".turn-origin")).toBeNull();
+  });
+
   it("reads earlier turns on request and keeps them above the latest page", async () => {
     const turn = (seq: number) => archivedTurn({ seq, content: `Question ${seq}`, reply: `Answer ${seq}`, sendId: `send-${String(seq).padStart(4, "0")}` });
     const { transport, calls } = routedTransport({

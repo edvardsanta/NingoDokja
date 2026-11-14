@@ -270,6 +270,12 @@ restart. Storage errors fail explicitly without a volatile fallback. Explicit ne
 sessions clear the relevant snapshot; only a verified owner may reset a shared
 channel scope. Identity and system instructions are rebuilt per turn, never restored
 from the database. Existing local owner conversation archives remain separate.
+Each archived turn records the interface it was written in (`origin`: `desktop`,
+`cli`, `tui` or `whatsapp`; additive SQLite column and turn-view field, empty for
+older turns). The desktop marks messages written elsewhere, since the message and
+its reply were also exchanged there. The owner's WhatsApp self-chat commands
+(`/new`, `/conversations`, `/open`, `/rename`, `/delete`, `/yes`, `/help`, with
+Portuguese names) are the `conversation.manage` capability in the Chat catalog.
 This stores bot-handled exchanges, not every channel message, and cannot recover
 history discarded by earlier builds. It is a current checkpoint, not a complete
 transcript archive or pgvector semantic recall of old topics. Exact summaries can

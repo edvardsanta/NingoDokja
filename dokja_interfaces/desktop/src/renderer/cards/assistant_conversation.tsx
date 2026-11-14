@@ -23,6 +23,8 @@ export type Turn = {
   id: string;
   // its place in the conversation, once the archive has it
   seq?: number;
+  // where the message was written, when the archive says
+  origin?: ArchivedTurn["origin"];
   content: string;
   reply: string;
   state: ArchivedTurnState | "unknown";
@@ -75,8 +77,16 @@ export type Conversation = {
   stop: () => Promise<void>;
 };
 
+// Where a message written outside the desktop came from, and that its reply went back there too.
+function originNote(origin: NonNullable<Turn["origin"]>, t: Translate): string {
+  if (origin === "whatsapp") return t("assistant_origin_whatsapp");
+  if (origin === "cli") return t("assistant_origin_cli");
+  if (origin === "tui") return t("assistant_origin_tui");
+  return "";
+}
+
 const fromArchive = (turn: ArchivedTurn): Turn => ({
-  sendId: turn.sendId, id: turn.id, seq: turn.seq, content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
+  sendId: turn.sendId, id: turn.id, seq: turn.seq, ...(turn.origin ? { origin: turn.origin } : {}), content: turn.content, reply: turn.reply, state: turn.state, reason: turn.reason,
   ...(turn.model ? { answeredBy: turn.provider ? `${turn.provider} / ${turn.model}` : turn.model } : {}),
   ...(turn.sources ? { sources: turn.sources } : {}),
 });
@@ -370,7 +380,7 @@ export function Transcript({ conversation, transport }: { conversation: Conversa
     {conversation.older && <Button size="compact" disabled={conversation.loadingOlder} onClick={readOlder}>{t("assistant_older")}</Button>}
     {conversation.olderError && <Problem error={conversation.olderError}/>}
     <ol className="assistant-turns" aria-live="polite">{turns.flatMap((turn) => [
-      <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p></li>,
+      <li key={`${turn.sendId}-user`} data-role="user"><strong>{t("assistant_you")}</strong><p>{turn.content}</p>{turn.origin && turn.origin !== "desktop" && <small className="assistant-by turn-origin">{originNote(turn.origin, t)}</small>}</li>,
       ...(turn.state === "completed" ? [<li key={`${turn.sendId}-reply`} data-role="assistant"><strong>{t("assistant_name")}</strong><ReplyBody reply={turn.reply} kept={turn.sources} onOpen={setReading}/>{turn.answeredBy && <small className="assistant-by">{t("assistant_answered_by", { model: turn.answeredBy })}</small>}{turn.context && <ReplyContextLine context={turn.context}/>}{conversation.judgeable && conversation.id && turn.id && turn.seq !== undefined && <AnswerVerdictBar transport={transport} conversationId={conversation.id} turnId={turn.id} seq={turn.seq}/>}</li>] : []),
       ...(turn !== latest && turn.state !== "completed" ? [<li key={`${turn.sendId}-none`} className="detail" data-role="assistant">{t("assistant_no_reply", { reason: reasonText(turn.reason, t) })}</li>] : []),
     ])}</ol>

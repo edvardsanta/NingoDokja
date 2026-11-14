@@ -696,7 +696,7 @@ test("an archived message forwards only its conversation, send id and text, or a
   const message = {content:"explain",conversation_id:conversation,send_id:"send-0001"};
   assert.equal((await handleRequest({type:"message.created",payload:message},client,limits)).ok,false, "a message needs a recent gesture");
   const answer = await handleRequest({type:"message.created",payload:{...message,reading_id:"entry-1",system:"inject"}},client,limits,undefined,present);
-  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",replayed:false,turn:{id:turnId,seq:1,sendId:"send-0001",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1,provider:"",model:""}}});
+  assert.deepEqual(answer,{ok:true,result:{reply:"Think through the evidence.",replayed:false,turn:{id:turnId,seq:1,sendId:"send-0001",origin:"",content:"explain",reply:"Think through the evidence.",state:"completed",reason:"",attempts:1,provider:"",model:""}}});
   await handleRequest({type:"message.created",payload:{conversation_id:conversation,retry_turn_id:turnId,content:"ignored",send_id:"send-0002"}},client,limits,undefined,present);
   assert.deepEqual(calls,[
     {type:"message.created",payload:message},
@@ -884,6 +884,16 @@ test("the shared turn projection is read as the orchestrator pins it, version 1"
   assert.deepEqual([turns[0]!.provider,turns[0]!.model,turns[0]!.reply],["ollama","example/model:latest","One who judges."]);
   assert.equal(turns[1]!.sendId,"wa-0123456789abcdef");
   assert.deepEqual([turns[2]!.attempts,turns[2]!.reason],[2,"the model returned no reply"]);
+  assert.deepEqual(turns.map((turn) => turn.origin),["desktop","whatsapp","","" ]);
+});
+
+test("a turn origin this desktop does not know is read as none", async () => {
+  const id = "e".repeat(32);
+  const turn = {view:1,id:"1".repeat(32),seq:1,send_id:"send-0001",origin:"carrier-pigeon",content:"hi",reply:"",state:"failed",reason:"",attempts:1,provider:"",model:""};
+  const conversation = {id,kind:"general",reading_id:"",title:"",updated_at:"u",revision:1,turns:1};
+  const client = { async request() { return {status:"ok",result:{domain:"conversation",result:{conversation,turns:[turn]}}}; } };
+  const read = await handleRequest({type:"conversation.read",payload:{conversation_id:id}},client,{defaultTimeoutMs:15000,maxTimeoutMs:120000});
+  assert.equal((read as {result:{turns:Record<string,unknown>[]}}).result.turns[0]!.origin,"");
 });
 
 test("a turn in a state this desktop does not know is kept as unknown, never dropped or shown as on its way", async () => {

@@ -353,6 +353,8 @@ export type ArchivedTurn = {
   id: string;
   seq: number;
   sendId: string;
+  // The interface the message was written in; empty for one kept before origins were recorded.
+  origin: "desktop" | "cli" | "tui" | "whatsapp" | "";
   content: string;
   reply: string;
   state: ArchivedTurnState;
