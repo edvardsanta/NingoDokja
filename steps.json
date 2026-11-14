@@ -1963,7 +1963,9 @@
             "Review durable state/ownership before choosing persistence and restart behavior. Unknown effects are not automatically replayed; report delivery and accepted completion remain separate.",
             "Prove lifecycle, capability admission, unsupported operations, dispatch outcomes and recovery through domain/orchestrator/application-port tests before UI or provider-team integration. No mobile or remote-relay runtime is required."
           ],
-          "evidence": [],
+          "evidence": [
+            "2026-11-14: the general task contract beyond archived chat is specified in dokja_docs/task-contract-design.md, awaiting owner review before implementation. It defines TaskRef as a logical task identity owned by the consumer's durable record (RunTask IDs stay per-invocation), restates the archived-chat settlement matrix for any consumer (duplicate and late attempt results conflict, foreign scope refuses before change, cancellation records an unknown effect that is never replayed), generalizes the ordered queue into bounded keyed lanes with accepted/queued/dispatched observations, and keeps cumulative budgets with the consumer that needs them (10.5). Batches 10.6-d (core lanes, archived chat as one preserved consumer) and 10.6-e (source-read journal settlement matrix) are planned; no runtime change is made by this documentation. Documentation only; no code, schema, envelope or config change."
+          ],
           "checks": [],
           "blockers": [],
           "references": [
