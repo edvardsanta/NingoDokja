@@ -1,7 +1,7 @@
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 
-import type { DiscordAttachment, DiscordDocumentAttachment } from "../types.js";
+import type { DiscordAttachment, DiscordDocumentAttachment, DiscordReplyReference } from "../types.js";
 
 export type BridgeRequest = {
   event_type: string;
@@ -14,6 +14,8 @@ export type BridgeRequest = {
     voiceStartedBy?: string;
     content?: string;
     documentAttachments?: DiscordDocumentAttachment[];
+    mediaAttachments?: DiscordDocumentAttachment[];
+    replyTo?: DiscordReplyReference;
     locale?: string;
     replyToContent?: string;
     mentionedUserIds?: string[];
@@ -218,6 +220,8 @@ export function buildBridgePayload(params: {
   eventType: string;
   content?: string;
   documentAttachments?: DiscordDocumentAttachment[];
+  mediaAttachments?: DiscordDocumentAttachment[];
+  replyTo?: DiscordReplyReference;
   locale?: string;
   replyToContent?: string;
   mentionedUserIds?: string[];
@@ -249,6 +253,12 @@ export function buildBridgePayload(params: {
     payload: {
       content: params.content,
       documentAttachments: params.documentAttachments?.slice(0, 10),
+      mediaAttachments: params.mediaAttachments?.slice(0, 5),
+      replyTo: params.replyTo && {
+        ...params.replyTo,
+        content: params.replyTo.content.slice(0, 2000),
+        mediaAttachments: params.replyTo.mediaAttachments?.slice(0, 5),
+      },
       locale: params.locale,
       replyToContent: params.replyToContent?.slice(0, 8000),
       mentionedUserIds: params.mentionedUserIds?.slice(0, 20),

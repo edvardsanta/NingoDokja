@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 )
 
 type fakeMemeTextReader struct {
@@ -139,5 +141,20 @@ func TestHashtagTagValidationPrecedesMediaAndStorageEffects(t *testing.T) {
 		if err == nil || len(media.urls) != 0 || len(knowledge.calls) != 0 {
 			t.Fatalf("invalid intent caused effects: error=%v media=%v storage=%v", err, media.urls, knowledge.calls)
 		}
+	}
+}
+
+// The owner's own label says so, so tagging again a meme an approved group proposal labelled makes
+// the label the owner's: the service keeps provenance across an unchanged reread otherwise.
+func TestAnOwnersTagCarriesTheOwnersOrigin(t *testing.T) {
+	media := &fakeMemeTextReader{result: map[string]any{"text": "words read from the meme"}}
+	knowledge := &fakeHashtagKnowledge{answers: map[string]map[string]any{"knowledge.ingest": {"changed": true}}}
+	if _, err := NewMemeHashtagWorkflow(media, knowledge).TagHashtag(context.Background(), "https://media.example/a.png", "#Humor", ""); err != nil {
+		t.Fatal(err)
+	}
+	metadata, _ := knowledge.calls[0].payload["metadata"].(map[string]any)
+	provenance, _ := metadata["provenance"].(knowledgedomain.Provenance)
+	if provenance.Origin != knowledgedomain.OriginOwner || provenance.ProposedBy != "" {
+		t.Fatalf("an owner's label must be assigned to the owner and nobody else: %#v", metadata)
 	}
 }

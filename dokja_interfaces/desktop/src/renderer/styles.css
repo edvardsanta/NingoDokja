@@ -3978,3 +3978,6 @@ button.cfg-toggle:focus-visible {
 
 /* What an answer read: quieter than who answered, since it is a diagnosis and not part of the reply. */
 .reply-context { opacity: .85; }
+
+/* The picture kept of a proposed meme: small, so a queue of them stays readable. */
+.proposal-preview { display: block; max-width: 16rem; max-height: 12rem; margin: var(--space-2) 0; border: 1px solid var(--line, currentColor); }

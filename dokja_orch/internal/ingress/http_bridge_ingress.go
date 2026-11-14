@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	chat "read_books/dokja_domain/dokja_chat"
+	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"read_books/internal/ownerconfig"
@@ -21,12 +22,16 @@ import (
 
 const defaultHTTPBridgeEndpoint = ":8091"
 
+// maxMediaAttachments bounds the media a message hands to a tag proposal.
+const maxMediaAttachments = 5
+
 type HTTPBridgeIngress struct {
 	media          MediaSource
 	service        *core.Service
 	endpoint       string
 	token          string
 	discordOwnerID string
+	memeChannels   map[string]bool
 	ownerProfile   chat.OwnerProfile
 	app            *fiber.App
 }
@@ -40,43 +45,57 @@ type BridgeRequest struct {
 }
 
 type BridgePayload struct {
-	DocumentAttachments []chat.WebAttachment   `json:"documentAttachments,omitempty"`
-	Document            *chat.IncomingDocument `json:"document,omitempty"`
-	Locale              string                 `json:"locale,omitempty"`
-	VoiceSessionID      string                 `json:"voiceSessionId"`
-	VoiceStartedBy      string                 `json:"voiceStartedBy"`
-	Realtime            map[string]any         `json:"realtime"`
-	Voice               map[string]any         `json:"voice"`
-	VoiceTurns          []chat.VoiceTurn       `json:"voiceTurns"`
-	VoiceChannelID      string                 `json:"voiceChannelId"`
-	Content             string                 `json:"content"`
-	ReplyToContent      string                 `json:"replyToContent"`
-	MentionedUserIDs    []string               `json:"mentionedUserIds"`
-	MentionedUsers      []chat.Mention         `json:"mentionedUsers"`
-	Limit               *int                   `json:"limit"`
-	MaxItems            *int                   `json:"maxItemsPerScraper"`
-	Query               string                 `json:"query"`    // price.search words
-	Brand               string                 `json:"brand"`    // price.search brand
-	Merchant            string                 `json:"merchant"` // price.search store
-	Link                string                 `json:"link"`     // price.compare product link
-	IntendedUse         string                 `json:"intended_use,omitempty"`
-	CurrentEquipment    string                 `json:"current_equipment,omitempty"`
-	BudgetCents         *int64                 `json:"budget_cents,omitempty"`
-	UserID              string                 `json:"userId"`
-	UserName            string                 `json:"userName"`
-	ChannelID           string                 `json:"channelId"`
-	MessageID           string                 `json:"messageId"`
-	GuildID             string                 `json:"guildId"`
-	SessionKey          string                 `json:"sessionKey"`
-	StartChat           bool                   `json:"startSession"`
-	AccountID           string                 `json:"accountId"`
-	EntryKind           string                 `json:"entryKind"`
-	Direct              *bool                  `json:"isDirectMessage"`
-	Mentioned           *bool                  `json:"mentionsBot"`
-	ChatKind            string                 `json:"chatKind"`
-	OwnAccount          *bool                  `json:"isOwnAccount"`
-	SelfChat            *bool                  `json:"isSelfChat"`
-	Numbers             []string               `json:"senderNumbers"`
+	DocumentAttachments []chat.WebAttachment `json:"documentAttachments,omitempty"`
+	// MediaAttachments are the images and videos a Discord message carries, and ReplyTo the
+	// message it answers. Only a meme channel's tag proposals read them.
+	MediaAttachments []chat.WebAttachment   `json:"mediaAttachments,omitempty"`
+	ReplyTo          *BridgeReplyTo         `json:"replyTo,omitempty"`
+	Document         *chat.IncomingDocument `json:"document,omitempty"`
+	Locale           string                 `json:"locale,omitempty"`
+	VoiceSessionID   string                 `json:"voiceSessionId"`
+	VoiceStartedBy   string                 `json:"voiceStartedBy"`
+	Realtime         map[string]any         `json:"realtime"`
+	Voice            map[string]any         `json:"voice"`
+	VoiceTurns       []chat.VoiceTurn       `json:"voiceTurns"`
+	VoiceChannelID   string                 `json:"voiceChannelId"`
+	Content          string                 `json:"content"`
+	ReplyToContent   string                 `json:"replyToContent"`
+	MentionedUserIDs []string               `json:"mentionedUserIds"`
+	MentionedUsers   []chat.Mention         `json:"mentionedUsers"`
+	Limit            *int                   `json:"limit"`
+	MaxItems         *int                   `json:"maxItemsPerScraper"`
+	Query            string                 `json:"query"`    // price.search words
+	Brand            string                 `json:"brand"`    // price.search brand
+	Merchant         string                 `json:"merchant"` // price.search store
+	Link             string                 `json:"link"`     // price.compare product link
+	IntendedUse      string                 `json:"intended_use,omitempty"`
+	CurrentEquipment string                 `json:"current_equipment,omitempty"`
+	BudgetCents      *int64                 `json:"budget_cents,omitempty"`
+	UserID           string                 `json:"userId"`
+	UserName         string                 `json:"userName"`
+	ChannelID        string                 `json:"channelId"`
+	MessageID        string                 `json:"messageId"`
+	GuildID          string                 `json:"guildId"`
+	SessionKey       string                 `json:"sessionKey"`
+	StartChat        bool                   `json:"startSession"`
+	AccountID        string                 `json:"accountId"`
+	EntryKind        string                 `json:"entryKind"`
+	Direct           *bool                  `json:"isDirectMessage"`
+	Mentioned        *bool                  `json:"mentionsBot"`
+	ChatKind         string                 `json:"chatKind"`
+	OwnAccount       *bool                  `json:"isOwnAccount"`
+	SelfChat         *bool                  `json:"isSelfChat"`
+	Numbers          []string               `json:"senderNumbers"`
+}
+
+// BridgeReplyTo is the message a Discord message answers, as far as a tag proposal needs it.
+type BridgeReplyTo struct {
+	MessageID        string               `json:"messageId"`
+	AuthorID         string               `json:"authorId"`
+	AuthorName       string               `json:"authorName"`
+	IsBot            bool                 `json:"isBot"`
+	Content          string               `json:"content"`
+	MediaAttachments []chat.WebAttachment `json:"mediaAttachments,omitempty"`
 }
 
 type BridgeResponse struct {
@@ -117,6 +136,39 @@ func (i *HTTPBridgeIngress) WithOwnerConfig(config ownerconfig.Config) *HTTPBrid
 	i.discordOwnerID = config.Owner.Accounts.Discord.UserID
 	i.ownerProfile = config.Owner.Profile
 	return i
+}
+
+// WithMemeChannels names the Discord channels where people post memes. A message there that
+// proposes a tag for a meme is marked, so it is authorized without a mention and routed to
+// intake instead of chat. The sender cannot mark itself: only this configuration does.
+func (i *HTTPBridgeIngress) WithMemeChannels(channels []string) *HTTPBridgeIngress {
+	i.memeChannels = map[string]bool{}
+	for _, channel := range channels {
+		if channel = strings.TrimSpace(channel); channel != "" {
+			i.memeChannels[channel] = true
+		}
+	}
+	return i
+}
+
+// markMemeTagPost marks a message in a meme channel that proposes a tag, by the domain's rule. A
+// message that mentions Ningo, a direct message and any other channel stay ordinary messages.
+func (i *HTTPBridgeIngress) markMemeTagPost(event *core.Event) {
+	if event.Source != core.SourceDiscord || event.Type != "message.created" || !i.memeChannels[event.Channel.ID] {
+		return
+	}
+	if direct, _ := event.Context["is_direct_message"].(bool); direct {
+		return
+	}
+	if mentioned, _ := event.Context["mentions_bot"].(bool); mentioned {
+		return
+	}
+	media, _ := event.Payload["media_attachments"].([]chat.WebAttachment)
+	_, isReply := event.Context["reply_to"].(map[string]any)
+	content, _ := event.Context["content"].(string)
+	if _, ok := knowledgedomain.ParseMemeTagPost(content, len(media) > 0, isReply); ok {
+		event.Context["meme_tag_post"] = true
+	}
 }
 
 func (i *HTTPBridgeIngress) Name() string {
@@ -197,6 +249,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 	))
 
 	event := bridgeEventFromRequest(bridgeRequest)
+	i.markMemeTagPost(&event)
 	if event.Source == core.SourceWhatsApp {
 		event.Payload["locale"] = bridgeRequest.Payload.Locale
 		if bridgeRequest.Payload.Document != nil {
@@ -604,6 +657,20 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 			payload["document_attachments"] = request.Payload.DocumentAttachments[:min(len(request.Payload.DocumentAttachments), 10)]
 		}
 		context["content"] = content
+		if source == core.SourceDiscord {
+			if media := request.Payload.MediaAttachments; len(media) > 0 {
+				payload["media_attachments"] = media[:min(len(media), maxMediaAttachments)]
+			}
+			if reply := request.Payload.ReplyTo; reply != nil && strings.TrimSpace(reply.MessageID) != "" {
+				quoted := []rune(reply.Content)
+				context["reply_to"] = map[string]any{
+					"message_id": strings.TrimSpace(reply.MessageID), "author_id": strings.TrimSpace(reply.AuthorID),
+					"author_name": string([]rune(reply.AuthorName)[:min(len([]rune(reply.AuthorName)), 100)]), "is_bot": reply.IsBot,
+					"content":           string(quoted[:min(len(quoted), 2000)]),
+					"media_attachments": reply.MediaAttachments[:min(len(reply.MediaAttachments), maxMediaAttachments)],
+				}
+			}
+		}
 		if source == core.SourceDiscord && request.Payload.ReplyToContent != "" {
 			quoted := []rune(request.Payload.ReplyToContent)
 			if len(quoted) > 8000 {

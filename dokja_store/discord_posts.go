@@ -49,3 +49,21 @@ func (d *DB) LatestDiscordPost(mediaURL string) (DiscordPost, bool, error) {
 	}
 	return p, true, nil
 }
+
+// DiscordPostMedia returns the media address Ningo posted as this Discord message: the address the
+// meme was recorded under, so a reply to the message can name the meme it carried. The latest
+// record wins when a message carried more than one.
+func (d *DB) DiscordPostMedia(channelID, messageID string) (string, bool, error) {
+	var mediaURL string
+	err := d.db.QueryRow(
+		`SELECT media_url FROM discord_posts
+		 WHERE channel_id = ? AND message_id = ? ORDER BY posted_at DESC, rowid DESC LIMIT 1`,
+		channelID, messageID).Scan(&mediaURL)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return mediaURL, true, nil
+}

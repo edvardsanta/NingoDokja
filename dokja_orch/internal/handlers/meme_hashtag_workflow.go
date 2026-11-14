@@ -71,7 +71,9 @@ func (w *MemeHashtagWorkflow) TagHashtag(ctx context.Context, url, hashtag, text
 	if err != nil {
 		return nil, err
 	}
-	return w.knowledge.StoreHashtagExample(ctx, example, text)
+	// The owner's own label says so, so a record an approved group proposal made earlier does not
+	// keep its origin when the owner tags the same meme again: their label replaces it.
+	return w.knowledge.StoreHashtagExampleWithProvenance(ctx, example, text, knowledgedomain.Provenance{Origin: knowledgedomain.OriginOwner})
 }
 
 func (w *MemeHashtagWorkflow) SuggestHashtag(ctx context.Context, url, text string, minScore *float64) (map[string]any, error) {

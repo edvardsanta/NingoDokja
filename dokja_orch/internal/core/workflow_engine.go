@@ -33,6 +33,9 @@ func (e *DefaultWorkflowEngine) Plan(_ context.Context, event Event, route Route
 		if route.Workflow == "incoming-content" && domain == DomainChat {
 			action = chat.ActionReadIncomingContent
 		}
+		if route.Workflow == "meme-tag-intake" && domain == DomainKnowledge {
+			action = "propose-meme-tag"
+		}
 		if route.Workflow == "link-conversation" && domain == DomainChat {
 			action = chat.ActionConverseLinks
 		}

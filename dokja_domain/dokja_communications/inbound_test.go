@@ -116,3 +116,30 @@ func TestInboundDiscordAcceptsEveryConfiguredServer(t *testing.T) {
 		t.Fatal("no servers configured means any server")
 	}
 }
+
+func TestAMemeTagPostNeedsNoMentionButKeepsTheOtherRules(t *testing.T) {
+	p := InboundPolicy{DiscordGuildIDs: []string{"guild"}, DiscordChannels: []string{"memes"}, DiscordNeedMention: true}
+	post := InboundIntent{Platform: "discord", Entry: "message", ChannelID: "memes", GuildID: "guild", MemeTagPost: true}
+	if !p.AuthorizeInbound(post) {
+		t.Fatal("a tag post in an allowed meme channel needs no mention")
+	}
+	ordinary := post
+	ordinary.MemeTagPost = false
+	if p.AuthorizeInbound(ordinary) {
+		t.Fatal("an ordinary message still needs a mention")
+	}
+	for name, change := range map[string]func(*InboundIntent){
+		"channel": func(r *InboundIntent) { r.ChannelID = "other" },
+		"guild":   func(r *InboundIntent) { r.GuildID = "other" },
+		"entry":   func(r *InboundIntent) { r.Entry = "unknown" },
+		"direct":  func(r *InboundIntent) { r.Direct = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := post
+			change(&r)
+			if p.AuthorizeInbound(r) {
+				t.Fatal("the flag must not widen where Ningo listens")
+			}
+		})
+	}
+}

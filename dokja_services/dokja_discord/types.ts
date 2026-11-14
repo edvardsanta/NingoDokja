@@ -82,6 +82,10 @@ export type DiscordMessageContext = {
   guildId?: string;
   content: string;
   replyToContent?: string;
+  // The images and videos the message carries, and the message it answers, for a meme channel's
+  // tag proposals.
+  mediaAttachments?: DiscordDocumentAttachment[];
+  replyTo?: DiscordReplyReference;
   mentionedUserIds?: string[];
   // The names the gateway shows for the tagged accounts, so the text can name them instead of an id.
   mentionedUsers?: Array<{ id: string; name: string }>;
@@ -89,6 +93,15 @@ export type DiscordMessageContext = {
   isDirectMessage: boolean;
   mentionsBot: boolean;
   reply(message: DiscordReply): Promise<void>;
+};
+
+export type DiscordReplyReference = {
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  isBot: boolean;
+  content: string;
+  mediaAttachments?: DiscordDocumentAttachment[];
 };
 
 export type DiscordDocumentAttachment = {

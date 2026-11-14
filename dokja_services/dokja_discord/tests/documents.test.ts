@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pdfAttachments } from "../messages/documents.js";
+import { mediaAttachments, pdfAttachments } from "../messages/documents.js";
 import { createDiscordMessageHandler } from "../messages/message_listener.js";
 import { toMessageContext } from "../runtime/discordjs_runtime.js";
 
@@ -44,4 +44,76 @@ test("an attachment-only message sends metadata to the orchestrator, not a direc
     assert.equal(calls, 1);
     assert.equal(reply, "Read page 9. [1]");
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("pictures and videos project as metadata and everything else is left out", () => {
+  const common = { url: "https://example.com/a", size: 10 };
+  assert.deepEqual(mediaAttachments([
+    { ...common, name: "clip.mp4", contentType: "video/mp4" },
+    { ...common, filename: "meme.png", content_type: "IMAGE/PNG" },
+    { ...common, name: "paper.pdf", contentType: "application/pdf" },
+    { ...common, name: "bad.png", contentType: "image/png", size: "big" },
+    null,
+  ]), [
+    { ...common, filename: "clip.mp4", content_type: "video/mp4" },
+    { ...common, filename: "meme.png", content_type: "image/png" },
+  ]);
+  assert.equal(mediaAttachments(Array.from({ length: 9 }, (_, i) => ({ ...common, name: `${i}.png`, contentType: "image/png" }))).length, 5);
+});
+
+test("the Discord runtime hands over the media of a message and the message it answers", async () => {
+  const video = { url: "https://example.com/clip.mp4", name: "clip.mp4", contentType: "video/mp4", size: 10 };
+  const referenced = {
+    id: "meme-message", channelId: "channel", guildId: "guild", content: "#Old",
+    author: { id: "webhook-id", bot: true, username: "Ningo Dokja" }, attachments: new Map([["file", video]]),
+  };
+  const context = await toMessageContext({
+    author: { id: "member", bot: false }, id: "message", channelId: "channel", guildId: "guild",
+    content: "#SomeGames", channel: { type: 0 }, mentions: { users: new Map() }, attachments: new Map(),
+    reference: { messageId: "meme-message", channelId: "channel" }, fetchReference: async () => referenced,
+  } as any);
+  assert.deepEqual(context.mediaAttachments, []);
+  assert.deepEqual(context.replyTo, {
+    messageId: "meme-message", authorId: "webhook-id", authorName: "Ningo Dokja", isBot: true, content: "#Old",
+    mediaAttachments: [{ url: video.url, filename: "clip.mp4", content_type: "video/mp4", size: 10 }],
+  });
+});
+
+test("a message sends its media and the answered message to the orchestrator for a tag proposal", async () => {
+  const originalFetch = globalThis.fetch;
+  const media = [{ url: "https://example.com/clip.mp4", filename: "clip.mp4", content_type: "video/mp4", size: 10 }];
+  const replyTo = { messageId: "m0", authorId: "u2", authorName: "Alex", isBot: false, content: "x".repeat(3000), mediaAttachments: media };
+  let seen: any;
+  globalThis.fetch = (async (_input, init) => {
+    seen = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ status: "ok", reply: "" }));
+  }) as typeof fetch;
+  try {
+    let replied = false;
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 })({
+      userId: "member", channelId: "channel", messageId: "message", content: "#SomeGames", isBot: false, isDirectMessage: false,
+      mentionsBot: false, mediaAttachments: media, replyTo, reply: async () => { replied = true; },
+    });
+    assert.deepEqual(seen.payload.mediaAttachments, media);
+    assert.equal(seen.payload.replyTo.messageId, "m0");
+    assert.equal(seen.payload.replyTo.content.length, 2000);
+    assert.equal(replied, false, "a proposal is never answered");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a post by a webhook, which is how Ningo posts a meme, is never read as a proposal", async () => {
+  let calls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { calls++; return new Response("{}"); }) as typeof fetch;
+  try {
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 })({
+      userId: "webhook-id", channelId: "channel", messageId: "message", content: "#TiagoGames", isBot: true, isDirectMessage: false,
+      mentionsBot: false, mediaAttachments: [{ url: "https://example.com/a.mp4", filename: "a.mp4", content_type: "video/mp4", size: 1 }], reply: async () => {},
+    });
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

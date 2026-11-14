@@ -79,6 +79,8 @@ func (h *KnowledgeProposalsHandler) workflowFor(kind string) (proposalKindWorkfl
 		return proposalKindWorkflow{Approve: h.approveWebArticle, Current: h.currentWebArticle}, true
 	case "document":
 		return proposalKindWorkflow{Approve: h.approveDocument, Current: h.currentDocument}, true
+	case knowledgedomain.HashtagKnowledgeKind:
+		return proposalKindWorkflow{Approve: h.approveMemeTag, Current: h.currentMemeTag}, true
 	default:
 		return proposalWorkflowFor(kind)
 	}

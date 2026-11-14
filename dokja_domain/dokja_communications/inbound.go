@@ -24,7 +24,11 @@ type InboundPolicy struct {
 type InboundIntent struct {
 	Platform, Entry, ChannelID, GuildID, ChatKind string
 	Direct, Mentioned, SelfChat                   bool
-	SenderNumbers                                 []string
+	// MemeTagPost is a message in a meme channel that proposes a tag for a meme. The orchestrator
+	// decides that from its own configuration, never from what the sender wrote about itself. It
+	// is read for the proposal and never answered, so it does not need to call Ningo.
+	MemeTagPost   bool
+	SenderNumbers []string
 }
 
 // AuthorizeInbound returns false for incomplete metadata. A rejected ingress
@@ -50,7 +54,7 @@ func (p InboundPolicy) AuthorizeInbound(r InboundIntent) bool {
 		if len(p.DiscordChannels) > 0 && !contains(p.DiscordChannels, r.ChannelID) {
 			return false
 		}
-		return r.Entry == "command" || !p.DiscordNeedMention || r.Mentioned
+		return r.Entry == "command" || !p.DiscordNeedMention || r.Mentioned || (r.Entry == "message" && r.MemeTagPost)
 	case "whatsapp":
 		if r.Entry != "message" {
 			return false
