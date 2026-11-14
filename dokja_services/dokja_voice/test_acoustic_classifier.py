@@ -52,6 +52,26 @@ class AcousticClassifierTests(unittest.TestCase):
         self.assertEqual(samples.shape, (16000,))
         self.assertEqual(classifier._processor.call_args.kwargs["sampling_rate"], 16000)
 
+    def test_each_classification_logs_the_scores_it_decided_on(self):
+        classifier = TransformersAudioClassifier("fixture-model")
+        classifier._processor = Mock(return_value={})
+        classifier._model = Mock(
+            return_value=SimpleNamespace(logits=torch.tensor([[0.0, 2.0, -2.0]]))
+        )
+        classifier._model.config = SimpleNamespace(
+            id2label={0: "Speech", 1: "Laughter", 2: "Music"}
+        )
+        classifier._model.eval = Mock()
+
+        with self.assertLogs("dokja_voice.acoustic", level="INFO") as logs:
+            classifier.classify(wav_bytes())
+
+        line = logs.records[-1].getMessage()
+        self.assertIn("kind=laughter", line)
+        self.assertIn("laughter=0.88", line)
+        self.assertIn("speech=0.50", line)
+        self.assertIn("top=laughter:0.88", line)
+
     def test_disabled_or_silent_classification_is_unknown(self):
         classifier = TransformersAudioClassifier("")
         self.assertEqual(classifier.classify(wav_bytes()), UNKNOWN)
