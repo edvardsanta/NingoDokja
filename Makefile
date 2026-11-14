@@ -46,8 +46,11 @@ help:
 	@echo "GPU for local Ollama: on when ENV_FILE sets DOKJA_OLLAMA_RENDER_DEVICE (OLLAMA_GPU=0 to disable)"
 
 # Keep startup ordered even when make is invoked with -j.
+# `stop` + `up -d` instead of `restart`: podman refuses to restart containers whose
+# one-shot dependencies (dokja-embedding-init, exited by design) are not running.
 start: up
-	$(COMPOSE_CMD) restart $(RUN_SERVICES)
+	$(COMPOSE_CMD) stop $(RUN_SERVICES)
+	$(COMPOSE_CMD) up -d $(RUN_SERVICES)
 	$(MAKE) desktop
 
 desktop:
