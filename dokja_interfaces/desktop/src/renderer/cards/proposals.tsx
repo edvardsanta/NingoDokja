@@ -7,7 +7,6 @@ import { useTranslate } from "../i18n/context.js";
 import { CardFrame, Problem } from "./card_frame.js";
 import { Button } from "./ui.js";
 import { useCard, type LoadResult } from "./use_card.js";
-import { WorkspacePanel } from "./workspace_panel.js";
 
 async function loadProposals(transport: Transport): Promise<LoadResult<KnowledgeProposals>> {
   const answer = await transport.request("knowledge.proposals.list", {});
@@ -185,9 +184,4 @@ export function ProposalsPanel({ transport }: { transport: Transport }) {
       </>}
     </CardFrame>
   );
-}
-
-export function ProposalsCard({ transport }: { transport: Transport }) {
-  const t = useTranslate();
-  return <WorkspacePanel trail={[t("nav_proposals")]}><ProposalsPanel transport={transport} /></WorkspacePanel>;
 }

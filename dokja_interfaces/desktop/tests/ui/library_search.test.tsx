@@ -34,7 +34,7 @@ describe("what a search finds", () => {
     // the list, its filter and its pager are not shown; the line that says how well search works is
     expect(view.container.querySelector(".hits.documents")).toBeNull();
     expect(screen.queryByText("Title 1")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show what Ningo keeps for himself" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Everything" })).toBeNull();
     expect(screen.getByText("6 documents in 52 passages")).toBeTruthy();
     expect(screen.getByText("Similarity on")).toBeTruthy();
     expect(view.container.querySelectorAll(".hits")).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("what a search finds", () => {
     await screen.findByText("Title 1");
     expect(screen.queryByText("3 passages for “boredom”")).toBeNull();
     expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Show what Ningo keeps for himself" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Everything" })).toBeTruthy();
   });
 
   it("is cleared by Esc in the field, which a search that is not shown leaves alone", async () => {

@@ -56,7 +56,6 @@ describe("the screen", () => {
       "Caderno",
       "Perfis",
       "Mensagens",
-      "Propostas",
       "Estúdio de dados",
       "Sistema",
     ]);
@@ -189,12 +188,37 @@ describe("the screen", () => {
     const views = screen.getByRole("tablist", { name: "Library" });
     const documents = screen.getByRole("tab", { name: "Documents" });
     expect(documents.getAttribute("aria-selected")).toBe("true");
+    // Facts and Pending are views of the Library too: what Ningo knows is in one place
+    fireEvent.keyDown(views, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Facts" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(views, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Pending" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(views, { key: "ArrowRight" });
     const readings = screen.getByRole("tab", { name: "Readings" });
     expect(readings.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(readings);
     await screen.findByRole("heading", { name: "Readings" });
     expect(screen.getByRole("region", { name: "Library › Readings" })).toBeTruthy();
+  });
+
+  it("keeps what Ningo knows in the Library: the facts and what waits for approval are views of it, not of the Notebook", async () => {
+    const { transport, calls } = screenTransport(statusReply(ALL_UP), {
+      "conversation.facts": ok({ facts: [] }),
+      "knowledge.proposals.list": ok({ proposals: [] }),
+    });
+    render(<App transport={transport} locale="en" />);
+
+    fireEvent.click(tabNamed("Library"));
+    fireEvent.click(screen.getByRole("tab", { name: "Facts" }));
+    await screen.findByText("Nothing kept yet.");
+    fireEvent.click(screen.getByRole("tab", { name: "Pending" }));
+    await screen.findByText("Nothing is waiting for a decision.");
+    // the sidebar has no place of its own for the pending ones, and the Notebook has no facts
+    expect(screen.queryByRole("tab", { name: "Proposals" })).toBeNull();
+    fireEvent.click(tabNamed("Notebook"));
+    await screen.findByRole("heading", { name: "Experience memory" });
+    expect(document.body.textContent).toContain("What he knows, facts included, is in the Library.");
+    expect(calls.some((call) => call.type === "conversation.facts")).toBe(true);
   });
 
   it("opens each workspace from the sidebar", async () => {
@@ -211,7 +235,6 @@ describe("the screen", () => {
     await waitFor(() =>
       expect(calls.map((call) => call.type).filter((type) => type !== "conversation.list" && type !== "conversation.capabilities")).toEqual([
         "ningo.status",
-        "conversation.facts",
         "memory.status",
         "knowledge.status",
         "digest.status",

@@ -246,11 +246,11 @@ describe("the memory card", () => {
     return { transport: { ...transport, request }, calls, lists };
   };
 
-  it("opens on what waits, then what it keeps, the record, and the numbers closed last", async () => {
+  it("opens on what waits, then the record, and the numbers closed last", async () => {
     renderCard(notebook().transport);
     await screen.findByText("Suggested #Wait for a meme");
     await screen.findByText("Suggested #Done for a meme");
-    const order = ["Waiting for your verdict", "What Ningo keeps", "Saved experiences", "How the predictions fare"].map((label) => text().indexOf(label));
+    const order = ["Waiting for your verdict", "Saved experiences", "How the predictions fare"].map((label) => text().indexOf(label));
     expect(order.every((at) => at >= 0)).toBe(true);
     expect([...order].sort((left, right) => left - right)).toEqual(order);
     expect(screen.getByText("How the predictions fare").closest("details")?.open).toBe(false);
@@ -263,11 +263,12 @@ describe("the memory card", () => {
     expect(problem.closest("details")?.open).toBe(true);
   });
 
-  it("keeps what Ningo keeps when the memory is switched off, without the record or the numbers", async () => {
+  it("points to the Library for what Ningo knows, and keeps no facts, even when the memory is switched off", async () => {
     const { transport } = routedTransport({ "memory.status": ok(OFF) });
     renderCard(transport);
     await screen.findByText("Switched off.");
-    await screen.findByText("Nothing kept yet.");
+    expect(text()).toContain("What he knows, facts included, is in the Library.");
+    expect(text()).not.toContain("What Ningo keeps");
     expect(text()).not.toContain("Saved experiences");
     expect(text()).not.toContain("How the predictions fare");
   });

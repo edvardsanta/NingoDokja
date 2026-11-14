@@ -1,3 +1,5 @@
+import { KeptFactsPanel } from "./kept_facts.js";
+import { ProposalsPanel } from "./proposals.js";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 
 import type { Transport } from "../../shared/transport.js";
@@ -63,6 +65,8 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
     t("nav_library"),
     [
       { id: "documents", label: t("knowledge_view_documents") },
+      { id: "facts", label: t("knowledge_view_facts") },
+      { id: "pending", label: t("knowledge_view_pending") },
       { id: "sources", label: t("knowledge_view_sources") },
       { id: "prices", label: t("knowledge_view_prices") },
     ],
@@ -122,6 +126,8 @@ export function KnowledgeWorkspace({ transport }: { transport: Transport }) {
           {panels(
             (id) =>
               id === "documents" ? <KnowledgeCard transport={transport} />
+                : id === "facts" ? <KeptFactsPanel transport={transport} />
+                : id === "pending" ? <ProposalsPanel transport={transport} />
                 : id === "prices" ? <PricesCard transport={transport} />
                 : <DigestCard transport={transport} />,
             (id) => {

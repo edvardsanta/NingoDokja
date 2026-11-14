@@ -1185,8 +1185,10 @@ export const ACTIONS: Record<ActionType, ActionDefinition> = {
         limit,
         offset: clampInt(raw.offset, 0, 100_000, 0),
         ...(raw.include_text === true && limit === 1 ? { include_text: true } : {}),
-        // what came from outside only: the documents Ningo keeps for itself are left out
+        // The Library's filter: "documents" leaves out the kinds that have a filter of their own, and
+        // a kind names one of them (the memes' tags). With neither, everything is shown.
         ...(raw.external === true ? { exclude_kinds: [...INTERNAL_KINDS] } : {}),
+        ...(typeof raw.kind === "string" && (INTERNAL_KINDS as readonly string[]).includes(raw.kind) ? { kind: raw.kind } : {}),
       };
     },
     project: (result) => inDomain(result, "knowledge", knowledgeDocuments),

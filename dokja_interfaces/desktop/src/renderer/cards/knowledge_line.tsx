@@ -15,23 +15,30 @@ const count = (value: unknown): number =>
 const unexpected = (): LoadResult<never> => ({ ok: false, error: { code: "unexpected", message: "unexpected knowledge reply" } });
 
 // The one line under the search: what the Library holds, how well search works, what is not indexed
-// and, at its end, the filter that shows what Ningo keeps for himself. Similarity that works is a
+// and, at its end, the filter: everything Ningo knows, the documents brought in, or the memes' tags. Similarity that works is a
 // quiet chip; only a search that cannot use it says so at length, since that changes what it finds.
 // `facts` is false where the counts would say nothing (a Library with nothing brought in yet).
-export function KnowledgeLine({ transport, status, facts, internal, onInternal, hidden, onChanged }: {
+export type LibraryScope = "all" | "documents" | "memes";
+const SCOPES = [
+  ["all", "library_scope_all"],
+  ["documents", "library_scope_documents"],
+  ["memes", "library_scope_memes"],
+] as const;
+
+export function KnowledgeLine({ transport, status, facts, scope, onScope, hidden, onChanged }: {
   transport: Transport;
   status?: KnowledgeStatus;
   facts: boolean;
-  internal: boolean;
-  onInternal?: (internal: boolean) => void;
-  // How many documents the counts include that the list leaves out, while the filter is off.
+  scope: LibraryScope;
+  onScope?: (scope: LibraryScope) => void;
+  // How many documents the counts include that the list leaves out, while it shows only the documents.
   hidden: number;
   onChanged: () => void;
 }) {
   const t = useTranslate();
   const similarity = status ? similarityOf(status) : undefined;
   // a line with nothing to say is not drawn: no counts to show, and the filter put away
-  if (!(facts && status) && !onInternal) return null;
+  if (!(facts && status) && !onScope) return null;
   return (
     <>
       <div className="library-line">
@@ -55,11 +62,15 @@ export function KnowledgeLine({ transport, status, facts, internal, onInternal, 
             <IndexPending transport={transport} pending={status.pendingEmbeddings} onChanged={onChanged} />
           </>
         )}
-        {onInternal && (
-          <Button extra="chip-toggle" aria-pressed={internal} onClick={() => onInternal(!internal)}>
-            {internal && <span aria-hidden="true">✓ </span>}
-            {t("documents_show_internal")}
-          </Button>
+        {onScope && (
+          <span className="library-scope" role="group" aria-label={t("library_scope_label")}>
+            {SCOPES.map(([id, label]) => (
+              <Button key={id} extra="chip-toggle" aria-pressed={scope === id} onClick={() => onScope(id)}>
+                {scope === id && <span aria-hidden="true">✓ </span>}
+                {t(label)}
+              </Button>
+            ))}
+          </span>
         )}
       </div>
       {hidden > 0 && <p className="detail library-hidden">{t("documents_hidden", { count: hidden })}</p>}

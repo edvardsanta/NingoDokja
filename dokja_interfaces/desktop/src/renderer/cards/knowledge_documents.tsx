@@ -7,7 +7,7 @@ import type { Transport } from "../../shared/transport.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import { OffNotice, OpenSystem, Problem } from "./card_frame.js";
 import { MenuRow, useRowMenu, type MenuItem } from "./context_menu.js";
-import { KnowledgeLine } from "./knowledge_line.js";
+import { KnowledgeLine, type LibraryScope } from "./knowledge_line.js";
 import { similarityOf } from "./knowledge_model.js";
 import { Button, Notice, VoiceBlock } from "./ui.js";
 import { useAction } from "./use_action.js";
@@ -52,15 +52,16 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
 }) {
   const t = useTranslate();
   const [offset, setOffset] = useState(0);
-  // What Ningo keeps for himself (a meme's hashtag) is left out unless the owner asks to see it.
-  const [internal, setInternal] = useState(false);
+  // Everything Ningo knows is shown unless the owner narrows it: to the documents brought in, or to
+  // the memes' tags, which are knowledge of a kind of their own.
+  const [scope, setScope] = useState<LibraryScope>("all");
   const busy = useRef(false);
   const load = useCallback(async (at: number): Promise<LoadResult<KnowledgeDocuments | Off>> => {
-    const answer = await transport.request("knowledge.list", { limit: PAGE_SIZE, offset: at, ...(internal ? {} : { external: true }) }, { timeoutMs: 15_000 });
+    const answer = await transport.request("knowledge.list", { limit: PAGE_SIZE, offset: at, ...(scope === "documents" ? { external: true } : scope === "memes" ? { kind: "meme_hashtag" } : {}) }, { timeoutMs: 15_000 });
     if (!answer.ok) return answer;
     const page = parseDocuments(answer.result);
     return page ? { ok: true, data: page } : unexpected();
-  }, [transport, internal]);
+  }, [transport, scope]);
   const listing = useAction(load);
   const remove = useCallback(async (id: string): Promise<LoadResult<{ deleted: boolean } | Off>> => {
     if (busy.current) return unexpected();
@@ -86,7 +87,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
   // panel's refresh.
   useEffect(() => {
     listing.start(offset);
-  }, [offset, revision, internal, listing.start]);
+  }, [offset, revision, scope, listing.start]);
   const reread = useCallback(() => listing.start(offset), [listing.start, offset]);
   useWorkspaceRefresh(reread, listing.state.phase === "loading");
 
@@ -104,7 +105,7 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
 
   // One stop of the tab key for the whole list: the row that last had the focus. The arrows move it.
   const [active, setActive] = useState(0);
-  useEffect(() => { setActive(0); }, [offset, internal]);
+  useEffect(() => { setActive(0); }, [offset, scope]);
   const list = useRef<HTMLUListElement>(null);
   const moveRows = (event: KeyboardEvent<HTMLUListElement>) => {
     const target = { ArrowDown: 1, ArrowUp: -1, Home: -Infinity, End: Infinity }[event.key];
@@ -117,12 +118,12 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
     rows[to]?.focus();
   };
 
-  // The Library is empty when it has nothing at all; when only what Ningo keeps for himself is there,
-  // it says nothing was brought in but still lets the owner see what is kept.
+  // The Library is empty when it has nothing at all; when a filter shows none, it says so and the
+  // other filters are still there.
   const total = page?.total;
   const empty = total === 0 && (status === undefined || status.documents === 0);
-  const nothingBrought = total === 0 && !empty && !internal;
-  const hidden = page && status && !internal ? status.documents - page.total : 0;
+  const nothingBrought = total === 0 && !empty && scope === "documents";
+  const hidden = page && status && scope === "documents" ? status.documents - page.total : 0;
   const similar = status !== undefined && similarityOf(status) === "on";
   const searching = results !== undefined;
   const row = (document: KnowledgeDocument, index: number) => (
@@ -147,8 +148,8 @@ export function KnowledgeDocumentsPanel({ transport, revision, onChanged, onOpen
       {page && empty && <VoiceBlock voice={t("library_voice_empty")} next={t("library_empty_next")} />}
       {page && !empty && <>
         {nothingBrought && !searching && <VoiceBlock voice={t("library_voice_empty")} next={t("library_empty_next")} />}
-        <KnowledgeLine transport={transport} status={status} facts={!nothingBrought} internal={internal}
-          onInternal={searching ? undefined : (next) => { setInternal(next); setOffset(0); }} hidden={searching ? 0 : hidden} onChanged={onChanged} />
+        <KnowledgeLine transport={transport} status={status} facts={!nothingBrought} scope={scope}
+          onScope={searching ? undefined : (next) => { setScope(next); setOffset(0); }} hidden={searching ? 0 : hidden} onChanged={onChanged} />
         {searching ? results : <>
         <div className="line-feedback" aria-live="polite">
           {removing && <Notice announce="polite">{t("documents_removing")}</Notice>}
@@ -186,6 +187,7 @@ function DocumentRow({ document, removing, similar, tabIndex, onFocus, onOpen, o
 }) {
   const t = useTranslate();
   const { ago } = useTimes();
+  const kindLabel = (kind: string) => (kind === "meme_hashtag" ? t("documents_kind_meme_hashtag") : kind);
   const title = document.title || document.id;
   const items: MenuItem[] = [
     ...(onOpen ? [{ label: t("documents_open"), run: () => onOpen(false) }, { label: t("documents_classify"), run: () => onOpen(true) }] : []),
@@ -202,7 +204,7 @@ function DocumentRow({ document, removing, similar, tabIndex, onFocus, onOpen, o
     <p className="detail document-meta">
       <span>
         {/* the id is the operator's: in the tooltip of the kind, not in the row */}
-        {document.kind && <span title={document.id}>{document.kind}</span>}
+        {document.kind && <span title={document.id}>{kindLabel(document.kind)}</span>}
         {rest.map((part, index) => <span key={index}>{document.kind || index > 0 ? " · " : ""}{part}</span>)}
         {similar && document.embedded < document.chunks && (
           <Notice as="span" boxed tone="unchecked">{t("documents_passages", { indexed: document.embedded, count: document.chunks })}</Notice>
