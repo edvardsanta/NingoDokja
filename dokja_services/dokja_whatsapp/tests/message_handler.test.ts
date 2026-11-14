@@ -181,22 +181,22 @@ test("a late message is not answered", async () => {
   assert.equal(dispatched.length, 1);
 });
 
-test("group id and mention state are forwarded for domain authorization", async () => {
+test("group id and mention state are forwarded for authorization, and a refused group is not dispatched at all", async () => {
   const { handler, dispatched, replies, group } = setup();
 
   await handler(group());
   await handler(group({ mentionsBot: false, messageId: "m2" }));
   await handler(group({ chatId: "120363000000000009@g.us", messageId: "m3" }));
 
-  assert.equal(dispatched.length, 3);
+  assert.equal(dispatched.length, 2);
   assert.equal(dispatched[0].payload.channelId, "120363000000000001@g.us");
   assert.equal(dispatched[0].payload.userId, "5511955555555@s.whatsapp.net");
-  assert.deepEqual(dispatched.map((request) => request.payload.mentionsBot), [true, false, true]);
-  assert.equal(replies.length, 3);
+  assert.deepEqual(dispatched.map((request) => request.payload.mentionsBot), [true, false]);
+  assert.equal(replies.length, 2);
 });
 
-test("a group that is not allowed is reported once so its id can be copied", async () => {
-  const { handler, logs, group } = setup();
+test("a group that is not allowed is reported once so its id can be copied, and stays silent", async () => {
+  const { handler, logs, group, dispatched, replies } = setup();
   const other = "120363000000000009@g.us";
 
   await handler(group({ chatId: other, messageId: "m1" }));
@@ -205,6 +205,28 @@ test("a group that is not allowed is reported once so its id can be copied", asy
   const notices = logs.map((line) => JSON.parse(line)).filter((line) => line.reason === "policy");
   assert.equal(notices.length, 1);
   assert.deepEqual(notices[0], { message: "ignored", reason: "policy", conversation: other });
+  assert.equal(dispatched.length, 0);
+  assert.equal(replies.length, 0);
+});
+
+test("a disallowed group hears nothing even when the orchestrator is down", async () => {
+  const { handler, group, dispatched, replies } = setup({}, new Error("fetch failed"));
+  const other = "120363000000000009@g.us";
+
+  await handler(group({ chatId: other }));
+
+  assert.equal(dispatched.length, 0);
+  assert.equal(replies.length, 0);
+});
+
+test("an allowed group still hears the failure notice when the orchestrator is down", async () => {
+  const { handler, group, dispatched, replies } = setup({}, new Error("fetch failed"));
+
+  await handler(group({ chatId: "120363000000000001@g.us" }));
+
+  assert.equal(dispatched.length, 1);
+  assert.equal(replies.length, 1);
+  assert.match(replies[0], /orchestrator|orquestrador/i);
 });
 
 test("an empty message is ignored", async () => {
@@ -310,7 +332,6 @@ test("in an allowed group any member calls Ningo by name, and only there", async
   assert.deepEqual(dispatched.map((request) => [request.payload.content, request.payload.mentionsBot]), [
     ["what would Kant say?", true],
     ["and Hegel?", true],
-    ["Ningo, elsewhere", false],
     ["just talking", false],
   ]);
 });

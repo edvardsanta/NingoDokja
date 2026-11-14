@@ -96,9 +96,15 @@ export function createWhatsAppMessageHandler(
       // one by one, and a phone number never reaches the log.
       return;
     }
-    if (context.chatKind === "group" && !config.allowedGroups.includes(context.chatId) && !reportedGroups.has(context.chatId)) {
-      reportedGroups.add(context.chatId);
-      deps.log?.(JSON.stringify({ message: "ignored", reason: "policy", conversation: context.chatId }));
+    if (context.chatKind === "group" && !config.allowedGroups.includes(context.chatId)) {
+      // The orchestrator's inbound policy refuses this group, so nothing is dispatched. A
+      // dispatch matters here: when it fails, the failure notice answers the chat, and
+      // nothing may be said in a refused group — not even that the orchestrator is down.
+      if (!reportedGroups.has(context.chatId)) {
+        reportedGroups.add(context.chatId);
+        deps.log?.(JSON.stringify({ message: "ignored", reason: "policy", conversation: context.chatId }));
+      }
+      return;
     }
     if (recent.seen(`${context.chatId}:${context.messageId}`)) {
       deps.log?.(JSON.stringify({ message: "ignored", reason: "duplicate", messageId: context.messageId }));
