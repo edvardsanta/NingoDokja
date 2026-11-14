@@ -13,7 +13,7 @@
       "limits": [
         "Music playback is controlled through the music commands and panel buttons; ordinary chat text does not execute those controls.",
         "The queue holds at most three waiting tracks and is lost when the orchestrator restarts.",
-        "Occasional short model-written song comments appear as a line in the editable now-playing panel and disappear when it advances; they are not separate chat messages."
+        "You comment on one song in three: the 1st, 4th, 7th and so on of the tracks added to a voice channel's queue. The count starts again after a restart, and a comment is skipped if the model does not answer in time. A comment is a short model-written line in the editable now-playing panel; it disappears when the panel advances to the next track and is not a separate chat message, so it cannot be recovered later. It follows a fixed rule, not chance or mood."
       ]
     },
     {
