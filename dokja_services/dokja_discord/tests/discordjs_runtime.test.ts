@@ -28,6 +28,30 @@ test("message replies fetch their quoted text without changing the current messa
   assert.deepEqual(context.mentionedUserIds, ["mentioned"]);
 });
 
+test("a message names the accounts it tags by the name the guild shows for them", async () => {
+  const context = await toMessageContext({
+    author: { id: "user", bot: false, username: "account-name" }, id: "new", channelId: "channel", guildId: "guild",
+    content: "noivo já? <@a1> <@b2> <@c3>", channel: { type: 0 },
+    mentions: {
+      users: new Map([["a1", { id: "a1", username: "pedro_acct", globalName: "Pedro G" }], ["b2", { id: "b2", username: "plain" }], ["c3", { id: "c3" }]]),
+      members: new Map([["a1", { displayName: "Pedro do Servidor" }]]),
+    },
+  } as any);
+  assert.deepEqual(context.mentionedUsers, [
+    { id: "a1", name: "Pedro do Servidor" },
+    { id: "b2", name: "plain" },
+    { id: "c3", name: "" },
+  ]);
+});
+
+test("a direct message tags accounts without a guild member list", async () => {
+  const context = await toMessageContext({
+    author: { id: "user", bot: false, username: "account-name" }, id: "new", channelId: "dm",
+    content: "oi <@a1>", channel: { type: 1 }, mentions: { users: new Map([["a1", { id: "a1", username: "friend" }]]) },
+  } as any);
+  assert.deepEqual(context.mentionedUsers, [{ id: "a1", name: "friend" }]);
+});
+
 test("missing and cross-channel reply references do not prevent handling", async () => {
   for (const referenceChannel of ["channel", "other"]) {
     let fetched = false;

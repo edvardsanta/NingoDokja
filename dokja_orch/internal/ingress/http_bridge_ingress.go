@@ -52,6 +52,7 @@ type BridgePayload struct {
 	Content             string                 `json:"content"`
 	ReplyToContent      string                 `json:"replyToContent"`
 	MentionedUserIDs    []string               `json:"mentionedUserIds"`
+	MentionedUsers      []chat.Mention         `json:"mentionedUsers"`
 	Limit               *int                   `json:"limit"`
 	MaxItems            *int                   `json:"maxItemsPerScraper"`
 	Query               string                 `json:"query"`    // price.search words
@@ -201,6 +202,11 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		if bridgeRequest.Payload.Document != nil {
 			event.Payload["document"] = bridgeRequest.Payload.Document
 		}
+	}
+
+	if event.Source == core.SourceDiscord && len(bridgeRequest.Payload.MentionedUsers) > 0 {
+		// The gateway's names for the accounts a message tags; chat resolves the tags in the text with them.
+		event.Context["mentioned_users"] = bridgeRequest.Payload.MentionedUsers[:min(len(bridgeRequest.Payload.MentionedUsers), chat.MaxMentions)]
 	}
 
 	if event.Source == core.SourceDiscord && i.discordOwnerID != "" {

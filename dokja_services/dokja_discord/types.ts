@@ -83,6 +83,8 @@ export type DiscordMessageContext = {
   content: string;
   replyToContent?: string;
   mentionedUserIds?: string[];
+  // The names the gateway shows for the tagged accounts, so the text can name them instead of an id.
+  mentionedUsers?: Array<{ id: string; name: string }>;
   isBot: boolean;
   isDirectMessage: boolean;
   mentionsBot: boolean;
