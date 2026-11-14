@@ -327,3 +327,38 @@ workflow other than chat needs it; the conversation capability report above is d
 such as the knowledge application journal, keep their own settlement and still need the same
 review. Scope/unknown-effect checks and the existing cognitive evaluation
 gate remain required; this archive fix does not satisfy them by itself.
+
+## Settlement and recovery matrix (`10.6-e`, knowledge source-read journal)
+
+The second consumer proven against the general task contract
+([task-contract-design](task-contract-design.md)) is the knowledge source-read
+journal: one journaled read is an attempt, the journal's revision CAS is the
+settlement fence, and the orchestrator's `sourceReadRecord` names every step by
+its attempt so a repeated step replays instead of re-executing. The matrix maps
+each contract row to the regression that holds it; the journal's settlement
+mechanics are the Memory domain's single implementation, tested there and
+reused, not re-implemented, by this consumer.
+
+| Situation | Outcome | Evidence |
+| --- | --- | --- |
+| Unpinned source read | No IO at all: the journal requires every version pin before any read | `TestSourceJournalRequiresPinsBeforeAnyIO` |
+| A journaled read succeeds | One episode, settled, bound to the workspace task/attempt; the journal persists no source text or goal | `TestSourceJournalNativeSuccess`, `TestPostgresNativeSourceReadThroughOrchestrator` |
+| The same step issued again (same command) | Replays the recorded operation; nothing re-executes | `TestSourceJournalStepsAreNamedByTheirAttemptAndReplay`, `TestJournalCompareAndSwapAndConcurrentReplay` (same operation) |
+| A different result competes for the same settled attempt | CAS selects one write; the competitor conflicts; the accepted observation stays | `TestJournalCompareAndSwapAndConcurrentReplay` (competing operation) |
+| A late result from an older attempt after interruption and a newer attempt | The late evidence settles only its original attempt; the newer attempt is untouched | `TestJournalLateReceiptChangesOnlyItsOriginalAttempt`, `TestSourceJournalLateReceiptSurvivesTaskCancellation` |
+| Conflicting or corrected evidence for one observation | The original is preserved; a correction is an explicit later observation, never an overwrite | `TestJournalPreservesConflictingAndCorrectedEvidence`, `TestJournalUnknownObservationResolvesThroughExplicitCorrection` |
+| An observation before dispatch, or with a client-supplied time | Refused before any change | `TestJournalRejectsClientTimeAndObservationBeforeDispatch` |
+| Rights change between execute and record admission | The record purpose re-authorizes; a refusal leaves nothing written | `TestSourceJournalRechecksRecordRightsAfterNativeRead` |
+| Event claims a journal binding | Ignored: only a trusted host context installs one | `TestSourceJournalIgnoresClaimedBindingsInEvent`, `TestSourceJournalBindingRejectsIncompleteHost` |
+| Cancellation while reading | The read's own settlement runs on a context the requester cannot cancel; the attempt settles with its actual outcome | `TestSourceJournalLateReceiptSurvivesTaskCancellation` |
+| Restart with reads prepared or dispatched | Startup recovery marks them interrupted at the revision read; nothing is re-read; a later result conflicts rather than updating | `TestSourceReadsLeftUnsettledAreInterruptedAtStart`, `TestRecoveryInterruptsOnlyWhatAStoppedProcessLeftUnsettled` |
+| Store/transport failure at any step | The step's fixed reason reaches the caller; the attempt stays at its last confirmed revision, never half-advanced | `TestSourceJournalFailures` (denied, record_denied, begin, dispatch, settlement, pin_mismatch, missing, transport) |
+
+Execution end, delivery and accepted result are distinct here as in archived chat:
+execution ends when the read returns; the result is accepted when the journal's
+conditional observation completes the attempt; the journal never re-reads a
+source on its own. **Persistence decision:** no schema change — the journal's
+operation revisions already supply the fence. **Budgets:** none cumulative; the
+read's deadline is its budget, and retries are the owner's explicit re-prepare.
+What remains open for the journal consumer is the `08.3` outcome linkage
+(verdict volume), which is a learning gate, not a settlement gap.
