@@ -164,13 +164,10 @@ func TestASmallPictureIsKeptAsBase64AndAVideoIsNot(t *testing.T) {
 	}
 }
 
-func TestOnlyAKnownNonOwnerPersonsPostIsHeld(t *testing.T) {
+func TestOnlyAKnownPersonsOrTheOwnersPostIsHeld(t *testing.T) {
 	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
-	owner := tagPost("user-sam", "#SomeGames", video, nil)
-	owner.Context["is_owner"] = true
 	for name, event := range map[string]core.Event{
 		"a stranger": tagPost("user-unknown", "#SomeGames", video, nil),
-		"the owner":  owner,
 		"no tag":     tagPost("user-sam", "nice one", video, nil),
 		"no meme":    tagPost("user-sam", "#SomeGames", nil, nil),
 	} {
@@ -182,6 +179,20 @@ func TestOnlyAKnownNonOwnerPersonsPostIsHeld(t *testing.T) {
 	}
 	if len(m.pending(t)) != 0 {
 		t.Fatal("nothing may be held")
+	}
+}
+
+func TestTheOwnersOwnTagPostIsHeldToo(t *testing.T) {
+	m := newMemeHarness(t, &postReaderStub{}, memeFetchStub{}, nil)
+	event := tagPost("user-owner", "#SomeGames", video, nil)
+	event.User.Name = "Eduardo"
+	event.Context["is_owner"] = true
+	if answer := propose(t, m, event); answer["meme_tag"] != "held" {
+		t.Fatalf("the owner's post is a proposal like anyone's: %v", answer)
+	}
+	held := m.pending(t)
+	if len(held) != 1 || held[0]["proposed_by"] != "Eduardo <user-owner>" {
+		t.Fatalf("the proposal names the owner as they appear: %v", held)
 	}
 }
 

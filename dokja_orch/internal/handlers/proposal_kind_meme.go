@@ -220,17 +220,19 @@ func personLabel(person chat.KnownPerson, id string) string {
 }
 
 // ProposeMemeTag reads a tag proposed in a meme channel and holds it for the owner. It answers
-// nothing, in every case: a known person's proposal is held, anyone else's is kept nowhere, and the
-// owner has the desktop for their own tags. The channel never learns what became of it.
+// nothing, in every case: a known person's proposal is held, and so is the owner's own, which they
+// then decide in the desktop like any other; anyone else's is kept nowhere. The channel never
+// learns what became of it.
 func (h *KnowledgeProposalsHandler) ProposeMemeTag(ctx context.Context, event core.Event) (map[string]any, error) {
 	silent := map[string]any{"reply": "", "meme_tag": "ignored"}
 	if h == nil || h.store == nil {
 		return silent, nil
 	}
-	if owner, _ := event.Context["is_owner"].(bool); owner {
-		return silent, nil
-	}
 	person, known := h.knownPerson(event)
+	if owner, _ := event.Context["is_owner"].(bool); owner && !known {
+		// The owner is not in the people mapping; the proposal names them as they appear.
+		person, known = chat.KnownPerson{Name: strings.TrimSpace(event.User.Name)}, true
+	}
 	if !known {
 		return silent, nil
 	}
