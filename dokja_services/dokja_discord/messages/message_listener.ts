@@ -39,6 +39,8 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           eventType: "message.created",
           content: context.content,
           documentAttachments: context.documentAttachments,
+          mediaAttachments: context.mediaAttachments,
+          replyTo: context.replyTo,
           locale: config.locale,
           replyToContent: context.replyToContent,
           mentionedUserIds: context.mentionedUserIds,

@@ -22,7 +22,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 
-import { pdfAttachments } from "../messages/documents.js";
+import { mediaAttachments, pdfAttachments } from "../messages/documents.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -33,6 +33,7 @@ import type {
   DiscordMessageContext,
   DiscordMessageHandler,
   DiscordReply,
+  DiscordReplyReference,
   DiscordSelectAction,
   DiscordSelectContext,
   DiscordSlashCommand,
@@ -436,12 +437,21 @@ async function handleModal(
 
 export async function toMessageContext(message: Message, botUserId?: string): Promise<DiscordMessageContext> {
   let replyToContent: string | undefined;
+  let replyTo: DiscordReplyReference | undefined;
   if (!message.author.bot && message.reference?.messageId
     && message.reference.channelId === message.channelId) {
     try {
       const referenced = await message.fetchReference();
       if (referenced.channelId === message.channelId && referenced.guildId === message.guildId) {
         replyToContent = referenced.content?.slice(0, 8000) || undefined;
+        replyTo = {
+          messageId: referenced.id,
+          authorId: referenced.author.id,
+          authorName: referenced.member?.displayName ?? referenced.author.globalName ?? referenced.author.username ?? "",
+          isBot: Boolean(referenced.author.bot),
+          content: referenced.content?.slice(0, 2000) ?? "",
+          mediaAttachments: mediaAttachments(referenced.attachments?.values() ?? []),
+        };
       }
     } catch {
       // Deleted or inaccessible references must not prevent the new message being handled.
@@ -456,6 +466,8 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     content: message.content?.trim() ?? "",
     documentAttachments: pdfAttachments(message.attachments?.values() ?? []),
     replyToContent,
+    mediaAttachments: mediaAttachments(message.attachments?.values() ?? []),
+    replyTo,
     mentionedUserIds: Array.from(message.mentions.users.values(), user => user.id).slice(0, 20),
     mentionedUsers: Array.from(message.mentions.users.values(), user => ({
       id: user.id,
