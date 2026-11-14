@@ -117,7 +117,9 @@ type Proposal struct {
 	ProposedAt time.Time
 }
 
-const maxProposalPayloadBytes = 64 * 1024
+// maxProposalPayloadBytes bounds a canonical payload. Kinds that carry a file
+// enforce their own tighter bounds inside Validate.
+const maxProposalPayloadBytes = 16 << 20
 
 // ProposalKindRules are what a kind of proposal supplies: how its payload is
 // validated and canonicalized, and the stable identity of the item it proposes,
