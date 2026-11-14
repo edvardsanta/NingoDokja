@@ -103,6 +103,10 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 			Workflow: "ningo",
 			Domains:  []Domain{DomainSystem},
 		}, nil
+	case eventType == "message.created" && event.Source == SourceDiscord && memeTagPost(event):
+		// A tag proposed in a meme channel is read for the owner's queue and never answered, so it
+		// does not reach chat. The ingress marks it from its own configuration.
+		return Route{Workflow: "meme-tag-intake", Domains: []Domain{DomainKnowledge}}, nil
 	case eventType == "message.created" && event.Source == SourceWhatsApp && hasIncomingContent(event):
 		return Route{Workflow: "incoming-content", Domains: []Domain{DomainModeration, DomainChat}}, nil
 	case eventType == "message.created" && (event.Source == SourceDiscord || event.Source == SourceWhatsApp) && hasWebReading(event):
@@ -140,6 +144,11 @@ func (r *RuleBasedEventRouter) route(_ context.Context, event Event) (Route, err
 			Domains:  []Domain{DomainChat},
 		}, nil
 	}
+}
+
+func memeTagPost(event Event) bool {
+	marked, _ := event.Context["meme_tag_post"].(bool)
+	return marked
 }
 
 func hasWebReading(event Event) bool {

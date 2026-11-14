@@ -108,7 +108,7 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 		return h.intake.Start(event)
 	}
 	switch workflow.Action {
-	case "propose-knowledge", "list-knowledge-proposals", "approve-knowledge-proposal", "reject-knowledge-proposal":
+	case "propose-knowledge", "propose-meme-tag", "list-knowledge-proposals", "approve-knowledge-proposal", "reject-knowledge-proposal":
 		if h.proposals == nil {
 			return nil, fmt.Errorf("knowledge proposals are not configured")
 		}

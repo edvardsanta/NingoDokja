@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	chat "read_books/dokja_domain/dokja_chat"
 	digest "read_books/dokja_domain/dokja_digest"
 	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	"read_books/dokja_store"
@@ -62,12 +63,18 @@ type KnowledgeProposalsHandler struct {
 	web       digest.Service
 	reader    DocumentReader
 	now       func() time.Time
+
+	// What a meme-tag proposal needs besides the shared handler; see WithMemeTags.
+	memeText  MemeTextReader
+	memeFetch memeAttachmentFetcher
+	memePosts discordPostMedia
+	people    []chat.KnownPerson
 }
 
 func NewKnowledgeProposalsHandler(db proposalStore, knowledge knowledgedomain.Service, web digest.Service, reader DocumentReader) *KnowledgeProposalsHandler {
 	// The built-in kinds register their payload rules once; a registration from
 	// an earlier wiring wins, the rules are pure and identical.
-	for _, rules := range []knowledgedomain.ProposalKindRules{webArticleKindRules(), documentKindRules()} {
+	for _, rules := range []knowledgedomain.ProposalKindRules{webArticleKindRules(), documentKindRules(), memeTagKindRules()} {
 		if _, exists := knowledgedomain.ProposalKindRulesFor(rules.Kind); exists {
 			continue
 		}
@@ -170,6 +177,8 @@ func (h *KnowledgeProposalsHandler) Handle(ctx context.Context, event core.Event
 			return nil, err
 		}
 		return map[string]any{"proposal_id": id, "duplicate": duplicate}, nil
+	case "propose-meme-tag":
+		return h.ProposeMemeTag(ctx, event)
 	case "list-knowledge-proposals":
 		return h.list(ctx)
 	case "approve-knowledge-proposal":

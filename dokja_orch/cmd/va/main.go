@@ -27,6 +27,7 @@ import (
 	"read_books/internal/logger"
 	"read_books/internal/ownerconfig"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -236,6 +237,16 @@ func main() {
 	// database until the owner decides it in the Desktop; approval stores it
 	// through the same ingestion path the kind already had.
 	proposalsHandler := handlers.NewKnowledgeProposalsHandler(sharedDB, knowledgeClient, feedsClient, feedsClient)
+	// A tag a known person proposes in a meme channel is held the same way. It reads the meme's
+	// text and picture through the meme client, and a reply to one of Ningo's own posts names the
+	// meme the delivery was recorded under.
+	var memePosts interface {
+		DiscordPostMedia(channelID, messageID string) (string, bool, error)
+	}
+	if sharedDB != nil {
+		memePosts = sharedDB
+	}
+	proposalsHandler.WithMemeTags(memeClient, memeClient, memePosts, ownerConfig.Ningo.People)
 	knowledgeHandler.WithProposals(proposalsHandler)
 	// Price history is kept in PostgreSQL when DOKJA_PRICE_POSTGRES_DSN names an initialized
 	// namespace, and in memory otherwise (ADR 0015).
@@ -322,7 +333,7 @@ func main() {
 
 	eventIngress := ingress.NewZeroMQEventIngress(service, os.Getenv("VA_ZMQ_ENDPOINT"), "")
 	requestIngress := ingress.NewZeroMQRequestIngress(service, os.Getenv("VA_ZMQ_REQUEST_ENDPOINT"))
-	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT")).WithOwnerConfig(ownerConfig).WithMediaSource(digestdomain.New(feedsClient))
+	httpBridgeIngress := ingress.NewHTTPBridgeIngress(service, os.Getenv("VA_HTTP_ENDPOINT")).WithOwnerConfig(ownerConfig).WithMediaSource(digestdomain.New(feedsClient)).WithMemeChannels(strings.Split(os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"), ","))
 
 	application := app.NewApp(
 		eventIngress,

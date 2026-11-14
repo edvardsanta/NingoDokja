@@ -211,3 +211,38 @@ def test_pending_axes_survive_rereads_until_user_supplies_them(service):
     assert answered["metadata"]["kind_choice"]["origin"] == "user"
     assert answered["metadata_changed"] and not answered["changed"]
     assert chunks(service) == before
+
+
+def example(service, title, origin, **extra):
+    """A labelled meme example as the orchestrator stores it: the tag is the title, the text its body."""
+    return service.ingest({
+        "source_id": "meme-hashtag:abc", "source_ref": "https://example.com/meme.mp4", "kind": "meme_hashtag",
+        "title": title, "body": "text read from the meme", "tags": ["meme-hashtag"],
+        "metadata": {"provenance": {"origin": origin, **extra}}})
+
+
+def stored_origin(service):
+    return service.list_documents({"kind": "meme_hashtag"})["documents"][0]["metadata"]["provenance"]["origin"]
+
+
+def test_an_owner_retag_replaces_an_approved_group_label_even_when_the_tag_is_the_same(service):
+    example(service, "#SomeGames", "group", proposed_by="sam <1>")
+    assert stored_origin(service) == "group"
+    # Same tag and same text: the content is unchanged, and the owner's explicit label still wins.
+    example(service, "#SomeGames", "owner")
+    assert stored_origin(service) == "owner"
+    assert len(service.list_documents({"kind": "meme_hashtag"})["documents"]) == 1
+
+
+def test_an_owner_retag_with_another_tag_replaces_the_label_and_the_origin(service):
+    example(service, "#SomeGames", "group", proposed_by="sam <1>")
+    example(service, "#OtherGames", "owner")
+    documents = service.list_documents({"kind": "meme_hashtag"})["documents"]
+    assert [d["title"] for d in documents] == ["#OtherGames"]
+    assert documents[0]["metadata"]["provenance"] == {"origin": "owner"}
+
+
+def test_a_group_approval_over_an_owner_label_is_the_owners_explicit_replacement(service):
+    example(service, "#SomeGames", "owner")
+    example(service, "#OtherGames", "group", proposed_by="sam <1>")
+    assert stored_origin(service) == "group"

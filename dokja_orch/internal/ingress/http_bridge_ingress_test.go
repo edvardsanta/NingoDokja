@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	chat "read_books/dokja_domain/dokja_chat"
 	"read_books/internal/core"
 )
 
@@ -255,5 +256,87 @@ func TestBridgePreservesOptionalComparisonContext(t *testing.T) {
 	_, payload := mapBridgeRequestToEvent(BridgeRequest{EventType: "price.compare", Payload: BridgePayload{Query: "GPU Example", BudgetCents: &budget, IntendedUse: " 1080p gaming ", CurrentEquipment: " Example CPU "}}, "")
 	if payload["intended_use"] != "1080p gaming" || payload["current_equipment"] != "Example CPU" || payload["budget_cents"] != budget {
 		t.Fatal(payload)
+	}
+}
+
+func memeChannelPost(content, channel string, change func(*BridgeRequest)) core.Event {
+	request := BridgeRequest{EventType: "message.created", Payload: BridgePayload{Content: content, UserID: "user-1", ChannelID: channel, MessageID: "msg-1", GuildID: "guild-1", EntryKind: "message"}}
+	mentioned, direct := false, false
+	request.Payload.Mentioned, request.Payload.Direct = &mentioned, &direct
+	if change != nil {
+		change(&request)
+	}
+	return bridgeEventFromRequest(request)
+}
+
+func TestAMemeChannelTagPostIsMarkedByTheConfigurationAndNotBySender(t *testing.T) {
+	ingress := (&HTTPBridgeIngress{}).WithMemeChannels([]string{"memes", " "})
+	video := []chat.WebAttachment{{URL: "https://cdn.example/a/clip.mp4", Filename: "clip.mp4", ContentType: "video/mp4", Size: 10}}
+	withVideo := func(r *BridgeRequest) { r.Payload.MediaAttachments = video }
+	cases := []struct {
+		name  string
+		event core.Event
+		want  bool
+	}{
+		{"a tag and a file in the meme channel", memeChannelPost("#SomeGames", "memes", withVideo), true},
+		{"a tag and a link in the meme channel", memeChannelPost("https://example.com/clip #SomeGames", "memes", nil), true},
+		{"a reply naming a tag", memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) { r.Payload.ReplyTo = &BridgeReplyTo{MessageID: "msg-0"} }), true},
+		{"the same post in another channel", memeChannelPost("#SomeGames", "general", withVideo), false},
+		{"a post without a tag", memeChannelPost("look at this", "memes", withVideo), false},
+		{"a tag with nothing to tag", memeChannelPost("#SomeGames", "memes", nil), false},
+		{"a message that mentions Ningo", memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) {
+			withVideo(r)
+			yes := true
+			r.Payload.Mentioned = &yes
+		}), false},
+		{"a direct message", memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) {
+			withVideo(r)
+			yes := true
+			r.Payload.Direct = &yes
+		}), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ingress.markMemeTagPost(&c.event)
+			if got, _ := c.event.Context["meme_tag_post"].(bool); got != c.want {
+				t.Fatalf("meme_tag_post = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestAMessageCannotMarkItselfAsATagPost(t *testing.T) {
+	event := memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) {
+		r.Payload.MediaAttachments = []chat.WebAttachment{{URL: "https://cdn.example/a/clip.mp4"}}
+	})
+	if _, set := event.Context["meme_tag_post"]; set {
+		t.Fatal("the bridge event builder must not mark a post; only the configured ingress does")
+	}
+	(&HTTPBridgeIngress{}).markMemeTagPost(&event)
+	if _, set := event.Context["meme_tag_post"]; set {
+		t.Fatal("without meme channels configured nothing is marked")
+	}
+}
+
+func TestMediaAndTheAnsweredMessageAreBoundedAndDiscordOnly(t *testing.T) {
+	media := make([]chat.WebAttachment, 9)
+	reply := &BridgeReplyTo{MessageID: " msg-0 ", AuthorName: strings.Repeat("n", 300), Content: strings.Repeat("c", 5000), MediaAttachments: media}
+	event := memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) { r.Payload.MediaAttachments, r.Payload.ReplyTo = media, reply })
+	if got := len(event.Payload["media_attachments"].([]chat.WebAttachment)); got != maxMediaAttachments {
+		t.Fatalf("media is bounded: %d", got)
+	}
+	answered := event.Context["reply_to"].(map[string]any)
+	if answered["message_id"] != "msg-0" || len([]rune(answered["content"].(string))) != 2000 || len([]rune(answered["author_name"].(string))) != 100 ||
+		len(answered["media_attachments"].([]chat.WebAttachment)) != maxMediaAttachments {
+		t.Fatalf("the answered message is bounded: %#v", answered)
+	}
+	whatsapp := memeChannelPost("#SomeGames", "memes", func(r *BridgeRequest) {
+		r.Interface, r.Payload.MediaAttachments, r.Payload.ReplyTo = "whatsapp", media, reply
+	})
+	if _, ok := whatsapp.Payload["media_attachments"]; ok {
+		t.Fatal("only Discord hands media to a proposal")
+	}
+	if _, ok := whatsapp.Context["reply_to"]; ok {
+		t.Fatal("only Discord hands the answered message to a proposal")
 	}
 }
