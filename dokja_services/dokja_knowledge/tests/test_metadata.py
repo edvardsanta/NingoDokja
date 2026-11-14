@@ -68,6 +68,26 @@ def test_changed_content_invalidates_unsupplied_metadata_and_explicit_empty_clea
     assert service.list_documents({})["documents"][0]["metadata"] == {}
 
 
+def provenance(**extra):
+    return {"origin": "group", "proposed_by": "sam", "sent_by": "tiago",
+            "proposed_channel": "memes", "proposed_permalink": "https://example.com/ch/1/msg/1",
+            "proposed_at": "2026-11-14T12:00:00Z", **extra}
+
+
+def test_provenance_roundtrips_and_survives_unchanged_rereads(service):
+    first = metadata(provenance=provenance())
+    ingest(service, metadata=first)
+    document = service.list_documents({})["documents"][0]
+    assert document["metadata"]["provenance"] == provenance()
+    # An unchanged reread with a patch keeps the assigned provenance.
+    defaults = {"form": None, "content_kind": None, "form_choice": {"origin": "user_required"},
+                "kind_choice": {"origin": "user_required"}}
+    ingest(service, metadata=defaults, metadata_if_unchanged={"topics": ["physics"]})
+    actual = service.list_documents({})["documents"][0]["metadata"]
+    assert actual["provenance"] == provenance()
+    assert actual["topics"] == ["physics"]
+
+
 def test_reading_reread_preserves_user_choices_and_patches_only_supplied_axes(service):
     first = metadata(reading={"format": "pdf", "reader": "test", "reader_version": "1"})
     ingest(service, metadata=first)
@@ -96,6 +116,11 @@ def test_reading_reread_preserves_user_choices_and_patches_only_supplied_axes(se
     {"reading": {"format": "pdf"}}, {"unknown": True}, {"topics": ["x" * 65537]},
     {"classifier": {"id": "kinds"}}, {"classifier": {"id": " ", "version": "1"}},
     {"classifier": {"id": "kinds", "version": "1", "model": "x"}},
+    {"provenance": {"origin": "member"}}, {"provenance": {"proposed_by": "sam"}},
+    {"provenance": {"origin": "group", "who": "x"}},
+    {"provenance": {"origin": "group", "proposed_by": 3}},
+    {"provenance": {"origin": "group", "proposed_by": " "}},
+    {"provenance": "group"},
 ])
 def test_invalid_metadata_does_not_replace_existing_document(service, bad):
     ingest(service, metadata=metadata())

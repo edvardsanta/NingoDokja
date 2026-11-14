@@ -37,6 +37,10 @@ type Reading struct {
 	ReaderVersion string
 	Documents     []ReadDocument
 	Payload       map[string]any // the knowledge.read request, without the file
+	// Provenance is set when the reading stores what someone proposed: the
+	// stored documents carry where they came from. The owner's own readings
+	// leave it nil and read as owner.
+	Provenance *Provenance
 }
 
 // ValidateRead checks a knowledge.read request: a file and its name, and nothing that
@@ -88,6 +92,12 @@ func (d *Domain) StoreReading(ctx context.Context, reading Reading) ([]map[strin
 	})
 	if err != nil {
 		return nil, err
+	}
+	if reading.Provenance != nil {
+		metadata, err = WithProvenance(metadata, *reading.Provenance)
+		if err != nil {
+			return nil, err
+		}
 	}
 	base, _ := request["source_id"].(string)
 	base = strings.TrimSpace(base)
