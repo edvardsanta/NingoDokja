@@ -1,6 +1,29 @@
 # Knowledge proposals: meme tags from the group
 
-Status: proposed. Nothing in this plan is implemented.
+Status: implemented on top of the proposals mechanism of
+[ADR 0016](decisions/0016-knowledge-proposals.md). The sections below are the design
+the owner approved; "As built" lists where the implementation settled a question.
+
+## As built
+
+- **Who proposes:** a known person (`NingoFacts.People`), as ADR 0016 and issues #427 and
+  #428 record. A stranger's post is kept nowhere, and the owner's own tags go through the
+  desktop. Widening this to every member is one rule in `ProposeMemeTag`.
+- **The reply:** a plain reply naming a tag (`#Tag`) to the message that carries the meme,
+  not a slash command, so no Discord command is added.
+- **The meme channel** is the configured list of meme channels
+  (`DISCORD_SCHEDULED_MEME_CHANNEL_ID`); no new variable. It must also be inside
+  `DISCORD_ALLOWED_CHANNELS` when that is set.
+- **Where it lives:** the kind is `meme_hashtag`, the same identity as the stored example.
+  The post rule is Knowledge's (`ParseMemeTagPost`), the authorization is Communications',
+  the routing is the orchestrator's.
+- **A video keeps its link**, which can expire; the queue shows the text read at intake and
+  the link to the source message. A small image is kept as base64.
+- **The owner's own tag** now stores `origin: owner`, so retagging a meme a group label
+  described replaces it (a test against the real service pins this).
+- **Still open:** the safety screening of a proposed meme before the owner's preview, a
+  per-meme duplicate check beyond the pending one, and what happens when the poster edits or
+  deletes the message.
 
 ## Why
 

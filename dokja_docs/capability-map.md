@@ -542,9 +542,34 @@ own ingestion path and stores the record with its provenance (`owner`,
 `group`, `api`; owner over approved group over source API per item), removing
 the proposal; rejection deletes it, keeping nothing. The owner's own readings
 still store directly. A kind supplies only its payload rules and approval step;
-web links and files are wired, and the meme tag builds on the same mechanism
+web links, files and meme tags are wired
 ([ADR 0016](decisions/0016-knowledge-proposals.md),
 [meme tag plan](meme-tag-proposals-plan.md)).
+
+#### Meme tags proposed in a meme channel
+
+`message.created -> bridge marks meme_tag_post -> Communications authorizes -> meme-tag-intake -> Knowledge propose-meme-tag`
+
+A message in one of the configured meme channels (`DISCORD_SCHEDULED_MEME_CHANNEL_ID`)
+proposes a tag when the Knowledge domain reads it so (`ParseMemeTagPost`): a
+`#Hashtag` with the meme itself (an attachment or a link), or a reply to a message
+that carries the meme. The bridge marks such a post from its own configuration, never
+from the sender, and Communications authorizes it without a mention, still inside the
+allowed servers and channels. The router sends it to intake instead of chat, so it is
+never answered. A webhook's post, which is how Ningo posts a meme, is ignored by the
+adapter.
+
+Only a known person's post is held (`NingoFacts.People`); a stranger's is kept
+nowhere and the owner's own tags go through the desktop. The proposal is a
+`meme_hashtag` kind keyed by the same identity as the stored example
+(`meme-hashtag:` plus the hash of the address without what makes a link expire). A
+reply to one of Ningo's memes names the meme its delivery was recorded under
+(`discord_posts`). A file keeps its address and the text read from it while the link
+works; a small image is kept as base64; a page that is not a file keeps only its link
+and the post reader resolves it when the owner approves. Approval reuses the OCR and
+example path of the owner's tagging and stores `origin: group` with the proposer, the
+sender and the channel; the owner's own tag stores `origin: owner`, so tagging the same
+meme again replaces a group label.
 
 ### Cross-document application preparation
 
