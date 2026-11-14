@@ -64,7 +64,7 @@ func (h *ChatDomainHandler) handleArchived(ctx context.Context, event core.Event
 	if !ok {
 		return nil, fmt.Errorf("only the owner's interfaces keep conversations")
 	}
-	return h.answerArchived(ctx, event, workflow, archivedSend{scope: scope, conversationID: conversationID, sendID: sendID, retryID: retryID})
+	return h.answerArchived(ctx, event, workflow, archivedSend{scope: scope, conversationID: conversationID, sendID: sendID, retryID: retryID, origin: string(event.Source)})
 }
 
 // archivedSend is one send to answer in an archived conversation. admitted, when set, runs once the
@@ -75,8 +75,10 @@ type archivedSend struct {
 	conversationID string
 	sendID         string
 	retryID        string
-	admitted       func()
-	quietPending   bool
+	// origin is the interface the message was written in, kept on the turn.
+	origin       string
+	admitted     func()
+	quietPending bool
 }
 
 func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event, workflow core.WorkflowStep, send archivedSend) (map[string]any, error) {
@@ -109,7 +111,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 		case retryID != "":
 			turn, err = h.archive.RetryInConversation(ctx, scope, held.ID, retryID)
 		default:
-			turn, replayed, err = h.archive.Send(ctx, scope, held.ID, sendID, chatMessageFromEvent(event), conversation.Provenance{})
+			turn, replayed, err = h.archive.SendFrom(ctx, scope, held.ID, sendID, send.origin, chatMessageFromEvent(event), conversation.Provenance{})
 		}
 		return turn.Seq, err == nil && !replayed, err
 	})

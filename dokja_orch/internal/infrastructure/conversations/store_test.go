@@ -355,15 +355,15 @@ func TestAReplysSourcesSurviveARestartAndARetryClearsThem(t *testing.T) {
 	}
 }
 
-// Regression guard for the owner's own file: an archive made before sources existed opens, keeps its
-// conversations, and its turns simply have none.
+// Regression guard for the owner's own file: an archive made before sources and origins existed opens, keeps
+// its conversations, and its turns simply have none.
 func TestAnArchiveFromBeforeSourcesUpgradesAndKeepsItsTurns(t *testing.T) {
 	path := filepath.Join(t.TempDir(), FileName)
 	s, a := open(t, path)
 	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "Old")
 	turn, _, _ := a.Send(ctx, conversation.OwnerScope, c.ID, "send-0001", "q", conversation.Provenance{})
 	a.Complete(ctx, conversation.OwnerScope, turn, "old reply", "", "")
-	for _, statement := range []string{`ALTER TABLE turns DROP COLUMN sources`, fmt.Sprintf(`PRAGMA user_version = %d`, len(migrations)-1)} {
+	for _, statement := range []string{`ALTER TABLE turns DROP COLUMN origin`, `ALTER TABLE turns DROP COLUMN sources`, fmt.Sprintf(`PRAGMA user_version = %d`, len(migrations)-2)} {
 		if _, err := s.db.Exec(statement); err != nil {
 			t.Fatal(err)
 		}
@@ -372,7 +372,7 @@ func TestAnArchiveFromBeforeSourcesUpgradesAndKeepsItsTurns(t *testing.T) {
 
 	_, again := open(t, path)
 	turns, err := again.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
-	if err != nil || len(turns) != 1 || turns[0].Reply != "old reply" || turns[0].Sources != nil {
+	if err != nil || len(turns) != 1 || turns[0].Reply != "old reply" || turns[0].Sources != nil || turns[0].Origin != "" {
 		t.Fatalf("%#v %v", turns, err)
 	}
 }
@@ -389,5 +389,25 @@ func TestATurnWhoseSourcesCannotBeReadStillGivesItsReply(t *testing.T) {
 	turns, err := a.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
 	if err != nil || len(turns) != 1 || turns[0].Reply != "reply" {
 		t.Fatalf("%#v %v", turns, err)
+	}
+}
+
+func TestATurnKeepsTheInterfaceItWasWrittenIn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	_, a := open(t, path)
+	c, _ := a.Start(ctx, conversation.OwnerScope, conversation.KindGeneral, "", "")
+	if _, _, err := a.SendFrom(ctx, conversation.OwnerScope, c.ID, "wa-00000001", "whatsapp", "from the phone", conversation.Provenance{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.Send(ctx, conversation.OwnerScope, c.ID, "send-00000002", "no origin named", conversation.Provenance{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.SendFrom(ctx, conversation.OwnerScope, c.ID, "send-00000003", "discord", "not an owner interface", conversation.Provenance{}); !errors.Is(err, conversation.ErrInvalid) {
+		t.Fatal("an unknown origin is refused", err)
+	}
+	_, reopened := open(t, path)
+	turns, _ := reopened.Turns(ctx, conversation.OwnerScope, c.ID, 0, 10)
+	if len(turns) != 2 || turns[0].Origin != "whatsapp" || turns[1].Origin != "" {
+		t.Fatal(turns)
 	}
 }

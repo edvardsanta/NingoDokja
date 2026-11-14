@@ -240,6 +240,9 @@ func turnView(t conversation.Turn) map[string]any {
 		"provider": t.Provenance.ObservedProvider, "model": t.Provenance.ObservedModel,
 		"created_at": t.CreatedAt.Format(time.RFC3339Nano),
 	}
+	if t.Origin != "" {
+		view["origin"] = t.Origin
+	}
 	if !t.FinishedAt.IsZero() {
 		view["finished_at"] = t.FinishedAt.Format(time.RFC3339Nano)
 	}

@@ -101,7 +101,11 @@ type Turn struct {
 	Seq int
 	// SendID is the interface's own name for the send, kept the same when it retries, so a retry
 	// returns the turn it already made instead of making another.
-	SendID  string
+	SendID string
+	// Origin is the interface the owner wrote the message in ("desktop", "cli", "tui", "whatsapp"),
+	// so the message and its reply are known to have been exchanged there too. Empty for a turn kept
+	// before origins were recorded.
+	Origin  string
 	Content string
 	Reply   string
 	State   TurnState
@@ -284,12 +288,22 @@ func (a *Archive) Delete(ctx context.Context, scope Scope, id string, revision u
 // it returns that turn with replayed true and the caller must not ask the model again: a completed
 // turn is its answer, and a pending one is still on its way.
 func (a *Archive) Send(ctx context.Context, scope Scope, conversationID, send, content string, selected Provenance) (Turn, bool, error) {
+	return a.SendFrom(ctx, scope, conversationID, send, "", content, selected)
+}
+
+// ValidOrigin says whether a name is an interface a turn can come from; "" is a turn without one.
+func ValidOrigin(origin string) bool {
+	return origin == "" || ownerInterfaces[origin] || origin == "whatsapp"
+}
+
+// SendFrom is Send for a message written in the named interface.
+func (a *Archive) SendFrom(ctx context.Context, scope Scope, conversationID, send, origin, content string, selected Provenance) (Turn, bool, error) {
 	content = strings.TrimSpace(content)
-	if scope != OwnerScope || !opaqueID.MatchString(conversationID) || !sendID.MatchString(send) || content == "" || utf8.RuneCountInString(content) > MaxContentRunes || !validProvenance(selected.SelectedProvider, selected.SelectedModel) {
+	if scope != OwnerScope || !opaqueID.MatchString(conversationID) || !sendID.MatchString(send) || content == "" || utf8.RuneCountInString(content) > MaxContentRunes || !validProvenance(selected.SelectedProvider, selected.SelectedModel) || !ValidOrigin(origin) {
 		return Turn{}, false, ErrInvalid
 	}
 	return a.store.BeginTurn(ctx, scope, Turn{
-		ID: a.newID(), ConversationID: conversationID, SendID: send, Content: content, State: TurnPending, Attempts: 1,
+		ID: a.newID(), ConversationID: conversationID, SendID: send, Origin: origin, Content: content, State: TurnPending, Attempts: 1,
 		Provenance: Provenance{SelectedProvider: selected.SelectedProvider, SelectedModel: selected.SelectedModel}, CreatedAt: a.now(),
 	})
 }

@@ -188,8 +188,8 @@ document evidence, citation sanitation, follow-ups, channel isolation and real
 PDF parser fixtures. An opt-in Feeds test can exercise a public PDF URL.
 
 The Chat domain's versioned [capabilities.json](../dokja_domain/dokja_chat/capabilities.json)
-provides static product self-knowledge: supported features, interface entry points
-and limits. It is embedded at build time and added to each generated turn's system
+provides static product self-knowledge: the features available in each interface
+(cli, tui, desktop, discord, whatsapp) and how to use them, plus each feature's limits. It is embedded at build time and added to each generated turn's system
 context across text, voice, streaming and plain fallback, including after history
 compaction. Music playback, editable panel comments and listening memory are
 explicit; the catalog states that current listens do not train recommendations
@@ -270,6 +270,12 @@ restart. Storage errors fail explicitly without a volatile fallback. Explicit ne
 sessions clear the relevant snapshot; only a verified owner may reset a shared
 channel scope. Identity and system instructions are rebuilt per turn, never restored
 from the database. Existing local owner conversation archives remain separate.
+Each archived turn records the interface it was written in (`origin`: `desktop`,
+`cli`, `tui` or `whatsapp`; additive SQLite column and turn-view field, empty for
+older turns). The desktop marks messages written elsewhere, since the message and
+its reply were also exchanged there. The owner's WhatsApp self-chat commands
+(`/new`, `/conversations`, `/open`, `/rename`, `/delete`, `/yes`, `/help`, with
+Portuguese names) are the `conversation.manage` capability in the Chat catalog.
 This stores bot-handled exchanges, not every channel message, and cannot recover
 history discarded by earlier builds. It is a current checkpoint, not a complete
 transcript archive or pgvector semantic recall of old topics. Exact summaries can

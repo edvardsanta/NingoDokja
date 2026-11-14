@@ -358,6 +358,7 @@ func TestTheTurnViewMatchesThePinnedProjection(t *testing.T) {
 			Reason: expected["reason"].(string), Attempts: int(expected["attempts"].(float64)), CreatedAt: at(expected["created_at"].(string)),
 			Provenance: conversation.Provenance{ObservedProvider: expected["provider"].(string), ObservedModel: expected["model"].(string)},
 		}
+		turn.Origin, _ = expected["origin"].(string)
 		if finished, ok := expected["finished_at"].(string); ok {
 			turn.FinishedAt = at(finished)
 		}

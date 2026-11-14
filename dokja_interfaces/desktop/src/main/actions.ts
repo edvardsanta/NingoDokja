@@ -264,13 +264,19 @@ function turnSources(value: unknown): ArchivedTurnSource[] {
   })).filter((source) => source.number > 0 && source.id !== "");
 }
 
+const TURN_ORIGINS = new Set(["desktop", "cli", "tui", "whatsapp"]);
+function turnOrigin(value: unknown): ArchivedTurn["origin"] {
+  const named = text(value);
+  return TURN_ORIGINS.has(named) ? (named as ArchivedTurn["origin"]) : "";
+}
+
 function archivedTurn(value: unknown): ArchivedTurn | undefined {
   if (!isRecord(value) || !ARCHIVE_ID.test(text(value.id))) return undefined;
   const named = text(value.state) as ArchivedTurnState;
   const state: ArchivedTurnState = TURN_STATES.has(named) ? named : "unknown";
   const sources = turnSources(value.sources);
   return {
-    id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64),
+    id: text(value.id), seq: count0(value.seq), sendId: shorten(text(value.send_id), 64), origin: turnOrigin(value.origin),
     content: shorten(text(value.content), MAX_TURN_CONTENT_CHARS), reply: shorten(text(value.reply), MAX_TURN_REPLY_CHARS),
     state, reason: shorten(text(value.reason)), attempts: count0(value.attempts),
     provider: shorten(text(value.provider), 64), model: shorten(text(value.model), 128),
