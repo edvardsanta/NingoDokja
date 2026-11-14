@@ -42,6 +42,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           locale: config.locale,
           replyToContent: context.replyToContent,
           mentionedUserIds: context.mentionedUserIds,
+          mentionedUsers: context.mentionedUsers,
           userId: context.userId,
           userName: context.userName,
           channelId: context.channelId,

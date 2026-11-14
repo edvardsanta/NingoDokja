@@ -126,3 +126,11 @@ test("only a request allowed past fetch's headers limit leaves fetch for node:ht
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("buildBridgePayload carries the names of the tagged accounts, at most twenty", () => {
+  const tagged = Array.from({ length: 25 }, (_, index) => ({ id: `account-${index}`, name: `Name ${index}` }));
+  const body = buildBridgePayload({ eventType: "message.created", userId: "u", channelId: "c", messageId: "m", content: "oi <@account-0>", mentionedUsers: tagged });
+  assert.equal(body.payload.mentionedUsers?.length, 20);
+  assert.deepEqual(body.payload.mentionedUsers?.[0], { id: "account-0", name: "Name 0" });
+  assert.equal(buildBridgePayload({ eventType: "message.created", userId: "u", channelId: "c", messageId: "m" }).payload.mentionedUsers, undefined);
+});

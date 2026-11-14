@@ -457,6 +457,10 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     documentAttachments: pdfAttachments(message.attachments?.values() ?? []),
     replyToContent,
     mentionedUserIds: Array.from(message.mentions.users.values(), user => user.id).slice(0, 20),
+    mentionedUsers: Array.from(message.mentions.users.values(), user => ({
+      id: user.id,
+      name: (message.mentions.members?.get(user.id)?.displayName ?? user.globalName ?? user.username ?? "").slice(0, 100),
+    })).slice(0, 20),
     isBot: Boolean(message.author.bot),
     isDirectMessage: message.channel.type === ChannelType.DM,
     mentionsBot: botUserId ? message.mentions.users.has(botUserId) : true,

@@ -17,6 +17,7 @@ export type BridgeRequest = {
     locale?: string;
     replyToContent?: string;
     mentionedUserIds?: string[];
+    mentionedUsers?: Array<{ id: string; name: string }>;
     limit?: number;
     maxItemsPerScraper?: number;
     query?: string;
@@ -220,6 +221,7 @@ export function buildBridgePayload(params: {
   locale?: string;
   replyToContent?: string;
   mentionedUserIds?: string[];
+  mentionedUsers?: Array<{ id: string; name: string }>;
   limit?: number;
   maxItemsPerScraper?: number;
   query?: string;
@@ -250,6 +252,7 @@ export function buildBridgePayload(params: {
       locale: params.locale,
       replyToContent: params.replyToContent?.slice(0, 8000),
       mentionedUserIds: params.mentionedUserIds?.slice(0, 20),
+      mentionedUsers: params.mentionedUsers?.slice(0, 20),
       limit: params.limit,
       maxItemsPerScraper: params.maxItemsPerScraper,
       query: params.query?.slice(0, 100),
