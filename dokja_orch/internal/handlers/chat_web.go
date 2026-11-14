@@ -137,7 +137,11 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 		hash := sha256.Sum256([]byte(document.URL))
 		id := "web:" + hex.EncodeToString(hash[:12])
 		for _, passage := range document.Passages {
-			sources = append(sources, knowledgeSource{Number: len(sources) + 1, SourceID: id, Title: document.Title, Heading: passage.Label, Text: passage.Text, Reference: passage.URL, Web: true, Published: document.Published, RetrievedAt: document.RetrievedAt, Partial: document.Partial})
+			sources = append(sources, knowledgeSource{
+				Number: len(sources) + 1, SourceID: id, Title: document.Title, Heading: passage.Label,
+				Text: passage.Text, TextVersion: document.TextVersion, Reference: passage.URL, Web: true,
+				Published: document.Published, RetrievedAt: document.RetrievedAt, Partial: document.Partial,
+			})
 		}
 	}
 	return sources, data
@@ -180,7 +184,20 @@ func decodeWebDocument(result map[string]any) (chat.WebDocument, error) {
 			break
 		}
 	}
+	d.TextVersion = webDocumentTextVersion(d)
 	return d, nil
+}
+
+func webDocumentTextVersion(document chat.WebDocument) string {
+	var text strings.Builder
+	for _, passage := range document.Passages {
+		text.WriteString(passage.Label)
+		text.WriteByte(0)
+		text.WriteString(passage.Text)
+		text.WriteByte(0)
+	}
+	sum := sha256.Sum256([]byte(text.String()))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 func boundWebText(s string, n int) string {
 	r := []rune(strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), ""))
@@ -194,7 +211,7 @@ func withWebEvidence(messages []map[string]string, sources []knowledgeSource, da
 	var passages []map[string]any
 	for _, s := range sources {
 		if s.Web {
-			passages = append(passages, map[string]any{"number": s.Number, "title": s.Title, "section": s.Heading, "text": s.Text, "url": s.Reference, "published": s.Published, "retrieved_at": s.RetrievedAt, "partial": s.Partial})
+			passages = append(passages, map[string]any{"number": s.Number, "title": s.Title, "section": s.Heading, "text": s.Text, "text_version": s.TextVersion, "url": s.Reference, "published": s.Published, "retrieved_at": s.RetrievedAt, "partial": s.Partial})
 		}
 	}
 	if len(passages) == 0 && data == nil {

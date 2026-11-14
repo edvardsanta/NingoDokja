@@ -1,7 +1,9 @@
 # Apply review: a flow step, not a screen
 
-Status: proposal, 2026-11-08. No code changes yet. Implementation follows the
-owner's approval, in the order under [Plan](#plan).
+Status: step 4 first slice implemented, 2026-11-14. Focused Talk sources and
+owner-supplied Discord/WhatsApp links now carry validated text-version pins in
+citations and archived turns. Durable PostgreSQL source-read receipts for this
+Talk path remain pending; no learning or method execution is claimed.
 
 ## Why this review
 
@@ -48,6 +50,14 @@ Every chat turn already uses documents for a goal, in `internal/handlers`:
 
 - `lookupForTurn` searches the focused document first (`lookupFocused`, the last
   document a reply cited), then the text-specific and general searches.
+- A focused document with a new or changed observed version runs the existing
+  one-source `knowledge.application.prepare` workflow; the returned
+  `text_version` is stamped on every cited passage and kept in the archived
+  `TurnSource`. An unchanged pin is reused without another whole-source read,
+  and preparation failure leaves the ordinary search usable.
+- Owner-supplied Discord/WhatsApp web readings also carry a bounded
+  `text_version` derived from their validated passages, so those links are
+  knowledge evidence with provenance instead of transient text.
 - Excerpts enter the prompt numbered, as reference material and never as
   instructions, and every quote is checked against the document.
 - Focus follows the conversation (`chatFocus.remember`) and ends after three
@@ -65,9 +75,10 @@ Talk. What Talk lacks is what `prepare` adds:
    (`begin`, `dispatch`, `observe`, or `interrupt` on recovery). This is the
    macro-learning record chosen in the journal review.
 
-What Talk also lacks, and `prepare` does not provide, is an **outcome**. No chat
-handler records whether an answer helped. Without an outcome, the journal holds
-reads and nothing can learn from them. 08.3 needs that signal.
+What preparation alone still lacks is an **outcome**. The answer-feedback slice
+now records whether a completed archived answer was useful or wrong; until that
+verdict exists, the journal and source pins remain provenance, not learning.
+08.3 needs enough verdicts to evaluate the signal.
 
 ## Decision
 
@@ -96,12 +107,11 @@ Interface → message.created → Orchestrator
   as `interrupted` for **that turn's episode only**. Each turn is its own
   application, so nothing latches across turns, and the next turn starts
   clean. This designs out the pause defect.
-- **Outcome.** The episode's outcome stays unknown until a later step adds
-  answer feedback in Talk (a person marking an answer useful or wrong). The
-  Notebook already lets the owner resolve memory experiences through
-  `memory.resolve`; step 4 should extend that existing path to answers rather
-  than open a new channel. Until then the journal is provenance, and the docs
-  say so; nothing claims learning.
+- **Outcome.** Answer feedback now supplies the observable outcome for
+  completed archived answers: a person marks an answer useful or wrong, and
+  `conversation.feedback` resolves the existing memory experience. The source
+  pins identify what was read; the verdict identifies whether it helped. Neither
+  alone claims learning.
 
 ## What goes away
 
@@ -138,7 +148,9 @@ Breaking, for an opt-in surface that is off by default:
   logs that it is ignored, instead of failing);
 - the Desktop Apply tab removed.
 
-No envelope, schema or journal namespace change. Existing journal rows remain
+No envelope, stored schema or journal namespace change. Cited-source projections
+and archived turns gain an optional `text_version` field; older readers ignore
+it, and no existing field changes meaning. Existing journal rows remain
 readable, and recovery keeps settling them.
 
 ## Plan
@@ -151,10 +163,12 @@ readable, and recovery keeps settling them.
 3. **Answer feedback as the outcome**, so 08.3 has a signal: the owner judges an
    answer in Talk as useful or wrong, through the existing experience memory. See
    [answer feedback](answer-feedback.md).
-4. **Prepare in Talk.** The workflow step above, with version-pinned citations,
-   Stop settling as `interrupted`, and tests for: no focus (unchanged turn),
-   focus with an unchanged version (no re-read), a changed version, a source
-   over budget, and a Stop during a read.
+4. **Prepare in Talk.** The version-pin slice is implemented for focused
+   Knowledge sources and owner-supplied Discord/WhatsApp links. The remaining
+   journal slice must attach the native source-read journal to this workflow,
+   settle a Stop during a read as `interrupted` for that turn only, and add the
+   no-focus, unchanged-version, changed-version, over-budget and Stop regressions
+   against the real journal port.
 
 ## Owner decision (2026-11-08)
 

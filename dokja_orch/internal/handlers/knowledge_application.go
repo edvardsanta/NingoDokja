@@ -3,9 +3,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
 	knowledge "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
-	"time"
 )
 
 // prepareApplication runs a read-only, opt-in task. The orchestrator owns the
@@ -23,6 +26,49 @@ func (h *KnowledgeDomainHandler) prepareApplication(ctx context.Context, event c
 		}
 	}
 	return h.runApplicationTask(ctx, event, h.applicationPreparationWorkflow(request), "prepared", "application", "context")
+}
+
+// PreparedKnowledgeSource is the validated whole-source read a focused Talk turn asked for. The
+// chat handler uses the returned text_version to pin every passage it cites from that source.
+type PreparedKnowledgeSource struct {
+	Source map[string]any
+	Task   core.TaskResult
+}
+
+// PrepareFocusedSource runs the existing one-source preparation workflow for a Talk focus. It is
+// intentionally narrow: no caller authority, outcome, applicability or conclusion enters here.
+func (h *KnowledgeDomainHandler) PrepareFocusedSource(ctx context.Context, sourceID, goal string) (PreparedKnowledgeSource, error) {
+	goal = strings.TrimSpace(goal)
+	if h == nil || h.domain == nil || sourceID == "" || goal == "" {
+		return PreparedKnowledgeSource{}, fmt.Errorf("focused source preparation is incomplete")
+	}
+	event := core.Event{
+		EventID: uuid.NewString(), Source: core.SourceOrchestrator, Type: knowledge.ActionPrepareApplication,
+		Payload: map[string]any{
+			"contract": knowledge.ApplicationContract,
+			"goal":     goal,
+			"sources":  []any{map[string]any{"source_id": sourceID}},
+		},
+	}
+	output, err := h.prepareApplication(ctx, event)
+	if err != nil {
+		return PreparedKnowledgeSource{}, err
+	}
+	if output["status"] != "prepared" {
+		return PreparedKnowledgeSource{}, fmt.Errorf("focused source was not prepared")
+	}
+	application, _ := output["application"].(map[string]any)
+	observations, _ := application["sources"].([]any)
+	if len(observations) != 1 {
+		return PreparedKnowledgeSource{}, fmt.Errorf("focused source preparation returned no unique source")
+	}
+	source, _ := observations[0].(map[string]any)
+	version, _ := source["text_version"].(string)
+	if version == "" {
+		return PreparedKnowledgeSource{}, fmt.Errorf("focused source preparation returned no text version")
+	}
+	task, _ := output["task"].(core.TaskResult)
+	return PreparedKnowledgeSource{Source: source, Task: task}, nil
 }
 
 func (h *KnowledgeDomainHandler) applicationPreparationWorkflow(request knowledge.ApplicationRequest) core.TypedWorkflow {
