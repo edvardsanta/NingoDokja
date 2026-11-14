@@ -37,3 +37,20 @@ func TestDiscordPostsRecordAndResolveTheLatestPermalink(t *testing.T) {
 		t.Fatal("empty media url must be refused")
 	}
 }
+
+func TestAReplyCanNameTheMemeTheMessageCarried(t *testing.T) {
+	db := open(t)
+	if _, ok, err := db.DiscordPostMedia("chan-1", "msg-1"); err != nil || ok {
+		t.Fatalf("a message Ningo did not post carries no recorded meme: %v %t", err, ok)
+	}
+	if err := db.RecordDiscordPost("https://memes.example/a.mp4", "guild-1", "chan-1", "msg-1"); err != nil {
+		t.Fatal(err)
+	}
+	media, ok, err := db.DiscordPostMedia("chan-1", "msg-1")
+	if err != nil || !ok || media != "https://memes.example/a.mp4" {
+		t.Fatalf("the recorded meme: %q %t %v", media, ok, err)
+	}
+	if _, ok, _ := db.DiscordPostMedia("chan-2", "msg-1"); ok {
+		t.Fatal("the same message id in another channel is another message")
+	}
+}
