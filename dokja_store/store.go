@@ -50,6 +50,21 @@ var migrations = []string{
 		PRIMARY KEY (media_url, channel_id, message_id)
 	);
 	CREATE INDEX discord_posts_by_url ON discord_posts(media_url, posted_at);`,
+	// 3: what people proposed for Ningo to learn, held apart from the stores chat
+	// retrieval reads. A proposal exists only while pending: approval stores the
+	// record and removes the row; rejection deletes it, keeping nothing.
+	`CREATE TABLE knowledge_proposals (
+		id               TEXT PRIMARY KEY,
+		kind             TEXT NOT NULL,
+		payload          TEXT NOT NULL,
+		proposed_by      TEXT NOT NULL,
+		sent_by          TEXT NOT NULL,
+		source_channel   TEXT NOT NULL,
+		source_message   TEXT NOT NULL,
+		source_permalink TEXT NOT NULL,
+		proposed_at      TEXT NOT NULL
+	);
+	CREATE INDEX knowledge_proposals_by_time ON knowledge_proposals(proposed_at);`,
 }
 
 // Open creates the database if needed (readable by its owner only, since it holds API
