@@ -360,15 +360,23 @@ func webAttachmentPrompt(event core.Event) string {
 	return webReadingCatalogs[locale].say("document_prompt")
 }
 
-// Short quotations and exact attribution receive the same check as longer ones.
-// Only whitespace is normalized; case, word order and punctuation must match.
+// A quotation attributed to a passage is checked against that passage; one with no citation
+// is checked only from quoteMinWords words, since shorter ones are as often a gloss, a
+// translation or a name as a quote. Case, punctuation and ellipses do not count, word order does.
 func verifyWebQuotes(reply string, sources []knowledgeSource) string {
 	for _, pattern := range []*regexp.Regexp{curlyQuote, angleQuote, straightQuote} {
 		reply = pattern.ReplaceAllStringFunc(reply, func(match string) string {
 			groups := pattern.FindStringSubmatch(match)
-			quote := strings.Join(strings.Fields(groups[1]), " ")
+			cited := strings.TrimSpace(groups[2]) != ""
+			if !cited && len(strings.Fields(groups[1])) < quoteMinWords {
+				return match
+			}
+			pieces := quotePieces(groups[1])
+			if len(pieces) == 0 {
+				pieces = []string{normalizeQuote(groups[1])}
+			}
 			selected := sources
-			if strings.TrimSpace(groups[2]) != "" {
+			if cited {
 				selected = citedSources(groups[2], sources)
 			}
 			// The library verifier owns quotations explicitly attributed only to library passages.
@@ -384,7 +392,7 @@ func verifyWebQuotes(reply string, sources []knowledgeSource) string {
 				return match
 			}
 			for _, source := range selected {
-				if source.Web && quote != "" && strings.Contains(strings.Join(strings.Fields(source.Text), " "), quote) {
+				if source.Web && pieces[0] != "" && containsPieces(source.Text, pieces) {
 					return match
 				}
 			}

@@ -166,8 +166,16 @@ func TestWebReadingResetAndDisabledServiceDoNotReuseEvidence(t *testing.T) {
 
 func TestWebExactQuotationChecksShortQuotesAndAttribution(t *testing.T) {
 	sources := []knowledgeSource{{Number: 1, Web: true, Text: "Art. 140. Include the financial impact estimate."}, {Number: 2, Web: true, Text: "§ 1º Include the calculation assumptions."}}
-	reply := verifyWebQuotes(`"financial impact" [1] "Financial impact" [1] "calculation assumptions" [1] "calculation assumptions" [2]`, sources)
-	if strings.Count(reply, quoteRemoved) != 2 || !strings.Contains(reply, `"financial impact" [1]`) || !strings.Contains(reply, `"calculation assumptions" [2]`) {
+	reply := verifyWebQuotes(`"financial impact" [1] "Financial impact!" [1] "calculation assumptions" [1] "calculation assumptions" [2]`, sources)
+	if strings.Count(reply, quoteRemoved) != 1 || strings.Count(reply, `"financial impact" [1]`) != 1 || !strings.Contains(reply, `"Financial impact!" [1]`) || !strings.Contains(reply, `"calculation assumptions" [2]`) {
+		t.Fatalf("%s", reply)
+	}
+}
+
+func TestWebQuotesKeepGlossesAndRemoveInventedSentences(t *testing.T) {
+	sources := []knowledgeSource{{Number: 1, Web: true, Text: "The Harbinger was hatched from the last remaining Ovum."}}
+	reply := verifyWebQuotes(`o "Arauto" e a "Mãe"; "hatched from the last remaining ovum" [1]; "she sent him to burn the whole world down" [1]`, sources)
+	if !strings.Contains(reply, `o "Arauto" e a "Mãe"`) || !strings.Contains(reply, `"hatched from the last remaining ovum" [1]`) || strings.Count(reply, quoteRemoved) != 1 {
 		t.Fatalf("%s", reply)
 	}
 }
