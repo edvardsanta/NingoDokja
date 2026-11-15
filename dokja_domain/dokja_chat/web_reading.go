@@ -105,15 +105,24 @@ type WebDocument struct {
 	Passages    []WebPassage `json:"passages"`
 }
 
+var sentenceEnd = regexp.MustCompile(`[\p{L}\p{N}][.!?…]+["”')\]]*(?:\s|$)`)
+
+// proseWeight counts sentence endings. It breaks ties between passages the question does not
+// separate, so a page's description comes before its menus, language lists and tag clouds.
+func proseWeight(text string) int { return len(sentenceEnd.FindAllStringIndex(text, -1)) }
+
 // SelectWebPassages balances the pages before ranking extra passages by the
 // current question. It can revisit text not included in the preceding reply.
+// Links in the question are not search words: a page's own name would otherwise favor the
+// passages that repeat it, such as breadcrumbs, over the text that describes the page.
 func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
+	question = webLinkPattern.ReplaceAllString(question, " ")
 	wantedPages := map[string]bool{}
 	for _, match := range requestedReadingPage.FindAllStringSubmatch(question, -1) {
 		wantedPages["page "+match[1]] = true
 	}
 	words := strings.FieldsFunc(strings.ToLower(question), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
-	type candidate struct{ doc, index, score int }
+	type candidate struct{ doc, index, score, prose int }
 	var rest []candidate
 	selected := map[int]map[int]bool{}
 	budget := MaxWebPassages
@@ -122,7 +131,7 @@ func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
 			continue
 		}
 		best := 0
-		bestScore := -1
+		bestScore, bestProse := -1, -1
 		for i, p := range document.Passages {
 			score := 0
 			if wantedPages[strings.ToLower(p.Label)] {
@@ -134,15 +143,21 @@ func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
 					score++
 				}
 			}
-			rest = append(rest, candidate{d, i, score})
-			if score > bestScore {
-				best, bestScore = i, score
+			prose := proseWeight(p.Text)
+			rest = append(rest, candidate{d, i, score, prose})
+			if score > bestScore || (score == bestScore && prose > bestProse) {
+				best, bestScore, bestProse = i, score, prose
 			}
 		}
 		selected[d] = map[int]bool{best: true}
 		budget--
 	}
-	sort.SliceStable(rest, func(i, j int) bool { return rest[i].score > rest[j].score })
+	sort.SliceStable(rest, func(i, j int) bool {
+		if rest[i].score != rest[j].score {
+			return rest[i].score > rest[j].score
+		}
+		return rest[i].prose > rest[j].prose
+	})
 	for _, c := range rest {
 		if budget <= 0 {
 			break

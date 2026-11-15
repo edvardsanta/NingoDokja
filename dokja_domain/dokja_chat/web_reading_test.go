@@ -35,3 +35,21 @@ func TestWebSelectionBalancesPagesAndFindsFollowupPassages(t *testing.T) {
 		t.Fatalf("count=%d found=%t", count, found)
 	}
 }
+
+// A bare link says nothing about the content. The page's name, repeated in menus and
+// breadcrumbs, must not outrank the passages that describe it.
+func TestWebSelectionPrefersDescriptionWhenQuestionIsOnlyALink(t *testing.T) {
+	passages := []WebPassage{{Text: "Store Home Militsioner"}, {Text: "Militsioner English French German Italian"}, {Text: "Militsioner Atmospheric Stealth Exploration"}}
+	for i := 0; i < 8; i++ {
+		passages = append(passages, WebPassage{Text: "Menu entry"})
+	}
+	described := WebPassage{Text: "You are an ordinary nobody. Someone has arrested you! Escape the town."}
+	passages = append(passages, described)
+	docs := []WebDocument{{URL: "https://example.com/app/1/Militsioner/", Passages: passages}}
+	for _, question := range []string{"https://example.com/app/1/Militsioner/ Parece interessante", "interessante"} {
+		selected := SelectWebPassages(docs, question)
+		if len(selected) != 1 || len(selected[0].Passages) != MaxWebPassages || selected[0].Passages[len(selected[0].Passages)-1].Text != described.Text {
+			t.Fatalf("%q lost the description: %#v", question, selected)
+		}
+	}
+}
