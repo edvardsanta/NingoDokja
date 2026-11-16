@@ -292,7 +292,7 @@ services:
     build:
       context: .
       dockerfile: dokja_services/dokja_vision/Dockerfile.dev
-    working_dir: /workspace
+    working_dir: /workspace/dokja_services/dokja_vision
     environment:
       DOKJA_VISION_HOST: 0.0.0.0
       DOKJA_VISION_PORT: 8082

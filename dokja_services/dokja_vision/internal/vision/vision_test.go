@@ -40,7 +40,7 @@ func newTestService(t *testing.T, generate ollamaGenerate) (*Service, *httptest.
 func TestDescribeReturnsTheModelReading(t *testing.T) {
 	var gotImages []string
 	service, host := newTestService(t, func(_ context.Context, model, prompt string, images []string) (string, error) {
-		if model != "minicpm-v" || !strings.Contains(prompt, "português") {
+		if model != "minicpm-v" || !strings.Contains(prompt, "português") || !strings.Contains(prompt, "apenas a primeira ocorrência") {
 			t.Fatal("model or prompt not applied", model)
 		}
 		gotImages = images

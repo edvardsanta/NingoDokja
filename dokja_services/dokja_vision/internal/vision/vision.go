@@ -38,7 +38,8 @@ type DescribeRequest struct {
 // DefaultPrompt asks for exactly what chat needs: the visible text preserved
 // (prices, names, buttons) and a short scene description, in Portuguese.
 const DefaultPrompt = `Você lê imagens enviadas em um chat em português (Brasil).
-Transcreva todo texto visível na imagem — títulos, preços, nomes, botões e rótulos — preservando números e valores exatamente como aparecem, sem convertê-los.
+Transcreva o texto principal visível na imagem — título, preços, nomes, botões e rótulos — preservando números e valores exatamente como aparecem, sem convertê-los.
+Se um texto aparecer repetido na imagem (listas de temas, tags, rótulos), transcreva apenas a primeira ocorrência e, quando fizer sentido, mencione uma única vez que há uma lista repetida; nunca repita palavras em sequência.
 Depois descreva em um parágrafo curto o que a imagem mostra e o contexto aparente.
 Se não houver texto legível, descreva apenas a cena. Responda somente com a transcrição e a descrição.`
 
