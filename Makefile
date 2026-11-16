@@ -28,13 +28,14 @@ VOICE_SERVICES = dokja-voice $(if $(VOICE_GPU_ON),dokja-whisper-gpu,)
 RUN_SERVICES = $(SERVICES) $(if $(VOICE_ON),$(VOICE_SERVICES),) $(if $(OLLAMA_GPU_ON),dokja-ollama,)
 COMPOSE_CMD = $(COMPOSE) --env-file "$(ENV_FILE)" -f "$(STACK_FILE)" -f docker-compose.postgres.yml $(VOICE_GPU_FILES) $(OLLAMA_GPU_FILES)
 
-.PHONY: help start desktop desktop-install up voice voice-host voice-host-setup status logs backup
+.PHONY: help start desktop desktop-install up down voice voice-host voice-host-setup status logs backup
 
 help:
 	@echo "make start           Start/restart local services, then open Desktop"
 	@echo "make desktop         Build and open Desktop only"
 	@echo "make desktop-install Install Desktop dependencies"
 	@echo "make up              Start local services, including PostgreSQL"
+	@echo "make down            Stop and remove the local stack's containers and network"
 	@echo "make status          Show container states"
 	@echo "make logs            Follow application service logs"
 	@echo "make backup          Dump PostgreSQL to .dokja/backups/postgres (KEEP=14 dumps)"
@@ -86,6 +87,9 @@ voice-host-setup:
 .PHONY: voice-up
 voice-up:
 	$(COMPOSE_CMD) up -d --no-deps --build $(VOICE_SERVICES)
+
+down:
+	$(COMPOSE_CMD) down
 
 status:
 	$(COMPOSE_CMD) ps
