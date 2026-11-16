@@ -29,3 +29,51 @@ func TestGenericComparisonChoosesCurrentVariantAndKeepsOtherVariants(t *testing.
 		t.Fatal("choice was not explained")
 	}
 }
+
+func TestGenericComparisonPrefersTheNamedProductOverCheaperMentions(t *testing.T) {
+	repo := NewMemoryRepository()
+	for _, o := range []Observation{
+		{Product: "mug", Title: "Caneca Red Dead Redemption (Mod.2)", Merchant: "store-a", Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 3591}}},
+		{Product: "game", Title: "Red Dead Redemption 2 Ps4 Midia Fisica", Merchant: "store-b", Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 26700}}},
+		{Product: "game", Title: "Red Dead Redemption 2", Merchant: "steam", Series: SeriesMerchant, Kind: KindUnknown, Points: []Point{{On: day(0), Cents: 29990}}},
+	} {
+		if _, err := repo.Upsert(context.Background(), o); err != nil {
+			t.Fatal(err)
+		}
+	}
+	domain := New(repo).WithClock(func() time.Time { return today })
+	result, err := domain.CompareProduct(context.Background(), Compare{Query: "red dead redemption 2"})
+	if err != nil || !result.Found {
+		t.Fatalf("comparison failed: %+v %v", result, err)
+	}
+	if result.Product.Key != "game" && result.Product.Key != "game-pc" {
+		t.Fatalf("the mug must not lead a game query, got %q", result.Product.Key)
+	}
+	merchants := map[string]bool{}
+	for _, offer := range result.Offers {
+		merchants[offer.Assessment.Key.Merchant] = true
+	}
+	if !merchants["steam"] {
+		t.Fatalf("the game reference must carry the steam offer: %+v", result.Offers)
+	}
+}
+
+func TestGenericComparisonKeepsPriceOrderWhenNoTitleLeadsWithTheQuery(t *testing.T) {
+	repo := NewMemoryRepository()
+	for _, o := range []Observation{
+		{Product: "cheap-mention", Title: "Caneca Red Dead Redemption (Mod.2)", Merchant: "store-a", Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 3591}}},
+		{Product: "other-mention", Title: "Poster Red Dead Redemption 2", Merchant: "store-b", Series: SeriesMerchant, Kind: KindPix, Points: []Point{{On: day(0), Cents: 9000}}},
+	} {
+		if _, err := repo.Upsert(context.Background(), o); err != nil {
+			t.Fatal(err)
+		}
+	}
+	domain := New(repo).WithClock(func() time.Time { return today })
+	result, err := domain.CompareProduct(context.Background(), Compare{Query: "red dead redemption 2"})
+	if err != nil || !result.Found {
+		t.Fatalf("comparison failed: %+v %v", result, err)
+	}
+	if result.Product.Key != "cheap-mention" {
+		t.Fatalf("with no title leading, the cheapest current quote leads as before, got %q", result.Product.Key)
+	}
+}

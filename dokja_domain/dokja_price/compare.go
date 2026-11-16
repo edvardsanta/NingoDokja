@@ -117,7 +117,7 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 	referenceMatches := 0
 	if chosen == nil && len(matched) > 1 && strings.TrimSpace(compare.PartNumber) == "" {
 		var selectionErr error
-		chosen, selectionErr = d.genericReference(ctx, matched)
+		chosen, selectionErr = d.genericReference(ctx, matched, compare.Query)
 		if selectionErr != nil {
 			return Comparison{}, selectionErr
 		}
