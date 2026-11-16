@@ -168,8 +168,27 @@ func TestImageTurnSanitizesMentionsAndEchoedURLs(t *testing.T) {
 	}
 }
 
-func TestNonDiscordMessagesIgnoreMediaAttachments(t *testing.T) {
-	reader := &fakeImageReader{}
+// A model that writes [1] meaning "image 1" must not get a text source's
+// citation label; only numbers of actually supplied sources survive.
+func TestImageTurnCitationMarksNeedRealSources(t *testing.T) {
+	stripped := sanitizeImageReply("a capa [1] do jogo sai por R$ 874,21 [2]", nil)
+	if strings.Contains(stripped, "[1]") || strings.Contains(stripped, "[2]") {
+		t.Fatal("sourceless citation kept", stripped)
+	}
+	if !strings.Contains(stripped, "R$ 874,21") {
+		t.Fatal("content lost", stripped)
+	}
+	kept := sanitizeImageReply("a capa [1] do jogo", []knowledgeSource{{Number: 1, Title: "Fonte real"}})
+	if !strings.Contains(kept, "[1]") {
+		t.Fatal("valid source citation dropped", kept)
+	}
+	mixed := sanitizeImageReply("veja [1] e [3]", []knowledgeSource{{Number: 1, Title: "Fonte real"}})
+	if !strings.Contains(mixed, "[1]") || strings.Contains(mixed, "[3]") {
+		t.Fatal("mixed citation handling wrong", mixed)
+	}
+}
+
+func TestNonDiscordMessagesIgnoreMediaAttachments(t *testing.T) {	reader := &fakeImageReader{}
 	g := &fakeChatGenerator{result: map[string]any{"reply": "resposta"}}
 	h := NewChatDomainHandler(g).WithImageReading(reader, nil)
 	event := chatEvent("olha")

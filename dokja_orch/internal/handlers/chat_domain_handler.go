@@ -334,7 +334,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		rawReply = sanitizeWebReply(rawReply, sources)
 	}
 	if _, imageTurn := event.Context["image_reading_turn"].(*imageTurnData); imageTurn {
-		rawReply = sanitizeImageReply(rawReply)
+		rawReply = sanitizeImageReply(rawReply, sources)
 	}
 	// Checked before the session keeps it, so a false quote is not repeated as a fact later.
 	rawReply = h.verifyQuotes(ctx, rawReply, sources, turn)
