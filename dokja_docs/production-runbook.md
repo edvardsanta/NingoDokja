@@ -16,7 +16,7 @@ Production stack:
 - `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
 - `dokja-feeds` (follows the sources the owner chooses, as plugins kept outside the repository)
-- `dokja-vision` (reads images posted in Discord chat with a local vision model)
+- `dokja-vision` (describes media bytes with a local vision model: chat images, and videos sampled into frames for social posts; it never fetches URLs itself)
 - `dokja-discord`
 - `dokja-scheduler`
 

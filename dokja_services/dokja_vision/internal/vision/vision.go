@@ -1,6 +1,7 @@
-// Package vision reads one image URL through a local Ollama vision model and
-// returns the visible text plus a short description. All input is untrusted:
-// the fetched bytes are data for the model, never instructions for the service.
+// Package vision reads one image or video handed over as bytes through a local Ollama
+// vision model and returns the visible text plus a short description. All input is
+// untrusted: the bytes are data for the model, never instructions for the service. The
+// caller fetches media; this service never makes requests of its own.
 package vision
 
 import (
@@ -12,27 +13,24 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
-const MaxURLBytes = 2048
-
 var (
-	ErrInvalidRequest = errors.New("invalid image request")
-	ErrTooLarge       = errors.New("image exceeds the size limit")
-	ErrFetchFailed    = errors.New("image download failed")
+	ErrInvalidRequest = errors.New("invalid media request")
+	ErrTooLarge       = errors.New("media exceeds the size limit")
+	ErrFetchFailed    = errors.New("media is unreadable")
 	ErrUpstream       = errors.New("vision model unavailable")
 )
 
-// DescribeRequest is platform metadata for one image, never bytes.
+// DescribeRequest carries one media as base64 bytes: a caller that already holds the
+// file (an attachment it fetched, a post reader's delivery) never needs this service to
+// reach back out for it. ContentType is image/* or video/mp4.
 type DescribeRequest struct {
-	URL         string `json:"url"`
+	DataB64     string `json:"data_b64"`
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
-	Size        int64  `json:"size"`
 }
 
 // The reading prompt lives in the operator's vision_prompt.md (mounted into
@@ -46,12 +44,11 @@ type ollamaGenerate func(ctx context.Context, model, prompt string, images []str
 // lives only in the operator's vision_prompt.md, never in code.
 var ErrNoPrompt = errors.New("vision prompt is not configured")
 
-// Service validates, downloads and describes one image at a time.
+// Service validates and describes one media at a time.
 type Service struct {
 	model     string
 	prompt    string
 	maxBytes  int64
-	fetch     *http.Client
 	generate  ollamaGenerate
 	maxOutput int
 }
@@ -67,9 +64,6 @@ func WithPrompt(prompt string) Option {
 func WithMaxBytes(n int64) Option {
 	return func(s *Service) { s.maxBytes = n }
 }
-func WithFetchClient(client *http.Client) Option {
-	return func(s *Service) { s.fetch = client }
-}
 func WithGenerate(generate ollamaGenerate) Option {
 	return func(s *Service) { s.generate = generate }
 }
@@ -79,7 +73,6 @@ func NewService(endpoint string, options ...Option) *Service {
 		model:     "minicpm-v",
 		maxBytes:  10 << 20,
 		maxOutput: 4000,
-		fetch:     &http.Client{Timeout: 20 * time.Second},
 	}
 	for _, option := range options {
 		option(service)
@@ -92,23 +85,27 @@ func NewService(endpoint string, options ...Option) *Service {
 
 func (s *Service) Model() string { return s.model }
 
-// Describe downloads the image and returns the model's reading of it.
+// Describe reads the media and returns the model's reading of it. An image is read as
+// one picture; a video is sampled into frames that are read together, so the model sees
+// scenes across the whole file rather than its first second.
 func (s *Service) Describe(ctx context.Context, request DescribeRequest) (string, error) {
 	if strings.TrimSpace(s.prompt) == "" {
 		return "", ErrNoPrompt
 	}
-	address, err := validateRequest(request, s.maxBytes)
+	data, video, err := validateRequest(request, s.maxBytes)
 	if err != nil {
 		return "", err
 	}
-	image, contentType, err := s.download(ctx, address)
-	if err != nil {
-		return "", err
+	var frames []string
+	if video {
+		frames, err = extractFrames(ctx, data)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		frames = []string{base64.StdEncoding.EncodeToString(data)}
 	}
-	if contentType != "" && !strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		return "", fmt.Errorf("%w: download is not an image", ErrFetchFailed)
-	}
-	text, err := s.generate(ctx, s.model, s.prompt, []string{base64.StdEncoding.EncodeToString(image)})
+	text, err := s.generate(ctx, s.model, s.prompt, frames)
 	if err != nil {
 		return "", err
 	}
@@ -122,48 +119,20 @@ func (s *Service) Describe(ctx context.Context, request DescribeRequest) (string
 	return text, nil
 }
 
-func validateRequest(request DescribeRequest, maxBytes int64) (*url.URL, error) {
-	if len(request.URL) > MaxURLBytes {
-		return nil, fmt.Errorf("%w: url too long", ErrInvalidRequest)
+func validateRequest(request DescribeRequest, maxBytes int64) ([]byte, bool, error) {
+	contentType := strings.ToLower(strings.TrimSpace(request.ContentType))
+	video := contentType == "video/mp4"
+	if !video && !strings.HasPrefix(contentType, "image/") {
+		return nil, false, fmt.Errorf("%w: content_type must be image/* or video/mp4", ErrInvalidRequest)
 	}
-	address, err := url.Parse(strings.TrimSpace(request.URL))
-	if err != nil || address.Hostname() == "" || address.User != nil || (address.Scheme != "https" && address.Scheme != "http") {
-		return nil, fmt.Errorf("%w: url must be http(s) without credentials", ErrInvalidRequest)
+	data, err := base64.StdEncoding.Strict().DecodeString(request.DataB64)
+	if err != nil || len(data) == 0 {
+		return nil, false, fmt.Errorf("%w: data_b64 is not valid base64", ErrInvalidRequest)
 	}
-	if request.Size > maxBytes {
-		return nil, ErrTooLarge
+	if int64(len(data)) > maxBytes {
+		return nil, false, ErrTooLarge
 	}
-	return address, nil
-}
-
-func (s *Service) download(ctx context.Context, address *url.URL) ([]byte, string, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address.String(), nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrInvalidRequest, err)
-	}
-	response, err := s.fetch.Do(request)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrFetchFailed, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("%w: status %d", ErrFetchFailed, response.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, s.maxBytes+1))
-	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrFetchFailed, err)
-	}
-	if int64(len(body)) > s.maxBytes {
-		return nil, "", ErrTooLarge
-	}
-	if !utf8.Valid(body) {
-		// Image bytes are binary; validity is checked only to catch error pages
-		// served as text with a 200 status.
-		if strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "text/") {
-			return nil, "", fmt.Errorf("%w: text response", ErrFetchFailed)
-		}
-	}
-	return body, response.Header.Get("Content-Type"), nil
+	return data, video, nil
 }
 
 type httpOllama struct {

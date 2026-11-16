@@ -67,7 +67,7 @@ a cognitive macro-component.
 | Experience | `dokja_domain/dokja_memory` interprets episodes/outcomes and owns [hashtag observations](hashtag-experience.md) and [confirmed media receipt policy](media-delivery-receipts.md) | Memory service for experiences; existing media cache for transitional delivery flags | Hashtag workflow sequences prediction/recording and feedback; scheduled/manual sends pass confirmed outcomes to Memory receipt policy | Contextual application of knowledge: concrete procedure, parameters, constraints and outcomes; receipt storage and durable attempt tracking still need migration |
 | Prediction/evaluation | Memory domain's `Predict` and `Score` functions | Memory service supplies recalled experiences and resolved outcomes | `memory.predict`, `memory.stats`, and hashtag shadow recording | Explicit outcome estimation; currently part of Memory |
 | Conversation/language | Go chat handler/session manager currently owns runtime conversation behavior; a separate Python chat domain also exists | `dokja_services/dokja_runtime/chat.go` | `message.*` conversation workflow | Chat domain policy plus replaceable generation providers |
-| Image reading in chat | Chat domain owns the per-message image plan, budgets and evidence framing; the vision service owns download and model mechanics | `dokja_services/dokja_vision` (`POST /describe`) over `dokja-ollama` | `message.created` conversation workflow for Discord image attachments; `conversation.images` capability | Image perception as bounded, untrusted evidence; readings stay per-turn |
+| Image reading in chat | Chat domain owns the per-message image plan, budgets and evidence framing; the caller owns the download; the vision service owns model mechanics | `dokja_services/dokja_vision` (`POST /describe`) over `dokja-ollama` | `message.created` conversation workflow for Discord image attachments; `conversation.images` capability | Image perception as bounded, untrusted evidence; readings stay per-turn |
 | Media perception and meme pool | Meme facade owns intake composition; Moderation interprets media safety observations; Communications owns destination eligibility | Feeds `media.library.v1` / `media.perceive.v1` plugins; legacy Meme transport opt-in | Meme facade fetch/screen/list, hashtag OCR, scheduled delivery | [Media admissibility](media-admissibility.md) is domain-owned. ADR 0010 still proposes grouping intake under Knowledge, admissibility/relevance under Rules and receipts under Memory; Meme events remain a facade |
 | Music in voice channels | Communications domain resolves tracks (`ResolveTrack`, `BestMatch`) and decides each server's queue (`MusicQueue`, `music.*` events) ([music plan](music-plan.md)) | One Feeds `audio.resolve.v1` plugin per source, the owner's in `feeds_plugins/`; `audio-pages` example; playback in the voice adapter; per-person listening as Memory experiences (`music.listen:<user id>`) | `music.*` events through the bridge, sent by the Discord commands and panel | A workflow across Knowledge intake, Rules, Action and Memory, not a component |
 | Book processing | `dokja_domain/dokja_book` interprets actions; Python service also selects processing strategies | Feeds `document.process.v1` compatibility plugin; legacy HTTP transport opt-in | `book.resource.classify`, `book.summary.requested` | Retired (ADR 0006): extraction moves to Reading, content to Knowledge, book context to Experience; `book.*` kept as a facade during migration |
@@ -479,11 +479,12 @@ MiB each) ride the ordinary `message.created` conversation workflow; a message
 with only images is accepted and answered. Authorization still precedes all
 reading. Inside Chat's turn, `PlanImageReadings` validates the image metadata
 (https or http, no credentials, bounded address and size; videos and other
-attachments are skipped) and the orchestrator calls `dokja-vision`'s
-`POST /describe`. The service downloads the bounded bytes itself, requires an
-image content type and asks one local Ollama vision model (`DOKJA_VISION_MODEL`,
-default `minicpm-v`; GPU through the `ollama-gpu` overlay) for the visible text
-and a short description.
+attachments are skipped) and the orchestrator downloads the bounded bytes and
+calls `dokja-vision`'s `POST /describe` with them (`data_b64`): the service
+never fetches. It accepts image content types and videos (`video/mp4`, sampled
+into at most six frames with ffmpeg and read together), and asks one local
+Ollama vision model (`DOKJA_VISION_MODEL`, default `minicpm-v`; GPU through the
+`ollama-gpu` overlay) for the visible text and a short description.
 
 The reading enters inference as `UNTRUSTED_IMAGE_EVIDENCE` JSON in a user-role
 message under fixed application instructions, exactly like web evidence: text

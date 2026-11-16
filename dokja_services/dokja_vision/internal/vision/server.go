@@ -8,6 +8,20 @@ import (
 	"time"
 )
 
+// maxDescribeBody bounds a /describe request: base64 inflates bytes by 4/3, and the
+// largest handed-over media is a video of maxVideoBytes.
+func maxDescribeBody(maxBytes int64) int64 {
+	limit := int64(maxVideoBytes)
+	if maxBytes > limit {
+		limit = maxBytes
+	}
+	return base64Inflation(limit) + 4096
+}
+
+func base64Inflation(n int64) int64 {
+	return (n + 2) / 3 * 4
+}
+
 // Server exposes the vision service over HTTP. It has no authentication: it
 // answers only inside the compose network, like the other private services.
 type Server struct {
@@ -42,8 +56,9 @@ func (server *Server) health(response http.ResponseWriter, _ *http.Request) {
 }
 
 func (server *Server) describe(response http.ResponseWriter, request *http.Request) {
-	body, err := io.ReadAll(io.LimitReader(request.Body, 1<<16+1))
-	if err != nil || len(body) > 1<<16 {
+	limit := maxDescribeBody(server.service.maxBytes)
+	body, err := io.ReadAll(io.LimitReader(request.Body, limit+1))
+	if err != nil || int64(len(body)) > limit {
 		writeError(response, http.StatusBadRequest, "invalid request body")
 		return
 	}
