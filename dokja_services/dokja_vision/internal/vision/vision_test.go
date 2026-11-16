@@ -11,52 +11,41 @@ import (
 	"testing"
 )
 
-func newTestService(t *testing.T, generate ollamaGenerate) (*Service, *httptest.Server) {
+func newTestService(t *testing.T, generate ollamaGenerate) *Service {
 	t.Helper()
-	imageHost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/shot.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write([]byte("PNG-BYTES"))
-		case "/page.html":
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write([]byte("<html>not an image</html>"))
-		case "/huge.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(make([]byte, 64<<10))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(imageHost.Close)
-	service := NewService("http://127.0.0.1:9",
+	return NewService("http://127.0.0.1:9",
 		WithMaxBytes(32<<10),
 		WithGenerate(generate),
 		WithPrompt("prompt de teste em português"),
 	)
-	service.fetch = imageHost.Client()
-	return service, imageHost
+}
+
+func imageRequest(t *testing.T) DescribeRequest {
+	t.Helper()
+	return DescribeRequest{
+		DataB64:     base64.StdEncoding.EncodeToString([]byte("PNG-BYTES")),
+		Filename:    "shot.png",
+		ContentType: "image/png",
+	}
 }
 
 func TestDescribeRefusesToRunWithoutAPrompt(t *testing.T) {
 	service := NewService("http://127.0.0.1:9")
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: "https://example.com/a.png"}); !errors.Is(err, ErrNoPrompt) {
+	if _, err := service.Describe(context.Background(), imageRequest(t)); !errors.Is(err, ErrNoPrompt) {
 		t.Fatal("describe ran without a configured prompt", err)
 	}
 }
 
 func TestDescribeReturnsTheModelReading(t *testing.T) {
 	var gotImages []string
-	service, host := newTestService(t, func(_ context.Context, model, prompt string, images []string) (string, error) {
+	service := newTestService(t, func(_ context.Context, model, prompt string, images []string) (string, error) {
 		if model != "minicpm-v" || prompt != "prompt de teste em português" {
 			t.Fatal("model or prompt not applied", model)
 		}
 		gotImages = images
 		return "  Grand Theft Auto: San Andreas — R$ 874,21. Captura da página da loja.  ", nil
 	})
-	text, err := service.Describe(context.Background(), DescribeRequest{
-		URL: host.URL + "/shot.png", Filename: "shot.png", ContentType: "image/png", Size: 9,
-	})
+	text, err := service.Describe(context.Background(), imageRequest(t))
 	if err != nil || !strings.Contains(text, "R$ 874,21") {
 		t.Fatal(text, err)
 	}
@@ -68,67 +57,84 @@ func TestDescribeReturnsTheModelReading(t *testing.T) {
 	}
 }
 
-func TestDescribeRejectsUnsafeOrOversizedInput(t *testing.T) {
-	service, _ := newTestService(t, func(context.Context, string, string, []string) (string, error) {
-		t.Fatal("model called for invalid input")
-		return "", nil
-	})
-	for _, request := range []DescribeRequest{
-		{URL: "file:///etc/passwd"},
-		{URL: "https://user:pass@example.com/a.png"},
-		{URL: strings.Repeat("x", MaxURLBytes+1)},
-		{URL: "https://example.com/a.png", Size: 32<<10 + 1},
-	} {
-		if _, err := service.Describe(context.Background(), request); !errors.Is(err, ErrInvalidRequest) && !errors.Is(err, ErrTooLarge) {
-			t.Fatalf("unsafe input accepted: %v (%v)", request, err)
+func TestDescribeSamplesAVideoIntoFrames(t *testing.T) {
+	stub := func(_ context.Context, _ string, _ string, images []string) (string, error) {
+		if len(images) != 2 {
+			t.Fatalf("frames not sampled together: %d", len(images))
 		}
+		for index, frame := range images {
+			if decoded, err := base64.StdEncoding.DecodeString(frame); err != nil || string(decoded) != "FRAME-"+strings.Repeat("x", index+1) {
+				t.Fatal("frame bytes mangled", index)
+			}
+		}
+		return "o reel mostra um gato no teclado", nil
+	}
+	original := extractFrames
+	extractFrames = func(_ context.Context, data []byte) ([]string, error) {
+		if string(data) != "MP4-BYTES" {
+			t.Fatal("video bytes not handed to the sampler")
+		}
+		return []string{
+			base64.StdEncoding.EncodeToString([]byte("FRAME-x")),
+			base64.StdEncoding.EncodeToString([]byte("FRAME-xx")),
+		}, nil
+	}
+	t.Cleanup(func() { extractFrames = original })
+
+	service := newTestService(t, stub)
+	text, err := service.Describe(context.Background(), DescribeRequest{
+		DataB64:     base64.StdEncoding.EncodeToString([]byte("MP4-BYTES")),
+		Filename:    "post-1.mp4",
+		ContentType: "video/mp4",
+	})
+	if err != nil || !strings.Contains(text, "gato no teclado") {
+		t.Fatal(text, err)
 	}
 }
 
-func TestDescribeBoundsDownloadAndRejectsNonImages(t *testing.T) {
-	called := false
-	service, host := newTestService(t, func(context.Context, string, string, []string) (string, error) {
-		called = true
-		return "x", nil
+func TestDescribeRejectsUnsafeOrOversizedInput(t *testing.T) {
+	service := newTestService(t, func(context.Context, string, string, []string) (string, error) {
+		t.Fatal("model called for invalid input")
+		return "", nil
 	})
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/huge.png"}); !errors.Is(err, ErrTooLarge) {
-		t.Fatal("oversized download accepted", err)
-	}
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/page.html"}); !errors.Is(err, ErrFetchFailed) {
-		t.Fatal("non-image accepted", err)
-	}
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/missing.png"}); !errors.Is(err, ErrFetchFailed) {
-		t.Fatal("missing image accepted", err)
-	}
-	if called {
-		t.Fatal("model called for rejected downloads")
-	}
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/shot.png", ContentType: "text/html"}); err != nil {
-		t.Fatal("declared content type must not override the download", err)
+	oversized := base64.StdEncoding.EncodeToString(make([]byte, 32<<10+1))
+	for name, request := range map[string]DescribeRequest{
+		"notBase64":        {DataB64: "!!!", ContentType: "image/png"},
+		"empty":            {DataB64: base64.StdEncoding.EncodeToString(nil), ContentType: "image/png"},
+		"oversized":        {DataB64: oversized, ContentType: "image/png"},
+		"wrongKind":        {DataB64: base64.StdEncoding.EncodeToString([]byte("x")), ContentType: "text/html"},
+		"missingKind":      {DataB64: base64.StdEncoding.EncodeToString([]byte("x"))},
+		"unsupportedVideo": {DataB64: base64.StdEncoding.EncodeToString([]byte("x")), ContentType: "video/webm"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := service.Describe(context.Background(), request); !errors.Is(err, ErrInvalidRequest) && !errors.Is(err, ErrTooLarge) {
+				t.Fatalf("unsafe input accepted: %v", err)
+			}
+		})
 	}
 }
 
 func TestDescribeReportsAnEmptyModelReading(t *testing.T) {
-	service, host := newTestService(t, func(context.Context, string, string, []string) (string, error) {
+	service := newTestService(t, func(context.Context, string, string, []string) (string, error) {
 		return "  ", nil
 	})
-	if _, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/shot.png"}); err == nil {
+	if _, err := service.Describe(context.Background(), imageRequest(t)); err == nil {
 		t.Fatal("empty reading accepted")
 	}
 }
 
 func TestDescribeCapsLongReadings(t *testing.T) {
-	service, host := newTestService(t, func(context.Context, string, string, []string) (string, error) {
+	service := newTestService(t, func(context.Context, string, string, []string) (string, error) {
 		return strings.Repeat("a", 5000), nil
 	})
-	text, err := service.Describe(context.Background(), DescribeRequest{URL: host.URL + "/shot.png"})
+	text, err := service.Describe(context.Background(), imageRequest(t))
 	if err != nil || len([]rune(text)) != 4001 {
 		t.Fatal("reading not capped", len([]rune(text)), err)
 	}
 }
 
 func TestServerDescribeAndHealth(t *testing.T) {
-	service, host := newTestService(t, func(context.Context, string, string, []string) (string, error) {
+	service := newTestService(t, func(context.Context, string, string, []string) (string, error) {
 		return "uma captura de loja", nil
 	})
 	server := NewServer(service, "127.0.0.1", "0")
@@ -139,7 +145,7 @@ func TestServerDescribeAndHealth(t *testing.T) {
 	if err != nil || health.StatusCode != http.StatusOK {
 		t.Fatal("health failed", err)
 	}
-	encoded, _ := json.Marshal(DescribeRequest{URL: host.URL + "/shot.png", Filename: "shot.png", ContentType: "image/png"})
+	encoded, _ := json.Marshal(imageRequest(t))
 	response, err := http.Post(api.URL+"/describe", "application/json", strings.NewReader(string(encoded)))
 	if err != nil || response.StatusCode != http.StatusOK {
 		t.Fatal("describe failed", err, response.StatusCode)
@@ -149,7 +155,7 @@ func TestServerDescribeAndHealth(t *testing.T) {
 		t.Fatal(decoded, err)
 	}
 
-	encoded, _ = json.Marshal(DescribeRequest{URL: "file:///etc/passwd"})
+	encoded, _ = json.Marshal(DescribeRequest{DataB64: "!!!", ContentType: "image/png"})
 	response, err = http.Post(api.URL+"/describe", "application/json", strings.NewReader(string(encoded)))
 	if err != nil || response.StatusCode != http.StatusBadRequest {
 		t.Fatal("invalid request accepted", err, response.StatusCode)

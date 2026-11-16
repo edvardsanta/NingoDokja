@@ -60,6 +60,7 @@ type ChatDomainHandler struct {
 	ownerDiscord string
 	incoming     *IncomingContentWorkflow
 	web          *webConversationReading
+	socialVision *socialMediaReading
 	images       *imageReading
 	macro        *macroContext
 	ningo        chat.NingoFacts
