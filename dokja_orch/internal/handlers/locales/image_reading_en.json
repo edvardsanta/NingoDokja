@@ -1,0 +1,9 @@
+{
+  "image_prompt": "Describe this image and let's talk about what it shows.",
+  "unreadable": "I could not read {count} image(s): the download failed or the address did not serve an image. I did not use that content as evidence.",
+  "too_large": "I left {count} image(s) unread because each exceeds the {limit} MiB limit.",
+  "vision_disabled": "The vision service is unavailable right now, so I did not read {count} image(s).",
+  "failed": "I could not read {count} image(s) with the vision model. I did not use that content as evidence.",
+  "omitted": "I left {count} more image(s) unread; I can read up to {limit} per message.",
+  "recovery": "Resend the image or describe what it shows and we can talk about it."
+}

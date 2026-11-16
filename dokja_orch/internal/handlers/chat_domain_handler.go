@@ -60,6 +60,7 @@ type ChatDomainHandler struct {
 	ownerDiscord string
 	incoming     *IncomingContentWorkflow
 	web          *webConversationReading
+	images       *imageReading
 	macro        *macroContext
 	ningo        chat.NingoFacts
 	visions      string
@@ -165,6 +166,8 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		attachments, _ := event.Payload["document_attachments"].([]chat.WebAttachment)
 		if len(chat.PlanWebReadings("", attachments)) > 0 {
 			content = webAttachmentPrompt(event)
+		} else if media, _ := event.Payload["media_attachments"].([]chat.WebAttachment); len(chat.PlanImageReadings(media)) > 0 {
+			content = imageAttachmentPrompt(event)
 		}
 	}
 	if content == "" {
@@ -284,17 +287,32 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 		sources = h.lookupForTurn(lookupCtx, content, anchor, turn)
 		cancelLookup()
 		var webData *webTurnData
+		var imageData *imageTurnData
 		event, sources, webData = h.withWebSources(ctx, event, lifecycle.SessionID, content, sources)
 		if webData != nil {
 			turn.planned = true
 			turn.text = true
 		}
-		if webData != nil && len(sources) == 0 && len(webData.Failures) > 0 {
+		event, imageData = h.withImageSources(ctx, event)
+		if imageData != nil && len(imageData.Descriptions) > 0 {
+			turn.planned = true
+			turn.text = true
+		}
+		if webData != nil && len(sources) == 0 && len(webData.Failures) > 0 && (imageData == nil || len(imageData.Descriptions) == 0) {
 			// No page was read. Return the application notice without letting
 			// the model improvise from URL slugs, titles or prior discussion.
 			webData.FailureOnly = true
 			sources = nil
-			result = map[string]any{"reply": webReadingStatus(event, webData)}
+			notice := webReadingStatus(event, webData)
+			if imageData != nil && len(imageData.Failures) > 0 {
+				imageData.FailureOnly = true
+				notice = strings.TrimSpace(notice + "\n\n" + imageReadingStatus(event, imageData))
+			}
+			result = map[string]any{"reply": notice}
+		} else if imageData != nil && len(imageData.Descriptions) == 0 && len(imageData.Failures) > 0 && len(sources) == 0 && webData == nil {
+			// No image was read and there is no other evidence to answer from.
+			imageData.FailureOnly = true
+			result = map[string]any{"reply": imageReadingStatus(event, imageData)}
 		} else {
 			macro, macroStatus = h.recallMacro(ctx, event, content, history)
 			result, err = h.generateReply(ctx, event, turnContent, history, sources, reference, macro)
@@ -315,6 +333,9 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
 		rawReply = sanitizeWebReply(rawReply, sources)
 	}
+	if _, imageTurn := event.Context["image_reading_turn"].(*imageTurnData); imageTurn {
+		rawReply = sanitizeImageReply(rawReply)
+	}
 	// Checked before the session keeps it, so a false quote is not repeated as a fact later.
 	rawReply = h.verifyQuotes(ctx, rawReply, sources, turn)
 	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
@@ -331,6 +352,11 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	reply := withKeptLine(citeSources(presentation.text, sources, h.discordPost, event.Source == core.SourceDiscord), keptLine)
 	if data, _ := event.Context["web_reading_turn"].(*webTurnData); data != nil && !data.FailureOnly {
 		if status := webReadingStatus(event, data); status != "" {
+			reply = strings.TrimSpace(reply) + "\n\n" + status
+		}
+	}
+	if data, _ := event.Context["image_reading_turn"].(*imageTurnData); data != nil && !data.FailureOnly {
+		if status := imageReadingStatus(event, data); status != "" {
 			reply = strings.TrimSpace(reply) + "\n\n" + status
 		}
 	}
@@ -396,6 +422,8 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
 		webData, _ := event.Context["web_reading_turn"].(*webTurnData)
 		messages = withWebEvidence(messages, sources, webData)
+		imageData, _ := event.Context["image_reading_turn"].(*imageTurnData)
+		messages = withImageEvidence(messages, imageData)
 		messages = withMacroEvidence(messages, macro)
 		if reference != "" {
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
@@ -409,6 +437,8 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		messages := withKnowledgeReference(chatMessagesForGenerator(history), sources)
 		webData, _ := event.Context["web_reading_turn"].(*webTurnData)
 		messages = withWebEvidence(messages, sources, webData)
+		imageData, _ := event.Context["image_reading_turn"].(*imageTurnData)
+		messages = withImageEvidence(messages, imageData)
 		messages = withMacroEvidence(messages, macro)
 		if reference != "" {
 			messages = append([]map[string]string{{"role": "system", "content": reference}}, messages...)
@@ -419,12 +449,12 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		// A spoken turn is spoken as it is written: each sentence goes to speech once it is whole, so
 		// the room hears the first one while the model is still on the next. A provider that gives no
 		// text before the end (Claude Code, Kimi) never calls this, and its reply is returned whole.
-		if voice && core.VoiceSpeech(ctx) != nil && webData == nil {
+		if voice && core.VoiceSpeech(ctx) != nil && webData == nil && imageData == nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, voiceSpeechStreamer(ctx, event))
 			}
 		}
-		if preview := core.ReplyPreview(ctx); preview != nil && webData == nil {
+		if preview := core.ReplyPreview(ctx); preview != nil && webData == nil && imageData == nil {
 			if streaming, ok := h.generator.(ChatStreamingGenerator); ok {
 				return streaming.GenerateMessagesStream(ctx, messages, preview)
 			}
@@ -440,6 +470,9 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 	}
 	if _, webTurn := event.Context["web_reading_turn"].(*webTurnData); webTurn {
 		return nil, fmt.Errorf("web reading requires a conversation generator")
+	}
+	if _, imageTurn := event.Context["image_reading_turn"].(*imageTurnData); imageTurn {
+		return nil, fmt.Errorf("image reading requires a conversation generator")
 	}
 	if reference != "" {
 		content = reference + "\n\nUser question:\n" + content

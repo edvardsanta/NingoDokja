@@ -15,7 +15,7 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
       console.log("[dokja-discord] message ignored", JSON.stringify({ reason: "bot", messageId: context.messageId }));
       return;
     }
-    if (!context.content && !context.documentAttachments?.length) {
+    if (!context.content && !context.documentAttachments?.length && !context.mediaAttachments?.length) {
       console.log("[dokja-discord] message ignored", JSON.stringify({ reason: "empty", messageId: context.messageId }));
       return;
     }

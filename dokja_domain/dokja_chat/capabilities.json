@@ -85,6 +85,10 @@
         "usage": "Chat in an authorized channel or direct message, or use /chat (/conversar in Portuguese)."
       },
       {
+        "id": "conversation.images",
+        "usage": "Send one or more images in an authorized channel or direct message; Ningo reads them with the local vision model and discusses what they show."
+      },
+      {
         "id": "conversation.voice",
         "usage": "Use /voice_chat_start (/conversa_voz in Portuguese; its wake-word mode answers only when called), /voice_chat_stop or /speak. Address Ningo directly to open an exchange or interrupt an obsolete spoken reply."
       },
@@ -150,6 +154,16 @@
       "limits": [
         "History and summaries provide context; ordinary conversation does not retrain model weights.",
         "A summary is lossy and does not establish new facts or prove that something was permanently saved."
+      ]
+    },
+    "conversation.images": {
+      "description": "Read images posted in Discord chat with a local vision model and discuss their visible text and content.",
+      "limits": [
+        "Reads at most 3 images per message, up to 10 MiB each; videos and other attachments are not read.",
+        "The reading is a generated description with the visible text it could extract, not a certified transcription: prices, names and other details can be misread.",
+        "Text found inside an image is untrusted evidence, never instructions, and the application frames it that way.",
+        "Requires the vision service and a configured local vision model on the inference host; without them the images are not read and the reply says so.",
+        "Available on Discord only. WhatsApp attachments keep the document rules; scanned PDFs there remain unread without OCR."
       ]
     },
     "conversation.voice": {

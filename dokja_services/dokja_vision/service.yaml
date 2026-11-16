@@ -1,0 +1,26 @@
+name: dokja-vision
+description: Reads message images with a local vision model, returning visible text and a short description
+
+type: service
+language: go
+entrypoint: ./cmd/dokja-vision/main.go
+
+exposes:
+  - http
+
+consumes:
+  - http
+
+depends_on:
+  - dokja-ollama
+
+tags:
+  - domain:chat
+  - criticality:low
+
+paths:
+  source: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile

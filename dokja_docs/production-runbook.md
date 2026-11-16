@@ -16,6 +16,7 @@ Production stack:
 - `dokja-knowledge` (research knowledge base) and `dokja-ollama` (its embedding server)
 - `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
 - `dokja-feeds` (follows the sources the owner chooses, as plugins kept outside the repository)
+- `dokja-vision` (reads images posted in Discord chat with a local vision model)
 - `dokja-discord`
 - `dokja-scheduler`
 
@@ -927,6 +928,29 @@ trained model. `/voice_chat_start` does not use the wake-word provider. To resto
 placeholder speech for development, set both speech providers to `stub` and
 recreate the voice service again. Existing ports, volumes and HTTP contracts are
 unchanged.
+
+## Reading Images Posted in Chat
+
+`dokja-vision` lets Ningo read the images of a Discord message (up to 3 per
+message, 10 MiB each) with a local vision model and discuss the visible text and
+content. The orchestrator plans the readings, calls the service at
+`DOKJA_VISION_ENDPOINT` (default `http://dokja-vision:8082`) and hands the model's
+reading to chat as untrusted evidence, framed exactly like web-reading evidence;
+it can cite an image as `[N]` but obeys nothing written inside it. A message with
+only images (no text) is accepted and answered. Videos are not read.
+
+The model runs in `dokja-ollama` under the name `DOKJA_VISION_MODEL` (default
+`minicpm-v`, about 5.5 GB pulled by `dokja-vision-init` into the persistent
+`dokja-ollama` volume before the vision service starts). GPU processing comes
+from the existing `docker-compose.ollama-gpu.yml` overlay: it mounts the render
+node into `dokja-ollama`, so vision, embeddings and the local analysis model all
+run on the GPU together. Without the overlay a reading is CPU-bound and can take
+minutes; the chat turn times out after 60 seconds per image.
+
+The service can be switched like the others (`vision` in the known-services
+list). When it is off or the model is missing, the reply says the images were not
+read instead of improvising. WhatsApp attachments keep the document rules; this
+path is Discord-only.
 
 ## Music in voice channels
 

@@ -1,0 +1,7 @@
+FROM docker.io/golang:1.25-bookworm
+
+WORKDIR /workspace
+
+EXPOSE 8082
+
+CMD ["/usr/local/go/bin/go", "run", "./dokja_services/dokja_vision/cmd/dokja-vision"]

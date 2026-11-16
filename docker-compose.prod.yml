@@ -24,6 +24,7 @@ services:
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_VOICE_HTTP_ENDPOINT: ${DOKJA_VOICE_HTTP_ENDPOINT:-}
       DOKJA_VOICE_CHAT_PROVIDER: ${DOKJA_VOICE_CHAT_PROVIDER:-runtime}
+      DOKJA_VISION_ENDPOINT: ${DOKJA_VISION_ENDPOINT:-}
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
       DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN: ${DOKJA_SOURCE_SUPERVISION_POSTGRES_DSN:-}
@@ -202,6 +203,50 @@ services:
     restart: unless-stopped
     volumes:
       - dokja-ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - dokja-net
+
+  # Reads images posted in chat with a local vision model; the model itself
+  # runs in dokja-ollama. Without the GPU overlay the reading is CPU-bound and
+  # slow; see dokja_docs/production-runbook.md.
+  dokja-vision:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_vision/Dockerfile
+    restart: unless-stopped
+    environment:
+      DOKJA_VISION_HOST: 0.0.0.0
+      DOKJA_VISION_PORT: 8082
+      DOKJA_VISION_OLLAMA: http://dokja-ollama:11434
+      DOKJA_VISION_MODEL: ${DOKJA_VISION_MODEL:-minicpm-v}
+      DOKJA_VISION_MAX_MIB: ${DOKJA_VISION_MAX_MIB:-10}
+    # No authentication: reachable from this host only.
+    ports:
+      - "127.0.0.1:8082:8082"
+    depends_on:
+      dokja-vision-init:
+        condition: service_completed_successfully
+    networks:
+      - dokja-net
+
+  # Download the vision model once into the persistent model cache before the
+  # vision service answers its first reading.
+  dokja-vision-init:
+    image: docker.io/ollama/ollama:latest
+    entrypoint: ["ollama"]
+    command: ["pull", "${DOKJA_VISION_MODEL:-minicpm-v}"]
+    environment:
+      OLLAMA_HOST: http://dokja-ollama:11434
+    depends_on:
+      dokja-ollama:
+        condition: service_healthy
+    restart: "no"
     networks:
       - dokja-net
 

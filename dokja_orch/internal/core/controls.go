@@ -14,7 +14,7 @@ import (
 // KnownServices are the only services that can be switched off. Anything else is
 // rejected, so an unauthenticated caller cannot invent keys.
 // "scheduler" is special: switching it off pauses every scheduled run at once.
-var KnownServices = []string{"meme", "chat", "book", "knowledge", "memory", "feeds", "scheduler"}
+var KnownServices = []string{"meme", "chat", "book", "knowledge", "memory", "feeds", "scheduler", "voice", "vision"}
 
 // KnownInterfaces are the interfaces people talk to Ningo through. They are switched like
 // services, but are shown in their own catalog, including before setup. Off means it neither answers nor receives deliveries, and says nothing about
