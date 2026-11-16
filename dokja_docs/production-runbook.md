@@ -947,6 +947,13 @@ node into `dokja-ollama`, so vision, embeddings and the local analysis model all
 run on the GPU together. Without the overlay a reading is CPU-bound and can take
 minutes; the chat turn times out after 60 seconds per image.
 
+The reading prompt is built into the service, and an operator can override it
+without a rebuild by writing `vision_prompt.md` into `.dokja/`
+(`DOKJA_VISION_PROMPT_FILE`; `/workspace/.dokja/vision_prompt.md` in dev and
+lite, `/run/dokja-config/vision_prompt.md` in prod). The file is read at
+startup, capped at 8 KiB, and a missing or empty file keeps the built-in
+prompt. Tuning it works like `visions.md`: restart the service after editing.
+
 The service can be switched like the others (`vision` in the known-services
 list). When it is off or the model is missing, the reply says the images were not
 read instead of improvising. WhatsApp attachments keep the document rules; this

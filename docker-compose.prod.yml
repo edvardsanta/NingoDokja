@@ -225,6 +225,8 @@ services:
       DOKJA_VISION_PORT: 8082
       DOKJA_VISION_OLLAMA: http://dokja-ollama:11434
       DOKJA_VISION_MODEL: ${DOKJA_VISION_MODEL:-minicpm-v}
+      # Optional operator prompt override, read at startup (missing file keeps the built-in prompt).
+      DOKJA_VISION_PROMPT_FILE: ${DOKJA_VISION_PROMPT_FILE:-/run/dokja-config/vision_prompt.md}
       DOKJA_VISION_MAX_MIB: ${DOKJA_VISION_MAX_MIB:-10}
     # No authentication: reachable from this host only.
     ports:
