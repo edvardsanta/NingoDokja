@@ -32,15 +32,23 @@ func newTestService(t *testing.T, generate ollamaGenerate) (*Service, *httptest.
 	service := NewService("http://127.0.0.1:9",
 		WithMaxBytes(32<<10),
 		WithGenerate(generate),
+		WithPrompt("prompt de teste em português"),
 	)
 	service.fetch = imageHost.Client()
 	return service, imageHost
 }
 
+func TestDescribeRefusesToRunWithoutAPrompt(t *testing.T) {
+	service := NewService("http://127.0.0.1:9")
+	if _, err := service.Describe(context.Background(), DescribeRequest{URL: "https://example.com/a.png"}); !errors.Is(err, ErrNoPrompt) {
+		t.Fatal("describe ran without a configured prompt", err)
+	}
+}
+
 func TestDescribeReturnsTheModelReading(t *testing.T) {
 	var gotImages []string
 	service, host := newTestService(t, func(_ context.Context, model, prompt string, images []string) (string, error) {
-		if model != "minicpm-v" || !strings.Contains(prompt, "português") || !strings.Contains(prompt, "apenas a primeira ocorrência") || !strings.Contains(prompt, "caractere por caractere") {
+		if model != "minicpm-v" || prompt != "prompt de teste em português" {
 			t.Fatal("model or prompt not applied", model)
 		}
 		gotImages = images

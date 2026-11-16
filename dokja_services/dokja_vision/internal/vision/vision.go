@@ -35,20 +35,16 @@ type DescribeRequest struct {
 	Size        int64  `json:"size"`
 }
 
-// DefaultPrompt asks for exactly what chat needs: the kind of image and its
-// apparent context, the visible text preserved character by character
-// (prices above all), and a short scene description, in Portuguese.
-const DefaultPrompt = `Você lê imagens enviadas em um chat em português (Brasil).
-
-Primeiro diga o TIPO da imagem e o contexto aparente em uma frase: captura de tela de página de loja/site, capa de jogo, captura de jogo, foto, print de conversa, gráfico, meme etc. Se for captura de tela, mencione o layout (página de qual site, janela de qual programa).
-
-Depois transcreva o texto principal visível — título, preços, nomes, botões e rótulos — preservando números e valores caractere por caractere (R$ 874,21 continua R$ 874,21: nunca troque vírgula por ponto, não mova dígitos e não reformate). Se um texto aparecer repetido na imagem (listas de temas, tags), transcreva apenas a primeira ocorrência e nunca repita palavras em sequência.
-
-Por fim, descreva em um parágrafo curto o que a imagem mostra e o que a pessoa provavelmente quer discutir nela.
-
-Se não houver texto legível, descreva apenas a cena e o tipo. Responda somente com: tipo/contexto, transcrição e descrição.`
+// The reading prompt lives in the operator's vision_prompt.md (mounted into
+// the container), so tuning a probabilistic behavior never needs a rebuild or
+// a code change. There is deliberately no built-in prompt: Describe refuses
+// to run without one.
 
 type ollamaGenerate func(ctx context.Context, model, prompt string, images []string) (string, error)
+
+// ErrNoPrompt means the service has no reading prompt configured. The prompt
+// lives only in the operator's vision_prompt.md, never in code.
+var ErrNoPrompt = errors.New("vision prompt is not configured")
 
 // Service validates, downloads and describes one image at a time.
 type Service struct {
@@ -81,7 +77,6 @@ func WithGenerate(generate ollamaGenerate) Option {
 func NewService(endpoint string, options ...Option) *Service {
 	service := &Service{
 		model:     "minicpm-v",
-		prompt:    DefaultPrompt,
 		maxBytes:  10 << 20,
 		maxOutput: 4000,
 		fetch:     &http.Client{Timeout: 20 * time.Second},
@@ -99,6 +94,9 @@ func (s *Service) Model() string { return s.model }
 
 // Describe downloads the image and returns the model's reading of it.
 func (s *Service) Describe(ctx context.Context, request DescribeRequest) (string, error) {
+	if strings.TrimSpace(s.prompt) == "" {
+		return "", ErrNoPrompt
+	}
 	address, err := validateRequest(request, s.maxBytes)
 	if err != nil {
 		return "", err
