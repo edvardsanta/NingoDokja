@@ -35,13 +35,18 @@ type DescribeRequest struct {
 	Size        int64  `json:"size"`
 }
 
-// DefaultPrompt asks for exactly what chat needs: the visible text preserved
-// (prices, names, buttons) and a short scene description, in Portuguese.
+// DefaultPrompt asks for exactly what chat needs: the kind of image and its
+// apparent context, the visible text preserved character by character
+// (prices above all), and a short scene description, in Portuguese.
 const DefaultPrompt = `Você lê imagens enviadas em um chat em português (Brasil).
-Transcreva o texto principal visível na imagem — título, preços, nomes, botões e rótulos — preservando números e valores exatamente como aparecem, sem convertê-los.
-Se um texto aparecer repetido na imagem (listas de temas, tags, rótulos), transcreva apenas a primeira ocorrência e, quando fizer sentido, mencione uma única vez que há uma lista repetida; nunca repita palavras em sequência.
-Depois descreva em um parágrafo curto o que a imagem mostra e o contexto aparente.
-Se não houver texto legível, descreva apenas a cena. Responda somente com a transcrição e a descrição.`
+
+Primeiro diga o TIPO da imagem e o contexto aparente em uma frase: captura de tela de página de loja/site, capa de jogo, captura de jogo, foto, print de conversa, gráfico, meme etc. Se for captura de tela, mencione o layout (página de qual site, janela de qual programa).
+
+Depois transcreva o texto principal visível — título, preços, nomes, botões e rótulos — preservando números e valores caractere por caractere (R$ 874,21 continua R$ 874,21: nunca troque vírgula por ponto, não mova dígitos e não reformate). Se um texto aparecer repetido na imagem (listas de temas, tags), transcreva apenas a primeira ocorrência e nunca repita palavras em sequência.
+
+Por fim, descreva em um parágrafo curto o que a imagem mostra e o que a pessoa provavelmente quer discutir nela.
+
+Se não houver texto legível, descreva apenas a cena e o tipo. Responda somente com: tipo/contexto, transcrição e descrição.`
 
 type ollamaGenerate func(ctx context.Context, model, prompt string, images []string) (string, error)
 
