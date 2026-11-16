@@ -12,6 +12,7 @@ import (
 	chat "read_books/dokja_domain/dokja_chat"
 	digest "read_books/dokja_domain/dokja_digest"
 	"read_books/internal/core"
+	"read_books/internal/logger"
 	"regexp"
 	"strings"
 	"sync"
@@ -205,7 +206,12 @@ func socialPostReading(ctx context.Context, domain *digest.Domain, address strin
 	socialCtx, cancel := context.WithTimeout(ctx, socialReadBudget)
 	defer cancel()
 	reply, err := domain.Handle(socialCtx, digest.Request{Action: digest.ActionReadLink, Event: digest.Event{Payload: map[string]any{"url": address}}})
-	if err != nil || reply["status"] != "ok" {
+	if err != nil {
+		logger.Info(fmt.Sprintf("social reader failed link=%s: %v", address, err))
+		return nil, false
+	}
+	if reply["status"] != "ok" {
+		logger.Info(fmt.Sprintf("social reader refused link=%s reason=%v", address, reply["refused"]))
 		return nil, false
 	}
 	post, _ := reply["post"].(map[string]any)
@@ -249,6 +255,7 @@ func (h *ChatDomainHandler) appendPostMediaReadings(ctx context.Context, domain 
 	defer cancel()
 	reply, err := domain.Handle(mediaCtx, digest.Request{Action: digest.ActionReadLinkDelivery, Event: digest.Event{Payload: map[string]any{"url": link}}})
 	if err != nil || reply["status"] != "ok" {
+		logger.Info(fmt.Sprintf("social media delivery failed link=%s err=%v refused=%v", link, err, reply["refused"]))
 		return
 	}
 	rows, _ := reply["media"].([]digest.DeliveryMedia)
@@ -262,6 +269,7 @@ func (h *ChatDomainHandler) appendPostMediaReadings(ctx context.Context, domain 
 		}
 		text, err := h.socialVision.describe.DescribeMedia(mediaCtx, item.DataB64, item.ContentType, item.Filename)
 		if err != nil || strings.TrimSpace(text) == "" {
+			logger.Info(fmt.Sprintf("social media reading failed link=%s media=%s err=%v", link, item.Filename, err))
 			continue
 		}
 		label := "video"
