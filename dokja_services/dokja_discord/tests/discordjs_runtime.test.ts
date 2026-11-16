@@ -277,3 +277,19 @@ test("autocomplete answers what the command suggests, cut to Discord's limits, a
   assert.equal(toEmbed({ title: "t", url: "https://store.example/p" }).url, "https://store.example/p");
   assert.equal(toEmbed({ title: "t", url: "javascript:alert(1)" }).url, undefined);
 });
+
+test("rich presence embeds become message embed context", async () => {
+  const context = await toMessageContext({
+    author: { id: "user", bot: false, username: "odraude" }, member: { displayName: "Odraude" },
+    id: "new", channelId: "channel", guildId: "guild",
+    content: "Mano vou sair aqui para fazer as licoes de casa - Pedro", channel: { type: 0 },
+    mentions: { users: new Map() },
+    embeds: new Map([
+      ["0", { author: { name: "Pedro" }, title: "Ghost of Tsushima DIRECTOR'S CUT", description: "Jogando há 2 horas" }],
+      ["1", {}],
+    ]),
+  } as any);
+  assert.equal(context.messageEmbeds?.length, 1);
+  assert.equal(context.messageEmbeds?.[0].author, "Pedro");
+  assert.equal(context.messageEmbeds?.[0].title, "Ghost of Tsushima DIRECTOR'S CUT");
+});

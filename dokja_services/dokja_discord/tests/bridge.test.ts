@@ -134,3 +134,12 @@ test("buildBridgePayload carries the names of the tagged accounts, at most twent
   assert.deepEqual(body.payload.mentionedUsers?.[0], { id: "account-0", name: "Name 0" });
   assert.equal(buildBridgePayload({ eventType: "message.created", userId: "u", channelId: "c", messageId: "m" }).payload.mentionedUsers, undefined);
 });
+
+test("buildBridgePayload passes rich embeds through bounded", () => {
+  const payload = buildBridgePayload({
+    eventType: "message.created", userId: "u", channelId: "c", messageId: "m",
+    messageEmbeds: Array.from({ length: 8 }, (_, i) => ({ author: `a${i}`, title: `t${i}` })),
+  });
+  assert.equal(payload.payload.messageEmbeds?.length, 5);
+  assert.equal(payload.payload.messageEmbeds?.[0].title, "t0");
+});

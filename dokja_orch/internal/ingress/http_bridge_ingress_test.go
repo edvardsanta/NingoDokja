@@ -340,3 +340,25 @@ func TestMediaAndTheAnsweredMessageAreBoundedAndDiscordOnly(t *testing.T) {
 		t.Fatal("only Discord hands the answered message to a proposal")
 	}
 }
+
+func TestBridgeMessageEmbedsAreDiscordOnlyContext(t *testing.T) {
+	embeds := []chat.MessageEmbed{{Author: "Pedro", Title: "Ghost of Tsushima DIRECTOR'S CUT"}}
+	for _, source := range []string{"discord", "whatsapp"} {
+		var request BridgeRequest
+		request.Interface = source
+		request.EventType = "message.created"
+		request.Payload.Content = "olha o que ele ta jogando"
+		request.Payload.MessageEmbeds = embeds
+		event := bridgeEventFromRequest(request)
+		got, ok := event.Context["message_embeds"].([]chat.MessageEmbed)
+		if source == "discord" {
+			if !ok || len(got) != 1 || got[0].Title != embeds[0].Title {
+				t.Fatalf("discord embeds missing: %#v", event.Context["message_embeds"])
+			}
+			continue
+		}
+		if ok {
+			t.Fatalf("non-discord interface received embeds: %#v", got)
+		}
+	}
+}

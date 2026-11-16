@@ -22,7 +22,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 
-import { mediaAttachments, pdfAttachments } from "../messages/documents.js";
+import { mediaAttachments, pdfAttachments, richEmbeds } from "../messages/documents.js";
 import type {
   DiscordButtonAction,
   DiscordButtonContext,
@@ -467,6 +467,7 @@ export async function toMessageContext(message: Message, botUserId?: string): Pr
     documentAttachments: pdfAttachments(message.attachments?.values() ?? []),
     replyToContent,
     mediaAttachments: mediaAttachments(message.attachments?.values() ?? []),
+    messageEmbeds: richEmbeds(message.embeds?.values() ?? []),
     replyTo,
     mentionedUserIds: Array.from(message.mentions.users.values(), user => user.id).slice(0, 20),
     mentionedUsers: Array.from(message.mentions.users.values(), user => ({

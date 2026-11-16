@@ -25,6 +25,9 @@ const defaultHTTPBridgeEndpoint = ":8091"
 // maxMediaAttachments bounds the media a message hands to a tag proposal.
 const maxMediaAttachments = 5
 
+// maxMessageEmbeds bounds the rich embeds (a game status card, a link preview) kept as context.
+const maxMessageEmbeds = 5
+
 type HTTPBridgeIngress struct {
 	media          MediaSource
 	service        *core.Service
@@ -48,7 +51,10 @@ type BridgePayload struct {
 	DocumentAttachments []chat.WebAttachment `json:"documentAttachments,omitempty"`
 	// MediaAttachments are the images and videos a Discord message carries, and ReplyTo the
 	// message it answers. Only a meme channel's tag proposals read them.
-	MediaAttachments []chat.WebAttachment   `json:"mediaAttachments,omitempty"`
+	MediaAttachments []chat.WebAttachment `json:"mediaAttachments,omitempty"`
+	// MessageEmbeds are the rich embeds a message carries (a friend's game status card,
+	// a link preview); the group chat reads them as conversation context.
+	MessageEmbeds    []chat.MessageEmbed    `json:"messageEmbeds,omitempty"`
 	ReplyTo          *BridgeReplyTo         `json:"replyTo,omitempty"`
 	Document         *chat.IncomingDocument `json:"document,omitempty"`
 	Locale           string                 `json:"locale,omitempty"`
@@ -660,6 +666,9 @@ func bridgeEventFromRequest(request BridgeRequest) core.Event {
 		if source == core.SourceDiscord {
 			if media := request.Payload.MediaAttachments; len(media) > 0 {
 				payload["media_attachments"] = media[:min(len(media), maxMediaAttachments)]
+			}
+			if embeds := request.Payload.MessageEmbeds; len(embeds) > 0 {
+				context["message_embeds"] = embeds[:min(len(embeds), maxMessageEmbeds)]
 			}
 			if reply := request.Payload.ReplyTo; reply != nil && strings.TrimSpace(reply.MessageID) != "" {
 				quoted := []rune(reply.Content)
