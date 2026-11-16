@@ -46,6 +46,42 @@ test("an attachment-only message sends metadata to the orchestrator, not a direc
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("an image-only message is dispatched for the vision workflow", async () => {
+  const originalFetch = globalThis.fetch;
+  const attachment = { url: "https://example.com/shot.png", filename: "shot.png", content_type: "image/png", size: 1600000 };
+  let calls = 0;
+  globalThis.fetch = (async (input, init) => {
+    calls++;
+    assert.equal(input, "http://orch");
+    const request = JSON.parse(String(init?.body));
+    assert.equal(request.payload.content, "");
+    assert.deepEqual(request.payload.mediaAttachments, [attachment]);
+    return new Response(JSON.stringify({ status: "ok", reply: "Ridiculous price." }));
+  }) as typeof fetch;
+  try {
+    let reply: unknown;
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })({
+      userId: "member", channelId: "channel", messageId: "message", content: "", mediaAttachments: [attachment],
+      isBot: false, isDirectMessage: false, mentionsBot: false, reply: async value => { reply = value; },
+    });
+    assert.equal(calls, 1);
+    assert.equal(reply, "Ridiculous price.");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a message with no content and no attachments is still ignored", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response("{}"); }) as typeof fetch;
+  try {
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })({
+      userId: "member", channelId: "channel", messageId: "message", content: "",
+      isBot: false, isDirectMessage: false, mentionsBot: false, reply: async () => {},
+    });
+    assert.equal(calls, 0);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("pictures and videos project as metadata and everything else is left out", () => {
   const common = { url: "https://example.com/a", size: 10 };
   assert.deepEqual(mediaAttachments([

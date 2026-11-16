@@ -1,0 +1,9 @@
+{
+  "image_prompt": "Descreva esta imagem e vamos conversar sobre o que ela mostra.",
+  "unreadable": "Não consegui ler {count} imagem(ns): o download falhou ou o endereço não entregou uma imagem. Não usei esse conteúdo como evidência.",
+  "too_large": "Deixei {count} imagem(ns) sem leitura por excederem o limite de {limit} MiB cada.",
+  "vision_disabled": "O serviço de visão está indisponível agora, então não li {count} imagem(ns).",
+  "failed": "Não consegui ler {count} imagem(ns) com o modelo de visão. Não usei esse conteúdo como evidência.",
+  "omitted": "Deixei {count} imagem(ns) adicionais sem leitura; consigo ler até {limit} por mensagem.",
+  "recovery": "Reenvie a imagem ou descreva o que ela mostra para conversarmos."
+}

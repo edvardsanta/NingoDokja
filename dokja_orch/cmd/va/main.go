@@ -205,6 +205,7 @@ func main() {
 	}
 	logger.Info(fmt.Sprintf("voice chat provider configured local=%t", voiceGenerator != nil))
 	voiceServiceClient := clients.NewVoiceServiceClient(voiceServiceEndpoint)
+	visionServiceClient := clients.NewVisionServiceClient(os.Getenv("DOKJA_VISION_ENDPOINT"))
 	communicationsHandler := handlers.NewCommunicationsDomainHandler(
 		clients.NewCommunicationsServiceClient(os.Getenv("COMMUNICATIONS_SERVICE_ENDPOINT"), os.Getenv("DOKJA_COMMUNICATIONS_TOKEN")),
 		os.Getenv("DISCORD_SCHEDULED_MEME_CHANNEL_ID"),
@@ -308,7 +309,7 @@ func main() {
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
 		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions).WithMemory(quizRuns),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithImageReading(visionServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("vision") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithApplicationSourcePreparer(knowledgeHandler).WithSourceReadJournal(sourceJournalStore).WithKnowledgePersistence(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithKnowledgeProposals(proposalsHandler).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
