@@ -5,7 +5,7 @@ PNPM ?= pnpm
 ENV_FILE ?= .env
 STACK_FILE ?= docker-compose.lite.yml
 # Explicit services avoid starting the interactive CLI/TUI containers.
-SERVICES ?= dokja-orchestrator dokja-discord dokja-feeds dokja-memory dokja-knowledge dokja-scheduler
+SERVICES ?= dokja-orchestrator dokja-discord dokja-feeds dokja-memory dokja-knowledge dokja-scheduler dokja-vision
 # dokja-voice is opt-in: its image is large (the ROCm build alone needs several GB), so nothing
 # builds or starts it unless VOICE=1 is given or `make voice` is run.
 VOICE ?= 0
