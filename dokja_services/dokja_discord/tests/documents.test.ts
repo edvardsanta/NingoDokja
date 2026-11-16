@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mediaAttachments, pdfAttachments } from "../messages/documents.js";
+import { mediaAttachments, pdfAttachments, richEmbeds } from "../messages/documents.js";
 import { createDiscordMessageHandler } from "../messages/message_listener.js";
 import { toMessageContext } from "../runtime/discordjs_runtime.js";
 
@@ -152,4 +152,19 @@ test("a post by a webhook, which is how Ningo posts a meme, is never read as a p
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("richEmbeds keeps author, title and description, skips empty and bounds at five", () => {
+  const values = [
+    { author: { name: "Pedro" }, title: "Ghost of Tsushima DIRECTOR'S CUT", description: "Jogando há 2 horas" },
+    { title: "Link preview only" },
+    {},
+    "not-an-embed",
+    ...Array.from({ length: 8 }, (_, i) => ({ author: { name: `a${i}` }, title: `t${i}` })),
+  ];
+  const got = richEmbeds(values);
+  assert.equal(got.length, 5);
+  assert.deepEqual(got[0], { author: "Pedro", title: "Ghost of Tsushima DIRECTOR'S CUT", description: "Jogando há 2 horas" });
+  assert.equal(got[1].title, "Link preview only");
+  assert.equal(got[1].author, undefined);
 });

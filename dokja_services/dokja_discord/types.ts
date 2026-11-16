@@ -73,6 +73,12 @@ export type DiscordCommandContext = {
   showModal(modal: DiscordModalSpec): Promise<void>;
 };
 
+export type DiscordMessageEmbed = {
+  author?: string;
+  title?: string;
+  description?: string;
+};
+
 export type DiscordMessageContext = {
   documentAttachments?: DiscordDocumentAttachment[];
   userId: string;
@@ -86,6 +92,9 @@ export type DiscordMessageContext = {
   // tag proposals.
   mediaAttachments?: DiscordDocumentAttachment[];
   replyTo?: DiscordReplyReference;
+  // Rich embeds the message carries (a friend's game status card, a link preview): group-chat
+  // context for the chat, metadata only.
+  messageEmbeds?: DiscordMessageEmbed[];
   mentionedUserIds?: string[];
   // The names the gateway shows for the tagged accounts, so the text can name them instead of an id.
   mentionedUsers?: Array<{ id: string; name: string }>;
