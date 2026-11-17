@@ -27,3 +27,24 @@ func TestGPUModelIdentityKeepsPerformanceAndMobileSuffixesDistinct(t *testing.T)
 		}
 	}
 }
+
+func TestShortlistAcceptsSameCoresThreadsCandidates(t *testing.T) {
+	// Without a price.technical.v1 provider, benchmark-backed classes never fire;
+	// same cores and threads extracted from the listings are the grounded signal.
+	result := map[string]any{
+		"product":  map[string]any{"title": "Processador AMD Ryzen 5 5600XT, 6 Núcleos, 12 Threads"},
+		"decision": map[string]any{"selected_cents": 105999.0},
+		"alternatives": []any{
+			map[string]any{"product": "intel-peer", "title": "Processador Intel Core i5 12400F, 6 Cores, 12 Threads", "brand": "intel", "price_cents": 104999.0, "classification": "similar_cpu_specs"},
+			map[string]any{"product": "ungrounded", "title": "Processador Example", "price_cents": 50000.0, "classification": "same_category_candidate"},
+		},
+	}
+	ShortlistAlternatives(result)
+	got := result["alternatives"].([]any)
+	if len(got) == 0 || got[0].(map[string]any)["product"] != "intel-peer" {
+		t.Fatalf("a same-cores-threads candidate was rejected: %v", got)
+	}
+	if len(got) != 1 {
+		t.Fatalf("an ungrounded candidate was promoted: %v", got)
+	}
+}
