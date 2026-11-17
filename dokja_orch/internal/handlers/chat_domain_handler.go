@@ -487,6 +487,11 @@ func (h *ChatDomainHandler) generateReply(ctx context.Context, event core.Event,
 		}
 		messages = withPersona(messages, event)
 		messages = withOwnerIdentity(messages, event)
+		if chat.NeedsReasoning(reasoningTurn(ctx, event, chatMessageFromEvent(event), sources)) {
+			if result, ok := h.reasonedReply(ctx, messages); ok {
+				return result, nil
+			}
+		}
 		messages = fitChatPrompt(messages)
 		// A spoken turn is spoken as it is written: each sentence goes to speech once it is whole, so
 		// the room hears the first one while the model is still on the next. A provider that gives no

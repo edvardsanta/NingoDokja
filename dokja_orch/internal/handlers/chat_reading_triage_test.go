@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
+
+	chat "read_books/dokja_domain/dokja_chat"
 )
 
 // triagingGenerator adds the structured task call the production client offers, with a scripted
@@ -14,6 +17,7 @@ type triagingGenerator struct {
 	verdict bool
 	err     error
 	asked   []string
+	wire    string
 }
 
 type triageModel interface {
@@ -21,16 +25,33 @@ type triageModel interface {
 	ChatConversationGenerator
 }
 
-func (g *triagingGenerator) GenerateTaskJSON(_ context.Context, _ string, _ map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
+func (g *triagingGenerator) GenerateTaskJSON(_ context.Context, profile string, _ map[string]any, messages []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
+	if profile != "lightweight" {
+		return nil, fmt.Errorf("only reading triage is scripted")
+	}
 	g.asked = append(g.asked, messages[len(messages)-1]["content"])
 	if g.err != nil {
 		return nil, g.err
 	}
-	reply := map[string]any{"uses_reading": g.verdict}
+	raw, _ := json.Marshal(map[string]bool{"uses_reading": g.verdict})
+	if g.wire != "" {
+		raw = []byte(g.wire)
+	}
+	reply := map[string]any{"reply": string(raw)}
 	if err := accept(reply); err != nil {
 		return nil, err
 	}
 	return reply, nil
+}
+
+func TestTriageRejectsMalformedTaskWireReplies(t *testing.T) {
+	for _, raw := range []string{`not JSON`, `{"uses_reading":"yes"}`, `{"uses_reading":null}`, `{"other":true}`} {
+		g := &triagingGenerator{triageModel: &fakeChatGenerator{}, wire: raw}
+		h := NewChatDomainHandler(g)
+		if h.readingRelevant(t.Context(), "And who decides?", []chat.WebDocument{{Title: "Law"}}) {
+			t.Fatal("malformed task reply enabled the reading")
+		}
+	}
 }
 
 func sentEvidence(generator *fakeChatGenerator) bool {
