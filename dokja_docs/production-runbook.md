@@ -1726,30 +1726,58 @@ and disables Profiles, so there are never two copies. Profiles are regenerable (
 **Infer profile** again); only the WhatsApp session notes would need to be learned again as the
 people write.
 
-## Optional price history store
+## Durable price storage and background synchronization
 
-`DOKJA_PRICE_POSTGRES_DSN` names the PostgreSQL database that keeps the Price
-domain's history ([ADR 0015](decisions/0015-price-history-domain.md)), including
-the database's explicit TLS policy. It is optional and unset by default; only
-the orchestrator and the `price-history-init` command read it. Unset, the
-history is kept in memory and a restart forgets it.
+Every price mutation is committed to `price_buffer.db` beside `DOKJA_DB_FILE`
+before the collector receives success. The SQLite transaction updates a compact
+local replica and appends an ordered outbox command together; WAL and full
+synchronous commits protect acknowledged writes across process restarts. The
+existing shared-data directory/volume holds this file; no new environment
+variable, port or Compose volume is required. Keep it and its WAL/SHM files on
+persistent storage. Never delete the buffer to repair a connection problem.
 
-The dev, lite and prod stacks project the DSN into the orchestrator. With the
-PostgreSQL overlay that `make start` applies, a DSN of the form
-`postgres://dokja:<password>@dokja-postgres:5432/dokja?sslmode=disable` uses the
-stack's own database; the password is `DOKJA_POSTGRES_PASSWORD`. Keep the DSN in
-`.env` or `.env.prod`, never in a committed file.
+`DOKJA_PRICE_POSTGRES_DSN` optionally names the central PostgreSQL database,
+including its explicit TLS policy. With no DSN, prices remains durable locally;
+commands wait for a future configured primary. An invalid or unavailable DSN
+keeps collection operating against SQLite, rather than switching to temporary
+memory. If local storage cannot open, only price operations are paused and
+System reports the failure; other assistant domains can still run. A failed
+local write is never acknowledged as saved.
 
-The orchestrator installs or upgrades the `dokja_price` namespace itself at
-startup when the DSN names a reachable database without a current namespace —
-`Initialize` is idempotent, runs in one locked transaction and keeps every
-stored point — so a deployment that missed the init step repairs itself on the
-first boot instead of silently demoting history to memory. The explicit
-`price-history-init` command remains for operators: production images include
-`/app/price-history-init`, and dev/lite can run `go run ./cmd/price-history-init`
-from `dokja_orch` with the DSN set. An invalid DSN, an unavailable database or
-a namespace that still cannot be installed or upgraded logs a sanitized message
-and keeps the history in memory; the rest of the orchestrator starts.
+The orchestrator hosts an automatic background job, separate from the optional
+price collection job. It checks/reconnects immediately and every 30 seconds on
+failure, validates or initializes the existing PostgreSQL namespace, and sends
+up to 100 commands per attempt under a 15-second deadline. A successful batch
+with backlog continues after one second. Commands are removed from the outbox
+only after primary confirmation; a crash in between retries the same command
+before later ones. Price points use their existing history/day identity, watch
+commands are idempotent, and decisions keep stable IDs and original timestamps.
+No orchestrator restart is required for an outage to recover.
+
+All writes use the local outbox, including when PostgreSQL is healthy. Reads
+merge primary results with pending changes. During outages they use the local
+replica and up to 256 cached primary query views, overlaid with newer local
+changes. This is not a full mirror of previously existing remote history: data
+never read or collected on this device may be unavailable while disconnected.
+Run one orchestrator writer per buffer. Synced local replica rows remain for
+offline reads; outbox commands are deleted after acknowledgement. Watch disk
+space during a prolonged outage.
+
+The dev, lite and prod stacks already project the DSN into the orchestrator.
+With the PostgreSQL overlay, use the compose database service and the owner's
+existing password configuration. Keep credentials in the owner's environment,
+never in committed files. The explicit `price-history-init` command remains
+available for operators; the background job can also install/upgrade a missing
+or older namespace through the established transactional initializer.
+
+**Backup and rollout.** Stop the orchestrator for a consistent file copy, or
+use SQLite's backup API, and back up `price_buffer.db` in addition to PostgreSQL.
+The durable local buffer starts with this release; it cannot recover data lost
+from an older process's memory. Deploy the orchestrator and matching desktop
+locales together. Before rollback, let the pending count reach zero and retain
+the buffer backup: an older build does not read this queue and may again use its
+old temporary-memory behavior. Never point integration tests at the owner's
+production database.
 
 **Price collection.** Prices come from an owner-installed Feeds plugin that
 provides `price.resolve.v1` (kept in the plugins directory, outside git). The
@@ -1759,12 +1787,12 @@ that still provides `source.collect.v1` for prices is no longer read: switch it
 off when the resolver is enabled. With no resolver enabled, a run fails with
 `price_resolver_unavailable` and nothing else changes.
 
-**Upgrade to schema version 2 (watched searches).** Run `price-history-init`
-again before restarting the orchestrator on the new build: it upgrades a
-version 1 namespace in one transaction and keeps every point. Started first,
-the orchestrator refuses the version 1 namespace, logs that it needs
-`price-history-init`, and keeps history in memory until the next restart after
-the upgrade. Back up the namespace before upgrading.
+**Schema upgrades.** The background initializer upgrades supported older price
+namespaces transactionally and keeps existing points. Unsupported schemas or
+insufficient permissions leave commands pending locally until corrected. Back
+up the namespace before upgrading.
+
+Back up the namespace before upgrading.
 
 Back up the namespace with the database (`pg_dump --schema=dokja_price`).
 Rolling back to a build without the adapter leaves the namespace unused;
@@ -1818,7 +1846,7 @@ pg_restore --no-owner -n dokja_price -d <database> .dokja/backups/postgres/dokja
 ```
 
 `pg_restore -n` restores what is inside the schema, not the schema itself, so create it first. Then
-restart the orchestrator, which only opens an initialized namespace at startup. Check the row
+allow the background worker to reconnect to the restored namespace. Check the row
 counts against what the dump lists with `pg_restore --list`.
 
 Nothing schedules it. To take one every day at 03:30, add to the owner's crontab (adjust the path):
@@ -2031,13 +2059,9 @@ shown in the renderer. Other module commands do not require this optional
 overlay. Stop retains the database volume; starting does not configure any DSN.
 
 The separate Data persistence section reports Price history storage through the
-main orchestrator. It distinguishes an unconfigured connection, startup fallback
-to temporary memory, an unavailable database/schema, and database-backed history
-with a successful read-only schema check. The database module only represents
-the local container; the price DSN may name a different database. A successful
-`pg_isready` check is not evidence that prices can access its namespace.
-
-After repairing a startup database failure, restart the orchestrator to select
-the persistent repository again. The running process does not migrate its
-in-memory history automatically, and a restart discards that temporary history.
-This status check does not verify every table permission or execute a test write.
+main orchestrator. It distinguishes local-only SQLite storage, pending durable
+commands with their count, an unavailable local buffer, and a drained primary
+queue. These statuses reflect the configured primary, which may be different
+from the local database container. The background worker reconnects automatically;
+starting the local container does not configure the price DSN. Connectivity is
+sampled periodically, and readiness does not prove every write permission.

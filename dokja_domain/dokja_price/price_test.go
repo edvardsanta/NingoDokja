@@ -595,3 +595,17 @@ func TestAnObservationKeepsItsNumericSpecifications(t *testing.T) {
 		}
 	}
 }
+
+func TestDecisionReplayIsIdempotentAndKeepsOriginalChronology(t *testing.T) {
+	repo := NewMemoryRepository()
+	ctx := context.Background()
+	recent := DecisionMemory{ID: "new", UserID: "fixture", CreatedAt: "2026-11-17T12:00:00Z"}
+	older := DecisionMemory{ID: "old", UserID: "fixture", CreatedAt: "2026-11-16T12:00:00Z"}
+	repo.SaveDecision(ctx, recent)
+	repo.SaveDecision(ctx, older)
+	repo.SaveDecision(ctx, recent)
+	rows, err := repo.RecentDecisions(ctx, "fixture", "", 10)
+	if err != nil || len(rows) != 2 || rows[0].ID != "new" || rows[1].ID != "old" {
+		t.Fatal(rows, err)
+	}
+}

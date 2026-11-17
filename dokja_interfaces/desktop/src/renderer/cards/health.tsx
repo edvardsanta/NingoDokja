@@ -44,8 +44,12 @@ const STATUS_IDS: Record<string, MessageId> = {
 
 // What an interface says about itself, from the closed list each one reports. A state this screen
 // does not know is shown as it came.
-const STORAGE_DETAILS = new Set<MessageId>(["price_storage_memory", "price_storage_fallback", "price_storage_unavailable", "price_storage_persistent"]);
-const detailWord = (row: ServiceRow, t: ReturnType<typeof useTranslate>) => STORAGE_DETAILS.has(row.detail as MessageId) ? t(row.detail as MessageId) : row.detail;
+const STORAGE_DETAILS = new Set<MessageId>(["price_storage_memory", "price_storage_fallback", "price_storage_unavailable", "price_storage_persistent", "price_storage_local", "price_storage_local_unavailable"]);
+const detailWord = (row: ServiceRow, t: ReturnType<typeof useTranslate>) => {
+  const buffered = /^price_storage_buffered:(\d{1,12})$/.exec(row.detail);
+  if (buffered) return t("price_storage_buffered", { count: buffered[1]! });
+  return STORAGE_DETAILS.has(row.detail as MessageId) ? t(row.detail as MessageId) : row.detail;
+};
 
 const STATE_IDS: Record<string, MessageId> = {
   connected: "state_connected",
@@ -254,6 +258,7 @@ type RowProps = {
 // An interface says its state; a switched-off one has none and says only that it is off. A state
 // this screen does not know is shown as it came.
 function stateWord(row: ServiceRow, t: ReturnType<typeof useTranslate>): string {
+  if (row.name === "price_storage" && /^price_storage_buffered:\d+$/.test(row.detail)) return t("price_sync_pending_status");
   const id = (row.state ? STATE_IDS[row.state] : undefined) ?? STATUS_IDS[row.status];
   return id ? t(id) : row.state || row.status;
 }

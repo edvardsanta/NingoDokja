@@ -7,8 +7,10 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	pricedomain "read_books/dokja_domain/dokja_price"
@@ -242,5 +244,47 @@ func TestTheDomainAssessesFromTheStore(t *testing.T) {
 	assessments, err := pricedomain.New(store).AssessProduct(ctx, "")
 	if err != nil || len(assessments) != 1 {
 		t.Fatalf("assessments %+v (%v)", assessments, err)
+	}
+}
+
+func TestBufferedDeliveryPreservesDatesAndDecisionTimestamp(t *testing.T) {
+	ctx := context.Background()
+	db := database(t)
+	primary, err := Initialize(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local, err := OpenLocal(filepath.Join(t.TempDir(), "buffer.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer local.Close()
+	buffered := pricedomain.NewBufferedRepository(local)
+	observation := pricedomain.Observation{Product: "pn:buffer", Title: "Fixture", Merchant: "fixture", Series: pricedomain.Series("merchant"), Kind: pricedomain.Kind("pix"), Points: []pricedomain.Point{{On: "2026-11-17", Cents: 123}}}
+	if _, err := buffered.Upsert(ctx, observation); err != nil {
+		t.Fatal(err)
+	}
+	decision := pricedomain.DecisionMemory{ID: "buffer-decision", UserID: "fixture", Product: pricedomain.Product{Key: "pn:buffer"}, CreatedAt: "2026-11-16T12:34:56Z"}
+	if err := buffered.SaveDecision(ctx, decision); err != nil {
+		t.Fatal(err)
+	}
+	if err := buffered.Synchronize(ctx, primary, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := buffered.Synchronize(ctx, primary, 100); err != nil {
+		t.Fatal(err)
+	}
+	points, err := primary.History(ctx, observation.Key(), "", "")
+	if err != nil || len(points) != 1 || points[0] != observation.Points[0] {
+		t.Fatal(points, err)
+	}
+	decisions, err := primary.RecentDecisions(ctx, "fixture", "", 10)
+	if err != nil || len(decisions) != 1 {
+		t.Fatal(decisions, err)
+	}
+	original, _ := time.Parse(time.RFC3339Nano, decision.CreatedAt)
+	delivered, err := time.Parse(time.RFC3339Nano, decisions[0].CreatedAt)
+	if err != nil || !original.Equal(delivered) {
+		t.Fatal(decisions[0].CreatedAt, err)
 	}
 }

@@ -1042,9 +1042,13 @@
   "name_database": "Banco de dados",
   "name_price_storage": "Persistência do histórico de preços",
   "storage_title": "Persistência de dados",
-  "runtime_database_hint": "Banco local da configuração opcional de armazenamento. Exige senha do banco configurada. Iniciar não configura a conexão de preços. Confira Persistência do histórico de preços abaixo; se preços passou a usar memória, reinicie o orquestrador após corrigir a conexão. Parar preserva o volume de dados.",
+  "runtime_database_hint": "Banco local da configuração opcional de armazenamento. Exige senha do banco configurada. Iniciar não configura a conexão de preços. Preços mantém uma fila SQLite persistente e sincroniza automaticamente quando o banco configurado volta. Parar preserva o volume de dados.",
   "price_storage_memory": "O histórico de preços é temporário: nenhuma conexão com o banco foi configurada. Reiniciar perde o histórico em memória.",
   "price_storage_fallback": "O banco configurado não pôde ser usado na inicialização. Preços está usando memória temporária. Corrija a conexão e reinicie o orquestrador; apenas iniciar o banco não restaura a persistência.",
   "price_storage_unavailable": "O histórico de preços não consegue acessar o banco ou o esquema esperado. Confira a conexão e a inicialização do banco.",
-  "price_storage_persistent": "O histórico de preços usa o banco; a verificação da conexão e do esquema passou."
+  "price_storage_persistent": "As alterações de preços estão salvas localmente e o job em segundo plano enviou a fila ao banco. A conexão é verificada periodicamente.",
+  "price_storage_local": "Os dados de preços estão salvos neste dispositivo em SQLite. Configure a conexão com o banco para habilitar a sincronização em segundo plano.",
+  "price_storage_local_unavailable": "A fila local de preços não está acessível. Novas gravações não podem ser consideradas salvas. Confira o espaço em disco e as permissões do arquivo.",
+  "price_storage_buffered": "{count} alterações estão guardadas na fila SQLite deste dispositivo. A sincronização em segundo plano tenta novamente quando o banco estiver disponível; não é preciso reiniciar.",
+  "price_sync_pending_status": "Sincronização pendente"
 }

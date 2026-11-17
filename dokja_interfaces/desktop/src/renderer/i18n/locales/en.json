@@ -1042,9 +1042,13 @@
   "name_database": "Database",
   "name_price_storage": "Price history storage",
   "storage_title": "Data persistence",
-  "runtime_database_hint": "Local database from the optional storage overlay. Requires a configured database password. Starting does not configure the price connection. Check Price history storage below; if prices fell back to memory, restart the orchestrator after fixing the connection. Stopping keeps the data volume.",
+  "runtime_database_hint": "Local database from the optional storage overlay. Requires a configured database password. Starting does not configure the price connection. Prices keep a durable SQLite queue and synchronize automatically when the configured database returns. Stopping preserves the database volume.",
   "price_storage_memory": "Price history is temporary: no database connection is configured. Restarting loses the in-memory history.",
   "price_storage_fallback": "The configured database could not be used at startup. Prices is using temporary memory. Fix the database connection and restart the orchestrator; starting the database alone does not restore persistence.",
   "price_storage_unavailable": "Price history cannot access the database or its expected schema. Check the connection and database initialization.",
-  "price_storage_persistent": "Price history uses the database; the connection and schema check succeeded."
+  "price_storage_persistent": "Price changes are saved locally and the background job has delivered the queue to the database. Connectivity is checked periodically.",
+  "price_storage_local": "Price data is saved on this device in SQLite. Configure the database connection to enable background synchronization.",
+  "price_storage_local_unavailable": "The local price buffer cannot be accessed. New writes must not be treated as saved. Check disk space and file permissions.",
+  "price_storage_buffered": "{count} changes are safely queued in SQLite on this device. Background synchronization retries automatically when the database is available; no restart is required.",
+  "price_sync_pending_status": "Synchronization pending"
 }
