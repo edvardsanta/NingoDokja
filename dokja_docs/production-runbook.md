@@ -1786,7 +1786,8 @@ question about the page itself, never searches.
 The backend is the `dokja-search` container, configured by
 `dokja_services/dokja_search/settings.yml` (JSON output, safe search on, no published port). Feeds
 reaches it through `DOKJA_WEB_SEARCH_URL`, set to the compose service in every stack. To turn
-research off, remove the `dokja-search` service or empty the variable in Feeds' environment: the
+research off, stop Web search in Desktop System → Status (local lite stack), remove
+the `dokja-search` service, or empty the variable in Feeds' environment: the
 search then fails quietly and the turn behaves as before. Production requires `DOKJA_SEARCH_SECRET`
 (a long random value); dev and lite default to a `CHANGE_ME_*` placeholder that must never reach
 production. `DOKJA_SEARCH_IMAGE` overrides the image; pin it to a tested tag in production.

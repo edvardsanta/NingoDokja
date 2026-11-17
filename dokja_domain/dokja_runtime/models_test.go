@@ -292,7 +292,7 @@ func TestTheEngineCanStartOnItsOwn(t *testing.T) {
 	if calls := f.trace(); len(calls) == 0 || strings.Join(calls, " ") != "start:embeddings" {
 		t.Fatal(calls)
 	}
-	if _, err := d.Set("embeddings", false); err == nil {
-		t.Fatal("the engine stays internal to the module switches")
+	if _, err := d.Set("embeddings", false); err != nil {
+		t.Fatal("the engine can be stopped from the module controls", err)
 	}
 }

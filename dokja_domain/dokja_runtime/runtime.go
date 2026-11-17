@@ -21,11 +21,14 @@ type Module struct {
 // implicitly started by any of these modules.
 var inventory = []Module{
 	{Name: "orchestrator", Service: "dokja-orchestrator", Port: 5558},
-	{Name: "embeddings", Service: "dokja-ollama", Internal: true},
+	{Name: "embeddings", Service: "dokja-ollama"},
 	{Name: "embedding_init", Service: "dokja-embedding-init", Dependencies: []string{"embeddings"}, Internal: true},
 	{Name: "memory", Service: "dokja-memory", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5562},
 	{Name: "knowledge", Service: "dokja-knowledge", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5561},
 	{Name: "feeds", Service: "dokja-feeds", Dependencies: []string{"orchestrator"}, Port: 5563},
+	{Name: "search", Service: "dokja-search"},
+	{Name: "vision_init", Service: "dokja-vision-init", Dependencies: []string{"embeddings"}, Internal: true},
+	{Name: "vision", Service: "dokja-vision", Dependencies: []string{"orchestrator", "vision_init"}, Port: 8082},
 	{Name: "voice", Service: "dokja-voice", Dependencies: []string{"orchestrator"}, Port: 8081},
 	// Communications only reads channels and history for the desktop; it never sends.
 	{Name: "communications", Service: "dokja-communications", Dependencies: []string{"orchestrator"}},
@@ -364,7 +367,7 @@ func (d *Domain) change(ctx context.Context, m Module, enabled bool) error {
 	// Include containers started outside the daemon. A borrowed shared dependency
 	// must survive stopping an unrelated module.
 	for _, other := range inventory {
-		if other.Name == "embeddings" || other.Name == "embedding_init" || other.Name == m.Name || !containers[other.Service].Running {
+		if other.Name == "embedding_init" || other.Name == "vision_init" || other.Name == m.Name || !containers[other.Service].Running {
 			continue
 		}
 		d.mu.Lock()

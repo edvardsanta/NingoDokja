@@ -148,3 +148,18 @@ test("chat selection requires recent input, strips extras and rejects incomplete
  for(const payload of [{...binding,provider:""},{...binding,model:""},{...binding,model:"--tools"},{...binding,configuration_revision:0}])assert.equal(ACTIONS["runtime.chat.configure"].payload(payload),undefined);
  assert.deepEqual(ACTIONS["runtime.chat"].project(wrap({configuration_revision:1,provider:"",model:"",secret:"drop"})),{configurationRevision:1,provider:"",model:""});
 });
+
+
+test("search, vision and the model engine pass the module allowlist", async () => {
+ for (const module of ["search", "vision", "embeddings"]) {
+  const calls: unknown[] = [];
+  const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({ type, payload }); return { status: "ok", result: wrap({ modules: [{ name: module, state: "stopped", dependencies: [] }], busy: false, error: "" }) }; } };
+  const limits = { defaultTimeoutMs: 15000, maxTimeoutMs: 120000 };
+  for (const enabled of [true, false]) {
+   const result = await handleRequest({ type: "runtime.set", payload: { module, enabled } }, client, limits, undefined, { recent: () => true });
+   assert.equal(result.ok, true);
+  }
+  assert.equal(calls.length, 2);
+  assert.deepEqual(runtimeSnapshot({ modules: [{ name: module, state: "running", dependencies: [] }], busy: false }).modules.map(row => row.name), [module]);
+ }
+});

@@ -831,6 +831,12 @@ socket access and detached daemon bootstrap; the renderer can request only known
 module actions, with a real input gesture for writes. No arbitrary event dispatch,
 command execution, database access or container socket reaches the renderer.
 
+The module inventory includes web search, vision and the shared model engine.
+Vision prepares its model through `vision_init`, backed by the shared engine;
+init jobs remain managed dependencies. Search is started independently because
+web research is optional to Feeds. Desktop shows direct dependency names and
+keeps process controls separate from the vision routing switch.
+
 Opening desktop never starts the stack. Explicit On starts a module and its
 required dependencies; Off preserves data, shared/borrowed dependencies and
 recognized external consumers. Runtime lifecycle and `services.set` routing
