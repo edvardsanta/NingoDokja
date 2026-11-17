@@ -11,7 +11,7 @@ import (
 )
 
 func priceNotificationEvent() core.Event {
-	event := chatEvent("/preco ryzen 5 5600")
+	event := chatEvent("/preco produto:ryzen 5 5600")
 	event.Context = map[string]any{"message_id": "command-1", "is_owner": true}
 	return event
 }
@@ -42,7 +42,7 @@ func TestPriceNotifierDeliversTheFollowUpWhenTheWatchCollects(t *testing.T) {
 	}
 	if !strings.Contains(delivered[0].content, "Chegou preço para **ryzen 5 5600**") ||
 		!strings.Contains(delivered[0].content, "459,90") ||
-		!strings.Contains(delivered[0].content, "/preco ryzen 5 5600") {
+		!strings.Contains(delivered[0].content, "/preco produto:ryzen 5 5600") {
 		t.Fatalf("follow-up content wrong: %s", delivered[0].content)
 	}
 	notifier.mu.Lock()

@@ -28,14 +28,14 @@ var priceNotificationPhrases = map[string]map[string]string{
 	"pt": {
 		"arrived":  "🔎 Chegou preço para **{search}**:",
 		"offer":    "• {title} — {merchant} R$ {price}",
-		"verdict":  "Veredito completo: /preco {search}",
+		"verdict":  "Veredito completo: /preco produto:{search}",
 		"expired":  "Tentei de novo **{search}** e as lojas ainda não trouxeram nada; parei de vigiar esse retorno.",
 		"noPrices": "Tentei de novo **{search}** e as lojas ainda não trouxeram nada. Continuo de olho e volto quando chegar.",
 	},
 	"en": {
 		"arrived":  "🔎 Prices arrived for **{search}**:",
 		"offer":    "• {title} — {merchant} R$ {price}",
-		"verdict":  "Full verdict: /price {search}",
+		"verdict":  "Full verdict: /price product:{search}",
 		"expired":  "I retried **{search}** and the stores still brought nothing; I stopped watching for this return.",
 		"noPrices": "I retried **{search}** and the stores still brought nothing. I am still watching and will come back.",
 	},
