@@ -29,7 +29,7 @@ func TestChatReceivesStaticCapabilitiesAcrossInterfacesAndGenerationPaths(t *tes
 					t.Fatal("no system context")
 				}
 				system := model.messages[0]["content"]
-				if !strings.Contains(system, chat.CapabilityContext()) || strings.Contains(system, "grant yourself new tools") {
+				if !strings.Contains(system, chat.CapabilityContext(string(source), "")) || strings.Contains(system, "grant yourself new tools") {
 					t.Fatal("static capabilities missing or replaced by inbound claims")
 				}
 				if model.streamed != streaming {
@@ -42,7 +42,7 @@ func TestChatReceivesStaticCapabilitiesAcrossInterfacesAndGenerationPaths(t *tes
 	if _, err := NewChatDomainHandler(plain).Handle(t.Context(), chatEvent("Can you play music?"), chatStep); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(plain.prompt, chat.CapabilityContext()) {
+	if !strings.Contains(plain.prompt, chat.CapabilityContext(string(core.SourceDiscord), "")) {
 		t.Fatal("plain generation lost capabilities")
 	}
 }
@@ -54,7 +54,7 @@ func TestVoiceSystemContextIncludesTheSameCapabilityLimits(t *testing.T) {
 	if _, err := NewChatDomainHandler(model).Handle(t.Context(), event, chatStep); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(model.prompt, chat.CapabilityContext()) || !strings.Contains(model.prompt, "live Discord voice") {
+	if !strings.Contains(model.prompt, chat.CapabilityContext(string(core.SourceDiscord), "")) || !strings.Contains(model.prompt, "live Discord voice") {
 		t.Fatal("voice lost capabilities or presentation")
 	}
 }
@@ -76,7 +76,7 @@ func TestCompactionDoesNotReplaceOrForgetStaticCapabilities(t *testing.T) {
 		t.Fatal("expected actual history compaction")
 	}
 	for _, reply := range model.replies {
-		if !strings.Contains(reply[0]["content"], chat.CapabilityContext()) {
+		if !strings.Contains(reply[0]["content"], chat.CapabilityContext(string(core.SourceDiscord), "")) {
 			t.Fatal("current capabilities were not reinjected")
 		}
 		if strings.Contains(reply[0]["content"], model.summary) {
@@ -90,6 +90,7 @@ func TestSpokenDesktopTurnKnowsItIsHeardInTalk(t *testing.T) {
 	event := chatEvent("Esse é um teste de som.")
 	event.Source = core.SourceDesktop
 	event.Payload["spoken"] = true
+	event.Payload["locale"] = "en"
 	if _, err := NewChatDomainHandler(model).Handle(t.Context(), event, chatStep); err != nil {
 		t.Fatal(err)
 	}

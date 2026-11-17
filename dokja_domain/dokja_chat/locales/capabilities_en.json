@@ -65,6 +65,10 @@
       {
         "id": "conversation.manage",
         "usage": "In Talk, the Conversations drawer lists the kept conversations to open, rename or delete, and starts a new one."
+      },
+      {
+        "id": "price.search",
+        "usage": "In Library › Prices, open a watched search's chart and store pages, or watch a new search."
       }
     ],
     "discord": [
@@ -103,6 +107,14 @@
       {
         "id": "quiz.take",
         "usage": "Someone runs /political_test link:<the questionnaire's link> (/teste_politico in Portuguese). The reply follows in about two minutes, publicly, in the same channel."
+      },
+      {
+        "id": "price.search",
+        "usage": "Use /price (/preco in Portuguese) with product words and, optionally, a brand or one store, to check the watched prices and whether a discount is real."
+      },
+      {
+        "id": "price.compare",
+        "usage": "Use /compare_product (/comparar_produto in Portuguese) with a product name, code or store link — plus optional budget, intended use and current equipment — to compare offers across stores and judge the price against its history."
       }
     ],
     "whatsapp": [
@@ -221,6 +233,23 @@
         "WhatsApp commands work only in the owner's self-chat; in any other chat, never claim they exist or that you ran one. Do not say WhatsApp has no commands: say they exist for the owner's self-chat.",
         "A command is not a conversation turn and is not sent to you. Deleting removes the conversation from every interface and cannot be undone.",
         "The WhatsApp commands show only general conversations, not the discussions attached to a reading."
+      ]
+    },
+    "price.search": {
+      "description": "Check the prices of watched product searches and judge whether a discount is real against each product's recorded history.",
+      "limits": [
+        "Only the /price command (/preco in Portuguese) answers with history; ordinary chat text cannot start the assessment — tell people to use the command.",
+        "Only watched searches carry history; a newly watched search collects its first prices in a moment, and a product nobody watches has no verdict.",
+        "Hardware offers come from the watched stores; a game title also resolves its offers on the game stores."
+      ]
+    },
+    "price.compare": {
+      "description": "Compare one product's offers across stores — hardware at the watched Brazilian retailers, game titles on the game stores — with the price judged against its own history.",
+      "limits": [
+        "Only the /compare_product command (/comparar_produto in Portuguese) starts a comparison; chat text alone cannot run one — when someone names it wrong, correct them and point to the command.",
+        "A store link is identified from its address text and read from the store's own catalog, never opened as a page.",
+        "An unknown product is looked up once and then compared; offers the collector did not record are not invented.",
+        "The verdict comes from the product's recorded price history; without history the comparison says what is missing instead of guessing."
       ]
     }
   }
