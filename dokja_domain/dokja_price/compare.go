@@ -110,6 +110,16 @@ func (d *Domain) CompareProduct(ctx context.Context, compare Compare) (Compariso
 				matched = append(matched, product)
 			}
 		}
+		if len(matched) == 0 {
+			// Only as a fallback: a base model whose listings carry variant suffixes
+			// ("5600" against titles that say "5600GT") still names those products;
+			// the strict matcher above keeps a variant from answering for the base.
+			for _, product := range products {
+				if comparisonMatchesVariant(product, compare.Query) {
+					matched = append(matched, product)
+				}
+			}
+		}
 		if len(matched) == 1 {
 			chosen = &matched[0]
 		}
