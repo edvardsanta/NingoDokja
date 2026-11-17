@@ -1,6 +1,6 @@
 # ADR 0017: deferred reading with a proactive follow-up reply
 
-Date: 2026-11-17. Status: proposed; no code exists. Related:
+Date: 2026-11-17. Status: implemented (#461); the registry became resilient per the owner's review — a persisted snapshot restores and re-arms pending promises on boot. Related:
 [ADR 0001](./0001-task-workspace.md),
 [ADR 0006](./0006-reading-macro-component.md),
 [capability map](../capability-map.md) (reading links, messages delivery).
@@ -42,14 +42,16 @@ runner already knows how to admit, order, block and settle background work.
    honest partial answer plus one fixed sentence ("vou tentar de novo e volto
    aqui"), and records the deferred task. When the domain declines, the turn
    behaves exactly as today.
-2. **The orchestrator owns a volatile deferred-reading registry, keyed by
-   channel and URL.** An entry holds the channel, the original message and
-   event ids, the question text, the URL and an expiry (bounded, minutes —
-   stale follow-ups are worse than none). At most one pending entry per
-   (channel, URL); at most a small number per channel. A restart forgets the
-   registry: a lost follow-up is a lost nicety, not state, so nothing is
-   persisted and no recovery is attempted (ADR 0003's no-new-durable-state
-   boundary is preserved). The loss is logged.
+2. **The orchestrator owns a resilient deferred-reading registry, keyed by
+   channel and URL.** An entry holds the channel, the original message id and
+   event, the question text, the URL and an expiry (bounded, minutes — stale
+   follow-ups are worse than none). At most one pending entry per channel.
+   The registry is mirrored to a small durable store beside the runtime
+   databases and restored on boot: unexpired promises are re-armed and settled,
+   expired ones are dropped. The owner overruled the original volatile design:
+   a promise made to a channel must survive a restart. The store holds promise
+   metadata only — never page content — and a broken or oversize snapshot is
+   forgotten, not fatal.
 3. **A background task re-reads with a longer budget.** The task runs outside
    the turn's context and its 15-second budget, through the same
    `readChatLink` path and the same untrusted-evidence framing — no new reader,

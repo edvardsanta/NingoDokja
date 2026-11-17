@@ -64,14 +64,16 @@ type ChatDomainHandler struct {
 	// proactive delivers deferred-reading follow-ups to a channel with no request
 	// driving them; nil disables deferral.
 	proactive ProactiveDeliverer
-	// deferred is the volatile registry of promised follow-ups (ADR 0017).
-	deferred *deferredReadingRegistry
-	images   *imageReading
-	macro    *macroContext
-	ningo    chat.NingoFacts
-	visions  string
-	quizRuns QuizRunReader
-	warm     string
+	// deferred is the registry of promised follow-ups (ADR 0017); deferredRestoreOnce
+	// re-arms the persisted promises at most once per process.
+	deferred            *deferredReadingRegistry
+	deferredRestoreOnce sync.Once
+	images              *imageReading
+	macro               *macroContext
+	ningo               chat.NingoFacts
+	visions             string
+	quizRuns            QuizRunReader
+	warm                string
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.
