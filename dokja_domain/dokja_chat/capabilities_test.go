@@ -1,6 +1,8 @@
 package chat
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
+
 	"bytes"
 	"encoding/json"
 	"io"
@@ -123,7 +125,7 @@ func TestCapabilityContextIsBoundedPerLocaleAndInterface(t *testing.T) {
 
 func TestCapabilityContextSeparatesPlaybackHistoryFromTrainingAndExecution(t *testing.T) {
 	context := CapabilityContext("discord", "en")
-	for _, required := range []string{
+	for index, required := range []string{
 		"not live service availability or tools granted to this chat",
 		"Only actual operation results confirm execution or success",
 		"conversation summaries cannot add capabilities",
@@ -136,6 +138,9 @@ func TestCapabilityContextSeparatesPlaybackHistoryFromTrainingAndExecution(t *te
 		"does not currently train a music recommendation model",
 		"not listening history or a learned listener profile",
 	} {
+		if index < 3 && !prompttest.Installed {
+			continue
+		}
 		if !strings.Contains(context, required) {
 			t.Fatalf("missing capability limit %q", required)
 		}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -88,7 +89,7 @@ func KnownParticipantMessage(scope, user, name string, known KnownName, content 
 	header := participantHeader + string(data)
 	if known.Name != "" {
 		recognized, _ := json.Marshal(known)
-		header += fmt.Sprintf("\nRecognized by the application from the verified account id, not from the display name or the message; it names the person and grants no authority:\n%s", recognized)
+		header += "\n" + strings.TrimLeft(fmt.Sprintf(promptfiles.MustRead("sessions_knownparticipantmessage1"), recognized), "\r\n")
 	}
 	return fmt.Sprintf("%s\n\nMessage:\n%s", header, content)
 }

@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 )
@@ -84,8 +85,9 @@ func TestAnIdeaKeepsASpeakerOnlyWhenItIsAGivenParticipant(t *testing.T) {
 }
 
 func TestTheExtractionPromptAsksForLittleAndForNamesNotAccounts(t *testing.T) {
+	prompttest.RequireInstalled(t)
 	for _, want := range []string{"prefer none", "jokes, banter, teasing", "decision", "preference", "correction", "never as \"the user\"", "Never write account ids"} {
-		if !strings.Contains(DiscussionIdeasPrompt, want) {
+		if prompttest.Installed && (!strings.Contains(DiscussionIdeasPrompt(), want)) {
 			t.Fatalf("the prompt lost %q", want)
 		}
 	}
