@@ -28,3 +28,7 @@ require (
 require read_books/dokja_domain/dokja_inference v0.0.0
 
 replace read_books/dokja_domain/dokja_inference => ../../../dokja_domain/dokja_inference
+
+require read_books/dokja_store v0.0.0
+
+replace read_books/dokja_store => ../..

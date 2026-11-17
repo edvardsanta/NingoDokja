@@ -1,13 +1,16 @@
 package cognitive
 
-import inference "read_books/dokja_domain/dokja_inference"
+import (
+	inference "read_books/dokja_domain/dokja_inference"
+	promptfiles "read_books/dokja_store/prompts"
+)
 
 func inferenceRequest(s State, c Config) inference.Request {
 	r := inference.Request{Contract: inference.Version, TaskID: c.Attempt, Revision: s.Revision, Scope: s.Scope, Goal: s.Goal, RemainingCalls: c.MaxCalls - s.Calls + 1,
 		RequiredFacts: []string{"sandbox_allowed", "sample_verified"},
 		Actions: []inference.Action{
-			{ID: "fast", Description: "Cost 1. Parse each token as an ASCII decimal integer and sum it; return failure on unsupported characters."},
-			{ID: "normalize", Description: "Cost 3. Convert full-width decimal digits to ASCII, then parse and sum; return failure on other unsupported characters."},
+			{ID: "fast", Description: promptfiles.MustRead("inference_inferencerequest1")},
+			{ID: "normalize", Description: promptfiles.MustRead("inference_inferencerequest2")},
 		}, Evidence: []inference.Evidence{}, Experiences: []inference.Experience{}}
 	for _, n := range s.Nodes {
 		facts := clone(n.Facts)
