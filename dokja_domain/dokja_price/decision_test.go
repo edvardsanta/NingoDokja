@@ -43,3 +43,15 @@ func TestDecideBuysWithinBudgetAndDoesNotCountMarketReference(t *testing.T) {
 		t.Fatalf("confidence = %q", decision.Confidence)
 	}
 }
+
+func TestCategoryTokenRecognizesFreeTextWatchCategories(t *testing.T) {
+	// A watched search's category is the owner's free text; the token must map it
+	// to the same family as the canonical category the orchestrator writes, or
+	// comparisons discard every recorded competitor as "another category".
+	if categoryToken("ryzen 5 5600") != "cpu" || categoryToken("intel core i5") != "cpu" {
+		t.Fatal("a free-text CPU watch category must tokenize as cpu")
+	}
+	if categoryToken("ssd sata") != "storage" || categoryToken("placa de video") != "gpu" {
+		t.Fatal("existing families must keep tokenizing as before")
+	}
+}

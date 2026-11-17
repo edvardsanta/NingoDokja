@@ -152,7 +152,7 @@ func categoryToken(value string) string {
 		switch word {
 		case "gpu", "placa", "video", "placas", "rx", "rtx", "gtx":
 			return "gpu"
-		case "cpu", "processador", "processadores":
+		case "cpu", "processador", "processadores", "ryzen", "core", "athlon":
 			return "cpu"
 		case "ssd", "hd", "armazenamento":
 			return "storage"
