@@ -37,7 +37,7 @@ func TestEveryChatTurnOpensWithNingosPersona(t *testing.T) {
 }
 
 func TestThePersonaNamesNingoAndRefusesOtherIdentities(t *testing.T) {
-	for _, want := range []string{"You are Ningo Dokja", "arrogant philosopher", "talkative", "never read it", "Never present yourself as ChatGPT, Claude", "Reply in the language the user wrote in"} {
+	for _, want := range []string{"You are Ningo Dokja", "arrogant philosopher", "talkative", "never read it", "Never present yourself as ChatGPT, Claude", "Reply in the language the user wrote in", "Not knowing is not the same as having no source", "belongs to the conversation just before it"} {
 		if !strings.Contains(chatPersona, want) {
 			t.Fatalf("the persona lost %q", want)
 		}
