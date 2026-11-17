@@ -163,6 +163,11 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	if len(links) == 0 && len(saved.documents) == 0 {
 		return nil, nil
 	}
+	// Kept readings follow the conversation only while the message is about them; otherwise a
+	// page shared long ago is attached to every later message, noise included.
+	if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
+		return nil, nil
+	}
 	data := &webTurnData{}
 	if w.enabled != nil && !w.enabled() {
 		for _, link := range links {

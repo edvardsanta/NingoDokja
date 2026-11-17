@@ -45,7 +45,7 @@ func evidenceSent(generator *fakeChatGenerator) string {
 func TestAFollowUpTheShopPageCannotAnswerSearchesTheWebOnce(t *testing.T) {
 	service := &shopService{}
 	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
-	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: generator, verdict: true}).WithWebReading(service, nil)
 	if _, err := h.Handle(context.Background(), chatEvent("https://example.com/book"), chatStep); err != nil {
 		t.Fatal(err)
 	}

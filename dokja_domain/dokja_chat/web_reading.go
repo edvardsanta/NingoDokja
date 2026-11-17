@@ -193,3 +193,41 @@ func SelectWebPassages(documents []WebDocument, question string) []WebDocument {
 	}
 	return out
 }
+
+// readingCues are words that point at a page the speaker already shared, without naming
+// anything the page says: "o link", "this article", "a fonte".
+var readingCues = map[string]bool{
+	"link": true, "links": true, "pagina": true, "página": true, "page": true, "artigo": true,
+	"article": true, "fonte": true, "fontes": true, "source": true, "sources": true,
+	"site": true, "texto": true, "text": true, "resume": true, "resuma": true, "summarize": true,
+	"summary": true, "resumo": true, "citacao": true, "citação": true, "quote": true,
+}
+
+// ReadingOverlap reports whether a message plainly concerns the pages already read in the
+// conversation: it names a cue like "the link" or shares a word of four or more letters with a
+// page's title or passages. A message with neither (noise, banter, a new subject) is not
+// evidence of interest in the reading, so the reading must not be attached to it.
+func ReadingOverlap(question string, documents []WebDocument) bool {
+	question = webLinkPattern.ReplaceAllString(question, " ")
+	words := strings.FieldsFunc(strings.ToLower(question), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	if len(words) == 0 {
+		return false
+	}
+	for _, word := range words {
+		if readingCues[word] {
+			return true
+		}
+	}
+	for _, document := range documents {
+		hay := strings.ToLower(document.Title)
+		for _, passage := range document.Passages {
+			hay += " " + strings.ToLower(passage.Label+" "+passage.Text)
+		}
+		for _, word := range words {
+			if len([]rune(word)) >= 4 && strings.Contains(hay, word) {
+				return true
+			}
+		}
+	}
+	return false
+}
