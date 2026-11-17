@@ -15,6 +15,7 @@ type Presentation struct {
 	Text   string
 	Images []Formula
 }
+
 // Attachment carries its bytes, or a token the interface streams them with through the bridge.
 type Attachment struct {
 	Filename    string `json:"filename"`
@@ -33,7 +34,6 @@ func PlanMath(reply string) Presentation {
 	plan.Text = mathBlock.ReplaceAllStringFunc(reply, func(block string) string {
 		match := mathBlock.FindStringSubmatch(block)
 		var formula Formula
-		force := false
 		for _, line := range strings.Split(strings.TrimSpace(match[1]), "\n") {
 			line = strings.TrimSpace(line)
 			switch {
@@ -42,7 +42,7 @@ func PlanMath(reply string) Presentation {
 			case strings.HasPrefix(line, "text: ") && formula.Text == "":
 				formula.Text = strings.TrimSpace(strings.TrimPrefix(line, "text: "))
 			case line == "image: true":
-				force = true
+				// Accept the previous optional marker for compatibility.
 			default:
 				return block
 			}
@@ -50,20 +50,10 @@ func PlanMath(reply string) Presentation {
 		if formula.LaTeX == "" || formula.Text == "" || len(formula.Text) > 2048 {
 			return block
 		}
-		if len(formula.LaTeX) <= MaxFormulaBytes && (needsImage(formula.LaTeX) || force) && len(plan.Images) < MaxFormulas {
+		if len(formula.LaTeX) <= MaxFormulaBytes && len(plan.Images) < MaxFormulas {
 			plan.Images = append(plan.Images, formula)
 		}
 		return formula.Text + "\n"
 	})
 	return plan
-}
-
-func needsImage(expression string) bool {
-	if len(expression) > 80 {
-		return true
-	}
-	if strings.Count(expression, "\\frac")+strings.Count(expression, "\\sqrt") > 1 {
-		return true
-	}
-	return strings.Contains(expression, "\\int") || strings.Contains(expression, "\\sum")
 }
