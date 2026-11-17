@@ -1740,14 +1740,16 @@ PostgreSQL overlay that `make start` applies, a DSN of the form
 stack's own database; the password is `DOKJA_POSTGRES_PASSWORD`. Keep the DSN in
 `.env` or `.env.prod`, never in a committed file.
 
-Initialize the `dokja_price` namespace once with the explicit
-`price-history-init` command before restarting the orchestrator; production
-images include `/app/price-history-init`, and dev/lite can run
-`go run ./cmd/price-history-init` from `dokja_orch` with the DSN set. The command
-is idempotent. Startup only opens an initialized namespace and never creates
-tables. An invalid DSN, an unavailable database or an unsupported schema logs a
-sanitized message and keeps the history in memory; the rest of the orchestrator
-starts.
+The orchestrator installs or upgrades the `dokja_price` namespace itself at
+startup when the DSN names a reachable database without a current namespace —
+`Initialize` is idempotent, runs in one locked transaction and keeps every
+stored point — so a deployment that missed the init step repairs itself on the
+first boot instead of silently demoting history to memory. The explicit
+`price-history-init` command remains for operators: production images include
+`/app/price-history-init`, and dev/lite can run `go run ./cmd/price-history-init`
+from `dokja_orch` with the DSN set. An invalid DSN, an unavailable database or
+a namespace that still cannot be installed or upgraded logs a sanitized message
+and keeps the history in memory; the rest of the orchestrator starts.
 
 **Price collection.** Prices come from an owner-installed Feeds plugin that
 provides `price.resolve.v1` (kept in the plugins directory, outside git). The
