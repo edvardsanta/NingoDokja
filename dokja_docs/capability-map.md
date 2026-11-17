@@ -432,6 +432,13 @@ Sources: [dispatcher](../dokja_orch/internal/core/dispatcher.go),
 
 ### Discord web conversations
 
+When the readings of a conversation never mention the words of a later question, the chat handler
+asks Digest's `SearchWeb` (event `feeds.web.search`) for the question's words plus the first
+reading's title. The best snippets join the evidence as passages headed "search result", flagged
+partial, and the answer is cached per conversation query. A failed or unconfigured search leaves
+the turn unchanged. The decision (`chat.WebSearchPlan`) lives in the Chat domain.
+
+
 Eligible Discord text messages containing one or more HTTP(S) URLs use
 `link-conversation` / Chat's `converse-links` action. Authorization still precedes
 all reading. The orchestrator asks Digest's `read-web-link` action to dispatch

@@ -362,3 +362,11 @@ returns one localized application notice without generating an interpretation of
 unread titles or URL slugs. Mixed-success turns discuss only retrieved passages.
 HTTP and output checks limit effects; they cannot prove an LLM interpretation is
 immune to prompt injection.
+
+## Web search
+
+`feeds.web.search` takes `{"query": "...", "language": "pt"}` (language optional) and returns
+`{"query", "results": [{"title", "url", "snippet"}], "retrieved_at"}` with at most five results.
+It asks the instance at `DOKJA_WEB_SEARCH_URL` (JSON output) and never fetches the pages it
+names; titles, addresses and snippets are untrusted text. Without the variable it fails with
+`web_search_unavailable`.
