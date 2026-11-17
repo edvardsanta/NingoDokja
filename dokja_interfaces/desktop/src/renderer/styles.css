@@ -3981,3 +3981,6 @@ button.cfg-toggle:focus-visible {
 
 /* The picture kept of a proposed meme: small, so a queue of them stays readable. */
 .proposal-preview { display: block; max-width: 16rem; max-height: 12rem; margin: var(--space-2) 0; border: 1px solid var(--line, currentColor); }
+
+.module-health { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
+.module-health .detail { margin: .25rem 0; }

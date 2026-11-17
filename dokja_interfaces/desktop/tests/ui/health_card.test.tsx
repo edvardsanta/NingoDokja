@@ -173,8 +173,8 @@ describe("the health card", () => {
     ]);
     expect(items).toEqual([
       ["Chat", "Error", "problem"],
-      ["Books", "Not checked", "unchecked"],
       ["Scheduler", "Not answering", "problem"],
+      ["Books", "Not checked", "unchecked"],
     ]);
     expect(heading.closest("section")?.textContent).toContain("connection refused");
   });
@@ -187,3 +187,12 @@ describe("the health card", () => {
     expect(screen.queryByRole("heading", { name: /Needs attention/ })).toBeNull();
   });
 });
+
+ it("distinguishes missing verification from a confirmed failure", async () => {
+    const { transport } = scriptedTransport(statusReply({ vision: { status: "unchecked", enabled: true, detail: "" } }));
+    renderCard(transport);
+    await screen.findByRole("heading", { name: "Verification pending" });
+    expect(screen.queryByRole("heading", { name: "Needs attention" })).toBeNull();
+    expect(screen.getAllByText("Vision").length).toBeGreaterThan(0);
+    expect(screen.getByText(/This does not confirm a failure/)).toBeTruthy();
+ });

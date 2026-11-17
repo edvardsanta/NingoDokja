@@ -46,7 +46,14 @@ const StatusContext = createContext<StatusValue>({
 // workspace asks its own service for the dots.
 export function StatusProvider({ transport, children }: { transport: Transport; children: ReactNode }) {
   const load = useCallback(() => loadHealth(transport), [transport]);
-  const { state, reload } = useCard(load);
+  const { state, reload, poll, refreshing } = useCard(load);
+  useEffect(() => {
+    if (state.phase === "loading" || refreshing) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") poll();
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [state, refreshing, poll]);
   const [tones, setTones] = useState<Tones>(NO_TONES);
 
   // while a reload runs, the sidebar keeps the tones it has instead of blinking them away

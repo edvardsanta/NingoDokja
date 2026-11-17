@@ -1020,5 +1020,15 @@
   "proposals_reject": "Rejeitar",
   "proposals_approved": "Aprovado e guardado.",
   "proposals_rejected_note": "Rejeitado e esquecido.",
-  "proposals_refused": "continua pendente: {reason}"
+  "proposals_refused": "continua pendente: {reason}",
+  "verification_title": "Verificação pendente",
+  "verification_hint": "{count} itens sem teste de funcionamento. Isso não confirma uma falha. Módulos em execução e automações ligadas não garantem que o recurso esteja funcionando.",
+  "name_vision": "Visão",
+  "plugins_title": "Plugins de Feeds",
+  "plugins_intro": "Estes plugins funcionam dentro de Feeds, sem módulos separados. Inicie Feeds em Status. Este inventário mostra o que Feeds informa; fica indisponível quando o serviço não responde.",
+  "plugins_empty": "Nenhum plugin informado por Feeds.",
+  "plugins_sources": "Plugins de coleta",
+  "plugins_processing": "Plugins de processamento",
+  "plugins_sources_hint": "Plugins de coleta trazem leituras e mídias. Confira a última execução bem-sucedida e os erros abaixo. Estar habilitado não significa que uma coleta deu certo.",
+  "plugins_processing_hint": "Plugins de processamento oferecem recursos usados sob demanda. Pronto significa disponível para uma solicitação; não confirma uma execução bem-sucedida."
 }
