@@ -51,8 +51,11 @@ func Open(ctx context.Context, db *sql.DB) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-// Initialize installs only this namespace in the supplied database. It is idempotent and is
-// run by the explicit price-history-init command, never by the orchestrator's startup.
+// Initialize installs or upgrades this namespace in the supplied database. It is idempotent
+// and runs in one advisory-locked transaction, keeping every stored point; the explicit
+// price-history-init command and the orchestrator's startup both use it, so a deployment
+// that missed the init step repairs itself on the first boot instead of demoting history
+// to memory.
 func Initialize(ctx context.Context, db *sql.DB) (*Store, error) {
 	if db == nil {
 		return nil, ErrStorage
