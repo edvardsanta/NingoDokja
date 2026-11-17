@@ -149,7 +149,7 @@ services:
       - dokja-net
 
   dokja-search:
-    image: ${DOKJA_SEARCH_IMAGE:-searxng/searxng:latest}
+    image: ${DOKJA_SEARCH_IMAGE:-docker.io/searxng/searxng:latest}
     restart: unless-stopped
     environment:
       SEARXNG_SECRET: ${DOKJA_SEARCH_SECRET:?set DOKJA_SEARCH_SECRET to a long random value}
