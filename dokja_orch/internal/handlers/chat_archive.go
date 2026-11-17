@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	promptfiles "read_books/dokja_store/prompts"
+
 	conversation "read_books/dokja_domain/dokja_conversation"
 	"read_books/internal/core"
 )
@@ -81,7 +83,7 @@ type archivedSend struct {
 	quietPending bool
 }
 
-func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event, workflow core.WorkflowStep, send archivedSend) (map[string]any, error) {
+func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event, workflow core.WorkflowStep, send archivedSend) (output map[string]any, failure error) {
 	var admitOnce sync.Once
 	admitted := func() {
 		if send.admitted != nil {
@@ -131,6 +133,18 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	}
 	// Released once this turn has settled, so the next send's context holds this reply.
 	defer ticket.Release()
+	// Configuration can fail while assembling evidence, before generation's own
+	// error boundary. Settle the recorded send so it cannot remain pending.
+	defer func() {
+		if value := recover(); value != nil {
+			configuration, ok := value.(*promptfiles.Error)
+			if !ok {
+				panic(value)
+			}
+			output = nil
+			failure = h.failArchived(ctx, scope, turn, configuration.Error())
+		}
+	}()
 	// A stopped send ends through this context, and this request still settles its turn.
 	ctx, finished := h.running.Track(ctx, held.ID, turn.SendID)
 	defer finished()

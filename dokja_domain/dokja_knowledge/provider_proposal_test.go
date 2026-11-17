@@ -1,6 +1,8 @@
 package knowledge
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
+
 	"encoding/json"
 	"strings"
 	"testing"
@@ -44,7 +46,7 @@ func TestProviderProposalAnchorsQuotesAndRemainsUnverified(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(prompt.Data, "current-task") || !strings.Contains(prompt.Instructions, "untrusted observations") {
+	if !strings.Contains(prompt.Data, "current-task") || prompt.Instructions != proposalInstructions() {
 		t.Fatal("missing task binding/data boundary")
 	}
 	result, err := DecodeProviderProposal("current-task", request, application, proposalBody(t, reply))
@@ -140,6 +142,7 @@ func TestProviderProposalPreservesExplicitSelectionPins(t *testing.T) {
 // Goal facts have no source to quote. As uncited claims they left correct proposals at
 // needs_evidence, which no semantic review could accept.
 func TestProposalPromptTreatsGoalFactsAsGiven(t *testing.T) {
+	prompttest.RequireInstalled(t)
 	prompt, err := BuildProposalPrompt("task", map[string]any{"contract": ApplicationContract})
 	if err != nil {
 		t.Fatal(err)

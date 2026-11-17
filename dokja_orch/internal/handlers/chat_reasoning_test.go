@@ -39,7 +39,7 @@ func (g *reasoningGenerator) GenerateMessages(ctx context.Context, messages []ma
 		g.t.Fatal("reasoning canceled the fallback context")
 	}
 	for _, m := range messages {
-		if m["content"] == chatReasoningBrief {
+		if m["content"] == chatReasoningBrief() {
 			g.t.Fatal("reasoning instructions reached normal generation")
 		}
 	}
@@ -64,7 +64,7 @@ func (g *reasoningGenerator) GenerateTaskJSON(ctx context.Context, profile strin
 	if profile != "analysis" || schema["additionalProperties"] != false {
 		g.t.Fatal("wrong task profile or schema")
 	}
-	if len(messages) < 3 || !strings.HasPrefix(messages[0]["content"], chatPersona) || messages[1]["content"] != chatReasoningBrief {
+	if len(messages) < 3 || !strings.HasPrefix(messages[0]["content"], chatPersona()) || messages[1]["content"] != chatReasoningBrief() {
 		g.t.Fatal("reasoning brief must follow persona")
 	}
 	if g.wait {
@@ -277,7 +277,7 @@ func TestReasoningThroughTaskClientDoesNotRecordScratch(t *testing.T) {
 				Format   map[string]any      `json:"format"`
 				Messages []map[string]string `json:"messages"`
 			}
-			if json.NewDecoder(r.Body).Decode(&body) != nil || body.Format["additionalProperties"] != false || len(body.Messages) < 3 || body.Messages[1]["content"] != chatReasoningBrief {
+			if json.NewDecoder(r.Body).Decode(&body) != nil || body.Format["additionalProperties"] != false || len(body.Messages) < 3 || body.Messages[1]["content"] != chatReasoningBrief() {
 				t.Error("task transport lost the schema or brief")
 			}
 			raw, _ := json.Marshal(map[string]string{"analysis": privateScratch, "reply": "Four."})

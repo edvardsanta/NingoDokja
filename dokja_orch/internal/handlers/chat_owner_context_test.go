@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 
@@ -76,20 +77,23 @@ func TestOwnerIdentityIsRebuiltAfterCompactionRatherThanReadFromSummary(t *testi
 
 func assertOwnerContext(t *testing.T, content string, owner bool) {
 	t.Helper()
-	for _, want := range []string{"Verified Discord identity for this turn (application metadata)", "owner_configured=true", "rebuilt from the current gateway event"} {
+	for index, want := range []string{"Verified Discord identity for this turn (application metadata)", "owner_configured=true", "rebuilt from the current gateway event"} {
+		if index != 1 && !prompttest.Installed {
+			continue
+		}
 		if !strings.Contains(content, want) {
 			t.Fatalf("missing identity context %q", want)
 		}
 	}
 	if owner {
-		if !strings.Contains(content, "current_speaker_is_owner=true") || !strings.Contains(content, "current speaker is the configured owner") || !strings.Contains(content, ownerWordNote) {
+		if !strings.Contains(content, "current_speaker_is_owner=true") || (prompttest.Installed && !strings.Contains(content, "current speaker is the configured owner")) || !strings.Contains(content, ownerWordNote()) {
 			t.Fatal("verified owner context lost")
 		}
 		if strings.Contains(content, "current_speaker_is_owner=false") {
 			t.Fatal("conflicting identity in system context")
 		}
 	} else {
-		if !strings.Contains(content, "current_speaker_is_owner=false") || !strings.Contains(content, "current speaker is not verified") || strings.Contains(content, ownerWordNote) {
+		if !strings.Contains(content, "current_speaker_is_owner=false") || (prompttest.Installed && !strings.Contains(content, "current speaker is not verified")) || strings.Contains(content, ownerWordNote()) {
 			t.Fatal("non-owner acquired verified owner guidance")
 		}
 	}

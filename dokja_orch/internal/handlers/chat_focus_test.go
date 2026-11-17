@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"read_books/dokja_store/prompts/prompttest"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -222,8 +223,9 @@ func TestAskingForFragmentsIsAskingForTheText(t *testing.T) {
 }
 
 func TestBriefsNeverAskForWhatTheLibraryHolds(t *testing.T) {
-	for _, brief := range []string{knowledgeReferenceBrief, knowledgeTextBrief} {
-		if !strings.Contains(brief, "never ask them to send you a passage") {
+	prompttest.RequireInstalled(t)
+	for _, brief := range []string{knowledgeReferenceBrief(), knowledgeTextBrief()} {
+		if prompttest.Installed && (!strings.Contains(brief, "never ask them to send you a passage")) {
 			t.Fatal(brief)
 		}
 	}
@@ -232,13 +234,14 @@ func TestBriefsNeverAskForWhatTheLibraryHolds(t *testing.T) {
 // A single retrieved passage is not the inventory: the general brief must stop a
 // "you have exactly one record of this kind" reading of what retrieval happened to return.
 func TestGeneralBriefNeverClaimsCompletenessFromExcerpts(t *testing.T) {
+	prompttest.RequireInstalled(t)
 	for _, line := range []string{
 		"never a view of the whole",
 		"never draw a count, a total or an",
 		"how much of something exists",
 	} {
-		if !strings.Contains(knowledgeReferenceBrief, line) {
-			t.Fatalf("knowledgeReferenceBrief lost its completeness rule %q:\n%s", line, knowledgeReferenceBrief)
+		if !strings.Contains(knowledgeReferenceBrief(), line) {
+			t.Fatalf("knowledgeReferenceBrief lost its completeness rule %q:\n%s", line, knowledgeReferenceBrief())
 		}
 	}
 }
@@ -263,7 +266,7 @@ func TestAQuestionAboutTheTextTakesHitsInTheDocumentWhateverTheirScore(t *testin
 	if len(sources) != 1 || !sources[0].AskedForText {
 		t.Fatalf("sources=%+v", sources)
 	}
-	if !strings.Contains(knowledgeReference(sources), "Quote word for word") {
+	if prompttest.Installed && (!strings.Contains(knowledgeReference(sources), "Quote word for word")) {
 		t.Fatal("a question about the text gets the text-first brief")
 	}
 }

@@ -15,6 +15,7 @@ import (
 	memedomain "read_books/dokja_domain/dokja_meme"
 	pricedomain "read_books/dokja_domain/dokja_price"
 	store "read_books/dokja_store"
+	promptfiles "read_books/dokja_store/prompts"
 	"read_books/internal/app"
 	"read_books/internal/clients"
 	"read_books/internal/core"
@@ -35,6 +36,10 @@ import (
 
 func main() {
 	logger.Init()
+	if err := promptfiles.Validate("chat_persona", "chat_capability_guidance"); err != nil {
+		logger.Error("load private model prompts", err)
+		os.Exit(1)
+	}
 	logger.Info("Starting Virtual Assistant (VA) orchestrator...")
 
 	stop := make(chan os.Signal, 1)

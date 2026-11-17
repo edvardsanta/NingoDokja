@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 
@@ -76,7 +77,7 @@ func TestPassiveVoiceHistoryDoesNotInferOrCompactButIsUsedWhenAddressed(t *testi
 			prompt.WriteString(message["content"])
 		}
 	}
-	if !strings.Contains(prompt.String(), "The application has selected this batch for your reply") || strings.Contains(prompt.String(), "[SILENT]") {
+	if (prompttest.Installed && (!strings.Contains(prompt.String(), "The application has selected this batch for your reply"))) || strings.Contains(prompt.String(), "[SILENT]") {
 		t.Fatal("accepted followup was instructed to make a second silence decision")
 	}
 }

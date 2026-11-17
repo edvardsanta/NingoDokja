@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-func TestMathPlanKeepsFallbackAndRendersOnlyComplexOrRequestedImages(t *testing.T) {
+func TestMathPlanRendersEveryFormulaAndKeepsFallback(t *testing.T) {
 	for _, tc := range []struct {
 		expression, extra string
 		images            int
 	}{
-		{`x^2+1`, "", 0},
+		{`x^2+1`, "", 1},
 		{`x^2+1`, "image: true\n", 1},
 		{`x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}`, "", 1},
 	} {

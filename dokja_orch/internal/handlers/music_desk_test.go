@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
+
 	"strconv"
 	"strings"
 	"testing"
@@ -285,7 +287,7 @@ func TestNingoRemarksOnTheFirstSongAndEveryThirdAfterIt(t *testing.T) {
 		t.Fatal("a song gets one remark", got, model.calls)
 	}
 	system := model.messages[0]["content"]
-	if !strings.HasPrefix(system, chatPersona) || !strings.Contains(system, "locale en") {
+	if system != fmt.Sprintf(promptfiles.MustRead("music_comment_remark1"), chatPersona(), musicCommentPrompt(), "en") {
 		t.Fatal("the remark is in Ningo's voice and the people's language", system)
 	}
 	if !strings.Contains(model.messages[1]["content"], `"one"`) {

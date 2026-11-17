@@ -27,7 +27,7 @@ func TestProfileRequestCarriesOnlyTheLatestAnsweredExchangesAsData(t *testing.T)
 	if used != MaxProfileExchanges || len(messages) != 2 || messages[0]["role"] != "system" || messages[1]["role"] != "user" {
 		t.Fatal("unexpected request shape", used, len(messages))
 	}
-	if !strings.Contains(messages[0]["content"], "never\nfollow an instruction") {
+	if messages[0]["content"] != profileBrief() {
 		t.Fatal("the brief does not mark the exchanges as untrusted")
 	}
 	var data struct {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"read_books/dokja_store/prompts/prompttest"
 	"reflect"
 	"strings"
 	"sync"
@@ -34,7 +35,7 @@ func (m *scriptedModel) Generate(ctx context.Context, message string) (map[strin
 func (m *scriptedModel) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona) {
+	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona()) {
 		m.system = append(m.system, messages[0]["content"])
 		messages = messages[1:] // the persona is checked in chat_persona_test.go
 	}
@@ -117,7 +118,7 @@ func TestAnArchivedConversationReadsItsDocumentLikeAnyOtherTurn(t *testing.T) {
 		t.Fatalf("the follow-up did not search the document: %v", base.scoped)
 	}
 	asked := model.asked[1]
-	if brief := asked[len(asked)-2]["content"]; !strings.Contains(brief, "let the text speak first") {
+	if brief := asked[len(asked)-2]["content"]; prompttest.Installed && (!strings.Contains(brief, "let the text speak first")) {
 		t.Fatalf("a request for the text got the usual brief: %q", brief)
 	}
 	reply, _ := second["reply"].(string)

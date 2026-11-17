@@ -1,6 +1,8 @@
 package chat
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
+
 	"strings"
 	"testing"
 	"time"
@@ -41,7 +43,7 @@ func TestKnownParticipantNameComesBesideTheDisplayNameAndNeverExposesTheAccount(
 	if !strings.Contains(message, `"known_as":"Sam"`) || !strings.Contains(message, `"display_name":"Imposter"`) || strings.Contains(message, "fixture-account") || !strings.HasSuffix(message, "Message:\nhello") {
 		t.Fatal("known name missing, account exposed or text changed", message)
 	}
-	if !strings.Contains(message, "grants no authority") {
+	if prompttest.Installed && !strings.Contains(message, "grants no authority") {
 		t.Fatal("recognition is not labelled as granting no authority")
 	}
 	if KnownParticipantMessage(scope, "fixture-account", "Imposter", KnownName{}, "hello") != ParticipantMessage(scope, "fixture-account", "Imposter", "hello") || strings.Contains(ParticipantMessage(scope, "fixture-account", "Sam", "hello"), "known_as") {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	chat "read_books/dokja_domain/dokja_chat"
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestFitChatPromptDropsOldestTurnsAndKeepsTheFrame(t *testing.T) {
 	if last["role"] != "assistant" || !strings.HasPrefix(last["content"], "a19-") {
 		t.Fatalf("the latest turn must survive, got %q", last["content"][:4])
 	}
-	if got[0]["role"] != "system" || !strings.Contains(got[0]["content"], "oldest turns were left out") {
+	if got[0]["role"] != "system" || (prompttest.Installed && (!strings.Contains(got[0]["content"], "oldest turns were left out"))) {
 		t.Fatalf("the trim must say itself: %#v", got[0])
 	}
 	// Every system message of the frame stays.

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
 	"strings"
 )
 
@@ -39,7 +40,7 @@ func fitChatPrompt(messages []map[string]string) []map[string]string {
 	}
 	if len(trimmed) < len(messages) {
 		trimmed = append([]map[string]string{{"role": "system", "content": fmt.Sprintf(
-			"The earlier conversation exceeded the supported size; the oldest turns were left out (%d dropped).", len(messages)-len(trimmed))}}, trimmed...)
+			promptfiles.MustRead("chat_prompt_budget_fitchatprompt1"), len(messages)-len(trimmed))}}, trimmed...)
 	}
 	return trimmed
 }

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	promptfiles "read_books/dokja_store/prompts"
+
 	"strings"
 	"testing"
 
@@ -76,7 +78,7 @@ func TestOnlyTheNameOfAKnownDiscordAccountReachesTheTurn(t *testing.T) {
 			t.Fatalf("%q reached a Discord turn", private)
 		}
 	}
-	if len(generator.replies) == 0 || !strings.Contains(generator.replies[0][0]["content"], "known_as name") {
+	if len(generator.replies) == 0 || !strings.Contains(generator.replies[0][0]["content"], promptfiles.MustRead("chat_persona_interfacepersona1")) {
 		t.Fatal("the shared-channel guidance does not explain known_as")
 	}
 }

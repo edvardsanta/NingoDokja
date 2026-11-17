@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	pricedomain "read_books/dokja_domain/dokja_price"
+	promptfiles "read_books/dokja_store/prompts"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
@@ -68,7 +69,8 @@ func (h *PriceDomainHandler) Domain() core.Domain {
 	return core.DomainPrice
 }
 
-func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
+func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	if h == nil || h.domain == nil {
 		return nil, fmt.Errorf("price domain is not configured")
 	}

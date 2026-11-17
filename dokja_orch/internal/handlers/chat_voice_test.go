@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	chat "read_books/dokja_domain/dokja_chat"
+	"read_books/dokja_store/prompts/prompttest"
 	"read_books/internal/core"
 	"reflect"
 	"strings"
@@ -64,13 +65,13 @@ func TestVoiceConversationSharesAttributedHistoryAcrossSpeakers(t *testing.T) {
 	if state.id != originalID || len(state.messages) != 4 {
 		t.Fatal("speaker change reset voice history")
 	}
-	if strings.Contains(personaForEvent(event), discordReplyPresentation) || !strings.Contains(personaForEvent(event), "live Discord voice") {
+	if strings.Contains(personaForEvent(event), discordReplyPresentation()) || (prompttest.Installed && (!strings.Contains(personaForEvent(event), "live Discord voice"))) {
 		t.Fatal("voice got text formatting instructions")
 	}
-	if !strings.Contains(personaForEvent(event), "Always speak natural Brazilian Portuguese") {
+	if prompttest.Installed && (!strings.Contains(personaForEvent(event), "Always speak natural Brazilian Portuguese")) {
 		t.Fatal("voice lost its explicit pt-BR presentation")
 	}
-	if !strings.Contains(personaForEvent(event), chatPersona) {
+	if !strings.Contains(personaForEvent(event), chatPersona()) {
 		t.Fatal("voice lost Ningo's shared personality and conversational judgment")
 	}
 }

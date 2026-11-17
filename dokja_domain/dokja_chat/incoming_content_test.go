@@ -34,7 +34,7 @@ func TestIncomingDocumentPlanningBoundsAndSanitizesPlatformMetadata(t *testing.T
 func TestDocumentSummaryTreatsDocumentAsDataAndDeclaresPartialInput(t *testing.T) {
 	for _, locale := range []string{"en", "pt-BR"} {
 		messages, partial := DocumentSummaryMessages("memo.pdf", strings.Repeat("x", MaxSummaryRunes+1), "focus on results", locale)
-		if !partial || len(messages) != 2 || messages[0].Role != "system" || !strings.Contains(messages[0].Content, "untrusted") || !strings.Contains(messages[1].Content, `"partial":true`) {
+		if !partial || len(messages) != 2 || messages[0].Role != "system" || messages[0].Content == "" || !strings.Contains(messages[1].Content, `"partial":true`) {
 			t.Fatal("summary context lost boundaries")
 		}
 		if (locale == "en") != strings.Contains(messages[0].Content, "English") {

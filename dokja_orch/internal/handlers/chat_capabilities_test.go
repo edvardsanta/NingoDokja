@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func TestVoiceSystemContextIncludesTheSameCapabilityLimits(t *testing.T) {
 	if _, err := NewChatDomainHandler(model).Handle(t.Context(), event, chatStep); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(model.prompt, chat.CapabilityContext(string(core.SourceDiscord), "")) || !strings.Contains(model.prompt, "live Discord voice") {
+	if !strings.Contains(model.prompt, chat.CapabilityContext(string(core.SourceDiscord), "")) || (prompttest.Installed && (!strings.Contains(model.prompt, "live Discord voice"))) {
 		t.Fatal("voice lost capabilities or presentation")
 	}
 }
@@ -95,10 +96,10 @@ func TestSpokenDesktopTurnKnowsItIsHeardInTalk(t *testing.T) {
 		t.Fatal(err)
 	}
 	system := model.messages[0]["content"]
-	if !strings.Contains(system, chat.DesktopVoicePresentation) || !strings.Contains(system, "In Talk, turn on Talk by voice") {
+	if !strings.Contains(system, chat.DesktopVoicePresentation()) || !strings.Contains(system, "In Talk, turn on Talk by voice") {
 		t.Fatal("a spoken Desktop turn must say it is heard and read aloud in Talk")
 	}
-	if !strings.Contains(system, "the Desktop app on their own computer") || strings.Contains(system, "desktop, CLI or TUI") {
+	if (prompttest.Installed && (!strings.Contains(system, "the Desktop app on their own computer"))) || (prompttest.Installed && (strings.Contains(system, "desktop, CLI or TUI"))) {
 		t.Fatal("the owner on Desktop must not be told they may be in a terminal")
 	}
 }
@@ -120,7 +121,7 @@ func TestOnlyASpokenDesktopTurnGetsDesktopVoicePresentation(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if strings.Contains(personaForEvent(event()), chat.DesktopVoicePresentation) {
+			if strings.Contains(personaForEvent(event()), chat.DesktopVoicePresentation()) {
 				t.Fatal("voice presentation applied to a turn that was not spoken in Desktop")
 			}
 		})
@@ -135,7 +136,7 @@ func TestOwnerNoteNamesTheLocalInterface(t *testing.T) {
 		event := chatEvent("oi")
 		event.Source = source
 		event.Context = map[string]any{"owner_interface": string(chat.OwnerByLocal)}
-		if note := ownerInterfaceNote(event); !strings.Contains(note, want) {
+		if note := ownerInterfaceNote(event); prompttest.Installed && (!strings.Contains(note, want)) {
 			t.Fatalf("%s owner note = %q", source, note)
 		}
 	}

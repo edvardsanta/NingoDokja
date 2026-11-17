@@ -69,7 +69,7 @@ func TestChatAdaptersBoundAndIsolateEachSelectedProvider(t *testing.T) {
 					{Role: "system", Content: "context"}, {Role: "user", Content: "question"},
 					{Role: "assistant", Content: "A billboard on the avenue."}, {Role: "user", Content: "followup"},
 				}
-				if !reflect.DeepEqual(transcript, expected) || !strings.Contains(input[:start], "same application assistant") {
+				if !reflect.DeepEqual(transcript, expected) || input[:start] != transcriptFixture(t) {
 					t.Fatal("history lost")
 				}
 				command := strings.Join(args, " ")

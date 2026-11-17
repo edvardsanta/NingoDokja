@@ -173,7 +173,7 @@ func TestCompareIdentifiesALinkLooksTheProductUpForTheOwnerAndComments(t *testin
 	// the comment is written from the facts, marked as data, with the persona
 	comment := commenter.messages[len(commenter.messages)-1]
 	user := comment[1]["content"]
-	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(comment[0]["content"], chatPersona) {
+	if !strings.Contains(user, "<<FACTS>>") || !strings.Contains(user, "11990") || !strings.HasPrefix(comment[0]["content"], chatPersona()) {
 		t.Fatalf("comment prompt %v", comment)
 	}
 }
