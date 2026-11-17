@@ -213,3 +213,82 @@ func TestWebMixedSuccessStillDiscussesOnlyRetrievedPassages(t *testing.T) {
 		t.Fatalf("%#v", result)
 	}
 }
+
+func TestWebFailedRereadServesTheKeptCopyInsteadOfDroppingIt(t *testing.T) {
+	service := &webReadingService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "Still supported by the earlier read. [1]"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	event := chatEvent("https://example.com/law")
+	if _, err := h.Handle(context.Background(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	service.fail = true
+	result, err := h.Handle(context.Background(), chatEvent("https://example.com/law"), chatStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply := result["reply"].(string)
+	if len(service.calls) != 2 {
+		t.Fatalf("re-read was not attempted: %#v", service.calls)
+	}
+	if !strings.Contains(reply, "Não consegui reler 1 link") || strings.Contains(reply, "Não consegui ler") {
+		t.Fatalf("stale serving not disclosed: %s", reply)
+	}
+	evidence := false
+	for _, m := range generator.messages {
+		if m["role"] == "user" && strings.Contains(m["content"], "UNTRUSTED_WEB_EVIDENCE") && strings.Contains(m["content"], "financial impact estimate") {
+			evidence = true
+		}
+	}
+	if !evidence {
+		t.Fatal("kept copy was not re-supplied as evidence")
+	}
+	h.web.mu.Lock()
+	saved := h.web.sessions[chatSessionBaseKey(event)]
+	h.web.mu.Unlock()
+	if len(saved.documents) != 1 || saved.documents[0].URL != "https://example.com/law" {
+		t.Fatalf("kept copy lost from the session: %#v", saved.documents)
+	}
+}
+
+func TestWebNewLinkKeepsEarlierSessionReadings(t *testing.T) {
+	service := &webReadingService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "Both readings considered. [1]"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	event := chatEvent("https://example.com/law")
+	if _, err := h.Handle(context.Background(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Handle(context.Background(), chatEvent("https://example.com/news"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.calls) != 2 || service.calls[0] != "https://example.com/law" || service.calls[1] != "https://example.com/news" {
+		t.Fatalf("earlier reading was refetched: %#v", service.calls)
+	}
+	h.web.mu.Lock()
+	saved := h.web.sessions[chatSessionBaseKey(event)]
+	h.web.mu.Unlock()
+	if len(saved.documents) != 2 {
+		t.Fatalf("earlier reading dropped from the session: %#v", saved.documents)
+	}
+}
+
+func TestWebSuccessfulRereadReplacesTheKeptCopy(t *testing.T) {
+	service := &webReadingService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "Updated. [1]"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	event := chatEvent("https://example.com/law")
+	if _, err := h.Handle(context.Background(), event, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	service.injection = "updated"
+	if _, err := h.Handle(context.Background(), chatEvent("https://example.com/law"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	h.web.mu.Lock()
+	saved := h.web.sessions[chatSessionBaseKey(event)]
+	h.web.mu.Unlock()
+	if len(saved.documents) != 1 || !strings.Contains(saved.documents[0].Passages[0].Text, "updated") {
+		t.Fatalf("fresh read did not replace the kept copy: %#v", saved.documents)
+	}
+}
