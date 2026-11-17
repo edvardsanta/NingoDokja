@@ -185,7 +185,7 @@ services:
       - ./:/workspace
 
   dokja-search:
-    image: ${DOKJA_SEARCH_IMAGE:-searxng/searxng:latest}
+    image: ${DOKJA_SEARCH_IMAGE:-docker.io/searxng/searxng:latest}
     environment:
       SEARXNG_SECRET: ${DOKJA_SEARCH_SECRET:-CHANGE_ME_search_dev_only}
     volumes:
