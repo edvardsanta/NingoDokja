@@ -83,7 +83,7 @@ func TestDocumentContextSurvivesHandlerAndSQLiteRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cache.Close()
-	h = NewChatDomainHandler(model).WithSessionStore(cache).WithMacroContext(durable, nil).WithWebReading(reader, nil)
+	h = NewChatDomainHandler(&triagingGenerator{triageModel: model, verdict: true}).WithSessionStore(cache).WithMacroContext(durable, nil).WithWebReading(reader, nil)
 	if _, err = h.Handle(t.Context(), chatEvent("Explain the architecture"), chatStep); err != nil {
 		t.Fatal(err)
 	}

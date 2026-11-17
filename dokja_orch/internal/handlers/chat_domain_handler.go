@@ -333,7 +333,7 @@ func (h *ChatDomainHandler) Handle(ctx context.Context, event core.Event, workfl
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	rawReply := chatReplyFromResult(result)
+	rawReply := stripReplyPreamble(chatReplyFromResult(result))
 	if _, voice := event.Context["voice_turns"]; voice {
 		logger.Info(fmt.Sprintf("voice generation event_id=%s raw_chars=%d silence_marker=%t", event.EventID, len(rawReply), strings.TrimSpace(rawReply) == "[SILENT]"))
 		rawReply = chat.ConciseSpokenReply(rawReply, voiceDecision)
