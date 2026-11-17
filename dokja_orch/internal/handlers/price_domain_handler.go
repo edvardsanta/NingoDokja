@@ -124,15 +124,21 @@ func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workf
 	return result, err
 }
 
-// registerPriceNotification records the ADR 0018 promise at its one deterministic
-// moment: a Discord search whose new watch was collected at once and still brought
-// no products. The interface sentence says the return is coming; the notifier settles it.
+// registerPriceNotification records the ADR 0018 promise at its deterministic
+// moments: a Discord search over a watch that exists — newly added and collected
+// at once with nothing, or watched for a while and still with nothing. The
+// interface sentence says the return is coming; the notifier settles it.
 func (h *PriceDomainHandler) registerPriceNotification(ctx context.Context, event core.Event, result map[string]any) {
 	if h.notifier == nil || event.Source != core.SourceDiscord {
 		return
 	}
 	watch, ok := result["watch"].(map[string]any)
-	if !ok || watch["status"] != "added" || watch["collected"] != true {
+	if !ok {
+		return
+	}
+	status, _ := watch["status"].(string)
+	promising := status == "watched" || (status == "added" && watch["collected"] == true)
+	if !promising {
 		return
 	}
 	if products, _ := result["products"].([]any); len(products) > 0 {

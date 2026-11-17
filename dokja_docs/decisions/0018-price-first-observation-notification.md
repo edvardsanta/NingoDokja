@@ -20,11 +20,12 @@ pattern (persisted snapshot, boot re-arm) exists since the ADR 0017 review.
 
 ## Decision
 
-1. **The promise is registered orchestrator-side, at one deterministic moment:**
-   a Discord search whose watch was added, collected at once and returned zero
-   products. The orchestrator sees all three facts in the search result; the
-   interface needs no new request shape. Permanent cases (watch full, not owner,
-   store refusal) never promise.
+1. **The promise is registered orchestrator-side, at deterministic moments:**
+   a Discord search over a watch that exists — newly added, collected at once
+   and returned zero products; or watched for a while and still with nothing.
+   The orchestrator sees these facts in the search result; the interface needs
+   no new request shape. Permanent cases (watch full, not owner, store refusal)
+   never promise.
 2. **A durable registry holds one pending notification per channel and watched
    search**, the same resilient pattern as ADR 0017: a snapshot beside the runtime
    databases, restored and re-armed on boot, metadata only (channel, correlation,

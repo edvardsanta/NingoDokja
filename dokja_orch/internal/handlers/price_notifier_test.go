@@ -141,10 +141,14 @@ func TestPriceNotificationRegistrationOnlyAtTheDeterministicMoment(t *testing.T)
 	none := map[string]any{"products": []any{}, "watch": map[string]any{"status": "added", "collected": true, "category": "ryzen 5 5600"}}
 	withProducts := map[string]any{"products": []any{map[string]any{"product": "found"}}, "watch": map[string]any{"status": "added", "collected": true, "category": "ryzen 5 5600"}}
 	notCollected := map[string]any{"products": []any{}, "watch": map[string]any{"status": "added", "category": "ryzen 5 5600"}}
-	alreadyWatched := map[string]any{"products": []any{}, "watch": map[string]any{"status": "watched", "collected": true, "category": "ryzen 5 5600"}}
+	watchedNone := map[string]any{"products": []any{}, "watch": map[string]any{"status": "watched", "category": "ryzen 5 5600"}}
+	watchedProducts := map[string]any{"products": []any{map[string]any{"product": "found"}}, "watch": map[string]any{"status": "watched", "category": "ryzen 5 5600"}}
 
 	if got := registered(none, priceNotificationEvent()); got != 1 {
 		t.Fatal("the deterministic moment did not register")
+	}
+	if got := registered(watchedNone, priceNotificationEvent()); got != 1 {
+		t.Fatal("an existing watched search with nothing did not register")
 	}
 	whatsapp := priceNotificationEvent()
 	whatsapp.Source = core.SourceWhatsApp
@@ -154,10 +158,10 @@ func TestPriceNotificationRegistrationOnlyAtTheDeterministicMoment(t *testing.T)
 	if got := registered(withProducts, priceNotificationEvent()); got != 0 {
 		t.Fatal("products present registered")
 	}
-	if got := registered(notCollected, priceNotificationEvent()); got != 0 {
-		t.Fatal("an uncollected watch registered")
+	if got := registered(watchedProducts, priceNotificationEvent()); got != 0 {
+		t.Fatal("a watched search with products registered")
 	}
-	if got := registered(alreadyWatched, priceNotificationEvent()); got != 0 {
-		t.Fatal("an existing watch registered")
+	if got := registered(notCollected, priceNotificationEvent()); got != 0 {
+		t.Fatal("an uncollected new watch registered")
 	}
 }

@@ -18,6 +18,7 @@ const messages: Record<string, Catalog> = {
     header: "🔎 {count} produto(s) encontrados",
     header_for: "🔎 {count} produto(s) para **{search}**",
     none: "Nenhum produto da watchlist corresponde a essa busca.",
+    none_watched: "Nenhum produto da watchlist corresponde a essa busca ainda. Essa busca já é vigiada; eu aviso aqui quando chegar.",
     more: "…e mais {count} produto(s). Refine a busca.",
     failed: "Não consegui consultar os preços agora.",
     market: "Mínimo do mercado",
@@ -102,6 +103,7 @@ const messages: Record<string, Catalog> = {
     header: "🔎 {count} product(s) found",
     header_for: "🔎 {count} product(s) for **{search}**",
     none: "No watched product matches that search.",
+    none_watched: "No watched product matches that search yet. That search is already watched; I will let you know here when prices arrive.",
     more: "…and {count} more product(s). Narrow the search.",
     failed: "I could not check prices right now.",
     market: "Market low",
@@ -293,6 +295,9 @@ export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): 
     : result.watch?.status === "full" ? text(words, "watch_full", { search: watched }) : "";
   if (products.length === 0 && result.watch?.collected === true && result.watch?.status === "added") {
     return notice;
+  }
+  if (products.length === 0 && result.watch?.status === "watched") {
+    return text(words, "none_watched");
   }
   if (products.length === 0) {
     return notice ? `${notice}\n${text(words, "none")}` : text(words, "none");

@@ -381,6 +381,16 @@ test("a new watch the orchestrator already collected says so, with or without pr
     "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing. I will let you know here when prices arrive.");
 });
 
+test("a watched search with nothing yet promises a return, in both locales", () => {
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "watched" } }, "pt-BR"),
+    "Nenhum produto da watchlist corresponde a essa busca ainda. Essa busca já é vigiada; eu aviso aqui quando chegar.");
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "watched" } }, "en"),
+    "No watched product matches that search yet. That search is already watched; I will let you know here when prices arrive.");
+  // A search the orchestrator never watched keeps the plain "none" answer.
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "not_owner" } }, "pt-BR"),
+    "Nenhum produto da watchlist corresponde a essa busca.");
+});
+
 test("comparison cards show workload context and collected technical references",()=>{
  const card=embedsOf(buildCompareReply({...compared,comparison_context:{intended_use:"1080p gaming",current_equipment:"Example CPU / 500W"},technical_sources:[{title:"Example test lab",url:"https://bench.example/review",workload:"1080p"}]},"pt-BR"))[0];
  assert.match(card.description!,/1080p gaming/);assert.match(card.description!,/Example CPU/);
