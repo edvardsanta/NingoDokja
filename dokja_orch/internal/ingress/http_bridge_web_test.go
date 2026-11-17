@@ -37,8 +37,11 @@ func (g *bridgeWebGenerator) GenerateMessages(_ context.Context, messages []map[
 
 // GenerateTaskJSON answers the reading triage: a follow-up with no words in common with the page
 // ("What does that mean?") still belongs to it. It is not a chat call, so it is not counted.
-func (g *bridgeWebGenerator) GenerateTaskJSON(_ context.Context, _ string, _ map[string]any, _ []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
-	reply := map[string]any{"uses_reading": true}
+func (g *bridgeWebGenerator) GenerateTaskJSON(_ context.Context, profile string, _ map[string]any, _ []map[string]string, accept func(map[string]any) error) (map[string]any, error) {
+	if profile != "lightweight" {
+		return nil, fmt.Errorf("only reading triage is scripted")
+	}
+	reply := map[string]any{"reply": `{"uses_reading":true}`}
 	return reply, accept(reply)
 }
 

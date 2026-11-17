@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -47,7 +48,12 @@ func (h *ChatDomainHandler) readingRelevant(ctx context.Context, question string
 		{"role": "system", "content": readingTriageBrief},
 		{"role": "user", "content": fmt.Sprintf("Pages read earlier:\n%s\nMessage:\n%s", titles.String(), boundWebText(question, 500))},
 	}, func(reply map[string]any) error {
-		parsed, ok := reply["uses_reading"].(bool)
+		raw, _ := reply["reply"].(string)
+		var fields map[string]any
+		if json.Unmarshal([]byte(raw), &fields) != nil {
+			return fmt.Errorf("invalid triage verdict")
+		}
+		parsed, ok := fields["uses_reading"].(bool)
 		if !ok {
 			return fmt.Errorf("triage verdict missing")
 		}
