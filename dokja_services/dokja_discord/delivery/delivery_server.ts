@@ -7,6 +7,17 @@ const browserUserAgent =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/133.0 Safari/537.36";
 
+export type DiscordDeliveryEmbed = {
+  title?: string;
+  description?: string;
+  thumbnail_url?: string;
+  color?: number;
+  fields?: Array<{ name: string; value: string; inline?: boolean }>;
+  footer?: string;
+  // the page the title links to; kept only when it is an http(s) address
+  url?: string;
+};
+
 export type DiscordDeliveryRequest = {
   channel_id: string;
   content?: string;
@@ -21,6 +32,9 @@ export type DiscordDeliveryRequest = {
   // reading settling its promise). Only the bot-token path can reply; the
   // webhook path ignores it.
   reply_to_message_id?: string;
+  // Rich content (a price notification's follow-up). Both the bot-token and the
+  // webhook path render them; content stays required nowhere when embeds exist.
+  embeds?: DiscordDeliveryEmbed[];
 };
 
 export type DiscordDeliveryResponse = {
@@ -118,12 +132,13 @@ export async function handleDiscordDeliveryRequest(
   const content = body.content ?? "";
   const attachmentUrl = body.attachment_url ?? "";
   const attachmentDataB64 = body.attachment_data_b64 ?? "";
-  if (!channelId || (!content && !attachmentUrl)) {
+  const embeds = cleanEmbeds(body.embeds);
+  if (!channelId || (!content && !attachmentUrl && embeds.length === 0)) {
     return {
       statusCode: 400,
       payload: {
         status: "error",
-        message: "channel_id and either content or attachment_url are required",
+        message: "channel_id and either content, attachment_url or embeds are required",
       },
     };
   }
@@ -149,10 +164,11 @@ export async function handleDiscordDeliveryRequest(
         attachmentDataB64,
         body.attachment_content_type ?? null,
         attachmentUrl,
+        embeds,
       )
     : attachmentUrl
-    ? await sendMessageWithAttachment(deps.fetchImpl, target, content, attachmentUrl)
-    : await sendPlainMessage(deps.fetchImpl, target, content, body.reply_to_message_id, !webhookUrl);
+    ? await sendMessageWithAttachment(deps.fetchImpl, target, content, attachmentUrl, embeds)
+    : await sendPlainMessage(deps.fetchImpl, target, content, body.reply_to_message_id, !webhookUrl, embeds);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -204,15 +220,56 @@ async function sendPlainMessage(
   content: string,
   replyToMessageID: string | undefined,
   canReply: boolean,
+  embeds: DiscordDeliveryEmbed[],
 ) {
   return fetchImpl(target.url, {
     method: "POST",
     headers: { ...target.headers, "Content-Type": "application/json" },
     body: JSON.stringify({
       content,
+      ...(embeds.length > 0 ? { embeds } : {}),
       ...(replyToMessageID && canReply ? { message_reference: { message_id: replyToMessageID } } : {}),
     }),
   });
+}
+
+// cleanEmbeds keeps a bounded, Discord-valid subset; anything else is dropped so a
+// bad embed never sinks an otherwise good delivery.
+export function cleanEmbeds(raw: unknown): DiscordDeliveryEmbed[] {
+  if (!Array.isArray(raw)) return [];
+  const embeds: DiscordDeliveryEmbed[] = [];
+  for (const entry of raw.slice(0, 4)) {
+    if (!entry || typeof entry !== "object") continue;
+    const value = entry as Record<string, unknown>;
+    const embed: DiscordDeliveryEmbed = {};
+    if (typeof value.title === "string" && value.title.trim()) embed.title = value.title.trim().slice(0, 256);
+    if (typeof value.description === "string" && value.description.trim()) embed.description = value.description.trim().slice(0, 4096);
+    if (typeof value.footer === "string" && value.footer.trim()) embed.footer = value.footer.trim().slice(0, 2048);
+    if (typeof value.thumbnail_url === "string" && /^https:\/\//.test(value.thumbnail_url)) embed.thumbnail_url = value.thumbnail_url.slice(0, 2048);
+    if (typeof value.url === "string" && /^https:\/\//.test(value.url)) embed.url = value.url.slice(0, 2048);
+    if (typeof value.color === "number" && Number.isInteger(value.color) && value.color >= 0 && value.color <= 0xffffff) embed.color = value.color;
+    if (Array.isArray(value.fields)) {
+      const fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+      for (const rawField of value.fields.slice(0, 25)) {
+        if (!rawField || typeof rawField !== "object") continue;
+        const field = rawField as Record<string, unknown>;
+        if (typeof field.name !== "string" || typeof field.value !== "string") continue;
+        fields.push({
+          name: field.name.trim().slice(0, 256),
+          value: field.value.trim().slice(0, 1024),
+          ...(field.inline === true ? { inline: true } : {}),
+        });
+      }
+      if (fields.length > 0) embed.fields = fields;
+    }
+    // normalize to Discord's shape: footer carries {text}; thumbnail carries {url}
+    const { footer, thumbnail_url, ...rest } = embed;
+    const discordEmbed: Record<string, unknown> = { ...rest };
+    if (footer) discordEmbed.footer = { text: footer };
+    if (thumbnail_url) discordEmbed.thumbnail = { url: thumbnail_url };
+    if (Object.keys(discordEmbed).length > 0) embeds.push(discordEmbed as unknown as DiscordDeliveryEmbed);
+  }
+  return embeds;
 }
 
 async function sendMessageWithAttachment(
@@ -220,6 +277,7 @@ async function sendMessageWithAttachment(
   target: { url: string; headers: Record<string, string> },
   content: string,
   attachmentUrl: string,
+  embeds: DiscordDeliveryEmbed[],
 ) {
   const attachmentResponse = await fetchImpl(attachmentUrl, {
     headers: attachmentRequestHeaders(attachmentUrl),
@@ -229,7 +287,7 @@ async function sendMessageWithAttachment(
   }
 
   const bytes = await attachmentResponse.arrayBuffer();
-  return postAttachment(fetchImpl, target, content, bytes, attachmentResponse.headers.get("content-type"), attachmentUrl);
+  return postAttachment(fetchImpl, target, content, bytes, attachmentResponse.headers.get("content-type"), attachmentUrl, embeds);
 }
 
 // sendMessageWithAttachmentBytes attaches bytes the caller already downloaded (the meme
@@ -243,9 +301,10 @@ async function sendMessageWithAttachmentBytes(
   dataB64: string,
   contentType: string | null,
   attachmentUrl: string,
+  embeds: DiscordDeliveryEmbed[],
 ) {
   const bytes = Buffer.from(dataB64, "base64");
-  return postAttachment(fetchImpl, target, content, bytes, contentType, attachmentUrl);
+  return postAttachment(fetchImpl, target, content, bytes, contentType, attachmentUrl, embeds);
 }
 
 async function postAttachment(
@@ -255,12 +314,14 @@ async function postAttachment(
   bytes: ArrayBuffer | Buffer,
   contentType: string | null,
   attachmentUrl: string,
+  embeds: DiscordDeliveryEmbed[],
 ) {
   const filename = buildAttachmentFilename(attachmentUrl, contentType);
 
   const form = new FormData();
   form.append("payload_json", JSON.stringify({
     content,
+    ...(embeds.length > 0 ? { embeds } : {}),
     attachments: [{ id: 0, filename }],
   }));
   form.append(
@@ -294,6 +355,7 @@ function parseDeliveryRequest(body: Record<string, unknown>): DiscordDeliveryReq
     attachment_data_b64: String(body.attachment_data_b64 ?? "").trim() || undefined,
     attachment_content_type: String(body.attachment_content_type ?? "").trim() || undefined,
     reply_to_message_id: String(body.reply_to_message_id ?? "").trim() || undefined,
+    embeds: Array.isArray(body.embeds) ? (body.embeds as DiscordDeliveryEmbed[]) : undefined,
   };
 }
 

@@ -32,6 +32,26 @@ type DiscordDeliveryRequest struct {
 	// earlier channel message (a deferred reading settling an original command).
 	// Interfaces that cannot reply ignore it.
 	ReplyToMessageID string `json:"reply_to_message_id,omitempty"`
+	// Embeds carries rich content (a price notification's follow-up) in the
+	// interface's own bounded embed shape; content may be empty when embeds exist.
+	Embeds []DiscordDeliveryEmbed `json:"embeds,omitempty"`
+}
+
+// DiscordDeliveryEmbed is the bounded subset of the interface's native embed the
+// delivery endpoint accepts; invalid or oversized pieces are dropped there.
+type DiscordDeliveryEmbed struct {
+	Title       string                      `json:"title,omitempty"`
+	Description string                      `json:"description,omitempty"`
+	Color       int                         `json:"color,omitempty"`
+	Footer      string                      `json:"footer,omitempty"`
+	URL         string                      `json:"url,omitempty"`
+	Fields      []DiscordDeliveryEmbedField `json:"fields,omitempty"`
+}
+
+type DiscordDeliveryEmbedField struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Inline bool   `json:"inline,omitempty"`
 }
 
 type DiscordDeliveryResponse struct {
@@ -74,15 +94,17 @@ func (c *DiscordInterfaceClient) Deliver(ctx context.Context, channelID, content
 
 // DeliverReply posts a new message to a channel as a reply to an earlier message,
 // for follow-ups no request is driving (a deferred reading settling its promise).
-// Interfaces that cannot reply post it as an ordinary channel message.
-func (c *DiscordInterfaceClient) DeliverReply(ctx context.Context, channelID, content, replyToMessageID string) error {
-	if strings.TrimSpace(content) == "" {
-		return fmt.Errorf("discord delivery requires content")
+// Interfaces that cannot reply post it as an ordinary channel message. Content may
+// be empty when embeds carry the message.
+func (c *DiscordInterfaceClient) DeliverReply(ctx context.Context, channelID, content, replyToMessageID string, embeds []DiscordDeliveryEmbed) error {
+	if strings.TrimSpace(content) == "" && len(embeds) == 0 {
+		return fmt.Errorf("discord delivery requires content or embeds")
 	}
 	_, err := c.deliver(ctx, DiscordDeliveryRequest{
 		ChannelID:        strings.TrimSpace(channelID),
 		Content:          strings.TrimSpace(content),
 		ReplyToMessageID: strings.TrimSpace(replyToMessageID),
+		Embeds:           embeds,
 	})
 	return err
 }

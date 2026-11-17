@@ -9,6 +9,7 @@ import (
 	"time"
 
 	pricedomain "read_books/dokja_domain/dokja_price"
+	"read_books/internal/clients"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 )
@@ -26,22 +27,24 @@ const maxPriceNotificationProducts = 3
 
 var priceNotificationPhrases = map[string]map[string]string{
 	"pt": {
-		"arrived":  "🔎 Chegou preço para **{search}**:",
-		"offer":    "• {title} — {merchant} R$ {price}",
-		"discount": " (de R$ {list})",
-		"market":   " · mercado mín. R$ {price}",
-		"verdict":  "Veredito completo: /preco produto:{search}",
-		"expired":  "Tentei de novo **{search}** e as lojas ainda não trouxeram nada; parei de vigiar esse retorno.",
-		"noPrices": "Tentei de novo **{search}** e as lojas ainda não trouxeram nada. Continuo de olho e volto quando chegar.",
+		"arrived":       "🔎 Chegou preço para **{search}**:",
+		"arrived_title": "🔎 Chegou preço para {search}",
+		"offer":         "• {title} — {merchant} R$ {price}",
+		"discount":      " (de R$ {list})",
+		"market":        " · mercado mín. R$ {price}",
+		"verdict":       "Veredito completo: /preco produto:{search}",
+		"expired":       "Tentei de novo **{search}** e as lojas ainda não trouxeram nada; parei de vigiar esse retorno.",
+		"noPrices":      "Tentei de novo **{search}** e as lojas ainda não trouxeram nada. Continuo de olho e volto quando chegar.",
 	},
 	"en": {
-		"arrived":  "🔎 Prices arrived for **{search}**:",
-		"offer":    "• {title} — {merchant} R$ {price}",
-		"discount": " (was R$ {list})",
-		"market":   " · market low R$ {price}",
-		"verdict":  "Full verdict: /price product:{search}",
-		"expired":  "I retried **{search}** and the stores still brought nothing; I stopped watching for this return.",
-		"noPrices": "I retried **{search}** and the stores still brought nothing. I am still watching and will come back.",
+		"arrived":       "🔎 Prices arrived for **{search}**:",
+		"arrived_title": "🔎 Prices arrived for {search}",
+		"offer":         "• {title} — {merchant} R$ {price}",
+		"discount":      " (was R$ {list})",
+		"market":        " · market low R$ {price}",
+		"verdict":       "Full verdict: /price product:{search}",
+		"expired":       "I retried **{search}** and the stores still brought nothing; I stopped watching for this return.",
+		"noPrices":      "I retried **{search}** and the stores still brought nothing. I am still watching and will come back.",
 	},
 }
 
@@ -213,11 +216,11 @@ func (n *PriceNotifier) notifyWatch(ctx context.Context, watch pricedomain.Watch
 	if err != nil || len(result.Products) == 0 {
 		return // nothing to say yet; the next run tries again
 	}
-	content := priceNotificationFollowup(entry.Event, entry.Search, result)
-	if content == "" {
+	embed, err := priceNotificationEmbed(entry.Event, entry.Search, result)
+	if err != nil {
 		return
 	}
-	if err := n.deliverer.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID); err != nil {
+	if err := n.deliverer.DeliverReply(ctx, entry.ChannelID, "", entry.ReplyToID, []clients.DiscordDeliveryEmbed{embed}); err != nil {
 		logger.Info(fmt.Sprintf("price notification delivery failed channel=%s watch=%s: %v", entry.ChannelID, entry.Category, err))
 		return
 	}
@@ -247,10 +250,51 @@ func (n *PriceNotifier) ExpireDue(ctx context.Context) {
 	n.mu.Unlock()
 	for _, entry := range expired {
 		content := priceNotificationPhrase(entry.Event, "expired", entry.Search)
-		if err := n.deliverer.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID); err != nil {
+		if err := n.deliverer.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID, nil); err != nil {
 			logger.Info(fmt.Sprintf("price notification expiry delivery failed channel=%s: %v", entry.ChannelID, err))
 		}
 	}
+}
+
+// priceNotificationEmbed wraps the follow-up in the interface's embed shape: the
+// header names the search, the description carries the offer lines, the footer
+// points back to the /preco command.
+func priceNotificationEmbed(event core.Event, search string, result pricedomain.SearchResult) (clients.DiscordDeliveryEmbed, error) {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return clients.DiscordDeliveryEmbed{}, fmt.Errorf("empty search")
+	}
+	var lines []string
+	for _, product := range result.Products {
+		if len(lines) == maxPriceNotificationProducts {
+			break
+		}
+		cheapest := cheapestMerchantOffer(product.Assessments)
+		if cheapest == nil || cheapest.Latest.Cents <= 0 {
+			continue
+		}
+		merchant := cheapest.Key.Merchant
+		if merchant == "" {
+			merchant = "market"
+		}
+		line := "• " + product.Product.Title + " — " + merchant + " R$ " + formatCents(cheapest.Latest.Cents)
+		if cheapest.Latest.ListCents > cheapest.Latest.Cents {
+			line += priceNotificationPhrase(event, "discount", search, "list", formatCents(cheapest.Latest.ListCents))
+		}
+		if market := cheapestMarketPoint(product.Market); market > 0 && market < cheapest.Latest.Cents {
+			line += priceNotificationPhrase(event, "market", search, "price", formatCents(market))
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 {
+		return clients.DiscordDeliveryEmbed{}, fmt.Errorf("no offers")
+	}
+	return clients.DiscordDeliveryEmbed{
+		Title:       priceNotificationPhrase(event, "arrived_title", search),
+		Description: strings.Join(lines, "\n"),
+		Footer:      priceNotificationPhrase(event, "verdict", search),
+		Color:       0x2b8a78,
+	}, nil
 }
 
 // priceNotificationFollowup composes the fixed follow-up from the fresh search:

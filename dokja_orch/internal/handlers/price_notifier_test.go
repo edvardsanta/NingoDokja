@@ -40,15 +40,19 @@ func TestPriceNotifierDeliversTheFollowUpWhenTheWatchCollects(t *testing.T) {
 	if delivered[0].replyTo != "command-1" || delivered[0].channelID != "c1" {
 		t.Fatalf("follow-up lost its correlation: %#v", delivered[0])
 	}
-	if !strings.Contains(delivered[0].content, "Chegou preço para **ryzen 5 5600**") ||
-		!strings.Contains(delivered[0].content, "459,90") ||
-		!strings.Contains(delivered[0].content, "R$ 459,90") ||
-		!strings.Contains(delivered[0].content, "store-a") ||
-		!strings.Contains(delivered[0].content, "/preco produto:ryzen 5 5600") {
-		t.Fatalf("follow-up content wrong: %s", delivered[0].content)
+	if len(delivered[0].embeds) != 1 {
+		t.Fatalf("follow-up did not deliver an embed: %#v", delivered[0])
 	}
-	if strings.ContainsAny(delivered[0].content, "{}") {
-		t.Fatalf("a template placeholder leaked into the follow-up: %s", delivered[0].content)
+	embed := delivered[0].embeds[0]
+	if !strings.Contains(embed.Title, "ryzen 5 5600") ||
+		!strings.Contains(embed.Description, "R$ 459,90") ||
+		!strings.Contains(embed.Description, "store-a") ||
+		!strings.Contains(embed.Footer, "/preco produto:ryzen 5 5600") ||
+		embed.Color == 0 {
+		t.Fatalf("follow-up embed incomplete: %+v", embed)
+	}
+	if strings.ContainsAny(embed.Description, "{}") {
+		t.Fatalf("a template placeholder leaked into the follow-up: %s", embed.Description)
 	}
 	notifier.mu.Lock()
 	remaining := len(notifier.pending)
