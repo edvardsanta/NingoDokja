@@ -7,5 +7,7 @@
   "blocked_one": "The site blocked automatic reading of one link. I have not read that content.",
   "blocked_many": "Automatic reading was blocked for {count} links. I have not read their contents.",
   "recovery": "Paste the text or an excerpt here so we can discuss it with citations.",
-  "served_stored": "I could not re-read {count} link(s) just now and used the copy kept from an earlier read in this conversation; the content may be outdated."
+  "served_stored": "I could not re-read {count} link(s) just now and used the copy kept from an earlier read in this conversation; the content may be outdated.",
+  "deferred_promise": "I could not read {count} link(s) right now — I will retry in the background and come back here with the result.",
+  "deferred_failed": "I retried the earlier link and still could not read it; it remains unavailable. Paste the text here if you want to discuss it."
 }

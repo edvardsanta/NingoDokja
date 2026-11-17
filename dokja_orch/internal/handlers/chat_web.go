@@ -60,7 +60,11 @@ type webTurnData struct {
 	// ServedStored lists URLs whose fresh re-read failed and whose passages came from
 	// a copy kept from an earlier read in this conversation; the content may be outdated.
 	ServedStored []string `json:"served_stored,omitempty"`
-	Omitted      int      `json:"omitted_links,omitempty"`
+	// Deferred lists URLs whose fresh read failed transiently, with no kept copy,
+	// and whose reading the application promised to retry in the background and
+	// deliver as a follow-up.
+	Deferred []string `json:"deferred,omitempty"`
+	Omitted  int      `json:"omitted_links,omitempty"`
 }
 type webSessionReading struct {
 	id        string
@@ -78,6 +82,31 @@ type webConversationReading struct {
 func (h *ChatDomainHandler) WithWebReading(service digest.Service, enabled func() bool) *ChatDomainHandler {
 	h.web = &webConversationReading{domain: digest.New(service), enabled: enabled, sessions: map[string]webSessionReading{}, now: time.Now}
 	return h
+}
+
+// upsert folds a document a background task read into the session's kept set,
+// replacing the entry of its own URL and keeping the set capped. A session that
+// moved on (or never had this reading) is left alone: a deferred follow-up must
+// not resurrect readings the conversation already dropped.
+func (w *webConversationReading) upsert(key, sessionID string, document chat.WebDocument) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	saved := w.sessions[key]
+	if saved.id == "" || saved.id != sessionID {
+		return
+	}
+	for i := range saved.documents {
+		if saved.documents[i].URL == document.URL {
+			saved.documents[i] = document
+			w.sessions[key] = saved
+			return
+		}
+	}
+	saved.documents = append(saved.documents, document)
+	if len(saved.documents) > chat.MaxWebLinks {
+		saved.documents = saved.documents[len(saved.documents)-chat.MaxWebLinks:]
+	}
+	w.sessions[key] = saved
 }
 
 // WithSocialMediaVision lets chat read media a post reader delivered: a reel's frames, a
@@ -166,10 +195,18 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 				if _, ok := stored[link.URL]; ok {
 					// The fresh read failed but an earlier read of this same URL is kept:
 					// serve that copy, marked as possibly outdated in the turn notice.
+					// A served copy never defers: the speaker already has something.
 					data.ServedStored = append(data.ServedStored, link.URL)
 					continue
 				}
-				data.Failures = append(data.Failures, webFailure{link.URL, digest.WebFailureReason(err)})
+				reason := digest.WebFailureReason(err)
+				data.Failures = append(data.Failures, webFailure{link.URL, reason})
+				// A transient failure may settle later: the turn promises a follow-up
+				// and a background re-read comes back to the channel (ADR 0017).
+				if event.Source == core.SourceDiscord && h.proactive != nil && chat.DeferredReadingReason(reason) {
+					data.Deferred = append(data.Deferred, link.URL)
+					h.deferReading(ctx, event, link.URL, question)
+				}
 				continue
 			}
 			document, err := decodeWebDocument(result)
@@ -523,6 +560,9 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 	}
 	if len(data.ServedStored) > 0 {
 		lines = append(lines, catalog.say("served_stored", "count", fmt.Sprint(len(data.ServedStored))))
+	}
+	if len(data.Deferred) > 0 {
+		lines = append(lines, catalog.say("deferred_promise", "count", fmt.Sprint(len(data.Deferred))))
 	}
 	if data.FailureOnly {
 		lines = append(lines, catalog.say("recovery"))
