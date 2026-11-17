@@ -52,13 +52,13 @@ the interface. Unsupported expressions or unavailable rendering preserve text.
 
 Run `go test ./...` inside this module.
 
-`capabilities.json` is a versioned, public catalog of implemented product
-abilities grouped by interface (how to use each one there), with each
-ability's description and practical limits kept once. The Go package
-embeds it at build time and supplies a compact `CapabilityContext()` independently
-of conversational history. Update the catalog with feature changes and rebuild
-the orchestrator to apply it; it contains no private accounts, credentials or
-runtime endpoints.
+`locales/capabilities_en.json` and `locales/capabilities_pt.json` are versioned,
+public catalogs of implemented product abilities grouped by interface (how to use
+each one there), with each ability's description and practical limits kept once,
+one full catalog per locale. The Go package embeds them at build time and supplies
+a compact `CapabilityContext(source, locale)` independently of conversational
+history. Update the catalogs with feature changes and rebuild the orchestrator to
+apply them; they contain no private accounts, credentials or runtime endpoints.
 
 The orchestrator adds this context to every generated chat turn, including voice,
 streamed replies and plain-generator fallbacks, and reinjects it after history
