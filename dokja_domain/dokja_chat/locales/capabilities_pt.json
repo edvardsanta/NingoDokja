@@ -115,6 +115,10 @@
       {
         "id": "price.compare",
         "usage": "Use /comparar_produto com o nome de um produto, código ou link de loja — mais orçamento, uso pretendido e equipamento atual opcionais — para comparar ofertas entre lojas e julgar o preço contra o histórico."
+      },
+      {
+        "id": "reading.deferred",
+        "usage": "Quando um link falha na leitura por um motivo transitório, o Ningo avisa que vai tentar de novo e depois posta uma resposta de follow-up na mensagem original com a leitura."
       }
     ],
     "whatsapp": [
@@ -250,6 +254,15 @@
         "Um link de loja é identificado pelo texto do seu endereço e lido do catálogo da própria loja, nunca aberto como página.",
         "Um produto desconhecido é pesquisado uma vez e depois comparado; ofertas que o coletor não registrou não são inventadas.",
         "O veredito vem do histórico de preços registrado do produto; sem histórico, a comparação diz o que falta em vez de chutar."
+      ]
+    },
+    "reading.deferred": {
+      "description": "Tenta de novo em segundo plano um link que falhou por motivo transitório e entrega uma resposta curta com citações no canal, como resposta à mensagem original.",
+      "limits": [
+        "Só falhas transitórias adiam: sites que bloqueiam, tempos de espera e páginas indisponíveis. Recusas permanentes, documentos ilegíveis, arquivos grandes demais e links servidos de uma leitura anterior guardada nunca prometem follow-up.",
+        "No máximo uma leitura adiada por canal; a promessa expira em dez minutos, e um reinício esquece toda promessa pendente.",
+        "Só a aplicação faz a promessa e reporta o assentamento; o modelo não deve inventar nenhum dos dois.",
+        "Disponível só no Discord, onde a entrega proativa existe."
       ]
     }
   }

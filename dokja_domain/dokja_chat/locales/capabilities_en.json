@@ -115,6 +115,10 @@
       {
         "id": "price.compare",
         "usage": "Use /compare_product (/comparar_produto in Portuguese) with a product name, code or store link — plus optional budget, intended use and current equipment — to compare offers across stores and judge the price against its history."
+      },
+      {
+        "id": "reading.deferred",
+        "usage": "When a link fails to read for a transient reason, Ningo says it will retry and later posts a follow-up reply to the original message with the reading."
       }
     ],
     "whatsapp": [
@@ -250,6 +254,15 @@
         "A store link is identified from its address text and read from the store's own catalog, never opened as a page.",
         "An unknown product is looked up once and then compared; offers the collector did not record are not invented.",
         "The verdict comes from the product's recorded price history; without history the comparison says what is missing instead of guessing."
+      ]
+    },
+    "reading.deferred": {
+      "description": "Retry a link that failed transiently in the background and deliver a short cited follow-up reply to the channel, as a reply to the original message.",
+      "limits": [
+        "Only transient failures defer: blocked sites, timeouts and unavailable pages. Permanent refusals, unreadable documents, oversize files and links served from a kept earlier reading never promise a follow-up.",
+        "At most one deferred reading per channel; the promise expires after ten minutes, and a restart forgets every pending promise.",
+        "Only the application makes the promise and reports the settlement; the model must not invent either.",
+        "Available on Discord only, where proactive delivery exists."
       ]
     }
   }
