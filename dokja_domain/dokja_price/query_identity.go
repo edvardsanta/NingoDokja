@@ -20,7 +20,25 @@ func comparisonWords(text string) []string {
 	return tokens
 }
 
+// comparisonMatches reports whether a query names a known product: every query
+// token must appear in the product's title words, with digit tokens matching
+// exactly, so a base model never silently answers for a different variant.
 func comparisonMatches(product Product, query string) bool {
+	return comparisonMatchesWith(product, query, false)
+}
+
+// comparisonMatchesVariant relaxes the digit rule: a digit token also matches a
+// title word that starts with it and continues with purely alphabetic suffixes,
+// so "5600" finds "5600GT" and "5600XT", the way stores compound model numbers.
+// It is the fallback for when the strict matcher found nothing: a base model
+// whose listings only exist as variants is still findable. "5" never matches
+// "5600GT" (the remainder is not purely alphabetic), and "5600" never matches
+// "56000".
+func comparisonMatchesVariant(product Product, query string) bool {
+	return comparisonMatchesWith(product, query, true)
+}
+
+func comparisonMatchesWith(product Product, query string, variantSuffixes bool) bool {
 	if part := alnum(product.PartNumber); len(part) >= 6 && alnum(query) == part {
 		return true
 	}
@@ -40,7 +58,7 @@ func comparisonMatches(product Product, query string) bool {
 		if strings.IndexFunc(token, unicode.IsDigit) >= 0 {
 			found := false
 			for _, word := range identity {
-				if word == token {
+				if word == token || variantSuffixes && strings.HasPrefix(word, token) && suffixIsAlpha(word, token) {
 					found = true
 					break
 				}
@@ -53,4 +71,10 @@ func comparisonMatches(product Product, query string) bool {
 		}
 	}
 	return true
+}
+
+// suffixIsAlpha reports whether word continues token with purely alphabetic
+// characters: "5600" → "5600XT" yes, "5" → "5600XT" no, "5600" → "56000" no.
+func suffixIsAlpha(word, token string) bool {
+	return strings.TrimLeftFunc(word[len(token):], unicode.IsLetter) == ""
 }
