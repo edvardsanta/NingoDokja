@@ -93,6 +93,32 @@ export function DigestCard({ transport }: { transport: Transport }) {
   );
 }
 
+// Plugin inventory uses the existing orchestrator contract; it never calls Feeds directly.
+export function PluginsCard({ transport }: { transport: Transport }) {
+  const t = useTranslate();
+  const load = useCallback(() => loadDigestStatus(transport), [transport]);
+  const { state, poll, refreshing } = useCard(load);
+  useEffect(() => {
+    if (refreshing || state.phase === "loading") return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") poll();
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [state, poll, refreshing]);
+  return <CardFrame title={t("plugins_title")} state={state} onReload={poll}>
+    {(status) => <>
+      <p className="detail">{t("plugins_intro")}</p>
+      {status.off ? <OffNotice reason={status.reason} /> : <>
+        {status.directoryError && <Notice>{t("digest_directory_error", { message: status.directoryError })}</Notice>}
+        {!status.configured && <Notice>{t("digest_not_configured")}</Notice>}
+        {status.sources.length === 0 && !status.providers?.length && <p>{t("plugins_empty")}</p>}
+        {status.sources.length > 0 && <><p className="detail">{t("plugins_sources_hint")}</p><SourceList sources={status.sources} title="plugins_sources" open /></>}
+        {!!status.providers?.length && <><p className="detail">{t("plugins_processing_hint")}</p><SourceList sources={status.providers} title="plugins_processing" open processing /></>}
+      </>}
+    </>}
+  </CardFrame>;
+}
+
 function DigestBody({ transport, status }: { transport: Transport; status: DigestStatus }) {
   const t = useTranslate();
   const following = followingOf(status);

@@ -30,7 +30,7 @@ describe("local runtime modules",()=>{
   await screen.findByText("Starting");
   expect(row("Starting")?.getAttribute("data-tone")).toBe("progress");
   expect(screen.getByText("Feeds").closest("li")?.getAttribute("data-tone")).toBe("progress");
-  expect(row("Running (readiness not checked)")?.getAttribute("data-tone")).toBe("ok");
+  expect(row("Running (readiness not checked)")?.getAttribute("data-tone")).toBe("unchecked");
  });
  it("keeps the module list on screen while polling a busy operation",async()=>{
   const later=deferred<ReturnType<typeof page>>();
@@ -95,6 +95,8 @@ it("shows one module row and separates lifecycle from optional request handling"
   // the screen opens on Talk; the modules are on System
   fireEvent.click(screen.getByRole("tab", { name: "System" }));
   await screen.findByText("Options for Memory");
+  const activity = screen.getByText("Activity: Working");
+  expect(activity.closest("details")).toBeNull();
   expect(screen.getAllByText("Memory", { selector: ".service-name" })).toHaveLength(1);
   // settings and providers are views of System of their own, opened from its tabs
   expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual(["Modules"]);

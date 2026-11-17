@@ -25,6 +25,7 @@ type Change = { module: RuntimeModule; enabled: boolean };
 
 type Props = {
   transport: Transport;
+  moduleStatus?: (name: RuntimeModule) => ReactNode;
   moduleDetails?: (name: RuntimeModule) => ReactNode;
   onChanged?: () => void;
   renderActivity?: (runtimeAvailable: boolean) => ReactNode;
@@ -33,7 +34,7 @@ type Props = {
   startNotice?: (name: RuntimeModule) => string[] | undefined;
 };
 
-export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivity, startNotice }: Props) {
+export function RuntimeCard({ transport, moduleStatus, moduleDetails, onChanged, renderActivity, startNotice }: Props) {
   const t = useTranslate();
   const [asking, setAsking] = useState<RuntimeModule>();
   const load = useCallback(async (): Promise<LoadResult<RuntimeSnapshot>> => {
@@ -53,6 +54,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
   const snapshot = state.phase === "ready" ? state.data : undefined;
   const busy = action.state.phase === "loading";
 
+  const [backgroundTick, setBackgroundTick] = useState(0);
   const wasBusy = useRef(false);
   useEffect(() => {
     if (!snapshot) return;
@@ -67,10 +69,13 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
     if (action.state.phase === "ready" || action.state.phase === "error") refresh();
   }, [action.state, refresh]);
   useEffect(() => {
-    if (!snapshot?.busy) return;
-    const timer = setTimeout(poll, 1200);
+    if (!snapshot) return;
+    const timer = setTimeout(() => {
+      if (document.visibilityState !== "hidden") poll();
+      else setBackgroundTick((value) => value + 1);
+    }, snapshot.busy ? 1200 : 10_000);
     return () => clearTimeout(timer);
-  }, [snapshot, poll]);
+  }, [snapshot, poll, backgroundTick]);
 
   return <CardFrame title={t("runtime_title")} state={state} onReload={refresh} supplement={renderActivity?.(state.phase !== "error")}>
     {(view) => <>
@@ -82,7 +87,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
         const details = moduleDetails?.(module.name);
         const label = displayName(module.name, t);
         const moving = module.state === "starting" || module.state === "stopping";
-        return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : moving ? "progress" : "ok"}>
+        return <li key={module.name} data-tone={module.state === "failed" ? "problem" : start ? "off" : moving ? "progress" : module.state === "running" ? "unchecked" : "ok"}>
           <span className="service-name" title={module.name}>{label}</span>
           <span className="service-status">{view.error ? t("runtime_unknown") : t(STATES[module.state])}</span>
           <Button extra="switch" disabled={!!busy || !!view.error || module.state === "starting" || module.state === "stopping"}
@@ -90,6 +95,7 @@ export function RuntimeCard({ transport, moduleDetails, onChanged, renderActivit
             onClick={() => start && DELIVERY_MODULES.includes(module.name) ? setAsking(module.name) : action.start({ module: module.name, enabled: start })}>
             {t(start ? "runtime_start" : "runtime_stop")}
           </Button>
+          {moduleStatus && <div className="module-health">{moduleStatus(module.name)}</div>}
           {module.progress && <p className="module-progress">{progressText(module.progress, t)}</p>}
           <RuntimeLogs transport={transport} name={module.name} label={label} />
           {asking === module.name && start && <div className="module-confirm" role="alertdialog" aria-label={t("runtime_confirm_title", { name: label })}>

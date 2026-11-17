@@ -9,6 +9,7 @@ const NAMES: Readonly<Record<string, MessageId>> = {
   "chat_ai": "name_chat_ai",
   "chat": "name_chat_ai",
   "feeds": "name_feeds",
+  "vision": "name_vision",
   "voice": "name_voice",
   "communications": "name_communications",
   "whatsapp": "name_whatsapp",

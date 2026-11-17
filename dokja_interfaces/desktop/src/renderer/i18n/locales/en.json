@@ -1020,5 +1020,15 @@
   "proposals_reject": "Reject",
   "proposals_approved": "Approved and stored.",
   "proposals_rejected_note": "Rejected and forgotten.",
-  "proposals_refused": "kept pending: {reason}"
+  "proposals_refused": "kept pending: {reason}",
+  "verification_title": "Verification pending",
+  "verification_hint": "{count} items have no functional check. This does not confirm a failure. Running modules and enabled automation do not guarantee that a feature is working.",
+  "name_vision": "Vision",
+  "plugins_title": "Plugins",
+  "plugins_intro": "These plugins run inside Feeds, not as separate modules. Start Feeds in Status. This inventory shows what Feeds reports; it is unavailable when the service cannot respond.",
+  "plugins_empty": "No plugins reported by Feeds.",
+  "plugins_sources": "Collection plugins",
+  "plugins_processing": "Processing plugins",
+  "plugins_sources_hint": "Collection plugins bring readings and media. Check the last successful run and any error below. Enabled does not mean a collection has succeeded.",
+  "plugins_processing_hint": "Processing plugins provide capabilities used on demand. Ready means available for a request; it does not confirm a successful execution."
 }

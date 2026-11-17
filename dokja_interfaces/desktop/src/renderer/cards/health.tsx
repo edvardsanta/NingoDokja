@@ -7,6 +7,7 @@ import { displayName } from "../display_names.js";
 import { useTimes, useTranslate } from "../i18n/context.js";
 import type { MessageId } from "../i18n/i18n.js";
 import { RuntimeEnabled } from "../runtime_context.js";
+import { PluginsCard } from "./digest.js";
 import { RuntimeCard } from "./runtime.js";
 import { ProvidersCard } from "./providers.js";
 import { SettingsCard } from "./settings.js";
@@ -107,16 +108,23 @@ export function HealthCard({ transport }: { transport: Transport }) {
   // Settings and providers belong to the runtime controller; without it System is its status alone.
   const { tabs, panels, currentLabel } = useViewTabs(t("nav_system"), runtimeEnabled ? [
     { id: "status", label: t("system_view_status") },
+    { id: "plugins", label: t("plugins_title") },
     { id: "settings", label: t("system_view_settings") },
     { id: "providers", label: t("system_view_providers") },
   ] : [{ id: "status", label: t("system_view_status") }]);
   const trail = tabs ? [t("nav_system"), currentLabel] : [t("nav_system")];
 
   if (runtimeEnabled) {
-    const status = <>{health && <NeedsAttention health={health} link={link} />}<RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleDetails={(name) => {
+    const status = <>{health && <NeedsAttention health={health} link={link} />}<RuntimeCard transport={transport} onChanged={refresh} startNotice={(name) => health && deliveryNotice(name, health, t)} moduleStatus={(name) => {
+      const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
+      return <>
+        <p className="detail">{t("runtime_activity")}: {row ? stateWord(row, t) : t("status_unchecked")}</p>
+        {row?.enabled !== undefined && <p className="detail">{t("runtime_routing_named", { name: displayName(name, t) })}: {t(row.enabled ? "switch_on" : "switch_off")}</p>}
+        {row?.detail && <p className="detail">{row.detail}</p>}
+      </>;
+    }} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
       return row ? <>
-        <p className="detail">{t("runtime_activity")}: {t((row.state && STATE_IDS[row.state]) || STATUS_IDS[row.status] || "status_unchecked")}{row.detail ? ` · ${row.detail}` : ""}</p>
         {row.enabled !== undefined && <Switch label={t("runtime_routing_named", { name: displayName(name, t) })}
           on={row.enabled} busy={change.state.phase === "loading" || row.configured === false}
           onToggle={() => change.start({ type: "services.set", payload: { name, enabled: !row.enabled } })} />}
@@ -130,7 +138,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
         failure={undefined} onChange={change.start} link={link} unified={runtimeAvailable} />}
     </>} /></>;
     return <WorkspacePanel trail={trail} views={tabs}>
-      {panels((id) => id === "status" ? status : id === "settings" ? <SettingsCard transport={transport} /> : <ProvidersCard transport={transport} />)}
+      {panels((id) => id === "status" ? status : id === "plugins" ? <PluginsCard transport={transport} /> : id === "settings" ? <SettingsCard transport={transport} /> : <ProvidersCard transport={transport} />)}
     </WorkspacePanel>;
   }
 
@@ -173,9 +181,9 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
 
   const { ok, problem, off, unchecked } = health.counts;
   const summary = t("health_summary", { ok, problem, off });
-  const switchableScheduler = health.rows.some((row) => row.name === "scheduler" && row.enabled !== undefined);
+  const switchableScheduler = allHealth.rows.some((row) => row.name === "scheduler" && row.enabled !== undefined);
   // The scheduler's own switch holds every job back, whatever the job's switch says.
-  const schedulerOff = health.rows.some((row) => row.name === "scheduler" && row.enabled === false);
+  const schedulerOff = allHealth.rows.some((row) => row.name === "scheduler" && row.enabled === false);
   return (
     <>
       {!unified && <><div className="strip" aria-hidden="true">
@@ -263,12 +271,15 @@ const needsLink = (row: ServiceRow) => row.name === LINKABLE && row.configured !
 function NeedsAttention({ health, link }: { health: Health; link: Link }) {
   const t = useTranslate();
   const titleId = useId();
-  const rows = [...health.rows, ...health.interfaces].filter((row) => row.tone === "problem" || row.tone === "unchecked");
+  const problems = [...health.rows, ...health.interfaces].filter((row) => row.tone === "problem");
+  const unchecked = [...health.rows, ...health.interfaces].filter((row) => row.tone === "unchecked");
+  const rows = [...problems, ...unchecked];
   if (rows.length === 0) return null;
   return (
     <section className="wp-section attention" aria-labelledby={titleId}>
       {/* no count: the sidebar counts the problems, and this list holds the unchecked too */}
-      <h2 id={titleId}>{t("attention_title")}</h2>
+      <h2 id={titleId}>{t(problems.length ? "attention_title" : "verification_title")}</h2>
+      {unchecked.length > 0 && <p className="detail">{t("verification_hint", { count: unchecked.length })}</p>}
       <ul className="attention-list">
         {rows.map((row) => (
           <li key={row.name} data-tone={row.tone}>
