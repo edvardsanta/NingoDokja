@@ -9,7 +9,7 @@ func TestReadingOverlap(t *testing.T) {
 		want     bool
 	}{
 		{"AAAAAAAAAAAAAAAA", false},
-		{"gay", false},
+		{"kkkkk", false},
 		{"jo", false},
 		{"burger", false},
 		{"PARA DE FALAR DE ASSUNTO!!!", false},

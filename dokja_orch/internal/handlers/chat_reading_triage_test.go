@@ -53,7 +53,7 @@ func readThenSay(t *testing.T, generator ChatGenerator, say string) {
 // banter in the channel were answered with citations of that page.
 // The messages are Portuguese on purpose: they are the channel noise that reproduced the bug.
 func TestKeptReadingStaysOutOfUnrelatedMessages(t *testing.T) {
-	for _, noise := range []string{"AAAAAAAAAAAAAAAA", "gay", "jo", "burger", "PARA DE FALAR DESSE ASSUNTO!!!"} {
+	for _, noise := range []string{"AAAAAAAAAAAAAAAA", "kkkkk", "jo", "burger", "PARA DE FALAR DESSE ASSUNTO!!!"} {
 		generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
 		readThenSay(t, generator, noise)
 		if sentEvidence(generator) {
