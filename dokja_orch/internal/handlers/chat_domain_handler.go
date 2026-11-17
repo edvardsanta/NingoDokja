@@ -61,12 +61,17 @@ type ChatDomainHandler struct {
 	incoming     *IncomingContentWorkflow
 	web          *webConversationReading
 	socialVision *socialMediaReading
-	images       *imageReading
-	macro        *macroContext
-	ningo        chat.NingoFacts
-	visions      string
-	quizRuns     QuizRunReader
-	warm         string
+	// proactive delivers deferred-reading follow-ups to a channel with no request
+	// driving them; nil disables deferral.
+	proactive ProactiveDeliverer
+	// deferred is the volatile registry of promised follow-ups (ADR 0017).
+	deferred *deferredReadingRegistry
+	images   *imageReading
+	macro    *macroContext
+	ningo    chat.NingoFacts
+	visions  string
+	quizRuns QuizRunReader
+	warm     string
 	// selfChat chooses, for the owner writing from the phone, the conversation a turn continues.
 	selfChat sync.Mutex
 	// selfChatState is what the self-chat's commands remember between messages; selfChat guards it.
@@ -121,6 +126,7 @@ func NewChatDomainHandler(generator ChatGenerator) *ChatDomainHandler {
 		focus:       newChatFocus(),
 		sends:       core.NewOrderedQueue(maxWaitingSends),
 		running:     core.NewRunningSends(),
+		deferred:    newDeferredReadingRegistry(),
 	}
 }
 

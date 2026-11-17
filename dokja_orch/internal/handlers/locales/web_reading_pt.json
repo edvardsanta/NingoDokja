@@ -7,5 +7,7 @@
   "blocked_one": "O site bloqueou a leitura automática de um dos links. Não li esse conteúdo.",
   "blocked_many": "A leitura automática foi bloqueada em {count} links. Não li esses conteúdos.",
   "recovery": "Cole aqui o texto ou um trecho para conversarmos com citações.",
-  "served_stored": "Não consegui reler {count} link(s) agora e usei a cópia guardada de uma leitura anterior nesta conversa; o conteúdo pode estar desatualizado."
+  "served_stored": "Não consegui reler {count} link(s) agora e usei a cópia guardada de uma leitura anterior nesta conversa; o conteúdo pode estar desatualizado.",
+  "deferred_promise": "Não consegui ler {count} link(s) agora — vou tentar de novo em segundo plano e volto aqui com o resultado.",
+  "deferred_failed": "Tentei de novo o link de antes e não consegui ler mesmo; ele segue indisponível. Se quiser conversar sobre o conteúdo, cole o texto aqui."
 }

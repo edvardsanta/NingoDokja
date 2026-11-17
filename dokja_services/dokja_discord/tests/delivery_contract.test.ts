@@ -193,6 +193,39 @@ test("delivery attaches bytes it was given instead of fetching the url again", a
   assert.equal(uploadedFilename, "clip.mp4");
 });
 
+test("delivery posts a reply reference on the bot path and ignores it on webhooks", async () => {
+  let botBody = "";
+  const bot = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-1", content: "voltei com a leitura", reply_to_message_id: "original-1" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      fetchImpl: async (input, init) => {
+        botBody = String(init?.body ?? "");
+        return new Response(JSON.stringify({ id: "m-reply" }), { status: 200 });
+      },
+    },
+  );
+  assert.equal(bot.statusCode, 200);
+  assert.equal(JSON.parse(botBody).message_reference.message_id, "original-1");
+
+  let webhookBody = "";
+  const webhook = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", content: "voltei com a leitura", reply_to_message_id: "original-1" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      webhooks: { "channel-9": "https://discord.test/api/webhooks/1/abc" },
+      fetchImpl: async (_input, init) => {
+        webhookBody = String(init?.body ?? "");
+        return new Response(JSON.stringify({ id: "m-webhook" }), { status: 200 });
+      },
+    },
+  );
+  assert.equal(webhook.statusCode, 200);
+  assert.equal(JSON.parse(webhookBody).message_reference, undefined);
+});
+
 test("parseWebhookMap splits on first equals and skips malformed entries", () => {
   assert.deepEqual(
     parseWebhookMap(" 1=https://d.test/api/webhooks/1/a?thread_id=5 , bad, 2=https://d.test/api/webhooks/2/b ,=x"),

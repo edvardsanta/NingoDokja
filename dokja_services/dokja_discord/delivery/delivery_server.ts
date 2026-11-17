@@ -17,6 +17,10 @@ export type DiscordDeliveryRequest = {
   // only to derive a filename; it is not fetched again when this is set.
   attachment_data_b64?: string;
   attachment_content_type?: string;
+  // Posts the message as a reply to this earlier channel message (a deferred
+  // reading settling its promise). Only the bot-token path can reply; the
+  // webhook path ignores it.
+  reply_to_message_id?: string;
 };
 
 export type DiscordDeliveryResponse = {
@@ -151,7 +155,14 @@ export async function handleDiscordDeliveryRequest(
     : await deps.fetchImpl(target.url, {
         method: "POST",
         headers: { ...target.headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          // Webhooks cannot reply; the bot-token path references the original
+          // message when the caller asked for it.
+          ...(body.reply_to_message_id && !webhookUrl
+            ? { message_reference: { message_id: body.reply_to_message_id } }
+            : {}),
+        }),
       });
 
   if (!response.ok) {
@@ -267,6 +278,7 @@ function parseDeliveryRequest(body: Record<string, unknown>): DiscordDeliveryReq
     attachment_url: String(body.attachment_url ?? "").trim() || undefined,
     attachment_data_b64: String(body.attachment_data_b64 ?? "").trim() || undefined,
     attachment_content_type: String(body.attachment_content_type ?? "").trim() || undefined,
+    reply_to_message_id: String(body.reply_to_message_id ?? "").trim() || undefined,
   };
 }
 

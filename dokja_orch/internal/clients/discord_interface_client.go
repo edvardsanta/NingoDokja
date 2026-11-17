@@ -28,6 +28,10 @@ type DiscordDeliveryRequest struct {
 	AttachmentURL         string `json:"attachment_url,omitempty"`
 	AttachmentDataB64     string `json:"attachment_data_b64,omitempty"`
 	AttachmentContentType string `json:"attachment_content_type,omitempty"`
+	// ReplyToMessageID asks the interface to post this message as a reply to an
+	// earlier channel message (a deferred reading settling an original command).
+	// Interfaces that cannot reply ignore it.
+	ReplyToMessageID string `json:"reply_to_message_id,omitempty"`
 }
 
 type DiscordDeliveryResponse struct {
@@ -64,6 +68,21 @@ func (c *DiscordInterfaceClient) Deliver(ctx context.Context, channelID, content
 		ChannelID:     strings.TrimSpace(channelID),
 		Content:       strings.TrimSpace(content),
 		AttachmentURL: strings.TrimSpace(attachmentURL),
+	})
+	return err
+}
+
+// DeliverReply posts a new message to a channel as a reply to an earlier message,
+// for follow-ups no request is driving (a deferred reading settling its promise).
+// Interfaces that cannot reply post it as an ordinary channel message.
+func (c *DiscordInterfaceClient) DeliverReply(ctx context.Context, channelID, content, replyToMessageID string) error {
+	if strings.TrimSpace(content) == "" {
+		return fmt.Errorf("discord delivery requires content")
+	}
+	_, err := c.deliver(ctx, DiscordDeliveryRequest{
+		ChannelID:        strings.TrimSpace(channelID),
+		Content:          strings.TrimSpace(content),
+		ReplyToMessageID: strings.TrimSpace(replyToMessageID),
 	})
 	return err
 }
