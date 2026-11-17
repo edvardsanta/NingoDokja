@@ -24,6 +24,20 @@ func TestPDFReadingPlanUsesTheLinkBudgetAndRejectsInvalidMetadata(t *testing.T) 
 	}
 }
 
+func TestPlainTextAttachmentsShareTheDocumentBudget(t *testing.T) {
+	attachments := []WebAttachment{
+		{URL: "https://cdn.example.com/message.txt", Filename: "message.txt", ContentType: "text/plain", Size: 39000},
+		{URL: "https://cdn.example.com/notes", Filename: "notes", ContentType: "text/plain", Size: 10},
+		{URL: "https://cdn.example.com/large.txt", Filename: "large.txt", Size: MaxWebDocumentBytes + 1},
+		{URL: "https://cdn.example.com/run.sh", Filename: "run.sh", ContentType: "text/x-shellscript", Size: 10},
+		{URL: "file:///etc/passwd", Filename: "passwd.txt"},
+	}
+	requests := PlanWebReadings("", attachments)
+	if len(requests) != 4 || requests[0].Error != "" || requests[1].Error != "" || requests[2].Error != "too_large" || requests[3].Error != "unreadable" {
+		t.Fatal(requests)
+	}
+}
+
 func TestPDFFollowupCanSelectAnOriginalPageBeyondTheFirstReply(t *testing.T) {
 	document := WebDocument{URL: "https://example.com/file.pdf"}
 	for i := 1; i <= 30; i++ {

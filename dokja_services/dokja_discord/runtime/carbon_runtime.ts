@@ -12,7 +12,7 @@ import {
   TextInputStyle,
 } from "@buape/carbon";
 import { GatewayPlugin, GatewayIntents } from "@buape/carbon/gateway";
-import { pdfAttachments } from "../messages/documents.js";
+import { documentAttachments } from "../messages/documents.js";
 
 import { getDiscordGatewayEmitter, waitForDiscordGatewayStop } from "./gateway.js";
 import { probeDiscordApplication } from "./probe.js";
@@ -162,7 +162,7 @@ class DokjaCarbonMessageListener extends MessageCreateListener {
       messageId: message.id,
       guildId: data.guild?.id,
       content: message.content?.trim() ?? "",
-      documentAttachments: pdfAttachments(message.rawData.attachments ?? []),
+      documentAttachments: documentAttachments(message.rawData.attachments ?? []),
       isBot: Boolean(author.bot),
       isDirectMessage: !message.rawData.guild_id,
       mentionsBot: this.botUserId
