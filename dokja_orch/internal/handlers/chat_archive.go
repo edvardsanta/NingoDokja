@@ -212,7 +212,7 @@ func (h *ChatDomainHandler) answerArchived(ctx context.Context, event core.Event
 	if err != nil {
 		return nil, h.failArchived(ctx, scope, turn, err.Error())
 	}
-	raw := strings.TrimSpace(chatReplyFromResult(result))
+	raw := strings.TrimSpace(stripReplyPreamble(chatReplyFromResult(result)))
 	if raw == "" {
 		return nil, h.failArchived(ctx, scope, turn, "the model returned no reply")
 	}
