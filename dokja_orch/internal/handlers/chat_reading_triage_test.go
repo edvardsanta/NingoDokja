@@ -51,6 +51,7 @@ func readThenSay(t *testing.T, generator ChatGenerator, say string) {
 
 // Regression: a page read earlier was attached to every later message, so keyboard mashing and
 // banter in the channel were answered with citations of that page.
+// The messages are Portuguese on purpose: they are the channel noise that reproduced the bug.
 func TestKeptReadingStaysOutOfUnrelatedMessages(t *testing.T) {
 	for _, noise := range []string{"AAAAAAAAAAAAAAAA", "gay", "jo", "burger", "PARA DE FALAR DESSE ASSUNTO!!!"} {
 		generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
