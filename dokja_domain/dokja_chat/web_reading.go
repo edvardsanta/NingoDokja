@@ -32,9 +32,18 @@ type WebAttachment struct {
 	Size        int64  `json:"size"`
 }
 
+// isReadableDocumentAttachment accepts what the bounded web reader handles:
+// PDFs and plain-text files, by extension or declared content type.
+func isReadableDocumentAttachment(attachment WebAttachment) bool {
+	extension := strings.ToLower(path.Ext(attachment.Filename))
+	contentType := strings.ToLower(strings.TrimSpace(attachment.ContentType))
+	return extension == ".pdf" || extension == ".txt" ||
+		contentType == "application/pdf" || contentType == "text/plain"
+}
+
 type WebReadingRequest struct{ URL, Error string }
 
-// PlanWebReadings shares the existing per-turn link budget with PDF attachments.
+// PlanWebReadings shares the existing per-turn link budget with document attachments.
 func PlanWebReadings(message string, attachments []WebAttachment) []WebReadingRequest {
 	return PlanWebReadingsWithLimit(message, attachments, MaxWebDocumentBytes)
 }
@@ -50,7 +59,7 @@ func PlanWebReadingsWithLimit(message string, attachments []WebAttachment, limit
 		if seen[attachment.URL] {
 			continue
 		}
-		if !strings.EqualFold(path.Ext(attachment.Filename), ".pdf") && !strings.EqualFold(attachment.ContentType, "application/pdf") {
+		if !isReadableDocumentAttachment(attachment) {
 			continue
 		}
 		request := WebReadingRequest{URL: attachment.URL}

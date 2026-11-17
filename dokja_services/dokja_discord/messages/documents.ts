@@ -1,7 +1,8 @@
 import type { DiscordDocumentAttachment, DiscordMessageEmbed } from "../types.js";
 
 // Forward metadata only. The orchestrator authorizes the turn before Feeds fetches bytes.
-export function pdfAttachments(values: Iterable<unknown>): DiscordDocumentAttachment[] {
+// Plain-text files join PDFs: the web reader handles text/plain the same bounded way.
+export function documentAttachments(values: Iterable<unknown>): DiscordDocumentAttachment[] {
   const documents: DiscordDocumentAttachment[] = [];
   for (const value of values) {
     if (!value || typeof value !== "object") continue;
@@ -9,7 +10,8 @@ export function pdfAttachments(values: Iterable<unknown>): DiscordDocumentAttach
     const name = attachment.name ?? attachment.filename;
     const contentType = attachment.contentType ?? attachment.content_type ?? "";
     if (typeof name !== "string" || typeof contentType !== "string"
-      || (!name.toLowerCase().endsWith(".pdf") && contentType.toLowerCase() !== "application/pdf")
+      || (!name.toLowerCase().endsWith(".pdf") && contentType.toLowerCase() !== "application/pdf"
+        && !name.toLowerCase().endsWith(".txt") && contentType.toLowerCase() !== "text/plain")
       || typeof attachment.url !== "string" || attachment.url.length > 2048
       || typeof attachment.size !== "number" || !Number.isSafeInteger(attachment.size)) continue;
     documents.push({ url: attachment.url, filename: name.slice(0, 200), content_type: contentType.slice(0, 100), size: attachment.size });
