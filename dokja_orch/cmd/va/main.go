@@ -272,6 +272,14 @@ func main() {
 	priceHandler := handlers.NewPriceDomainHandler(priceDomain, handlers.NewPriceIntakeTask(
 		feedsClient, priceDomain, func() bool { return controls == nil || controls.ServiceEnabled("feeds") },
 	)).WithCommenter(clients.NewChatProviderClient(""))
+	// A watched search that collected nothing promises a return (ADR 0018): the first
+	// recorded prices deliver a follow-up to the original command message.
+	priceNotificationsStore, err := deferredreadings.Open(deferredreadings.PathFor(sharedPath, "dokja_price_notifications.json"))
+	if err != nil {
+		logger.Error("open price notifications store", err)
+		os.Exit(1)
+	}
+	priceHandler.WithPriceNotifier(handlers.NewPriceNotifier(priceNotificationsStore, clients.NewDiscordInterfaceClient(""), priceDomain))
 	if competitorCache != nil {
 		priceHandler.
 			WithCompetitorQueryCache(competitorCache).

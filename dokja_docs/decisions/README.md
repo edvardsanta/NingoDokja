@@ -30,7 +30,9 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0015](./0015-price-history-domain.md) | A store-agnostic Price domain owns watched-product price history; owner collectors speak `price.observation.v1` through Feeds | Proposed; PostgreSQL confirmed by the owner; domain, orchestrator intake and PostgreSQL adapter implemented |
 
-| [0017](./0017-deferred-reading-followup.md) | A failed transient link read may defer: the orchestrator re-reads in the background and proactively delivers a cited follow-up reply | Proposed; no code yet |
+| [0017](./0017-deferred-reading-followup.md) | A failed transient link read may defer: the orchestrator re-reads in the background and proactively delivers a cited follow-up reply | Implemented (#461); the registry became resilient (#466) |
+
+| [0018](./0018-price-first-observation-notification.md) | A watched search that collected nothing promises a follow-up; the first recorded prices trigger a proactive reply to the original command | Implemented in `feat/price-notification` |
 
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):

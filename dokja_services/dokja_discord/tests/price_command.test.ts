@@ -378,7 +378,17 @@ test("a new watch the orchestrator already collected says so, with or without pr
   assert.match(found.content, /^👁️ Passei a vigiar \*\*hd\*\* e já busquei agora\./);
   assert.doesNotMatch(found.content, /pergunte de novo/);
   assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "added", collected: true } }, "en"),
-    "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing.");
+    "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing. I will let you know here when prices arrive.");
+});
+
+test("a watched search with nothing yet promises a return, in both locales", () => {
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "watched" } }, "pt-BR"),
+    "Nenhum produto da watchlist corresponde a essa busca ainda. Essa busca já é vigiada; eu aviso aqui quando chegar.");
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "watched" } }, "en"),
+    "No watched product matches that search yet. That search is already watched; I will let you know here when prices arrive.");
+  // A search the orchestrator never watched keeps the plain "none" answer.
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "not_owner" } }, "pt-BR"),
+    "Nenhum produto da watchlist corresponde a essa busca.");
 });
 
 test("comparison cards show workload context and collected technical references",()=>{

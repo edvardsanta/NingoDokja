@@ -7,6 +7,7 @@ import (
 	pricedomain "read_books/dokja_domain/dokja_price"
 	"read_books/internal/core"
 	"read_books/internal/logger"
+	"strings"
 	"sync"
 	"time"
 )
@@ -37,10 +38,22 @@ type PriceDomainHandler struct {
 	commenter        priceCommenter
 	competitorCache  competitorQueryCache
 	equivalenceCache competitorEquivalenceCache
+	// notifier settles "come back when this watch has prices" promises (ADR 0018).
+	notifier *PriceNotifier
 	// watchWait bounds the wait for a new watched search's first collection; 0 answers at once.
 	watchWait time.Duration
 	// compareTime bounds one comparison; 0 uses compareBudget.
 	compareTime time.Duration
+}
+
+// WithPriceNotifier lets a watched search that collected nothing promise a
+// follow-up; the notifier delivers it when the first prices are recorded.
+func (h *PriceDomainHandler) WithPriceNotifier(notifier *PriceNotifier) *PriceDomainHandler {
+	h.notifier = notifier
+	if h.intake != nil {
+		h.intake.notifier = notifier
+	}
+	return h
 }
 
 func NewPriceDomainHandler(domain *pricedomain.Domain, intake *PriceIntakeTask) *PriceDomainHandler {
@@ -107,7 +120,35 @@ func (h *PriceDomainHandler) Handle(ctx context.Context, event core.Event, workf
 			}
 		}
 	}
+	h.registerPriceNotification(ctx, event, result)
 	return result, err
+}
+
+// registerPriceNotification records the ADR 0018 promise at its deterministic
+// moments: a Discord search over a watch that exists — newly added and collected
+// at once with nothing, or watched for a while and still with nothing. The
+// interface sentence says the return is coming; the notifier settles it.
+func (h *PriceDomainHandler) registerPriceNotification(ctx context.Context, event core.Event, result map[string]any) {
+	if h.notifier == nil || event.Source != core.SourceDiscord {
+		return
+	}
+	watch, ok := result["watch"].(map[string]any)
+	if !ok {
+		return
+	}
+	status, _ := watch["status"].(string)
+	promising := status == "watched" || (status == "added" && watch["collected"] == true)
+	if !promising {
+		return
+	}
+	if products, _ := result["products"].([]any); len(products) > 0 {
+		return
+	}
+	category, _ := watch["category"].(string)
+	brand, _ := watch["brand"].(string)
+	search := strings.TrimSpace(strings.Join([]string{category, brand}, " · "))
+	search = strings.Trim(search, "· ")
+	h.notifier.Register(ctx, event, pricedomain.Watch{Category: category, Brand: brand}, search)
 }
 
 // PriceIntakeTask collects the watched searches. It asks the Price domain what to look for,
@@ -123,6 +164,7 @@ type PriceIntakeTask struct {
 	domain   *pricedomain.Domain
 	enabled  func() bool
 	deadline time.Duration
+	notifier *PriceNotifier
 
 	mu      sync.Mutex
 	running bool
@@ -252,6 +294,14 @@ func (t *PriceIntakeTask) run(ctx context.Context, event core.Event, only []pric
 	))
 	for _, invalid := range run.outcome.Invalid {
 		logger.Info(fmt.Sprintf("price intake refused item=%s reason=%s", invalid.ID, invalid.Reason))
+	}
+	// A run that recorded new data may settle promised returns (ADR 0018); expiry
+	// runs either way, so an old promise never sits silent.
+	if t.notifier != nil {
+		if run.outcome.Written > 0 {
+			t.notifier.NotifyWatches(context.Background(), run.searches)
+		}
+		t.notifier.ExpireDue(context.Background())
 	}
 	return result, run, nil
 }

@@ -18,7 +18,13 @@ const maxBytes = 1 << 20
 type Store struct{ path string }
 
 func PathBeside(sharedDB string) string {
-	return filepath.Join(filepath.Dir(sharedDB), "dokja_deferred_readings.json")
+	return PathFor(sharedDB, "dokja_deferred_readings.json")
+}
+
+// PathFor places one named snapshot document beside the runtime databases, the
+// same directory the other local stores use.
+func PathFor(sharedDB, filename string) string {
+	return filepath.Join(filepath.Dir(sharedDB), filename)
 }
 
 func Open(path string) (*Store, error) {
