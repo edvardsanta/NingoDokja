@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	datastudio "read_books/internal/infrastructure/data_studio"
 	"read_books/internal/core"
+	datastudio "read_books/internal/infrastructure/data_studio"
 )
 
 // DataStudioSourceLister discovers sources the Data Studio can browse.
@@ -21,13 +21,13 @@ type DataStudioSourceLister interface {
 // DataStudioHandler answers administrative read requests from the Data Studio workspace.
 // It never writes unless an explicit future action is added; the first version is read-only.
 type DataStudioHandler struct {
-	discovery      DataStudioSourceLister
-	sqlite         *datastudio.SQLiteReader
-	postgres       *datastudio.PostgresReader
-	postgresConns  []datastudio.PostgresConnection
-	baseDir        string
-	maxTextBytes   int64
-	maxJSONBytes   int64
+	discovery     DataStudioSourceLister
+	sqlite        *datastudio.SQLiteReader
+	postgres      *datastudio.PostgresReader
+	postgresConns []datastudio.PostgresConnection
+	baseDir       string
+	maxTextBytes  int64
+	maxJSONBytes  int64
 }
 
 // NewDataStudioHandler creates the handler. postgresDSNs maps a display name to a DSN.

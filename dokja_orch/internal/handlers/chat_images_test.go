@@ -188,7 +188,8 @@ func TestImageTurnCitationMarksNeedRealSources(t *testing.T) {
 	}
 }
 
-func TestNonDiscordMessagesIgnoreMediaAttachments(t *testing.T) {	reader := &fakeImageReader{}
+func TestNonDiscordMessagesIgnoreMediaAttachments(t *testing.T) {
+	reader := &fakeImageReader{}
 	g := &fakeChatGenerator{result: map[string]any{"reply": "resposta"}}
 	h := NewChatDomainHandler(g).WithImageReading(reader, nil)
 	event := chatEvent("olha")

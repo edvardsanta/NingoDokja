@@ -28,6 +28,8 @@ var priceNotificationPhrases = map[string]map[string]string{
 	"pt": {
 		"arrived":  "🔎 Chegou preço para **{search}**:",
 		"offer":    "• {title} — {merchant} R$ {price}",
+		"discount": " (de R$ {list})",
+		"market":   " · mercado mín. R$ {price}",
 		"verdict":  "Veredito completo: /preco produto:{search}",
 		"expired":  "Tentei de novo **{search}** e as lojas ainda não trouxeram nada; parei de vigiar esse retorno.",
 		"noPrices": "Tentei de novo **{search}** e as lojas ainda não trouxeram nada. Continuo de olho e volto quando chegar.",
@@ -35,6 +37,8 @@ var priceNotificationPhrases = map[string]map[string]string{
 	"en": {
 		"arrived":  "🔎 Prices arrived for **{search}**:",
 		"offer":    "• {title} — {merchant} R$ {price}",
+		"discount": " (was R$ {list})",
+		"market":   " · market low R$ {price}",
 		"verdict":  "Full verdict: /price product:{search}",
 		"expired":  "I retried **{search}** and the stores still brought nothing; I stopped watching for this return.",
 		"noPrices": "I retried **{search}** and the stores still brought nothing. I am still watching and will come back.",
@@ -261,7 +265,7 @@ func priceNotificationFollowup(event core.Event, search string, result pricedoma
 		if len(lines) == maxPriceNotificationProducts {
 			break
 		}
-		cheapest := cheapestAssessment(product.Assessments)
+		cheapest := cheapestMerchantOffer(product.Assessments)
 		if cheapest == nil || cheapest.Latest.Cents <= 0 {
 			continue
 		}
@@ -269,8 +273,15 @@ func priceNotificationFollowup(event core.Event, search string, result pricedoma
 		if merchant == "" {
 			merchant = "market"
 		}
-		lines = append(lines, priceNotificationPhrase(event, "offer", search,
-			"title", product.Product.Title, "merchant", merchant, "price", formatCents(cheapest.Latest.Cents)))
+		line := priceNotificationPhrase(event, "offer", search,
+			"title", product.Product.Title, "merchant", merchant, "price", formatCents(cheapest.Latest.Cents))
+		if cheapest.Latest.ListCents > cheapest.Latest.Cents {
+			line += priceNotificationPhrase(event, "discount", search, "list", formatCents(cheapest.Latest.ListCents))
+		}
+		if market := cheapestMarketPoint(product.Market); market > 0 && market < cheapest.Latest.Cents {
+			line += priceNotificationPhrase(event, "market", search, "price", formatCents(market))
+		}
+		lines = append(lines, line)
 	}
 	if len(lines) == 0 {
 		return ""
@@ -280,14 +291,26 @@ func priceNotificationFollowup(event core.Event, search string, result pricedoma
 	return header + "\n" + strings.Join(lines, "\n") + "\n" + footer
 }
 
-func cheapestAssessment(assessments []pricedomain.Assessment) *pricedomain.Assessment {
+// cheapestMerchantOffer picks the cheapest store offer; the market aggregate is a
+// reference, not a store to buy from, and never speaks for the product alone.
+func cheapestMerchantOffer(assessments []pricedomain.Assessment) *pricedomain.Assessment {
 	var best *pricedomain.Assessment
 	for i := range assessments {
-		if assessments[i].Latest.Cents <= 0 {
+		if assessments[i].Key.Series == pricedomain.SeriesMarketMin || assessments[i].Latest.Cents <= 0 {
 			continue
 		}
 		if best == nil || assessments[i].Latest.Cents < best.Latest.Cents {
 			best = &assessments[i]
+		}
+	}
+	return best
+}
+
+func cheapestMarketPoint(points []pricedomain.Point) int64 {
+	var best int64
+	for _, point := range points {
+		if point.Cents > 0 && (best == 0 || point.Cents < best) {
+			best = point.Cents
 		}
 	}
 	return best

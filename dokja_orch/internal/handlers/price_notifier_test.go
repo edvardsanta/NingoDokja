@@ -185,3 +185,33 @@ func TestPriceNotificationRegistrationOnlyAtTheDeterministicMoment(t *testing.T)
 		t.Fatal("an uncollected new watch registered")
 	}
 }
+
+func TestPriceNotificationFollowupPrefersStoresAndShowsDiscountAndMarket(t *testing.T) {
+	result := pricedomain.SearchResult{Products: []pricedomain.ProductAssessments{{
+		Product: pricedomain.Product{Key: "pn:example", Title: "Processador Example"},
+		Assessments: []pricedomain.Assessment{
+			{Key: pricedomain.Key{Product: "pn:example", Merchant: "store-b", Series: pricedomain.SeriesMerchant, Kind: pricedomain.KindCard},
+				Latest: pricedomain.Point{On: "2026-11-17", Cents: 120000, ListCents: 150000}},
+			{Key: pricedomain.Key{Product: "pn:example", Merchant: "store-a", Series: pricedomain.SeriesMerchant, Kind: pricedomain.KindPix},
+				Latest: pricedomain.Point{On: "2026-11-17", Cents: 105999, ListCents: 150000}},
+			{Key: pricedomain.Key{Product: "pn:example", Merchant: "gamevalio", Series: pricedomain.SeriesMarketMin, Kind: pricedomain.KindUnknown},
+				Latest: pricedomain.Point{On: "2026-11-17", Cents: 90000}},
+		},
+		Market: []pricedomain.Point{{On: "2026-11-17", Cents: 90000}},
+	}}}
+	content := priceNotificationFollowup(priceNotificationEvent(), "processador example", result)
+	// The store offer speaks, never the market aggregate; the discount and the
+	// market reference annotate the line.
+	if !strings.Contains(content, "store-a R$ 1.059,99") {
+		t.Fatalf("the cheapest store offer is missing: %s", content)
+	}
+	if strings.Contains(content, "gamevalio R$") {
+		t.Fatalf("the market aggregate spoke for the product: %s", content)
+	}
+	if !strings.Contains(content, "mercado mín. R$ 900,00") {
+		t.Fatalf("the market reference is missing: %s", content)
+	}
+	if !strings.Contains(content, "(de R$ 1.500,00)") {
+		t.Fatalf("the list-price discount is missing: %s", content)
+	}
+}
