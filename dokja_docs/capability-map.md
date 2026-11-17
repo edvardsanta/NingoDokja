@@ -831,7 +831,14 @@ socket access and detached daemon bootstrap; the renderer can request only known
 module actions, with a real input gesture for writes. No arbitrary event dispatch,
 command execution, database access or container socket reaches the renderer.
 
-The module inventory includes web search, vision and the shared model engine.
+The module inventory includes web search, vision, the shared model engine and
+the optional local database. Database lifecycle commands include the existing
+storage overlay only when targeting the database; unrelated controls do not
+require its password. `ningo.status` also reports `price_storage`, independently
+of the local database container, using the repository selected at startup.
+A memory fallback stays visible until an orchestrator restart; database-backed
+history is checked read-only against its expected schema, with bounded timeout
+and fixed reason codes rather than raw connection errors.
 Vision prepares its model through `vision_init`, backed by the shared engine;
 init jobs remain managed dependencies. Search is started independently because
 web research is optional to Feeds. Desktop shows direct dependency names and

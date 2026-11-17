@@ -9,6 +9,8 @@ const NAMES: Readonly<Record<string, MessageId>> = {
   "chat_ai": "name_chat_ai",
   "chat": "name_chat_ai",
   "feeds": "name_feeds",
+  "postgres": "name_database",
+  "price_storage": "name_price_storage",
   "search": "name_search",
   "embeddings": "name_model_engine",
   "embedding_init": "name_embedding_init",

@@ -109,6 +109,15 @@ var profiles = []string{"communications", "whatsapp"}
 
 func composeArgs(root string, args []string) []string {
 	all := []string{"compose", "-f", filepath.Join(root, "docker-compose.lite.yml")}
+	// The database overlay requires an owner-supplied password. Include it only
+	// when targeting that service, so optional database configuration never
+	// prevents unrelated module controls from working.
+	for _, arg := range args {
+		if arg == "dokja-postgres" {
+			all = append(all, "-f", filepath.Join(root, "docker-compose.postgres.yml"))
+			break
+		}
+	}
 	for _, profile := range profiles {
 		all = append(all, "--profile", profile)
 	}
@@ -281,6 +290,13 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 			if m.Name == "embeddings" {
 				probe, cancel := context.WithTimeout(ctx, 5*time.Second)
 				_, err := c.Run(probe, "exec", "-T", m.Service, "ollama", "list")
+				cancel()
+				if err == nil {
+					return nil
+				}
+			} else if m.Name == "postgres" {
+				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err := c.Run(probeContext, "exec", "-T", m.Service, "pg_isready", "-U", "dokja", "-d", "dokja")
 				cancel()
 				if err == nil {
 					return nil

@@ -210,3 +210,14 @@ it("shows search and vision with lifecycle controls, usage and dependencies", as
  expect(screen.getByText(/Feeds must also be running and enabled/)).toBeTruthy();
  expect(calls.some(call => call.type === "runtime.set")).toBe(false);
 });
+
+
+it("exposes database controls without implying that price storage is connected", async () => {
+ const { transport, calls } = routedTransport({ "runtime.modules": ok({ modules: [
+  { name: "postgres", state: "stopped", dependencies: [], error: "" },
+ ], busy: false, error: "" }) });
+ show(transport);
+ await screen.findByRole("button", { name: "Start Database" });
+ expect(screen.getByText(/Starting does not configure the price connection/)).toBeTruthy();
+ expect(calls.map(call => call.type)).toEqual(["runtime.modules"]);
+});

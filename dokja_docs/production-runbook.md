@@ -2020,3 +2020,24 @@ Back up PostgreSQL together with the existing SQLite session files for full
 continuity. Restart-only tests preserve the SQLite session ID, restore exact
 page locators from PostgreSQL, and verify no second download is needed. No
 production cutover or deployment is performed by this change.
+
+
+### Desktop database and price persistence visibility
+
+For the local lite stack, System → Status exposes Database with start, stop and
+logs controls. Database commands include `docker-compose.postgres.yml` and
+require the existing `DOKJA_POSTGRES_PASSWORD` configuration. No credential is
+shown in the renderer. Other module commands do not require this optional
+overlay. Stop retains the database volume; starting does not configure any DSN.
+
+The separate Data persistence section reports Price history storage through the
+main orchestrator. It distinguishes an unconfigured connection, startup fallback
+to temporary memory, an unavailable database/schema, and database-backed history
+with a successful read-only schema check. The database module only represents
+the local container; the price DSN may name a different database. A successful
+`pg_isready` check is not evidence that prices can access its namespace.
+
+After repairing a startup database failure, restart the orchestrator to select
+the persistent repository again. The running process does not migrate its
+in-memory history automatically, and a restart discards that temporary history.
+This status check does not verify every table permission or execute a test write.

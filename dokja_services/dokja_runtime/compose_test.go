@@ -228,6 +228,7 @@ func TestDiscordAndSchedulerReadiness(t *testing.T) {
 		name, service string
 		want          []string
 	}{
+		{"postgres", "dokja-postgres", []string{"exec", "-T", "dokja-postgres", "pg_isready", "-U", "dokja", "-d", "dokja"}},
 		{"search", "dokja-search", []string{"exec", "-T", "dokja-search", "python3", "-c", searchHealth}},
 		{"discord", "dokja-discord", []string{"exec", "-T", "dokja-discord", "node", "--input-type=module", "-e", discordHealth}},
 		{"scheduler", "dokja-scheduler", []string{"ps", "--all", "--quiet"}},
@@ -319,5 +320,23 @@ func TestVisionInitWaitsForSuccessfulCompletion(t *testing.T) {
 	module, _ := domain.Lookup("vision_init")
 	if err := c.Ready(context.Background(), module); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDatabaseOverlayOnlyAppliesToDatabaseCommands(t *testing.T) {
+	for _, command := range [][]string{
+		{"up", "-d", "dokja-postgres"}, {"stop", "dokja-postgres"},
+		{"logs", "dokja-postgres"}, {"exec", "-T", "dokja-postgres", "pg_isready"},
+	} {
+		got := strings.Join(composeArgs("/stack", command), " ")
+		if !strings.Contains(got, "-f /stack/docker-compose.postgres.yml") {
+			t.Fatal(got)
+		}
+	}
+	for _, command := range [][]string{{"ps", "--all", "--quiet"}, {"up", "-d", "dokja-memory"}} {
+		got := strings.Join(composeArgs("/stack", command), " ")
+		if strings.Contains(got, "docker-compose.postgres.yml") {
+			t.Fatal("optional database configuration broke independent commands", got)
+		}
 	}
 }

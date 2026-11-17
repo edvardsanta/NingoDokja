@@ -196,3 +196,12 @@ describe("the health card", () => {
     expect(screen.getAllByText("Vision").length).toBeGreaterThan(0);
     expect(screen.getByText(/This does not confirm a failure/)).toBeTruthy();
  });
+
+it("shows price database failures as localized persistence warnings", async () => {
+ const { transport } = scriptedTransport(statusReply({ price_storage: { status: "error", detail: "price_storage_fallback" } }));
+ renderCard(transport, "pt");
+ await screen.findByRole("heading", { name: "Persistência de dados" });
+ expect(screen.getAllByText(/Preços está usando memória temporária/).length).toBeGreaterThan(0);
+ expect(screen.queryByText("price_storage_fallback")).toBeNull();
+ expect(screen.queryByRole("switch")).toBeNull();
+});

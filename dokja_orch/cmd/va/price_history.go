@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	pricedomain "read_books/dokja_domain/dokja_price"
+	"read_books/internal/handlers"
 	pricehistory "read_books/internal/infrastructure/price_history"
 	"read_books/internal/logger"
 )
@@ -22,26 +24,31 @@ const schemaReason = "the namespace is missing or has another schema version; ru
 // recorded price on the next restart. A database that stays unusable keeps history in
 // memory; the failure is logged without the DSN, and the orchestrator still starts.
 func configurePriceHistory(dsn string) (pricedomain.Repository, func()) {
+	repository, closeIt, _ := configurePriceHistoryStatus(dsn)
+	return repository, closeIt
+}
+
+func configurePriceHistoryStatus(dsn string) (pricedomain.Repository, func(), handlers.ServiceProbe) {
 	if dsn == "" {
 		logger.Info("Price history is kept in memory: DOKJA_PRICE_POSTGRES_DSN is unset")
-		return pricedomain.NewMemoryRepository(), func() {}
+		return pricedomain.NewMemoryRepository(), func() {}, priceStorageFallback("price_storage_memory")
 	}
 	store, db, reason := openPriceHistory(dsn)
 	if store != nil {
 		logger.Info("Price history is kept in PostgreSQL")
-		return store, func() { db.Close() }
+		return store, func() { db.Close() }, priceStorageProbe(db)
 	}
 	if reason != schemaReason {
 		logger.Info("Price history is kept in memory, so a restart forgets it: " + reason)
-		return pricedomain.NewMemoryRepository(), func() {}
+		return pricedomain.NewMemoryRepository(), func() {}, priceStorageFallback("price_storage_fallback")
 	}
 	installed, installDB, installReason := initializePriceHistory(dsn)
 	if installed == nil {
 		logger.Info("Price history is kept in memory, so a restart forgets it: " + installReason)
-		return pricedomain.NewMemoryRepository(), func() {}
+		return pricedomain.NewMemoryRepository(), func() {}, priceStorageFallback("price_storage_fallback")
 	}
 	logger.Info("Price history namespace was installed or upgraded at startup and is kept in PostgreSQL")
-	return installed, func() { installDB.Close() }
+	return installed, func() { installDB.Close() }, priceStorageProbe(installDB)
 }
 
 // openPriceHistory never returns native errors, which could carry the DSN.
@@ -92,4 +99,21 @@ func initializePriceHistory(dsn string) (*pricehistory.Store, *sql.DB, string) {
 		return nil, nil, schemaReason
 	}
 	return store, db, ""
+}
+
+// Report the selected repository, not just whether a server can accept connections.
+// A repository selected as memory at startup stays memory until the orchestrator restarts.
+func priceStorageFallback(reason string) handlers.ServiceProbe {
+	return func(context.Context) (string, error) { return "", fmt.Errorf("%s", reason) }
+}
+
+func priceStorageProbe(db *sql.DB) handlers.ServiceProbe {
+	return func(parent context.Context) (string, error) {
+		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+		defer cancel()
+		if _, err := pricehistory.Open(ctx, db); err != nil {
+			return "", fmt.Errorf("price_storage_unavailable")
+		}
+		return "price_storage_persistent", nil
+	}
 }
