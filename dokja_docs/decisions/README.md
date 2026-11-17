@@ -30,6 +30,8 @@ validated, deployed, or approved as a new repository-wide rule.
 
 | [0015](./0015-price-history-domain.md) | A store-agnostic Price domain owns watched-product price history; owner collectors speak `price.observation.v1` through Feeds | Proposed; PostgreSQL confirmed by the owner; domain, orchestrator intake and PostgreSQL adapter implemented |
 
+| [0017](./0017-deferred-reading-followup.md) | A failed transient link read may defer: the orchestrator re-reads in the background and proactively delivers a cited follow-up reply | Proposed; no code yet |
+
 The design keeps large capabilities modular and gives them explicit contracts.
 ADR 0005 was accepted after the step 03 [reference experiment](../step-03-baseline.md):
 the orchestrator supervises the Knowledge–Prediction–Experience cycle. Its
