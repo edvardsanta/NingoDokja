@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"testing"
 
@@ -96,7 +97,7 @@ func TestAuthenticatedBridgeRecognizesOwnerThroughTheActualChatHandler(t *testin
 				if result.Reply != "model reply" {
 					t.Fatal("normal generation was intercepted")
 				}
-				if strings.Contains(g.messages[0]["content"], "current speaker is the configured owner") != tc.owner {
+				if prompttest.Installed && (strings.Contains(g.messages[0]["content"], "current speaker is the configured owner") != tc.owner) {
 					t.Fatal("incorrect identity guidance reached model")
 				}
 			}

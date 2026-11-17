@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
+	promptfiles "read_books/dokja_store/prompts"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 	"strings"
@@ -62,7 +63,8 @@ func (h *KnowledgeDomainHandler) Domain() core.Domain {
 	return core.DomainKnowledge
 }
 
-func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
+func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	if h == nil || h.domain == nil {
 		return nil, fmt.Errorf("knowledge domain is not configured")
 	}

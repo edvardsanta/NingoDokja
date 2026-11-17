@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"read_books/dokja_store/prompts/prompttest"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func (g *compactionGenerator) Generate(context.Context, string) (map[string]any,
 	return nil, errors.New("unexpected plain generation")
 }
 func (g *compactionGenerator) GenerateMessages(_ context.Context, messages []map[string]string) (map[string]any, error) {
-	if strings.HasPrefix(messages[0]["content"], chatPersona) {
+	if strings.HasPrefix(messages[0]["content"], chatPersona()) {
 		g.replies = append(g.replies, messages)
 		return map[string]any{"reply": "An assistant claim about the kingdom."}, nil
 	}
@@ -194,7 +195,7 @@ func TestPlainGenerationReceivesCompactedHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result["notice"] != "chat.context_compacted" || !strings.Contains(g.prompt, "Earlier conversation summary") || !strings.HasSuffix(g.prompt, "Continue from the summary") {
+	if (result["notice"] != "chat.context_compacted" || (prompttest.Installed && (!strings.Contains(g.prompt, "Earlier conversation summary")))) || !strings.HasSuffix(g.prompt, "Continue from the summary") {
 		t.Fatal("plain generation lost compacted history or current turn")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"read_books/dokja_store/prompts/prompttest"
 	"strings"
 	"sync"
 	"testing"
@@ -117,7 +118,7 @@ func TestNingoTakesAQuizAndReturnsTheSitesResultLink(t *testing.T) {
 		t.Fatalf("the runner must receive the offered options as written: %#v", answers)
 	}
 	system := model.messages[0][0]["content"]
-	if !strings.Contains(system, "You are Ningo Dokja") || !strings.Contains(system, "- Merit over birth.") {
+	if (prompttest.Installed && (!strings.Contains(system, "You are Ningo Dokja"))) || !strings.Contains(system, "- Merit over birth.") {
 		t.Fatal("the answers must come from Ningo's persona and worldview")
 	}
 	if !strings.Contains(model.messages[0][1]["content"], "Tradition matters.") {

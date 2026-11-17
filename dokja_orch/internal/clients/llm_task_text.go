@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
 	"strings"
 )
 
-func (c *ChatProviderClient) GenerateTaskText(ctx context.Context, profile string, messages []map[string]string, accept func(string) error) (map[string]any, error) {
+func (c *ChatProviderClient) GenerateTaskText(ctx context.Context, profile string, messages []map[string]string, accept func(string) error) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	structured := append([]map[string]string(nil), messages...)
-	structured = append(structured, map[string]string{"role": "system", "content": `Return one JSON object {"text":"your response"}. Preserve the requested language, persona and content requirements.`})
+	structured = append(structured, map[string]string{"role": "system", "content": promptfiles.MustRead("llm_task_text_generatetasktext1")})
 	schema := map[string]any{
 		"type": "object", "additionalProperties": false, "required": []string{"text"},
 		"properties": map[string]any{"text": map[string]any{"type": "string", "minLength": 1, "maxLength": 8192}},

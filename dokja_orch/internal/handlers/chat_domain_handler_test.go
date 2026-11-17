@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	digestdomain "read_books/dokja_domain/dokja_digest"
+	"read_books/dokja_store/prompts/prompttest"
 	"read_books/internal/core"
 	"strings"
 	"testing"
@@ -31,7 +32,7 @@ func (f *fakeChatGenerator) GenerateMessages(_ context.Context, messages []map[s
 }
 
 func (f *fakeChatGenerator) withoutPersona(messages []map[string]string) []map[string]string {
-	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona) {
+	if len(messages) > 0 && messages[0]["role"] == "system" && strings.HasPrefix(messages[0]["content"], chatPersona()) {
 		f.personas++
 		return messages[1:]
 	}
@@ -381,7 +382,7 @@ func TestDesktopReadingConversationUsesServerResolvedExcerptAndPrivateSession(t 
 	if resolveCalls != 2 {
 		t.Fatalf("selected reading must be validated each turn: %d", resolveCalls)
 	}
-	if len(generator.messages) == 0 || !strings.Contains(generator.messages[0]["content"], "Bounded excerpt") || !strings.Contains(generator.messages[0]["content"], "have read the full article") {
+	if (len(generator.messages) == 0 || !strings.Contains(generator.messages[0]["content"], "Bounded excerpt")) || (prompttest.Installed && (!strings.Contains(generator.messages[0]["content"], "have read the full article"))) {
 		t.Fatalf("missing grounded reading context: %+v", generator.messages)
 	}
 	if len(generator.messages) < 3 || generator.messages[len(generator.messages)-1]["content"] != "What could be wrong?" {

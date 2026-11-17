@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -65,7 +66,8 @@ func (h *QuizDomainHandler) Domain() core.Domain {
 	return core.DomainQuiz
 }
 
-func (h *QuizDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (map[string]any, error) {
+func (h *QuizDomainHandler) Handle(ctx context.Context, event core.Event, workflow core.WorkflowStep) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	if workflow.Action != quiz.ActionTake {
 		return nil, fmt.Errorf("unsupported quiz action %q", workflow.Action)
 	}
@@ -271,9 +273,9 @@ func (h *QuizDomainHandler) generate(ctx context.Context, prompt string) (string
 
 // persona is Ningo's own: the public persona and, when configured, his private worldview.
 func (h *QuizDomainHandler) persona() string {
-	persona := chatPersona
+	persona := chatPersona()
 	if h.visions != "" {
-		persona += "\n\n" + fmt.Sprintf(visionsNote, h.visions)
+		persona += "\n\n" + fmt.Sprintf(visionsNote(), h.visions)
 	}
 	return persona
 }

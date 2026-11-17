@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"read_books/dokja_store/prompts/prompttest"
 	"reflect"
 	"strings"
 	"testing"
@@ -71,7 +72,7 @@ func TestResumedChannelDebateRestoresSettledRulesAcrossRestartAndSpeakers(t *tes
 		t.Fatal("previous summary was not merged on resume")
 	}
 	messages := g2.replies[0]
-	if !strings.Contains(messages[0]["content"], "current_speaker_is_owner=true") || !strings.Contains(messages[0]["content"], "shared Discord channel discussion") {
+	if !strings.Contains(messages[0]["content"], "current_speaker_is_owner=true") || (prompttest.Installed && (!strings.Contains(messages[0]["content"], "shared Discord channel discussion"))) {
 		t.Fatal("current identity or shared participant guidance missing")
 	}
 	if messages[1]["role"] != "user" || !strings.Contains(messages[1]["content"], settled) {

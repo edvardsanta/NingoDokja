@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	promptfiles "read_books/dokja_store/prompts"
 	"strings"
 	"time"
 
@@ -52,7 +53,8 @@ func (h *ConversationDomainHandler) Domain() core.Domain {
 	return core.DomainConversation
 }
 
-func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event, _ core.WorkflowStep) (map[string]any, error) {
+func (h *ConversationDomainHandler) Handle(ctx context.Context, event core.Event, _ core.WorkflowStep) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	if h != nil && strings.HasPrefix(event.Type, "realtime.") {
 		return h.realtimeHandle(ctx, event)
 	}

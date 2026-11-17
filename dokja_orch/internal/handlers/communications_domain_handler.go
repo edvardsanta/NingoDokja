@@ -4,6 +4,7 @@ import (
 	"context"
 	communications "read_books/dokja_domain/dokja_communications"
 	memorydomain "read_books/dokja_domain/dokja_memory"
+	promptfiles "read_books/dokja_store/prompts"
 	"read_books/internal/core"
 )
 
@@ -74,7 +75,8 @@ func (h *CommunicationsDomainHandler) WithVoice(voice communications.Voice) *Com
 }
 
 func (h *CommunicationsDomainHandler) Domain() core.Domain { return core.DomainCommunications }
-func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (map[string]any, error) {
+func (h *CommunicationsDomainHandler) Handle(ctx context.Context, event core.Event, step core.WorkflowStep) (output map[string]any, failure error) {
+	defer promptfiles.Recover(&failure)
 	if step.Action == communications.ActionAuthorizeInbound {
 		if !h.inboundConfigured {
 			return nil, core.ErrInboundDenied
