@@ -151,7 +151,7 @@ test("chat selection requires recent input, strips extras and rejects incomplete
 
 
 test("search, vision and the model engine pass the module allowlist", async () => {
- for (const module of ["search", "vision", "embeddings"]) {
+ for (const module of ["search", "vision", "embeddings", "postgres"]) {
   const calls: unknown[] = [];
   const client = { async request(type: string, payload: Record<string, unknown>) { calls.push({ type, payload }); return { status: "ok", result: wrap({ modules: [{ name: module, state: "stopped", dependencies: [] }], busy: false, error: "" }) }; } };
   const limits = { defaultTimeoutMs: 15000, maxTimeoutMs: 120000 };

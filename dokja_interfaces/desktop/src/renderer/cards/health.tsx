@@ -44,6 +44,9 @@ const STATUS_IDS: Record<string, MessageId> = {
 
 // What an interface says about itself, from the closed list each one reports. A state this screen
 // does not know is shown as it came.
+const STORAGE_DETAILS = new Set<MessageId>(["price_storage_memory", "price_storage_fallback", "price_storage_unavailable", "price_storage_persistent"]);
+const detailWord = (row: ServiceRow, t: ReturnType<typeof useTranslate>) => STORAGE_DETAILS.has(row.detail as MessageId) ? t(row.detail as MessageId) : row.detail;
+
 const STATE_IDS: Record<string, MessageId> = {
   connected: "state_connected",
   connecting: "state_connecting",
@@ -120,7 +123,7 @@ export function HealthCard({ transport }: { transport: Transport }) {
       return <>
         <p className="detail">{t("runtime_activity")}: {row ? stateWord(row, t) : t("status_unchecked")}</p>
         {row?.enabled !== undefined && <p className="detail">{t("runtime_routing_named", { name: displayName(name, t) })}: {t(row.enabled ? "switch_on" : "switch_off")}</p>}
-        {row?.detail && <p className="detail">{row.detail}</p>}
+        {row?.detail && <p className="detail">{detailWord(row, t)}</p>}
       </>;
     }} moduleDetails={(name) => {
       const row = health && [...health.rows, ...health.interfaces].find((item) => item.name === name);
@@ -179,6 +182,8 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
   } : allHealth;
   if (health.rows.length === 0 && health.interfaces.length === 0 && health.jobs.length === 0) return unified ? null : <p>{t("health_empty")}</p>;
 
+  const storageRows = health.rows.filter((row) => row.name === "price_storage");
+  const serviceRows = health.rows.filter((row) => row.name !== "price_storage");
   const { ok, problem, off, unchecked } = health.counts;
   const summary = t("health_summary", { ok, problem, off });
   const switchableScheduler = allHealth.rows.some((row) => row.name === "scheduler" && row.enabled !== undefined);
@@ -195,9 +200,10 @@ function HealthBody({ health: allHealth, busy, failure, onChange, link, unified 
         {unchecked > 0 ? `${summary}, ${t("health_unchecked", { count: unchecked })}` : summary}
       </p></>}
       {failure && <Problem error={failure} />}
-      {unified && health.rows.length > 0 && <h3>{t("runtime_automation")}</h3>}
+      {storageRows.length > 0 && <><h3>{t("storage_title")}</h3><ul className="services">{storageRows.map((row, index) => <ServiceRowItem key={row.name} row={row} index={index} busy={busy} onChange={onChange} />)}</ul></>}
+      {unified && serviceRows.length > 0 && <h3>{t("runtime_automation")}</h3>}
       <ul className="services">
-        {health.rows.map((row, index) => (
+        {serviceRows.map((row, index) => (
           <ServiceRowItem key={row.name} row={row} index={index} busy={busy} onChange={onChange} />
         ))}
       </ul>
@@ -285,7 +291,7 @@ function NeedsAttention({ health, link }: { health: Health; link: Link }) {
           <li key={row.name} data-tone={row.tone}>
             <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
             <span className="service-status">{stateWord(row, t)}</span>
-            {row.detail && <span className="service-detail">{row.detail}</span>}
+            {row.detail && <span className="service-detail">{detailWord(row, t)}</span>}
             {needsLink(row) && <div className="attention-action"><LinkControl link={link} /></div>}
           </li>
         ))}
@@ -300,7 +306,7 @@ function ServiceRowItem({ row, index, busy, onChange, extra }: RowProps) {
     <li data-tone={row.tone} data-kind={row.kind} style={{ "--i": index } as CSSProperties}>
       <span className="service-name" title={row.name}>{displayName(row.name, t)}</span>
       <span className="service-status">{stateWord(row, t)}</span>
-      {row.detail && <span className="service-detail">{row.detail}</span>}
+      {row.detail && <span className="service-detail">{detailWord(row, t)}</span>}
       {row.enabled !== undefined && (
         <Switch
           label={t("switch_for", { name: displayName(row.name, t) })}

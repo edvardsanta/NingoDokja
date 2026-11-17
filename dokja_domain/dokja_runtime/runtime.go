@@ -26,6 +26,7 @@ var inventory = []Module{
 	{Name: "memory", Service: "dokja-memory", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5562},
 	{Name: "knowledge", Service: "dokja-knowledge", Dependencies: []string{"orchestrator", "embedding_init"}, Port: 5561},
 	{Name: "feeds", Service: "dokja-feeds", Dependencies: []string{"orchestrator"}, Port: 5563},
+	{Name: "postgres", Service: "dokja-postgres"},
 	{Name: "search", Service: "dokja-search"},
 	{Name: "vision_init", Service: "dokja-vision-init", Dependencies: []string{"embeddings"}, Internal: true},
 	{Name: "vision", Service: "dokja-vision", Dependencies: []string{"orchestrator", "vision_init"}, Port: 8082},

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"strings"
 	"testing"
 
@@ -27,5 +29,34 @@ func TestPriceHistoryFallsBackToMemoryWithoutLeakingTheDSN(t *testing.T) {
 		if _, ok := repository.(*pricedomain.MemoryRepository); !ok {
 			t.Fatalf("broken DSN gave %T", repository)
 		}
+	}
+}
+
+func TestPriceStorageStatusReportsSelectedMemoryRepository(t *testing.T) {
+	for _, tc := range []struct{ dsn, reason string }{
+		{"", "price_storage_memory"},
+		{"not a connection configuration", "price_storage_fallback"},
+	} {
+		repository, closeIt, probe := configurePriceHistoryStatus(tc.dsn)
+		if repository == nil {
+			t.Fatal("missing fallback repository")
+		}
+		_, err := probe(context.Background())
+		closeIt()
+		if err == nil || err.Error() != tc.reason {
+			t.Fatalf("wanted %s, got %v", tc.reason, err)
+		}
+	}
+}
+
+func TestPriceStorageProbeDoesNotExposeConnectionErrors(t *testing.T) {
+	db, err := sql.Open("pgx", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	detail, err := priceStorageProbe(db)(context.Background())
+	if detail != "" || err == nil || err.Error() != "price_storage_unavailable" {
+		t.Fatal(detail, err)
 	}
 }

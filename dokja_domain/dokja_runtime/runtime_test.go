@@ -434,3 +434,12 @@ func TestExplicitEngineRemainsRunningWhenVisionStops(t *testing.T) {
 		t.Fatal("engine no longer ready")
 	}
 }
+
+func TestDatabaseIsIndependentAndPreservesOtherModules(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "postgres", true)
+	change(t, d, "postgres", false)
+	if got := f.trace(); !reflect.DeepEqual(got, []string{"start:postgres", "stop:postgres"}) {
+		t.Fatal(got)
+	}
+}

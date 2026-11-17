@@ -259,8 +259,9 @@ func main() {
 	knowledgeHandler.WithProposals(proposalsHandler)
 	// Price history is kept in PostgreSQL when DOKJA_PRICE_POSTGRES_DSN names an initialized
 	// namespace, and in memory otherwise (ADR 0015).
-	priceRepository, closePriceHistory := configurePriceHistory(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
+	priceRepository, closePriceHistory, priceStorageStatus := configurePriceHistoryStatus(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
 	defer closePriceHistory()
+	serviceProbes["price_storage"] = priceStorageStatus
 	priceDomain := pricedomain.New(priceRepository)
 	var competitorCache *competitorcache.Store
 	if opened, cacheErr := competitorcache.Open(competitorcache.PathBeside(sharedPath)); cacheErr != nil {
