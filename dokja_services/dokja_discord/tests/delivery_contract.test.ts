@@ -226,6 +226,29 @@ test("delivery posts a reply reference on the bot path and ignores it on webhook
   assert.equal(JSON.parse(webhookBody).message_reference, undefined);
 });
 
+test("an unknown reply reference falls back to a plain message instead of failing", async () => {
+  const bodies: string[] = [];
+  const result = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-1", content: "voltei com a leitura", reply_to_message_id: "interaction-id" },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      fetchImpl: async (_input, init) => {
+        bodies.push(String(init?.body ?? ""));
+        if (bodies.length === 1) {
+          return new Response(JSON.stringify({ message: "Invalid Form Body", code: 50035, errors: { message_reference: { _errors: [{ code: "MESSAGE_REFERENCE_UNKNOWN_MESSAGE", message: "Unknown message" }] } } }), { status: 400 });
+        }
+        return new Response(JSON.stringify({ id: "m-plain" }), { status: 200 });
+      },
+    },
+  );
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.payload.message_id, "m-plain");
+  assert.equal(bodies.length, 2);
+  assert.equal(JSON.parse(bodies[0]).message_reference.message_id, "interaction-id");
+  assert.equal(JSON.parse(bodies[1]).message_reference, undefined);
+});
+
 test("parseWebhookMap splits on first equals and skips malformed entries", () => {
   assert.deepEqual(
     parseWebhookMap(" 1=https://d.test/api/webhooks/1/a?thread_id=5 , bad, 2=https://d.test/api/webhooks/2/b ,=x"),

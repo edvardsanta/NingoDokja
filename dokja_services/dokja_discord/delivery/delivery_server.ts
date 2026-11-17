@@ -152,21 +152,17 @@ export async function handleDiscordDeliveryRequest(
       )
     : attachmentUrl
     ? await sendMessageWithAttachment(deps.fetchImpl, target, content, attachmentUrl)
-    : await deps.fetchImpl(target.url, {
-        method: "POST",
-        headers: { ...target.headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content,
-          // Webhooks cannot reply; the bot-token path references the original
-          // message when the caller asked for it.
-          ...(body.reply_to_message_id && !webhookUrl
-            ? { message_reference: { message_id: body.reply_to_message_id } }
-            : {}),
-        }),
-      });
+    : await sendPlainMessage(deps.fetchImpl, target, content, body.reply_to_message_id, !webhookUrl);
 
   if (!response.ok) {
     const errorText = await response.text();
+    // A reply reference the originator cannot resolve (a slash command's interaction
+    // id, a deleted message) must not sink the delivery: post once without it.
+    if (!attachmentUrl && !attachmentDataB64 && !webhookUrl
+      && response.status === 400 && errorText.includes("MESSAGE_REFERENCE_UNKNOWN_MESSAGE")) {
+      deps.log?.(JSON.stringify({ delivery: "reply_reference_unknown", channelId }));
+      return handleDiscordDeliveryRequest({ ...body, reply_to_message_id: undefined }, deps);
+    }
     deps.error?.(
       JSON.stringify({ delivery: "error", channelId, status: response.status, errorText }),
     );
@@ -198,6 +194,25 @@ export async function handleDiscordDeliveryRequest(
       has_attachment: attachmentUrl.length > 0,
     },
   };
+}
+
+// sendPlainMessage posts text, referencing an earlier channel message on the
+// bot-token path when the caller asked for it (webhooks cannot reply).
+async function sendPlainMessage(
+  fetchImpl: typeof fetch,
+  target: { url: string; headers: Record<string, string> },
+  content: string,
+  replyToMessageID: string | undefined,
+  canReply: boolean,
+) {
+  return fetchImpl(target.url, {
+    method: "POST",
+    headers: { ...target.headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content,
+      ...(replyToMessageID && canReply ? { message_reference: { message_id: replyToMessageID } } : {}),
+    }),
+  });
 }
 
 async function sendMessageWithAttachment(
