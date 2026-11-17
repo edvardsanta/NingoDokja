@@ -205,3 +205,13 @@ it("shows price database failures as localized persistence warnings", async () =
  expect(screen.queryByText("price_storage_fallback")).toBeNull();
  expect(screen.queryByRole("switch")).toBeNull();
 });
+
+it("shows queued prices as durable local data with automatic recovery", async () => {
+ const { transport } = scriptedTransport(statusReply({ price_storage: { status: "degraded", detail: "price_storage_buffered:127" } }));
+ renderCard(transport, "pt");
+ await screen.findByRole("heading", { name: "Persistência de dados" });
+ expect(screen.getAllByText("Sincronização pendente").length).toBeGreaterThan(0);
+ expect(screen.getAllByText(/127 alterações estão guardadas na fila SQLite/).length).toBeGreaterThan(0);
+ expect(screen.getAllByText(/não é preciso reiniciar/).length).toBeGreaterThan(0);
+ expect(screen.queryByText(/histórico de preços é temporário/)).toBeNull();
+});

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	pricedomain "read_books/dokja_domain/dokja_price"
 )
@@ -410,6 +411,9 @@ func (s *Store) RemoveWatch(ctx context.Context, watch pricedomain.Watch) (bool,
 }
 
 func (s *Store) SaveDecision(ctx context.Context, memory pricedomain.DecisionMemory) error {
+	if memory.CreatedAt == "" {
+		memory.CreatedAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
 	reasons, err := json.Marshal(memory.Decision.ReasonCodes)
 	if err != nil {
 		return safeError(ctx)
@@ -421,13 +425,13 @@ func (s *Store) SaveDecision(ctx context.Context, memory pricedomain.DecisionMem
 	_, err = s.db.ExecContext(ctx, `
 INSERT INTO dokja_price.purchase_decisions
 	(decision_id, user_id, product_key, product_title, category, brand, part_number,
-	 budget_cents, action, selected_merchant, selected_cents, confidence, reason_codes, evidence)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)
+	 budget_cents, action, selected_merchant, selected_cents, confidence, reason_codes, evidence, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15::timestamptz)
 ON CONFLICT (decision_id) DO NOTHING`,
 		memory.ID, memory.UserID, memory.Product.Key, memory.Product.Title, memory.Product.Category,
 		memory.Product.Brand, memory.Product.PartNumber, memory.BudgetCents, memory.Decision.Action,
 		memory.Decision.SelectedOffer, memory.Decision.SelectedCents, memory.Decision.Confidence,
-		string(reasons), string(evidence))
+		string(reasons), string(evidence), memory.CreatedAt)
 	if err != nil {
 		return safeError(ctx)
 	}
@@ -441,7 +445,7 @@ func (s *Store) RecentDecisions(ctx context.Context, userID, product string, lim
 	rows, err := s.db.QueryContext(ctx, `
 SELECT decision_id, user_id, product_key, product_title, category, brand, part_number,
        budget_cents, action, selected_merchant, selected_cents, confidence,
-       reason_codes, evidence, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+       reason_codes, evidence, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
 FROM dokja_price.purchase_decisions
 WHERE user_id = $1 AND ($2 = '' OR product_key = $2)
 ORDER BY created_at DESC

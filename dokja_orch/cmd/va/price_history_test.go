@@ -2,61 +2,49 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"strings"
-	"testing"
-
+	"os"
+	"path/filepath"
 	pricedomain "read_books/dokja_domain/dokja_price"
+	"testing"
 )
 
-func TestPriceHistoryFallsBackToMemoryWithoutLeakingTheDSN(t *testing.T) {
-	repository, closeIt := configurePriceHistory("")
-	defer closeIt()
-	if _, ok := repository.(*pricedomain.MemoryRepository); !ok {
-		t.Fatalf("unset DSN gave %T", repository)
-	}
-
-	for _, dsn := range []string{"host='private-invalid", unavailableJournalDSN(t)} {
-		store, db, reason := openPriceHistory(dsn)
-		if store != nil || db != nil {
-			t.Fatalf("%q opened a store", dsn)
+func TestPriceBufferStatusIsDurableWithoutPostgres(t *testing.T) {
+	for _, dsn := range []string{"", "not a connection configuration"} {
+		_, closeIt, probe, err := configureDurablePriceHistory(dsn, filepath.Join(t.TempDir(), "dokja.db"))
+		if err != nil {
+			t.Fatal(err)
 		}
-		if reason == "" || strings.Contains(reason, "private-") || strings.Contains(reason, "127.0.0.1") {
-			t.Fatalf("reason %q", reason)
+		detail, probeErr := probe(context.Background())
+		if dsn == "" {
+			if detail != "price_storage_local" || probeErr != nil {
+				t.Fatal(detail, probeErr)
+			}
+		} else if probeErr == nil || probeErr.Error() != "price_storage_buffered:0" {
+			t.Fatal(detail, probeErr)
 		}
-		repository, closeIt := configurePriceHistory(dsn)
 		closeIt()
-		if _, ok := repository.(*pricedomain.MemoryRepository); !ok {
-			t.Fatalf("broken DSN gave %T", repository)
+		_, probeErr = probe(context.Background())
+		if probeErr == nil || probeErr.Error() != "price_storage_local_unavailable" {
+			t.Fatal(probeErr)
 		}
 	}
 }
-
-func TestPriceStorageStatusReportsSelectedMemoryRepository(t *testing.T) {
-	for _, tc := range []struct{ dsn, reason string }{
-		{"", "price_storage_memory"},
-		{"not a connection configuration", "price_storage_fallback"},
-	} {
-		repository, closeIt, probe := configurePriceHistoryStatus(tc.dsn)
-		if repository == nil {
-			t.Fatal("missing fallback repository")
-		}
-		_, err := probe(context.Background())
-		closeIt()
-		if err == nil || err.Error() != tc.reason {
-			t.Fatalf("wanted %s, got %v", tc.reason, err)
-		}
-	}
-}
-
-func TestPriceStorageProbeDoesNotExposeConnectionErrors(t *testing.T) {
-	db, err := sql.Open("pgx", "")
-	if err != nil {
+func TestPriceBufferCannotSilentlyFallBackWhenDiskIsUnavailable(t *testing.T) {
+	path := t.TempDir()
+	if err := os.WriteFile(filepath.Join(path, "price_buffer.db"), []byte("blocked"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	db.Close()
-	detail, err := priceStorageProbe(db)(context.Background())
-	if detail != "" || err == nil || err.Error() != "price_storage_unavailable" {
-		t.Fatal(detail, err)
+	// Using a directory as the shared file's parent buffer destination refuses startup.
+	repository, closeIt, probe, err := configureDurablePriceHistory("", filepath.Join(path, "price_buffer.db", "shared.db"))
+	if err == nil {
+		closeIt()
+		t.Fatal("expected unavailable parent")
+	}
+	defer closeIt()
+	if _, writeErr := repository.AddWatch(context.Background(), pricedomain.Watch{Category: "fixture"}); writeErr == nil {
+		t.Fatal("unavailable storage accepted a write")
+	}
+	if _, probeErr := probe(context.Background()); probeErr == nil {
+		t.Fatal("unavailable storage reported healthy")
 	}
 }

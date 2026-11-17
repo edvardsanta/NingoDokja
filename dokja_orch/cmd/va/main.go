@@ -257,9 +257,11 @@ func main() {
 	}
 	proposalsHandler.WithMemeTags(memeClient, memeClient, memePosts, ownerConfig.Ningo.People)
 	knowledgeHandler.WithProposals(proposalsHandler)
-	// Price history is kept in PostgreSQL when DOKJA_PRICE_POSTGRES_DSN names an initialized
-	// namespace, and in memory otherwise (ADR 0015).
-	priceRepository, closePriceHistory, priceStorageStatus := configurePriceHistoryStatus(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"))
+	// Every price write is committed locally before the background PostgreSQL sync.
+	priceRepository, closePriceHistory, priceStorageStatus, err := configureDurablePriceHistory(os.Getenv("DOKJA_PRICE_POSTGRES_DSN"), sharedPath)
+	if err != nil {
+		logger.Error("price operations paused: durable storage unavailable", err)
+	}
 	defer closePriceHistory()
 	serviceProbes["price_storage"] = priceStorageStatus
 	priceDomain := pricedomain.New(priceRepository)

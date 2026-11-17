@@ -86,6 +86,13 @@ func NewMemoryRepository() *MemoryRepository {
 func (m *MemoryRepository) SaveDecision(_ context.Context, memory DecisionMemory) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if memory.ID != "" {
+		for _, existing := range m.decisions {
+			if existing.ID == memory.ID {
+				return nil
+			}
+		}
+	}
 	m.decisions = append(m.decisions, memory)
 	return nil
 }
@@ -96,12 +103,17 @@ func (m *MemoryRepository) RecentDecisions(_ context.Context, userID, product st
 	if limit <= 0 {
 		return []DecisionMemory{}, nil
 	}
-	result := make([]DecisionMemory, 0, limit)
-	for i := len(m.decisions) - 1; i >= 0 && len(result) < limit; i-- {
+
+	result := make([]DecisionMemory, 0, min(limit, len(m.decisions)))
+	for i := len(m.decisions) - 1; i >= 0; i-- {
 		item := m.decisions[i]
 		if item.UserID == userID && (product == "" || item.Product.Key == product) {
 			result = append(result, item)
 		}
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].CreatedAt > result[j].CreatedAt })
+	if len(result) > limit {
+		result = result[:limit]
 	}
 	return result, nil
 }

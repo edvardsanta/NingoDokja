@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"read_books/internal/core"
 	"sort"
@@ -25,6 +26,12 @@ type InterfaceProbe func(ctx context.Context) (level, state, detail string, err 
 // ServiceProbe checks one service. A nil error means it answers; detail is a short note
 // shown beside the ok ("" when there is nothing to add).
 type ServiceProbe func(ctx context.Context) (detail string, err error)
+
+// ProbeWarning reports degraded operation with a fixed reason code, without
+// claiming that a durable offline service has failed entirely.
+type ProbeWarning struct{ Reason string }
+
+func (w ProbeWarning) Error() string { return w.Reason }
 
 // HealthProbe probes a service through its health request.
 func HealthProbe(checker HealthChecker) ServiceProbe {
@@ -173,7 +180,12 @@ func (h *SystemDomainHandler) probeServices(ctx context.Context, services map[st
 			defer wg.Done()
 			detail, err := h.probes[name](ctx)
 			if err != nil {
-				entries[i] = map[string]any{"status": "error", "error": err.Error()}
+				var warning ProbeWarning
+				if errors.As(err, &warning) {
+					entries[i] = map[string]any{"status": "degraded", "detail": warning.Reason}
+				} else {
+					entries[i] = map[string]any{"status": "error", "error": err.Error()}
+				}
 				return
 			}
 			entries[i] = map[string]any{"status": "ok"}
@@ -186,7 +198,7 @@ func (h *SystemDomainHandler) probeServices(ctx context.Context, services map[st
 
 	for i, name := range names {
 		services[name] = entries[i]
-		if entries[i]["status"] == "error" {
+		if entries[i]["status"] == "error" || entries[i]["status"] == "degraded" {
 			failed = true
 		}
 	}

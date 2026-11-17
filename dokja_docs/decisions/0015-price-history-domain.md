@@ -139,9 +139,9 @@ Thresholds are constants in `assess.go`, in basis points:
   product, merchant, series, price kind and day. An upsert rewrites a point only
   when it changed, so it counts writes the way the memory repository does.
 - `DOKJA_PRICE_POSTGRES_DSN` selects it explicitly. The explicit
-  `price-history-init` command creates the namespace; startup only opens it.
-  Unset, or when the database cannot be used, history stays in memory and a
-  sanitized message says so. The DSN is never logged.
+  `price-history-init` command and background initializer create/upgrade the
+  namespace. The durable offline buffer amendment below replaces the original
+  temporary-memory fallback. The DSN is never logged.
 - An integration test, built with the `integration` tag against a disposable
   `price_test` database, runs the same writes against both repositories and
   compares their answers.
@@ -197,7 +197,8 @@ one brand, "hd" from any brand. What a person asks for decides the rest.
 - **Schema version 2** adds the product description columns, `offers` (the
   page per history) and `watches`. `price-history-init` upgrades a version 1
   namespace in one transaction and keeps its points; until it runs, the
-  orchestrator refuses the version 1 namespace and keeps history in memory.
+  background initializer upgrades the namespace; unavailable storage leaves
+  changes pending in the durable local buffer.
 - This replaces "the contract is the opt-in, so no list of sources is
   configured": collectors no longer pick what to follow.
 
@@ -401,3 +402,34 @@ PR 1 adds a Go module and its CI step only. It changes no event envelope,
 route, service contract, command, schema, environment variable or Compose file.
 Collectors and their target addresses stay outside the repository. Tests and
 documentation use invented products and merchants.
+
+
+## Durable offline buffer amendment (2026-11-17)
+
+The owner chose a persistent SQLite buffer and automatic background delivery
+when PostgreSQL is unavailable. This supersedes the original runtime memory
+fallback: the memory repository remains a reference/cache, never the sole
+acknowledgement of a production price write.
+
+The Price domain owns buffering/replay and read-composition policy behind its
+Repository port. Its DurableQueue port requires atomic local-view/outbox writes.
+The infrastructure adapter stores this compact replica and an ordered outbox in
+`price_buffer.db` beside the shared database. The orchestrator hosts the job and
+owns connection lifecycle. Collection and replay remain independent; database
+outages cannot block the local observation commit.
+
+The job checks immediately, retries failures every 30 seconds and replays at
+most 100 commands per 15-second attempt. Backlog continues after one second.
+Acknowledged commands leave the outbox, while the local replica remains for
+reads. Existing history/day keys, watch identities and decision IDs make retry
+after uncertain acknowledgement safe for one ordered writer. Original observed
+dates and decision timestamps are preserved. This does not implement a
+multi-device conflict-resolution protocol.
+
+Primary query views are cached with a local sequence watermark and overlaid
+with newer local changes while offline. The cache retains at most 256 query
+views and is not a complete remote mirror. An inaccessible local buffer pauses
+price operations; other domains remain available. The desktop reports local-only
+storage, pending durable commands, synchronization recovery and local failure.
+No restart is needed for PostgreSQL recovery. Data already lost by the old
+memory-only fallback cannot be reconstructed by this change.

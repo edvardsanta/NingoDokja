@@ -202,3 +202,13 @@ func TestStatusShowsTheFeedsServiceWithItsNote(t *testing.T) {
 		t.Fatalf("unexpected feeds entry %#v", feeds)
 	}
 }
+
+func TestDurableStorageQueueReportsDegradedWithoutPretendingToBeMemoryOnly(t *testing.T) {
+	handler, _ := controlledHandler(t)
+	handler.WithServiceProbes(map[string]ServiceProbe{"price_storage": func(context.Context) (string, error) { return "", ProbeWarning{Reason: "price_storage_buffered:3"} }})
+	result, services := statusServices(t, handler)
+	entry := services["price_storage"].(map[string]any)
+	if entry["status"] != "degraded" || entry["detail"] != "price_storage_buffered:3" || result["status"] != "degraded" {
+		t.Fatal(result)
+	}
+}
