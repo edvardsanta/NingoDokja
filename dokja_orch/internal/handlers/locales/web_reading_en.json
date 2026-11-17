@@ -1,10 +1,11 @@
 {
-  "document_prompt": "Read the attached PDF so we can discuss it.",
+  "document_prompt": "Read the attached document (PDF or plain text) so we can discuss it.",
   "pdf_unreadable": "I could not extract text from {count} PDF(s). Scanned, protected or damaged files may be unreadable; I have not read their contents.",
   "too_large": "I left {count} PDF(s) unread because they exceed the {limit} MiB limit per file.",
   "failed": "I could not read {count} of the supplied links. They are not evidence for this reply.",
   "omitted": "I left {count} additional links unread; I can read up to {limit} per message.",
   "blocked_one": "The site blocked automatic reading of one link. I have not read that content.",
   "blocked_many": "Automatic reading was blocked for {count} links. I have not read their contents.",
-  "recovery": "Paste the text or an excerpt here so we can discuss it with citations."
+  "recovery": "Paste the text or an excerpt here so we can discuss it with citations.",
+  "served_stored": "I could not re-read {count} link(s) just now and used the copy kept from an earlier read in this conversation; the content may be outdated."
 }

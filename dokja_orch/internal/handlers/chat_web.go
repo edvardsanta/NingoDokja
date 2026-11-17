@@ -57,7 +57,10 @@ type webFailure struct {
 type webTurnData struct {
 	FailureOnly bool         `json:"-"`
 	Failures    []webFailure `json:"failures,omitempty"`
-	Omitted     int          `json:"omitted_links,omitempty"`
+	// ServedStored lists URLs whose fresh re-read failed and whose passages came from
+	// a copy kept from an earlier read in this conversation; the content may be outdated.
+	ServedStored []string `json:"served_stored,omitempty"`
+	Omitted      int      `json:"omitted_links,omitempty"`
 }
 type webSessionReading struct {
 	id        string
@@ -122,23 +125,59 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 		return nil, data
 	}
 	if len(links) > 0 {
-		saved = webSessionReading{id: sessionID}
 		data.Omitted = max(0, len(links)-chat.MaxWebLinks)
 		links = links[:min(len(links), chat.MaxWebLinks)]
 		readCtx, cancel := context.WithTimeout(ctx, webReadBudget)
 		defer cancel()
+		if len(saved.documents) == 0 {
+			saved.documents = h.loadReadingContext(ctx, key, sessionID)
+		}
+		// A new read updates its own URL; documents read earlier in this session stay
+		// available. Resetting to an empty set here used to drop every previous reading
+		// on a transient fetch failure — and then the save below wiped the durable copy.
+		stored := make(map[string]chat.WebDocument, len(saved.documents))
+		merged := make([]chat.WebDocument, 0, len(saved.documents)+len(links))
+		for _, document := range saved.documents {
+			if _, dup := stored[document.URL]; !dup {
+				stored[document.URL] = document
+				merged = append(merged, document)
+			}
+		}
+		replace := func(document chat.WebDocument) {
+			for i := range merged {
+				if merged[i].URL == document.URL {
+					merged[i] = document
+					return
+				}
+			}
+			merged = append(merged, document)
+		}
 		for _, link := range links {
 			if link.Error != "" {
-				data.Failures = append(data.Failures, webFailure{link.URL, link.Error})
+				if _, ok := stored[link.URL]; ok {
+					data.ServedStored = append(data.ServedStored, link.URL)
+				} else {
+					data.Failures = append(data.Failures, webFailure{link.URL, link.Error})
+				}
 				continue
 			}
 			result, kind, err := readChatLink(readCtx, w.domain, link.URL)
 			if err != nil {
+				if _, ok := stored[link.URL]; ok {
+					// The fresh read failed but an earlier read of this same URL is kept:
+					// serve that copy, marked as possibly outdated in the turn notice.
+					data.ServedStored = append(data.ServedStored, link.URL)
+					continue
+				}
 				data.Failures = append(data.Failures, webFailure{link.URL, digest.WebFailureReason(err)})
 				continue
 			}
 			document, err := decodeWebDocument(result)
 			if err != nil {
+				if _, ok := stored[link.URL]; ok {
+					data.ServedStored = append(data.ServedStored, link.URL)
+					continue
+				}
 				data.Failures = append(data.Failures, webFailure{link.URL, "unreadable"})
 				continue
 			}
@@ -148,8 +187,12 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 			h.learnFromReading(readCtx, event, kind, map[string]any{"url": document.URL}, func(storeCtx context.Context) {
 				h.knowledgePersist.persistWebReading(storeCtx, event, document)
 			})
-			saved.documents = append(saved.documents, document)
+			replace(document)
 		}
+		if len(merged) > chat.MaxWebLinks {
+			merged = merged[len(merged)-chat.MaxWebLinks:]
+		}
+		saved = webSessionReading{id: sessionID, documents: merged}
 	}
 	if len(links) > 0 {
 		h.saveReadingContext(ctx, key, sessionID, saved.documents)
@@ -477,6 +520,9 @@ func webReadingStatus(event core.Event, data *webTurnData) string {
 	}
 	if data.Omitted > 0 {
 		lines = append(lines, catalog.say("omitted", "count", fmt.Sprint(data.Omitted), "limit", fmt.Sprint(chat.MaxWebLinks)))
+	}
+	if len(data.ServedStored) > 0 {
+		lines = append(lines, catalog.say("served_stored", "count", fmt.Sprint(len(data.ServedStored))))
 	}
 	if data.FailureOnly {
 		lines = append(lines, catalog.say("recovery"))
