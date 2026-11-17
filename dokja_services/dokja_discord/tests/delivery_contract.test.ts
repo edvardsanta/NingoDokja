@@ -86,7 +86,7 @@ test("delivery contract rejects invalid payload", async () => {
 
   assert.equal(result.statusCode, 400);
   assert.equal(result.payload.status, "error");
-  assert.match(String(result.payload.message), /content or attachment_url/);
+  assert.match(String(result.payload.message), /content, attachment_url or embeds/);
 });
 
 test("delivery routes mapped channels through the webhook without bot auth", async () => {
@@ -275,4 +275,51 @@ test("delivery logs which route was used without leaking the webhook url", async
 
   assert.match(logs.join("\n"), /"via":"webhook"/);
   assert.equal(logs.join("\n").includes("secret-token"), false);
+});
+
+test("delivery renders bounded embeds on the bot and webhook paths", async () => {
+  let botBody = "";
+  const bot = await handleDiscordDeliveryRequest(
+    {
+      channel_id: "channel-1",
+      embeds: [{
+        title: "Chegou preço para ryzen 5 5600",
+        description: "• 5600XT — kabum R$ 1.059,99",
+        footer: "Veredito completo: /preco produto:ryzen 5 5600",
+        color: 0x00b8a9,
+        url: "https://example.com/offer",
+        fields: [{ name: "Mercado", value: "mín. R$ 900,00", inline: true }],
+      }],
+    },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      fetchImpl: async (_input, init) => {
+        botBody = String(init?.body ?? "");
+        return new Response(JSON.stringify({ id: "m-embed" }), { status: 200 });
+      },
+    },
+  );
+  assert.equal(bot.statusCode, 200);
+  const sent = JSON.parse(botBody);
+  assert.equal(sent.embeds[0].title, "Chegou preço para ryzen 5 5600");
+  assert.equal(sent.embeds[0].footer.text, "Veredito completo: /preco produto:ryzen 5 5600");
+  assert.equal(sent.embeds[0].color, 0x00b8a9);
+  assert.equal(sent.embeds[0].fields[0].name, "Mercado");
+
+  let webhookPayload = "";
+  const webhook = await handleDiscordDeliveryRequest(
+    { channel_id: "channel-9", embeds: [{ title: "título", description: "corpo" }] },
+    {
+      apiBaseUrl: "https://discord.test/api/v10",
+      token: "token",
+      webhooks: { "channel-9": "https://discord.test/api/webhooks/1/abc" },
+      fetchImpl: async (_input, init) => {
+        webhookPayload = String(init?.body ?? "");
+        return new Response(JSON.stringify({ id: "m-webhook-embed" }), { status: 200 });
+      },
+    },
+  );
+  assert.equal(webhook.statusCode, 200);
+  assert.equal(JSON.parse(webhookPayload).embeds[0].title, "título");
 });

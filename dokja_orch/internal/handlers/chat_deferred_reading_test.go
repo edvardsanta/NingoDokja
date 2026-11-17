@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"read_books/internal/clients"
 )
 
 type fakeProactiveDeliverer struct {
@@ -17,12 +19,13 @@ type proactiveDelivery struct {
 	channelID string
 	content   string
 	replyTo   string
+	embeds    []clients.DiscordDeliveryEmbed
 }
 
-func (f *fakeProactiveDeliverer) DeliverReply(_ context.Context, channelID, content, replyToMessageID string) error {
+func (f *fakeProactiveDeliverer) DeliverReply(_ context.Context, channelID, content, replyToMessageID string, embeds []clients.DiscordDeliveryEmbed) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.delivered = append(f.delivered, proactiveDelivery{channelID: channelID, content: content, replyTo: replyToMessageID})
+	f.delivered = append(f.delivered, proactiveDelivery{channelID: channelID, content: content, replyTo: replyToMessageID, embeds: embeds})
 	return nil
 }
 

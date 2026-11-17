@@ -11,6 +11,7 @@ import (
 	"time"
 
 	chat "read_books/dokja_domain/dokja_chat"
+	"read_books/internal/clients"
 	"read_books/internal/core"
 	"read_books/internal/logger"
 )
@@ -177,7 +178,7 @@ func (r *deferredReadingRegistry) claim(ctx context.Context, channelID, url stri
 // ProactiveDeliverer posts a new message to a channel with no request driving it.
 // Implemented by the Discord interface client; nil disables deferred readings.
 type ProactiveDeliverer interface {
-	DeliverReply(ctx context.Context, channelID, content, replyToMessageID string) error
+	DeliverReply(ctx context.Context, channelID, content, replyToMessageID string, embeds []clients.DiscordDeliveryEmbed) error
 }
 
 // WithProactiveDeliverer lets a failed transient reading defer: the handler re-reads
@@ -296,7 +297,7 @@ func (h *ChatDomainHandler) settleDeferredReading(ctx context.Context, entry def
 	if content == "" {
 		return
 	}
-	if err := h.proactive.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID); err != nil {
+	if err := h.proactive.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID, nil); err != nil {
 		logger.Info(fmt.Sprintf("deferred follow-up delivery failed channel=%s url=%s: %v", entry.ChannelID, entry.URL, err))
 		return
 	}
