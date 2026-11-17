@@ -1,8 +1,8 @@
 # Search backend for Ningo's chat research. It only answers Feeds on the compose network and
-# is never published to the host. The secret comes from SEARXNG_SECRET, not from this file.
+# is never published to the host. The secret comes from DOKJA_SEARCH_SECRET, not from this file.
 use_default_settings: true
 general:
-  instance_name: dokja-searxng
+  instance_name: dokja-search
   enable_metrics: false
 search:
   safe_search: 1

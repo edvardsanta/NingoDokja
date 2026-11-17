@@ -148,13 +148,13 @@ services:
     networks:
       - dokja-net
 
-  dokja-searxng:
-    image: ${DOKJA_SEARXNG_IMAGE:-searxng/searxng:latest}
+  dokja-search:
+    image: ${DOKJA_SEARCH_IMAGE:-searxng/searxng:latest}
     restart: unless-stopped
     environment:
-      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET to a long random value}
+      SEARXNG_SECRET: ${DOKJA_SEARCH_SECRET:?set DOKJA_SEARCH_SECRET to a long random value}
     volumes:
-      - ./dokja_services/dokja_searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./dokja_services/dokja_search/settings.yml:/etc/searxng/settings.yml:ro
     # Reached by Feeds over the compose network only; no port is published.
     networks:
       - dokja-net
@@ -169,7 +169,7 @@ services:
         FEEDS_PLUGIN_BROWSER: ${FEEDS_PLUGIN_BROWSER:-none}
     restart: unless-stopped
     environment:
-      DOKJA_WEB_SEARCH_URL: http://dokja-searxng:8080
+      DOKJA_WEB_SEARCH_URL: http://dokja-search:8080
       DOKJA_PDF_MAX_MIB: ${DOKJA_PDF_MAX_MIB:-25}
       FEEDS_SERVICE_ENDPOINT: tcp://*:5563
       FEEDS_PLUGINS_DIR: /plugins

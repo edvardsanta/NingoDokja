@@ -1781,13 +1781,13 @@ for a book, then a question about one of its characters), Ningo searches the web
 title as context and answers from the snippets, labelled as search results. A bare link, or a
 question about the page itself, never searches.
 
-The backend is the `dokja-searxng` container, configured by
-`dokja_services/dokja_searxng/settings.yml` (JSON output, safe search on, no published port). Feeds
+The backend is the `dokja-search` container, configured by
+`dokja_services/dokja_search/settings.yml` (JSON output, safe search on, no published port). Feeds
 reaches it through `DOKJA_WEB_SEARCH_URL`, set to the compose service in every stack. To turn
-research off, remove the `dokja-searxng` service or empty the variable in Feeds' environment: the
-search then fails quietly and the turn behaves as before. Production requires `SEARXNG_SECRET`
+research off, remove the `dokja-search` service or empty the variable in Feeds' environment: the
+search then fails quietly and the turn behaves as before. Production requires `DOKJA_SEARCH_SECRET`
 (a long random value); dev and lite default to a `CHANGE_ME_*` placeholder that must never reach
-production. `DOKJA_SEARXNG_IMAGE` overrides the image; pin it to a tested tag in production.
+production. `DOKJA_SEARCH_IMAGE` overrides the image; pin it to a tested tag in production.
 The search query leaves the host through the instance's upstream engines, so it carries only the
 words of the question and the page title, never the user's identity or channel.
 
