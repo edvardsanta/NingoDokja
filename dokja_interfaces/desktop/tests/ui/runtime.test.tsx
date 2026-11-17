@@ -194,3 +194,19 @@ it("splits System into Status, Settings and Providers, and asks for a view only 
   fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
   await waitFor(() => expect(calls.filter((call) => call.type === "runtime.settings")).toHaveLength(1));
 });
+
+
+it("shows search and vision with lifecycle controls, usage and dependencies", async () => {
+ const { transport, calls } = routedTransport({ "runtime.modules": ok({ modules: [
+  { name: "search", state: "stopped", dependencies: [], error: "" },
+  { name: "vision", state: "stopped", dependencies: ["orchestrator", "vision_init"], error: "" },
+  { name: "embeddings", state: "running", dependencies: [], error: "" },
+ ], busy: false, error: "" }) });
+ show(transport);
+ await screen.findByRole("button", { name: "Start Web search" });
+ expect(screen.getByRole("button", { name: "Start Vision" })).toBeTruthy();
+ expect(screen.getByRole("button", { name: "Stop Model engine" })).toBeTruthy();
+ expect(screen.getByText(/Dependencies: Orchestrator, Vision model setup/)).toBeTruthy();
+ expect(screen.getByText(/Feeds must also be running and enabled/)).toBeTruthy();
+ expect(calls.some(call => call.type === "runtime.set")).toBe(false);
+});

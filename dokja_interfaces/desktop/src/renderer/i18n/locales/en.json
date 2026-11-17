@@ -1030,5 +1030,13 @@
   "plugins_sources": "Collection plugins",
   "plugins_processing": "Processing plugins",
   "plugins_sources_hint": "Collection plugins bring readings and media. Check the last successful run and any error below. Enabled does not mean a collection has succeeded.",
-  "plugins_processing_hint": "Processing plugins provide capabilities used on demand. Ready means available for a request; it does not confirm a successful execution."
+  "plugins_processing_hint": "Processing plugins provide capabilities used on demand. Ready means available for a request; it does not confirm a successful execution.",
+  "name_search": "Web search",
+  "name_model_engine": "Model engine",
+  "name_embedding_init": "Embedding model setup",
+  "name_vision_init": "Vision model setup",
+  "runtime_dependencies": "Dependencies: {names}",
+  "runtime_search_hint": "Complements chat questions about a previously read link when the reading has no matching subject terms. Feeds must also be running and enabled. Serving readiness does not verify upstream search results.",
+  "runtime_vision_hint": "Reads images and supported media in chat. Starting prepares the vision model; the activity switch controls whether chat can use it.",
+  "runtime_engine_hint": "Shared by memory, knowledge and vision. Running dependents must be stopped before this engine can stop."
 }

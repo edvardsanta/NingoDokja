@@ -1030,5 +1030,13 @@
   "plugins_sources": "Plugins de coleta",
   "plugins_processing": "Plugins de processamento",
   "plugins_sources_hint": "Plugins de coleta trazem leituras e mídias. Confira a última execução bem-sucedida e os erros abaixo. Estar habilitado não significa que uma coleta deu certo.",
-  "plugins_processing_hint": "Plugins de processamento oferecem recursos usados sob demanda. Pronto significa disponível para uma solicitação; não confirma uma execução bem-sucedida."
+  "plugins_processing_hint": "Plugins de processamento oferecem recursos usados sob demanda. Pronto significa disponível para uma solicitação; não confirma uma execução bem-sucedida.",
+  "name_search": "Busca na web",
+  "name_model_engine": "Motor de modelos",
+  "name_embedding_init": "Preparação do modelo de embeddings",
+  "name_vision_init": "Preparação do modelo de visão",
+  "runtime_dependencies": "Dependências: {names}",
+  "runtime_search_hint": "Complementa perguntas no chat sobre um link já lido quando o texto não contém os termos do assunto. Feeds também precisa estar rodando e habilitado. A prontidão do serviço não verifica resultados dos buscadores.",
+  "runtime_vision_hint": "Lê imagens e mídias compatíveis no chat. Iniciar prepara o modelo de visão; a opção de atividade controla se o chat pode usá-lo.",
+  "runtime_engine_hint": "Compartilhado por memória, conhecimento e visão. Pare os módulos dependentes em execução antes de parar este motor."
 }

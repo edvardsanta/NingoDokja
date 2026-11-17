@@ -228,6 +228,7 @@ func TestDiscordAndSchedulerReadiness(t *testing.T) {
 		name, service string
 		want          []string
 	}{
+		{"search", "dokja-search", []string{"exec", "-T", "dokja-search", "python3", "-c", searchHealth}},
 		{"discord", "dokja-discord", []string{"exec", "-T", "dokja-discord", "node", "--input-type=module", "-e", discordHealth}},
 		{"scheduler", "dokja-scheduler", []string{"ps", "--all", "--quiet"}},
 	} {
@@ -292,4 +293,31 @@ func TestLogsTailOnlySelectedModuleWithoutUnboundedOutput(t *testing.T) {
 func nameService(name string) string {
 	module, _ := domain.Lookup(name)
 	return module.Service
+}
+
+func TestVisionUsesHTTPHealth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/health" {
+			t.Error(r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	endpoint, _ := url.Parse(server.URL)
+	port, _ := strconv.Atoi(endpoint.Port())
+	if err := probe(context.Background(), domain.Module{Name: "vision", Port: port}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVisionInitWaitsForSuccessfulCompletion(t *testing.T) {
+	c := &Compose{Wait: time.Second, Poll: time.Millisecond, Run: func(context.Context, ...string) ([]byte, error) {
+		return []byte("aaaaaaaaaaaa"), nil
+	}, Inspect: func(context.Context, ...string) ([]byte, error) {
+		return []byte(`[{"Config":{"Labels":{"com.docker.compose.service":"dokja-vision-init"}},"State":{"Status":"exited","ExitCode":0}}]`), nil
+	}}
+	module, _ := domain.Lookup("vision_init")
+	if err := c.Ready(context.Background(), module); err != nil {
+		t.Fatal(err)
+	}
 }

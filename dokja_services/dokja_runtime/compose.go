@@ -252,7 +252,7 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 	}
 	wait := c.Wait
 	switch m.Name {
-	case "embedding_init":
+	case "embedding_init", "vision_init":
 		wait = 8 * time.Minute
 	case "discord":
 		// The development image installs its packages when it starts.
@@ -273,7 +273,7 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 		if state.Failed {
 			return fmt.Errorf("%s exited or became unhealthy; inspect its container logs and retry", m.Name)
 		}
-		if m.Name == "embedding_init" {
+		if m.Name == "embedding_init" || m.Name == "vision_init" {
 			if state.Completed {
 				return nil
 			}
@@ -281,6 +281,14 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 			if m.Name == "embeddings" {
 				probe, cancel := context.WithTimeout(ctx, 5*time.Second)
 				_, err := c.Run(probe, "exec", "-T", m.Service, "ollama", "list")
+				cancel()
+				if err == nil {
+					return nil
+				}
+			} else if m.Name == "search" {
+				// Search has no published port. Verify HTTP inside its container.
+				probeContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err := c.Run(probeContext, "exec", "-T", m.Service, "python3", "-c", searchHealth)
 				cancel()
 				if err == nil {
 					return nil
@@ -324,7 +332,7 @@ func (c *Compose) Ready(parent context.Context, m domain.Module) error {
 }
 
 func probe(parent context.Context, m domain.Module) error {
-	if m.Name == "voice" {
+	if m.Name == "voice" || m.Name == "vision" {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
 		defer cancel()
 		endpoint := url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(m.Port), Path: "/health"}
@@ -499,3 +507,9 @@ func (c *Compose) Logs(parent context.Context, modules []domain.Module) (string,
 	}
 	return cleanLogs(combined.String()), nil
 }
+
+// A response from the search application's root verifies serving readiness, not upstream results.
+const searchHealth = `import urllib.request
+with urllib.request.urlopen("http://127.0.0.1:8080/", timeout=3) as response:
+    assert response.status == 200
+`

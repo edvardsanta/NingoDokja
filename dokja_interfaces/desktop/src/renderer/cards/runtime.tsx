@@ -95,6 +95,10 @@ export function RuntimeCard({ transport, moduleStatus, moduleDetails, onChanged,
             onClick={() => start && DELIVERY_MODULES.includes(module.name) ? setAsking(module.name) : action.start({ module: module.name, enabled: start })}>
             {t(start ? "runtime_start" : "runtime_stop")}
           </Button>
+          {module.name === "search" && <p className="module-health detail">{t("runtime_search_hint")}</p>}
+          {module.name === "vision" && <p className="module-health detail">{t("runtime_vision_hint")}</p>}
+          {module.name === "embeddings" && <p className="module-health detail">{t("runtime_engine_hint")}</p>}
+          {module.dependencies.length > 0 && <p className="module-health detail">{t("runtime_dependencies", { names: module.dependencies.map((name) => displayName(name, t)).join(", ") })}</p>}
           {moduleStatus && <div className="module-health">{moduleStatus(module.name)}</div>}
           {module.progress && <p className="module-progress">{progressText(module.progress, t)}</p>}
           <RuntimeLogs transport={transport} name={module.name} label={label} />

@@ -32,7 +32,7 @@ func (f *fake) Start(_ context.Context, m Module) error {
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "start:"+m.Name)
 	f.containers[m.Service] = Container{Running: true}
-	if m.Name == "embedding_init" {
+	if m.Name == "embedding_init" || m.Name == "vision_init" {
 		f.containers[m.Service] = Container{Completed: true}
 	}
 	return nil
@@ -238,7 +238,7 @@ func TestOwnershipJournalSurvivesDaemonRestartWithoutStartingAnything(t *testing
 }
 func TestInvalidModuleAndUnwritableOwnershipNeverExecuteCommands(t *testing.T) {
 	d, f := fresh()
-	for _, name := range []string{"", "embeddings", "embedding_init", "--all", "meme; shutdown"} {
+	for _, name := range []string{"", "vision_init", "embedding_init", "--all", "meme; shutdown"} {
 		if _, err := d.Set(name, true); err == nil {
 			t.Fatal(name)
 		}
@@ -377,5 +377,60 @@ func TestModuleLogsExcludeDependenciesAndRetiredContainers(t *testing.T) {
 		if row.Name == "book" || row.Name == "meme" {
 			t.Fatal(row)
 		}
+	}
+}
+
+func TestSearchVisionAndEngineAreManagedWithoutStartingDelivery(t *testing.T) {
+	for _, name := range []string{"search", "vision", "embeddings"} {
+		d, f := fresh()
+		if got := row(d.List(context.Background()), name).State; got != "stopped" {
+			t.Fatal(name, got)
+		}
+		if got := row(change(t, d, name, true), name).State; got != "ready" {
+			t.Fatal(name, got)
+		}
+		for _, call := range f.trace() {
+			if call == "start:discord" || call == "start:scheduler" || call == "start:feeds" {
+				t.Fatal(f.trace())
+			}
+		}
+		if got := row(change(t, d, name, false), name).State; got != "stopped" {
+			t.Fatal(name, got)
+		}
+	}
+}
+
+func TestVisionPreparesModelAndProtectsSharedEngine(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "vision", true)
+	want := []string{"start:orchestrator", "start:embeddings", "start:vision_init", "start:vision"}
+	if !reflect.DeepEqual(f.trace(), want) {
+		t.Fatal(f.trace())
+	}
+	change(t, d, "memory", true)
+	change(t, d, "vision", false)
+	if !f.containers["dokja-ollama"].Running {
+		t.Fatal("stopped shared engine while memory is running")
+	}
+	before := len(f.trace())
+	change(t, d, "embeddings", false)
+	if len(f.trace()) != before {
+		t.Fatal("stopped engine required by memory")
+	}
+}
+
+func TestExplicitEngineRemainsRunningWhenVisionStops(t *testing.T) {
+	d, f := fresh()
+	change(t, d, "embeddings", true)
+	change(t, d, "vision", true)
+	before := len(f.trace())
+	change(t, d, "vision", false)
+	for _, call := range f.trace()[before:] {
+		if call == "stop:embeddings" {
+			t.Fatal("stopped the independently enabled shared engine")
+		}
+	}
+	if row(d.List(context.Background()), "embeddings").State != "ready" {
+		t.Fatal("engine no longer ready")
 	}
 }
