@@ -43,5 +43,9 @@ func eligibleAlternative(original, candidate map[string]any) bool {
 		return true
 	}
 	classification, _ := candidate["classification"].(string)
-	return classification == "technically_comparable" || classification == "technically_superior"
+	// similar_cpu_specs is grounded in cores and threads extracted verbatim from the
+	// listings, and the shortlist already ranks it below benchmark-backed classes;
+	// without it no candidate passes until a price.technical.v1 provider exists.
+	return classification == "technically_comparable" || classification == "technically_superior" ||
+		classification == "similar_cpu_specs"
 }
