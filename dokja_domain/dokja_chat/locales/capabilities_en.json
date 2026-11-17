@@ -244,7 +244,8 @@
       "limits": [
         "Only the /price command (/preco in Portuguese) answers with history; ordinary chat text cannot start the assessment — tell people to use the command.",
         "Only watched searches carry history; a newly watched search collects its first prices in a moment, and a product nobody watches has no verdict.",
-        "Hardware offers come from the watched stores; a game title also resolves its offers on the game stores."
+        "Hardware offers come from the watched stores; a game title also resolves its offers on the game stores.",
+        "When the owner starts watching a new search and its first collection brings nothing, the application promises a return on Discord: the first recorded prices trigger a follow-up reply to the original command message. One per channel and search, for seven days."
       ]
     },
     "price.compare": {

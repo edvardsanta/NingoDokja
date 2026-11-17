@@ -244,7 +244,8 @@
       "limits": [
         "Só o comando /preco responde com histórico; texto comum de chat não pode iniciar a avaliação — diga para usarem o comando.",
         "Só buscas vigiadas carregam histórico; uma busca recém-vigiada coleta seus primeiros preços num instante, e um produto que ninguém vigia não tem veredito.",
-        "Ofertas de hardware vêm das lojas vigiadas; um título de jogo também resolve suas ofertas nas lojas de jogos."
+        "Ofertas de hardware vêm das lojas vigiadas; um título de jogo também resolve suas ofertas nas lojas de jogos.",
+        "Quando o dono começa a vigiar uma busca nova e a primeira coleta não traz nada, a aplicação promete voltar no Discord: os primeiros preços registrados disparam uma resposta de follow-up na mensagem original do comando. Uma por canal e busca, por sete dias."
       ]
     },
     "price.compare": {

@@ -378,7 +378,7 @@ test("a new watch the orchestrator already collected says so, with or without pr
   assert.match(found.content, /^👁️ Passei a vigiar \*\*hd\*\* e já busquei agora\./);
   assert.doesNotMatch(found.content, /pergunte de novo/);
   assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "added", collected: true } }, "en"),
-    "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing.");
+    "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing. I will let you know here when prices arrive.");
 });
 
 test("comparison cards show workload context and collected technical references",()=>{
