@@ -301,11 +301,21 @@ func priceNotificationPhrase(event core.Event, key, search string, pairs ...stri
 		locale = "en"
 	}
 	text := priceNotificationPhrases[locale][key]
-	replacements := append([]string{"{search}", search}, pairs...)
+	replacements := []string{"{search}", search}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		replacements = append(replacements, "{"+pairs[i]+"}", pairs[i+1])
+	}
 	return strings.NewReplacer(replacements...).Replace(text)
 }
 
-// formatCents renders a price in reais the way the price interfaces do.
+// formatCents renders a price in reais the way the price interfaces do:
+// thousands separated by a dot, cents by a comma.
 func formatCents(cents int64) string {
-	return fmt.Sprintf("%d,%02d", cents/100, cents%100)
+	reais, rest := cents/100, cents%100
+	digits := fmt.Sprintf("%d", reais)
+	if reais >= 1000 {
+		head := digits[:len(digits)-3]
+		digits = head + "." + digits[len(digits)-3:]
+	}
+	return fmt.Sprintf("%s,%02d", digits, rest)
 }

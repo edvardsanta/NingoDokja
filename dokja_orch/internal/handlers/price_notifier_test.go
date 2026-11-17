@@ -42,14 +42,34 @@ func TestPriceNotifierDeliversTheFollowUpWhenTheWatchCollects(t *testing.T) {
 	}
 	if !strings.Contains(delivered[0].content, "Chegou preço para **ryzen 5 5600**") ||
 		!strings.Contains(delivered[0].content, "459,90") ||
+		!strings.Contains(delivered[0].content, "R$ 459,90") ||
+		!strings.Contains(delivered[0].content, "store-a") ||
 		!strings.Contains(delivered[0].content, "/preco produto:ryzen 5 5600") {
 		t.Fatalf("follow-up content wrong: %s", delivered[0].content)
+	}
+	if strings.ContainsAny(delivered[0].content, "{}") {
+		t.Fatalf("a template placeholder leaked into the follow-up: %s", delivered[0].content)
 	}
 	notifier.mu.Lock()
 	remaining := len(notifier.pending)
 	notifier.mu.Unlock()
 	if remaining != 0 {
 		t.Fatal("settled promise still pending")
+	}
+}
+
+func TestPriceNotificationFormatsPricesAndRendersEveryPlaceholder(t *testing.T) {
+	if got := formatCents(45990); got != "459,90" {
+		t.Fatalf("formatCents(45990) = %s", got)
+	}
+	if got := formatCents(105999); got != "1.059,99" {
+		t.Fatalf("formatCents(105999) = %s", got)
+	}
+	event := priceNotificationEvent()
+	line := priceNotificationPhrase(event, "offer", "ryzen 5 5600",
+		"title", "Processador Example", "merchant", "kabum", "price", formatCents(105999))
+	if line != "• Processador Example — kabum R$ 1.059,99" {
+		t.Fatalf("offer line rendered wrong: %s", line)
 	}
 }
 
