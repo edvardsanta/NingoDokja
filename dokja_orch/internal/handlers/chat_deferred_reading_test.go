@@ -56,8 +56,28 @@ func waitForDelivery(t *testing.T, deliverer *fakeProactiveDeliverer, want int) 
 	return nil
 }
 
+// failThenSucceed fails the first web read and succeeds afterwards, so a test does
+// not race the background goroutine flipping a shared flag. Only feeds.web.read
+// calls count: the social-reader probe dispatches other kinds and must not consume
+// the failure.
+type failThenSucceedService struct {
+	webReads int
+	inner    *webReadingService
+}
+
+func (s *failThenSucceedService) Dispatch(ctx context.Context, kind string, payload map[string]any) (map[string]any, error) {
+	if kind == "feeds.web.read" {
+		s.webReads++
+		s.inner.fail = s.webReads == 1
+		if s.webReads == 2 {
+			s.inner.injection = "settled"
+		}
+	}
+	return s.inner.Dispatch(ctx, kind, payload)
+}
+
 func TestDeferredReadingPromisesAndSettlesWithTheFreshEvidence(t *testing.T) {
-	service := &webReadingService{fail: true}
+	service := &failThenSucceedService{inner: &webReadingService{}}
 	generator := &fakeChatGenerator{result: map[string]any{"reply": "model reply"}}
 	deliverer := &fakeProactiveDeliverer{}
 	h := NewChatDomainHandler(generator).WithWebReading(service, nil).WithProactiveDeliverer(deliverer)
@@ -71,8 +91,6 @@ func TestDeferredReadingPromisesAndSettlesWithTheFreshEvidence(t *testing.T) {
 	if !strings.Contains(reply, "Não consegui ler 1") || !strings.Contains(reply, "vou tentar de novo") {
 		t.Fatalf("turn did not report the failure and promise the follow-up: %s", reply)
 	}
-	service.fail = false
-	service.injection = "settled"
 	delivered := waitForDelivery(t, deliverer, 1)
 	if delivered[0].channelID != "c1" || delivered[0].replyTo != "original-1" {
 		t.Fatalf("follow-up lost its correlation: %#v", delivered[0])
@@ -153,29 +171,93 @@ func TestDeferredReadingRefusesPermanentFailures(t *testing.T) {
 
 func TestDeferredReadingRegistryHoldsOnePromisePerChannel(t *testing.T) {
 	registry := newDeferredReadingRegistry()
-	entry := deferredReading{channelID: "chan", url: "https://example.com/one"}
-	if !registry.add(entry) {
+	ctx := context.Background()
+	entry := deferredReading{ChannelID: "chan", URL: "https://example.com/one"}
+	if !registry.add(ctx, entry) {
 		t.Fatal("first promise refused")
 	}
-	if registry.add(deferredReading{channelID: "chan", url: "https://example.com/two"}) {
+	if registry.add(ctx, deferredReading{ChannelID: "chan", URL: "https://example.com/two"}) {
 		t.Fatal("a second promise for the same channel was admitted")
 	}
-	if registry.add(deferredReading{channelID: "chan", url: "https://example.com/one"}) {
+	if registry.add(ctx, deferredReading{ChannelID: "chan", URL: "https://example.com/one"}) {
 		t.Fatal("a duplicate promise for the same URL was admitted")
 	}
-	if !registry.add(deferredReading{channelID: "other", url: "https://example.com/two"}) {
+	if !registry.add(ctx, deferredReading{ChannelID: "other", URL: "https://example.com/two"}) {
 		t.Fatal("another channel's promise was refused")
 	}
-	claimed, ok := registry.claim("chan", "https://example.com/one")
-	if !ok || claimed.channelID != "chan" {
+	claimed, ok := registry.claim(ctx, "chan", "https://example.com/one")
+	if !ok || claimed.ChannelID != "chan" {
 		t.Fatalf("claim did not return the pending entry: %#v", claimed)
 	}
-	if _, ok := registry.claim("chan", "https://example.com/one"); ok {
+	if _, ok := registry.claim(ctx, "chan", "https://example.com/one"); ok {
 		t.Fatal("claimed twice")
 	}
-	registry.add(deferredReading{channelID: "chan", url: "https://example.com/late"})
+	registry.add(ctx, deferredReading{ChannelID: "chan", URL: "https://example.com/late"})
 	registry.now = func() time.Time { return time.Now().Add(deferredReadingTTL + time.Minute) }
-	if _, ok := registry.claim("chan", "https://example.com/late"); ok {
+	if _, ok := registry.claim(ctx, "chan", "https://example.com/late"); ok {
 		t.Fatal("an expired promise settled")
+	}
+}
+
+type memoryDeferredStore struct {
+	data  []byte
+	found bool
+	err   error
+}
+
+func (s *memoryDeferredStore) Save(_ context.Context, data []byte) error {
+	s.data, s.found = append([]byte(nil), data...), len(data) > 0
+	return s.err
+}
+
+func (s *memoryDeferredStore) Load(_ context.Context) ([]byte, bool, error) {
+	return s.data, s.found, s.err
+}
+
+func TestDeferredReadingRegistrySurvivesARestartThroughItsStore(t *testing.T) {
+	store := &memoryDeferredStore{}
+	before := newDeferredReadingRegistry().WithStore(store)
+	ctx := context.Background()
+	entry := deferredReading{ChannelID: "chan", URL: "https://example.com/one", Event: chatEvent("oi")}
+	if !before.add(ctx, entry) {
+		t.Fatal("promise refused")
+	}
+	if !store.found {
+		t.Fatal("promise was not persisted")
+	}
+
+	after := newDeferredReadingRegistry().WithStore(store)
+	rearm := after.restore(ctx)
+	if len(rearm) != 1 || rearm[0].URL != "https://example.com/one" {
+		t.Fatalf("restore did not re-arm the promise: %#v", rearm)
+	}
+	if _, ok := after.claim(ctx, "chan", "https://example.com/one"); !ok {
+		t.Fatal("restored promise not claimable")
+	}
+	if store.found {
+		t.Fatal("settled promise still persisted")
+	}
+}
+
+func TestDeferredReadingRegistryRestoreDropsExpiredAndBrokenDocuments(t *testing.T) {
+	store := &memoryDeferredStore{}
+	before := newDeferredReadingRegistry().WithStore(store)
+	ctx := context.Background()
+	entry := deferredReading{ChannelID: "chan", URL: "https://example.com/old", Event: chatEvent("oi")}
+	before.add(ctx, entry)
+	before.now = func() time.Time { return time.Now().Add(2 * deferredReadingTTL) }
+	fresh := newDeferredReadingRegistry().WithStore(store)
+	fresh.now = before.now
+	if rearm := fresh.restore(ctx); len(rearm) != 0 {
+		t.Fatalf("expired promises were re-armed: %#v", rearm)
+	}
+	if len(fresh.entries) != 0 {
+		t.Fatal("expired promises kept")
+	}
+
+	broken := &memoryDeferredStore{data: []byte("{not json"), found: true}
+	busted := newDeferredReadingRegistry().WithStore(broken)
+	if rearm := busted.restore(ctx); len(rearm) != 0 {
+		t.Fatal("a broken document re-armed something")
 	}
 }

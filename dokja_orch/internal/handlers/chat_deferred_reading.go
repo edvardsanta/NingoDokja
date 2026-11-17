@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -31,51 +32,132 @@ Write the follow-up in your usual voice, in the speaker's language: short, concr
 // deferredReading is one promised follow-up. It names where it came from, never
 // anything the fetch must re-derive: the reader works from the URL alone.
 type deferredReading struct {
-	channelID string
-	replyToID string
-	question  string
-	url       string
-	event     core.Event
-	expiresAt time.Time
+	ChannelID string     `json:"channel_id"`
+	ReplyToID string     `json:"reply_to_id"`
+	Question  string     `json:"question"`
+	URL       string     `json:"url"`
+	Event     core.Event `json:"event"`
+	ExpiresAt time.Time  `json:"expires_at"`
 }
 
-// deferredReadingRegistry is volatile (ADR 0017): a restart forgets every promise,
-// and the loss is logged where the entry was claimed. Nothing durable backs it.
+// DeferredReadingStore persists the promise registry across restarts. The handler
+// snapshots the whole registry on every mutation; a restart loads the snapshot,
+// drops expired entries and re-arms the survivors.
+type DeferredReadingStore interface {
+	Save(ctx context.Context, data []byte) error
+	Load(ctx context.Context) (data []byte, found bool, err error)
+}
+
+// deferredReadingRegistry holds the promises of one process and mirrors them to a
+// store when one is wired. Entries themselves stay volatile in memory; the store is
+// the recovery source (ADR 0017, resilient registry).
 type deferredReadingRegistry struct {
 	mu      sync.Mutex
 	entries map[string]deferredReading // channelID + "\x00" + url
 	now     func() time.Time
+	store   DeferredReadingStore
 }
 
 func newDeferredReadingRegistry() *deferredReadingRegistry {
 	return &deferredReadingRegistry{entries: map[string]deferredReading{}, now: time.Now}
 }
 
+// WithStore wires durable persistence; every mutation is mirrored.
+func (r *deferredReadingRegistry) WithStore(store DeferredReadingStore) *deferredReadingRegistry {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.store = store
+	return r
+}
+
 func deferredReadingKey(channelID, url string) string { return channelID + "\x00" + url }
+
+func (r *deferredReadingRegistry) persistLocked(ctx context.Context) {
+	if r.store == nil {
+		return
+	}
+	snapshot := make([]deferredReading, 0, len(r.entries))
+	for _, entry := range r.entries {
+		snapshot = append(snapshot, entry)
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		logger.Info(fmt.Sprintf("deferred readings snapshot failed: %v", err))
+		return
+	}
+	if len(snapshot) == 0 {
+		encoded = nil
+	}
+	if err := r.store.Save(ctx, encoded); err != nil {
+		logger.Info(fmt.Sprintf("deferred readings persistence failed: %v", err))
+	}
+}
+
+// restore loads the persisted promises, keeps the unexpired ones and reports them
+// so the handler can re-arm their background runs. A broken document forgets
+// everything: promises are niceties, never load-bearing state.
+func (r *deferredReadingRegistry) restore(ctx context.Context) []deferredReading {
+	r.mu.Lock()
+	store := r.store
+	r.mu.Unlock()
+	if store == nil {
+		return nil
+	}
+	data, found, err := store.Load(ctx)
+	if err != nil || !found {
+		if err != nil {
+			logger.Info(fmt.Sprintf("deferred readings restore failed: %v", err))
+		}
+		return nil
+	}
+	var snapshot []deferredReading
+	if json.Unmarshal(data, &snapshot) != nil {
+		logger.Info("deferred readings snapshot was unreadable; forgotten")
+		return nil
+	}
+	now := r.now()
+	kept := map[string]deferredReading{}
+	var rearm []deferredReading
+	for _, entry := range snapshot {
+		if now.After(entry.ExpiresAt) {
+			continue
+		}
+		kept[deferredReadingKey(entry.ChannelID, entry.URL)] = entry
+		rearm = append(rearm, entry)
+	}
+	r.mu.Lock()
+	r.entries = kept
+	r.mu.Unlock()
+	if len(rearm) > 0 {
+		logger.Info(fmt.Sprintf("deferred readings restored count=%d", len(rearm)))
+	}
+	return rearm
+}
 
 // add records one promise. It refuses when the channel already holds one — expired
 // entries are dropped first — or when the same URL is already pending: a channel
 // must never accumulate promises.
-func (r *deferredReadingRegistry) add(entry deferredReading) bool {
+func (r *deferredReadingRegistry) add(ctx context.Context, entry deferredReading) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	now := r.now()
 	for key, pending := range r.entries {
-		if now.After(pending.expiresAt) {
+		if now.After(pending.ExpiresAt) {
 			delete(r.entries, key)
 			continue
 		}
-		if pending.channelID == entry.channelID || key == deferredReadingKey(entry.channelID, entry.url) {
+		if pending.ChannelID == entry.ChannelID || key == deferredReadingKey(entry.ChannelID, entry.URL) {
 			return false
 		}
 	}
-	entry.expiresAt = now.Add(deferredReadingTTL)
-	r.entries[deferredReadingKey(entry.channelID, entry.url)] = entry
+	entry.ExpiresAt = now.Add(deferredReadingTTL)
+	r.entries[deferredReadingKey(entry.ChannelID, entry.URL)] = entry
+	r.persistLocked(ctx)
 	return true
 }
 
 // claim removes and returns one pending entry, or false when it expired or is gone.
-func (r *deferredReadingRegistry) claim(channelID, url string) (deferredReading, bool) {
+func (r *deferredReadingRegistry) claim(ctx context.Context, channelID, url string) (deferredReading, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := deferredReadingKey(channelID, url)
@@ -84,7 +166,8 @@ func (r *deferredReadingRegistry) claim(channelID, url string) (deferredReading,
 		return deferredReading{}, false
 	}
 	delete(r.entries, key)
-	if r.now().After(entry.expiresAt) {
+	r.persistLocked(ctx)
+	if r.now().After(entry.ExpiresAt) {
 		logger.Info(fmt.Sprintf("deferred reading expired channel=%s url=%s", channelID, url))
 		return deferredReading{}, false
 	}
@@ -104,6 +187,13 @@ func (h *ChatDomainHandler) WithProactiveDeliverer(deliverer ProactiveDeliverer)
 	return h
 }
 
+// WithDeferredReadingStore makes the promise registry resilient: every mutation is
+// mirrored, and a restart restores the pending promises and re-arms their runs.
+func (h *ChatDomainHandler) WithDeferredReadingStore(store DeferredReadingStore) *ChatDomainHandler {
+	h.deferred.WithStore(store)
+	return h
+}
+
 // deferReading records one promise and starts its background re-read. The turn has
 // already reported the failure; nothing here can change that reply. A refused or
 // expired promise settles nowhere: the registry drops it and logs.
@@ -111,17 +201,28 @@ func (h *ChatDomainHandler) deferReading(parent context.Context, event core.Even
 	if h.proactive == nil || h.web == nil {
 		return
 	}
+	h.restoreDeferredReadings(parent)
 	entry := deferredReading{
-		channelID: event.Channel.ID,
-		replyToID: resultString(event.Context, "message_id"),
-		question:  question,
-		url:       url,
-		event:     event,
+		ChannelID: event.Channel.ID,
+		ReplyToID: resultString(event.Context, "message_id"),
+		Question:  question,
+		URL:       url,
+		Event:     event,
 	}
-	if !h.deferred.add(entry) {
+	if !h.deferred.add(parent, entry) {
 		return
 	}
 	go h.runDeferredReading(parent, entry)
+}
+
+// restoreDeferredReadings runs at most once per process: it re-arms the promises a
+// previous process persisted, so a restart settles them instead of dropping them.
+func (h *ChatDomainHandler) restoreDeferredReadings(ctx context.Context) {
+	h.deferredRestoreOnce.Do(func() {
+		for _, entry := range h.deferred.restore(ctx) {
+			go h.runDeferredReading(context.Background(), entry)
+		}
+	})
 }
 
 // runDeferredReading settles one promise: re-read with the long budget, then either
@@ -130,13 +231,13 @@ func (h *ChatDomainHandler) deferReading(parent context.Context, event core.Even
 func (h *ChatDomainHandler) runDeferredReading(parent context.Context, entry deferredReading) {
 	settled := false
 	defer func() {
-		if _, ok := h.deferred.claim(entry.channelID, entry.url); ok && !settled {
-			logger.Info(fmt.Sprintf("deferred reading finished without a settlement channel=%s url=%s", entry.channelID, entry.url))
+		if _, ok := h.deferred.claim(context.Background(), entry.ChannelID, entry.URL); ok && !settled {
+			logger.Info(fmt.Sprintf("deferred reading finished without a settlement channel=%s url=%s", entry.ChannelID, entry.URL))
 		}
 	}()
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), deferredReadBudget)
 	defer cancel()
-	result, kind, err := readChatLink(ctx, h.web.domain, entry.url)
+	result, kind, err := readChatLink(ctx, h.web.domain, entry.URL)
 	var document chat.WebDocument
 	if err == nil {
 		document, err = decodeWebDocument(result)
@@ -146,17 +247,17 @@ func (h *ChatDomainHandler) runDeferredReading(parent context.Context, entry def
 		return
 	}
 	if kind == "post" {
-		h.appendPostMediaReadings(ctx, h.web.domain, entry.url, &document)
+		h.appendPostMediaReadings(ctx, h.web.domain, entry.URL, &document)
 	}
-	h.learnFromReading(ctx, entry.event, kind, map[string]any{"url": document.URL}, func(storeCtx context.Context) {
-		h.knowledgePersist.persistWebReading(storeCtx, entry.event, document)
+	h.learnFromReading(ctx, entry.Event, kind, map[string]any{"url": document.URL}, func(storeCtx context.Context) {
+		h.knowledgePersist.persistWebReading(storeCtx, entry.Event, document)
 	})
 	h.upsertDeferredReading(entry, document)
 	sources := webDocumentSources([]chat.WebDocument{document})
 	messages := withWebEvidence([]map[string]string{{"role": "system", "content": deferredFollowupBrief}}, sources, &webTurnData{})
 	generated, err := generateConversationMessages(ctx, h.generator, messages)
 	if err != nil {
-		logger.Info(fmt.Sprintf("deferred follow-up generation failed channel=%s url=%s: %v", entry.channelID, entry.url, err))
+		logger.Info(fmt.Sprintf("deferred follow-up generation failed channel=%s url=%s: %v", entry.ChannelID, entry.URL, err))
 		h.settleDeferredReading(ctx, entry, nil)
 		return
 	}
@@ -171,7 +272,7 @@ func (h *ChatDomainHandler) upsertDeferredReading(entry deferredReading, documen
 	if h.web == nil {
 		return
 	}
-	baseKey := chatSessionBaseKey(entry.event)
+	baseKey := chatSessionBaseKey(entry.Event)
 	h.sessions.mu.Lock()
 	sessionID := ""
 	if state, ok := h.sessions.items[baseKey]; ok {
@@ -190,20 +291,20 @@ func (h *ChatDomainHandler) settleDeferredReading(ctx context.Context, entry def
 		content = replies[0]
 	}
 	if content == "" {
-		content = h.deferredNotice(entry.event)
+		content = h.deferredNotice(entry.Event)
 	}
 	if content == "" {
 		return
 	}
-	if err := h.proactive.DeliverReply(ctx, entry.channelID, content, entry.replyToID); err != nil {
-		logger.Info(fmt.Sprintf("deferred follow-up delivery failed channel=%s url=%s: %v", entry.channelID, entry.url, err))
+	if err := h.proactive.DeliverReply(ctx, entry.ChannelID, content, entry.ReplyToID); err != nil {
+		logger.Info(fmt.Sprintf("deferred follow-up delivery failed channel=%s url=%s: %v", entry.ChannelID, entry.URL, err))
 		return
 	}
 	if len(replies) > 0 {
 		// The settlement is an ordinary assistant turn in the session transcript, so a
 		// later conversation can refer to what came back.
-		if err := h.sessions.CompleteTurn(ctx, entry.event, replies[0]); err != nil {
-			logger.Info(fmt.Sprintf("deferred follow-up transcript failed channel=%s: %v", entry.channelID, err))
+		if err := h.sessions.CompleteTurn(ctx, entry.Event, replies[0]); err != nil {
+			logger.Info(fmt.Sprintf("deferred follow-up transcript failed channel=%s: %v", entry.ChannelID, err))
 		}
 	}
 }

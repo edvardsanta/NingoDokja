@@ -22,6 +22,7 @@ import (
 	chatsessions "read_books/internal/infrastructure/chat_sessions"
 	competitorcache "read_books/internal/infrastructure/competitor_cache"
 	"read_books/internal/infrastructure/conversations"
+	"read_books/internal/infrastructure/deferredreadings"
 	quizruns "read_books/internal/infrastructure/quiz_runs"
 	"read_books/internal/ingress"
 	"read_books/internal/logger"
@@ -81,6 +82,13 @@ func main() {
 		os.Exit(1)
 	}
 	defer chatSessions.Close()
+	// Promised deferred-reading follow-ups survive a restart: the registry mirrors here
+	// and re-arms the pending runs on the next boot.
+	deferredStore, err := deferredreadings.Open(deferredreadings.PathBeside(sharedPath))
+	if err != nil {
+		logger.Error("open deferred readings store", err)
+		os.Exit(1)
+	}
 	// The owner's Profiles: inferred readings of how Ningo deals with each person. Without the file the
 	// screen reports them unavailable and nothing else changes.
 	profileBook, closeProfiles := configureProfiles(os.Getenv("DOKJA_PROFILES_POSTGRES_DSN"), sharedPath)
@@ -309,7 +317,7 @@ func main() {
 		handlers.NewDigestDomainHandler(feedsClient),
 		priceHandler,
 		handlers.NewQuizDomainHandler(feedsClient, clients.NewChatProviderClient(""), func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithVisions(visions).WithMemory(quizRuns),
-		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithProactiveDeliverer(clients.NewDiscordInterfaceClient("")).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithImageReading(visionServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("vision") }).WithSocialMediaVision(visionServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("vision") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
+		handlers.NewChatDomainHandler(clients.NewChatProviderClient("")).WithProactiveDeliverer(clients.NewDiscordInterfaceClient("")).WithDeferredReadingStore(deferredStore).WithOwnerProfile(ownerConfig.Owner.Profile).WithOwnerDiscordAccount(ownerConfig.Owner.Accounts.Discord.UserID).WithNingoFacts(ownerConfig.Ningo).WithVisions(visions).WithQuizRuns(quizRuns).WithWarmth(warm).WithWebReading(feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") }).WithImageReading(visionServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("vision") }).WithSocialMediaVision(visionServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("vision") }).WithIncomingContent(handlers.NewIncomingContentWorkflow(feedsClient, feedsClient, func() bool { return controls == nil || controls.ServiceEnabled("feeds") })).WithVoiceGenerator(voiceGenerator).WithSpeech(voiceServiceClient, func() bool { return controls == nil || controls.ServiceEnabled("voice") }).WithSessionStore(chatSessions).WithMacroContext(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithDiscordPosts(discordPostReader).WithKnowledge(
 			knowledgeClient,
 			func() bool { return controls == nil || controls.ServiceEnabled("knowledge") },
 		).WithApplicationSourcePreparer(knowledgeHandler).WithSourceReadJournal(sourceJournalStore).WithKnowledgePersistence(knowledgeClient, func() bool { return controls == nil || controls.ServiceEnabled("knowledge") }).WithKnowledgeProposals(proposalsHandler).WithReading(func(ctx context.Context, id string) (digestdomain.Reference, error) {
