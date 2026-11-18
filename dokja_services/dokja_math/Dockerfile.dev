@@ -1,0 +1,7 @@
+FROM python:3.13-slim
+
+WORKDIR /workspace
+
+COPY dokja_services/dokja_math/requirements.txt /tmp/dokja_math_requirements.txt
+
+RUN pip install --no-cache-dir -r /tmp/dokja_math_requirements.txt

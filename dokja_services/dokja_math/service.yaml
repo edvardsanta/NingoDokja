@@ -1,0 +1,24 @@
+name: dokja-math
+description: Standalone math renderer for chat formulas, turning bounded LaTeX into PNG images
+
+type: service
+language: python
+entrypoint: ./main.py
+
+exposes:
+  - http
+
+consumes: []
+
+depends_on: []
+
+tags:
+  - domain:chat
+  - criticality:low
+
+paths:
+  source: ./
+
+runtime:
+  containerized: true
+  dockerfile: ./Dockerfile

@@ -3,15 +3,22 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"io"
 	"math"
+	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-latex/latex/drawtex"
 	"github.com/go-latex/latex/drawtex/drawimg"
@@ -36,8 +43,63 @@ var mathCommands = func() map[string]bool {
 var mathRenderMu sync.Mutex
 var errMath = errors.New("unsupported or oversized mathematical expression")
 
-// RenderMath uses a math parser, not a TeX installation or shell. Only bounded expressions enter it.
+// RenderMath renders one bounded expression. When DOKJA_MATH_ENDPOINT names the
+// dokja-math service, its full engine (real subscripts, superscripts and
+// fractions) answers first and any failure falls back to the built-in
+// renderer; without the endpoint the built-in renderer is the whole answer.
 func RenderMath(ctx context.Context, expression string) (data []byte, err error) {
+	if endpoint := strings.TrimSpace(os.Getenv("DOKJA_MATH_ENDPOINT")); endpoint != "" {
+		if data, err := renderMathRemote(ctx, endpoint, expression); err == nil {
+			return data, nil
+		}
+	}
+	return renderMathLocal(ctx, expression)
+}
+
+const mathRemoteTimeout = 8 * time.Second
+
+// renderMathRemote asks the dokja-math service. A missing, slow or failing
+// service is an error, so the caller falls back to the built-in renderer.
+func renderMathRemote(ctx context.Context, endpoint, expression string) ([]byte, error) {
+	body, err := json.Marshal(map[string]string{"expression": expression})
+	if err != nil {
+		return nil, err
+	}
+	remoteCtx, cancel := context.WithTimeout(ctx, mathRemoteTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(remoteCtx, http.MethodPost, strings.TrimRight(endpoint, "/")+"/math/render", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("math service returned %d", response.StatusCode)
+	}
+	limited := io.LimitReader(response.Body, 600<<10)
+	var payload struct {
+		DataB64     string `json:"data_b64"`
+		ContentType string `json:"content_type"`
+	}
+	if err := json.NewDecoder(limited).Decode(&payload); err != nil {
+		return nil, err
+	}
+	if payload.ContentType != "image/png" || len(payload.DataB64) == 0 {
+		return nil, fmt.Errorf("math service answered an invalid image")
+	}
+	data, err := base64.StdEncoding.DecodeString(payload.DataB64)
+	if err != nil || len(data) < 8 || len(data) > 256<<10 || string(data[:8]) != "\x89PNG\r\n\x1a\n" {
+		return nil, fmt.Errorf("math service answered an invalid image")
+	}
+	return data, nil
+}
+
+// renderMathLocal uses a math parser, not a TeX installation or shell. Only bounded expressions enter it.
+func renderMathLocal(ctx context.Context, expression string) (data []byte, err error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
