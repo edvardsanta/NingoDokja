@@ -43,8 +43,13 @@ func TestOwnerWebLinkIsPersistedToKnowledge(t *testing.T) {
 		t.Fatalf("durable source lost its passages: %q", body)
 	}
 	tags, _ := payload["tags"].([]string)
-	if len(tags) != 1 || tags[0] != "origin:discord" {
+	if len(tags) != 2 || tags[0] != "origin:discord" || tags[1] != "via:chat-link" {
 		t.Fatalf("unexpected provenance tags: %v", payload["tags"])
+	}
+	metadata := payload["metadata"].(map[string]any)
+	provenance := metadata["provenance"].(knowledgedomain.Provenance)
+	if provenance.Origin != knowledgedomain.OriginOwner || provenance.Channel != "c1" {
+		t.Fatalf("the owner's reading lost its provenance: %+v", provenance)
 	}
 }
 
@@ -70,7 +75,7 @@ func TestStrangerWebLinkIsNotPersistedToKnowledge(t *testing.T) {
 		}
 		if want == 1 {
 			tags, _ := knowledge.payloads[0]["tags"].([]string)
-			if len(tags) != 1 || tags[0] != "origin:whatsapp" {
+			if len(tags) != 2 || tags[0] != "origin:whatsapp" || tags[1] != "via:chat-link" {
 				t.Fatalf("self-chat provenance lost: %v", knowledge.payloads[0]["tags"])
 			}
 		}
@@ -141,6 +146,7 @@ type recordedProposal struct {
 	payload map[string]any
 	source  knowledgedomain.ProposalSource
 	by      string
+	sentBy  string
 }
 
 type recordingProposer struct {
@@ -148,7 +154,7 @@ type recordingProposer struct {
 }
 
 func (r *recordingProposer) Propose(_ context.Context, kind string, payload map[string]any, source knowledgedomain.ProposalSource, proposedBy, sentBy string) (string, bool, error) {
-	r.calls = append(r.calls, recordedProposal{kind: kind, payload: payload, source: source, by: proposedBy})
+	r.calls = append(r.calls, recordedProposal{kind: kind, payload: payload, source: source, by: proposedBy, sentBy: sentBy})
 	return "proposal:test", false, nil
 }
 
@@ -246,7 +252,7 @@ func runSearchTurns(t *testing.T, h *ChatDomainHandler, second core.Event) {
 	}
 }
 
-func TestOwnerWebSearchIsPersistedToKnowledge(t *testing.T) {
+func TestOwnerWebSearchIsHeldAsANingoProposal(t *testing.T) {
 	knowledge := &ingestRecorder{changed: true}
 	proposer := &recordingProposer{}
 	h := NewChatDomainHandler(&triagingGenerator{triageModel: &fakeChatGenerator{result: map[string]any{"reply": "ok"}}, verdict: true}).
@@ -256,14 +262,16 @@ func TestOwnerWebSearchIsPersistedToKnowledge(t *testing.T) {
 	second := chatEvent("me fale do kian")
 	second.Context = map[string]any{"is_owner": true}
 	runSearchTurns(t, h, second)
-	if len(proposer.calls) != 0 {
-		t.Fatalf("the owner's search was held: %+v", proposer.calls)
+	if len(knowledge.payloads) != 0 {
+		t.Fatalf("a search result reached the store without approval: %v", knowledge.payloads)
 	}
-	if len(knowledge.payloads) != 1 {
-		t.Fatalf("the owner's search was not persisted: %v", knowledge.payloads)
+	if len(proposer.calls) != 1 || proposer.calls[0].by != "Ningo" ||
+		proposer.calls[0].payload["url"] != "https://example.com/kian" {
+		t.Fatalf("the owner's search was not held as Ningo's: %+v", proposer.calls)
 	}
-	if knowledge.payloads[0]["source_ref"] != "https://example.com/kian" {
-		t.Fatalf("the search lost its reference: %v", knowledge.payloads[0])
+	tags, _ := proposer.calls[0].payload["tags"].([]string)
+	if len(tags) != 1 || tags[0] != "via:search" {
+		t.Fatalf("the search proposal lost its via tag: %+v", proposer.calls[0].payload)
 	}
 }
 
@@ -295,8 +303,8 @@ func TestKnownPersonWebSearchIsHeldAsAProposal(t *testing.T) {
 	if held.kind != "web_article" {
 		t.Fatalf("the search proposal lost its kind: %+v", held)
 	}
-	if held.by != "Sam <sam-id>" {
-		t.Fatalf("the search proposal lost its proposer: %+v", held)
+	if held.by != "Ningo" || held.sentBy != "Sam <sam-id>" {
+		t.Fatalf("the search proposal lost its attribution: %+v", held)
 	}
 }
 

@@ -74,6 +74,7 @@ func TestSelectIntakeTakesOnlyChosenRecentItemsWithTheirText(t *testing.T) {
 	want := map[string]any{
 		"title": "Title kept", "body": "Text of kept", "kind": "article",
 		"source_id": id, "source_ref": "https://example.com/kept",
+		"tags": []string{"via:feed", "feed:example-blog"},
 	}
 	if !reflect.DeepEqual(selection.Documents[0], want) {
 		t.Fatalf("got %+v", selection.Documents[0])

@@ -66,7 +66,7 @@ func (d *Domain) storeHashtagExample(ctx context.Context, example HashtagExample
 	payload := map[string]any{
 		"source_id": HashtagKnowledgeID(example.sourceURL), "source_ref": example.sourceURL,
 		"kind": HashtagKnowledgeKind, "title": example.hashtag, "body": text,
-		"tags": []string{"meme-hashtag"},
+		"tags": []string{"meme-hashtag", "via:meme"},
 	}
 	if provenance != nil {
 		metadata, err := WithProvenance(nil, *provenance)

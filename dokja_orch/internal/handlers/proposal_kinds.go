@@ -32,7 +32,11 @@ func webArticleKindRules() knowledgedomain.ProposalKindRules {
 			if err != nil || address.Hostname() == "" || address.User != nil || (address.Scheme != "http" && address.Scheme != "https") {
 				return nil, fmt.Errorf("a proposal link must be an http(s) url")
 			}
-			return map[string]any{"url": raw}, nil
+			canonical := map[string]any{"url": raw}
+			if tags := proposalViaTags(payload["tags"]); len(tags) > 0 {
+				canonical["tags"] = tags
+			}
+			return canonical, nil
 		},
 		Identity: func(payload map[string]any) string {
 			return webArticleIdentity(payloadString(payload, "url"))
@@ -126,6 +130,7 @@ func (h *KnowledgeProposalsHandler) approveWebArticle(ctx context.Context, propo
 		}},
 		Payload: map[string]any{
 			"source_id": webArticleIdentity(raw), "source_ref": raw, "kind": "article",
+			"tags": proposalViaTags(proposal.Payload["tags"]),
 		},
 		Provenance: &provenance,
 	})
@@ -225,4 +230,38 @@ func (h *KnowledgeProposalsHandler) currentStoredRecord(ctx context.Context, kin
 		return map[string]any{"origin": string(knowledgedomain.MetadataOrigin(metadata)), "title": payloadString(document, "title")}
 	}
 	return nil
+}
+
+// proposalViaTags reads the provenance tags a proposal carries: bounded plain words,
+// so an approval stores exactly what the submission said about where it came from.
+func proposalViaTags(raw any) []string {
+	list, _ := raw.([]any)
+	if len(list) == 0 {
+		if tagged, ok := raw.([]string); ok {
+			list = make([]any, len(tagged))
+			for i, tag := range tagged {
+				list[i] = tag
+			}
+		}
+	}
+	tags := []string{}
+	for _, item := range list {
+		tag := strings.TrimSpace(payloadString(map[string]any{"tag": item}, "tag"))
+		if tag != "" && len([]rune(tag)) <= 40 && !containsString(tags, tag) {
+			tags = append(tags, tag)
+		}
+		if len(tags) == 8 {
+			break
+		}
+	}
+	return tags
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
