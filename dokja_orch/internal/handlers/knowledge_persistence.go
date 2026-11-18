@@ -91,7 +91,9 @@ func (h *ChatDomainHandler) learnFromSearch(ctx context.Context, event core.Even
 		return
 	}
 	sender := "Ningo"
-	if person, ok := h.knownSpeaker(event); ok {
+	if boolFromContext(event.Context, "is_owner") {
+		sender = "owner"
+	} else if person, ok := h.knownSpeaker(event); ok {
 		sender = proposalBy(person, event.User.ID)
 	}
 	h.holdKnowledgeProposal(ctx, event, "web_article", map[string]any{"url": result.url, "tags": []string{"via:search"}}, "Ningo", sender)
