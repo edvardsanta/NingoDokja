@@ -96,12 +96,13 @@ test("message handler forwards allowed message and replies with orchestrator out
   }
 });
 
-test("message handler tells the sender when the orchestrator cannot take the turn", async () => {
+test("message handler promises a late retry when the orchestrator cannot take the turn", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () => new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 })) as typeof fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 }); }) as typeof fetch;
   try {
     let delivered = "";
-    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR" });
+    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [60_000] });
     await assert.rejects(
       () => handler({
         userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
@@ -110,6 +111,60 @@ test("message handler tells the sender when the orchestrator cannot take the tur
       }),
       /orchestrator http 502/,
     );
-    assert.match(delivered, /conexão com o orquestrador falhou/);
+    assert.match(delivered, /Vou tentar de novo mais tarde/);
+    // The production-schedule retry stays queued (unref'd) and does not fire within the suite.
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a failed dispatch is retried in the background and answered late", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response(JSON.stringify(calls === 1
+      ? { status: "error", error: "context deadline exceeded" }
+      : { status: "ok", reply: "resposta tardia" }), { status: calls === 1 ? 502 : 200 });
+  }) as typeof fetch;
+  try {
+    const delivered: string[] = [];
+    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5] });
+    await assert.rejects(
+      () => handler({
+        userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
+        isDirectMessage: false, mentionsBot: true,
+        reply: async (message) => { delivered.push(String(message)); },
+      }),
+      /orchestrator http 502/,
+    );
+    await wait(80);
+    assert.equal(calls, 2);
+    assert.match(delivered[0], /Vou tentar de novo mais tarde/);
+    assert.equal(delivered[1], "resposta tardia");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("retries that keep failing end with an honest give-up notice", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 }); }) as typeof fetch;
+  try {
+    const delivered: string[] = [];
+    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5, 5] });
+    await assert.rejects(
+      () => handler({
+        userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
+        isDirectMessage: false, mentionsBot: true,
+        reply: async (message) => { delivered.push(String(message)); },
+      }),
+      /orchestrator http 502/,
+    );
+    await wait(150);
+    assert.equal(calls, 3);
+    assert.match(delivered.at(-1), /Tentei de novo algumas vezes/);
+    // Only the first failure promises; retries reschedule quietly.
+    assert.equal(delivered.length, 2);
   } finally { globalThis.fetch = originalFetch; }
 });
