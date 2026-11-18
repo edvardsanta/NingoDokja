@@ -89,3 +89,42 @@ func TestAFailedSearchLeavesTheReadingTurnAlone(t *testing.T) {
 		t.Fatal("no search result exists to show")
 	}
 }
+
+func TestAnExplicitResearchRequestSearchesWithoutAReading(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("pesquise o personagem kian"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 1 || !strings.Contains(service.searches[0], "kian") {
+		t.Fatalf("the research request did not search: %v", service.searches)
+	}
+	if sent := evidenceSent(generator); !strings.Contains(sent, "Kian is a character") || !strings.Contains(sent, webSearchHeading) {
+		t.Fatalf("the search snippet did not reach the model: %s", sent)
+	}
+}
+
+func TestABareQuestionWithoutResearchIntentDoesNotSearch(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("me fale do kian"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 0 {
+		t.Fatalf("a bare question searched the web: %v", service.searches)
+	}
+}
+
+func TestBareResearchRequestWithReaderDisabledLeavesTheTurnAlone(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, func() bool { return false })
+	if _, err := h.Handle(context.Background(), chatEvent("pesquise o personagem kian"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 0 {
+		t.Fatalf("a disabled reader searched: %v", service.searches)
+	}
+}

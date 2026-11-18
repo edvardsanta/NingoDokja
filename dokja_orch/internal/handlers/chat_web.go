@@ -160,18 +160,29 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	if len(links) == 0 && len(saved.documents) == 0 {
 		saved = webSessionReading{id: sessionID, documents: h.loadReadingContext(ctx, key, sessionID)}
 	}
+	bareSearch := ""
 	if len(links) == 0 && len(saved.documents) == 0 {
-		return nil, nil
+		// An explicit research request ("pesquise X") searches the web even with
+		// no reading to steer it; anything else has no evidence to attach.
+		query, ok := chat.WebSearchQuestionPlan(question)
+		if !ok {
+			return nil, nil
+		}
+		bareSearch = query
 	}
 	// Kept readings follow the conversation only while the message is about them; otherwise a
-	// page shared long ago is attached to every later message, noise included.
-	if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
+	// page shared long ago is attached to every later message, noise included. An explicit
+	// research request is not about the readings — but it still gets its search below.
+	if len(links) == 0 && bareSearch == "" && !h.readingRelevant(ctx, question, saved.documents) {
 		return nil, nil
 	}
 	data := &webTurnData{}
 	if w.enabled != nil && !w.enabled() {
 		for _, link := range links {
 			data.Failures = append(data.Failures, webFailure{link.URL, "reader_disabled"})
+		}
+		if bareSearch != "" {
+			data.Failures = append(data.Failures, webFailure{bareSearch, "reader_disabled"})
 		}
 		return nil, data
 	}
@@ -256,7 +267,7 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	if len(links) > 0 {
 		h.saveReadingContext(ctx, key, sessionID, saved.documents)
 	}
-	research, researched := h.researchContext(ctx, &saved, question)
+	research, researched := h.researchContext(ctx, &saved, question, bareSearch)
 	saved.seen = now
 	w.mu.Lock()
 	if len(w.sessions) >= webCacheSessions {
@@ -303,10 +314,14 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 const webSearchHeading = "search result"
 
 // researchContext searches the web when the readings so far cannot answer the question, using
-// the reading's title as the context a bare name lacks. A search that fails, finds nothing or is
-// not configured leaves the turn exactly as it was.
-func (h *ChatDomainHandler) researchContext(ctx context.Context, saved *webSessionReading, question string) (webSearchAnswer, bool) {
+// the reading's title as the context a bare name lacks. A non-empty bareSearch is an explicit
+// research request ("pesquise X") with no readings at all; it asks directly. A search that
+// fails, finds nothing or is not configured leaves the turn exactly as it was.
+func (h *ChatDomainHandler) researchContext(ctx context.Context, saved *webSessionReading, question, bareSearch string) (webSearchAnswer, bool) {
 	query, ok := chat.WebSearchPlan(saved.documents, question)
+	if !ok && bareSearch != "" {
+		query, ok = bareSearch, true
+	}
 	if !ok {
 		return webSearchAnswer{}, false
 	}

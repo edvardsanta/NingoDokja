@@ -34,3 +34,35 @@ func TestDoesNotSearchForAQuestionAboutTheReadingItself(t *testing.T) {
 		t.Fatal("without a reading there is no context to search from")
 	}
 }
+
+func TestQuestionPlanSearchesOnAnExplicitResearchRequest(t *testing.T) {
+	for _, test := range []struct {
+		question string
+		query    string
+	}{
+		{"pesquise termodinâmica quântica", "termodinâmica quântica"},
+		{"pesquise algo relacionado a modelagem estatística", "modelagem estatística"},
+		{"busque modelagem e inferência estatística", "modelagem inferência estatística"},
+		{"nao quero banca, so quero que pesquise algo relacionado", "banca"},
+		{"search for bayesian inference", "bayesian inference"},
+	} {
+		query, ok := WebSearchQuestionPlan(test.question)
+		if !ok || query != test.query {
+			t.Fatalf("%q: query=%q ok=%v, want %q", test.question, query, ok, test.query)
+		}
+	}
+}
+
+func TestQuestionPlanIgnoresQuestionsWithoutResearchIntent(t *testing.T) {
+	for _, question := range []string{
+		"me fale do kian",
+		"o que é entropia",
+		"qual a busca mais usada", // "busca" names a thing, not a request here — no subject intent
+		"pesquise aí",
+		"pesquise sobre",
+	} {
+		if query, ok := WebSearchQuestionPlan(question); ok {
+			t.Fatalf("%q searched %q", question, query)
+		}
+	}
+}

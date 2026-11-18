@@ -20,9 +20,49 @@ var askingWords = map[string]bool{
 	"gostaria": true, "queria": true, "quero": true, "sabe": true, "saber": true, "tambem": true, "também": true,
 	"ainda": true, "entao": true, "então": true, "link": true, "pagina": true, "página": true, "livro": true,
 	"resume": true, "leia": true, "analise": true, "analisa": true, "comente": true, "comenta": true, "acha": true,
-	"voce": true, "você": true, "pensa": true, "opine": true, "read": true, "analyze": true, "think": true, "thoughts": true,
+	"voce": true, "você": true, "pensa": true, "opine": true,
+	"algo": true, "coisa": true, "coisas": true, "relacionado": true, "relacionada": true,
+	"read": true, "analyze": true, "think": true, "thoughts": true,
 	"that": true, "this": true, "what": true, "tell": true, "about": true, "explain": true, "summarize": true,
 	"summary": true, "with": true, "from": true, "have": true, "does": true, "your": true, "please": true, "page": true,
+}
+
+// researchIntentWords name an explicit request to search the web, as opposed to
+// a question that merely hopes for an answer. Verb forms only: nouns like
+// "busca" name a thing ("a busca binária", "qual a busca mais usada") far more
+// often than they request one.
+var researchIntentWords = map[string]bool{
+	"pesquise": true, "pesquisar": true, "pesquisem": true,
+	"busque": true, "buscar": true, "procure": true, "procurar": true,
+	"googla": true, "googlar": true,
+	"search": true, "research": true,
+}
+
+// WebSearchQuestionPlan plans a search from the question alone, for when the
+// person explicitly asks for research ("pesquise X") and no reading exists to
+// steer or trigger it. Asking for research is a deliberate act, not every
+// factual question: without an intent word there is no search, and without a
+// subject there is nothing to search for.
+func WebSearchQuestionPlan(question string) (string, bool) {
+	question = webLinkPattern.ReplaceAllString(question, " ")
+	intent := false
+	var terms []string
+	seen := map[string]bool{}
+	for _, word := range strings.FieldsFunc(strings.ToLower(question), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if researchIntentWords[word] {
+			intent = true
+			continue
+		}
+		if len([]rune(word)) < 4 || askingWords[word] || seen[word] {
+			continue
+		}
+		seen[word] = true
+		terms = append(terms, word)
+	}
+	if !intent || len(terms) == 0 {
+		return "", false
+	}
+	return strings.Join(terms, " "), true
 }
 
 // WebSearchPlan decides whether the pages read so far leave the question unanswered, and if so

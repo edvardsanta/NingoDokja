@@ -193,7 +193,7 @@
     "reading.links": {
       "description": "Read supported links and stored reading references, then discuss or summarize their content.",
       "limits": [
-        "Extraction depends on source access and active reading services. Discord PDFs are limited to 25 MiB each and share a four-source limit with links. Scanned or protected PDFs may be unreadable; OCR is not included. With PostgreSQL macro context configured, document readings survive restarts within the same conversation/session. Otherwise readings remain temporary. Attributed ideas may be extracted automatically into scoped durable context; these are unverified historical context, not current access to the original document. Do not claim to have read unavailable content or performed an unrestricted web search."
+        "Extraction depends on source access and active reading services. Discord PDFs are limited to 25 MiB each and share a four-source limit with links. Scanned or protected PDFs may be unreadable; OCR is not included. With PostgreSQL macro context configured, document readings survive restarts within the same conversation/session. Otherwise readings remain temporary. Attributed ideas may be extracted automatically into scoped durable context; these are unverified historical context, not current access to the original document. The web search fires when a stored reading cannot answer the question or when the person explicitly asks for research (e.g. \"pesquise\", \"busque\", \"search\"); otherwise the answer comes from the readings and stored knowledge. Do not claim to have read unavailable content or performed an unrestricted web search."
       ]
     },
     "knowledge.saved": {
