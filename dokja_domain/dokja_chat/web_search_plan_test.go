@@ -34,3 +34,28 @@ func TestDoesNotSearchForAQuestionAboutTheReadingItself(t *testing.T) {
 		t.Fatal("without a reading there is no context to search from")
 	}
 }
+
+func TestAnExplicitResearchAskSearchesEvenWithoutReadings(t *testing.T) {
+	query, ok := WebSearchPlan(nil, "ningo, pesquisa para mim livros sobre sound design")
+	if !ok || query != "livros sound design" {
+		t.Fatalf("query=%q ok=%v", query, ok)
+	}
+	query, ok = WebSearchPlan(nil, "search for quantum thermodynamics books")
+	if !ok || query != "quantum thermodynamics books" {
+		t.Fatalf("query=%q ok=%v", query, ok)
+	}
+}
+
+func TestAPlainQuestionWithoutReadingsStillDoesNotSearch(t *testing.T) {
+	for _, question := range []string{"me fale do kian", "o que voce acha do lula", "quanto custa um ssd"} {
+		if q, ok := WebSearchPlan(nil, question); ok {
+			t.Fatalf("%q searched %q without an explicit ask", question, q)
+		}
+	}
+}
+
+func TestResearchAskDoesNotSearchAgainWhatTheReadingCovers(t *testing.T) {
+	if q, ok := WebSearchPlan(shopPage(), "pesquisa o espreitador"); ok {
+		t.Fatalf("the reading covers the subject, searched %q", q)
+	}
+}
