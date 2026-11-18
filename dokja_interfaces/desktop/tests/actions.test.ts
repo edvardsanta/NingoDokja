@@ -963,8 +963,8 @@ test("knowledge.proposals.list keeps the queue with its trace and current record
       proposals: [{
         id: "proposal:web_article:web:abc",
         kind: "web_article",
-        payload: { url: "https://example.com/a" },
-        proposed_by: "sam <1>",
+        payload: { url: "https://example.com/a", tags: ["via:search"] },
+        proposed_by: "Ningo",
         sent_by: "sam <1>",
         source: { channel_id: "c1", message_id: "m1", permalink: "https://example.com/ch/1/m1" },
         proposed_at: "2026-11-14T12:00:00Z",
@@ -977,8 +977,8 @@ test("knowledge.proposals.list keeps the queue with its trace and current record
     proposals: [{
       id: "proposal:web_article:web:abc",
       kind: "web_article",
-      payload: { url: "https://example.com/a" },
-      proposedBy: "sam <1>",
+      payload: { url: "https://example.com/a", tags: ["via:search"] },
+      proposedBy: "Ningo",
       sentBy: "sam <1>",
       source: { channelId: "c1", messageId: "m1", permalink: "https://example.com/ch/1/m1" },
       proposedAt: "2026-11-14T12:00:00Z",

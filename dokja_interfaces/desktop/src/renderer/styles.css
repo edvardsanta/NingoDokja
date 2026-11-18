@@ -3982,5 +3982,16 @@ button.cfg-toggle:focus-visible {
 /* The picture kept of a proposed meme: small, so a queue of them stays readable. */
 .proposal-preview { display: block; max-width: 16rem; max-height: 12rem; margin: var(--space-2) 0; border: 1px solid var(--line, currentColor); }
 
+/* The queue's filters: two quiet chip rows, so a long queue narrows by how an item
+   arrived and by who it involves. */
+.proposal-filters { display: flex; flex-direction: column; gap: var(--space-1); margin: 0 0 var(--space-2); }
+.proposal-filter-row { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.proposal-filter { padding: 0 var(--space-2); border: 1px solid var(--line, currentColor); border-radius: 999px; background: transparent; color: var(--ink-dim); font-size: 0.75rem; line-height: 1.6rem; cursor: pointer; }
+.proposal-filter.is-active { color: var(--ink); border-color: var(--ink); }
+.proposal-filter:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 1px; }
+
+/* How a proposal arrived, next to its kind: Ningo's search or a sent link. */
+.proposal-via { margin-left: var(--space-2); padding: 0 var(--space-2); border: 1px solid var(--line, currentColor); border-radius: 999px; font-size: 0.7rem; font-weight: normal; vertical-align: middle; color: var(--ink-dim); }
+
 .module-health { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
 .module-health .detail { margin: .25rem 0; }

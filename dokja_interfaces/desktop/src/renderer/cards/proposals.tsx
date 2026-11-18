@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { KnowledgeProposal, KnowledgeProposals } from "../../shared/replies.js";
 import type { Transport, TransportError } from "../../shared/transport.js";
@@ -17,6 +17,8 @@ async function loadProposals(transport: Transport): Promise<LoadResult<Knowledge
   }
   return { ok: true, data: result as KnowledgeProposals };
 }
+
+import { baseName, proposalMatchesPerson, proposalPersons, viaLabelOf } from "./proposals_model.js";
 
 // The kinds and origins this screen knows by name; anything else shows its raw value.
 const KIND_LABEL_IDS = {
@@ -91,12 +93,20 @@ function ProposalItem({ proposal, busy, edit, onEdit, textEdit, onTextEdit, onDe
   const filename = textOf(proposal.payload.filename);
   const tag = textOf(proposal.payload.tag);
   const meme = proposal.kind === "meme_hashtag" ? memeMedia(proposal) : undefined;
-  const who = proposal.sentBy !== "" && proposal.sentBy !== proposal.proposedBy
-    ? t("proposals_proposed_by_two", { proposed: proposal.proposedBy, sent: proposal.sentBy })
+  const via = viaLabelOf(proposal.payload.tags);
+  const sharedByTwo = proposal.sentBy !== "" && proposal.sentBy !== proposal.proposedBy;
+  // The two-name label is the meme kind's own wording; other kinds say who proposed
+  // and on whose behalf in one generic line.
+  const who = sharedByTwo
+    ? t(proposal.kind === "meme_hashtag" ? "proposals_proposed_by_two" : "proposals_proposed_for_two",
+      { proposed: proposal.proposedBy, sent: proposal.sentBy })
     : t("proposals_proposed_by", { name: proposal.proposedBy });
   return (
     <section className="proposal" aria-label={kind}>
-      <h3>{kind}</h3>
+      <h3>
+        {kind}
+        {via && <span className="proposal-via">{via === "via:search" ? t("proposals_via_search") : t("proposals_via_link")}</span>}
+      </h3>
       <p className="proposal-content">
         {tag && <span className="proposal-tag">{tag.startsWith("#") ? tag : `#${tag}`}</span>}
         {tag && (url || filename) && " · "}
@@ -156,6 +166,13 @@ export function ProposalsPanel({ transport }: { transport: Transport }) {
   const [problem, setProblem] = useState<TransportError>();
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [textEdits, setTextEdits] = useState<Record<string, string>>({});
+  const [viaFilter, setViaFilter] = useState("");
+  const [personFilter, setPersonFilter] = useState("");
+  const [decided, setDecided] = useState<string[]>([]);
+
+  // A reload settles the queue: anything the server still lists was refused and
+  // stays pending, so it must become visible again.
+  useEffect(() => setDecided([]), [state]);
 
   const decide = async (proposal: KnowledgeProposal, action: "approve" | "reject") => {
     if (busy) return;
@@ -179,18 +196,49 @@ export function ProposalsPanel({ transport }: { transport: Transport }) {
       setNote(t("proposals_refused", { reason: result.reason }));
     } else {
       setNote(action === "approve" ? t("proposals_approved") : t("proposals_rejected_note"));
+      // A settled decision leaves the queue at once; the reload confirms it.
+      setDecided((previous) => [...previous, proposal.id]);
     }
     reload();
   };
 
   return (
     <CardFrame title={t("proposals_title")} state={state} onReload={reload}>
-      {(data) => <>
+      {(data) => {
+        const persons = proposalPersons(data.proposals);
+        const visible = data.proposals
+          .filter((proposal) => !decided.includes(proposal.id))
+          .filter((proposal) => viaFilter === "" || viaLabelOf(proposal.payload.tags) === viaFilter)
+          .filter((proposal) => personFilter === "" || proposalMatchesPerson(proposal, personFilter));
+        return <>
         <p className="detail kept-about">{t("proposals_about")}</p>
+        {data.proposals.length > 1 && (
+          <div className="proposal-filters">
+            <div className="proposal-filter-row" role="group" aria-label={t("proposals_filter_via")}>
+              {(["", "via:search", "via:link"] as const).map((value) => (
+                <button key={value || "all"} type="button" className={viaFilter === value ? "proposal-filter is-active" : "proposal-filter"}
+                  aria-pressed={viaFilter === value} onClick={() => setViaFilter(value)}>
+                  {value === "" ? t("proposals_filter_all") : t(value === "via:search" ? "proposals_via_search" : "proposals_via_link")}
+                </button>
+              ))}
+            </div>
+            {persons.length > 0 && (
+              <div className="proposal-filter-row" role="group" aria-label={t("proposals_filter_person")}>
+                {["" , ...persons].map((value) => (
+                  <button key={value || "all"} type="button" className={personFilter === value ? "proposal-filter is-active" : "proposal-filter"}
+                    aria-pressed={personFilter === value} onClick={() => setPersonFilter(value)}>
+                    {value === "" ? t("proposals_filter_all") : value === "owner" ? t("proposals_person_owner") : value}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {problem && <Problem error={problem} />}
         {note && <p className="detail" role="status">{note}</p>}
         {data.proposals.length === 0 && <p className="detail">{t("proposals_empty")}</p>}
-        {data.proposals.map((proposal) => (
+        {data.proposals.length > 0 && visible.length === 0 && <p className="detail">{t("proposals_filtered_empty")}</p>}
+        {visible.map((proposal) => (
           <ProposalItem key={proposal.id} proposal={proposal} busy={busy === proposal.id}
             edit={edits[proposal.id] ?? ""}
             onEdit={(value) => setEdits((previous) => ({ ...previous, [proposal.id]: value }))}
@@ -198,7 +246,8 @@ export function ProposalsPanel({ transport }: { transport: Transport }) {
             onTextEdit={(value) => setTextEdits((previous) => ({ ...previous, [proposal.id]: value }))}
             onDecide={(chosen, action) => void decide(chosen, action)} />
         ))}
-      </>}
+        </>;
+      }}
     </CardFrame>
   );
 }
