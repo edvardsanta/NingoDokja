@@ -229,3 +229,108 @@ func TestKnownPersonDocumentIsHeldAsAProposal(t *testing.T) {
 		t.Fatalf("the proposal lost its proposer: %+v", proposer.calls[0])
 	}
 }
+
+// runSearchTurns drives the two-turn flow a web search needs: a link read the
+// follow-up cannot answer, which triggers the search once. Both turns speak as
+// the second event's user: the kept readings are per user, and a different
+// speaker would start with no context and never reach the search.
+func runSearchTurns(t *testing.T, h *ChatDomainHandler, second core.Event) {
+	t.Helper()
+	first := chatEvent("https://example.com/book")
+	first.User.ID = second.User.ID
+	if _, err := h.Handle(context.Background(), first, chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Handle(context.Background(), second, chatStep); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOwnerWebSearchIsPersistedToKnowledge(t *testing.T) {
+	knowledge := &ingestRecorder{changed: true}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: &fakeChatGenerator{result: map[string]any{"reply": "ok"}}, verdict: true}).
+		WithWebReading(&shopService{}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer)
+	second := chatEvent("me fale do kian")
+	second.Context = map[string]any{"is_owner": true}
+	runSearchTurns(t, h, second)
+	if len(proposer.calls) != 0 {
+		t.Fatalf("the owner's search was held: %+v", proposer.calls)
+	}
+	if len(knowledge.payloads) != 1 {
+		t.Fatalf("the owner's search was not persisted: %v", knowledge.payloads)
+	}
+	if knowledge.payloads[0]["source_ref"] != "https://example.com/kian" {
+		t.Fatalf("the search lost its reference: %v", knowledge.payloads[0])
+	}
+}
+
+func TestKnownPersonWebSearchIsHeldAsAProposal(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: &fakeChatGenerator{result: map[string]any{"reply": "ok"}}, verdict: true}).
+		WithWebReading(&shopService{}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", RealName: "Sam", Discord: "sam-id"}}})
+	second := chatEvent("me fale do kian")
+	second.User.ID = "sam-id"
+	second.Context = map[string]any{"is_owner": false, "guild_id": "guild", "message_id": "m9"}
+	runSearchTurns(t, h, second)
+	if len(knowledge.payloads) != 0 {
+		t.Fatalf("a pending search reached the store: %v", knowledge.payloads)
+	}
+	// The known speaker's link read is also held; the search is the kian one.
+	var held *recordedProposal
+	for i := range proposer.calls {
+		if proposer.calls[i].payload["url"] == "https://example.com/kian" {
+			held = &proposer.calls[i]
+		}
+	}
+	if held == nil {
+		t.Fatalf("the known person's search was not held: %+v", proposer.calls)
+	}
+	if held.kind != "web_article" {
+		t.Fatalf("the search proposal lost its kind: %+v", held)
+	}
+	if held.by != "Sam <sam-id>" {
+		t.Fatalf("the search proposal lost its proposer: %+v", held)
+	}
+}
+
+// A search is Ningo's own act: even a stranger's question holds its results for
+// the owner, attributed to Ningo itself.
+func TestStrangerWebSearchIsHeldAsANingoProposal(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: &fakeChatGenerator{result: map[string]any{"reply": "ok"}}, verdict: true}).
+		WithWebReading(&shopService{}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer).
+		WithNingoFacts(chat.NingoFacts{People: []chat.KnownPerson{{Name: "Nick", Discord: "sam-id"}}})
+	second := chatEvent("me fale do kian")
+	second.User.ID = "someone-else"
+	runSearchTurns(t, h, second)
+	if len(knowledge.payloads) != 0 {
+		t.Fatalf("a stranger's search reached the store: %v", knowledge.payloads)
+	}
+	if len(proposer.calls) != 1 || proposer.calls[0].by != "Ningo" ||
+		proposer.calls[0].payload["url"] != "https://example.com/kian" {
+		t.Fatalf("the stranger's search was not held as Ningo's: %+v", proposer.calls)
+	}
+}
+
+func TestFailedWebSearchHoldsNothing(t *testing.T) {
+	knowledge := &ingestRecorder{}
+	proposer := &recordingProposer{}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: &fakeChatGenerator{result: map[string]any{"reply": "ok"}}, verdict: true}).
+		WithWebReading(&shopService{searchFail: true}, nil).
+		WithKnowledgePersistence(knowledge, nil).
+		WithKnowledgeProposals(proposer)
+	runSearchTurns(t, h, chatEvent("me fale do kian"))
+	if len(proposer.calls) != 0 || len(knowledge.payloads) != 0 {
+		t.Fatalf("a failed search kept something: proposals=%d stored=%d", len(proposer.calls), len(knowledge.payloads))
+	}
+}
