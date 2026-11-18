@@ -131,6 +131,7 @@ replies follow `DOKJA_DISCORD_LOCALE`.
 | `/price product brand store` | `/preco produto marca loja` |
 | `/compare_product product link` | `/comparar_produto produto link` |
 | `/political_test link` | `/teste_politico link` |
+| `/save_document link` | `/salvar link` |
 
 The music player's buttons pause, resume, skip, stop and change the volume, and the Ningo
 panel's buttons show the status, fetch a meme, open the chat prompt and stop the radio.

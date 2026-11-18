@@ -21,6 +21,7 @@ test("createCommands exposes dokja slash commands", () => {
       "price",
       "compare_product",
       "political_test",
+      "save_document",
       // the player's buttons pause, resume, skip, stop and set the volume
       "play",
       "queue",

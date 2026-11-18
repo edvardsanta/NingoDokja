@@ -12,6 +12,7 @@ import { localizeNotice } from "../messages/notices.js";
 import { adapterText, translateCommand } from "../messages/commands.js";
 import { createCompareCommand, createPriceCommand } from "./price_command.js";
 import { createQuizCommand } from "./quiz_command.js";
+import { createSaveCommand } from "./save_command.js";
 
 type DokjaCommandParams = {
   name: string;
@@ -346,6 +347,7 @@ export function createCommands(
     createPriceCommand(orchestratorEndpoint, orchestratorTimeoutMs, options?.locale),
     createCompareCommand(orchestratorEndpoint, orchestratorTimeoutMs, options?.locale),
     createQuizCommand(orchestratorEndpoint, options?.locale),
+    createSaveCommand(orchestratorEndpoint, options?.locale),
     // Music in a voice channel: the queue lives in the orchestrator.
     ...(options?.music ?? createMusic({ orchestratorEndpoint, orchestratorTimeoutMs, voice })).commands,
   ].map(translateCommand);

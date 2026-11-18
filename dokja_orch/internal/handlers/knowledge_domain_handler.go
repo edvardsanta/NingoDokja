@@ -109,6 +109,9 @@ func (h *KnowledgeDomainHandler) Handle(ctx context.Context, event core.Event, w
 	if workflow.Action == knowledgedomain.ActionIntakeKnowledge && h.intake != nil {
 		return h.intake.Start(event)
 	}
+	if workflow.Action == actionSaveKnowledge {
+		return h.saveDocument(ctx, event)
+	}
 	switch workflow.Action {
 	case "propose-knowledge", "propose-meme-tag", "list-knowledge-proposals", "approve-knowledge-proposal", "reject-knowledge-proposal":
 		if h.proposals == nil {
