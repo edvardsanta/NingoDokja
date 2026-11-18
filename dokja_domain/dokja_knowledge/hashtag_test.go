@@ -56,7 +56,7 @@ func TestHashtagStorageIdentityAndPayloadRemainCompatible(t *testing.T) {
 	store := &hashtagStoreStub{reply: map[string]any{"changed": true, "embedded": 1, "degraded": false, "reason": "indexed"}}
 	domain := New(store)
 	result, err := domain.StoreHashtagExample(context.Background(), example, "labelled text")
-	want := map[string]any{"source_id": id, "source_ref": url, "kind": "meme_hashtag", "title": "#Humor", "body": "labelled text", "tags": []string{"meme-hashtag"}}
+	want := map[string]any{"source_id": id, "source_ref": url, "kind": "meme_hashtag", "title": "#Humor", "body": "labelled text", "tags": []string{"meme-hashtag", "via:meme"}}
 	if err != nil || store.kind != "knowledge.ingest" || !reflect.DeepEqual(store.input, want) {
 		t.Fatalf("payload=%v error=%v", store.input, err)
 	}

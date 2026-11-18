@@ -11,6 +11,7 @@ import (
 	knowledgedomain "read_books/dokja_domain/dokja_knowledge"
 	"read_books/internal/core"
 	"read_books/internal/logger"
+	"time"
 )
 
 // knowledgeProposer is what the chat handler needs from the proposals handler.
@@ -76,36 +77,24 @@ func (h *ChatDomainHandler) learnFromReading(ctx context.Context, event core.Eve
 	if !ok {
 		return
 	}
-	h.holdKnowledgeProposal(ctx, event, kind, payload, proposalBy(person, event.User.ID))
+	by := proposalBy(person, event.User.ID)
+	payload["tags"] = viaTags(payload, "via:link")
+	h.holdKnowledgeProposal(ctx, event, kind, payload, by, by)
 }
 
-// learnFromSearch is the Ningo-reading tier: a web search is Ningo's own act,
-// so its results go to the owner's queue even on a stranger's question. The
-// owner's searches store directly; anyone else's are held pending, attributed
-// to the speaker when known and to Ningo itself otherwise.
+// learnFromSearch holds every web-search result pending, whoever asked. A search is
+// Ningo's own act and its hits can be junk, so nothing enters knowledge until the owner
+// approves it; the proposal is Ningo's, with the speaker it searched for kept as the
+// sender when known.
 func (h *ChatDomainHandler) learnFromSearch(ctx context.Context, event core.Event, result webSearchResult, retrievedAt string) {
-	if h.knowledgePersist == nil || !h.knowledgePersist.available(event) {
+	if h.knowledgePersist == nil || !h.knowledgePersist.available(event) || h.knowledgeProposer == nil {
 		return
 	}
-	document := chat.WebDocument{
-		URL: result.url, Title: result.title, RetrievedAt: retrievedAt, Partial: true,
-		Passages: []chat.WebPassage{{Label: webSearchHeading, Text: result.snippet, URL: result.url}},
-	}
-	store := func(storeCtx context.Context) {
-		h.knowledgePersist.persistWebReading(storeCtx, event, document)
-	}
-	if ownerReadingTurn(event) {
-		store(ctx)
-		return
-	}
-	if h.knowledgeProposer == nil {
-		return
-	}
-	by := "Ningo"
+	sender := "Ningo"
 	if person, ok := h.knownSpeaker(event); ok {
-		by = proposalBy(person, event.User.ID)
+		sender = proposalBy(person, event.User.ID)
 	}
-	h.holdKnowledgeProposal(ctx, event, "web_article", map[string]any{"url": result.url}, by)
+	h.holdKnowledgeProposal(ctx, event, "web_article", map[string]any{"url": result.url, "tags": []string{"via:search"}}, "Ningo", sender)
 }
 
 // proposalBy names a proposal after the person who sent the material, with the
@@ -141,7 +130,7 @@ func (h *ChatDomainHandler) knownSpeaker(event core.Event) (chat.KnownPerson, bo
 
 // holdKnowledgeProposal holds one submission pending. It answers nothing: the
 // proposer learns only that, later, Ningo knows it or does not.
-func (h *ChatDomainHandler) holdKnowledgeProposal(ctx context.Context, event core.Event, kind string, payload map[string]any, by string) {
+func (h *ChatDomainHandler) holdKnowledgeProposal(ctx context.Context, event core.Event, kind string, payload map[string]any, proposedBy, sentBy string) {
 	source := knowledgedomain.ProposalSource{
 		ChannelID: event.Channel.ID, MessageID: resultString(event.Context, "message_id"),
 	}
@@ -150,7 +139,7 @@ func (h *ChatDomainHandler) holdKnowledgeProposal(ctx context.Context, event cor
 			source.Permalink = fmt.Sprintf("https://discord.com/channels/%s/%s/%s", guild, source.ChannelID, source.MessageID)
 		}
 	}
-	id, duplicate, err := h.knowledgeProposer.Propose(ctx, kind, payload, source, by, by)
+	id, duplicate, err := h.knowledgeProposer.Propose(ctx, kind, payload, source, proposedBy, sentBy)
 	if err != nil {
 		logger.Info(fmt.Sprintf("knowledge proposal was not held: %v", err))
 		return
@@ -188,8 +177,9 @@ func (p *knowledgePersistence) persistWebReading(ctx context.Context, event core
 			"source_id":  "web:" + hex.EncodeToString(hash[:12]),
 			"source_ref": document.URL,
 			"kind":       "article",
-			"tags":       []string{"origin:" + string(event.Source)},
+			"tags":       []string{"origin:" + string(event.Source), "via:chat-link"},
 		},
+		Provenance: ownerReadingProvenance(event),
 	})
 	if err != nil {
 		logger.Info(fmt.Sprintf("web reading was not persisted: %v", err))
@@ -215,4 +205,28 @@ func (p *knowledgePersistence) persistExtractedReading(ctx context.Context, even
 		return
 	}
 	logger.Info(fmt.Sprintf("extracted reading persisted stored=%d", len(stored)))
+}
+
+// ownerReadingProvenance records who stored the reading and which message carried it:
+// the owner, on the channel, at the exact Discord message when the turn has one.
+func ownerReadingProvenance(event core.Event) *knowledgedomain.Provenance {
+	provenance := knowledgedomain.Provenance{
+		Origin:     knowledgedomain.OriginOwner,
+		Channel:    event.Channel.ID,
+		ProposedAt: time.Now().UTC().Format(rfc3339Nano),
+	}
+	if event.Source == core.SourceDiscord {
+		if messageID := resultString(event.Context, "message_id"); messageID != "" {
+			provenance.Permalink = fmt.Sprintf("https://discord.com/channels/%s/%s/%s",
+				resultString(event.Context, "guild_id"), event.Channel.ID, messageID)
+		}
+	}
+	return &provenance
+}
+
+// viaTags adds one provenance tag to a proposal or ingest payload, keeping any tags
+// the caller already set.
+func viaTags(payload map[string]any, via string) []string {
+	tags, _ := payload["tags"].([]string)
+	return append(tags, via)
 }

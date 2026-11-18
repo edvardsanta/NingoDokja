@@ -212,3 +212,23 @@ func coreStep(action string) core.WorkflowStep {
 func proposalsQueueEvent(payload map[string]any) core.Event {
 	return core.Event{Source: core.SourceDesktop, Type: "knowledge.proposal.approve", Payload: payload}
 }
+
+func TestProposalApprovalStoresTheViaTags(t *testing.T) {
+	knowledge := &proposalsKnowledgeStub{}
+	h := newProposalsHandler(t, knowledge, &webReadingService{}, &fakeReader{answer: readAnswer("bounded text")})
+
+	id, _, err := h.Propose(context.Background(), "web_article",
+		map[string]any{"url": "https://example.com/news", "tags": []string{"via:search", strings.Repeat("x", 50)}},
+		knowledgedomain.ProposalSource{ChannelID: "memes"}, "Ningo", "Ningo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := h.Handle(context.Background(), proposalsQueueEvent(map[string]any{"proposal_id": id}), coreStep("approve-knowledge-proposal"))
+	if err != nil || approved["approved"] != true {
+		t.Fatalf("approval did not store the article: %v %v", approved, err)
+	}
+	tags, _ := knowledge.payloads[0]["tags"].([]string)
+	if len(tags) != 1 || tags[0] != "via:search" {
+		t.Fatalf("the stored article lost its via tag or kept an oversized one: %v", knowledge.payloads[0]["tags"])
+	}
+}

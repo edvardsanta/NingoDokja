@@ -114,7 +114,8 @@ func SelectIntake(items any, sources []string, now time.Time) IntakeSelection {
 			selection.WithoutBody++
 			continue
 		}
-		payload := map[string]any{"title": title, "body": body, "kind": intakeKind, "source_id": sourceID}
+		payload := map[string]any{"title": title, "body": body, "kind": intakeKind, "source_id": sourceID,
+			"tags": []string{"via:feed", "feed:" + plugin}}
 		if address := intakeText(item, "url"); address != "" {
 			payload["source_ref"] = address
 		}
