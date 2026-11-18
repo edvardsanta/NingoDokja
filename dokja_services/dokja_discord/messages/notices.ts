@@ -1,3 +1,14 @@
+// What the interface says when the orchestrator itself could not take the turn
+// (unreachable or over its deadline): the sender waited for an answer, and silence
+// reads as a lost message.
+export function dispatchFailureNotice(locale = "pt-BR"): string {
+  const messages: Record<string, string> = {
+    "pt-BR": "Não consegui processar essa mensagem agora — a conexão com o orquestrador falhou. Tenta de novo em instantes.",
+    en: "I could not process that message right now — the connection to the orchestrator failed. Try again in a moment.",
+  };
+  return messages[locale] ?? messages[locale.split("-")[0]] ?? messages.en;
+}
+
 export function localizeNotice(notice: string | undefined, reply: string, locale = "pt-BR"): string {
   const messages: Record<string, Record<string, string>> = {
     "chat.context_compacted": {

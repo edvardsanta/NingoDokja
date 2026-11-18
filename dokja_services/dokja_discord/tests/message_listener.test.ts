@@ -95,3 +95,21 @@ test("message handler forwards allowed message and replies with orchestrator out
     globalThis.fetch = originalFetch;
   }
 });
+
+test("message handler tells the sender when the orchestrator cannot take the turn", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 })) as typeof fetch;
+  try {
+    let delivered = "";
+    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR" });
+    await assert.rejects(
+      () => handler({
+        userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
+        isDirectMessage: false, mentionsBot: true,
+        reply: async (message) => { delivered = String(message); },
+      }),
+      /orchestrator http 502/,
+    );
+    assert.match(delivered, /conexão com o orquestrador falhou/);
+  } finally { globalThis.fetch = originalFetch; }
+});

@@ -6,7 +6,7 @@ export type DiscordMessageConfig = {
 
 import { buildBridgePayload, dispatchToOrchestratorResponse } from "../transport/bridge.js";
 import type { DiscordMessageContext, DiscordMessageHandler } from "../types.js";
-import { localizeNotice } from "./notices.js";
+import { localizeNotice, dispatchFailureNotice } from "./notices.js";
 import { formatCitations } from "./citations.js";
 
 export function createDiscordMessageHandler(config: DiscordMessageConfig): DiscordMessageHandler {
@@ -80,6 +80,19 @@ export function createDiscordMessageHandler(config: DiscordMessageConfig): Disco
           error: error instanceof Error ? error.message : String(error),
         }),
       );
+      // A dead or over-deadline orchestrator otherwise leaves the sender unanswered;
+      // say the attempt failed instead of leaving silence.
+      try {
+        await context.reply(dispatchFailureNotice(config.locale));
+      } catch (replyError) {
+        console.error(
+          "[dokja-discord] dispatch failure notice failed",
+          JSON.stringify({
+            messageId: context.messageId,
+            error: replyError instanceof Error ? replyError.message : String(replyError),
+          }),
+        );
+      }
       throw error;
     }
   };
