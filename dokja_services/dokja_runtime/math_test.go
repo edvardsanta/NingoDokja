@@ -3,7 +3,14 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"image"
+	"image/color"
+	"image/draw"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -54,4 +61,72 @@ func TestRenderMathRejectsCommandsAndResourceAbuse(t *testing.T) {
 	if _, err := RenderMath(ctx, "x"); err == nil {
 		t.Fatal("canceled render succeeded")
 	}
+}
+
+func TestRenderMathPrefersTheConfiguredMathService(t *testing.T) {
+	want := testPNG(t)
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/math/render" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		var body struct {
+			Expression string `json:"expression"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Expression == "" {
+			t.Errorf("bad request body: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"data_b64": base64.StdEncoding.EncodeToString(want), "content_type": "image/png"})
+	}))
+	defer service.Close()
+	t.Setenv("DOKJA_MATH_ENDPOINT", service.URL)
+
+	data, err := RenderMath(t.Context(), `\rho_\beta = e^{-\beta \hat{H}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, want) {
+		t.Fatal("the service render was not used")
+	}
+}
+
+func TestRenderMathFallsBackToTheLocalRenderer(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer service.Close()
+	t.Setenv("DOKJA_MATH_ENDPOINT", service.URL)
+
+	// A flat formula the built-in renderer accepts: the failure above must not
+	// change behavior for what it can do.
+	data, err := RenderMath(t.Context(), `y=\frac{a+b}{2}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := png.Decode(bytes.NewReader(data)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRenderMathFallsBackAndStillRejects(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	}))
+	defer service.Close()
+	t.Setenv("DOKJA_MATH_ENDPOINT", service.URL)
+
+	// Unrenderable everywhere: the local renderer must have the last word.
+	if data, err := RenderMath(t.Context(), `\unknown{x}`); err == nil || len(data) != 0 {
+		t.Fatal("an invalid expression was rendered through the fallback")
+	}
+}
+
+func testPNG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 24, 24))
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.White}, image.Point{}, draw.Src)
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
 }

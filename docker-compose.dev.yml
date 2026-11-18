@@ -26,6 +26,7 @@ services:
       COMMUNICATIONS_SERVICE_ENDPOINT: http://dokja-communications:8084
       DOKJA_VOICE_HTTP_ENDPOINT: ${DOKJA_VOICE_HTTP_ENDPOINT:-}
       DOKJA_VOICE_CHAT_PROVIDER: ${DOKJA_VOICE_CHAT_PROVIDER:-runtime}
+      DOKJA_MATH_ENDPOINT: http://dokja-math:8096
       DOKJA_VISION_ENDPOINT: ${DOKJA_VISION_ENDPOINT:-}
       DOKJA_COMMUNICATIONS_TOKEN: ${DOKJA_COMMUNICATIONS_TOKEN:-}
       DOKJA_GATEWAY_INGRESS_TOKEN: ${DOKJA_GATEWAY_INGRESS_TOKEN:-}
@@ -294,6 +295,22 @@ services:
       - ./:/workspace
     ports:
       - "8081:8081"
+    networks:
+      - dokja-net
+
+  # Renders chat formulas (bounded LaTeX) as PNGs with a real math engine;
+  # the orchestrator falls back to its built-in flat renderer when it is absent.
+  dokja-math:
+    build:
+      context: .
+      dockerfile: dokja_services/dokja_math/Dockerfile.dev
+    working_dir: /workspace
+    command: python dokja_services/dokja_math/main.py --reload
+    environment:
+      DOKJA_MATH_HOST: 0.0.0.0
+      DOKJA_MATH_PORT: 8096
+    volumes:
+      - ./:/workspace
     networks:
       - dokja-net
 

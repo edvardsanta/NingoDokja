@@ -17,6 +17,7 @@ Production stack:
 - `dokja-memory` (experience memory: what the bot did in a context and how it turned out)
 - `dokja-feeds` (follows the sources the owner chooses, as plugins kept outside the repository)
 - `dokja-vision` (describes media bytes with a local vision model: chat images, and videos sampled into frames for social posts; it never fetches URLs itself)
+- `dokja-math` (renders the bounded LaTeX formulas chat asks for as PNGs; the orchestrator uses it through `DOKJA_MATH_ENDPOINT` and falls back to its built-in flat renderer when the service is absent or failing)
 - `dokja-discord`
 - `dokja-scheduler`
 
