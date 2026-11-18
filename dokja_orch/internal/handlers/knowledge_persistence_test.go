@@ -265,7 +265,7 @@ func TestOwnerWebSearchIsHeldAsANingoProposal(t *testing.T) {
 	if len(knowledge.payloads) != 0 {
 		t.Fatalf("a search result reached the store without approval: %v", knowledge.payloads)
 	}
-	if len(proposer.calls) != 1 || proposer.calls[0].by != "Ningo" ||
+	if len(proposer.calls) != 1 || proposer.calls[0].by != "Ningo" || proposer.calls[0].sentBy != "owner" ||
 		proposer.calls[0].payload["url"] != "https://example.com/kian" {
 		t.Fatalf("the owner's search was not held as Ningo's: %+v", proposer.calls)
 	}
