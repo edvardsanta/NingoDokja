@@ -76,7 +76,49 @@ func (h *ChatDomainHandler) learnFromReading(ctx context.Context, event core.Eve
 	if !ok {
 		return
 	}
-	h.holdKnowledgeProposal(ctx, event, kind, payload, person)
+	h.holdKnowledgeProposal(ctx, event, kind, payload, proposalBy(person, event.User.ID))
+}
+
+// learnFromSearch is the Ningo-reading tier: a web search is Ningo's own act,
+// so its results go to the owner's queue even on a stranger's question. The
+// owner's searches store directly; anyone else's are held pending, attributed
+// to the speaker when known and to Ningo itself otherwise.
+func (h *ChatDomainHandler) learnFromSearch(ctx context.Context, event core.Event, result webSearchResult, retrievedAt string) {
+	if h.knowledgePersist == nil || !h.knowledgePersist.available(event) {
+		return
+	}
+	document := chat.WebDocument{
+		URL: result.url, Title: result.title, RetrievedAt: retrievedAt, Partial: true,
+		Passages: []chat.WebPassage{{Label: webSearchHeading, Text: result.snippet, URL: result.url}},
+	}
+	store := func(storeCtx context.Context) {
+		h.knowledgePersist.persistWebReading(storeCtx, event, document)
+	}
+	if ownerReadingTurn(event) {
+		store(ctx)
+		return
+	}
+	if h.knowledgeProposer == nil {
+		return
+	}
+	by := "Ningo"
+	if person, ok := h.knownSpeaker(event); ok {
+		by = proposalBy(person, event.User.ID)
+	}
+	h.holdKnowledgeProposal(ctx, event, "web_article", map[string]any{"url": result.url}, by)
+}
+
+// proposalBy names a proposal after the person who sent the material, with the
+// verified account id appended so same-name people stay distinguishable.
+func proposalBy(person chat.KnownPerson, userID string) string {
+	by := person.Name
+	if person.RealName != "" {
+		by = person.RealName
+	}
+	if userID != "" {
+		by = fmt.Sprintf("%s <%s>", by, userID)
+	}
+	return by
 }
 
 // knownSpeaker matches the turn's speaker against the owner's people mapping,
@@ -99,14 +141,7 @@ func (h *ChatDomainHandler) knownSpeaker(event core.Event) (chat.KnownPerson, bo
 
 // holdKnowledgeProposal holds one submission pending. It answers nothing: the
 // proposer learns only that, later, Ningo knows it or does not.
-func (h *ChatDomainHandler) holdKnowledgeProposal(ctx context.Context, event core.Event, kind string, payload map[string]any, person chat.KnownPerson) {
-	by := person.Name
-	if person.RealName != "" {
-		by = person.RealName
-	}
-	if event.User.ID != "" {
-		by = fmt.Sprintf("%s <%s>", by, event.User.ID)
-	}
+func (h *ChatDomainHandler) holdKnowledgeProposal(ctx context.Context, event core.Event, kind string, payload map[string]any, by string) {
 	source := knowledgedomain.ProposalSource{
 		ChannelID: event.Channel.ID, MessageID: resultString(event.Context, "message_id"),
 	}

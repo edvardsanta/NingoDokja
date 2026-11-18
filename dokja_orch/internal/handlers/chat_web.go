@@ -291,6 +291,9 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 				Heading: webSearchHeading, Text: result.snippet, Reference: result.url, Web: true,
 				RetrievedAt: research.retrievedAt, Partial: true,
 			})
+			// The owner's searches store directly; anyone else's are held as
+			// pending proposals the owner can approve into references.
+			h.learnFromSearch(ctx, event, result, research.retrievedAt)
 		}
 	}
 	return sources, data
