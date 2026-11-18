@@ -377,8 +377,11 @@ test("a new watch the orchestrator already collected says so, with or without pr
   const found = buildPriceReply({ products: [product], matched: 1, watch: { category: "hd", brand: "", status: "added", collected: true } }, "pt-BR") as { content: string };
   assert.match(found.content, /^👁️ Passei a vigiar \*\*hd\*\* e já busquei agora\./);
   assert.doesNotMatch(found.content, /pergunte de novo/);
+  // With nothing found the no-match answer stays and the watch notice goes below it.
+  assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "added", collected: true } }, "pt-BR"),
+    "Nenhum produto da watchlist corresponde a essa busca.\n👁️ Passei a vigiar **hd** e já busquei agora, mas as lojas que consigo ler não trouxeram nada. Eu aviso aqui quando chegar.");
   assert.equal(buildPriceReply({ products: [], matched: 0, watch: { category: "hd", brand: "", status: "added", collected: true } }, "en"),
-    "👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing. I will let you know here when prices arrive.");
+    "No watched product matches that search.\n👁️ Now watching **hd**. I searched just now, but the stores I can read brought nothing. I will let you know here when prices arrive.");
 });
 
 test("a watched search with nothing yet promises a return, in both locales", () => {

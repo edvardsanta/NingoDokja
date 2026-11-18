@@ -294,7 +294,9 @@ export function buildPriceReply(price: unknown, locale = "pt-BR", search = ""): 
   const notice = result.watch?.status === "added" ? text(words, added, { search: watched })
     : result.watch?.status === "full" ? text(words, "watch_full", { search: watched }) : "";
   if (products.length === 0 && result.watch?.collected === true && result.watch?.status === "added") {
-    return notice;
+    // The no-match answer stays on top; the watch notice goes below it, so the
+    // promise never reads as a replacement of the answer.
+    return `${text(words, "none")}\n${notice}`;
   }
   if (products.length === 0 && result.watch?.status === "watched") {
     return text(words, "none_watched");
