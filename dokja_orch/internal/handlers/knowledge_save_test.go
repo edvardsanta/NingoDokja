@@ -55,6 +55,10 @@ func TestOwnerSaveIngestsTheLinkWithItsDiscordIdentity(t *testing.T) {
 	if _, exists := service.payload["metadata"]; exists {
 		t.Fatal("save must not assert metadata: the service owns that schema")
 	}
+	tags, _ := service.payload["tags"].([]string)
+	if len(tags) != 1 || tags[0] != "via:save" {
+		t.Fatalf("the saved document lost its via tag: %v", service.payload)
+	}
 }
 
 func TestSaveRefusesEveryoneButTheOwner(t *testing.T) {
