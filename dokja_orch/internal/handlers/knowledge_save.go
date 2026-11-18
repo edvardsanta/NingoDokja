@@ -65,6 +65,7 @@ func (h *KnowledgeDomainHandler) saveDocument(ctx context.Context, event core.Ev
 				"kind":       "note",
 				"source_id":  sourceID,
 				"source_ref": reference,
+				"tags":       []string{"via:save"},
 			},
 			Context: event.Context,
 		},
