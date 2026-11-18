@@ -198,6 +198,8 @@ func actionFor(domain Domain, eventType string) string {
 			return "recall-context"
 		case "knowledge.ingest":
 			return "ingest-knowledge"
+		case "knowledge.save":
+			return "save-knowledge"
 		case "knowledge.reclassify":
 			return "reclassify-knowledge"
 		case "knowledge.classify":

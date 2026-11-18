@@ -121,6 +121,8 @@ type BridgeResponse struct {
 	Price map[string]any `json:"price,omitempty"`
 	// Quiz is a questionnaire run's result or refusal code, for the interface to word.
 	Quiz map[string]any `json:"quiz,omitempty"`
+	// Knowledge is a document save's result or refusal code, for the interface to word.
+	Knowledge map[string]any `json:"knowledge,omitempty"`
 }
 
 func NewHTTPBridgeIngress(service *core.Service, endpoint string) *HTTPBridgeIngress {
@@ -313,6 +315,7 @@ func (i *HTTPBridgeIngress) handle(c *fiber.Ctx) error {
 		Music:            extractBridgeMusic(result),
 		Price:            extractBridgePrice(result),
 		Quiz:             extractBridgeQuiz(result),
+		Knowledge:        extractBridgeKnowledge(result),
 		Voice:            extractBridgeVoice(result),
 		Realtime:         extractBridgeRealtime(result),
 	})
@@ -383,6 +386,16 @@ func extractBridgeQuiz(result core.ProcessResult) map[string]any {
 	}
 	quiz, _ := result.Result[string(core.DomainQuiz)].(map[string]any)
 	return quiz
+}
+
+// extractBridgeKnowledge hands a document save back to the interface: what changed, or a refusal
+// code the interface words itself.
+func extractBridgeKnowledge(result core.ProcessResult) map[string]any {
+	if strings.TrimSpace(result.Event.Type) != "knowledge.save" {
+		return nil
+	}
+	knowledge, _ := result.Result[string(core.DomainKnowledge)].(map[string]any)
+	return knowledge
 }
 
 // authorize checks the bearer token every bridge route requires; it answers the status to send when
@@ -755,6 +768,17 @@ func mapBridgeRequestToEvent(request BridgeRequest, content string) (string, map
 		return "price.compare", payload
 	case "quiz.take":
 		return "quiz.take", map[string]any{"url": content, "locale": strings.TrimSpace(request.Payload.Locale)}
+	case "knowledge.save":
+		// The save is the owner's: the link is fetched by the knowledge service, and the
+		// Discord message that carried it becomes the document's identity and citation.
+		return "knowledge.save", map[string]any{
+			"link":      strings.TrimSpace(request.Payload.Link),
+			"userId":    strings.TrimSpace(request.Payload.UserID),
+			"channelId": strings.TrimSpace(request.Payload.ChannelID),
+			"messageId": strings.TrimSpace(request.Payload.MessageID),
+			"guildId":   strings.TrimSpace(request.Payload.GuildID),
+			"locale":    strings.TrimSpace(request.Payload.Locale),
+		}
 	case "realtime.start", "realtime.join", "realtime.leave", "realtime.stop", "realtime.observe":
 		return strings.TrimSpace(request.EventType), request.Payload.Realtime
 	case "voice.synthesize", "voice.transcribe", "voice.wakeword", "voice.activity":

@@ -61,6 +61,8 @@ type BridgeResponse = {
   price?: unknown;
   // a questionnaire run's result or refusal code, after quiz.take
   quiz?: unknown;
+  // a document save's result or refusal code, after knowledge.save
+  knowledge?: unknown;
   realtime?: { accepted?: boolean };
 };
 
@@ -71,6 +73,8 @@ export type OrchestratorReply = {
   price?: unknown;
   // a questionnaire run (quiz.take): result link, label and comment, or a refusal code
   quiz?: unknown;
+  // a document save (knowledge.save): what changed, or a refusal code
+  knowledge?: unknown;
   attachments?: DiscordAttachment[];
   music?: unknown;
   realtime?: { accepted?: boolean };
@@ -186,6 +190,7 @@ export async function dispatchToOrchestratorResponse(
       ...(payload.music !== undefined ? { music: payload.music } : {}),
       ...(payload.price !== undefined ? { price: payload.price } : {}),
       ...(payload.quiz !== undefined ? { quiz: payload.quiz } : {}),
+      ...(payload.knowledge !== undefined ? { knowledge: payload.knowledge } : {}),
       ...(payload.realtime?.accepted === true ? { realtime: {accepted: true} } : {}),
     };
   } catch (error) {

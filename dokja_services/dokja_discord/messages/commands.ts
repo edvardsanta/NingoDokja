@@ -79,6 +79,10 @@ export const COMMAND_TRANSLATIONS: Record<string, Record<string, CommandText>> =
       name: "teste_politico", description: "O Ningo faz um questionário online e posta o link do resultado.",
       options: { link: { name: "link", description: "Link do questionário" } },
     },
+    save_document: {
+      name: "salvar", description: "Guarda um link na biblioteca do Ningo, como documento seu.",
+      options: { link: { name: "link", description: "O link a ser lido e guardado" } },
+    },
   },
 };
 
