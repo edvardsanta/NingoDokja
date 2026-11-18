@@ -41,7 +41,7 @@ test("an attachment-only message sends metadata to the orchestrator, not a direc
   }) as typeof fetch;
   try {
     let reply: unknown;
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })({
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" }).handler({
       userId: "member", channelId: "channel", messageId: "message", content: "", documentAttachments: [attachment],
       isBot: false, isDirectMessage: false, mentionsBot: false, reply: async value => { reply = value; },
     });
@@ -64,7 +64,7 @@ test("an image-only message is dispatched for the vision workflow", async () => 
   }) as typeof fetch;
   try {
     let reply: unknown;
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })({
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" }).handler({
       userId: "member", channelId: "channel", messageId: "message", content: "", mediaAttachments: [attachment],
       isBot: false, isDirectMessage: false, mentionsBot: false, reply: async value => { reply = value; },
     });
@@ -78,7 +78,7 @@ test("a message with no content and no attachments is still ignored", async () =
   let calls = 0;
   globalThis.fetch = (async () => { calls++; return new Response("{}"); }) as typeof fetch;
   try {
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })({
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" }).handler({
       userId: "member", channelId: "channel", messageId: "message", content: "",
       isBot: false, isDirectMessage: false, mentionsBot: false, reply: async () => {},
     });
@@ -130,7 +130,7 @@ test("a message sends its media and the answered message to the orchestrator for
   }) as typeof fetch;
   try {
     let replied = false;
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 })({
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 }).handler({
       userId: "member", channelId: "channel", messageId: "message", content: "#SomeGames", isBot: false, isDirectMessage: false,
       mentionsBot: false, mediaAttachments: media, replyTo, reply: async () => { replied = true; },
     });
@@ -148,7 +148,7 @@ test("a post by a webhook, which is how Ningo posts a meme, is never read as a p
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => { calls++; return new Response("{}"); }) as typeof fetch;
   try {
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 })({
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 }).handler({
       userId: "webhook-id", channelId: "channel", messageId: "message", content: "#TiagoGames", isBot: true, isDirectMessage: false,
       mentionsBot: false, mediaAttachments: [{ url: "https://example.com/a.mp4", filename: "a.mp4", content_type: "video/mp4", size: 1 }], reply: async () => {},
     });

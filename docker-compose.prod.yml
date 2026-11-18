@@ -284,10 +284,15 @@ services:
       DOKJA_DISCORD_WEBHOOKS: ${DOKJA_DISCORD_WEBHOOKS:-}
       DISCORD_DM_POLICY: ${DISCORD_DM_POLICY}
       DOKJA_ORCHESTRATOR_TIMEOUT_MS: ${DOKJA_ORCHESTRATOR_TIMEOUT_MS}
+      # Persistent queue of promised late retries; the named volume below keeps it
+      # across container recreation.
+      DOKJA_DISCORD_DEFERRAL_DB: ${DOKJA_DISCORD_DEFERRAL_DB:-/data/deferred_dispatches.db}
     ports:
       - "8092:8092"
     depends_on:
       - dokja-orchestrator
+    volumes:
+      - dokja-discord-data:/data
     networks:
       - dokja-net
 
@@ -323,3 +328,4 @@ networks:
 volumes:
   dokja-data:
   dokja-ollama:
+  dokja-discord-data:

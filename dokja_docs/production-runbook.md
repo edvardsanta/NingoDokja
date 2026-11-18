@@ -680,7 +680,10 @@ blacklist. `DOKJA_OCR_REC_MODEL` (empty by default) names another text recognize
 a Latin-alphabet one keeps Portuguese accents that the default drops (see the meme service README, "OCR
 recognizer"). `DOKJA_DISCORD_WEBHOOKS` (`channel_id=webhook_url`, comma-separated) makes the delivery server
 post to those channels through a webhook instead of the bot; the URLs are credentials, keep them in the
-env file only.
+env file only. A message the orchestrator could not take (unreachable or over its deadline) is promised
+a late retry, and the queue of those retries persists in `DOKJA_DISCORD_DEFERRAL_DB` (SQLite; the prod
+default `/data/deferred_dispatches.db` lives on the `dokja-discord-data` volume, so promised returns
+survive a container recreation and are re-armed on boot).
 
 ## Hashtag Suggestion for Memes
 

@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { splitDiscordReply, toMessageContext, toMessageReply } from "../runtime/discordjs_runtime.js";
+import { Client, Events } from "discord.js";
+
+import { registerMessageHandlers, splitDiscordReply, toMessageContext, toMessageReply } from "../runtime/discordjs_runtime.js";
 
 test("long formula replies attach the PNG only to their first chunk", () => {
   const attachment = { filename: "formula-1.png", content_type: "image/png" as const, data_b64: Buffer.from("png bytes").toString("base64") };
@@ -292,4 +294,87 @@ test("rich presence embeds become message embed context", async () => {
   assert.equal(context.messageEmbeds?.length, 1);
   assert.equal(context.messageEmbeds?.[0].author, "Pedro");
   assert.equal(context.messageEmbeds?.[0].title, "Ghost of Tsushima DIRECTOR'S CUT");
+});
+
+const txtAttachment = {
+  url: "https://cdn.example.com/message.txt",
+  name: "message.txt",
+  contentType: "text/plain",
+  size: 5000,
+};
+
+function messageStub(overrides: Record<string, unknown> = {}) {
+  return {
+    author: { id: "user", bot: false, username: "pedro" },
+    id: "m1",
+    channelId: "channel",
+    guildId: "guild",
+    channel: { type: 0 },
+    content: "ta ai oh",
+    attachments: { values: () => [][Symbol.iterator]() },
+    embeds: { values: () => [][Symbol.iterator]() },
+    mentions: { users: new Map(), members: new Map() },
+    ...overrides,
+  } as never;
+}
+
+function runtimeWithHandler(handled: string[][]) {
+  const client = new Client({ intents: [] });
+  registerMessageHandlers(client, {
+    token: "unused",
+    commands: [],
+    onMessage: async (context) => {
+      handled.push([context.messageId, ...(context.documentAttachments ?? []).map((entry) => entry.filename)]);
+    },
+    log: () => {},
+    error: () => {},
+  });
+  return client;
+}
+
+const nextTick = () => new Promise((resolve) => setImmediate(resolve));
+
+test("a message update that delivers the first attachment re-handles the message once", async () => {
+  const handled: string[][] = [];
+  const client = runtimeWithHandler(handled);
+  // Discord delivered the create before the upload finished: no attachment yet.
+  client.emit(Events.MessageCreate, messageStub());
+  await nextTick();
+  assert.deepEqual(handled, [["m1"]]);
+  // The upload lands in an update; the message is answered again, now with the file.
+  client.emit(Events.MessageUpdate, {}, messageStub({
+    attachments: { values: () => [txtAttachment][Symbol.iterator]() },
+  }));
+  await nextTick();
+  assert.deepEqual(handled, [["m1"], ["m1", "message.txt"]]);
+  // Further updates never re-trigger an answer.
+  client.emit(Events.MessageUpdate, {}, messageStub({
+    attachments: { values: () => [txtAttachment][Symbol.iterator]() },
+  }));
+  await nextTick();
+  assert.deepEqual(handled, [["m1"], ["m1", "message.txt"]]);
+});
+
+test("updates without new attachments and bot updates are never re-handled", async () => {
+  const handled: string[][] = [];
+  const client = runtimeWithHandler(handled);
+  client.emit(Events.MessageCreate, messageStub());
+  await nextTick();
+  client.emit(Events.MessageUpdate, {}, messageStub({ content: "edited text only" }));
+  await nextTick();
+  assert.deepEqual(handled, [["m1"]]);
+
+  // The runtime forwards bot messages (the listener drops them); a bot message
+  // is never a rehandle candidate, so its later update stays unanswered here.
+  const botHandled: string[][] = [];
+  const botClient = runtimeWithHandler(botHandled);
+  botClient.emit(Events.MessageCreate, messageStub({ author: { id: "bot", bot: true, username: "ningo" } }));
+  await nextTick();
+  assert.equal(botHandled.length, 1);
+  botClient.emit(Events.MessageUpdate, {}, messageStub({
+    author: { id: "bot", bot: true, username: "ningo" },
+    attachments: { values: () => [txtAttachment][Symbol.iterator]() },
+  }));
+  await nextTick();
+  assert.equal(botHandled.length, 1);
 });

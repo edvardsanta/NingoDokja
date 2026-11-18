@@ -58,6 +58,57 @@ type StartDiscordJsRuntimeParams = {
   gateway?: GatewayStateTracker;
 };
 
+// registerMessageHandlers wires the message create/update flows. Exported so the
+// behavior is exercised without a gateway connection.
+export function registerMessageHandlers(client: Client, params: StartDiscordJsRuntimeParams) {
+  // Discord can deliver a message before its upload finishes: the create arrives
+  // with no attachment and the file lands in a later message update. Only a message
+  // the bot saw attachment-less may be re-handled, and only once, when an attachment
+  // appears; text edits and embed fills never re-trigger an answer.
+  const attachmentRehandleCandidates = new Map<string, number>();
+  const rehandledMessages = new Set<string>();
+  const rememberAttachmentRehandle = (id: string) => {
+    if (attachmentRehandleCandidates.size >= 1000) {
+      const oldest = attachmentRehandleCandidates.keys().next().value;
+      if (oldest !== undefined) attachmentRehandleCandidates.delete(oldest);
+    }
+    attachmentRehandleCandidates.set(id, Date.now());
+  };
+
+  client.on(Events.MessageCreate, async (message) => {
+    try {
+      if (params.signal?.aborted) return;
+      const context = await toMessageContext(message, client.user?.id);
+      if (!context.isBot && !context.documentAttachments?.length && !context.mediaAttachments?.length) {
+        rememberAttachmentRehandle(message.id);
+      }
+      await params.onMessage(context);
+    } catch (error) {
+      params.error?.("[dokja-discord] message listener failed", error);
+    }
+  });
+
+  client.on(Events.MessageUpdate, async (_previous, received) => {
+    try {
+      if (params.signal?.aborted) return;
+      if (!attachmentRehandleCandidates.has(received.id) || rehandledMessages.has(received.id)) return;
+      const message = received.partial ? await received.fetch() : received;
+      if (message.author?.bot) return;
+      const context = await toMessageContext(message, client.user?.id);
+      if (!context.documentAttachments?.length && !context.mediaAttachments?.length) return;
+      rehandledMessages.add(message.id);
+      attachmentRehandleCandidates.delete(message.id);
+      params.log?.(
+        "[dokja-discord] message update rehandled",
+        JSON.stringify({ messageId: message.id, userId: message.author?.id }),
+      );
+      await params.onMessage(context);
+    } catch (error) {
+      params.error?.("[dokja-discord] message update listener failed", error);
+    }
+  });
+}
+
 export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams): Promise<void> {
   const client = new Client({
     intents: [
@@ -70,6 +121,7 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
   });
 
   params.onClientCreated?.(client);
+  registerMessageHandlers(client, params);
 
   const buttons = params.buttons ?? [];
   const selects = params.selects ?? [];
@@ -102,15 +154,6 @@ export async function startDiscordJsRuntime(params: StartDiscordJsRuntimeParams)
     }
     if (params.signal?.aborted) return;
     await params.onReady?.(client, { botUserId: readyClient.user.id });
-  });
-
-  client.on(Events.MessageCreate, async (message) => {
-    try {
-      if (params.signal?.aborted) return;
-      await params.onMessage(await toMessageContext(message, client.user?.id));
-    } catch (error) {
-      params.error?.("[dokja-discord] message listener failed", error);
-    }
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
