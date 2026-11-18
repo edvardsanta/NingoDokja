@@ -21,7 +21,7 @@ test("formula failures remain visible in messages, slash commands and modals", a
       getNumber: () => undefined, updateReply: async () => {}, showModal: async () => {},
       reply: async (message: DiscordReply) => { replies.push(typeof message === "string" ? message : message.content); },
     };
-    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" })(context);
+    await createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "en" }).handler(context);
     const command = createCommands("http://orch", 1000, undefined, { locale: "en" }).find(entry => entry.name === "chat");
     assert.ok(command);
     await command.handle(context);

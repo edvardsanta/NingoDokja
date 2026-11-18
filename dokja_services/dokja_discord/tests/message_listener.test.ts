@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { buildBridgePayload } from "../transport/bridge.js";
 import { createDiscordMessageHandler } from "../messages/message_listener.js";
+import { openDeferredDispatchStore } from "../messages/deferred_dispatch.js";
 
 test("message handler delivers formula attachments with readable text", async () => {
   const originalFetch = globalThis.fetch;
@@ -9,7 +15,7 @@ test("message handler delivers formula attachments with readable text", async ()
   globalThis.fetch = (async () => new Response(JSON.stringify({ status: "ok", reply: "x / 2 [1]\n\n📚 [1] Formula · Formula <https://example.com/formula>", attachments: [attachment] }))) as typeof fetch;
   try {
     let delivered: unknown;
-    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 });
+    const { handler } = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000 });
     await handler({ userId: "u", channelId: "c", messageId: "m", content: "show a formula", isBot: false,
       isDirectMessage: true, mentionsBot: false, reply: async message => { delivered = message; } });
     assert.deepEqual(delivered, { content: "x / 2 [1]\n\n📚\n[1] [Formula](https://example.com/formula)", attachments: [attachment] });
@@ -24,7 +30,7 @@ test("message handler forwards mention facts for domain authorization", async ()
     return new Response(JSON.stringify({ status: "ok", reply: "" }), { status: 200 });
   }) as typeof fetch;
   try {
-  const handler = createDiscordMessageHandler({
+  const { handler } = createDiscordMessageHandler({
     orchestratorEndpoint: "http://orch",
     orchestratorTimeoutMs: 1000,
   });
@@ -69,7 +75,7 @@ test("message handler forwards allowed message and replies with orchestrator out
   }) as typeof fetch;
 
   try {
-    const handler = createDiscordMessageHandler({
+    const { handler } = createDiscordMessageHandler({
       orchestratorEndpoint: "http://orch",
       orchestratorTimeoutMs: 1000,
     });
@@ -102,7 +108,7 @@ test("message handler promises a late retry when the orchestrator cannot take th
   globalThis.fetch = (async () => { calls++; return new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 }); }) as typeof fetch;
   try {
     let delivered = "";
-    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [60_000] });
+    const { handler } = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [60_000] });
     await assert.rejects(
       () => handler({
         userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
@@ -130,7 +136,11 @@ test("a failed dispatch is retried in the background and answered late", async (
   }) as typeof fetch;
   try {
     const delivered: string[] = [];
-    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5] });
+    const late: string[] = [];
+    const { handler } = createDiscordMessageHandler({
+      orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5],
+      lateReply: async (_target, reply) => { late.push(String(reply)); },
+    });
     await assert.rejects(
       () => handler({
         userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
@@ -142,7 +152,8 @@ test("a failed dispatch is retried in the background and answered late", async (
     await wait(80);
     assert.equal(calls, 2);
     assert.match(delivered[0], /Vou tentar de novo mais tarde/);
-    assert.equal(delivered[1], "resposta tardia");
+    // The late answer posts as a reply to the original message, not as a fresh reply.
+    assert.deepEqual(late, ["resposta tardia"]);
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -152,7 +163,11 @@ test("retries that keep failing end with an honest give-up notice", async () => 
   globalThis.fetch = (async () => { calls++; return new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 }); }) as typeof fetch;
   try {
     const delivered: string[] = [];
-    const handler = createDiscordMessageHandler({ orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5, 5] });
+    const late: string[] = [];
+    const { handler } = createDiscordMessageHandler({
+      orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5, 5],
+      lateReply: async (_target, reply) => { late.push(String(reply)); },
+    });
     await assert.rejects(
       () => handler({
         userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
@@ -163,8 +178,71 @@ test("retries that keep failing end with an honest give-up notice", async () => 
     );
     await wait(150);
     assert.equal(calls, 3);
-    assert.match(delivered.at(-1), /Tentei de novo algumas vezes/);
+    assert.match(late.at(-1), /Tentei de novo algumas vezes/);
     // Only the first failure promises; retries reschedule quietly.
-    assert.equal(delivered.length, 2);
+    assert.equal(delivered.length, 1);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a failed dispatch writes its retry job to the store", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ status: "error", error: "context deadline exceeded" }), { status: 502 })) as typeof fetch;
+  const store = openDeferredDispatchStore(":memory:");
+  try {
+    const { handler } = createDiscordMessageHandler({
+      orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [60_000],
+      deferralStore: store,
+      lateReply: async () => {},
+    });
+    await assert.rejects(
+      () => handler({
+        userId: "u", channelId: "c", messageId: "m", content: "oi", isBot: false,
+        isDirectMessage: false, mentionsBot: true,
+        reply: async () => {},
+      }),
+      /orchestrator http 502/,
+    );
+    const jobs = store.pending();
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].messageId, "m");
+    assert.equal(jobs[0].attempt, 1);
+    assert.ok(jobs[0].nextRetryAt > Date.now());
+  } finally { globalThis.fetch = originalFetch; store.close(); }
+});
+
+test("a deferred dispatch survives a restart and answers late on restore", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    return new Response(JSON.stringify({ status: "ok", reply: "resposta após reinício" }), { status: 200 });
+  }) as typeof fetch;
+  const dir = mkdtempSync(join(tmpdir(), "dokja-deferral-"));
+  const dbPath = join(dir, "deferrals.db");
+  try {
+    // A previous process queued the retry; only the store crossed the restart.
+    const before = openDeferredDispatchStore(dbPath);
+    before.upsert({
+      messageId: "m-restart", channelId: "c", userId: "u", attempt: 1, nextRetryAt: Date.now() - 1,
+      body: buildBridgePayload({ eventType: "message.created", userId: "u", channelId: "c", messageId: "m-restart" }),
+    });
+    before.close();
+
+    const late: string[] = [];
+    const store = openDeferredDispatchStore(dbPath);
+    const { restoreDeferrals } = createDiscordMessageHandler({
+      orchestratorEndpoint: "http://orch", orchestratorTimeoutMs: 1000, locale: "pt-BR", retryDelaysMs: [5],
+      deferralStore: store,
+      lateReply: async (_target, reply) => { late.push(String(reply)); },
+    });
+    restoreDeferrals();
+    await wait(80);
+    assert.equal(calls, 1);
+    assert.deepEqual(late, ["resposta após reinício"]);
+    assert.deepEqual(store.pending(), []);
+    store.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

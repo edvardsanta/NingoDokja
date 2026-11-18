@@ -11,6 +11,9 @@ export type DiscordInterfaceConfig = {
   voiceServiceEndpoint: string;
   deliveryPort: number;
   deliveryWebhooks: Record<string, string>;
+  // Where the deferred-dispatch queue persists; the promised late retries
+  // survive a restart only when this file does.
+  deferralDbPath: string;
 };
 
 export function env(name: string, fallback = ""): string {
@@ -40,6 +43,7 @@ export function buildConfig(): DiscordInterfaceConfig {
     voiceServiceEndpoint: env("DOKJA_VOICE_HTTP_ENDPOINT", "http://dokja-voice:8081"),
     deliveryPort: Number(env("DOKJA_DISCORD_DELIVERY_PORT", "8092")),
     deliveryWebhooks: parseWebhookMap(env("DOKJA_DISCORD_WEBHOOKS")),
+    deferralDbPath: env("DOKJA_DISCORD_DEFERRAL_DB", "deferred_dispatches.db"),
   };
 }
 

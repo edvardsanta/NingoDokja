@@ -5,9 +5,12 @@ import { createCommands } from "./commands/commands.js";
 import { createInteractionDefinitions } from "./commands/interactions.js";
 import { startDiscordDeliveryServer } from "./delivery/delivery_server.js";
 import { createDiscordMessageHandler } from "./messages/message_listener.js";
-import { startDiscordJsRuntime } from "./runtime/discordjs_runtime.js";
+import { openDeferredDispatchStore, type DeferredDispatchStore } from "./messages/deferred_dispatch.js";
+import { startDiscordJsRuntime, toMessageReply } from "./runtime/discordjs_runtime.js";
 import { createGatewayState, discordStatusReply } from "./runtime/gateway_state.js";
 import { createDiscordVoiceController } from "./voice/voice.js";
+import type { Client } from "discord.js";
+import type { DiscordReply } from "./types.js";
 
 export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig, shutdown: Shutdown): Promise<void> {
   const runtime = {
@@ -81,6 +84,35 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig, 
     shutdown.add(() => closeDeliveryServer(server));
   }
 
+  // Late retries answer the original message after a restart, when only its ids
+  // remain: the discord.js client captured at startup fetches that message and
+  // replies to it, the same rendering a live context.reply uses.
+  let discordClient: Client | undefined;
+  const lateReply = async (target: { channelId: string; messageId: string }, reply: DiscordReply) => {
+    if (!discordClient) throw new Error("discord client is not connected");
+    const channel = await discordClient.channels.fetch(target.channelId);
+    if (!channel || !channel.isTextBased()) throw new Error("channel is not text-based");
+    const original = await channel.messages.fetch(target.messageId);
+    await original.reply(toMessageReply(reply));
+  };
+
+  // The deferred-dispatch queue persists beside the runtime databases: a promised
+  // late retry survives a container restart and is re-armed on boot.
+  let deferralStore: DeferredDispatchStore | undefined;
+  if (cfg.mode === "full") {
+    deferralStore = openDeferredDispatchStore(cfg.deferralDbPath);
+    shutdown.add(() => deferralStore?.close());
+  }
+  const messageHandling = cfg.mode === "full"
+    ? createDiscordMessageHandler({
+        orchestratorEndpoint: cfg.orchestratorEndpoint,
+        orchestratorTimeoutMs: cfg.orchestratorTimeoutMs,
+        locale: cfg.locale,
+        ...(deferralStore ? { deferralStore } : {}),
+        lateReply,
+      })
+    : undefined;
+
   const interactions = cfg.mode === "full"
     ? createInteractionDefinitions({
         orchestratorEndpoint: cfg.orchestratorEndpoint,
@@ -92,7 +124,10 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig, 
 
   await startDiscordJsRuntime({
     signal: shutdown.signal,
-    onClientCreated: (client) => shutdown.add(() => client.destroy()),
+    onClientCreated: (client) => {
+      discordClient = client;
+      shutdown.add(() => client.destroy());
+    },
     token,
     applicationId: cfg.applicationId,
     devGuildIds: cfg.allowedGuildIds,
@@ -106,11 +141,9 @@ export async function runDiscordApp(token: string, cfg: DiscordInterfaceConfig, 
     onReady: (client) => {
       voice.attachClient(client);
     },
-    onMessage: cfg.mode === "full"
-      ? createDiscordMessageHandler({
-          orchestratorEndpoint: cfg.orchestratorEndpoint,
-          orchestratorTimeoutMs: cfg.orchestratorTimeoutMs,
-        })
-      : async () => {},
+    onMessage: messageHandling?.handler ?? (async () => {}),
   });
+  // Re-arm promised late retries only once the gateway connection is up: a due
+  // job may fire immediately, and its answer needs the client to be connected.
+  messageHandling?.restoreDeferrals();
 }
