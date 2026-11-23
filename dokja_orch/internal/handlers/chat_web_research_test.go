@@ -116,3 +116,36 @@ func TestAPlainQuestionWithNothingReadDoesNotSearchTheWeb(t *testing.T) {
 		t.Fatalf("a plain question must not search: %v", service.searches)
 	}
 }
+
+func TestAnExplicitResearchAskSearchesDespiteAKeptReadingAndLeavesItOut(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: generator, verdict: true}).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("https://example.com/book"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Handle(context.Background(), chatEvent("Pesquise o mistfall hunters"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 1 || service.searches[0] != "mistfall hunters" {
+		t.Fatalf("the ask must search its own subject, not the earlier reading's: %v", service.searches)
+	}
+	if sent := evidenceSent(generator); strings.Contains(sent, "Preço, autores e ficha técnica") {
+		t.Fatalf("the earlier reading must stay out of an unrelated research ask: %s", sent)
+	}
+}
+
+func TestAnExplicitResearchAskSearchesEvenWhenTheReadingCoversTheWords(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(&triagingGenerator{triageModel: generator, verdict: true}).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("https://example.com/book"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Handle(context.Background(), chatEvent("pesquisa quem sao os autores do espreitador"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 1 {
+		t.Fatalf("an explicit ask searches even when a reading mentions the words: %v", service.searches)
+	}
+}
