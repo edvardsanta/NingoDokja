@@ -66,7 +66,38 @@ func (d *Domain) TaskBindings(profile string) ([]TaskBinding, error) {
 	if len(bindings) == 0 {
 		return nil, fmt.Errorf("no task models are registered in enabled providers")
 	}
+	if chat, err := d.ChatBinding(); err == nil {
+		bindings = preferChatProvider(bindings, chat, profile, preferences.Providers)
+	}
 	return bindings, nil
+}
+
+// preferChatProvider puts the provider the owner chose for chat first when no priority list says
+// otherwise, instead of the fixed provider order. Analysis tasks also use the chat model itself
+// when the provider has it registered; lightweight tasks keep their small model.
+func preferChatProvider(bindings []TaskBinding, chat ChatBinding, profile string, registrations []ProviderRegistration) []TaskBinding {
+	for i, binding := range bindings {
+		if binding.Provider != chat.Provider {
+			continue
+		}
+		if profile == "analysis" {
+			for _, registration := range registrations {
+				if registration.ID != chat.Provider {
+					continue
+				}
+				for _, model := range registration.Models {
+					if SameModel(model, chat.Model) {
+						binding.Model = model
+					}
+				}
+			}
+		}
+		ordered := make([]TaskBinding, 0, len(bindings))
+		ordered = append(ordered, binding)
+		ordered = append(ordered, bindings[:i]...)
+		return append(ordered, bindings[i+1:]...)
+	}
+	return bindings
 }
 
 func lightweightModelRank(model string) float64 {
