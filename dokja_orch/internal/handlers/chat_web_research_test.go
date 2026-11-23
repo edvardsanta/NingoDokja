@@ -89,3 +89,30 @@ func TestAFailedSearchLeavesTheReadingTurnAlone(t *testing.T) {
 		t.Fatal("no search result exists to show")
 	}
 }
+
+func TestAnExplicitResearchAskSearchesTheWebWithNothingReadYet(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("pesquisa livros sobre sound design"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 1 || service.searches[0] != "livros sound design" {
+		t.Fatalf("an explicit research ask must search with its own content words: %v", service.searches)
+	}
+	if sent := evidenceSent(generator); !strings.Contains(sent, "Kian is a character") || !strings.Contains(sent, webSearchHeading) {
+		t.Fatalf("the search snippet must reach the model labelled as a search result: %s", sent)
+	}
+}
+
+func TestAPlainQuestionWithNothingReadDoesNotSearchTheWeb(t *testing.T) {
+	service := &shopService{}
+	generator := &fakeChatGenerator{result: map[string]any{"reply": "ok"}}
+	h := NewChatDomainHandler(generator).WithWebReading(service, nil)
+	if _, err := h.Handle(context.Background(), chatEvent("quais livros de sound design voce conhece?"), chatStep); err != nil {
+		t.Fatal(err)
+	}
+	if len(service.searches) != 0 {
+		t.Fatalf("a plain question must not search: %v", service.searches)
+	}
+}

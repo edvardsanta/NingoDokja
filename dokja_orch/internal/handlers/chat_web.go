@@ -161,11 +161,14 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 		saved = webSessionReading{id: sessionID, documents: h.loadReadingContext(ctx, key, sessionID)}
 	}
 	if len(links) == 0 && len(saved.documents) == 0 {
-		return nil, nil
-	}
-	// Kept readings follow the conversation only while the message is about them; otherwise a
-	// page shared long ago is attached to every later message, noise included.
-	if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
+		// With nothing read, only an explicit research ask ("pesquisa livros sobre ...") goes on
+		// to the search; any other message has no web work to do.
+		if _, asksToSearch := chat.WebSearchPlan(nil, question); !asksToSearch {
+			return nil, nil
+		}
+	} else if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
+		// Kept readings follow the conversation only while the message is about them; otherwise
+		// a page shared long ago is attached to every later message, noise included.
 		return nil, nil
 	}
 	data := &webTurnData{}
