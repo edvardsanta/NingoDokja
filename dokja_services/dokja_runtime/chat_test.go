@@ -229,3 +229,23 @@ func TestOllamaIsHeldToJSONOnlyWhenARequestAsksForIt(t *testing.T) {
 		t.Fatalf("commands %q", commands)
 	}
 }
+
+func TestClaudeEnforcesAJSONSchemaOnlyWhenOneIsGiven(t *testing.T) {
+	schema := `{"type":"object","required":["reply"],"properties":{"reply":{"type":"string"}}}`
+	for _, tc := range []struct {
+		format string
+		want   bool
+	}{{"", false}, {domain.ChatFormatJSON, false}, {schema, true}} {
+		var command string
+		a := ChatAdapters{Run: func(_ context.Context, _ string, args []string, _, _ string) ([]byte, error) {
+			command = strings.Join(args, " ")
+			return []byte(`{"result":"{}"}`), nil
+		}}
+		if _, err := a.Generate(t.Context(), domain.ChatBinding{Provider: "claude_code", Model: "fixture", Format: tc.format}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(command, "--json-schema "+schema); got != tc.want {
+			t.Fatalf("format %q: schema flag present=%v, want %v: %s", tc.format, got, tc.want, command)
+		}
+	}
+}
