@@ -54,8 +54,16 @@ func TestAPlainQuestionWithoutReadingsStillDoesNotSearch(t *testing.T) {
 	}
 }
 
-func TestResearchAskDoesNotSearchAgainWhatTheReadingCovers(t *testing.T) {
-	if q, ok := WebSearchPlan(shopPage(), "pesquisa o espreitador"); ok {
-		t.Fatalf("the reading covers the subject, searched %q", q)
+func TestAnExplicitResearchAskSearchesEvenWhenTheReadingCoversIt(t *testing.T) {
+	query, ok := WebSearchPlan(shopPage(), "pesquisa o espreitador")
+	if !ok || query != "espreitador" {
+		t.Fatalf("an explicit ask must search with its own words only: query=%q ok=%v", query, ok)
+	}
+}
+
+func TestAnExplicitResearchAskNeverBorrowsTheReadingsTitle(t *testing.T) {
+	query, ok := WebSearchPlan(shopPage(), "Pesquise o mistfall hunters")
+	if !ok || query != "mistfall hunters" {
+		t.Fatalf("query=%q ok=%v", query, ok)
 	}
 }

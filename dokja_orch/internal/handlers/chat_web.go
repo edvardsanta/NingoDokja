@@ -160,16 +160,19 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	if len(links) == 0 && len(saved.documents) == 0 {
 		saved = webSessionReading{id: sessionID, documents: h.loadReadingContext(ctx, key, sessionID)}
 	}
-	if len(links) == 0 && len(saved.documents) == 0 {
-		// With nothing read, only an explicit research ask ("pesquisa livros sobre ...") goes on
-		// to the search; any other message has no web work to do.
-		if _, asksToSearch := chat.WebSearchPlan(nil, question); !asksToSearch {
+	// An explicit research ask ("pesquisa ...") is a request for something new: it searches
+	// whatever the conversation already holds, and the readings kept from before stay out of it.
+	_, explicitResearch := chat.WebSearchPlan(nil, question)
+	researchOnly := explicitResearch && len(links) == 0
+	if !researchOnly {
+		if len(links) == 0 && len(saved.documents) == 0 {
 			return nil, nil
 		}
-	} else if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
 		// Kept readings follow the conversation only while the message is about them; otherwise
 		// a page shared long ago is attached to every later message, noise included.
-		return nil, nil
+		if len(links) == 0 && !h.readingRelevant(ctx, question, saved.documents) {
+			return nil, nil
+		}
 	}
 	data := &webTurnData{}
 	if w.enabled != nil && !w.enabled() {
@@ -259,7 +262,7 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	if len(links) > 0 {
 		h.saveReadingContext(ctx, key, sessionID, saved.documents)
 	}
-	research, researched := h.researchContext(ctx, &saved, question)
+	research, researched := h.researchContext(ctx, &saved, question, researchOnly)
 	saved.seen = now
 	w.mu.Lock()
 	if len(w.sessions) >= webCacheSessions {
@@ -275,7 +278,11 @@ func (h *ChatDomainHandler) webSources(ctx context.Context, event core.Event, se
 	w.sessions[key] = saved
 	w.mu.Unlock()
 	var sources []knowledgeSource
-	for _, document := range chat.SelectWebPassages(saved.documents, question) {
+	readings := saved.documents
+	if researchOnly {
+		readings = nil
+	}
+	for _, document := range chat.SelectWebPassages(readings, question) {
 		hash := sha256.Sum256([]byte(document.URL))
 		id := "web:" + hex.EncodeToString(hash[:12])
 		for _, passage := range document.Passages {
@@ -308,11 +315,13 @@ const webSearchHeading = "search result"
 // researchContext searches the web when the readings so far cannot answer the question, using
 // the reading's title as the context a bare name lacks. A search that fails, finds nothing or is
 // not configured leaves the turn exactly as it was.
-func (h *ChatDomainHandler) researchContext(ctx context.Context, saved *webSessionReading, question string) (webSearchAnswer, bool) {
+func (h *ChatDomainHandler) researchContext(ctx context.Context, saved *webSessionReading, question string, researchOnly bool) (webSearchAnswer, bool) {
 	query, ok := chat.WebSearchPlan(saved.documents, question)
 	if !ok {
+		logger.Info("web search skipped reason=not_asked_or_covered_by_reading")
 		return webSearchAnswer{}, false
 	}
+	logger.Info(fmt.Sprintf("web search planned query_words=%d explicit=%t", len(strings.Fields(query)), researchOnly))
 	if answer, cached := saved.searches[query]; cached {
 		return answer, len(answer.results) > 0
 	}

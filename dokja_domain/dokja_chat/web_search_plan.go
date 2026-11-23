@@ -48,18 +48,21 @@ var researchIntentWords = map[string]bool{
 //     search out, with the question's own content words as the query.
 //
 // A question with no subject of its own ("resume isso") asks about the reading itself and never
-// searches; a question the readings already answer does not search again.
+// searches; an explicit research ask always searches, and a question the readings already
+// answer does not search again unless it commands the search.
 func WebSearchPlan(documents []WebDocument, question string) (string, bool) {
 	question = webLinkPattern.ReplaceAllString(question, " ")
 	terms := searchTerms(question)
 	if len(terms) == 0 {
 		return "", false
 	}
-	if len(documents) == 0 {
-		if !asksForResearch(question) {
-			return "", false
-		}
+	// A command to go look is a request for something new: it searches with the question's own
+	// words whatever the conversation already read, and never borrows a reading's title.
+	if asksForResearch(question) {
 		return strings.Join(terms, " "), true
+	}
+	if len(documents) == 0 {
+		return "", false
 	}
 	for _, document := range documents {
 		for _, passage := range document.Passages {
