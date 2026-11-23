@@ -62,6 +62,11 @@ func (a ChatAdapters) generate(ctx context.Context, b domain.ChatBinding, m []do
 	case "claude_code":
 		binary = "claude"
 		args = []string{"-p", "--output-format", "json", "--tools", "", "--no-session-persistence", "--setting-sources", "", "--settings", `{"disableAllHooks":true}`, "--strict-mcp-config", "--model", b.Model}
+		// The CLI enforces a JSON Schema itself; without it the model answers in any JSON shape
+		// and the caller rejects the reply. A bare "json" format names no shape, so it adds nothing.
+		if strings.HasPrefix(b.Format, "{") {
+			args = append(args, "--json-schema", b.Format)
+		}
 	case "codex":
 		binary = "codex"
 		args = []string{"exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--json", "--color", "never", "--model", b.Model}
